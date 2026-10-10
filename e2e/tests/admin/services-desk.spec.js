@@ -6,13 +6,16 @@ import { appReady } from '../../helpers/app.js';
 
 const run = () => `E2E svc desk ${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`;
 
+// A customer cannot set priority (the server drops it), so the desk triages it as staff would.
 async function raise(request, subject, { team = 'loans', priority } = {}) {
   const res = await request.post(`${API}/tickets`, {
     headers: await authHeaders(ACTORS.tenant),
-    data: { team, subject, priority, body: 'Two-bedroom move, ground floor to third floor.' },
+    data: { team, subject, body: 'Two-bedroom move, ground floor to third floor.' },
   });
   expect(res.status(), await res.text()).toBe(201);
-  return (await res.json()).id;
+  const { id } = await res.json();
+  if (priority) await adminPatch(request, id, { priority });
+  return id;
 }
 
 const adminBoard = async (request) => {

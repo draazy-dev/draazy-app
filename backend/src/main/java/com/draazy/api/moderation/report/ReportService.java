@@ -4,6 +4,7 @@ import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.engagement.flatmate.FlatmateModerationService;
 import com.draazy.api.moderation.property.PropertyModerationService;
@@ -14,7 +15,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -79,7 +79,7 @@ public class ReportService {
         String wantedStatus = blankToNull(status);
         String wantedReason = blankToNull(reason);
         String wantedTargetType = blankToNull(targetType);
-        String like = blankToNull(q) == null ? null : "%" + q.strip().toLowerCase(Locale.ROOT) + "%";
+        String like = LikePatterns.contains(q);
         Instant since = sinceDays == null || sinceDays <= 0 ? null : Instant.now().minus(sinceDays, ChronoUnit.DAYS);
 
         if (wantedStatus != null && !ReportStatuses.isValid(wantedStatus)) {

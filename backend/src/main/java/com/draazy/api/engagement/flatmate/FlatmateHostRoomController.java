@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.web.PageResponse;
+import com.draazy.api.common.web.Pageables;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.CurrentUser;
@@ -29,7 +30,7 @@ public class FlatmateHostRoomController {
     @GetMapping(Routes.Flatmates.MY_ROOMS)
     public PageResponse<FlatmateRoomCard> myRooms(@CurrentUser AuthPrincipal principal,
             @PageableDefault(size = 20) Pageable pageable) {
-        return PageResponse.of(service.myRooms(principal, pageable), dto -> dto);
+        return PageResponse.of(service.myRooms(principal, Pageables.unsorted(pageable)), dto -> dto);
     }
 
     /** {@code DELETE /flatmates/rooms/{id}} — the host withdraws a room they posted. 204. */

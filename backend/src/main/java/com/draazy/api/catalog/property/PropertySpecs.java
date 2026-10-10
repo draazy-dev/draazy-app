@@ -1,5 +1,6 @@
 package com.draazy.api.catalog.property;
 
+import com.draazy.api.common.persistence.LikePatterns;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.JoinType;
@@ -239,7 +240,7 @@ final class PropertySpecs {
         };
     }
 
-    /** Status, {@code q} and the {@link ModerationFacets} axes stay at the call sites: that is where the two reads must differ. */
+    // Status, q and the ModerationFacets axes stay at the call sites: that is where the two reads differ.
     private static List<Predicate> facets(PropertySearchQuery filters, Root<Property> root,
             CriteriaBuilder cb, LocalityPoint localityCenter) {
         List<Predicate> where = new ArrayList<>();
@@ -304,7 +305,7 @@ final class PropertySpecs {
                 .filter(token -> !token.isEmpty())
                 .limit(MAX_Q_TOKENS)
                 .forEach(token -> {
-                    String like = "%" + escapeLike(token) + "%";
+                    String like = "%" + LikePatterns.escape(token) + "%";
                     where.add(cb.or(
                             cb.like(title, like, LIKE_ESCAPE),
                             cb.like(locality, like, LIKE_ESCAPE),
@@ -313,29 +314,24 @@ final class PropertySpecs {
                 });
     }
 
-    private static String escapeLike(String token) {
-        return token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
-    }
-
     /** Adds owner name, mobile and the id as text; the id cast must be {@link HibernateCriteriaBuilder#cast}. */
     private static void adminTextSearch(PropertySearchQuery filters, Root<Property> root,
             CriteriaBuilder cb, List<Predicate> where) {
         if (!StringUtils.hasText(filters.q())) {
             return;
         }
-        String term = filters.q().trim().toLowerCase();
-        String like = "%" + term + "%";
+        String like = LikePatterns.contains(filters.q());
 
         // The path is typed to UUID before the cast because HibernateCriteriaBuilder.cast takes a
         // JpaExpression, and an untyped `root.get("id")` is a Path that matches nothing.
         JpaExpression<UUID> id = (JpaExpression<UUID>) root.<UUID>get("id");
         Expression<String> idAsText = ((HibernateCriteriaBuilder) cb).cast(id, String.class);
         where.add(cb.or(
-                cb.like(cb.lower(root.get("title")), like),
-                cb.like(cb.lower(root.get("locality")), like),
-                cb.like(cb.lower(root.get("owner").get("name")), like),
-                cb.like(root.get("owner").get("mobile"), like),
-                cb.like(idAsText, like)));
+                cb.like(cb.lower(root.get("title")), like, LIKE_ESCAPE),
+                cb.like(cb.lower(root.get("locality")), like, LIKE_ESCAPE),
+                cb.like(cb.lower(root.get("owner").get("name")), like, LIKE_ESCAPE),
+                cb.like(root.get("owner").get("mobile"), like, LIKE_ESCAPE),
+                cb.like(idAsText, like, LIKE_ESCAPE)));
     }
 
     /** Applied only by {@link #publicSearch}: a predicate the database cannot see cannot page correctly. */

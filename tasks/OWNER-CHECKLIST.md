@@ -3,6 +3,9 @@
 Things code can't close: secrets, deploy steps, real-device checks, human fact-checks. Tick and delete.
 
 ## Secrets and deploy
+- [ ] **Before the next deploy** (security SH02): GitHub secret `SANDBOX_FLYWAY_DB_USER` = current `SANDBOX_DB_USER`, and Secret Manager `draazy-sandbox-flyway-db-password` (runtime SA `secretAccessor`) = current DB password, or the deploy fails its required-input check
+- [ ] Supabase sandbox: run `backend/deploy/sql/supabase-revoke-data-api.sql` and turn the Data API off; then `app-runtime-role.sql` and repoint `SANDBOX_DB_USER` — `docs/DEPLOY.md` §2.1 steps 1–4
+- [ ] Next deploy log: the security-header smoke check passes (this office network strips headers, so only CI can tell)
 - [ ] `draazy-sandbox-origin-shared-secret` + Pages `ORIGIN_SHARED_SECRET` (same value), or the revision won't start
 - [ ] Deploy `both`, then `curl` a direct non-health route: expect 403
 - [ ] Widen `INTERNAL_PROXIES` per `docs/DEPLOY.md` §4 with a real `X-Forwarded-For`

@@ -90,7 +90,7 @@ public interface SocietyRepository
      * {@code like} is a lower-cased pattern over name and locality words. */
     @Query("select s from Society s where s.source = 'community' and s.mergedInto is null"
             + " and s.archivedAt is null"
-            + " and lower(concat(s.name, ' ', replace(coalesce(s.localitySlug, ''), '-', ' '))) like :like"
+            + " and lower(concat(s.name, ' ', replace(coalesce(s.localitySlug, ''), '-', ' '))) like :like escape '\\'"
             + " order by s.createdAt desc")
     org.springframework.data.domain.Page<Society> candidates(@Param("like") String like,
             org.springframework.data.domain.Pageable pageable);

@@ -272,4 +272,22 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].builder")
                         .value(org.hamcrest.Matchers.containsStringIgnoringCase("godrej")));
     }
+
+    @Test
+    @DisplayName("% and _ in q are literal characters, not wildcards, on both the plain and the ranked read")
+    void wildcardsInQueryAreLiteral() throws Exception {
+        fixtures();
+        society("50%_off");
+
+        for (String sort : List.of("name", "homes")) {
+            mvc.perform(get("/societies").param("q", "zz socpage").param("sort", sort))
+                    .andExpect(jsonPath("$.totalElements").value(greaterThan(0)));
+            mvc.perform(get("/societies").param("q", "socpage 50%_off").param("sort", sort))
+                    .andExpect(jsonPath("$.totalElements").value(1));
+            mvc.perform(get("/societies").param("q", "zz_socpage").param("sort", sort))
+                    .andExpect(jsonPath("$.totalElements").value(0));
+            mvc.perform(get("/societies").param("q", "%").param("sort", sort))
+                    .andExpect(jsonPath("$.totalElements").value(1));
+        }
+    }
 }

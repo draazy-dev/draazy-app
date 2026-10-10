@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.web.PageResponse;
+import com.draazy.api.common.web.Pageables;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.BackOfficePermissions;
@@ -10,6 +11,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -28,6 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
  * see {@link FlatmateModerationService} for why they must not collapse into one another. */
 @RestController
 public class FlatmateModerationController {
+
+    private static final Set<String> SORTABLE = Set.of("createdAt");
 
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
@@ -55,7 +59,7 @@ public class FlatmateModerationController {
             @RequestParam(required = false) Boolean flagged,
             @PageableDefault(size = 20, sort = "createdAt",
                     direction = Sort.Direction.ASC) Pageable pageable) {
-        return PageResponse.of(service.queue(status, flagged, pageable), dto -> dto);
+        return PageResponse.of(service.queue(status, flagged, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
     }
 
     @PatchMapping(Routes.Moderation.FLATMATE_REVIEW_BY_ID)
@@ -72,7 +76,7 @@ public class FlatmateModerationController {
             @RequestParam(required = false) List<String> modStatus,
             @PageableDefault(size = 20, sort = "createdAt",
                     direction = Sort.Direction.ASC) Pageable pageable) {
-        return PageResponse.of(service.moderationQueue(kind, modStatus, pageable), dto -> dto);
+        return PageResponse.of(service.moderationQueue(kind, modStatus, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
     }
 
     /** What the desk's tab labels show: the true size of each tab, not of the window downloaded. */
@@ -120,7 +124,7 @@ public class FlatmateModerationController {
     public PageResponse<GroupApplicationDto> applications(
             @RequestParam(required = false) List<String> modStatus,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return PageResponse.of(service.applications(modStatus, pageable), dto -> dto);
+        return PageResponse.of(service.applications(modStatus, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
     }
 
     /** Named "decide" by the contract, but it writes the moderation axis only — the owner's

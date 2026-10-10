@@ -21,6 +21,13 @@
     "no-empty": ["warn", { "allowEmptyCatch": true }],
     "no-control-regex": "off",
 
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error",
+    "react/no-danger": "error",
+    "react/jsx-no-script-url": "error",
+
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "warn",
 

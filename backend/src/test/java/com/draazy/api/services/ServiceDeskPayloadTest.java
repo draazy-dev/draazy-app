@@ -147,7 +147,7 @@ class ServiceDeskPayloadTest extends ServiceFixtures {
         void summaryAndFilters() throws Exception {
             User buyer = customer("9820016023");
             User legal = staff("9820016024", Teams.LEGAL);
-            create(buyer, "{\"subject\":\"Sale deed question\",\"team\":\"legal\",\"priority\":\"high\"}");
+            create(legal, "{\"subject\":\"Sale deed question\",\"team\":\"legal\",\"priority\":\"high\"}");
             create(buyer, "{\"subject\":\"Stamp duty\",\"team\":\"legal\"}");
             create(buyer, "{\"subject\":\"Site visit\",\"team\":\"rental\"}");
 

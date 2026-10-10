@@ -1,6 +1,7 @@
 package com.draazy.api.moderation.verification;
 
 import com.draazy.api.common.web.PageResponse;
+import com.draazy.api.common.web.Pageables;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.BackOfficePermissions;
@@ -53,7 +54,7 @@ public class PropertyVerificationController {
     @GetMapping(Routes.Moderation.ME_PROPERTY_REVIEWS)
     public PageResponse<ReviewBadge> listMyCases(
             @CurrentUser AuthPrincipal principal, Pageable pageable) {
-        return PageResponse.of(queue.listMyCases(principal, pageable), badge -> badge);
+        return PageResponse.of(queue.listMyCases(principal, Pageables.unsorted(pageable)), badge -> badge);
     }
 
     /** {@code POST /properties/{id}/verification} (contract {@code initPropertyVerification}) — 201. */

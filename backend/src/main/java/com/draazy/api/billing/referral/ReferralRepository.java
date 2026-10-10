@@ -29,11 +29,11 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             where (:anyStatus = true or r.status in :statuses)
               and (:risk is null or r.risk = :risk)
               and (:q is null
-                   or lower(r.referred) like :q
-                   or r.referrerMobile like :q
-                   or r.referredMobile like :q
-                   or lower(cast(r.id as string)) like :q
-                   or r.referrerId in (select u.id from User u where lower(u.name) like :q))
+                   or lower(r.referred) like :q escape '\\'
+                   or r.referrerMobile like :q escape '\\'
+                   or r.referredMobile like :q escape '\\'
+                   or lower(cast(r.id as string)) like :q escape '\\'
+                   or r.referrerId in (select u.id from User u where lower(u.name) like :q escape '\\'))
             order by r.at desc
             """)
     Page<Referral> queue(@Param("anyStatus") boolean anyStatus, @Param("statuses") List<String> statuses,

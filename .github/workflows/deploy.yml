@@ -141,6 +141,7 @@ jobs:
           DB_URL: ${{ secrets.SANDBOX_DB_URL }}
           FLYWAY_DB_URL: ${{ secrets.SANDBOX_FLYWAY_DB_URL }}
           DB_USER: ${{ secrets.SANDBOX_DB_USER }}
+          FLYWAY_DB_USER: ${{ secrets.SANDBOX_FLYWAY_DB_USER }}
           # Must be in envsubst: literal "${R2_ENDPOINT}" is non-blank and bypasses
           # R2FileStorage's boot refusal.
           R2_ENDPOINT: ${{ vars.SANDBOX_R2_ENDPOINT }}
@@ -154,14 +155,14 @@ jobs:
           BOOTSTRAP_ADMIN_RECOVER: ${{ vars.SANDBOX_BOOTSTRAP_ADMIN_RECOVER }}
         run: |
           set -euo pipefail
-          for required in GCP_PROJECT_ID DB_URL FLYWAY_DB_URL DB_USER \
+          for required in GCP_PROJECT_ID DB_URL FLYWAY_DB_URL DB_USER FLYWAY_DB_USER \
                           R2_ENDPOINT R2_BUCKET_PRIVATE R2_BUCKET_PUBLIC R2_PUBLIC_BASE_URL; do
             if [ -z "${!required}" ]; then
               echo "::error::$required is empty. Cloud Run would start a container that fails on the first query, or refuses to boot at all." >&2
               exit 1
             fi
           done
-          envsubst '${GCP_PROJECT_ID} ${IMAGE} ${DB_URL} ${FLYWAY_DB_URL} ${DB_USER} ${R2_ENDPOINT} ${R2_BUCKET_PRIVATE} ${R2_BUCKET_PUBLIC} ${R2_PUBLIC_BASE_URL} ${BOOTSTRAP_ADMIN_EMAIL} ${BOOTSTRAP_ADMIN_MOBILE} ${BOOTSTRAP_ADMIN_RECOVER}' \
+          envsubst '${GCP_PROJECT_ID} ${IMAGE} ${DB_URL} ${FLYWAY_DB_URL} ${DB_USER} ${FLYWAY_DB_USER} ${R2_ENDPOINT} ${R2_BUCKET_PRIVATE} ${R2_BUCKET_PUBLIC} ${R2_PUBLIC_BASE_URL} ${BOOTSTRAP_ADMIN_EMAIL} ${BOOTSTRAP_ADMIN_MOBILE} ${BOOTSTRAP_ADMIN_RECOVER}' \
             < backend/deploy/cloudrun-sandbox.yaml > "${RUNNER_TEMP}/service.yaml"
 
       # `replace`, not `deploy`: removed repo settings must not linger on the service.
@@ -350,6 +351,29 @@ jobs:
                   ok=false
                 fi
               done
+            fi
+
+            # `/` gets dist/_headers; Function pages get SECURITY_HEADERS from edge/seo-pages.mjs, so both are probed.
+            if [ "$ok" = true ]; then
+              for path in / /property/smoke /society/smoke-society; do
+                head=$(curl -sS --max-time 30 -o /dev/null -D - "${SITE_URL}${path}" | tr -d '\r') || head=
+                for want in "^content-security-policy:.*frame-ancestors 'none'" "^strict-transport-security: *max-age=" \
+                    "^x-frame-options: *deny" "^x-content-type-options: *nosniff" "^referrer-policy: *no-referrer\$"; do
+                  if ! grep -qiE "$want" <<<"$head"; then
+                    echo "::warning::${path} lacks a header matching ${want}. / reads dist/_headers (exactly one /* rule); Function pages read SECURITY_HEADERS."
+                    ok=false
+                  fi
+                done
+              done
+            fi
+
+            if [ "$ok" = true ]; then
+              head=$(curl -sS --max-time 30 -o /dev/null -D - -H 'Origin: https://cors-probe.invalid' \
+                "${SITE_URL}/api/actuator/health" | tr -d '\r') || head=
+              if grep -qi '^access-control-allow-origin:' <<<"$head"; then
+                echo "::warning::/api granted CORS to a foreign Origin. The proxy must strip it (functions/api) and WEB_ORIGINS must list only our sites."
+                ok=false
+              fi
             fi
 
             if [ "$ok" = true ]; then

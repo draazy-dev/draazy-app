@@ -80,12 +80,12 @@ You need **two** connection strings, and this is the part that costs a day if it
 | `DB_URL` | Supavisor pooler, **transaction** mode | `6543` | Cloud Run scales to zero and back; every cold start would otherwise open fresh backends against a free-tier connection ceiling measured in dozens |
 | `FLYWAY_DB_URL` | Supavisor pooler, **session** mode | `5432` | Flyway locks concurrent deploys out with `pg_advisory_lock`, which is *session*-scoped. Transaction pooling moves the session between statements, so the lock is taken on one backend and released against another — Flyway's own docs call PgBouncer transaction mode unsupported |
 
-Both take the same `postgres.<project-ref>` username, so `DB_USER` / `DB_PASSWORD` cover both;
-`application-prod.properties` and `application-sandbox.properties` bind them to `spring.flyway.user`
-and `spring.flyway.password` explicitly because Spring Boot's dedicated Flyway DataSource does not
-inherit them from `spring.datasource` when `spring.flyway.url` is set. If you use the *direct* connection
-for migrations instead (username `postgres`, and IPv4 is a paid add-on on new projects), supply
-`SPRING_FLYWAY_USER` and `SPRING_FLYWAY_PASSWORD` as plain environment variables to override them.
+Flyway and the running app log in as different roles. `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` are the
+schema owner `postgres.<project-ref>`, and `DB_USER` / `DB_PASSWORD` are the DML-only runtime role
+(§2.1). Spring Boot's dedicated Flyway DataSource does not inherit credentials from
+`spring.datasource` when `spring.flyway.url` is set, which is why both pairs are bound explicitly. If
+you use the *direct* connection for migrations instead (username `postgres`, and IPv4 is a paid add-on
+on new projects), point `FLYWAY_DB_URL` / `FLYWAY_DB_USER` at it.
 
 Getting `FLYWAY_DB_URL` wrong does not fail cleanly. The migration hangs holding a lock nobody owns,
 the container never passes readiness, and nothing in the log names Flyway.
@@ -111,6 +111,31 @@ divergence, so hardening prod without hardening sandbox fails the build.
 
 All four tiers are in [`system/profiles.md`](./system/profiles.md).
 
+### 2.1 Database roles, and the order to switch them
+
+Supabase leaves two holes that the app never needs: the Data API serves `public` to `anon` and
+`authenticated` with full grants, and `postgres` (the owner of every table) is a single credential for
+both migrations and every request. Close them in this order, per project. Each step deploys green on
+its own, so the rollout can stop at any point.
+
+1. Run [`backend/deploy/sql/supabase-revoke-data-api.sql`](../backend/deploy/sql/supabase-revoke-data-api.sql)
+   and switch the Data API off (Project Settings → Data API). Both verify queries must return no rows.
+2. Copy today's values into the new Flyway inputs: `SANDBOX_FLYWAY_DB_USER` = the current
+   `SANDBOX_DB_USER`, and secret `draazy-sandbox-flyway-db-password` = the current
+   `draazy-sandbox-db-password`. Deploy. Nothing changes yet.
+3. Run [`backend/deploy/sql/app-runtime-role.sql`](../backend/deploy/sql/app-runtime-role.sql), set
+   the password with `\password draazy_app`, and check the verify output.
+4. Point `SANDBOX_DB_USER` at `draazy_app.<project-ref>` and add the new password as a version of
+   `draazy-sandbox-db-password`. Deploy. `DatabasePrivilegeCheck` refuses to boot if the runtime role can
+   still run DDL.
+
+Rollback for step 4: point `SANDBOX_DB_USER` back at `postgres.<project-ref>`, re-add the old password
+version, and redeploy.
+
+Known limit: Flyway still runs at boot inside the serving container, so `FLYWAY_DB_PASSWORD` sits in every
+instance's environment. Code execution in the app still reaches the owner role; moving migrations to a
+Cloud Run Job (and `spring.flyway.enabled=false` on the service) closes it. Tracked in `tasks/todo.md`.
+
 ---
 
 ## 3. Environment
@@ -122,7 +147,8 @@ a committed JWT secret, `trusted-proxies=none`). That is the design, not an inco
 | Variable | Notes |
 |---|---|
 | `DB_URL` | transaction pooler, `:6543`, `sslmode=require` |
-| `DB_USER` / `DB_PASSWORD` | `postgres.<project-ref>` |
+| `DB_USER` / `DB_PASSWORD` | runtime role `draazy_app.<project-ref>` (§2.1) |
+| `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` | schema owner `postgres.<project-ref>`, migrations only |
 | `FLYWAY_DB_URL` | session pooler, `:5432` — see §2 |
 | `JWT_SECRET` | HS256, ≥ 32 bytes, generated per environment |
 | `REFERRAL_SIGNAL_SALT` | any long random string; **never** shared with dev. Rotating it is safe — stored digests simply stop matching, and they are discarded after 90 days anyway |
@@ -513,7 +539,7 @@ RUNTIME="$SERVICE@$PROJECT_ID.iam.gserviceaccount.com"
 # Every secret `cloudrun-sandbox.yaml` names with a secretKeyRef. Miss one and `services replace`
 # is a hard boot error, so create them all even where the feature behind them is off — an unused
 # placeholder version costs nothing. Ten is past Secret Manager's free six; the overage is cents.
-for s in db-password jwt-secret referral-signal-salt identity-hash-secret staff-totp-key \
+for s in db-password flyway-db-password jwt-secret referral-signal-salt identity-hash-secret staff-totp-key \
          cashfree-app-id cashfree-secret-key \
          r2-access-key-id r2-secret-access-key origin-shared-secret; do
   gcloud secrets create "draazy-sandbox-$s" --replication-policy=automatic
@@ -596,7 +622,8 @@ file** — `shred -u key.json`. Also on that environment:
 | variable | `GCP_PROJECT_ID` | the project id |
 | secret | `SANDBOX_DB_URL` | transaction pooler, `:6543` (§2) |
 | secret | `SANDBOX_FLYWAY_DB_URL` | session pooler, `:5432` (§2) |
-| secret | `SANDBOX_DB_USER` | `postgres.<project-ref>` |
+| secret | `SANDBOX_DB_USER` | `draazy_app.<project-ref>` (§2.1) |
+| secret | `SANDBOX_FLYWAY_DB_USER` | `postgres.<project-ref>` |
 | variable | `SANDBOX_R2_ENDPOINT` | `https://<accountId>.r2.cloudflarestorage.com` |
 | variable | `SANDBOX_R2_BUCKET_PRIVATE` | bucket for identity captures, never public |
 | variable | `SANDBOX_R2_BUCKET_PUBLIC` | bucket for listing photos |

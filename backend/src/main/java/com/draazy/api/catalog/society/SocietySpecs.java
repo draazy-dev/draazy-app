@@ -2,6 +2,7 @@ package com.draazy.api.catalog.society;
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyStatus;
+import com.draazy.api.common.persistence.LikePatterns;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
@@ -10,7 +11,6 @@ import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import org.springframework.data.jpa.domain.Specification;
 
 /** A {@link Specification} avoids a derived-query method per filter combination, as in {@code PropertySpecs}. */
@@ -31,7 +31,7 @@ public final class SocietySpecs {
             where.add(cb.isNull(root.get("archivedAt")));
 
             if (likePattern(q) != null) {
-                where.add(cb.like(cb.lower(searchText(root, cb)), likePattern(q)));
+                where.add(cb.like(cb.lower(searchText(root, cb)), likePattern(q), '\\'));
             }
             if (trimmed(localitySlug) != null) {
                 where.add(cb.equal(root.get("localitySlug"), trimmed(localitySlug)));
@@ -45,7 +45,7 @@ public final class SocietySpecs {
 
     /** The lower-cased {@code LIKE} pattern for a free-text query, or null when there is none. */
     public static String likePattern(String q) {
-        return q == null || q.isBlank() ? null : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+        return LikePatterns.contains(q);
     }
 
     /** The locality filter value, or null when blank. */

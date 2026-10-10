@@ -156,7 +156,7 @@ public class TicketService {
         if (team != null && !Teams.isKnown(team)) {
             throw new BadRequestException("Unknown team: " + team);
         }
-        String priority = blankToNull(body.priority());
+        String priority = Roles.isBackOffice(caller.role()) ? blankToNull(body.priority()) : null;
         if (priority != null && !TicketPriorities.isKnown(priority)) {
             throw new BadRequestException("Unknown priority: " + priority);
         }

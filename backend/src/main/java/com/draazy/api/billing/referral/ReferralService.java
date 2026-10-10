@@ -3,6 +3,7 @@ package com.draazy.api.billing.referral;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
@@ -14,7 +15,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -140,9 +140,8 @@ public class ReferralService {
     public Page<ReferralDto> queue(String status, String risk, String q, Pageable pageable) {
         List<String> statuses = blankToNull(status) == null ? List.of()
                 : Arrays.stream(status.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
-        String pattern = blankToNull(q) == null ? null : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
         Page<Referral> page = referrals.queue(statuses.isEmpty(), statuses.isEmpty() ? List.of("") : statuses,
-                blankToNull(risk), pattern, pageable);
+                blankToNull(risk), LikePatterns.contains(q), pageable);
         // why not page.map(mapper::toDto): that would resolve the referrer's name one row at a
         // time. toDtos resolves the whole page in a single query.
         return new PageImpl<>(mapper.toDtos(page.getContent()), pageable, page.getTotalElements());

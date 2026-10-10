@@ -8,6 +8,9 @@
 ## Open
 
 ### Backend: API, data and schema
+- [ ] **SH17** flatmate room photos accept any URL; restrict to our storage origin like listing media.
+- [ ] **SH18** run Flyway as a Cloud Run Job so the serving revision never holds the schema-owner password (DEPLOY.md §2.1 known limit).
+- [ ] Consolidate private LIKE-escape copies onto `LikePatterns` (`StaffActivityFilter`, `AdminFinanceService`, `ServiceRequestQueryService`, `UserAdminService`, `TicketService`, `FlatmateSearchQueries.like`, `EnquiryBoardService`, `IdentityReviewQueueService`).
 
 ### Admin and ops UI
 - [x] **A01** back-office functions split so each feature is its own checkbox: `flatmates`, `referrals` (from reports), `localities` + `reviews` (from listingModeration), `enquiries` (from support), `societies` (from content), `users`; V103/V104 carry holders; Add-member groups come from the catalogue (Analytics was never rendered). Verified 2026-10-10: back-office-functions, reports, localities-console, referrals, admin-content-reports-payload, support-referrals-payload specs green; full backend suite green. PENDING AGENT REVIEW
@@ -15,7 +18,8 @@
 ### Consumer UI
 - [x] **C04** sign-in/sign-up/staff error copy: plain, actionable, rate limits state the wait (`busyMessage`, `lib/staffAuthError.js`); no raw `err.message` on auth pages; Signup retry after a refused profile save patches instead of re-spending the OTP; `OwnerConsentModal` uses `classifyOtpVerifyError`; Turnstile challenges only the OTP send step (`AuthController`, not `BotDefenceFilter`); suspension answers 403 `account_suspended` (staff told to ask an administrator); `http.js` no longer refresh-replays a wrong-code 401 (`attemptsRemaining`), which spent two guesses. Verified 2026-10-10: backend auth/bot-defence/moderation/guard tests, e2e staff-two-factor, signin-otp-session, owner-consent (exact "2 attempts left"), users, improvements, inline-otp-gate green. Follow-up: Turnstile tokens are single-use but Signin/Signup/InlineOtpSheet keep the first one, so once enforced a Resend is refused; reset the widget after each send. Possible flake: signin-otp-session "a sign-out the server never hears about…" failed twice in a shard run (Log out click intercepted), green alone and on the next run.
 ### e2e and test health
-
+- [ ] **E01** since `d52fec60` (letters-only names) ~30 live specs fail at `PATCH /auth/me` 422: they name actors with `Date.now()` digits (dashboard, dashboard-integrity, action-center, photo-requests, lead-notes, messages-*, contact-request-verified-badge, doc-viewer-scheme, command-palette). Name them with letters only.
+- [ ] **E02** fail on repeat, outside the security diff: `maps-geo-console` city-limit re-save 412 (stale settings version), `api-call-budget` admin page reads `/admin/settings` twice, `filter-request-volume` drag/sort issue an extra `GET /properties`.
 ## Waiting by design
 - Web push and the WhatsApp digest are server-only (backend tests cover them); the live check needs the owner's VAPID pair — see OWNER-CHECKLIST.
 - V95 society contract step: move `db/pending/V95__…` into `db/migration` once V94 is live everywhere; drop the society_* `ErasureCoverageTest` entries.
@@ -28,6 +32,7 @@
 ## Shipped
 Newest first, one line per slice; the commit (or the uncommitted tree) is the record.
 
+- 2026-10-10 Security hardening SH01–SH16 ([plan](security-hardening-plan.md)): DML-only runtime DB role + boot privilege check, Data API revoke, SQL/LIKE guard, error-leak, authorization + paging sweep, IDOR/mass-assignment/boundary/token suites, CSP/CORS deploy smoke, output-encoding + session e2e. Fixed: NUL 409→400, ticket priority customer-settable, page=MAX_INT and bad sort 500s, contact quota race. Owner steps in OWNER-CHECKLIST before next deploy
 - 2026-10-10 C03 back-office gaps closed: Users copy/badge reason/archive ends sessions; Enquiries Responded (`notes:write`), dead chips gone, Funnel deal filter dropped; Team Suspend really suspends; phone admin search; Finance/Integrations error states + refund banner; Settings `If-Match` 412, no ₹ on counts, blank refused; erasure sweeps `personal_documents` (+ vault deletes purge unreferenced files); help feedback one vote per voter (V105) ranked by share; Team Activity CSV pages the whole trail
 - 2026-10-10 C01 fact gaps closed: tenant profile/flatmates no longer promise owners see income; /refer says "qualified referral", Move-in guarantee removed; Seeker Plus "one payment · 1 month"; Terms/Refund/Privacy factual edits (lawyer glance in OWNER-CHECKLIST)
 - 2026-10-10 Free rent agreement spent at RA checkout (V106 `referral_credit`): waives Draazy fee + GST only, zero total skips gateway, cancel releases, race-safe; `/me/entitlements` adds used/remaining

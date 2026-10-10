@@ -7,6 +7,7 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ContactQuotaExhaustedException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.VerificationRequiredException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.ContactAllowanceLookup;
 import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.Notifier;
@@ -24,9 +25,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,8 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ContactService {
-
-    private static final Logger LOG = LoggerFactory.getLogger(ContactService.class);
 
     private final ContactRequestRepository contactRequests;
     private final PropertyRepository properties;
@@ -45,11 +41,12 @@ public class ContactService {
     private final VerifiedTenantLookup verifiedTenants;
     private final ContactAllowanceLookup allowances;
     private final AuditService audit;
+    private final RateLimitLock locks;
 
     public ContactService(ContactRequestRepository contactRequests, PropertyRepository properties,
             UserRepository users, ContactMapper contactMapper, Notifier notifier,
             VerifiedTenantLookup verifiedTenants, ContactAllowanceLookup allowances,
-            AuditService audit) {
+            AuditService audit, RateLimitLock locks) {
         this.contactRequests = contactRequests;
         this.properties = properties;
         this.users = users;
@@ -58,6 +55,7 @@ public class ContactService {
         this.verifiedTenants = verifiedTenants;
         this.allowances = allowances;
         this.audit = audit;
+        this.locks = locks;
     }
 
     @Transactional(readOnly = true)
@@ -78,20 +76,15 @@ public class ContactService {
             throw new VerificationRequiredException("This owner only accepts verified contacts");
         }
 
+        // Serialises one buyer's requests so the allowance count is never read stale and a parallel duplicate
+        // finds the winner's row instead of tripping the unique key, which would abort this transaction.
+        locks.holdUntilCommit(RateLimitLock.Limit.CONTACT_REQUEST, viewerId.toString());
         Optional<ContactRequest> existing =
                 contactRequests.findByRequesterIdAndPropertyId(viewerId, property.getId());
         if (existing.isEmpty()) {
             requireContactAllowance(viewerId);
-            try {
-                contactRequests.saveAndFlush(
-                        new ContactRequest(property.getId(), viewerId, body.message()));
-                announceToOwner(owner, viewerId, property);
-            } catch (DataIntegrityViolationException concurrentDuplicate) {
-
-                // A parallel tap won the race; its row is the one true request, so this call is
-                // simply a re-read. Nothing to repair, nothing worth telling the user about.
-                LOG.debug("Concurrent contact request for property {}", property.getId());
-            }
+            contactRequests.saveAndFlush(new ContactRequest(property.getId(), viewerId, body.message()));
+            announceToOwner(owner, viewerId, property);
         } else if (ContactRequestStatuses.isExpiredPending(existing.get().getStatus(),
                 existing.get().getCreatedAt(), Instant.now())) {
 

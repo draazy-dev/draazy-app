@@ -103,8 +103,11 @@ spec:
               value: ${DB_URL}
             - name: FLYWAY_DB_URL
               value: ${FLYWAY_DB_URL}
+            # DB_USER is the DML-only runtime role; FLYWAY_DB_USER owns the schema — docs/DEPLOY.md §2.1.
             - name: DB_USER
               value: ${DB_USER}
+            - name: FLYWAY_DB_USER
+              value: ${FLYWAY_DB_USER}
 
             # `latest` so a rotation lands on the next revision without editing this file; the cost
             # is that redeploying an old image rolls back code but never secrets.
@@ -112,6 +115,11 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: draazy-sandbox-db-password
+                  key: latest
+            - name: FLYWAY_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-flyway-db-password
                   key: latest
             - name: JWT_SECRET
               valueFrom:

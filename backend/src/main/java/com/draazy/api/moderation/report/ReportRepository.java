@@ -27,8 +27,9 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
               and (:reason is null or r.reason = :reason)
               and (:targetType is null or r.targetType = :targetType)
               and r.createdAt >= :since
-              and (:like is null or lower(r.targetId) like :like or lower(r.reason) like :like
-                   or lower(coalesce(r.details, '')) like :like or lower(cast(r.id as string)) like :like)
+              and (:like is null or lower(r.targetId) like :like escape '\\' or lower(r.reason) like :like escape '\\'
+                   or lower(coalesce(r.details, '')) like :like escape '\\'
+                   or lower(cast(r.id as string)) like :like escape '\\')
             order by r.createdAt desc
             """)
     Page<Report> search(@Param("status") String status,

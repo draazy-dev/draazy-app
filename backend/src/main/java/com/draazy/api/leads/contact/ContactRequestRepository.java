@@ -17,7 +17,7 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
 
     Optional<ContactRequest> findByRequesterIdAndPropertyId(UUID requesterId, UUID propertyId);
 
-    // This count is the tally, and that is what makes the quota race-proof.
+    // Read under RateLimitLock.Limit.CONTACT_REQUEST; the count alone does not stop concurrent overshoot.
     long countByRequesterId(UUID requesterId);
 
     // The mapper asks this on every detail render, so an existence check is enough.

@@ -2,10 +2,12 @@ package com.draazy.api.common.error;
 
 import com.draazy.api.common.web.RequestCorrelation;
 import jakarta.validation.ConstraintViolationException;
+import java.sql.SQLException;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpHeaders;
@@ -34,6 +36,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    /** Postgres {@code character_not_in_repertoire}: a NUL in a text value, which no column can hold. */
+    private static final String UNSTORABLE_CHARACTER = "22021";
 
     /** Typed domain errors — the common, expected path. */
     @ExceptionHandler(ApiException.class)
@@ -177,6 +181,13 @@ public class GlobalExceptionHandler {
      * Why local recovery cannot work: docs/system/api-standards.md §4.3. */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex) {
+        if (NestedExceptionUtils.getMostSpecificCause(ex) instanceof SQLException sql
+                && UNSTORABLE_CHARACTER.equals(sql.getSQLState())) {
+            log.debug("Unstorable character in input [traceId={}]", traceId());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiError(ErrorCodes.BAD_REQUEST, "The request contains an invalid character",
+                            400, traceId()));
+        }
         log.warn("Database rejected a write [traceId={}]", traceId(), ex);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError(ErrorCodes.CONFLICT,

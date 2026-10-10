@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.web.PageResponse;
+import com.draazy.api.common.web.Pageables;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.CurrentUser;
@@ -35,7 +36,7 @@ public class FlatmateApplicationController {
     @GetMapping(Routes.Flatmates.MY_GROUPS)
     public PageResponse<FlatmateGroupCard> myGroups(@CurrentUser AuthPrincipal principal,
             @PageableDefault(size = 20) Pageable pageable) {
-        return PageResponse.of(service.myGroups(principal, pageable), dto -> dto);
+        return PageResponse.of(service.myGroups(principal, Pageables.unsorted(pageable)), dto -> dto);
     }
 
     /** {@code POST /flatmates/groups/{id}/apply} — the group's host applies to a listing. */

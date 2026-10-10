@@ -43,6 +43,10 @@ class ProdProfileContractTest {
             // transaction pooler — defaulting it to DB_URL would default to a hang.
             "FLYWAY_DB_URL",
 
+            // The schema owner. DB_USER is the DML-only runtime role, which cannot migrate.
+            "FLYWAY_DB_USER",
+            "FLYWAY_DB_PASSWORD",
+
             "API_PUBLIC_ORIGIN",
 
             "ORIGIN_SHARED_SECRET");

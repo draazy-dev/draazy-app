@@ -200,10 +200,11 @@ gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER" \
 
 # ---------------------------------------------------------------------------------------------
 say "Secret Manager"
-# All thirteen must exist before the first `services replace`; use printf '%s', as a trailing newline
+# All sixteen must exist before the first `services replace`; use printf '%s', as a trailing newline
 # joins the value and reads later as a bad password.
 SECRETS=(
-  "draazy-sandbox-db-password:Supabase database password"
+  "draazy-sandbox-db-password:Supabase password for DB_USER (the draazy_app runtime role; postgres until docs/DEPLOY.md §2.1 is done)"
+  "draazy-sandbox-flyway-db-password:Supabase postgres password, for Flyway only"
   "draazy-sandbox-jwt-secret:JWT signing key (openssl rand -base64 48)"
   "draazy-sandbox-referral-signal-salt:Referral signal salt (openssl rand -base64 32)"
   "draazy-sandbox-identity-hash-secret:KYC identity_hash HMAC key (openssl rand -base64 32) — set once, rotating orphans every stored hash"
@@ -216,6 +217,8 @@ SECRETS=(
   "draazy-sandbox-r2-secret-access-key:R2 secret access key (shown once at token creation)"
   "draazy-sandbox-google-places-server-key:Google Places API (New) server key, restricted to that API"
   "draazy-sandbox-zeptomail-api-key:ZeptoMail Send Mail token (CPaaS → Agents → agent → SMTP/API)"
+  "draazy-sandbox-push-vapid-private-key:Web push VAPID private key (npx web-push generate-vapid-keys)"
+  "draazy-sandbox-push-vapid-public-key:Web push VAPID public key (same pair; also repo var VITE_VAPID_PUBLIC_KEY)"
 )
 
 for entry in "${SECRETS[@]}"; do
@@ -270,7 +273,8 @@ cat <<EOF
   Secrets (carry over unchanged from the previous project — Supabase is a separate vendor):
     SANDBOX_DB_URL         transaction pooler, port 6543
     SANDBOX_FLYWAY_DB_URL  session pooler, port 5432
-    SANDBOX_DB_USER        postgres.<project-ref>
+    SANDBOX_DB_USER        draazy_app.<project-ref>  (postgres.<project-ref> until DEPLOY.md §2.1)
+    SANDBOX_FLYWAY_DB_USER postgres.<project-ref>
 
   If GCP_SA_KEY is still present from the key-based setup, DELETE IT — it is now unused, and an
   unused permanent credential is strictly worse than no credential. Then delete the key itself:

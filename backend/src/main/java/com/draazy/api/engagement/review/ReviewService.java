@@ -7,6 +7,7 @@ import com.draazy.api.common.error.AlreadyReviewedException;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ReviewNotEligibleException;
+import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.trust.PropertyExperience;
 import com.draazy.api.common.trust.ReviewerStanding;
 import com.draazy.api.identity.user.User;
@@ -71,7 +72,7 @@ public class ReviewService {
     @Transactional(readOnly = true)
     public Page<ReviewModerationRow> listForModeration(String status, String q, Pageable pageable) {
         Page<Review> page = reviews.findForModeration(
-                status == null || status.isBlank() ? null : status.strip(), likePattern(q), pageable);
+                status == null || status.isBlank() ? null : status.strip(), LikePatterns.contains(q), pageable);
         Map<UUID, String> names = authorNames(page.getContent());
         return page.map(r -> ReviewModerationRow.of(r, nameOf(names, r)));
     }
@@ -91,10 +92,6 @@ public class ReviewService {
         }
         counts.put("all", all);
         return counts;
-    }
-
-    private static String likePattern(String q) {
-        return q == null || q.isBlank() ? null : "%" + q.strip().toLowerCase(java.util.Locale.ROOT) + "%";
     }
 
     /** {@link ReviewTargetKey#resolve} 404s an unknown target, so a bad locality slug is an error

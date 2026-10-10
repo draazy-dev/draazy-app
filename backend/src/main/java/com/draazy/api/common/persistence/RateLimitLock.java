@@ -24,7 +24,9 @@ public class RateLimitLock {
 
         OTP_SEND_CALLER(5),
 
-        LISTING_CREATE(6);
+        LISTING_CREATE(6),
+
+        CONTACT_REQUEST(7);
 
         /** Distinct from {@link #OTP_SEND}, which keys on the recipient a caller can rotate freely.
          * Both are taken on one send, always in namespace order, so the pair cannot deadlock. */

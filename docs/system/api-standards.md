@@ -200,7 +200,8 @@ vault's byte-sniffing check *and* Spring refusing a `Content-Type` the endpoint 
   500. 409 is the honest reply, and a client retrying the same idempotent request gets the stored
   result because by then the winner has committed. Logged at `warn` with the cause, because a
   not-null or foreign-key violation from a genuine bug also reaches here and must not disappear
-  behind a tidy 409.
+  behind a tidy 409. The one exception is SQLState `22021` (a NUL in a text value, which Postgres
+  cannot store): that is bad input, so it answers 400 and logs at `debug`.
 - **`OptimisticLockingFailureException` → 409, with different advice.** There the database refused a
   write that was never valid; here it refused one that was valid when the caller loaded the row and
   stopped being valid while they were editing it. The caller did nothing wrong and has not lost their
@@ -293,6 +294,10 @@ and the alternative is a blank site because somebody mistyped a config value.
   default is 2000, so this is not optional — and it must be duplicated in
   `src/test/resources/application.properties`, which *shadows* the main file rather than merging with
   it. Without the duplicate, tests "prove" a cap the test run doesn't have.
+- `page` is capped at **10,000** by `common.web.PageBoundsConfig` (400 above it): Spring caps neither the
+  page number nor the `page × size` offset, which overflows an int and would 500.
+- A published sort validates with `Pageables.allowSort` (unknown field → 400); a fixed order strips the
+  client's with `Pageables.unsorted`. `AuthorizationCoverageTest` probes every paged GET with both.
 
 ### 5.1 Which collections get paged
 
