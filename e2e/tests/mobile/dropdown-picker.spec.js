@@ -15,8 +15,8 @@ async function settledBox(locator) {
   return prev;
 }
 
-/* The /societies locality filter is a public searchable dropdown: Select turns searchable at eight
-   options, and the seeded city has far more localities than that. */
+/* The /societies locality filter is a public dropdown that searches localities on the server, so it
+   always opens with a search box. */
 async function openSearchablePicker(page) {
   await seedConsent(page);
   await page.goto('/societies');
@@ -57,7 +57,7 @@ test.describe('Searchable dropdowns on a phone', () => {
     await settledBox(picker);
     expect(await rootVar(page, '--dz-vv-bottom'), 'the open picker must be tracking the viewport').toBe('0px');
 
-    await picker.locator('.dz-dropdown__search input').fill('a');
+    await picker.locator('.dz-dropdown__search input').fill('an');
     await expect.poll(() => picker.locator('[role="option"]').count()).toBeGreaterThan(3);
     const keyboard = 320;
     await page.evaluate((kb) => document.documentElement.style.setProperty('--dz-vv-bottom', `${kb}px`), keyboard);

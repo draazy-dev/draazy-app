@@ -109,7 +109,7 @@ function framing(items, localityCoords) {
 
 function FlatmateMap({ items, tab, kindWord, onInterest, onRoomInterest, onJoin, onSave, saved, interestedFor, goToPosting }) {
   const { t } = useTranslation();
-  const localityCoords = useLocalityCoords();
+  const localityCoords = useLocalityCoords(Object.keys(items));
   const [openLoc, setOpenLoc] = useState(null);
   // kindWord is 'homes' on the Move-in tab and 'flatmates' on Team up — the two
   // tabs are the only sources, so there is no third case to handle.

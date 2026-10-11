@@ -1,5 +1,5 @@
-/* Locality directory against the live API: `GET /localities` is public and `liveListings` counts bound listings, which cannot exceed what the
- * same slug's property search finds (it also matches pins within 2 km). Fixtures: `R__zz_DML_dev_live_localities.sql`. */
+/* Locality directory against the live API: `liveListings` counts bound listings, which cannot exceed what the
+ * slug's property search finds (it also matches pins within 2 km). Fixtures: `R__zz_DML_dev_live_localities.sql`. */
 import { test, expect } from '../../fixtures/live.js';
 import { API } from '../../helpers/liveAuth.js';
 
@@ -40,13 +40,12 @@ test('the search endpoint answers with live rows only', async () => {
   for (const row of rows) expect(Object.keys(row).sort()).toEqual(['city', 'lat', 'lng', 'name', 'slug']);
 });
 
-test('the listings page loads the locality directory from the server', async ({ page }) => {
-  const request = page.waitForResponse(
-    (r) => r.url().includes('/api/localities') && r.status() === 200,
-    { timeout: 20000 },
-  );
+test('the listings page never downloads the whole locality directory', async ({ page }) => {
+  const full = [];
+  page.on('request', (r) => { if (new URL(r.url()).pathname === '/api/localities') full.push(r.url()); });
 
+  const results = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/properties' && r.status() === 200);
   await page.goto('/listings');
-  const rows = await (await request).json();
-  expect(rows.length, 'the page should have received the directory it asked for').toBeGreaterThan(100);
+  await results;
+  expect(full).toEqual([]);
 });

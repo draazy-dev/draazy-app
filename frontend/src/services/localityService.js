@@ -3,9 +3,6 @@ import { createProvider } from './config.js';
 
 const provider = createProvider('locality');
 
-/* Locality pages are public landing pages: no token and no session short-circuit. */
-export const listLocalities = async () => (await provider()).listLocalities();
-
 /** The back office's locality table: slim rows (pin, retired flag, live count). Staff with `localities:read`. */
 export const listAdminLocalities = async () => (await provider()).listAdminLocalities();
 
@@ -22,3 +19,11 @@ export const resolveLocality = async (place) => (await provider()).resolveLocali
 
 /** Active localities matching `q`; the picker's fallback when Google has nothing. */
 export const searchLocalities = async (q) => (await provider()).searchLocalities(q);
+
+/** Localities named in free text. There is no full list to match against, so each longer word is looked up. */
+// ponytail: one search per word, capped at 8; a server endpoint that scans the whole text if queries grow longer.
+export async function localitiesIn(text) {
+  const words = [...new Set(String(text || '').toLowerCase().match(/[a-z]{4,}/g) || [])].slice(0, 8);
+  const hits = (await Promise.all(words.map((w) => searchLocalities(w).catch(() => [])))).flat();
+  return [...new Map(hits.map((l) => [l.slug, l])).values()];
+}

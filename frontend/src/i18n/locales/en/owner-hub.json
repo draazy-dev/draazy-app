@@ -47,6 +47,7 @@
     "rentAlreadyRecorded": "That month was already recorded",
     "rentRecordFailed": "Couldn’t record that month. Please try again.",
     "rentReceiptsFailed": "Couldn’t load your rent receipts",
+    "receiptDownloadFailed": "Couldn’t create the receipt. Please try again.",
     "retryReceipts": "Try loading again",
     "edit": "Edit",
     "tenant": "Tenant",

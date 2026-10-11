@@ -14,7 +14,7 @@ export async function recordSignal(signal) {
     deal: trimmed(signal?.deal),
     bhk: trimmed(signal?.bhk),
     propertyId: trimmed(signal?.propertyId),
-  });
+  }, { keepReads: true });
   return true;
 }
 

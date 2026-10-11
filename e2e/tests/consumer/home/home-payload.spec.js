@@ -1,5 +1,5 @@
-import { test, expect } from '../../../fixtures/live.js';
-import { API } from '../../../helpers/liveAuth.js';
+import { test, expect, ACTORS } from '../../../fixtures/live.js';
+import { API, authHeaders } from '../../../helpers/liveAuth.js';
 
 /* The home page receives only the fields it draws: slim cards, slim society tiles, a key-only
    saved list and no shell reads for alerts, follows or identity. */
@@ -44,8 +44,10 @@ test('signed-in home boots from a slim /me/bootstrap and defers screen-only read
   page.on('request', (r) => { if (r.method() === 'GET') paths.add(new URL(r.url()).pathname); });
   const boot = onPath(page, '/api/me/bootstrap');
   await page.goto('/');
+  await boot;
 
-  const doc = await (await boot).json();
+  // index.html preloads this read, and Playwright reports that buffered body as empty: read the shape directly.
+  const doc = await (await fetch(`${API}/me/bootstrap`, { headers: await authHeaders(ACTORS.buyer) })).json();
   expect(Object.keys(doc).sort()).toEqual(['me', 'messagesUnread', 'notificationsUnread', 'saved', 'subscription']);
   expect(extraKeys(doc.saved, ['id', 'slug'])).toEqual([]);
   expect(doc.me.passwordHash).toBeUndefined();

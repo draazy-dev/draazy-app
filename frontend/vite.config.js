@@ -40,6 +40,26 @@ function devInlineScriptHashesPlugin() {
     },
   };
 }
+/* Each Phosphor icon ships six weights; the app renders only regular and fill (Icon `weight` prop), so the
+   other four are cut at build — two thirds of the icon bytes in the entry chunk. */
+function phosphorWeightsPlugin(keep = ['regular', 'fill']) {
+  return {
+    name: 'draazy-phosphor-weights',
+    apply: 'build',
+    transform(code, id) {
+      if (!/@phosphor-icons[\\/]react[\\/]dist[\\/]defs[\\/]/.test(id)) return null;
+      let list;
+      (function walk(node) {
+        if (list || !node || typeof node !== 'object') return;
+        if (node.type === 'NewExpression' && node.callee.name === 'Map') { list = node.arguments[0]; return; }
+        Object.values(node).forEach(walk);
+      })(this.parse(code));
+      if (list?.type !== 'ArrayExpression') return null;
+      const kept = list.elements.filter((el) => keep.includes(el.elements[0].value));
+      return code.slice(0, list.start) + '[' + kept.map((el) => code.slice(el.start, el.end)).join(',') + ']' + code.slice(list.end);
+    },
+  };
+}
 /* Only draazy.com may be indexed: the sandbox host's page copies would compete with production. Google and
    Bing may still crawl, or they never see the noindex on pages indexed earlier; other bots are kept out. */
 function noindexOffProductionPlugin() {
@@ -131,7 +151,7 @@ function pwaPlugin() {
 
 export default defineConfig({
   // spaFallbackPlugin reads files the blog, locality and route-head plugins write, so it runs after them.
-  plugins: [react(), helpContentPlugin({ root: __dirname }), blogPlugin({ root: __dirname }), localityGuidesPlugin({ root: __dirname }), contentIndexPlugin({ root: __dirname }), routeHeadsPlugin(), spaFallbackPlugin({ root: __dirname }), pwaPlugin(), apiBaseHtmlPlugin(), devInlineScriptHashesPlugin(), noindexOffProductionPlugin()],
+  plugins: [react(), phosphorWeightsPlugin(), helpContentPlugin({ root: __dirname }), blogPlugin({ root: __dirname }), localityGuidesPlugin({ root: __dirname }), contentIndexPlugin({ root: __dirname }), routeHeadsPlugin(), spaFallbackPlugin({ root: __dirname }), pwaPlugin(), apiBaseHtmlPlugin(), devInlineScriptHashesPlugin(), noindexOffProductionPlugin()],
   build: {
     rollupOptions: {
       output: {

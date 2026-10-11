@@ -1,6 +1,6 @@
 /** Shape translation lives in `propertyMapper.js`; what the server does not yet cover is named at each call site
  * rather than silently no-oped. */
-import { PAGE_LOAD_TTL, del, get, patch, post } from '../../http.js';
+import { PAGE_LOAD_TTL, PUBLIC_READ_TTL, del, get, patch, post } from '../../http.js';
 import {
   toEditForm,
   toListingCreate,
@@ -99,7 +99,7 @@ export async function getProperty(id) {
 }
 
 export async function featuredProperties(limit = 6) {
-  return toViewModelList(await get('/properties/featured', null, { auth: false })).slice(0, limit);
+  return toViewModelList(await get('/properties/featured', null, { auth: false, ttl: PUBLIC_READ_TTL })).slice(0, limit);
 }
 
 /** The three trust numbers, counted by the database over the whole live catalogue. No client-side arithmetic and no
@@ -150,7 +150,7 @@ function inAskedOrder(wanted, rows) {
 export async function listPropertiesByIds(ids = []) {
   const wanted = ids.slice(0, 16);
   if (!wanted.length) return [];
-  return inAskedOrder(wanted, toViewModelList(await get('/properties/cards', { ids: wanted }, { auth: false })));
+  return inAskedOrder(wanted, toViewModelList(await get('/properties/cards', { ids: wanted }, { auth: false, ttl: PUBLIC_READ_TTL })));
 }
 
 /** Compare-table rows for up to four slugs or UUIDs; ids not publicly live drop out. */

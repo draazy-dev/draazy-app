@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router';
 import Icon from '../../components/Icon.jsx';
 import { recordSignal } from '../../services/demandService.js';
-import { getLocality, listLocalities } from '../../services/localityService.js';
+import { getLocality, localitiesIn } from '../../services/localityService.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { setLastSearch, getLastSearch } from '../../lib/localPrefs.js';
 import { useSavedSearchCreate } from '../../context/SavedSearchContext.jsx';
@@ -15,7 +15,6 @@ import { useCity } from '../../context/CityContext.jsx';
 import { cityHasData } from '../../lib/geoConfig.js';
 import NewCityEmptyState from '../../components/city/NewCityEmptyState.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
-import useAsyncList from '../../hooks/useAsyncList.js';
 import usePullToRefresh from '../../lib/usePullToRefresh.js';
 import { useSignInGate } from '../../lib/useSignInGate.js';
 import { getSocietyBrief } from '../../services/societyService.js';
@@ -42,8 +41,15 @@ const MAP_MARKER_CAP = 100;
 const MAP_MAX_AREAS = 5;
 const LAST_LISTINGS_SEARCH_KEY = 'draazy.listings.lastSearch.v1';
 
-/* The locality list: filter options, chip labels and the map's fallback focus. */
-const loadLocalities = () => listLocalities();
+/* Localities are created on demand, so there is no list to match typed words against: only the words no other rule
+   claimed are looked up, then the query is parsed again with the hits. */
+async function parseWithLocalities(raw, ctx) {
+  const first = parseSmartQuery(raw, ctx);
+  const hits = first?.q ? await localitiesIn(first.q) : [];
+  if (!hits.length) return first && { ...first, hits, locNames: ctx.locNameBySlug };
+  const locNames = { ...ctx.locNameBySlug, ...Object.fromEntries(hits.map((l) => [l.slug, l.name])) };
+  return { ...parseSmartQuery(raw, { ...ctx, localities: [...ctx.localities, ...hits], locNameBySlug: locNames }), hits, locNames };
+}
 const filterSignature = (value) => JSON.stringify(serializeF(value));
 let pendingDrawerBackSnapshot = null;
 
@@ -107,9 +113,6 @@ export default function Listings() {
   const [page, setPage] = useState(1);
   const [view, setView] = useState(backRestoreInitial?.view || (params.get('view') === 'map' ? 'map' : params.get('view') === 'list' ? 'list' : (!initialHadUrlParams.current && ['map', 'list', 'grid'].includes(initialListingsSearch?.view) ? initialListingsSearch.view : 'grid')));
   const [activeId, setActiveId] = useState(backRestoreInitial?.activeId || params.get('property') || null);
-  /* The locality registry, through `useAsyncList` so a failed read has a name and a retry rather than leaving the
-     most-visited page in the app on skeletons that never resolve. */
-  const [localityRows, localityStatus] = useAsyncList(loadLocalities, []);
   // Only Pune has inventory today, so a data-less live city gets an honest empty state here
   // rather than Pune listings mislabelled as its own.
   const { city } = useCity();
@@ -285,13 +288,6 @@ export default function Listings() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a deal.
   }, [urlDeal]);
 
-  useEffect(() => {
-    setLocalities((prev) => {
-      const seen = new Set(localityRows.map((l) => l.slug));
-      return [...localityRows, ...prev.filter((l) => !seen.has(l.slug))];
-    });
-  }, [localityRows]);
-
   // A Places pick resolves to a locality that isn't in the option list yet;
   // register it (slug → name) so its chip and the dropdown summary show a friendly name.
   const addLocalityOption = useCallback(({ slug, name, lat, lng }) => {
@@ -300,22 +296,10 @@ export default function Listings() {
   }, []);
 
   const locNameBySlug = useMemo(() => Object.fromEntries(localities.map((l) => [l.slug, l.name])), [localities]);
-  // A shared URL or saved search can carry a slug the list does not hold; ask the server for its name.
-  const askedLocalitiesRef = useRef(new Set());
-  const locSlugsKey = [...f.localities].sort().join(',');
-  useEffect(() => {
-    if (localityStatus === 'loading') return;
-    locSlugsKey.split(',').filter((slug) => slug && !locNameBySlug[slug] && !askedLocalitiesRef.current.has(slug)).forEach((slug) => {
-      askedLocalitiesRef.current.add(slug);
-      getLocality(slug).then(addLocalityOption).catch(() => {});
-    });
-  }, [locSlugsKey, locNameBySlug, localityStatus, addLocalityOption]);
   const suggestedMapLocalities = useMemo(() => {
     const stored = deserializeStoredFilters(initialListingsSearch?.filters);
-    if (!stored?.localities?.size) return [];
-    const known = new Set(localities.filter((l) => !l.archived).map((l) => l.slug));
-    return [...stored.localities].filter((slug) => known.has(slug)).slice(0, MAP_MAX_AREAS);
-  }, [initialListingsSearch, localities]);
+    return stored?.localities?.size ? [...stored.localities].slice(0, MAP_MAX_AREAS) : [];
+  }, [initialListingsSearch]);
   const [socNameBySlug, setSocNameBySlug] = useState({});
   const socSlugsKey = [...f.societies].join(',');
   useEffect(() => {
@@ -339,6 +323,16 @@ export default function Listings() {
   const mapAreaCount = f.localities.size;
   const mapGated = effView === 'map' && (mapAreaCount === 0 || mapAreaCount > MAP_MAX_AREAS);
   const size = effView === 'map' ? MAP_MARKER_CAP : PAGE_SIZE;
+
+  // Names and centres come one slug at a time: for the chosen areas, and for the map gate's suggestions while it shows.
+  const askedLocalitiesRef = useRef(new Set());
+  const locSlugsKey = [...new Set([...f.localities, ...(mapGated ? suggestedMapLocalities : [])])].sort().join(',');
+  useEffect(() => {
+    locSlugsKey.split(',').filter((slug) => slug && !locNameBySlug[slug] && !askedLocalitiesRef.current.has(slug)).forEach((slug) => {
+      askedLocalitiesRef.current.add(slug);
+      getLocality(slug).then(addLocalityOption).catch(() => {});
+    });
+  }, [locSlugsKey, locNameBySlug, addLocalityOption]);
 
   const query = useMemo(
     () => (hasData && !mapGated ? toFacetQuery(deferredF, { sort, q: freeText }) : null),
@@ -424,8 +418,14 @@ export default function Listings() {
     setFreeText(parsed.q);
   };
 
-  const smartSearch = () => {
-    const parsed = parseSmartQuery(aiQuery, { current: f, localities, locNameBySlug });
+  const parseTyped = async () => {
+    const parsed = await parseWithLocalities(aiQuery, { current: f, localities, locNameBySlug });
+    parsed?.hits.filter((l) => parsed.next.localities.has(l.slug)).forEach(addLocalityOption);
+    return parsed;
+  };
+
+  const smartSearch = async () => {
+    const parsed = await parseTyped();
     if (!parsed) return;
     applyParsed(parsed);
     const detail = [...parsed.parts, parsed.q && tr('listings.smartFreeText', { text: parsed.q })]
@@ -446,9 +446,9 @@ export default function Listings() {
     // (and apply it to the results) — no more "label says X but filters say Y" mismatch.
     try {
       const typed = aiQuery.trim();
-      const parsed = typed ? parseSmartQuery(aiQuery, { current: f, localities, locNameBySlug }) : null;
+      const parsed = typed ? await parseTyped() : null;
       if (parsed) applyParsed(parsed);
-      const record = buildAlertRecord(parsed ? parsed.next : f, locNameBySlug);
+      const record = buildAlertRecord(parsed ? parsed.next : f, parsed ? parsed.locNames : locNameBySlug);
       await createSavedSearch({ ...record, label: typed || record.label, query: typed });
       toast(tr('listings.searchSavedToast'), 'success');
     } catch {
@@ -508,7 +508,7 @@ export default function Listings() {
               </div>
             </aside>
 
-            <ResultsArea f={f} set={set} localities={localities} aiQuery={aiQuery} setAiQuery={setAiQuery} smartSearch={smartSearch} saveSearch={saveSearch} savingSearch={savingSearch} results={pageResults} total={total} verifiedCount={verifiedCount} unstatedCount={unstatedCount} relaxedNear={relaxedNear} page={safePage} pageCount={pageCount} goToPage={goToPage} view={effView} setView={setView} sort={sort} setSort={setSort} flagEnabled={flagEnabled} activeChips={activeChips} clearAll={clearAll} locNameBySlug={locNameBySlug} loaded={loaded} loadFailed={search.status === 'error'} searching={search.status === 'loading'} loadError={search.error} onRetryLoad={search.retry} toast={toast} onOpenFilters={() => setDrawer(true)} filterTriggerRef={filterTriggerRef} mapGated={mapGated} mapAreaCount={mapAreaCount} mapMaxAreas={MAP_MAX_AREAS} mapMarkerCap={MAP_MARKER_CAP} mapFocus={mapFocus} activeId={activeId} activeProperty={activeProperty} activeIndex={activeIndex} onSelectProperty={onSelectProperty} onCloseProperty={onCloseProperty} fromSearch={buildReturnSearch()} onOpenProperty={saveReturnContext} isIn={isIn} mapUnavailable={view === 'map' && !mapEnabled} suggestedMapLocalities={suggestedMapLocalities} />
+            <ResultsArea f={f} set={set} localities={localities} aiQuery={aiQuery} setAiQuery={setAiQuery} smartSearch={smartSearch} saveSearch={saveSearch} savingSearch={savingSearch} results={pageResults} total={total} verifiedCount={verifiedCount} unstatedCount={unstatedCount} relaxedNear={relaxedNear} page={safePage} pageCount={pageCount} goToPage={goToPage} view={effView} setView={setView} sort={sort} setSort={setSort} flagEnabled={flagEnabled} activeChips={activeChips} clearAll={clearAll} locNameBySlug={locNameBySlug} loaded={loaded} loadFailed={search.status === 'error'} searching={search.status === 'loading'} loadError={search.error} onRetryLoad={search.retry} toast={toast} onOpenFilters={() => setDrawer(true)} filterTriggerRef={filterTriggerRef} mapGated={mapGated} mapAreaCount={mapAreaCount} mapMaxAreas={MAP_MAX_AREAS} mapMarkerCap={MAP_MARKER_CAP} mapFocus={mapFocus} activeId={activeId} activeProperty={activeProperty} activeIndex={activeIndex} onSelectProperty={onSelectProperty} onCloseProperty={onCloseProperty} fromSearch={buildReturnSearch()} onOpenProperty={saveReturnContext} isIn={isIn} mapUnavailable={view === 'map' && !mapEnabled} suggestedMapLocalities={suggestedMapLocalities} onAddLocality={addLocalityOption} />
           </div>
           )}
         </div>

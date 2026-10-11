@@ -8,20 +8,11 @@ import { currentDueStatus, recentMonths } from '../../../lib/data/rentReminders.
 import { generateSingle } from '../../../lib/rentReceipt.js';
 import { FIELD_CLS } from './constants.js';
 
-/* How many months the ledger shows. One constant, because the fetch window and the row window must
-   agree: ask for fewer receipts than there are rows and a settled month renders as outstanding,
-   with a button that mints nothing and a 409 to explain it. */
+// Shared by the fetch window and the row window: fetching fewer receipts than rows shows a settled month as unpaid.
 const LEDGER_MONTHS = 6;
 
-/* Rent reminders & receipts — the retention hook. The owner records rent they collected (any way)
-   and gets an instant HRA receipt. No payment rails: nothing here touches the tenant's gateway
-   payments, whose paid state is webhook-controlled and is not an owner's to assert.
-
-   Which months are settled is a *server* fact now, read through `managedService`. It used to be a
-   localStorage ledger, which meant a receipt vanished with a cleared browser, disagreed between a
-   phone and a laptop, and reprinted at whatever rent the record happened to hold today rather than
-   the rent that was actually collected. Every figure below therefore comes off the receipt the
-   server returned, never off `prop`. */
+// Settled months are a server fact; every figure comes off the returned receipt, never off `prop`.
+// Gateway payments are webhook-controlled, so nothing here asserts them.
 export default function RentPanel({ prop, onChange }) {
   const { t, i18n } = useTranslation();
   const { toast } = useToast();
@@ -34,22 +25,16 @@ export default function RentPanel({ prop, onChange }) {
   });
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  // `null` while the first read is in flight, so the ledger can render its months without claiming
-  // any of them is unpaid — a month that is settled must never flash a "Mark received" button the
-  // owner might press.
+  // `null` while the first read is in flight, so a settled month never flashes a "Mark received" button.
   const [receipts, setReceipts] = useState(null);
   const [failed, setFailed] = useState(false);
   const [busyMonth, setBusyMonth] = useState('');
   // Re-armed in the effect body, not only cleared in cleanup: under StrictMode a mount/cleanup/
   // re-mount would otherwise leave this false forever and silently swallow every state update.
   const alive = useRef(true);
-  // The re-entrancy guard proper. `busyMonth` is state, so a second handler firing in the same
-  // render generation still reads the old value — the disabled attribute happens to cover that for
-  // a discrete click, but the guard should not depend on the caller being a discrete click.
+  // Re-entrancy guard: `busyMonth` is state, so a second handler in the same render still reads the old value.
   const busyRef = useRef('');
-  // `t` is a new function on every language change, so holding it in `load`'s deps would make a
-  // language toggle re-run the effect, blank the ledger back to pending and refetch. It is only
-  // there to compose one error string.
+  // Kept out of `load`'s deps so a language toggle doesn't blank the ledger and refetch.
   const tRef = useRef(t);
   tRef.current = t;
 
@@ -65,9 +50,7 @@ export default function RentPanel({ prop, onChange }) {
         setFailed(false);
       }
     } catch {
-      // A failed read must not turn settled months into unsettled ones. Staying on the pending
-      // shape keeps every row read-only, which is the honest state: we do not know. But honest and
-      // terminal is not a state a panel may sit in, so `failed` earns a retry the owner can press.
+      // Stay on the read-only pending shape so settled months never look unpaid; `failed` offers a retry.
       if (alive.current) {
         setFailed(true);
         toast(tRef.current('ownerHub.rentReceiptsFailed'), 'error');
@@ -89,9 +72,7 @@ export default function RentPanel({ prop, onChange }) {
   );
 
   const saveDetails = async (rented) => {
-    // The 1–28 clamp is this panel's rule, not the server's: February is why, and a due day of 31
-    // would silently never fall due. It stays here because it is about what the owner can
-    // meaningfully pick, and the server accepts what it is told.
+    // Clamped to 1–28 here (the server accepts anything): a due day of 31 would never fall due in February.
     await updateManaged(prop.id, {
       rented,
       tenantName: form.tenantName.trim(),
@@ -130,10 +111,7 @@ export default function RentPanel({ prop, onChange }) {
     }
   };
 
-  /* Printed strictly from the receipt, never from `prop`: those are the figures that were true in
-     the month it covers. `txnRef` is the server's durable receipt id, so re-downloading the same
-     month on another device produces the same reference — the old `'RCPT' + Date.now()` produced a
-     new one on every click. */
+  // Printed from the receipt, not `prop`, so figures match the month; `txnRef` is the server's stable receipt id.
   const download = (r) => generateSingle({
     tenant: r.tenantName || t('ownerHub.tenant'),
     landlord: r.landlordName || t('ownerHub.landlord'),
@@ -143,7 +121,7 @@ export default function RentPanel({ prop, onChange }) {
     month: r.ym,
     txnRef: r.id,
     paidOnline: false,
-  });
+  }).catch(() => toast(t('ownerHub.receiptDownloadFailed'), 'error'));
 
   // ---- Vacant / setup state ----
   if (!prop.rented || editing) {
@@ -176,10 +154,7 @@ export default function RentPanel({ prop, onChange }) {
     );
   }
 
-  // ---- Active tracking state ----
-  // `pending` is the first read still in flight (or failed). Everything below stays laid out and
-  // read-only in that state rather than defaulting to "unpaid", so a settled month never offers a
-  // button that would only earn a 409.
+  // While pending (or failed) rows stay read-only rather than "unpaid", so no button earns a 409.
   const pending = receipts === null;
   const s = currentDueStatus(prop, i18n.language);
   const thisMonth = byMonth.get(s.ym) || null;
@@ -219,9 +194,7 @@ export default function RentPanel({ prop, onChange }) {
               {r ? (
                 <span className="flex items-center gap-3">
                   <span className="text-emerald-300 text-xs flex items-center gap-1"><Icon name="check-circle" className="w-3.5 h-3.5" /> {rentStr(r.amount)}</span>
-                  {/* Six rows of "Mark received" and "Receipt" are six identical accessible names
-                      unless the month comes with them, and picking the wrong one here mints a
-                      receipt for a month nobody paid. */}
+                  {/* The month in the label keeps six rows' accessible names distinct. */}
                   <button onClick={() => download(r)} aria-label={t('ownerHub.receiptFor', { month: m.label })} className="text-brand-teal-3 text-xs hover:underline flex items-center gap-1"><Icon name="download" className="w-3.5 h-3.5" /> {t('ownerHub.receipt')}</button>
                 </span>
               ) : (

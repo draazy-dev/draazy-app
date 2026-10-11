@@ -16,11 +16,14 @@ const REGISTRY = [
 
 test('a locality name with regex punctuation is matched as text, not compiled as a pattern', async ({ page }) => {
   // Scoped to the API path: a looser glob also fulfils source-module requests with JSON, which blanks the whole app.
-  await page.route('**/api/localities', (route) => route.fulfill({
-    status: 200,
-    contentType: 'application/json',
-    body: JSON.stringify(REGISTRY),
-  }));
+  await page.route('**/api/localities/search**', (route) => {
+    const q = (new URL(route.request().url()).searchParams.get('q') || '').toLowerCase();
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(REGISTRY.filter((r) => r.name.toLowerCase().includes(q))),
+    });
+  });
 
   const thrown = trackErrors(page);
 

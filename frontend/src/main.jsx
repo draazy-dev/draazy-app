@@ -1,7 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
-import { APIProvider } from '@vis.gl/react-google-maps';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
@@ -15,7 +14,7 @@ import { VerificationProvider } from './context/VerificationContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { ConversationProvider } from './context/ConversationContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
-import { GOOGLE_MAPS_API_KEY } from './lib/mapsConfig.js';
+import { installMapsLoader } from './lib/mapsConfig.js';
 import { initPmf } from './lib/pmf.js';
 import { initProductAnalytics } from './lib/productAnalytics.js';
 import { loadGeoPolicy } from './lib/geoConfig.js';
@@ -41,11 +40,7 @@ import './styles/theme.css';
 // Boot the temporary PMF-test overlay (GA4). No-op unless VITE_PMF_MODE=on.
 initPmf();
 initProductAnalytics();
-
-// Bootstrap the Maps JS API once app-wide so every locality box can use Places, not just map
-// pages. Without a key the provider is skipped and consumers fall back to the static registry.
-const withMaps = (node) =>
-  GOOGLE_MAPS_API_KEY ? <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>{node}</APIProvider> : node;
+installMapsLoader();
 
 // "auto" restoration lands this SPA part-scrolled once async content and reveals run. Scoped to
 // reloads so back/forward still restores, and set before React renders to beat the deferred restore.
@@ -77,7 +72,7 @@ const app = (
                 <NotificationProvider>
                   <CompareProvider>
                     <ToastProvider>
-                      {withMaps(<App />)}
+                      <App />
                     </ToastProvider>
                   </CompareProvider>
                 </NotificationProvider>

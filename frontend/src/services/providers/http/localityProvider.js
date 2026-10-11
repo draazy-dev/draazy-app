@@ -23,12 +23,6 @@ const toLocality = (row) => {
   };
 };
 
-/** Every locality, alphabetical. Public — no token, no session short-circuit. */
-export async function listLocalities() {
-  const rows = await get('/localities');
-  return (Array.isArray(rows) ? rows : []).map(toLocality);
-}
-
 const toAdminRow = (row) => ({
   slug: String(row?.slug || ''),
   name: String(row?.name || ''),

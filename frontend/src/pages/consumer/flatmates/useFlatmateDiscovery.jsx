@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import { useLocalityCoords } from './useLocalityCoords.js';
+import { localitiesIn } from '../../../services/localityService.js';
 import { TAB_MOVE_IN, TAB_TEAM_UP, normalizeTab, decorateRooms } from './model.js';
 import { inr, withCoords, BUDGET_MIN, BUDGET_MAX, budgetIsAny, segClass } from './helpers.js';
 import {
@@ -40,7 +41,6 @@ const isoInDays = (n) => {
 export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, openPostModal, onPost }) {
   const [params, setParams] = useSearchParams();
   const { pathname } = useLocation();
-  const localityCoords = useLocalityCoords();
   const initFromUrl = () => (hasFlatmateSearchParams(params)
     ? flatmateFiltersFromParams(params, emptyFilters)
     : readRememberedFlatmateSearch(emptyFilters) || { ...emptyFilters, budget: [...emptyFilters.budget], habits: [] });
@@ -170,6 +170,10 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
   const requestPage = pagedKey === requestKey ? page : 0;
 
   const search = useFlatmatesSearch({ tab, filters: query, page: requestPage, size });
+  // Centres only place map pins, so the list view never looks them up.
+  const localityCoords = useLocalityCoords(viewMode === 'map'
+    ? search.items.flatMap((it) => (it.localities?.length ? it.localities : [it.locality]))
+    : []);
 
   const activeList = useMemo(() => {
     const withPoints = search.items.map((p) => withCoords(p, localityCoords));
@@ -252,7 +256,7 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
   const seg = segClass;
   // Once a sentence is translated into structured chips the raw sentence must be CLEARED from `q`,
   // or it keeps applying as a substring match and silently zeroes out honest results.
-  const smartSearchFlat = (raw = filters.q) => {
+  const smartSearchFlat = async (raw = filters.q) => {
     const rawQuery = String(raw);
     const q = rawQuery.toLowerCase().trim();
     if (!q) return false;
@@ -271,7 +275,9 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     if (budgetD) next.budget = [BUDGET_MIN, parseInt(budgetD[1], 10)];
     if (!budgetIsAny(next.budget)) parts.push('≤ ' + inr(next.budget[1]));
 
-    const loc = Object.keys(localityCoords).find((l) => q.includes(l.toLowerCase()));
+    const loc = (await localitiesIn(q)).map((l) => l.name)
+      .filter((name) => q.includes(name.toLowerCase()))
+      .sort((a, b) => b.length - a.length)[0];
     if (loc) { next.locality = loc; parts.push(loc); }
 
     if (/\b(immediate|now|asap|urgent)\b/.test(q)) { next.moveIn = 'now'; parts.push(t('flatmates.immediate')); }

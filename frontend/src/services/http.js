@@ -168,6 +168,8 @@ export function get(path, query, opts = {}) {
 
 // Long enough to absorb the reads a page's panels repeat while mounting; any write clears it first.
 export const PAGE_LOAD_TTL = 5_000;
+// Matches the server's public-read cache TTL (`draazy.cache.public-reads.ttl`), so a repeat visit costs no request.
+export const PUBLIC_READ_TTL = 30_000;
 
 // Seeds the read `get(path, query)` would make with a value fetched elsewhere; a null or failed seed falls back.
 // An unread seed is dropped so the next `get` can surface its own error; without `ttl` it is single-use.
@@ -242,13 +244,15 @@ export function unwrapFullPage(res, label) {
 /** True for a `multipart/form-data` body: the platform owns its `Content-Type` (boundary and all). */
 const isFormData = (body) => typeof FormData !== 'undefined' && body instanceof FormData;
 
-// index.html starts `GET /bootstrap` (user-independent) before the bundle loads, and the first read
-// of it takes that response (once: a body reads once). Staff skip it because their reads revalidate.
-function takeEarlyRead(url) {
-  const early = globalThis.__dzBootstrap;
-  if (url !== '/bootstrap' || !early || isInternal(readUser())) return null;
-  globalThis.__dzBootstrap = undefined;
-  return early;
+// index.html starts `GET /bootstrap` (and `/me/bootstrap` when a token is stored) before the bundle loads; the
+// first read of each takes that response once, if sent with the same token. Staff revalidate, so they never do.
+const EARLY_READS = { '/bootstrap': '__dzBootstrap', '/me/bootstrap': '__dzMeBootstrap' };
+function takeEarlyRead(url, token) {
+  const name = EARLY_READS[url];
+  const early = name && globalThis[name];
+  if (!early) return null;
+  globalThis[name] = undefined;
+  return !isInternal(readUser()) && (early.token || null) === (token || null) ? early : null;
 }
 
 async function send(path, { method = 'GET', body, query, headers: extra, signal }, token) {
@@ -262,7 +266,7 @@ async function send(path, { method = 'GET', body, query, headers: extra, signal 
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    const early = method === 'GET' ? takeEarlyRead(path + buildQuery(query)) : null;
+    const early = method === 'GET' ? takeEarlyRead(path + buildQuery(query), token) : null;
     const res = (early && await early) || await fetch(API_BASE + path + buildQuery(query), {
       method,
       headers,

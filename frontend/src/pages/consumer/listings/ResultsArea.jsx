@@ -17,7 +17,7 @@ import { RANGE, rangeChanged } from '../../../lib/listings/filterState.js';
 const PropertyMap = lazy(() => import('../../../components/property/PropertyMap.jsx'));
 const MapDetailPanel = lazy(() => import('../../../components/property/MapDetailPanel.jsx'));
 
-export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, smartSearch, saveSearch, savingSearch = false, results, total, verifiedCount = 0, unstatedCount = 0, relaxedNear, page, pageCount, goToPage, view, setView, sort, setSort, flagEnabled, activeChips, clearAll, locNameBySlug, loaded, loadFailed = false, searching = false, loadError, onRetryLoad, toast, onOpenFilters, filterTriggerRef, mapGated, mapAreaCount: _mapAreaCount, mapMaxAreas, mapMarkerCap: _mapMarkerCap, mapFocus, activeId, activeProperty, activeIndex, onSelectProperty, onCloseProperty, fromSearch, onOpenProperty, isIn, mapUnavailable, suggestedMapLocalities = [] }) {
+export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, smartSearch, saveSearch, savingSearch = false, results, total, verifiedCount = 0, unstatedCount = 0, relaxedNear, page, pageCount, goToPage, view, setView, sort, setSort, flagEnabled, activeChips, clearAll, locNameBySlug, loaded, loadFailed = false, searching = false, loadError, onRetryLoad, toast, onOpenFilters, filterTriggerRef, mapGated, mapAreaCount: _mapAreaCount, mapMaxAreas, mapMarkerCap: _mapMarkerCap, mapFocus, activeId, activeProperty, activeIndex, onSelectProperty, onCloseProperty, fromSearch, onOpenProperty, isIn, mapUnavailable, suggestedMapLocalities = [], onAddLocality }) {
   const { t } = useTranslation();
   const count = total ?? results.length;
   const mapCapped = view === 'map' && !mapGated && total > results.length;
@@ -163,7 +163,7 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
 
               {view === 'map' && flagEnabled('mapSearch') ? (
                 mapGated ? (
-                  <MapGate localities={localities} f={f} set={set} locNameBySlug={locNameBySlug} maxAreas={mapMaxAreas} setView={setView} suggestedLocalities={suggestedMapLocalities} />
+                  <MapGate localities={localities} f={f} set={set} locNameBySlug={locNameBySlug} maxAreas={mapMaxAreas} setView={setView} suggestedLocalities={suggestedMapLocalities} onAddLocality={onAddLocality} />
                 ) : (
                   <>
                     {mapCapped && (

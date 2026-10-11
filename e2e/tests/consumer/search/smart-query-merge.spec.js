@@ -7,11 +7,14 @@ const REGISTRY = [
   { slug: 'kharadi', name: 'Kharadi', city: 'Pune' },
 ];
 
-const stubRegistry = (page) => page.route('**/api/localities', (route) => route.fulfill({
-  status: 200,
-  contentType: 'application/json',
-  body: JSON.stringify(REGISTRY),
-}));
+const stubRegistry = (page) => page.route('**/api/localities/search**', (route) => {
+  const q = (new URL(route.request().url()).searchParams.get('q') || '').toLowerCase();
+  return route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify(REGISTRY.filter((r) => r.name.toLowerCase().includes(q))),
+  });
+});
 
 const smartSearch = async (page, text) => {
   const field = page.locator('.lst-search-field').first();

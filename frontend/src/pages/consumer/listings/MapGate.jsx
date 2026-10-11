@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import LocalitySearchInput from '../../../components/search/LocalitySearchInput.jsx';
 
 /* The map only appears after focusing on 1–maxAreas localities: a whole city of markers is expensive. */
 
@@ -12,7 +13,7 @@ const popularAreas = (localities, limit = 8) =>
     .sort((a, b) => (b.liveListings || 0) - (a.liveListings || 0))
     .slice(0, limit);
 
-export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, setView, suggestedLocalities = [] }) {
+export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, setView, suggestedLocalities = [], onAddLocality }) {
   const { t } = useTranslation();
   const selected = [...f.localities];
   const overLimit = selected.length > maxAreas;
@@ -25,10 +26,15 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
 
   const choices = useMemo(() => {
     const bySlug = new Map(localities.filter((l) => !l.archived).map((l) => [l.slug, l]));
-    const picked = initialDraft.map((slug) => bySlug.get(slug)).filter(Boolean);
-    const rest = popularAreas(localities, 10).filter((l) => !initialDraft.includes(l.slug));
+    const first = [...new Set([...initialDraft, ...draft])];
+    const picked = first.map((slug) => bySlug.get(slug)).filter(Boolean);
+    const rest = popularAreas(localities, 10).filter((l) => !first.includes(l.slug));
     return [...picked, ...rest].slice(0, 8);
-  }, [localities, initialDraft]);
+  }, [localities, initialDraft, draft]);
+  const pickArea = (loc) => {
+    onAddLocality(loc);
+    setDraft((prev) => (prev.size < maxAreas ? new Set([...prev, loc.slug]) : prev));
+  };
 
   const toggleArea = (slug) => {
     const next = new Set(f.localities);
@@ -93,7 +99,11 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
               {t('listings.focusIntro')} <span className="text-teal-300 font-semibold">{maxAreas}</span>.
             </p>
 
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <div className="mx-auto mt-5 max-w-sm text-left">
+              <LocalitySearchInput onPick={pickArea} clearOnPick placeholder={t('listings.searchLocalityPlaceholder')} ariaLabel={t('listings.localities')} />
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
               {choices.map((l) => {
                 const on = draft.has(l.slug);
                 return (

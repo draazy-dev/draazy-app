@@ -15,3 +15,23 @@ export const PUNE_CENTER = { lat: 18.553, lng: 73.86 };
 
 // A map takes its scheme when constructed; the switch lives in Settings, which renders no map.
 export const mapColorScheme = () => (document.documentElement.classList.contains('light') ? 'LIGHT' : 'DARK');
+
+/* Google's dynamic-import bootstrap: the ~800 KB SDK loads on the first importLibrary call, not on every page.
+   Each map's APIProvider finds importLibrary defined and reuses it. */
+export function installMapsLoader() {
+  if (!GOOGLE_MAPS_API_KEY) return;
+  const maps = ((window.google ||= {}).maps ||= {});
+  if (maps.importLibrary) return;
+  let sdk;
+  maps.importLibrary = (...args) => {
+    sdk ||= new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://maps.googleapis.com/maps/api/js?' +
+        new URLSearchParams({ key: GOOGLE_MAPS_API_KEY, v: 'weekly', callback: 'google.maps.__ib__' });
+      maps.__ib__ = resolve;
+      s.onerror = () => { sdk = null; reject(new Error('Google Maps JS could not load')); };
+      document.head.append(s);
+    });
+    return sdk.then(() => maps.importLibrary(...args));
+  };
+}

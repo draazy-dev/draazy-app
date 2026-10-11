@@ -8,7 +8,7 @@ import { useFollows } from '../../context/FollowContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
 import { useSignInGate } from '../../lib/useSignInGate.js';
-import { listLocalities } from '../../services/localityService.js';
+import { searchLocalities } from '../../services/localityService.js';
 import { listSocietiesPage } from '../../services/societyService.js';
 import SocietySelect from './list-property/SocietySelect.jsx';
 import { Stars } from './property/Stars.jsx';
@@ -151,16 +151,8 @@ export default function Societies() {
   const failed = feed.status === 'failed';
   const fresh = feed.status === 'ready' && feed.key === key;
 
-  const [localityRows, setLocalityRows] = useState([]);
-  useEffect(() => {
-    let alive = true;
-    listLocalities().then((rows) => { if (alive) setLocalityRows(rows); }).catch(() => {});
-    return () => { alive = false; };
-  }, []);
-  const nameOf = useMemo(() => {
-    const byslug = Object.fromEntries(localityRows.map((l) => [l.slug, l.name]));
-    return (slug) => byslug[slug] || titleCase(slug);
-  }, [localityRows]);
+  const [locName, setLocName] = useState('');
+  const nameOf = useCallback((slug) => (slug === loc && locName) || titleCase(slug), [loc, locName]);
 
   const cards = useMemo(() => feed.rows.map((soc) => ({
     slug: soc.slug, name: soc.name, builder: soc.builder || '',
@@ -172,13 +164,15 @@ export default function Societies() {
     homes: soc.listingCount,
   })), [feed.rows, feed.ratings, nameOf]);
 
-  const localities = useMemo(() => {
-    const known = localityRows.filter((l) => !l.archived || l.liveListings > 0 || l.slug === loc)
-      .map((l) => ({ value: l.slug, label: l.name }))
-      .sort((a, b) => a.label.localeCompare(b.label));
-    const extra = loc && !known.some((o) => o.value === loc) ? [{ value: loc, label: nameOf(loc) }] : [];
-    return [{ value: '', label: t('societies.allLocalities') }, ...known, ...extra];
-  }, [localityRows, loc, nameOf, t]);
+  // Localities are created on demand, so the filter searches the server instead of listing them all.
+  const localities = useMemo(
+    () => [{ value: '', label: t('societies.allLocalities') }, ...(loc ? [{ value: loc, label: nameOf(loc) }] : [])],
+    [loc, nameOf, t],
+  );
+  const findLocalities = useCallback(
+    async (text) => (await searchLocalities(text)).map((l) => ({ value: l.slug, label: l.name })),
+    [],
+  );
 
   const sortOptions = useMemo(() => SORTS.map((o) => ({ value: o.value, label: t(o.labelKey) })), [t]);
 
@@ -228,7 +222,7 @@ export default function Societies() {
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Select value={loc} onChange={setLoc} options={localities} ariaLabel={t('societies.filterLocality')} className="min-w-0 flex-1 lg:flex-none" />
+            <Select value={loc} onChange={setLoc} onPick={(o) => setLocName(o.value ? o.label : '')} options={localities} asyncSearch={findLocalities} ariaLabel={t('societies.filterLocality')} className="min-w-0 flex-1 lg:flex-none" />
             <Select value={sort} onChange={setSort} options={sortOptions} ariaLabel={t('societies.sortAria')} className="min-w-0 flex-1 lg:flex-none" />
           </div>
         </div>

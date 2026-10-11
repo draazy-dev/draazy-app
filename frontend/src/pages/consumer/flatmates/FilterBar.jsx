@@ -184,9 +184,9 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
     setSmartClearPending(false);
     setQDraft('');
   }, [searching, smartClearPending]);
-  const submitSmartSearch = () => {
+  const submitSmartSearch = async () => {
     const query = qInputRef.current?.value ?? qDraft;
-    if (smartSearchFlat(query)) {
+    if (await smartSearchFlat(query)) {
       sawSmartLoadingRef.current = false;
       setSmartClearPending(true);
     }

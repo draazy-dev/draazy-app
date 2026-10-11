@@ -24,11 +24,14 @@ function countGets(page) {
 
 test('a guest home page reads public config once, from /bootstrap', async ({ page, consoleErrors }) => {
   const gets = countGets(page);
+  const maps = [];
+  page.on('request', (r) => { if (r.url().includes('maps.googleapis.com')) maps.push(r.url()); });
   await page.goto('/');
   await expect(page.locator('h1').first()).toBeVisible();
   await expect.poll(() => gets.timesPath('/api/bootstrap')).toBe(1);
 
   expect(gets.paths().filter((p) => RETIRED.test(p))).toEqual([]);
+  expect(maps, 'the Maps SDK loads with the first map, not on a page without one').toEqual([]);
   expect(consoleErrors).toEqual([]);
 });
 
@@ -154,6 +157,20 @@ test('the societies directory reads one filtered page, then the next on Show mor
   await page.getByRole('button', { name: /show more/i }).click();
   await expect.poll(() => gets.timesPath('/api/societies')).toBe(2);
   expect(gets.keys()).toContain('/api/societies?sort=relevance&page=1&size=24');
+  expect(gets.timesPath('/api/localities'), 'the locality filter searches; it never downloads the directory').toBe(0);
+  expect(consoleErrors).toEqual([]);
+});
+
+test('a society page reads its reviews and rating summary in one request', async ({ page, consoleErrors }) => {
+  await page.goto('/societies');
+  const href = await page.locator('a[href^="/society/"]').first().getAttribute('href', { timeout: 15000 });
+  const gets = countGets(page);
+  await page.goto(href);
+  await expect(page.locator('h1').first()).toBeVisible({ timeout: 15000 });
+  await page.waitForTimeout(1500);
+
+  const reviewReads = gets.keys().filter((k) => k.startsWith('/api/reviews/society/'));
+  expect(reviewReads).toHaveLength(1);
   expect(consoleErrors).toEqual([]);
 });
 
