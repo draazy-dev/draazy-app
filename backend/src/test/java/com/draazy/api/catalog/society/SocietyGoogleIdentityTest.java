@@ -18,6 +18,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -216,9 +217,9 @@ class SocietyGoogleIdentityTest extends AbstractApiTest {
                                  "furnishing":"semi","locality":"Aundh",%s
                                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                                  "lookingFor":"any","foodPref":"any",
-                                 "photos":["https://cdn.example/1.jpg"],"hostRole":"owner",
+                                 "photos":["%s"],"hostRole":"owner",
                                  "note":"Quiet room."}
-                                """.formatted(societyFields)))
+                                """.formatted(societyFields, UploadedPhotos.of(host.getId()))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
@@ -305,21 +306,21 @@ class SocietyGoogleIdentityTest extends AbstractApiTest {
         assertThat(properties.findById(listing.getId()).orElseThrow().getSocietyId()).isEqualTo(retired);
     }
 
-    private String roomBody(String societyFields) {
+    private String roomBody(User host, String societyFields) {
         return """
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "furnishing":"semi","locality":"Aundh",%s
                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                  "lookingFor":"any","foodPref":"any",
-                 "photos":["https://cdn.example/1.jpg"],"hostRole":"owner",
+                 "photos":["%s"],"hostRole":"owner",
                  "note":"Quiet room."}
-                """.formatted(societyFields);
+                """.formatted(societyFields, UploadedPhotos.of(host.getId()));
     }
 
     private String postRoom(User host, String societyFields) throws Exception {
         String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
-                        .contentType(MediaType.APPLICATION_JSON).content(roomBody(societyFields)))
+                        .contentType(MediaType.APPLICATION_JSON).content(roomBody(host, societyFields)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
@@ -328,7 +329,7 @@ class SocietyGoogleIdentityTest extends AbstractApiTest {
     private void patchRoom(User host, String roomId, String societyFields, int expected) throws Exception {
         mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, roomId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
-                        .contentType(MediaType.APPLICATION_JSON).content(roomBody(societyFields)))
+                        .contentType(MediaType.APPLICATION_JSON).content(roomBody(host, societyFields)))
                 .andExpect(status().is(expected));
     }
 

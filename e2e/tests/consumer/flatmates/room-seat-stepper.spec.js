@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAsNew } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAsNew, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
@@ -49,7 +49,7 @@ test('the host closes and reopens a real standalone room seat from its detail pa
       lookingFor: 'any',
       foodPref: 'any',
       hostRole: 'tenant',
-      photos: ['https://cdn.example/live-room-seat.jpg'],
+      photos: await uploadedListingPhotos(accessToken),
       ...(await tenantRoomAgreement(accessToken)),
     }),
   });

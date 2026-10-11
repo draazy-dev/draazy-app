@@ -67,9 +67,14 @@ Size: S < 1h, M half-day, L day+. **Owner** = needs secrets/dashboard access onl
   customer and desk views; `?q=` on three search pages).
 - [x] **SH16 Session-state e2e** — `e2e/tests/platform/security/session-state.spec.js` (tampered cached role,
   corrupt cache). Logout/cookie lifecycle is already `platform/auth/signin-otp-session`.
-- [ ] **SH17 Flatmate room photos accept any URL** — logged in `tasks/todo.md`, not fixed here.
-- [ ] **SH18 Migrations out of the serving container** — Flyway runs at boot, so the runtime still holds the
-  owner password. Move it to a Cloud Run Job; logged in `tasks/todo.md`.
+- [x] **SH17 Flatmate room photos** — `FlatmateSupplyService` runs `ListingPhotoSources.requireUploaded` on
+  create and edit: new photos must be the caller's own uploads (`FlatmateRoomPhotoSourcesTest`).
+- [x] **SH18 Migrations out of the serving container** — `--migrate-only` Cloud Run Job
+  (`cloudrun-migrate-sandbox.yaml`, SA `draazy-migrator-sandbox`) runs before `services replace`; deployed
+  profiles set `spring.flyway.enabled=false`; runtime SA secrets granted one by one (the owner drops the old
+  project-wide grant after the first deploy)
+  (`MigrateOnlyModeTest`, `SandboxDeploymentManifestTest`). DEPLOY.md §2.1.
+- [x] **LIKE escapes** — eight private copies now call `LikePatterns.escape`.
 ## Not doing (and why)
 
 - `DB_USER:postgres` default in `application.properties`, `pg_stat_statements` / `log_min_error_statement`

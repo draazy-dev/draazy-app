@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
@@ -37,7 +37,7 @@ async function seedRoom(hostToken) {
       attachedBath: 'attached',
       furnishing: 'semi',
       hostRole: 'tenant',
-      photos: ['https://example.test/room.jpg'],
+      photos: await uploadedListingPhotos(hostToken),
       ...(await tenantRoomAgreement(hostToken)),
     }),
   });

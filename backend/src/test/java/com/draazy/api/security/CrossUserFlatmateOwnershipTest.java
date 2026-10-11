@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
+import com.draazy.api.support.UploadedPhotos;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -21,13 +22,13 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
             {"name":"Asha","budget":18000,"localities":["Baner"],"moveIn":"2026-09-01","note":"Tidy."}
             """;
 
-    private String room(long rentShare) {
+    private String room(User host, long rentShare) {
         return withSocietyIds("""
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached","furnishing":"semi",
                  "locality":"Baner","society":"Sunrise Heights","rentShare":%d,"deposit":30000,
                  "availableFrom":"2026-09-01","lookingFor":"any","foodPref":"any",
-                 "photos":["https://cdn.example/1.jpg"],"hostRole":"owner","note":"Sunny room."}
-                """.formatted(rentShare));
+                 "photos":["%s"],"hostRole":"owner","note":"Sunny room."}
+                """.formatted(rentShare, UploadedPhotos.of(host.getId())));
     }
 
     private static String group(String title) {
@@ -65,11 +66,11 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
     void editingSomeoneElsesRoom() throws Exception {
         User a = user("9898100003", BUYER);
         User b = user("9898100004", BUYER);
-        String id = create(a, Routes.Flatmates.ROOMS, room(15000));
+        String id = create(a, Routes.Flatmates.ROOMS, room(a, 15000));
         String before = row("flatmate_rooms", uuid(id));
 
         mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(b))
-                        .contentType(JSON).content(room(1000)))
+                        .contentType(JSON).content(room(b, 1000)))
                 .andExpect(status().isForbidden());
 
         assertThat(row("flatmate_rooms", uuid(id))).isEqualTo(before);

@@ -6,6 +6,7 @@ import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.RateLimitedException;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
@@ -115,9 +116,8 @@ public class TicketService {
         return mapper.toDto(accessible(caller, id));
     }
 
-    // An unescaped % or _ would slip the caller's own wildcard into the search.
     private static String containsPattern(String term) {
-        return "%" + term.toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return "%" + LikePatterns.escape(term.toLowerCase(Locale.ROOT)) + "%";
     }
 
     /** What {@code list(team, "open")} would total, without reading a page. */

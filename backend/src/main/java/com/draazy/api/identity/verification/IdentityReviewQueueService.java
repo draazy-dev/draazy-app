@@ -1,6 +1,7 @@
 package com.draazy.api.identity.verification;
 
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.AuthPrincipal;
 import jakarta.persistence.criteria.Root;
@@ -156,7 +157,7 @@ public class IdentityReviewQueueService {
 
     private static Specification<IdentityVerification> applicantMatches(String q) {
         String digits = q.replaceAll("\\D", "");
-        String namePattern = "%" + escapeLike(q.toLowerCase(Locale.ROOT)) + "%";
+        String namePattern = "%" + LikePatterns.escape(q.toLowerCase(Locale.ROOT)) + "%";
         return (root, query, cb) -> {
             Subquery<UUID> users = query.subquery(UUID.class);
             Root<User> u = users.from(User.class);
@@ -166,9 +167,5 @@ public class IdentityReviewQueueService {
                     : byName);
             return root.get("userId").in(users);
         };
-    }
-
-    private static String escapeLike(String s) {
-        return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }

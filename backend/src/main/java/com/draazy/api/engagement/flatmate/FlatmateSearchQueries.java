@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
+import com.draazy.api.common.persistence.LikePatterns;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import java.util.HashMap;
@@ -462,13 +463,7 @@ public class FlatmateSearchQueries {
                 + " where lower(e.v) like :q)").formatted(column);
     }
 
-    /** Binding stops the statement being rewritten but leaves {@code %} a wildcard, so the escape
-     * happens here — backslash first, or it would escape the escapes. */
     private static String like(String q) {
-        String escaped = q.toLowerCase()
-                .replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
-        return "%" + escaped + "%";
+        return "%" + LikePatterns.escape(q.toLowerCase()) + "%";
     }
 }

@@ -2,6 +2,7 @@ package com.draazy.api.admin;
 
 import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.web.PageResponse;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -138,8 +139,7 @@ public class AdminFinanceService {
 
         // Escaped before wrapping: an operator searching for a party with an underscore or a
         // percent in the name would otherwise be running a wildcard they did not type.
-        String term = (q == null || q.isBlank()) ? null
-                : "%" + q.trim().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        String term = (q == null || q.isBlank()) ? null : "%" + LikePatterns.escape(q.trim()) + "%";
 
         long total = metrics.ledgerCount(kind, status, term);
         List<AdminFinanceTransaction> rows = metrics

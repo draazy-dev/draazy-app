@@ -12,6 +12,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
 import java.util.List;
 import org.hamcrest.Matchers;
@@ -97,10 +98,10 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                                  "furnishing":"semi","locality":"%s","society":"%s",
                                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                                  "lookingFor":"any","foodPref":"any",
-                                 "photos":["https://cdn.example/1.jpg"],
+                                 "photos":["%s"],
                                  "hostRole":"owner",
                                  "note":"Sunny room."}
-                                """.formatted(locality, society)))
+                                """.formatted(locality, society, UploadedPhotos.of(host.getId()))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
     }
@@ -231,8 +232,8 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                                      "furnishing":"semi","locality":"GateTownF","society":"Ch House",
                                      "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                                      "lookingFor":"any","foodPref":"any",
-                                     "photos":["https://cdn.example/1.jpg"],"hostRole":"owner","note":"Hi."}
-                                    """))
+                                     "photos":["%s"],"hostRole":"owner","note":"Hi."}
+                                    """.formatted(UploadedPhotos.of(host.getId()))))
                     .andExpect(status().isCreated())
                     // Without this the client has no way to distinguish "saved" from "published",
                     // and would show a success screen for a post nobody can see.

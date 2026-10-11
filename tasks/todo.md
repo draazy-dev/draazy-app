@@ -8,9 +8,6 @@
 ## Open
 
 ### Backend: API, data and schema
-- [ ] **SH17** flatmate room photos accept any URL; restrict to our storage origin like listing media.
-- [ ] **SH18** run Flyway as a Cloud Run Job so the serving revision never holds the schema-owner password (DEPLOY.md §2.1 known limit).
-- [ ] Consolidate private LIKE-escape copies onto `LikePatterns` (`StaffActivityFilter`, `AdminFinanceService`, `ServiceRequestQueryService`, `UserAdminService`, `TicketService`, `FlatmateSearchQueries.like`, `EnquiryBoardService`, `IdentityReviewQueueService`).
 
 ### Admin and ops UI
 - [x] **A01** back-office functions split so each feature is its own checkbox: `flatmates`, `referrals` (from reports), `localities` + `reviews` (from listingModeration), `enquiries` (from support), `societies` (from content), `users`; V103/V104 carry holders; Add-member groups come from the catalogue (Analytics was never rendered). Verified 2026-10-10: back-office-functions, reports, localities-console, referrals, admin-content-reports-payload, support-referrals-payload specs green; full backend suite green. PENDING AGENT REVIEW
@@ -32,6 +29,7 @@
 ## Shipped
 Newest first, one line per slice; the commit (or the uncommitted tree) is the record.
 
+- 2026-10-11 Security SH17 + SH18 + LIKE consolidation ([plan](security-hardening-plan.md)): flatmate room photos must be the caller's own uploads (kept legacy photos pass on edit); Flyway moved to the `--migrate-only` Cloud Run Job `draazy-migrate-sandbox` under its own SA, service runs `spring.flyway.enabled=false` without the owner password, runtime SA secrets granted per-secret; eight private LIKE escapes now call `LikePatterns`. Owner step in OWNER-CHECKLIST
 - 2026-10-10 Security hardening SH01–SH16 ([plan](security-hardening-plan.md)): DML-only runtime DB role + boot privilege check, Data API revoke, SQL/LIKE guard, error-leak, authorization + paging sweep, IDOR/mass-assignment/boundary/token suites, CSP/CORS deploy smoke, output-encoding + session e2e. Fixed: NUL 409→400, ticket priority customer-settable, page=MAX_INT and bad sort 500s, contact quota race. Owner steps in OWNER-CHECKLIST before next deploy
 - 2026-10-10 C03 back-office gaps closed: Users copy/badge reason/archive ends sessions; Enquiries Responded (`notes:write`), dead chips gone, Funnel deal filter dropped; Team Suspend really suspends; phone admin search; Finance/Integrations error states + refund banner; Settings `If-Match` 412, no ₹ on counts, blank refused; erasure sweeps `personal_documents` (+ vault deletes purge unreferenced files); help feedback one vote per voter (V105) ranked by share; Team Activity CSV pages the whole trail
 - 2026-10-10 C01 fact gaps closed: tenant profile/flatmates no longer promise owners see income; /refer says "qualified referral", Move-in guarantee removed; Seeker Plus "one payment · 1 month"; Terms/Refund/Privacy factual edits (lawyer glance in OWNER-CHECKLIST)

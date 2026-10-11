@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAs, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAs, signedInAsNew, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { ACTORS } from '../../../fixtures/live.js';
@@ -83,7 +83,7 @@ async function hostsRoom(token, society) {
       attachedBath: 'attached',
       furnishing: 'semi',
       hostRole: 'tenant',
-      photos: ['https://example.test/room.jpg'],
+      photos: await uploadedListingPhotos(token),
       ...(await tenantRoomAgreement(token)),
     }),
   });
@@ -325,7 +325,7 @@ test.describe('LIVE: my flatmate listings', () => {
         society: unique('Bad Home Type'),
         rentShare: 14000,
         availableFrom: '2026-12-01',
-        photos: ['https://cdn.example.com/room.png'],
+        photos: await uploadedListingPhotos(accessToken),
         ...(await tenantRoomAgreement(accessToken)),
       }),
     });

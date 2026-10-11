@@ -9,6 +9,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -41,13 +42,13 @@ class FlatmatePostTitleTest extends AbstractApiTest {
         return saved;
     }
 
-    private static String roomBody(String title) {
+    private static String roomBody(User host, String title) {
         return """
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached","furnishing":"semi",
                  "locality":"Baner","society":"Headline Heights","rentShare":15000,"deposit":30000,
-                 "availableFrom":"2026-09-01","photos":["https://cdn.example/1.jpg"],
+                 "availableFrom":"2026-09-01","photos":["%s"],
                  "hostRole":"owner","title":%s}
-                """.formatted(title);
+                """.formatted(UploadedPhotos.of(host.getId()), title);
     }
 
     private static String postBody(String title) {
@@ -59,10 +60,11 @@ class FlatmatePostTitleTest extends AbstractApiTest {
     @Test
     @DisplayName("a room keeps the headline its host typed, trimmed")
     void roomTitleIsStored() throws Exception {
+        User host = user("9840007001");
         mvc.perform(post(Routes.Flatmates.ROOMS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(user("9840007001")))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(roomBody("\"  Sunny room near Baner high street  \"")))
+                        .content(roomBody(host, "\"  Sunny room near Baner high street  \"")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Sunny room near Baner high street"));
     }
@@ -70,10 +72,11 @@ class FlatmatePostTitleTest extends AbstractApiTest {
     @Test
     @DisplayName("a room with no headline is still accepted — older clients send none")
     void roomTitleIsOptional() throws Exception {
+        User host = user("9840007002");
         mvc.perform(post(Routes.Flatmates.ROOMS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(user("9840007002")))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(roomBody("null")))
+                        .content(roomBody(host, "null")))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").doesNotExist());
     }
@@ -81,10 +84,11 @@ class FlatmatePostTitleTest extends AbstractApiTest {
     @Test
     @DisplayName("a phone number in a room headline is refused")
     void roomTitleRefusesContact() throws Exception {
+        User host = user("9840007003");
         mvc.perform(post(Routes.Flatmates.ROOMS)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(user("9840007003")))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(roomBody("\"Call 9876543210 for the room\"")))
+                        .content(roomBody(host, "\"Call 9876543210 for the room\"")))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.fields[0].field").value("title"));
     }

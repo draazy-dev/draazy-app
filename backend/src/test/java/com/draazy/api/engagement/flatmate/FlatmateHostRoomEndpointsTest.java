@@ -15,10 +15,13 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -44,6 +47,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
     EntityManager em;
 
     private final List<String> createdActors = new ArrayList<>();
+    private final Map<UUID, String> hostPhotos = new HashMap<>();
 
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
@@ -64,22 +68,26 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
         return saved;
     }
 
-    private static String roomBody(String locality, String society) {
+    private String photoOf(User host) {
+        return hostPhotos.computeIfAbsent(host.getId(), UploadedPhotos::of);
+    }
+
+    private String roomBody(User host, String locality, String society) {
         return """
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "furnishing":"semi","locality":"%s","society":"%s","rentShare":15000,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
-                 "foodPref":"any","photos":["https://cdn.example/1.jpg"],
+                 "foodPref":"any","photos":["%s"],
                  "hostRole":"owner",
                  "note":"Sunny room, quiet building."}
-                """.formatted(locality, society);
+                """.formatted(locality, society, photoOf(host));
     }
 
     private String createRoom(User host, String locality, String society) throws Exception {
         String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(roomBody(locality, society)))
+                        .content(roomBody(host, locality, society)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
@@ -161,7 +169,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].modStatus").value("pending"))
                     .andExpect(jsonPath("$.content[0].shareMax").isNumber())
                     .andExpect(jsonPath("$.content[0].occupants").isNumber())
-                    .andExpect(jsonPath("$.content[0].cover").value("https://cdn.example/1.jpg"))
+                    .andExpect(jsonPath("$.content[0].cover").value(photoOf(host)))
                     .andExpect(jsonPath("$.content[0].createdAt").isNotEmpty())
                     .andExpect(jsonPath("$.content[0].ownerMobile").doesNotExist())
                     .andExpect(jsonPath("$.content[0].owner").doesNotExist())
@@ -266,7 +274,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("Aundh", "Cap Four")))
+                            .content(roomBody(host, "Aundh", "Cap Four")))
                     .andExpect(status().isConflict());
 
             mvc.perform(delete(Routes.Flatmates.ROOM_BY_ID, third)
@@ -276,7 +284,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("Aundh", "Cap Four")))
+                            .content(roomBody(host, "Aundh", "Cap Four")))
                     .andExpect(status().isCreated());
         }
 

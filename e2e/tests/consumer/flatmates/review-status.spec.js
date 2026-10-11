@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, E2E_OTP, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, E2E_OTP, apiLogin, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
@@ -70,7 +70,7 @@ async function createRoom(token, body) {
     body: JSON.stringify({
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
       locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01',
-      lookingFor: 'any', foodPref: 'any', photos: ['https://cdn.example/review-status.jpg'],
+      lookingFor: 'any', foodPref: 'any', photos: await uploadedListingPhotos(token),
       ...(await withSocietyId(token, payload)),
     }),
   });

@@ -15,6 +15,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import com.jayway.jsonpath.JsonPath;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
@@ -34,6 +35,7 @@ class FlatmateRoomOutlookTest extends AbstractApiTest {
         @Autowired PropertyRepository properties;
     @Autowired EntityManager em;
     private User host;
+    private String photo;
     private String ownerPropertyId;
 
     @BeforeEach
@@ -42,6 +44,7 @@ class FlatmateRoomOutlookTest extends AbstractApiTest {
         host.setName("Outlook Host");
         host.setMobileVerified(true);
         host = users.saveAndFlush(host);
+        photo = UploadedPhotos.of(host.getId());
         Property flat = new Property(host, "Outlook parent flat", "rent", "apartment",
                 45000L, "Baner", "Pune");
         flat.setStatus(PropertyStatus.APPROVED);
@@ -170,8 +173,8 @@ class FlatmateRoomOutlookTest extends AbstractApiTest {
                 {"bhk":"2","roomType":"Private room","locality":"Baner",
                  "society":"Outlook House","rentShare":15000,"hostRole":"owner",
                  "propertyId":"%s",
-                 "photos":["https://cdn.example/room.jpg"]%s}
-                """.formatted(ownerPropertyId, fields.isEmpty() ? "" : "," + fields);
+                 "photos":["%s"]%s}
+                """.formatted(ownerPropertyId, photo, fields.isEmpty() ? "" : "," + fields);
     }
 
     private void assertStoredAndReadable(String id, String facing, String overlooking) throws Exception {

@@ -253,9 +253,9 @@ not in Mumbai and §2.1 needs doing again.
 
 | | `DB_URL` — transaction, `6543` | `FLYWAY_DB_URL` — session, `5432` |
 |---|---|---|
-| Used by | every request the app serves | Flyway, once per boot |
+| Used by | every request the app serves | the migration job, once per deploy |
 | Because | Cloud Run scales to zero and back, so each cold start would otherwise open fresh real backends against a free-tier ceiling measured in dozens | Flyway serialises concurrent deploys with `pg_advisory_lock`, which is **session**-scoped |
-| Fails how | prepared statements break — `prepared statement "S_1" does not exist`, intermittently, on the busiest endpoints only. Already handled: `prepareThreshold=0` is pinned in `application-prod.properties` | **it hangs.** The lock is taken on one backend and released against another, readiness never passes, and nothing in the log says "Flyway" |
+| Fails how | prepared statements break — `prepared statement "S_1" does not exist`, intermittently, on the busiest endpoints only. Already handled: `prepareThreshold=0` is pinned in `application-prod.properties` | **it hangs.** The lock is taken on one backend and released against another, the job runs to its timeout, and nothing in the log says "Flyway" |
 
 The direct connection *would* work for Flyway — it is a real session — but it is IPv6-only on the
 free tier, and it uses a different username (`postgres`, not `postgres.<project-ref>`), which means
@@ -386,9 +386,20 @@ configuration — that is the next step, and it is the one that matters.
 
 ### 3.4 Run it against Supabase
 
-Ten variables, which is not a coincidence: `ProdProfileContractTest` asserts that the set of
-`${ENV}` lookups in `application-prod.properties` is **exactly** this list, so it cannot drift
-without a test going red. Omit any one and the container refuses to start rather than defaulting.
+Not an arbitrary list: `ProdProfileContractTest` asserts that the set of `${ENV}` lookups in
+`application-prod.properties` is **exactly** the documented one, so it cannot drift without a test
+going red. Omit any one and the container refuses to start rather than defaulting.
+
+The serving app never migrates (`docs/DEPLOY.md` §2.1), so apply the schema first, then start it:
+
+```bash
+docker run --rm \
+  -e SPRING_PROFILES_ACTIVE='sandbox' \
+  -e FLYWAY_DB_URL='jdbc:postgresql://aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require' \
+  -e FLYWAY_DB_USER='postgres.<project-ref>' \
+  -e FLYWAY_DB_PASSWORD='<from §2.1>' \
+  draazy-api --migrate-only
+```
 
 **macOS**
 
@@ -396,8 +407,8 @@ without a test going red. Omit any one and the container refuses to start rather
 docker run --rm -p 8080:8080 \
   -e SPRING_PROFILES_ACTIVE='sandbox' \
   -e DB_URL='jdbc:postgresql://aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require' \
-  -e FLYWAY_DB_URL='jdbc:postgresql://aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require' \
   -e DB_USER='postgres.<project-ref>' \
+  -e FLYWAY_DB_USER='postgres.<project-ref>' \
   -e DB_PASSWORD='<from §2.1>' \
   -e JWT_SECRET="$(openssl rand -base64 48)" \
   -e REFERRAL_SIGNAL_SALT='any-long-random-string-for-now' \

@@ -15,8 +15,10 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -43,6 +45,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
 
     /** Audit writes run {@code REQUIRES_NEW} and escape this test's rollback. */
     private final List<String> createdActors = new ArrayList<>();
+    private final Map<UUID, String> hostPhotos = new HashMap<>();
 
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
@@ -59,19 +62,23 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
         return saved;
     }
 
-    private String roomBody(String locality, String society, long rentShare) {
+    private String photoOf(User host) {
+        return hostPhotos.computeIfAbsent(host.getId(), UploadedPhotos::of);
+    }
+
+    private String roomBody(User host, String locality, String society, long rentShare) {
         return withSocietyIds("""
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "furnishing":"semi","locality":"%s","society":"%s","rentShare":%d,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
-                 "foodPref":"any","photos":["https://cdn.example/1.jpg"],
+                 "foodPref":"any","photos":["%s"],
                  "hostRole":"owner",
                  "note":"Sunny room, quiet building."}
-                """.formatted(locality, society, rentShare));
+                """.formatted(locality, society, rentShare, photoOf(host)));
     }
 
     private String liveRoomBody(User host, String locality, String society, long rentShare) {
-        return roomBody(locality, society, rentShare)
+        return roomBody(host, locality, society, rentShare)
                 .replace("\"hostRole\":\"owner\"",
                         "\"hostRole\":\"tenant\",\"agreementDeclared\":true,"
                                 + agreementEvidence(host));
@@ -155,7 +162,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
             String id = idOf(mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("Kothrud", "Anon Residency", 15000)))
+                            .content(roomBody(host, "Kothrud", "Anon Residency", 15000)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString());
 

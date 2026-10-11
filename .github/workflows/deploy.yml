@@ -164,6 +164,15 @@ jobs:
           done
           envsubst '${GCP_PROJECT_ID} ${IMAGE} ${DB_URL} ${FLYWAY_DB_URL} ${DB_USER} ${FLYWAY_DB_USER} ${R2_ENDPOINT} ${R2_BUCKET_PRIVATE} ${R2_BUCKET_PUBLIC} ${R2_PUBLIC_BASE_URL} ${BOOTSTRAP_ADMIN_EMAIL} ${BOOTSTRAP_ADMIN_MOBILE} ${BOOTSTRAP_ADMIN_RECOVER}' \
             < backend/deploy/cloudrun-sandbox.yaml > "${RUNNER_TEMP}/service.yaml"
+          envsubst '${GCP_PROJECT_ID} ${IMAGE} ${FLYWAY_DB_URL} ${FLYWAY_DB_USER}' \
+            < backend/deploy/cloudrun-migrate-sandbox.yaml > "${RUNNER_TEMP}/migrate.yaml"
+
+      # Runs while the old revision still serves, so every migration must stay compatible with it.
+      - name: Migrate the database
+        run: |
+          set -euo pipefail
+          gcloud run jobs replace "${RUNNER_TEMP}/migrate.yaml" --region "$REGION" --quiet
+          gcloud run jobs execute draazy-migrate-sandbox --region "$REGION" --wait --quiet
 
       # `replace`, not `deploy`: removed repo settings must not linger on the service.
       - name: Deploy to Cloud Run
@@ -202,7 +211,7 @@ jobs:
       # Self-hosted runners can keep RUNNER_TEMP after the job.
       - name: Remove rendered service definition
         if: always()
-        run: rm -f "${RUNNER_TEMP}/service.yaml"
+        run: rm -f "${RUNNER_TEMP}/service.yaml" "${RUNNER_TEMP}/migrate.yaml"
 
   # Keep the deploy token away from repository code; dependency scripts can alter
   # the workspace that a later `npx` resolves from.

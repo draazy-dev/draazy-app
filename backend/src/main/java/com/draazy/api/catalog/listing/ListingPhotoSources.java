@@ -9,7 +9,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
-class ListingPhotoSources {
+public class ListingPhotoSources {
 
     private final FileStorage storage;
     private final PhotoKeys keys;
@@ -19,7 +19,7 @@ class ListingPhotoSources {
         this.keys = keys;
     }
 
-    void requireUploaded(Collection<String> urls, Collection<String> alreadyHeld, Collection<UUID> ownerIds) {
+    public void requireUploaded(Collection<String> urls, Collection<String> alreadyHeld, Collection<UUID> ownerIds) {
         if (urls == null) {
             return;
         }

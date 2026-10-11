@@ -1057,7 +1057,8 @@ support surprise.
 - **Secrets - GCP Secret Manager** (free: 6 active versions). All keys (JWT secret, Razorpay, WhatsApp,
   identity-hash secret, DB creds) injected into Cloud Run at runtime; nothing in the repo. (Implied by ADR-005.)
 - **CI/CD - GitHub Actions** (free 2,000 min): build + push container -> deploy Cloud Run revision;
-  Cloudflare Pages auto-deploys the SPA on push; **Flyway** runs migrations on startup.
+  Cloudflare Pages auto-deploys the SPA on push; **Flyway** runs migrations in a Cloud Run Job
+  before each revision (`docs/DEPLOY.md` §2.1).
 - **Observability.**
   - Logs -> structured JSON to **Cloud Logging** (free tier).
   - Metrics -> **Cloud Monitoring** + Cloud Run built-in dashboards.

@@ -82,13 +82,14 @@ You need **two** connection strings, and this is the part that costs a day if it
 
 Flyway and the running app log in as different roles. `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` are the
 schema owner `postgres.<project-ref>`, and `DB_USER` / `DB_PASSWORD` are the DML-only runtime role
-(§2.1). Spring Boot's dedicated Flyway DataSource does not inherit credentials from
-`spring.datasource` when `spring.flyway.url` is set, which is why both pairs are bound explicitly. If
+(§2.1). Only the migration job (§2.1) reads the Flyway pair. Spring Boot's dedicated Flyway DataSource
+does not inherit credentials from `spring.datasource` when `spring.flyway.url` is set, which is why both
+pairs are bound explicitly. If
 you use the *direct* connection for migrations instead (username `postgres`, and IPv4 is a paid add-on
 on new projects), point `FLYWAY_DB_URL` / `FLYWAY_DB_USER` at it.
 
 Getting `FLYWAY_DB_URL` wrong does not fail cleanly. The migration hangs holding a lock nobody owns,
-the container never passes readiness, and nothing in the log names Flyway.
+the job runs until its 15-minute timeout, and nothing in the log names Flyway.
 
 Append `?sslmode=require` to both. `application-prod.properties` already pins
 `prepareThreshold=0` (the transaction pooler cannot keep server-side prepared statements alive; the
@@ -132,9 +133,26 @@ its own, so the rollout can stop at any point.
 Rollback for step 4: point `SANDBOX_DB_USER` back at `postgres.<project-ref>`, re-add the old password
 version, and redeploy.
 
-Known limit: Flyway still runs at boot inside the serving container, so `FLYWAY_DB_PASSWORD` sits in every
-instance's environment. Code execution in the app still reaches the owner role; moving migrations to a
-Cloud Run Job (and `spring.flyway.enabled=false` on the service) closes it. Tracked in `tasks/todo.md`.
+Migrations never run in the serving container. The deployed profiles set `spring.flyway.enabled=false`,
+and `deploy.yml` first runs the Cloud Run Job
+[`cloudrun-migrate-sandbox.yaml`](../backend/deploy/cloudrun-migrate-sandbox.yaml) to completion. The
+job runs the same image with `--migrate-only`, which boots Flyway alone and exits. It runs as
+`draazy-migrator-sandbox`, the only identity granted `draazy-sandbox-flyway-db-password`. The runtime
+account gets per-secret grants that leave that secret out, so code execution in the app can no longer
+reach the owner role. A failed job stops the deploy before the service is replaced. Migrations still
+apply while the previous revision serves, so each one must stay compatible with the code before it.
+
+Moving an existing project over takes two steps. The order matters, because any revision built before
+this change still reads the Flyway password as the runtime account:
+
+1. Re-run `bootstrap-project.sh`. It creates the migrator and grants every secret individually, then
+   deploy.
+2. Once a revision from this change is serving, drop the old project-wide grant:
+   `gcloud projects remove-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:draazy-api-sandbox@$PROJECT_ID.iam.gserviceaccount.com" --role=roles/secretmanager.secretAccessor --condition=None`.
+   Rolling back past this change afterwards needs that grant restored first, or the old revision cannot
+   start.
+
+Run locally with `java -jar app.jar --migrate-only` and the three `FLYWAY_*` variables set.
 
 ---
 
@@ -148,7 +166,7 @@ a committed JWT secret, `trusted-proxies=none`). That is the design, not an inco
 |---|---|
 | `DB_URL` | transaction pooler, `:6543`, `sslmode=require` |
 | `DB_USER` / `DB_PASSWORD` | runtime role `draazy_app.<project-ref>` (§2.1) |
-| `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` | schema owner `postgres.<project-ref>`, migrations only |
+| `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` | schema owner `postgres.<project-ref>`, migration job only; the service reads just the user name, for `DatabasePrivilegeCheck` |
 | `FLYWAY_DB_URL` | session pooler, `:5432` — see §2 |
 | `JWT_SECRET` | HS256, ≥ 32 bytes, generated per environment |
 | `REFERRAL_SIGNAL_SALT` | any long random string; **never** shared with dev. Rotating it is safe — stored digests simply stop matching, and they are discarded after 90 days anyway |
@@ -496,8 +514,8 @@ Six settings in it encode consequences that are invisible from the console:
 | `autoscaling.knative.dev/maxScale` | `4` | Each instance opens up to 5 Postgres connections (`spring.datasource.hikari.maximum-pool-size`), so the ceiling multiplies straight into Supabase's budget: 4 × 5 = 20, which the free-tier pooler absorbs. At the default of 100 the same arithmetic gives 500 and the database refuses connections under a spike — arriving as scattered 500s on unrelated endpoints, never as anything naming the pool. It is also the runaway-cost stop: a crawler cannot cost more than four instances' compute. |
 | `containerConcurrency` | `40` | Tomcat accepts 200 by default and then parks 195 of them on Hikari until its 30-second connection timeout expires, which surfaces as slow 500s rather than honest backpressure. Forty keeps the queue short enough that Cloud Run scales out instead. |
 | `timeoutSeconds` | `3600` | The Cloud Run maximum. The messages SSE stream (`MessageEventHub`) is a single long request, so any shorter timeout cuts it mid-stream and reconnects every client on that period (it did at `120`); the hub's own 5-minute stream timeout and 25-second heartbeat bound it instead. The other slow request is a 13 MB multipart upload (`spring.servlet.multipart.max-request-size`) over a slow mobile uplink. A hung ordinary request now holds its thread for longer than the old `120`. |
-| `resources.limits.memory` | `1Gi` | The Dockerfile sets `-XX:MaxRAMPercentage=70.0`, so this is a ~717 Mi heap with ~300 Mi for metaspace, code cache and thread stacks. Measured under these limits: a first boot applying every migration plus the seed peaks at ~560 MB resident, 40 concurrent requests at ~650 MB, and the live heap after GC is ~130 MB. A first-boot startup-probe failure at this size is the migration backlog outrunning the probe, not memory — the fix is the probe below, not a bigger instance. At 512 Mi the non-heap no longer fits and the container is OOM-killed during startup. With `minScale: 1` each extra GiB is billed around the clock. |
-| `startupProbe` | HTTP, `60 × 5s` | A TCP probe passes the moment Tomcat binds, so Cloud Run would route traffic to a context that is not finished refreshing. The path carries `/api` because `server.servlet.context-path` moves the actuator too. 300 seconds of grace is for the deploy that carries a long migration backlog — exactly when a tight probe would roll back a good release. A warm deploy with nothing to migrate is ready in about 45 s. `livenessProbe` watches the `liveness` group, which deliberately excludes the database indicator: restarting the container is no part of the remedy for Supabase being down. |
+| `resources.limits.memory` | `1Gi` | The Dockerfile sets `-XX:MaxRAMPercentage=70.0`, so this is a ~717 Mi heap with ~300 Mi for metaspace, code cache and thread stacks. Measured under these limits: 40 concurrent requests peak at ~650 MB resident, and the live heap after GC is ~130 MB. The migration job uses the same size; applying every migration plus the seed peaked at ~560 MB. At 512 Mi the non-heap no longer fits and the container is OOM-killed during startup. With `minScale: 1` each extra GiB is billed around the clock. |
+| `startupProbe` | HTTP, `60 × 5s` | A TCP probe passes the moment Tomcat binds, so Cloud Run would route traffic to a context that is not finished refreshing. The path carries `/api` because `server.servlet.context-path` moves the actuator too. Migrations run in the job before this revision starts (§2.1), so the 300 seconds of grace now only covers a cold JVM on a throttled CPU. A warm deploy is ready in about 45 s. `livenessProbe` watches the `liveness` group, which deliberately excludes the database indicator: restarting the container is no part of the remedy for Supabase being down. |
 
 `SPRING_PROFILES_ACTIVE=sandbox` is set on the service, overriding the `prod` baked into the image.
 `application-sandbox.properties` is standalone rather than a delta — its own datasource, secrets,
@@ -539,13 +557,20 @@ RUNTIME="$SERVICE@$PROJECT_ID.iam.gserviceaccount.com"
 # Every secret `cloudrun-sandbox.yaml` names with a secretKeyRef. Miss one and `services replace`
 # is a hard boot error, so create them all even where the feature behind them is off — an unused
 # placeholder version costs nothing. Ten is past Secret Manager's free six; the overage is cents.
-for s in db-password flyway-db-password jwt-secret referral-signal-salt identity-hash-secret staff-totp-key \
+for s in db-password jwt-secret referral-signal-salt identity-hash-secret staff-totp-key \
          cashfree-app-id cashfree-secret-key \
          r2-access-key-id r2-secret-access-key origin-shared-secret; do
   gcloud secrets create "draazy-sandbox-$s" --replication-policy=automatic
   gcloud secrets add-iam-policy-binding "draazy-sandbox-$s" \
     --member="serviceAccount:$RUNTIME" --role=roles/secretmanager.secretAccessor
 done
+
+# The schema-owner password goes to the migration job's identity only, never the runtime (§2.1).
+gcloud iam service-accounts create draazy-migrator-sandbox --display-name="Draazy schema migrations"
+gcloud secrets create draazy-sandbox-flyway-db-password --replication-policy=automatic
+gcloud secrets add-iam-policy-binding draazy-sandbox-flyway-db-password \
+  --member="serviceAccount:draazy-migrator-sandbox@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role=roles/secretmanager.secretAccessor
 ```
 
 Then add each value — **piped, never as an argument**, because a command line lands in shell history

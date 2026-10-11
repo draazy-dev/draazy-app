@@ -1,6 +1,7 @@
 package com.draazy.api.services.request;
 
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
@@ -183,7 +184,7 @@ public class ServiceRequestQueryService {
 
     // An unescaped % would slip the caller's own wildcard past the anchor and scan every user.
     private static String anchoredPrefix(String term) {
-        return term.toLowerCase(Locale.ROOT).replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return LikePatterns.escape(term.toLowerCase(Locale.ROOT)) + "%";
     }
 
     private static boolean isOps(AuthPrincipal caller) {

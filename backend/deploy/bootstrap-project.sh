@@ -23,6 +23,7 @@ AR_REPOSITORY="${AR_REPOSITORY:-draazy}"
 SERVICE="${SERVICE:-draazy-api-sandbox}"
 
 RUNTIME_SA="draazy-api-sandbox"
+MIGRATOR_SA="draazy-migrator-sandbox"
 DEPLOYER_SA="github-deployer"
 WIF_POOL="github-actions"
 WIF_PROVIDER="github"
@@ -32,6 +33,7 @@ WIF_PROVIDER="github"
 GITHUB_ENVIRONMENT="${GITHUB_ENVIRONMENT:-sandbox}"
 
 RUNTIME="${RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
+MIGRATOR="${MIGRATOR_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 DEPLOYER="${DEPLOYER_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
@@ -108,9 +110,10 @@ gcloud artifacts repositories set-cleanup-policies "$AR_REPOSITORY" \
 # ---------------------------------------------------------------------------------------------
 say "Service accounts"
 # ---------------------------------------------------------------------------------------------
-# Two identities, deliberately: only the runtime one may read secrets. Cloud Run checks the runtime
-# identity's grant when it starts the container, so secretAccessor on the deployer buys nothing.
-for pair in "$RUNTIME_SA:Draazy API runtime" "$DEPLOYER_SA:GitHub Actions deployer"; do
+# Three identities, deliberately: secrets are granted one by one (below), and only the migrator can read
+# the schema-owner password. The deployer reads none — Cloud Run checks the identity it starts as.
+for pair in "$RUNTIME_SA:Draazy API runtime" "$MIGRATOR_SA:Draazy schema migrations" \
+            "$DEPLOYER_SA:GitHub Actions deployer"; do
   sa_id="${pair%%:*}"
   sa_desc="${pair#*:}"
   if ! gcloud iam service-accounts describe "${sa_id}@${PROJECT_ID}.iam.gserviceaccount.com" >/dev/null 2>&1; then
@@ -118,14 +121,12 @@ for pair in "$RUNTIME_SA:Draazy API runtime" "$DEPLOYER_SA:GitHub Actions deploy
   fi
 done
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$RUNTIME" --role=roles/secretmanager.secretAccessor \
-  --condition=None --quiet >/dev/null
-
-# Scoped to the runtime service account, NOT the project: at project level serviceAccountUser confers
+# Scoped to each account, NOT the project: at project level serviceAccountUser confers
 # actAs on the default Compute Engine account, which carries Editor — docs/DEPLOY.md §5.
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME" \
-  --member="serviceAccount:$DEPLOYER" --role=roles/iam.serviceAccountUser --quiet >/dev/null
+for sa in "$RUNTIME" "$MIGRATOR"; do
+  gcloud iam service-accounts add-iam-policy-binding "$sa" \
+    --member="serviceAccount:$DEPLOYER" --role=roles/iam.serviceAccountUser --quiet >/dev/null
+done
 
 gcloud artifacts repositories add-iam-policy-binding "$AR_REPOSITORY" --location="$REGION" \
   --member="serviceAccount:$DEPLOYER" --role=roles/artifactregistry.writer --quiet >/dev/null
@@ -228,6 +229,11 @@ for entry in "${SECRETS[@]}"; do
   if ! gcloud secrets describe "$name" >/dev/null 2>&1; then
     gcloud secrets create "$name" --replication-policy=automatic --quiet
   fi
+
+  reader="$RUNTIME"
+  if [ "$name" = "draazy-sandbox-flyway-db-password" ]; then reader="$MIGRATOR"; fi
+  gcloud secrets add-iam-policy-binding "$name" \
+    --member="serviceAccount:$reader" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
 
   # Only prompts when the secret has no version, so a re-run neither asks for every value again nor
   # adds a redundant version — every version counts against the free tier's six.

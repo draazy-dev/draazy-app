@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
@@ -37,7 +37,7 @@ test('host sees a seeker\'s room interest in the dashboard, and Accept persists 
       attachedBath: 'attached',
       furnishing: 'semi',
       hostRole: 'owner',
-      photos: ['https://example.test/inbox-room.jpg'],
+      photos: await uploadedListingPhotos(hostToken),
     }),
   });
   const roomBody = await roomRes.text();

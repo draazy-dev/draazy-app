@@ -11,6 +11,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -32,9 +33,9 @@ class FlatmateRoomPhotoLimitTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    private static String roomWithPhotos(int count) {
+    private static String roomWithPhotos(User host, int count) {
         String photos = IntStream.range(0, count)
-                .mapToObj(i -> "\"https://cdn.example/limit-" + i + ".jpg\"")
+                .mapToObj(i -> "\"" + UploadedPhotos.of(host.getId()) + "\"")
                 .collect(Collectors.joining(","));
         return """
                 {"bhk":"2","roomType":"private","attachedBath":"attached","furnishing":"semi",
@@ -49,12 +50,12 @@ class FlatmateRoomPhotoLimitTest extends AbstractApiTest {
     void elevenIsRefused() throws Exception {
         User h = host();
         mvc.perform(post(Routes.Flatmates.ROOMS).header(HttpHeaders.AUTHORIZATION, bearer(h))
-                        .contentType(MediaType.APPLICATION_JSON).content(roomWithPhotos(11)))
+                        .contentType(MediaType.APPLICATION_JSON).content(roomWithPhotos(h, 11)))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message", containsString("A room can have at most 10 photos")));
         mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, bearer(h))
-                        .contentType(MediaType.APPLICATION_JSON).content(roomWithPhotos(11)))
+                        .contentType(MediaType.APPLICATION_JSON).content(roomWithPhotos(h, 11)))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message", containsString("A room can have at most 10 photos")));
     }

@@ -14,8 +14,11 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -35,6 +38,7 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
     PropertyRepository properties;
 
     private final List<String> createdActors = new ArrayList<>();
+    private final Map<UUID, String> hostPhotos = new HashMap<>();
 
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
@@ -55,6 +59,10 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
         return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
+    private String photoOf(User host) {
+        return hostPhotos.computeIfAbsent(host.getId(), UploadedPhotos::of);
+    }
+
     private String createRoom(User host, String society) throws Exception {
         return idIn(mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -64,9 +72,9 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
                                  "furnishing":"semi","locality":"DetailTown","society":"%s",
                                  "rentShare":15500,"deposit":31000,"availableFrom":"2026-09-01",
                                  "lookingFor":"any","foodPref":"any",
-                                 "photos":["https://cdn.example/1.jpg"],"hostRole":"owner",
+                                 "photos":["%s"],"hostRole":"owner",
                                  "note":"Sunny room near the metro."}
-                                """.formatted(society)))
+                                """.formatted(society, photoOf(host))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
     }
@@ -95,7 +103,8 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
     @Test
     @DisplayName("a room opens in full — rent, deposit, photos and the host's number")
     void roomDetail() throws Exception {
-        String id = createRoom(user("9811100001", "Detail Host", Roles.Wire.BUYER), "Detail Heights");
+        User host = user("9811100001", "Detail Host", Roles.Wire.BUYER);
+        String id = createRoom(host, "Detail Heights");
         User staff = user("9811100002", "Mod", Roles.Wire.ADMIN);
 
         mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, id)
@@ -106,7 +115,7 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.item.freeText").value("Sunny room near the metro."))
                 .andExpect(jsonPath("$.room.budget").value(15500))
                 .andExpect(jsonPath("$.room.deposit").value(31000))
-                .andExpect(jsonPath("$.room.photos[0]").value("https://cdn.example/1.jpg"))
+                .andExpect(jsonPath("$.room.photos[0]").value(photoOf(host)))
                 .andExpect(jsonPath("$.room.owner").value("Detail Host"))
                 .andExpect(jsonPath("$.room.ownerMobile").value("9811100001"))
                 .andExpect(jsonPath("$.group").doesNotExist())

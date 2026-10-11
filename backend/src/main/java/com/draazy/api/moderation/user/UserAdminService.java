@@ -8,6 +8,7 @@ import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.identity.auth.RefreshTokenService;
 import com.draazy.api.identity.auth.StaffInviteService;
@@ -118,10 +119,9 @@ public class UserAdminService {
                 "badgePending", view.pendingBadgeGrants());
     }
 
-    // Turn a search term into an anchored LIKE pattern, neutralising the caller's own wildcards —
-    // ?q=% would otherwise be an unanchored scan of every user. Escape char matches the query.
+    // Anchored prefix: ?q=% would otherwise be an unanchored scan of every user.
     private static String likePrefix(String term) {
-        return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return LikePatterns.escape(term) + "%";
     }
 
     // Catch email collisions here so operators see a named field, not a generic conflict.

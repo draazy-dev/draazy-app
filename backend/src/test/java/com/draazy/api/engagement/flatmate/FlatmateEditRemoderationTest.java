@@ -14,10 +14,14 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +47,10 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     @Autowired
     EntityManager entityManager;
 
+    private static final Pattern FIXTURE_PHOTO = Pattern.compile("https://cdn\\.example/[^\"]+");
+
     private final List<String> createdActors = new ArrayList<>();
+    private final Map<String, String> uploads = new HashMap<>();
 
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
@@ -84,11 +91,17 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                 FlatmateAgreementFixture.EVIDENCE);
     }
 
+    private String withUploads(User owner, String body) {
+        return FIXTURE_PHOTO.matcher(body).replaceAll(m -> uploads.computeIfAbsent(
+                owner.getId() + m.group(), k -> UploadedPhotos.of(owner.getId())));
+    }
+
     private String ownedEvidence(User owner, String body) {
         PersonalDocument doc = personalDocuments.saveAndFlush(new PersonalDocument(owner.getId(),
                 "Registered Leave and Licence", "leave-and-licence.pdf",
                 "personal/" + owner.getId() + "/" + UUID.randomUUID(), 184320L, "application/pdf"));
-        return body.replace("\"id\":\"agr-doc-1\"", "\"id\":\"" + doc.getId() + "\"");
+        return withUploads(owner,
+                body.replace("\"id\":\"agr-doc-1\"", "\"id\":\"" + doc.getId() + "\""));
     }
 
     // New supply waits in the queue; every test below starts from an already-public post.
@@ -354,7 +367,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
             String id = idIn(mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(body.formatted("owner", "false", "")))
+                            .content(withUploads(owner, body.formatted("owner", "false", ""))))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.modStatus").value("pending"))
                     .andReturn().getResponse().getContentAsString());

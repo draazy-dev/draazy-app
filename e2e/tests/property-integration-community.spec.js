@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { IGNORE as SHARED_IGNORE } from '../helpers/console.js';
-import { signedInAs, signedInAsNew, apiLogin, uniqueMobile, authHeaders, API } from '../helpers/liveAuth.js';
+import { signedInAs, signedInAsNew, apiLogin, uniqueMobile, authHeaders, uploadedListingPhotos, API } from '../helpers/liveAuth.js';
 
 // OWNER has four listings, including one non-public row, to distinguish /me/listings from public search.
 const OWNER = { mobile: '9470744469', name: 'Meera Deshpande', total: 4, publiclyVisible: 3 };
@@ -323,9 +323,10 @@ test.describe('LIVE: the flatmates board against the real API', () => {
 
   test('a room posted through the API reaches the public board once it is moderated', async ({ page, request }) => {
     // A new host each time: the server caps live posts per host, and this room is never closed.
-    await signedInAsNew(page);
+    const mobile = await signedInAsNew(page);
+    const photos = await uploadedListingPhotos((await apiLogin(mobile)).accessToken);
     const marker = `live probe ${Date.now()}`;
-    const created = await page.evaluate(async (note) => {
+    const created = await page.evaluate(async ({ note, photos }) => {
       const svc = await import('/src/services/flatmateService.js');
       const room = await svc.createRoom({
         locality: 'Baner',
@@ -338,11 +339,11 @@ test.describe('LIVE: the flatmates board against the real API', () => {
         hostRole: 'owner',
         lookingFor: 'any',
         foodPref: 'any',
-        photos: ['https://example.test/room.jpg'],
+        photos,
         note,
       });
       return { id: room.id, budget: room.budget };
-    }, marker);
+    }, { note: marker, photos });
 
     expect(created.id, 'the server assigned no id').toBeTruthy();
     expect(created.budget, 'the created room came back with no price — check the budget/rent mapping').toBe(14000);

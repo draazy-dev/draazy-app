@@ -18,13 +18,16 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
@@ -56,6 +59,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         EntityManager entityManager;
 
     private final List<String> createdActors = new ArrayList<>();
+    private final Map<UUID, String> hostPhotos = new HashMap<>();
 
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
@@ -79,22 +83,26 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         return saved;
     }
 
-    private String roomBody(String locality, String society) {
+    private String photoOf(User host) {
+        return hostPhotos.computeIfAbsent(host.getId(), UploadedPhotos::of);
+    }
+
+    private String roomBody(User host, String locality, String society) {
         return withSocietyIds("""
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "furnishing":"semi","locality":"%s","society":"%s","rentShare":15000,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
-                 "foodPref":"any","photos":["https://cdn.example/1.jpg"],
+                 "foodPref":"any","photos":["%s"],
                  "hostRole":"owner","note":"Sunny room, quiet building."}
-                """.formatted(locality, society));
+                """.formatted(locality, society, photoOf(host)));
     }
 
-    private String roomBodyWithFlatNumber(String locality, String society, String flatNumber) {
-        return roomBody(locality, society).replace("\"furnishing\"", "\"flatNumber\":\"%s\",\"furnishing\""
+    private String roomBodyWithFlatNumber(User host, String locality, String society, String flatNumber) {
+        return roomBody(host, locality, society).replace("\"furnishing\"", "\"flatNumber\":\"%s\",\"furnishing\""
                 .formatted(flatNumber));
     }
 
-    private String declaredRoomBody(String agreementDoc, String ownerConsent) {
+    private String declaredRoomBody(User host, String agreementDoc, String ownerConsent) {
         return withSocietyIds("""
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "furnishing":"semi","locality":"Baner","society":"Tenant Heights","rentShare":15000,
@@ -102,9 +110,9 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                  "foodPref":"any","agreementDeclared":true,
                  "hostRole":"tenant",
                  "agreementDoc":%s,
-                 "ownerConsent":%s,"photos":["https://cdn.example/1.jpg"],
+                 "ownerConsent":%s,"photos":["%s"],
                  "note":"Sunny room, quiet building."}
-                """.formatted(agreementDoc, ownerConsent));
+                """.formatted(agreementDoc, ownerConsent, photoOf(host)));
     }
 
     private String agreementEvidence(User host) {
@@ -119,7 +127,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(roomBody(locality, society)))
+                        .content(roomBody(host, locality, society)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return publish("flatmate_rooms", idOf(json));
@@ -133,7 +141,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(declaredRoomBody(
+                        .content(declaredRoomBody(host,
                                 "{\"name\":\"leave-and-licence.pdf\",\"size\":184320,"
                                         + "\"mime\":\"application/pdf\"}",
                                 "true")))
@@ -154,7 +162,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(declaredRoomBody(
+                        .content(declaredRoomBody(host,
                                 "{\"id\":\"" + docId + "\",\"name\":\"leave-and-licence.pdf\","
                                         + "\"size\":184320,\"mime\":\"application/pdf\"}",
                                 "false")))
@@ -180,8 +188,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                  "society":"Tenant Heights","rentShare":15000,
                                  "hostRole":"tenant",
                                  "agreementDoc":{"id":"%s"},"ownerConsent":true,
-                                 "photos":["https://cdn.example/1.jpg"]}
-                                """.formatted(docId)))
+                                 "photos":["%s"]}
+                                """.formatted(docId, photoOf(host))))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.message").value(
                         "agreementDeclared must be true for a tenant-hosted flatmate room."));
@@ -195,7 +203,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(declaredRoomBody(
+                        .content(declaredRoomBody(host,
                                 "{\"id\":\"11111111-1111-1111-1111-111111111111\","
                                         + "\"name\":\"leave-and-licence.pdf\","
                                         + "\"size\":184320,\"mime\":\"application/pdf\"}",
@@ -231,7 +239,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(declaredRoomBody(
+                        .content(declaredRoomBody(host,
                                 "{\"id\":\"" + personalDocuments.saveAndFlush(new PersonalDocument(
                                         host.getId(), "Registered Leave and Licence",
                                         "leave-and-licence.pdf",
@@ -350,7 +358,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("Baner", "Sai Radha C")))
+                            .content(roomBody(host, "Baner", "Sai Radha C")))
                     .andExpect(status().isConflict());
         }
 
@@ -363,7 +371,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("Kothrud", "Green Acres")))
+                            .content(roomBody(host, "Kothrud", "Green Acres")))
                     .andExpect(status().isConflict());
         }
 
@@ -396,7 +404,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("wakad", "sai radha complex")))
+                            .content(roomBody(host, "wakad", "sai radha complex")))
                     .andExpect(status().isConflict());
         }
     }
@@ -413,8 +421,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"%s","rentShare":15000,"hostRole":"owner",
                                      "propertyId":"%s",
-                                     "photos":["https://cdn.example/1.jpg"]}
-                                    """.formatted(society, propertyId))))
+                                     "photos":["%s"]}
+                                    """.formatted(society, propertyId, photoOf(host)))))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
         }
@@ -450,8 +458,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"Rose Villa","rentShare":15000,
                                      "hostRole":"tenant","agreementDeclared":true,
-                                     "photos":["https://cdn.example/1.jpg"],%s}
-                                    """.formatted(agreementEvidence(host))))
+                                     "photos":["%s"],%s}
+                                    """.formatted(photoOf(host), agreementEvidence(host))))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.verificationTier").value("tenant"))
 
@@ -479,8 +487,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"Bare Claim House","rentShare":15000,
                                      "hostRole":"tenant","agreementDeclared":true,
-                                     "photos":["https://cdn.example/1.jpg"]}
-                                    """))
+                                     "photos":["%s"]}
+                                    """.formatted(photoOf(host))))
                     .andExpect(status().isUnprocessableEntity())
                     .andExpect(jsonPath("$.error").value("validation_failed"))
                     .andExpect(jsonPath("$.message").value(
@@ -549,8 +557,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"Afterthought Court","rentShare":15000,
                                      "hostRole":"owner","propertyId":"%s",
-                                     "photos":["https://cdn.example/1.jpg"]}
-                                    """.formatted(flat.getId())))
+                                     "photos":["%s"]}
+                                    """.formatted(flat.getId(), photoOf(host))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.verificationTier").value("owner"))
                     .andExpect(jsonPath("$.verified").value(true));
@@ -570,8 +578,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"Sold Heights","rentShare":15000,
                                      "hostRole":"tenant","agreementDeclared":true,
-                                     "photos":["https://cdn.example/1.jpg"],%s}
-                                    """.formatted(agreementEvidence(host))))
+                                     "photos":["%s"],%s}
+                                    """.formatted(photoOf(host), agreementEvidence(host))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.verificationTier").value("tenant"))
                     .andExpect(jsonPath("$.modStatus").value("pending"));
@@ -589,8 +597,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"Held Villa","rentShare":15000,
                                      "hostRole":"tenant","agreementDeclared":true,
-                                     "photos":["https://cdn.example/1.jpg"],%s}
-                                    """.formatted(agreementEvidence(host))))
+                                     "photos":["%s"],%s}
+                                    """.formatted(photoOf(host), agreementEvidence(host))))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.verificationTier").value("tenant"))
                     .andExpect(jsonPath("$.modStatus").value("pending"));
@@ -636,7 +644,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("DoubleRoomTown", "Twin House")
+                            .content(roomBody(host, "DoubleRoomTown", "Twin House")
                                     .replace("Private room", "Shared room")))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.seatsTotal").value(2))
@@ -1045,7 +1053,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBodyWithFlatNumber("Kalyani Nagar", "River Side", "A-902")))
+                            .content(roomBodyWithFlatNumber(host, "Kalyani Nagar", "River Side", "A-902")))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
             publish("flatmate_rooms", idOf(json));
@@ -1076,8 +1084,9 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"%s","rentShare":15000,
                                      "hostRole":"tenant","agreementDeclared":true,%s,
-                                     "photos":["https://cdn.example/1.jpg"]%s}
-                                    """.formatted(society, agreementEvidence(host), consent))))
+                                     "photos":["%s"]%s}
+                                    """.formatted(society, agreementEvidence(host),
+                                    photoOf(host), consent))))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
             return publish("flatmate_rooms", idOf(json));
@@ -1166,8 +1175,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"Somewhere Else Entirely","rentShare":15000,
                                      "hostRole":"tenant","agreementDeclared":true,
-                                     "photos":["https://cdn.example/1.jpg"],%s}
-                                    """.formatted(agreementEvidence(host))))
+                                     "photos":["%s"],%s}
+                                    """.formatted(photoOf(host), agreementEvidence(host))))
                     .andExpect(status().isOk());
 
             assertThat(jdbc.queryForObject(
@@ -1223,8 +1232,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"Deed In Hand","rentShare":15000,
                                      "hostRole":"owner","propertyId":"%s",
-                                     "photos":["https://cdn.example/1.jpg"]}
-                                    """.formatted(flat.getId())))
+                                     "photos":["%s"]}
+                                    """.formatted(flat.getId(), photoOf(host))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.verificationTier").value("owner"));
 
@@ -1287,8 +1296,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                      "society":"A Different Flat","rentShare":15000,
                                      "hostRole":"owner","agreementDeclared":false,
                                      "ownerConsentMobile":"%s",
-                                     "photos":["https://cdn.example/1.jpg"]}
-                                    """.formatted(ownerConsentMobile)))
+                                     "photos":["%s"]}
+                                    """.formatted(ownerConsentMobile, photoOf(host))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.verificationTier").value("identity"));
 
@@ -1329,8 +1338,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Kothrud",
                                      "society":"Deed Standing","rentShare":19000,
                                      "hostRole":"owner","propertyId":"%s",
-                                     "photos":["https://cdn.example/1.jpg"]}
-                                    """.formatted(flat.getId())))
+                                     "photos":["%s"]}
+                                    """.formatted(flat.getId(), photoOf(host))))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.verificationTier").value("owner"))
                     .andExpect(jsonPath("$.verified").value(true))
@@ -1566,15 +1575,16 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @DisplayName("server-side facets (D116)")
     class Facets {
 
-        private String facetRoomBody(String locality, String society, String lookingFor,
+        private String facetRoomBody(User host, String locality, String society, String lookingFor,
                 String foodPref, long rentShare, String bhk) {
             return withSocietyIds("""
                     {"bhk":"%s","roomType":"Private room","attachedBath":"attached",
                      "furnishing":"semi","locality":"%s","society":"%s","rentShare":%d,
                      "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"%s",
                      "foodPref":"%s","hostRole":"owner",
-                     "photos":["https://cdn.example/1.jpg"],"note":"Room."}
-                    """.formatted(bhk, locality, society, rentShare, lookingFor, foodPref));
+                     "photos":["%s"],"note":"Room."}
+                    """.formatted(bhk, locality, society, rentShare, lookingFor, foodPref,
+                    photoOf(host)));
         }
 
         private void createFacetRoom(User host, String locality, String society, String lookingFor,
@@ -1582,7 +1592,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(facetRoomBody(
+                            .content(facetRoomBody(host,
                                     locality, society, lookingFor, foodPref, rentShare, bhk)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();

@@ -1,5 +1,5 @@
 import { test, expect, STAFF } from '../../../fixtures/live.js';
-import { API, apiLogin, authHeaders, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, authHeaders, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { trackErrors } from '../../../helpers/console.js';
@@ -7,13 +7,12 @@ import { withSocietyId } from '../../../helpers/liveSociety.js';
 
 const track = flatmateCleanup(test);
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
-const COVER = 'https://cdn.example/zztest-cover-first.jpg';
-const SECOND = 'https://cdn.example/zztest-cover-second.jpg';
 const FALLBACK = /images\.unsplash\.com/;
 
 test.describe('LIVE: room card cover', () => {
   test('a room card shows the host\'s first photo, not the stock fallback', async ({ page }) => {
     const { accessToken } = await apiLogin(uniqueMobile());
+    const [COVER, SECOND] = await uploadedListingPhotos(accessToken, 2);
     const society = `Zztest Cover ${Date.now().toString(36)}`;
     const created = await fetch(`${API}/flatmates/rooms`, {
       method: 'POST',

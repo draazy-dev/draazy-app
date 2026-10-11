@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAsNew, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
@@ -51,7 +51,7 @@ async function createRoom(token, society) {
       lookingFor: 'any',
       foodPref: 'any',
       hostRole: 'tenant',
-      photos: ['https://cdn.example/live-identity-room.jpg'],
+      photos: await uploadedListingPhotos(token),
       ...(await tenantRoomAgreement(token)),
     }),
   });

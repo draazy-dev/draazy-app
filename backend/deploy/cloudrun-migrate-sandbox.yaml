@@ -1,0 +1,42 @@
+# Cloud Run Job — SANDBOX schema migrations. deploy.yml executes it to completion before replacing the
+# service, which never migrates and never holds the schema-owner password — docs/DEPLOY.md §2.1.
+
+apiVersion: run.googleapis.com/v1
+kind: Job
+metadata:
+  name: draazy-migrate-sandbox
+  labels:
+    cloud.googleapis.com/location: asia-south1
+
+spec:
+  template:
+    spec:
+      taskCount: 1
+      parallelism: 1
+      template:
+        spec:
+          # Its own identity, the only one granted the Flyway password secret.
+          serviceAccountName: draazy-migrator-sandbox@${GCP_PROJECT_ID}.iam.gserviceaccount.com
+          # A failed migration needs a human; a blind retry against a half-applied version does not help.
+          maxRetries: 0
+          timeoutSeconds: 900
+          containers:
+            - image: ${IMAGE}
+              args: ["--migrate-only"]
+              resources:
+                limits:
+                  cpu: '1'
+                  memory: 1Gi
+              env:
+                # Same profile as the service, so the job applies the same locations (the demo seed).
+                - name: SPRING_PROFILES_ACTIVE
+                  value: sandbox
+                - name: FLYWAY_DB_URL
+                  value: ${FLYWAY_DB_URL}
+                - name: FLYWAY_DB_USER
+                  value: ${FLYWAY_DB_USER}
+                - name: FLYWAY_DB_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: draazy-sandbox-flyway-db-password
+                      key: latest

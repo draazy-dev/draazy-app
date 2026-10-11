@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
+import com.draazy.api.catalog.listing.ListingPhotoSources;
 import com.draazy.api.catalog.locality.LocalityBinding;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -77,6 +78,7 @@ public class FlatmateSupplyService {
     private final OwnedDocumentLookup ownedDocuments;
     private final FlatmateMembershipService membership;
     private final LocalityBinding localities;
+    private final ListingPhotoSources photoSources;
 
     public FlatmateSupplyService(FlatmateRoomRepository rooms, FlatmateGroupRepository groups,
             FlatmateRequestRepository requests,
@@ -88,7 +90,7 @@ public class FlatmateSupplyService {
             RateLimitLock locks, FlatmateRoomCards cards, SocietyReference societyReference,
             FlatmateReviewStatuses reviewStatuses, FlatmateEditRules editRules,
             OwnedDocumentLookup ownedDocuments, FlatmateMembershipService membership,
-            LocalityBinding localities) {
+            LocalityBinding localities, ListingPhotoSources photoSources) {
         this.rooms = rooms;
         this.groups = groups;
         this.requests = requests;
@@ -108,10 +110,12 @@ public class FlatmateSupplyService {
         this.ownedDocuments = ownedDocuments;
         this.membership = membership;
         this.localities = localities;
+        this.photoSources = photoSources;
     }
 
     @Transactional
     public FlatmateRoomDto createRoom(AuthPrincipal caller, FlatmateRoomCreateRequest body) {
+        photoSources.requireUploaded(body.photos(), List.of(), List.of(caller.userId()));
         String hostRole = FlatmateVocabulary.orDefault(
                 body.hostRole(), FlatmateVocabulary.HOST_ROLE, "tenant", "host role");
         boolean declared = declaresAgreement(caller.userId(), body.agreementDeclared(), body.agreementDoc());
@@ -289,6 +293,7 @@ public class FlatmateSupplyService {
                             + "Edit the property instead.",
                     FlatmateConflicts.SPLIT_ROOM));
         }
+        photoSources.requireUploaded(body.photos(), room.getPhotos(), List.of(caller.userId()));
 
         String hostRole = FlatmateVocabulary.orDefault(
                 body.hostRole(), FlatmateVocabulary.HOST_ROLE, "tenant", "host role");

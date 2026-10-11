@@ -13,6 +13,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.ArrayList;
@@ -81,8 +82,8 @@ class FlatmateDetailEndpointsTest extends AbstractApiTest {
                  "furnishing":"semi","locality":"DetailTown","society":"Detail Heights",
                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                  "lookingFor":"any","foodPref":"any","lat":18.5912345,"lng":73.7712345,
-                 "photos":["https://cdn.example/1.jpg"],"hostRole":"owner","note":"Sunny."}
-                """);
+                 "photos":["%s"],"hostRole":"owner","note":"Sunny."}
+                """.formatted(UploadedPhotos.of(host.getId())));
     }
 
     private String seekerPost(User author) throws Exception {

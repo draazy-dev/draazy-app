@@ -1,6 +1,6 @@
 // Every fixture is minted through the consumer path, because the seed's five flatmate rows are all already `approved`.
 import { ACTORS, expect, test } from '../../fixtures/live.js';
-import { API, E2E_OTP, apiLogin, authHeaders, uniqueMobile } from '../../helpers/liveAuth.js';
+import { API, E2E_OTP, apiLogin, authHeaders, uniqueMobile, uploadedListingPhotos } from '../../helpers/liveAuth.js';
 import { tenantRoomAgreement } from '../../helpers/flatmateAgreement.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
 import { pickLocalitiesIn } from '../../helpers/locality.js';
@@ -55,6 +55,7 @@ async function seedTenantRoom(host, society, agreementDoc = undefined, extra = {
   const { accessToken } = await apiLogin(host.mobile);
   const ownerConsentMobile = await consentTo(accessToken, society);
   const agreement = await tenantRoomAgreement(accessToken);
+  const photos = await uploadedListingPhotos(accessToken);
   const room = await post('/flatmates/rooms', accessToken, {
     bhk: '2',
     roomType: 'Private room',
@@ -67,7 +68,7 @@ async function seedTenantRoom(host, society, agreementDoc = undefined, extra = {
     availableFrom: '2026-12-01',
     lookingFor: 'any',
     foodPref: 'any',
-    photos: ['https://cdn.example/1.jpg'],
+    photos,
     note: 'Quiet building, sunny room.',
     hostRole: 'tenant',
     ...agreement,
@@ -75,7 +76,7 @@ async function seedTenantRoom(host, society, agreementDoc = undefined, extra = {
     ...extra,
     ownerConsentMobile,
   });
-  return { room, accessToken };
+  return { room, accessToken, photos };
 }
 
 async function seedSeekerPost(host, freeText) {
@@ -376,7 +377,7 @@ test.describe('Ops → flatmate desk (live)', () => {
     const swapped = `Swap Heights ${stamp()}`;
     const quiet = `Quiet Court ${stamp()}`;
     const { room: swapRoom, accessToken: swapToken } = await seedTenantRoom(HOSTS.swapPhoto, swapped);
-    const { room: quietRoom, accessToken: quietToken } = await seedTenantRoom(HOSTS.quietEdit, quiet);
+    const { room: quietRoom, accessToken: quietToken, photos: quietPhotos } = await seedTenantRoom(HOSTS.quietEdit, quiet);
 
     // Publish first so the edit is to something already visible.
     const { accessToken: staffToken } = await apiLogin(STAFF);
@@ -401,7 +402,7 @@ test.describe('Ops → flatmate desk (live)', () => {
       availableFrom: '2026-12-01',
       lookingFor: 'any',
       foodPref: 'any',
-      photos: ['https://cdn.example/1.jpg'],
+      photos: quietPhotos,
       note: 'Quiet building, sunny room.',
       hostRole: 'tenant',
       ...(await tenantRoomAgreement(token)),
@@ -417,7 +418,7 @@ test.describe('Ops → flatmate desk (live)', () => {
       if (!res.ok) throw new Error(`edit room → ${res.status} ${await res.text()}`);
     };
 
-    const SWAPPED_IN = 'https://cdn.example/swapped-in.jpg';
+    const [SWAPPED_IN] = await uploadedListingPhotos(swapToken);
     await edit(swapRoom.id, swapToken, await body(swapToken, swapped, { photos: [SWAPPED_IN] }));
     await edit(quietRoom.id, quietToken, await body(quietToken, quiet, { foodPref: 'veg' }));
 
@@ -441,13 +442,12 @@ test.describe('Ops → flatmate desk (live)', () => {
   test('the uploaded agreement opens in a new tab, and uploaded photos show on the popup', async ({ page, login }) => {
     // Use two hosts because the anti-broker cap counts supply per host.
     const withDoc = `Paper Towers ${stamp()}`;
-    const UPLOADED = '/api/dev/storage/public/photos/e2e/room.jpg';
-    await seedTenantRoom(HOSTS.withDoc, withDoc, {
+    const { photos: [UPLOADED] } = await seedTenantRoom(HOSTS.withDoc, withDoc, {
       name: 'rent-agreement.pdf',
       size: 32,
       mime: 'application/pdf',
       dataUrl: AGREEMENT_PDF,
-    }, { photos: [UPLOADED] });
+    });
 
     await openDesk(page, login);
     const dialog = await review(page, withDoc);

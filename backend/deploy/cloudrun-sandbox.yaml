@@ -98,12 +98,11 @@ spec:
                   key: latest
 
             # Identifiers, not passwords, but readable by any project viewer once set as plain env.
-            # DB_URL is the transaction pooler; FLYWAY_DB_URL must be the session one — docs/DEPLOY.md §2.
+            # DB_URL is the transaction pooler. The migration job, not this service, uses the Flyway inputs.
             - name: DB_URL
               value: ${DB_URL}
-            - name: FLYWAY_DB_URL
-              value: ${FLYWAY_DB_URL}
-            # DB_USER is the DML-only runtime role; FLYWAY_DB_USER owns the schema — docs/DEPLOY.md §2.1.
+            # DB_USER is the DML-only runtime role. FLYWAY_DB_USER is read only by DatabasePrivilegeCheck,
+            # to compare against it (docs/DEPLOY.md §2.1).
             - name: DB_USER
               value: ${DB_USER}
             - name: FLYWAY_DB_USER
@@ -115,11 +114,6 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: draazy-sandbox-db-password
-                  key: latest
-            - name: FLYWAY_DB_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: draazy-sandbox-flyway-db-password
                   key: latest
             - name: JWT_SECRET
               valueFrom:
@@ -244,7 +238,7 @@ spec:
                   key: latest
 
           # HTTP, not TCP: a TCP probe passes the moment Tomcat binds, before the context is ready.
-          # 60 × 5s covers a cold JVM that also has a long Flyway backlog to apply.
+          # 60 × 5s covers a cold JVM on a throttled CPU.
           startupProbe:
             httpGet:
               path: /api/actuator/health/readiness

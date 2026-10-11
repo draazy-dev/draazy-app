@@ -12,6 +12,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -57,8 +58,8 @@ class FlatmateRequestConversationEndpointsTest extends AbstractApiTest {
                         .content("""
                                 {"bhk":"2","roomType":"Private room","locality":"Aundh",
                                  "society":"Chat Towers","rentShare":15000,"hostRole":"owner",
-                                 "photos":["https://cdn.example/1.jpg"]}
-                                """))
+                                 "photos":["%s"]}
+                                """.formatted(UploadedPhotos.of(host.getId()))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = idOf(json);

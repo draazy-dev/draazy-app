@@ -4,6 +4,7 @@ import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.common.web.Pageables;
@@ -140,14 +141,11 @@ public class EnquiryBoardService {
         return new EnquiryBoardQueries.Filter(
                 status == null ? "" : status.trim(),
                 deal == null ? "" : deal.trim(),
-                term.isEmpty() ? "" : "%" + escapeLike(term) + "%",
+                term.isEmpty() ? "" : "%" + LikePatterns.escape(term) + "%",
                 mobile == null ? "-" : mobile,
                 since(days));
     }
 
-    private static String escapeLike(String term) {
-        return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
-    }
     /** {@code GET /admin/enquiries/{id}} — one contact request; audited, as opening a row is. */
     @Transactional
     public AdminEnquiryDto enquiry(AuthPrincipal actor, String id) {

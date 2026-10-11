@@ -55,7 +55,6 @@ const roomBody = ({ society: name, hostRole = 'tenant', agreementDeclared = fals
   availableFrom: '2026-12-01',
   lookingFor: 'any',
   foodPref: 'any',
-  photos: ['https://cdn.example/zztest-trust-badge.jpg'],
   hostRole,
   agreementDeclared,
   ...(ownerConsentMobile ? { ownerConsentMobile } : {}),
@@ -63,7 +62,7 @@ const roomBody = ({ society: name, hostRole = 'tenant', agreementDeclared = fals
 });
 
 async function roomPayload(token, spec) {
-  const body = await withSocietyId(token, roomBody(spec));
+  const body = await withSocietyId(token, { ...roomBody(spec), photos: await uploadedListingPhotos(token) });
   return (body.hostRole || 'tenant') === 'tenant'
     ? { ...body, ...(await tenantRoomAgreement(token)), ...(body.ownerConsentMobile ? { ownerConsentMobile: body.ownerConsentMobile } : {}) }
     : body;

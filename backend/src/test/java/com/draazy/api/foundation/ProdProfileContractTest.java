@@ -43,7 +43,7 @@ class ProdProfileContractTest {
             // transaction pooler — defaulting it to DB_URL would default to a hang.
             "FLYWAY_DB_URL",
 
-            // The schema owner. DB_USER is the DML-only runtime role, which cannot migrate.
+            // The schema owner, used only by the --migrate-only job. DB_USER is the DML-only runtime role.
             "FLYWAY_DB_USER",
             "FLYWAY_DB_PASSWORD",
 
@@ -144,14 +144,20 @@ class ProdProfileContractTest {
         }
     }
 
-    // {@code R__} means Flyway re-runs the seed on every checksum change, so production would
-    // re-seed indefinitely. Profiles are not exclusive, so {@code local,prod} needs this override.
     @Test
     @DisplayName("the refresh cookie is Secure in prod")
     void theRefreshCookieIsSecure() throws IOException {
         assertThat(prod().getProperty("draazy.security.refresh-cookie.secure"))
                 .as("a non-Secure refresh cookie fails silently — no boot error, no failed request")
                 .isEqualTo("true");
+    }
+
+    @Test
+    @DisplayName("the serving app never migrates — only the --migrate-only job does")
+    void theServingAppNeverMigrates() throws IOException {
+        assertThat(prod().getProperty("spring.flyway.enabled"))
+                .as("migrating at boot puts the schema-owner password in every instance (docs/DEPLOY.md §2.1)")
+                .isEqualTo("false");
     }
 
     @Test
@@ -200,6 +206,8 @@ class ProdProfileContractTest {
         }
     }
 
+    // `R__` re-runs on every checksum change, so production would re-seed indefinitely. Profiles are
+    // not exclusive, so `local,prod` needs this override.
     @Test
     @DisplayName("Flyway runs the schema only, never the demo seed")
     void productionNeverRunsTheLocalSeed() throws IOException {

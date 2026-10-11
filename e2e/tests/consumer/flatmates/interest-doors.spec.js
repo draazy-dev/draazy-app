@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAsNew, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { trackErrors } from '../../../helpers/console.js';
@@ -42,7 +42,7 @@ async function hostsRoom(token, society) {
       attachedBath: 'attached',
       furnishing: 'semi',
       hostRole: 'tenant',
-      photos: ['https://example.test/room.jpg'],
+      photos: await uploadedListingPhotos(token),
       ...(await tenantRoomAgreement(token)),
     }),
   });

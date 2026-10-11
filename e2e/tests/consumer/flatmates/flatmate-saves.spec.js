@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, seedConsent, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, seedConsent, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
@@ -31,7 +31,7 @@ async function createRoom(token, body) {
     body: JSON.stringify({
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
       locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01',
-      lookingFor: 'any', foodPref: 'any', photos: ['https://cdn.example/saves.jpg'],
+      lookingFor: 'any', foodPref: 'any', photos: await uploadedListingPhotos(token),
       ...(await tenantRoomAgreement(token)),
       ...(await withSocietyId(token, body)),
     }),
@@ -166,7 +166,7 @@ test('the saved card shows what the room says today, not what it said when it wa
     body: JSON.stringify({
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
       locality: 'Baner', society, rentShare: 21000, deposit: 30000, availableFrom: '2026-12-01',
-      lookingFor: 'any', foodPref: 'any', photos: ['https://cdn.example/saves.jpg'],
+      lookingFor: 'any', foodPref: 'any', photos: room.photos,
       ...(await tenantRoomAgreement(hostAuth.accessToken)),
     }),
   });

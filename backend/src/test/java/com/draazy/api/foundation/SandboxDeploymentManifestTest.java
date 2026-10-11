@@ -13,20 +13,13 @@ import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * {@code deploy/cloudrun-sandbox.yaml} is compiled by nothing and read by no profile test, so the
- * two facts below fail silently, in the deployed environment, on the path that settles money.
- */
 @DisplayName("The sandbox deployment manifest — the facts in it that no compiler checks")
 class SandboxDeploymentManifestTest {
 
     /** See {@code ProdProfileContractTest.MODULE} — same working-directory hazard, same fix. */
     private static final Path MODULE = Path.of(System.getProperty("basedir", "")).toAbsolutePath();
 
-    /**
-     * Deliberately not a YAML parse: the file is an {@code envsubst} template, so a parser would
-     * either choke or force this test to reproduce the rendering.
-     */
+    // Not a YAML parse: the file is an envsubst template a parser would choke on.
     private static final Pattern ENTRY = Pattern.compile(
             "- name: (\\w+)\\s*\\n\\s*(?:value: (.+)|valueFrom:\\s*\\n\\s*secretKeyRef:\\s*\\n\\s*name: (\\S+))");
 
@@ -49,10 +42,7 @@ class SandboxDeploymentManifestTest {
         throw new AssertionError(variable + " is not set in deploy/cloudrun-sandbox.yaml");
     }
 
-    /**
-     * Nothing else in the build ties the manifest string to the route constant. The easiest half to
-     * drop is {@code /api} — a context path, invisible in {@code @PostMapping}, and still valid https.
-     */
+    // Nothing else ties this string to the route constant; `/api` is the context path, easy to drop.
     @Test
     @DisplayName("the deployed notify URL is the route this service actually serves")
     void theNotifyUrlMatchesTheRoute() throws IOException {
@@ -66,10 +56,6 @@ class SandboxDeploymentManifestTest {
         assertThat(notifyUrl.getScheme()).isEqualTo("https");
     }
 
-    /**
-     * Cashfree signs callbacks with the API key, so two Secret Manager entries would be correct only
-     * until the first rotation — after which a stale key still boots and every callback is refused.
-     */
     @Test
     @DisplayName("the API key and the webhook secret come from one entry, because they are one value")
     void theWebhookSecretIsTheApiKey() throws IOException {
@@ -78,5 +64,14 @@ class SandboxDeploymentManifestTest {
                         + "Secret Manager entries survives until the first rotation and then "
                         + "rejects every payment callback, silently and permanently.")
                 .isEqualTo(entry("CASHFREE_SECRET_KEY"));
+    }
+
+    @Test
+    @DisplayName("the service never holds the schema-owner password; only the migration job does")
+    void theServiceNeverHoldsTheSchemaOwnerPassword() throws IOException {
+        assertThat(manifest())
+                .as("code execution in the service would reach the owner role (docs/DEPLOY.md §2.1)")
+                .doesNotContain("FLYWAY_DB_PASSWORD")
+                .doesNotContain("draazy-sandbox-flyway-db-password");
     }
 }

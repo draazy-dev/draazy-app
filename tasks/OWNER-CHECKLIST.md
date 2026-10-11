@@ -3,7 +3,9 @@
 Things code can't close: secrets, deploy steps, real-device checks, human fact-checks. Tick and delete.
 
 ## Secrets and deploy
-- [ ] **Before the next deploy** (security SH02): GitHub secret `SANDBOX_FLYWAY_DB_USER` = current `SANDBOX_DB_USER`, and Secret Manager `draazy-sandbox-flyway-db-password` (runtime SA `secretAccessor`) = current DB password, or the deploy fails its required-input check
+- [ ] **Before the next deploy** (security SH02): GitHub secret `SANDBOX_FLYWAY_DB_USER` = current `SANDBOX_DB_USER`, and Secret Manager `draazy-sandbox-flyway-db-password` = current DB password, or the deploy fails its required-input check
+- [ ] **Before the next deploy** (security SH18): re-run `backend/deploy/bootstrap-project.sh` (creates SA `draazy-migrator-sandbox`, grants each secret individually), or the migration step fails and the deploy stops. If `github-deployer`'s `roles/run.admin` was narrowed to the service, it also needs Cloud Run Jobs rights. First deploy: check the `draazy-migrate-sandbox` execution log
+- [ ] **After that deploy is serving** (SH18): remove the runtime SA's project-wide `secretAccessor` — command in `docs/DEPLOY.md` §2.1. Until then it can still read the Flyway password
 - [ ] Supabase sandbox: run `backend/deploy/sql/supabase-revoke-data-api.sql` and turn the Data API off; then `app-runtime-role.sql` and repoint `SANDBOX_DB_USER` — `docs/DEPLOY.md` §2.1 steps 1–4
 - [ ] Next deploy log: the security-header smoke check passes (this office network strips headers, so only CI can tell)
 - [ ] `draazy-sandbox-origin-shared-secret` + Pages `ORIGIN_SHARED_SECRET` (same value), or the revision won't start

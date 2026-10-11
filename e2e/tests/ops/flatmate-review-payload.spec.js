@@ -1,5 +1,5 @@
 import { expect, test } from '../../fixtures/live.js';
-import { API, E2E_OTP, apiLogin, uniqueMobile } from '../../helpers/liveAuth.js';
+import { API, E2E_OTP, apiLogin, uniqueMobile, uploadedListingPhotos } from '../../helpers/liveAuth.js';
 import { tenantRoomAgreement } from '../../helpers/flatmateAgreement.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
 
@@ -35,7 +35,7 @@ async function seedTenantRoom(host, society) {
     availableFrom: '2026-12-01',
     lookingFor: 'any',
     foodPref: 'any',
-    photos: ['https://cdn.example/1.jpg', 'https://cdn.example/2.jpg'],
+    photos: await uploadedListingPhotos(accessToken, 2),
     note: 'Quiet building, sunny room.',
     hostRole: 'tenant',
     ...(await tenantRoomAgreement(accessToken)),
