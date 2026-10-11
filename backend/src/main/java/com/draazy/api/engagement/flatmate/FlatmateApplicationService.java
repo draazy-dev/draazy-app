@@ -7,6 +7,7 @@ import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
@@ -22,22 +23,28 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FlatmateApplicationService {
 
+    private static final String CLOSED_TO_GROUPS =
+            "This flat has already been given to a group and is closed to new group applications.";
+
     private final FlatmateGroupApplicationRepository applications;
     private final FlatmateGroupRepository groups;
     private final PropertyRepository properties;
     private final GroupApplicationHydrator hydrator;
     private final Notifier notifier;
     private final AuditService audit;
+    private final RateLimitLock locks;
 
     public FlatmateApplicationService(FlatmateGroupApplicationRepository applications,
             FlatmateGroupRepository groups, PropertyRepository properties,
-            GroupApplicationHydrator hydrator, Notifier notifier, AuditService audit) {
+            GroupApplicationHydrator hydrator, Notifier notifier, AuditService audit,
+            RateLimitLock locks) {
         this.applications = applications;
         this.groups = groups;
         this.properties = properties;
         this.hydrator = hydrator;
         this.notifier = notifier;
         this.audit = audit;
+        this.locks = locks;
     }
 
     /** Host view: the card draws the moderation state and the seats; the edit form reads the one group it opens. */
@@ -80,9 +87,14 @@ public class FlatmateApplicationService {
         if (listing.getOwner() != null && listing.getOwner().getId().equals(caller.userId())) {
             throw new BadRequestException("This is your own listing.");
         }
+        locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION, listingId.toString());
         if (applications.existsByListingIdAndGroupId(listingId, groupId)) {
             throw new ConflictException(
                     "Your group has already applied to this flat — the owner has it.");
+        }
+        if (applications.existsByListingIdAndStatusAndModStatusIn(listingId,
+                FlatmateVocabulary.STATUS_ACCEPTED, FlatmateVocabulary.MOD_PUBLIC)) {
+            throw new ConflictException(CLOSED_TO_GROUPS);
         }
 
         FlatmateGroupApplication saved = applications.saveAndFlush(
@@ -127,11 +139,19 @@ public class FlatmateApplicationService {
                 .filter(p -> p.getOwner() != null && p.getOwner().getId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Group application"));
 
+        locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION,
+                listing.getId().toString());
         if (verdict.equals(application.getStatus())) {
             return hydrator.hydrateOne(application);
         }
         if (!FlatmateVocabulary.STATUS_PENDING.equals(application.getStatus())) {
             throw new ConflictException("You have already answered this application.");
+        }
+
+        boolean accepting = FlatmateVocabulary.STATUS_ACCEPTED.equals(verdict);
+        if (accepting && applications.existsByListingIdAndStatusAndModStatusInAndIdNot(listing.getId(),
+                FlatmateVocabulary.STATUS_ACCEPTED, FlatmateVocabulary.MOD_PUBLIC, application.getId())) {
+            throw new ConflictException(CLOSED_TO_GROUPS);
         }
 
         if (applications.updateDecisionIfPending(application.getId(),
@@ -146,18 +166,36 @@ public class FlatmateApplicationService {
         FlatmateGroupApplication decided = applications.findById(application.getId())
                 .orElseThrow(() -> NotFoundException.of("Group application"));
 
-        notifier.notify(decided.getApplicantId(), "flatmate.groupApplication." + verdict,
-                "accepted".equals(verdict)
-                        ? "Your group's application was accepted"
-                        : "Your group's application was declined",
-                "accepted".equals(verdict)
-                        ? "The owner of " + listing.getTitle() + " accepted your group. "
-                                + "They will be in touch to arrange the paperwork."
-                        : "The owner of " + listing.getTitle() + " declined your group.",
-                FlatmateLinks.of("group", decided.getGroupId()));
+        notifyVerdict(listing, decided, verdict);
         audit.record(caller, "flatmate.groupApplication." + verdict, "flatmateGroupApplication",
                 decided.getId().toString(), "status", verdict);
 
+        if (accepting) {
+            declineOtherPending(caller, listing, decided.getId());
+        }
         return hydrator.hydrateOne(decided);
+    }
+
+    private void declineOtherPending(AuthPrincipal caller, Property listing, UUID acceptedId) {
+        for (FlatmateGroupApplication other : applications.findByListingIdAndStatus(
+                listing.getId(), FlatmateVocabulary.STATUS_PENDING)) {
+            if (!other.getId().equals(acceptedId) && applications.updateDecisionIfPending(other.getId(),
+                    FlatmateVocabulary.STATUS_PENDING, "declined", Instant.now()) == 1) {
+                notifyVerdict(listing, other, "declined");
+                audit.record(caller, "flatmate.groupApplication.declined", "flatmateGroupApplication",
+                        other.getId().toString(), "status", "declined");
+            }
+        }
+    }
+
+    private void notifyVerdict(Property listing, FlatmateGroupApplication application, String verdict) {
+        boolean accepted = FlatmateVocabulary.STATUS_ACCEPTED.equals(verdict);
+        notifier.notify(application.getApplicantId(), "flatmate.groupApplication." + verdict,
+                accepted ? "Your group's application was accepted"
+                        : "Your group's application was declined",
+                accepted ? "The owner of " + listing.getTitle() + " accepted your group. "
+                                + "They will be in touch to arrange the paperwork."
+                        : "The owner of " + listing.getTitle() + " declined your group.",
+                FlatmateLinks.of("group", application.getGroupId()));
     }
 }

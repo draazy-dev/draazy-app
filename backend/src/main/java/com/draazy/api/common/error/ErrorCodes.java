@@ -61,6 +61,10 @@ public final class ErrorCodes {
 
     public static final String OWNER_CONSENT_SELF = "owner_consent_self";
 
+    public static final String OWNER_SIDE_REQUIRES_OWNER = "owner_side_requires_owner";
+
+    public static final String OWNER_SIDE_PENDING = "owner_side_pending";
+
     // No permission fixes it, only a completed visit or a tenancy does.
     public static final String REVIEW_NOT_ELIGIBLE = "review_not_eligible";
 

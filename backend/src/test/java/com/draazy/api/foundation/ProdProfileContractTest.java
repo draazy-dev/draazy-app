@@ -221,6 +221,13 @@ class ProdProfileContractTest {
                 .contains("db/seed");
     }
 
+    @Test
+    @DisplayName("redirects stay relative in every profile, since the container only sees the proxy's host")
+    void redirectsAreRelative() throws IOException {
+        assertThat(mainResource("application.properties").getProperty("server.tomcat.use-relative-redirects"))
+                .isEqualTo("true");
+    }
+
     // Inheriting local's loosened window would make the OTP endpoint a free SMS-bombing service.
     // The window, not the cooldown: local matches prod's 60s on purpose so the countdown is exercised.
     @Test

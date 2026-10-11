@@ -11,3 +11,5 @@ export const submitHelpFeedback = async (verdict) => (await provider()).submitHe
 export const listHelpFeedbackArticles = async (opts) => (await provider()).listHelpFeedbackArticles(opts);
 
 export const listHelpFeedbackComments = async (opts) => (await provider()).listHelpFeedbackComments(opts);
+
+export const staffHelpContent = async () => (await provider()).staffHelpContent();

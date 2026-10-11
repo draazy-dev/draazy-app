@@ -90,7 +90,7 @@ class ServiceDeskPayloadTest extends ServiceFixtures {
             Property p = listing(buyer);
             String id = raise(buyer, "rent-agreement", p);
             upload(buyer, id, "Aadhaar");
-            String docId = documentId(buyer, id, "Aadhaar");
+            String docId = documentId(buyer, id, "aadhaar");
 
             mvc.perform(get(Routes.ServiceRequests.DOC_URL, id, docId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))

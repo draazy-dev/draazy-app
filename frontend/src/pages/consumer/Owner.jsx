@@ -177,7 +177,8 @@ export default function Owner() {
           toast(t('owner.reviewPosted'), 'success');
         });
       })
-      .catch(() => toast(t('common.somethingWentWrong'), 'error'))
+      .catch((err) => toast(
+        err?.code === 'review_not_eligible' && err.message ? err.message : t('common.somethingWentWrong'), 'error'))
       .finally(() => setPosting(false));
   };
 

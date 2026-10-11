@@ -64,6 +64,7 @@ public class DealService {
     @Transactional
     public void reserve(UUID callerId, UUID propertyId) {
         Property property = ownedProperty(callerId, propertyId);
+        requireLive(property, "reserved");
         Deal deal = getOrCreate(propertyId, property.getDeal());
 
         if (!DealStatuses.canTransition(deal.getStatus(), DealStatuses.RESERVED)) {
@@ -78,7 +79,7 @@ public class DealService {
     @Transactional
     public void close(UUID callerId, UUID propertyId, DealCloseRequest body) {
         Property property = ownedProperty(callerId, propertyId);
-        requireApprovedForClose(property);
+        requireLive(property, "closed");
         Deal deal = getOrCreate(propertyId, property.getDeal());
 
         if (!DealStatuses.canTransition(deal.getStatus(), DealStatuses.CLOSED)) {
@@ -105,9 +106,9 @@ public class DealService {
 
         if (DealIntent.RENT.equals(property.getDeal())) {
             tenancyService.openFromClosedDeal(
-                            propertyId, callerId, deal.getCounterpartyId(), body.agreedPrice())
+                            propertyId, callerId, deal.getCounterpartyId(), normalised, body.agreedPrice())
                     .ifPresentOrElse(
-                            tenancy -> LOG.info("Tenancy {} active on rent close of property {}",
+                            tenancy -> LOG.info("Tenancy {} proposed on rent close of property {}",
                                     tenancy.getId(), propertyId),
                             () -> LOG.info("Rent deal closed off-platform on property {}; "
                                     + "no tenancy opened", propertyId));
@@ -117,6 +118,7 @@ public class DealService {
     @Transactional
     public void reopen(AuthPrincipal caller, UUID propertyId) {
         Property property = ownedProperty(caller.userId(), propertyId);
+        requireReopenable(property);
         Deal deal = deals.findByPropertyId(propertyId)
                 .orElseThrow(() -> new ConflictException(
                         "Cannot reopen a deal in status " + DealStatuses.ACTIVE));
@@ -160,7 +162,7 @@ public class DealService {
     public void closeForFinalization(UUID ownerId, UUID propertyId, long agreedPrice,
                                      String counterpartyMobile, UUID counterpartyId) {
         Property property = ownedProperty(ownerId, propertyId);
-        requireApprovedForClose(property);
+        requireLive(property, "closed");
         Deal deal = getOrCreate(propertyId, property.getDeal());
 
         if (!DealStatuses.canTransition(deal.getStatus(), DealStatuses.CLOSED)) {
@@ -188,9 +190,18 @@ public class DealService {
                 ? PropertyStatus.RENTED : PropertyStatus.SOLD;
     }
 
-    private static void requireApprovedForClose(Property property) {
-        if (property.isArchived() || !PropertyStatus.APPROVED.equals(property.getStatus())) {
-            throw new ConflictException("Only a live approved listing can be closed");
+    private static void requireLive(Property property, String action) {
+        if (!property.isPubliclyVisible()) {
+            throw new ConflictException("Only a live approved listing can be " + action);
+        }
+    }
+
+    // A closed deal's listing is sold/rented, so reopening must still reach it.
+    private static void requireReopenable(Property property) {
+        boolean closedOut = PropertyStatus.SOLD.equals(property.getStatus())
+                || PropertyStatus.RENTED.equals(property.getStatus());
+        if (property.isArchived() || !(closedOut || PropertyStatus.APPROVED.equals(property.getStatus()))) {
+            throw new ConflictException("Only a live or closed listing can be reopened");
         }
     }
 

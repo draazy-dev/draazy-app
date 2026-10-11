@@ -32,16 +32,18 @@ public class ServiceRequestDocumentReviews {
     private final ServiceRequestPartyRepository parties;
     private final AuditService audit;
     private final Notifier notifier;
+    private final RentAgreementOwnerSide ownerSide;
 
     public ServiceRequestDocumentReviews(ServiceRequestService requests, ServiceRequestMapper mapper,
             ServiceRequestDocumentReviewRepository reviews, ServiceRequestPartyRepository parties,
-            AuditService audit, Notifier notifier) {
+            AuditService audit, Notifier notifier, RentAgreementOwnerSide ownerSide) {
         this.requests = requests;
         this.mapper = mapper;
         this.reviews = reviews;
         this.parties = parties;
         this.audit = audit;
         this.notifier = notifier;
+        this.ownerSide = ownerSide;
     }
 
     // Checklist is built from the same DTO document list, so GET and checklist cannot drift.
@@ -115,6 +117,10 @@ public class ServiceRequestDocumentReviews {
         if (requester) {
             Set<String> live = all.stream().filter(p -> !CoFillParties.DECLINED.equals(p.getStatus())).map(ServiceRequestParty::getRole).collect(Collectors.toSet());
             CoFillParties.ROLES.stream().filter(role -> !live.contains(role)).forEach(own::add);
+            if (own.contains("owner") && ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())
+                    && !ownerSide.requesterIsOwner(request)) {
+                own.remove("owner");
+            }
         }
         return own;
     }

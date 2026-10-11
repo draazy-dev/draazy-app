@@ -10,9 +10,12 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.UncheckedIOException;
+import java.util.Iterator;
 import java.util.Locale;
 import java.util.UUID;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import org.springframework.web.multipart.MultipartFile;
 
 final class MessagePhotoUpload {
@@ -48,13 +51,23 @@ final class MessagePhotoUpload {
     }
 
     private static BufferedImage decode(byte[] bytes) {
-        try {
-            BufferedImage image = ImageIO.read(new ByteArrayInputStream(bytes));
-            if (image == null) {
+        try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+            Iterator<ImageReader> readers = in == null ? null : ImageIO.getImageReaders(in);
+            if (readers == null || !readers.hasNext()) {
                 throw new ValidationException("Upload a readable JPEG or PNG photo.");
             }
-            return image;
-        } catch (java.io.IOException e) {
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(in, true, true);
+                PhotoUploads.requireSaneSize(reader.getWidth(0), reader.getHeight(0));
+                return reader.read(0);
+            } finally {
+                reader.dispose();
+            }
+        } catch (java.io.IOException | RuntimeException e) {
+            if (e instanceof ValidationException || e instanceof PayloadTooLargeException) {
+                throw (RuntimeException) e;
+            }
             throw new ValidationException("Upload a readable JPEG or PNG photo.");
         }
     }

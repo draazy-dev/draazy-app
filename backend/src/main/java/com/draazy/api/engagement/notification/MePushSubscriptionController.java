@@ -5,6 +5,7 @@ import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.CurrentUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -34,7 +35,7 @@ public class MePushSubscriptionController {
     @DeleteMapping(Routes.Engagement.PUSH_SUBSCRIPTIONS)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@CurrentUser AuthPrincipal principal,
-            @RequestParam @NotBlank String endpoint) {
+            @RequestParam @NotBlank @Size(max = 2048) String endpoint) {
         service.delete(principal.userId(), endpoint);
     }
 }

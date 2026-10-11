@@ -112,7 +112,7 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
     myTenancies()
       // Fails closed: an unreadable tenancy list means "not proven", which shows the prompt to ask
       // the owner. Failing open would let an unreachable endpoint hand out reviewer standing.
-      .then((all) => { if (alive) setBrokeredTenancy(all.some((tn) => String(tn.propId) === propId)); })
+      .then((all) => { if (alive) setBrokeredTenancy(all.some((tn) => tn.confirmed && String(tn.propId) === propId)); })
       .catch(() => { if (alive) setBrokeredTenancy(false); });
     return () => { alive = false; };
   }, [isIn, propId]);

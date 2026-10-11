@@ -328,4 +328,47 @@ class DealEndpointsTest extends AbstractApiTest {
         assertThat(review.getStatus()).isEqualTo("pending");
         assertThat(review.getDecidedAt()).isNull();
     }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"pending", "rejected", "flagged", "paused", "archived"})
+    void reserve_onAListingThatIsNotLive_returns409AndWritesNothing(String state) throws Exception {
+        User owner = user("9820200071", "owner");
+        Property p = listing(owner, "Not live reserve");
+        notLive(p, state);
+
+        mvc.perform(post(dealPath(p) + "/reserve")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isConflict());
+
+        assertThat(dealRepo.findByPropertyId(p.getId())).isEmpty();
+        assertThat(properties.findById(p.getId()).orElseThrow().getDealStatus())
+                .isNotEqualTo(DealStatuses.RESERVED);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"pending", "rejected", "flagged", "paused", "archived"})
+    void reopen_onAListingThatIsNotLive_returns409AndLeavesTheDealAlone(String state) throws Exception {
+        User owner = user("9820200072", "owner");
+        Property p = listing(owner, "Not live reopen");
+        mvc.perform(post(dealPath(p) + "/reserve")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk());
+        notLive(p, state);
+
+        mvc.perform(post(dealPath(p) + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isConflict());
+
+        assertThat(dealRepo.findByPropertyId(p.getId()).orElseThrow().getStatus())
+                .isEqualTo(DealStatuses.RESERVED);
+    }
+
+    private void notLive(Property p, String state) {
+        if ("archived".equals(state)) {
+            p.archive("Taken down by the owner");
+        } else {
+            p.setStatus(state);
+        }
+        properties.saveAndFlush(p);
+    }
 }

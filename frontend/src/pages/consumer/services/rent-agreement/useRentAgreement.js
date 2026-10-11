@@ -696,7 +696,9 @@ export function useRentAgreement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume listing URL once without overwriting edits
   }, [searchParams, mode, myProperties]);
 
-  const stepErrors = (s) => formStepErrors(s, formSnapshot());
+  const stepErrors = (s) => formStepErrors(s, {
+    ...formSnapshot(), listed: !!selectedPropertyId, selfMobile: mode === 'invite' ? undefined : user?.mobile,
+  });
   const [liveStep, setLiveStep] = useState(null);
   const [errorFocus, setErrorFocus] = useState(0);
   const flagErrors = (s, e) => { setErrors(e); setLiveStep(s); setErrorFocus((n) => n + 1); };

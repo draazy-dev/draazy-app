@@ -114,7 +114,7 @@ class ServiceRequestDocsTest extends ServiceFixtures {
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.documents[0].category").value("Aadhaar"))
+                .andExpect(jsonPath("$.documents[0].category").value("aadhaar"))
                 .andExpect(jsonPath("$.timeline[?(@.event=='document.uploaded')]").isNotEmpty());
     }
 

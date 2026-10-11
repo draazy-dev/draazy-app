@@ -5533,16 +5533,54 @@ paths:
   /me/tenancies:
     get:
       tags: [Rentals & Payments]
-      summary: My active tenancies (as tenant)
+      summary: My tenancies (as tenant), including ones awaiting my confirmation
       operationId: myTenancies
       responses:
         '200':
-          description: Tenancies
+          description: Tenancies, pending first, then active, then ended. Declined ones are omitted.
           content:
             application/json:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/Tenancy' }
+  /me/tenancies/{id}/confirm:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Rentals & Payments]
+      summary: Confirm a tenancy a landlord named me on (tenant)
+      description: >
+        Turns a `pending` tenancy `active`. Only the signed-in account whose verified mobile matches
+        the mobile the landlord entered when closing the deal may confirm. 404 -- never 403 -- for
+        any other caller, so a tenancy id is never confirmed to exist to a stranger. 409 when the
+        tenancy is no longer pending.
+      operationId: confirmTenancy
+      responses:
+        '200':
+          description: Confirmed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tenancy' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /me/tenancies/{id}/decline:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+    post:
+      tags: [Rentals & Payments]
+      summary: Decline a tenancy a landlord named me on (tenant)
+      description: >
+        Turns a `pending` tenancy `declined`. The deal stays closed. Same caller rules as confirm:
+        404 for anyone but the named tenant, 409 when the tenancy is no longer pending.
+      operationId: declineTenancy
+      responses:
+        '200':
+          description: Declined
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Tenancy' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /me/tenant-profile:
     get:
       tags: [Rentals & Payments]
@@ -5790,6 +5828,9 @@ paths:
       tags: [Documents]
       summary: Remove personal KYC document (owner)
       operationId: deletePersonalDocument
+      description: >
+        Also withdraws the copies of this paper filed on service requests still awaiting payment.
+        Copies on requests already paid or with staff stay as the record.
       responses:
         '204': { description: Removed }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -8105,6 +8146,11 @@ paths:
       tags: [Engagement]
       summary: Post a review for a society / locality / owner
       operationId: createEntityReview
+      description: >
+        For `owner`, the author must have a real relationship with that owner: an approved contact
+        request or an accepted offer, closed deal or accepted finalization on one of their listings,
+        a completed visit to one, or a tenancy with them. Reviewing yourself is refused too. Either
+        failure is 422 `review_not_eligible`.
       requestBody:
         required: true
         content:
@@ -8116,6 +8162,11 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Review' }
+        '422':
+          description: Owner review refused (`review_not_eligible`) - the author is the owner or has no relationship with them
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /flatmates/feed:
     get:
       tags: [Engagement]
@@ -8796,7 +8847,7 @@ paths:
               schema: { $ref: '#/components/schemas/GroupApplication' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: This group has already applied to this listing (`already_applied`) }
+        '409': { description: This group has already applied to this listing (`already_applied`), or the listing already has an accepted group and takes no new applications }
         '422': { $ref: '#/components/responses/ValidationError' }
   /me/flatmate-groups:
     get:
@@ -8866,6 +8917,11 @@ paths:
         The owner's verdict, and **only** the owner's: `status` here is a different column from the
         `modStatus` that `decideGroupApplication` writes, so an admin can never answer on an owner's
         behalf and moderating a group can never look like accepting it.
+
+
+        Accepting closes the listing to groups: every other pending application on it is declined (and
+        its group notified) and a further acceptance is a 409. A moderator removing the accepted
+        application lifts the block.
       requestBody:
         required: true
         content:
@@ -8883,6 +8939,7 @@ paths:
               schema: { $ref: '#/components/schemas/GroupApplication' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Already answered, or another group on this listing is already accepted }
         '422': { $ref: '#/components/responses/ValidationError' }
   /me/flatmate-requests:
     get:
@@ -9190,6 +9247,7 @@ paths:
             schema: { $ref: '#/components/schemas/PushSubscriptionCreate' }
       responses:
         '204': { description: Registered }
+        '409': { description: The endpoint is registered to another account with different keys }
         '422': { $ref: '#/components/responses/ValidationError' }
     delete:
       tags: [Engagement]
@@ -9199,7 +9257,7 @@ paths:
         - name: endpoint
           in: query
           required: true
-          schema: { type: string }
+          schema: { type: string, maxLength: 2048 }
       responses:
         '204': { description: Removed }
   /faqs:
@@ -10045,6 +10103,28 @@ paths:
                         type: array
                         items: { $ref: '#/components/schemas/AdminHelpFeedbackComment' }
         '400': { $ref: '#/components/responses/BadRequest' }
+  /admin/help/staff:
+    get:
+      tags: [Admin & Analytics]
+      summary: Staff-only help runbooks
+      operationId: adminStaffHelp
+      description: >
+        The help-centre sections, categories and articles marked `access: staff`, compiled from the
+        frontend help content. Served here so they never ship in the public frontend bundle.
+      x-roles: [staff, manager, admin]
+      responses:
+        '200':
+          description: The staff help tree
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sections: { type: array, items: { type: object } }
+                  categories: { type: array, items: { type: object } }
+                  articles: { type: array, items: { type: object } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /admin/settings/flags:
     get:
       tags: [Admin & Analytics]
@@ -14417,7 +14497,12 @@ components:
         deposit: { $ref: '#/components/schemas/Money' }
         startDate: { type: string, format: date }
         endDate: { type: string, format: date }
-        status: { type: string, enum: [active, ended, terminated] }
+        status:
+          type: string
+          enum: [pending, active, ended, terminated, declined]
+          description: >
+            `pending` is a tenancy the landlord proposed when closing a rent deal; it counts for
+            nothing until the named tenant confirms it. `declined` never became a tenancy.
     TenancyDeclaration:
       type: object
       description: >
@@ -16570,13 +16655,13 @@ components:
       type: object
       required: [endpoint, keys]
       properties:
-        endpoint: { type: string }
+        endpoint: { type: string, maxLength: 2048, pattern: '^https://\S+$' }
         keys:
           type: object
           required: [p256dh, auth]
           properties:
-            p256dh: { type: string }
-            auth: { type: string }
+            p256dh: { type: string, maxLength: 256 }
+            auth: { type: string, maxLength: 64 }
     OwnerProfile:
       type: object
       description: >

@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.notification;
 
+import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.trust.PushNotifier;
 import com.draazy.api.provider.PushPayloads;
 import com.draazy.api.provider.PushSender;
@@ -25,9 +26,10 @@ public class PushSubscriptionService implements PushNotifier {
         this.sender = sender;
     }
 
+    /** A row owned by someone else is only re-bound when the keys match, i.e. the same browser subscription. */
     @Transactional
     public void upsert(UUID userId, PushSubscriptionRequest body) {
-        jdbc.update("""
+        int written = jdbc.update("""
                 insert into push_subscriptions (id, user_id, endpoint, p256dh, auth)
                 values (gen_random_uuid(), ?, ?, ?, ?)
                 on conflict (endpoint) do update
@@ -35,7 +37,12 @@ public class PushSubscriptionService implements PushNotifier {
                        p256dh = excluded.p256dh,
                        auth = excluded.auth,
                        created_at = now()
+                 where push_subscriptions.user_id = excluded.user_id
+                    or (push_subscriptions.p256dh = excluded.p256dh and push_subscriptions.auth = excluded.auth)
                 """, userId, body.endpoint(), body.keys().p256dh(), body.keys().auth());
+        if (written == 0) {
+            throw new ConflictException("This push subscription belongs to another account.");
+        }
         jdbc.update("""
                 delete from push_subscriptions
                  where user_id = ?

@@ -32,6 +32,14 @@ export async function myTenancies() {
   return toList(await get('/me/tenancies', undefined, { ttl: PAGE_LOAD_TTL }), toTenancyViewModel);
 }
 
+export async function confirmTenancy(id) {
+  return toTenancyViewModel(await post(`/me/tenancies/${encodeURIComponent(id)}/confirm`, {}));
+}
+
+export async function declineTenancy(id) {
+  return toTenancyViewModel(await post(`/me/tenancies/${encodeURIComponent(id)}/decline`, {}));
+}
+
 /** The server decides what comes back: every claim if the caller owns the listing, their own otherwise. The client
  * does not filter, and must not. */
 export async function listTenancyDeclarations(propId) {

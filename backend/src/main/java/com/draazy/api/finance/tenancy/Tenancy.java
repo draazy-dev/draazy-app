@@ -9,29 +9,7 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 
-/**
- * A rental agreement between an owner and a tenant over one property — the parent of every rent
- * payment and mandate. Maps {@code tenancies} (V6, constrained by V12).
- *
- * <p><strong>Created by the system, never by a client.</strong> {@code POST /tenancies} was deleted
- * from the contract (spec fix S9): it carried no role guard and accepted the whole shape, so any
- * signed-in user could fabricate a money-bearing relationship on any property, naming themselves
- * owner or tenant. The only way a tenancy comes into existence is inside {@code DealService.close}
- * on a rent deal, in the same transaction that closes the deal — which is the moment the agreement
- * actually exists in the real world.
- *
- * <p><strong>At most one active tenancy per property</strong>, enforced by {@code V10__DDL_tenancy_finance.sql}'s
- * partial unique index rather than a service check. Two active rows would not be a duplicate record but a
- * double-let: two tenants each believing they hold the flat, and rent payments that cannot be
- * attributed to either.
- *
- * <p><strong>Ids, not associations.</strong> {@code propertyId}, {@code tenantId} and
- * {@code ownerId} are plain UUID columns — this entity lives in {@code finance} while its targets
- * live in {@code catalog} and {@code identity}.
- *
- * <p>Money is {@code Long} whole rupees ({@code bigint} in V6), matching the contract's
- * {@code Money}.
- */
+/** A rental of one property. Created only by closing a rent deal, and starts {@code pending}. */
 @Entity
 @Table(name = "tenancies")
 @Getter
@@ -60,15 +38,15 @@ public class Tenancy extends AuditedEntity {
     @Setter
     private LocalDate startDate;
 
-    /**
-     * When the agreement is due to end, or when it actually ended once terminal. Nullable: a
-     * tenancy created on deal close has a start but not yet an agreed end.
-     */
     @Column(name = "end_date")
     @Setter
     private LocalDate endDate;
 
-    /** One of {@link TenancyStatuses}; the V6 CHECK rejects anything else. */
+    /** The number the owner named at close; the confirming account's verified mobile must match it. */
+    @Column(name = "tenant_mobile", updatable = false)
+    private String tenantMobile;
+
+    /** One of {@link TenancyStatuses}; the V109 CHECK rejects anything else. */
     @Column(name = "status", nullable = false)
     @Setter
     private String status = TenancyStatuses.ACTIVE;
@@ -81,6 +59,11 @@ public class Tenancy extends AuditedEntity {
         this.propertyId = propertyId;
         this.tenantId = tenantId;
         this.ownerId = ownerId;
+    }
+
+    public Tenancy(UUID propertyId, UUID tenantId, UUID ownerId, String tenantMobile) {
+        this(propertyId, tenantId, ownerId);
+        this.tenantMobile = tenantMobile;
     }
 
 }

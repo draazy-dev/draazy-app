@@ -37,17 +37,19 @@ public class ServiceRequestIdentityService {
     private final ServiceRequestEventRepository events;
     private final AuditService audit;
     private final AccountPermissions accountPermissions;
+    private final RentAgreementOwnerSide ownerSide;
 
     public ServiceRequestIdentityService(ServiceRequestIdentityRepository identities,
             ServiceRequestRepository requests, ServiceRequestPartyRepository parties,
             ServiceRequestEventRepository events, AuditService audit,
-            AccountPermissions accountPermissions) {
+            AccountPermissions accountPermissions, RentAgreementOwnerSide ownerSide) {
         this.identities = identities;
         this.requests = requests;
         this.parties = parties;
         this.events = events;
         this.audit = audit;
         this.accountPermissions = accountPermissions;
+        this.ownerSide = ownerSide;
     }
 
     // Replace rows first so corrected parties do not leave old numbers behind.
@@ -220,11 +222,15 @@ public class ServiceRequestIdentityService {
             }
             return bodySlots;
         }
+        boolean ownsOwnerSide = !ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType()) || ownerSide.requesterIsOwner(request);
+        if (!ownsOwnerSide && bodySlots.stream().anyMatch(slot -> "owner".equals(slot.role()))) {
+            throw RentAgreementOwnerSide.refusal();
+        }
         Set<Slot> coFillSlots = acceptedCoFillSlots(request.getId());
         if (bodySlots.stream().anyMatch(coFillSlots::contains)) {
             throw new ConflictException("the invited party records their own identity numbers");
         }
-        return identities.findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(request.getId()).stream().map(row -> new Slot(row.getPartyRole(), row.getPartyIndex())).filter(slot -> !coFillSlots.contains(slot)).collect(Collectors.toSet());
+        return identities.findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(request.getId()).stream().map(row -> new Slot(row.getPartyRole(), row.getPartyIndex())).filter(slot -> !coFillSlots.contains(slot) && (ownsOwnerSide || !"owner".equals(slot.role()))).collect(Collectors.toSet());
     }
 
     private Set<Slot> purgedSlots(UUID requestId) {

@@ -6,8 +6,6 @@ import { esc, headTags, jsonLd, renderPage } from './seo-html.mjs';
 
 const VIRTUAL_ID = 'virtual:help-content';
 const RESOLVED_ID = '\0' + VIRTUAL_ID;
-const STAFF_VIRTUAL_ID = 'virtual:help-content-staff';
-const STAFF_RESOLVED_ID = '\0' + STAFF_VIRTUAL_ID;
 
 /* GitHub-style callouts: > [!NOTE] / [!TIP] / [!WARNING] / [!IMPORTANT] */
 const CALLOUTS = {
@@ -180,7 +178,7 @@ function compileArticles(contentDir) {
 }
 
 /* Access is inherited downwards — a staff category makes its articles staff, a staff section its
-   categories — because this flag decides which chunk the text is compiled into. */
+   categories — because this flag decides whether the text ships in the public bundle at all. */
 function splitByAccess({ sections, categories, articles }) {
   const staffSections = new Set(sections.filter((s) => s.access === 'staff').map((s) => s.id));
   const categoryIsStaff = (c) => c.access === 'staff' || staffSections.has(c.section);
@@ -306,6 +304,14 @@ export function helpPages({ sections, categories, articles, changelog }, copy, s
   ];
 }
 
+/* Staff runbooks never enter the public bundle: `scripts/gen-staff-help.mjs` writes this to the backend,
+   which serves it to back-office roles only. */
+export function compileStaffHelp(root) {
+  const contentDir = join(root, 'src/content/help');
+  const { sections, categories } = loadTaxonomy(join(contentDir, 'categories.json'));
+  return splitByAccess({ sections, categories, articles: compileArticles(contentDir) }).staff;
+}
+
 /** @param {{ root?: string, siteUrl?: string }} [options] */
 export default function helpContentPlugin(options = {}) {
   const root = options.root || process.cwd();
@@ -317,16 +323,14 @@ export default function helpContentPlugin(options = {}) {
   let server;
   let outDir = join(root, 'dist');
 
-  const build = (audience) => {
+  const build = () => {
     const { sections, categories } = loadTaxonomy(categoriesFile);
     const articles = compileArticles(contentDir);
-    const side = splitByAccess({ sections, categories, articles })[audience];
-    return `export const sections = ${JSON.stringify(side.sections)};\n`
-      + `export const categories = ${JSON.stringify(side.categories)};\n`
-      + `export const articles = ${JSON.stringify(side.articles)};\n`
-      + (audience === 'open'
-        ? `export const changelog = ${JSON.stringify(compileChangelog(changelogFile))};\n`
-        : '');
+    const open = splitByAccess({ sections, categories, articles }).open;
+    return `export const sections = ${JSON.stringify(open.sections)};\n`
+      + `export const categories = ${JSON.stringify(open.categories)};\n`
+      + `export const articles = ${JSON.stringify(open.articles)};\n`
+      + `export const changelog = ${JSON.stringify(compileChangelog(changelogFile))};\n`;
   };
 
   return {
@@ -334,22 +338,18 @@ export default function helpContentPlugin(options = {}) {
     configResolved(config) { outDir = resolve(root, config.build?.outDir || 'dist'); },
     configureServer(s) { server = s; },
     resolveId(id) {
-      if (id === VIRTUAL_ID) return RESOLVED_ID;
-      return id === STAFF_VIRTUAL_ID ? STAFF_RESOLVED_ID : null;
+      return id === VIRTUAL_ID ? RESOLVED_ID : null;
     },
     load(id) {
-      if (id === RESOLVED_ID) return build('open');
-      return id === STAFF_RESOLVED_ID ? build('staff') : null;
+      return id === RESOLVED_ID ? build() : null;
     },
     /* Editing a doc invalidates the virtual module so the dev server hot-reloads
        the compiled output instead of requiring a restart. */
     handleHotUpdate(ctx) {
       const changed = ctx.file.replace(/\\/g, '/');
       if (!changed.includes('/src/content/')) return;
-      for (const id of [RESOLVED_ID, STAFF_RESOLVED_ID]) {
-        const mod = server?.moduleGraph.getModuleById(id);
-        if (mod) server.moduleGraph.invalidateModule(mod);
-      }
+      const mod = server?.moduleGraph.getModuleById(RESOLVED_ID);
+      if (mod) server.moduleGraph.invalidateModule(mod);
       server?.ws.send({ type: 'full-reload' });
       return [];
     },

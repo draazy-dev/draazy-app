@@ -67,8 +67,9 @@ public class SecurityConfig {
         this.propertyReadBudget = propertyReadBudget;
         this.rateLimitWindow = Duration.ofSeconds(windowSeconds);
 
-        this.proxyAware = !TrustedProxyConfig.NO_PROXY.equalsIgnoreCase(trustedProxies.trim());
         this.originGate = OriginGateFilter.fromSetting(originSecret);
+        this.proxyAware = originGate.isPresent()
+                || !TrustedProxyConfig.NO_PROXY.equalsIgnoreCase(trustedProxies.trim());
     }
 
     @Bean

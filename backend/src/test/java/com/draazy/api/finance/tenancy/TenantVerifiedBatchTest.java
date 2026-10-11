@@ -29,6 +29,7 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired TenantProfileRepository profiles;
+    @Autowired TenancyRepository tenancies;
 
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
@@ -46,13 +47,17 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /** Opens a tenancy the only way the platform allows — by closing a rent deal. */
+    /** Opens a tenancy the only way the platform allows — by closing a rent deal — and the tenant confirms it. */
     private void closeRentDeal(User owner, Property p, User tenant) throws Exception {
         mvc.perform(post("/me/deals/" + p.getId() + "/close")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"agreedPrice\":26000,\"counterpartyMobile\":\""
                                 + tenant.getMobile() + "\"}"))
+                .andExpect(status().isOk());
+        String tenancyId = tenancies.findPendingByPropertyId(p.getId()).orElseThrow().getId().toString();
+        mvc.perform(post(Routes.Tenancies.CONFIRM.replace("{id}", tenancyId))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                 .andExpect(status().isOk());
     }
 
@@ -141,10 +146,7 @@ class TenantVerifiedBatchTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[4].verified").value(false));
     }
 
-    /** The only numbers this endpoint emits are the ones it was handed, as typed, which is what keeps
-     *  it from ever revealing a mobile the caller did not already have. Both answers on the same pair
-     *  in one test, so relaxing the batch's relationship guard fails here rather than shipping as a
-     *  bypass of the per-item read. */
+    /** The endpoint emits only the numbers it was handed, so it cannot reveal a mobile the caller lacked. */
     @Test
     void aRowCarriesTheFlagAndTheCallersOwnInputAndNothingElse() throws Exception {
         User owner = user("9822300007", "owner");

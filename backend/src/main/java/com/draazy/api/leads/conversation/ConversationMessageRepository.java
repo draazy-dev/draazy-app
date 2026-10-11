@@ -49,10 +49,28 @@ public interface ConversationMessageRepository extends JpaRepository<Conversatio
 
     Optional<ConversationMessage> findByIdAndConversationId(UUID id, UUID conversationId);
 
-    boolean existsByConversationIdAndAuthorId(UUID conversationId, UUID authorId);
+    // The first-contact limit is per buyer-owner pair, so a new thread adds no capacity.
+    @Query("""
+            select count(m) > 0 from ConversationMessage m
+            where m.authorId = :authorId
+              and m.conversationId in (
+                    select c.id from Conversation c
+                    where (c.userAId = :authorId and c.userBId = :otherId)
+                       or (c.userAId = :otherId and c.userBId = :authorId))
+            """)
+    boolean existsByAuthorWithinPair(@Param("authorId") UUID authorId, @Param("otherId") UUID otherId);
 
-    long countByConversationIdAndAuthorIdAndCreatedAtAfter(
-            UUID conversationId, UUID authorId, Instant createdAt);
+    @Query("""
+            select count(m) from ConversationMessage m
+            where m.authorId = :authorId
+              and m.createdAt > :since
+              and m.conversationId in (
+                    select c.id from Conversation c
+                    where (c.userAId = :authorId and c.userBId = :otherId)
+                       or (c.userAId = :otherId and c.userBId = :authorId))
+            """)
+    long countByAuthorWithinPairSince(@Param("authorId") UUID authorId,
+            @Param("otherId") UUID otherId, @Param("since") Instant since);
 
     @Query("""
             select m.conversationId, count(m) from ConversationMessage m

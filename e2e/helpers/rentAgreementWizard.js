@@ -94,7 +94,9 @@ export async function fillOwner(page, { docs = true, next = true, aadhaar = AADH
   await p.getByPlaceholder('If used in older papers').first().fill('Anu');
   await p.getByPlaceholder('ABCDE1234F').first().fill('ABCDE1234F');
   await p.getByPlaceholder('12-digit Aadhaar').first().fill(aadhaar);
-  await p.getByPlaceholder('10-digit mobile').first().fill(MOBILE.owner);
+  const mobile = p.getByPlaceholder('10-digit mobile').first();
+  // The wizard prefills the signed-in requester, who must be the owner on a flat that is not their listing.
+  if (!(await mobile.inputValue())) await mobile.fill(MOBILE.owner);
   await p.getByPlaceholder('Full permanent address').first().fill('12, MG Road, Pune 411001');
   if (docs) await uploadAll(p, 'owner-doc');
   if (next) await clickNext(page, 2);

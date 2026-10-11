@@ -514,6 +514,12 @@ public final class Routes {
         /** Authenticated — tenancies the caller holds as tenant. */
         public static final String MINE = "/me/tenancies";
 
+        /** Authenticated — the named tenant confirms a pending tenancy. Anyone else gets 404. */
+        public static final String CONFIRM = MINE + "/{id}/confirm";
+
+        /** Authenticated — the named tenant declines a pending tenancy. Anyone else gets 404. */
+        public static final String DECLINE = MINE + "/{id}/decline";
+
         // Authenticated — tenancies on the caller's listings.
         /** Authenticated — {@code GET}/{@code PUT} the caller's own tenant profile. */
         public static final String MY_PROFILE = "/me/tenant-profile";
@@ -1119,6 +1125,9 @@ public final class Routes {
         public static final String HELP_FEEDBACK = "/admin/help-feedback";
 
         public static final String HELP_FEEDBACK_COMMENTS = HELP_FEEDBACK + "/comments";
+
+        /** Back-office roles — the staff runbooks, kept out of the public frontend bundle. */
+        public static final String HELP_STAFF = "/admin/help/staff";
 
         /** Admin only — one curated city's launch state. */
         public static final String CITY_BY_SLUG = "/admin/cities/{slug}";

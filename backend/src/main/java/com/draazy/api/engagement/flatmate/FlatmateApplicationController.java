@@ -52,7 +52,7 @@ public class FlatmateApplicationController {
     @GetMapping(Routes.Flatmates.MY_GROUP_APPLICATIONS)
     public PageResponse<GroupApplicationDto> inbox(@CurrentUser AuthPrincipal principal,
             @PageableDefault(size = 20) Pageable pageable) {
-        return PageResponse.of(service.inbox(principal, pageable), dto -> dto);
+        return PageResponse.of(service.inbox(principal, Pageables.unsorted(pageable)), dto -> dto);
     }
 
     /** {@code PATCH /me/group-applications/{id}} — the owner accepts or declines. */

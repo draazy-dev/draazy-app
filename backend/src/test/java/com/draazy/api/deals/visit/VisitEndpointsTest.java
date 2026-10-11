@@ -17,6 +17,7 @@ import com.draazy.api.security.JwtService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -612,5 +613,28 @@ class VisitEndpointsTest extends AbstractApiTest {
             assertThat((String) row.get("body")).contains("The owner");
         });
         assertThat(notificationsFor(owner, "visit.rescheduled")).isEmpty();
+    }
+
+    @Test
+    void scheduleVisit_onAListingThatIsNotLive_is404LikeThePublicRead() throws Exception {
+        User owner = user("9820200071", "owner");
+        User visitor = user("9820200072", "buyer");
+        for (String state : List.of("pending", "rejected", "flagged", "paused", "archived")) {
+            Property p = listing(owner, "Not live " + state);
+            if ("archived".equals(state)) {
+                p.archive("Taken down by the owner");
+            } else {
+                p.setStatus(state);
+            }
+            properties.saveAndFlush(p);
+
+            mvc.perform(post(Routes.Visits.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot() + "\"}"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error").value("not_found"));
+        }
+        assertThat(visitRepo.count()).isZero();
     }
 }

@@ -108,7 +108,7 @@ class CoFillParties {
                 "service-request.party-" + DECLINED, request.getId().toString())) {
             throw new ConflictException("That person has declined this request — invite someone else.");
         }
-        purgeSideIdentityScans(request.getId(), side);
+        purgeSlotIdentityScans(request.getId(), side, partyIndex);
         ServiceRequestParty saved = parties.saveAndFlush(
                 new ServiceRequestParty(request.getId(), invitee.getId(), side, partyIndex, caller.userId()));
         audit.record(caller, "service-request.party-invited", "service_request",
@@ -137,7 +137,7 @@ class CoFillParties {
         if (parties.existsByRequestIdAndRoleAndPartyIndex(request.getId(), side, partyIndex)) {
             throw new ConflictException("That tenant row already has an invitation.");
         }
-        purgeSideIdentityScans(request.getId(), side);
+        purgeSlotIdentityScans(request.getId(), side, partyIndex);
         ServiceRequestParty saved = parties.saveAndFlush(new ServiceRequestParty(
                 request.getId(), normalised, Instant.now().plus(PENDING_INVITE_TTL), side,
                 partyIndex, caller.userId()));
@@ -146,8 +146,8 @@ class CoFillParties {
         return toDto(saved, request.getType(), null, displayName(caller.userId()));
     }
 
-    private void purgeSideIdentityScans(UUID requestId, String side) {
-        var stale = documents.findByServiceRequestIdOrderByUploadedAtDesc(requestId).stream().filter(document -> side.equals(RentAgreementReadiness.identityScanSide(document.getCategory()))).toList();
+    private void purgeSlotIdentityScans(UUID requestId, String side, int partyIndex) {
+        var stale = documents.findByServiceRequestIdOrderByUploadedAtDesc(requestId).stream().filter(document -> RentAgreementReadiness.isIdentityScanFor(document.getCategory(), side, partyIndex)).toList();
         documents.deleteAll(stale);
     }
 

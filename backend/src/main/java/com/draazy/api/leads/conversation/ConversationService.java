@@ -334,9 +334,8 @@ public class ConversationService {
         if (conversations.blockedEitherWay(author.userId(), other)) {
             throw new ForbiddenException("You can't message this user");
         }
-        if (!messages.existsByConversationIdAndAuthorId(conversation.getId(), other)
-                && messages.countByConversationIdAndAuthorIdAndCreatedAtAfter(
-                        conversation.getId(), author.userId(),
+        if (!messages.existsByAuthorWithinPair(other, author.userId())
+                && messages.countByAuthorWithinPairSince(author.userId(), other,
                         Instant.now().minus(1, ChronoUnit.HOURS)) >= 20) {
             throw new RateLimitedException("Please wait before sending another message.", 3600);
         }

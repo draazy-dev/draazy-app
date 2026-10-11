@@ -78,6 +78,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
     private final ServiceRequestSelfDealing selfDealing;
     private final ServiceRequestDraftApprovals draftApprovals;
     private final AccountPermissions accountPermissions;
+    private final RentAgreementOwnerSide ownerSide;
 
     private final TransactionTemplate transactions;
 
@@ -97,6 +98,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
             ServiceRequestSelfDealing selfDealing,
             ServiceRequestDraftApprovals draftApprovals,
             AccountPermissions accountPermissions,
+            RentAgreementOwnerSide ownerSide,
             PlatformTransactionManager transactionManager) {
         this.requests = requests;
         this.events = events;
@@ -114,6 +116,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
         this.selfDealing = selfDealing;
         this.draftApprovals = draftApprovals;
         this.accountPermissions = accountPermissions;
+        this.ownerSide = ownerSide;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -454,22 +457,28 @@ public class ServiceRequestService implements AbandonedCheckouts {
     private String filedCategory(AuthPrincipal caller, ServiceRequest request, String category) {
         String filedAs = ServiceRequestDrafting.customerCategory(request, category);
         String side = RentAgreementReadiness.sideOf(filedAs);
-        if (side != null && !isOps(caller)) {
-            int partyIndex = partyIndexOf(filedAs, side);
+        if (side != null) {
+            int partyIndex = RentAgreementReadiness.partyIndex(filedAs);
+            if (isOps(caller)) {
+                return filedAs;
+            }
             boolean ownSlot = identities.hasAcceptedSlot(request.getId(), caller.userId(),
                     side, partyIndex);
-            if (!ownSlot
-                    && (!caller.userId().equals(request.getRequesterId())
-                            || identities.hasLiveCoFillSlot(request.getId(), side, partyIndex))) {
+            if (ownSlot) {
+                return filedAs;
+            }
+            if (!caller.userId().equals(request.getRequesterId())) {
+                throw new ForbiddenException("You can file papers only for your own side of this agreement.");
+            }
+            if ("owner".equals(side) && ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())
+                    && !ownerSide.requesterIsOwner(request)) {
+                throw RentAgreementOwnerSide.refusal();
+            }
+            if (identities.hasLiveCoFillSlot(request.getId(), side, partyIndex)) {
                 throw new ForbiddenException("You can file papers only for your own side of this agreement.");
             }
         }
         return filedAs;
-    }
-
-    private static int partyIndexOf(String category, String side) {
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(("tenant".equals(side) ? "^tenant-" : "^licensor-") + "(\\d+)-").matcher(category);
-        return matcher.find() ? Integer.parseInt(matcher.group(1)) : 0;
     }
 
     @Transactional

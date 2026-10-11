@@ -47,9 +47,8 @@ export default function ServiceLanding({
   const [trackerRefresh, setTrackerRefresh] = useState(0);
   const [openFaq, setOpenFaq] = useState(-1);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-  // Never autosave contact PII to localStorage — matches the ignore list every service page uses,
-  // so name/mobile are not left at rest on a shared device.
-  const draft = useFormDraft(draftKey || 'dzDraft:service', form, setForm, { enabled: !!draftKey, ignore: ['name', 'mobile'] });
+  // Contact PII never reaches localStorage, so name/mobile are not left at rest on a shared device.
+  const draft = useFormDraft(draftKey || 'dzDraft:service', form, setForm, { enabled: !!draftKey, omit: ['name', 'mobile'] });
   const err = useFieldErrors(formRef);
 
   useEffect(() => { window.scrollTo(0, 0); }, []);

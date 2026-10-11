@@ -1,5 +1,17 @@
 {
   "dash": {
+    "tenancy": {
+      "pendingTitle": "Confirm your tenancy",
+      "pendingLine": "{{owner}} named you as the tenant of {{home}}.",
+      "confirm": "Confirm",
+      "decline": "Decline",
+      "confirmedToast": "Tenancy confirmed.",
+      "declinedToast": "Tenancy declined.",
+      "declineConfirm": "Decline this tenancy? This can't be undone.",
+      "saving": "Saving",
+      "failedToast": "Could not update the tenancy. Try again.",
+      "ownerClosedToast": "{{title}} closed as Rented. If the tenant is on Draazy, they'll confirm the tenancy."
+    },
     "societyFinder": {
       "title": "Track a society",
       "hint": "Pick it from Google Maps and we'll alert you when a home is listed.",

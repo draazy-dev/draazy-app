@@ -35,6 +35,7 @@ export function toRentalCard(row, listing) {
     leaseStart: startDate,
     leaseEnd: row?.endDate || '',
     status: row?.status || 'active',
+    pending: row?.status === 'pending',
   };
 }
 
@@ -58,6 +59,7 @@ export function tenancyStatus(t) {
   const dueDay = Number(t?.dueDay) || 1;
   const due = new Date(now.getFullYear(), now.getMonth(), dueDay);
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (t?.status === 'pending' || t?.status === 'declined') return { month, nextDue: null, nextDueLabel: '' };
   if (due < startOfToday) due.setMonth(due.getMonth() + 1);
   return {
     month,

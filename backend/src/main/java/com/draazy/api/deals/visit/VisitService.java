@@ -53,7 +53,7 @@ public class VisitService {
     public VisitDto schedule(UUID callerId, VisitCreateRequest body) {
         UUID propertyId = Ids.parseUuid(body.propertyId()).orElse(null);
         Property property = propertyId == null ? null : properties.findById(propertyId).orElse(null);
-        if (property == null) {
+        if (property == null || !property.isPubliclyVisible()) {
             throw NotFoundException.of("Property");
         }
 

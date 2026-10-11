@@ -112,6 +112,49 @@ class ConversationEndpointsTest extends AbstractApiTest {
             // of them — otherwise propertyId is an arbitrary id that drives the title and the gate.
             start(buyer, owner, elsewhere, 403);
         }
+
+        @Test
+        @DisplayName("approval on one listing does not open a thread about another listing of the same owner")
+        void approvalIsPerListing() throws Exception {
+            User owner = user("9830000113", Roles.Wire.OWNER, "Owner Per Listing");
+            User buyer = user("9830000114", Roles.Wire.BUYER, "Buyer Per Listing");
+            Property approved = listing(owner);
+            Property other = listing(owner);
+            approve(buyer, approved);
+
+            start(buyer, owner, other, 403);
+            start(buyer, owner, approved, 201);
+        }
+
+        @Test
+        @DisplayName("a buyer cannot open a listing-less thread on the strength of a listing approval")
+        void buyerCannotOpenGeneralThread() throws Exception {
+            User owner = user("9830000115", Roles.Wire.OWNER, "Owner General");
+            User buyer = user("9830000116", Roles.Wire.BUYER, "Buyer General");
+            approve(buyer, listing(owner));
+
+            start(buyer, owner, null, 403);
+        }
+
+        @Test
+        @DisplayName("an owner may open a listing-less thread to a buyer they approved")
+        void ownerMayOpenGeneralThread() throws Exception {
+            User owner = user("9830000117", Roles.Wire.OWNER, "Owner Opens");
+            User buyer = user("9830000118", Roles.Wire.BUYER, "Buyer Approved");
+            approve(buyer, listing(owner));
+
+            start(owner, buyer, null, 201);
+        }
+
+        @Test
+        @DisplayName("an owner cannot open a listing thread to a buyer who was only approved elsewhere")
+        void ownerCannotOpenUnapprovedListingThread() throws Exception {
+            User owner = user("9830000119", Roles.Wire.OWNER, "Owner Opens Other");
+            User buyer = user("9830000120", Roles.Wire.BUYER, "Buyer Elsewhere");
+            approve(buyer, listing(owner));
+
+            start(owner, buyer, listing(owner), 403);
+        }
     }
 
     // These cover the derivation added for that — and, more importantly, that it did not become a way around the guard.
@@ -316,7 +359,7 @@ class ConversationEndpointsTest extends AbstractApiTest {
             approve(buyer, p);
 
             start(buyer, owner, p, 201);
-            start(buyer, owner, null, 201);
+            start(owner, buyer, null, 201);
 
             assertThat(conversations.inboxOf(buyer.getId(), Pageable.unpaged())).hasSize(2);
         }
@@ -652,6 +695,48 @@ class ConversationEndpointsTest extends AbstractApiTest {
         }
 
         @Test
+        @DisplayName("the first-contact limit is shared by every thread between the same pair")
+        void firstContactRateLimitIsPerPair() throws Exception {
+            User owner = user("9830000182", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000183", Roles.Wire.BUYER, "Buyer");
+            Property first = listing(owner);
+            Property second = listing(owner);
+            approve(buyer, first);
+            approve(buyer, second);
+            String firstId = id(start(buyer, owner, first, 201));
+            String secondId = id(start(buyer, owner, second, 201));
+
+            for (int i = 0; i < 9; i++) {
+                reply(buyer, firstId, "ping " + i, 201);
+                reply(buyer, secondId, "pong " + i, 201);
+            }
+            reply(buyer, firstId, "one too many", 429);
+            reply(buyer, secondId, "one too many", 429);
+            start(buyer, owner, first, 429);
+        }
+
+        @Test
+        @DisplayName("an owner reply anywhere in the pair lifts the first-contact limit")
+        void ownerReplyLiftsPairLimit() throws Exception {
+            User owner = user("9830000184", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000185", Roles.Wire.BUYER, "Buyer");
+            Property first = listing(owner);
+            Property second = listing(owner);
+            approve(buyer, first);
+            approve(buyer, second);
+            String firstId = id(start(buyer, owner, first, 201));
+            String secondId = id(start(buyer, owner, second, 201));
+            for (int i = 0; i < 18; i++) {
+                reply(buyer, firstId, "ping " + i, 201);
+            }
+            reply(buyer, firstId, "too many", 429);
+
+            reply(owner, secondId, "hello", 201);
+
+            reply(buyer, firstId, "thanks", 201);
+        }
+
+        @Test
         @DisplayName("notification previews mask phones, email and links")
         void notificationPreviewMasksPersonalData() throws Exception {
             User owner = user("9830000182", Roles.Wire.OWNER, "Owner");
@@ -733,7 +818,7 @@ class ConversationEndpointsTest extends AbstractApiTest {
             User buyer = user("9830000154", Roles.Wire.BUYER, "Buyer");
             Property p = listing(owner);
             approve(buyer, p);
-            String id = id(start(buyer, owner, null, 201));
+            String id = id(start(owner, buyer, null, 201));
 
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))

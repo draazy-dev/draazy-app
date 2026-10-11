@@ -39,7 +39,7 @@ export default function ScheduleVisit() {
   // second of which the server would reject as a duplicate live visit.
   const [busy, setBusy] = useState(false);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-  const draft = useFormDraft('dzDraft:schedule-visit', form, setForm);
+  const draft = useFormDraft('dzDraft:schedule-visit', form, setForm, { omit: ['name', 'phone'] });
   const formRef = useRef(null);
   const err = useFieldErrors(formRef);
   // Resolve the real listing so the page always shows the correct property

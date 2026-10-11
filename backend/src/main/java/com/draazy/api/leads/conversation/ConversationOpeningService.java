@@ -145,7 +145,7 @@ public class ConversationOpeningService {
                 throw refuse();
             }
         }
-        if (!related(caller, counterparty.getId())) {
+        if (!related(caller, counterparty.getId(), listing)) {
             throw refuse();
         }
 
@@ -170,14 +170,19 @@ public class ConversationOpeningService {
         return new Started(mapper.toDetail(conversation, me), existing.isEmpty());
     }
 
-    private boolean related(AuthPrincipal caller, UUID counterpartyId) {
+    // Consent is per listing. A thread without a listing is only for staff or an owner writing to
+    // someone who has an approved request on one of their listings.
+    private boolean related(AuthPrincipal caller, UUID counterpartyId, Property listing) {
         if (Roles.isBackOffice(caller.role())) {
             return true;
         }
-        return contactRequests.existsApprovedForOwner(
-                        caller.userId(), counterpartyId, ContactRequestStatuses.APPROVED)
-                || contactRequests.existsApprovedForOwner(
-                        counterpartyId, caller.userId(), ContactRequestStatuses.APPROVED);
+        if (listing == null) {
+            return contactRequests.existsApprovedForOwner(
+                    counterpartyId, caller.userId(), ContactRequestStatuses.APPROVED);
+        }
+        UUID requester = listing.getOwner().getId().equals(caller.userId()) ? counterpartyId : caller.userId();
+        return contactRequests.existsByRequesterIdAndPropertyIdAndStatus(
+                requester, listing.getId(), ContactRequestStatuses.APPROVED);
     }
 
     // The relationship guard still runs later; this lookup proves nothing alone.

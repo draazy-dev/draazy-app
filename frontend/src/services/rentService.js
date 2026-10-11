@@ -5,6 +5,9 @@ const provider = createProvider('rent');
 /** Tenancies where the caller is the tenant. */
 export const myTenancies = async () => (await provider()).myTenancies();
 
+export const confirmTenancy = async (id) => (await provider()).confirmTenancy(id);
+export const declineTenancy = async (id) => (await provider()).declineTenancy(id);
+
 export const listTenancyDeclarations = async (propId) => (await provider()).listTenancyDeclarations(propId);
 /** Claim a past stay. 409 if you own the listing, already have a tenancy on it, or already claimed. */
 export const declareTenancy = async (propId, body) => (await provider()).declareTenancy(propId, body);

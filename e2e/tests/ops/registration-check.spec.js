@@ -196,10 +196,11 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
   });
 
   test('a flat that was never listed completes, and prepares no badge rows', async () => {
-    const customer = (await apiLogin(uniqueMobile())).accessToken;
+    const mobile = uniqueMobile();
+    const customer = (await apiLogin(mobile)).accessToken;
     const request = await ok('POST', '/service-requests', customer, {
       type: 'rent-agreement',
-      details: { ownerName: 'Unlisted Owner', rent: 18000, deposit: 60000, months: 11, _state: { tenantMode: 'fill', prop: { gramPanchayat: false } } },
+      details: { ownerName: 'Unlisted Owner', rent: 18000, deposit: 60000, months: 11, _state: { tenantMode: 'fill', prop: { gramPanchayat: false }, owner: { oMobile: mobile } } },
     });
     settle(request.id);
 
@@ -253,7 +254,8 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
   });
 
   test('the desk shows the deed particulars with full mobiles, and will not share a draft until every check is ticked', async ({ page }) => {
-    const customer = (await apiLogin(uniqueMobile())).accessToken;
+    const ownerMobile = uniqueMobile();
+    const customer = (await apiLogin(ownerMobile)).accessToken;
     const request = await ok('POST', '/service-requests', customer, {
       type: 'rent-agreement',
       details: {
@@ -261,7 +263,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
         _state: {
           tenantMode: 'fill',
           prop: { flatNo: 'B-702', society: 'Kumar Park', locality: 'Kothrud', gramPanchayat: false, city: 'Pune', pincode: '411038' },
-          owner: { oName: 'Asha Deshpande', oMobile: '9822012345', capacity: 'poa', poaPrincipal: 'Vinod Deshpande', poaRegNo: 'HVL3-889-2024', poaSro: 'Haveli 3', poaDate: '2024-03-15' },
+          owner: { oName: 'Asha Deshpande', oMobile: ownerMobile, capacity: 'poa', poaPrincipal: 'Vinod Deshpande', poaRegNo: 'HVL3-889-2024', poaSro: 'Haveli 3', poaDate: '2024-03-15' },
           tenants: [{ name: 'Kiran Rao', mobile: '9922054321' }],
           terms: { rent: '25000', deposit: '100000', months: '11', lockin: '6', notice: '1' },
         },
@@ -285,7 +287,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     await expect(await section('Licensee')).toContainText('9922054321');
     const licensor = await section('Licensor');
     await expect(licensor).toContainText('for Vinod Deshpande, reg. HVL3-889-2024 (Haveli 3, 2024-03-15)');
-    await expect(licensor).toContainText('9822012345');
+    await expect(licensor).toContainText(ownerMobile);
 
     await dialog.locator('#service-draft-file').setInputFiles({ name: 'draft.png', mimeType: 'image/png', buffer: PNG });
     const share = dialog.getByRole('button', { name: 'Share draft' });
@@ -305,7 +307,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     const customer = (await apiLogin(mobile)).accessToken;
     const request = await ok('POST', '/service-requests', customer, {
       type: 'rent-agreement',
-      details: { ownerName: 'Reupload Owner', rent: 20000, deposit: 60000, months: 11, _state: { tenantMode: 'fill', prop: { gramPanchayat: false } } },
+      details: { ownerName: 'Reupload Owner', rent: 20000, deposit: 60000, months: 11, _state: { tenantMode: 'fill', prop: { gramPanchayat: false }, owner: { oMobile: mobile } } },
     });
     settle(request.id);
     const staff = (await apiLogin(STAFF.rental)).accessToken;
@@ -388,7 +390,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     const customer = (await apiLogin(mobile)).accessToken;
     const request = await ok('POST', '/service-requests', customer, {
       type: 'rent-agreement',
-      details: { ownerName: 'Revised Terms Owner', rent: 20000, deposit: 60000, months: 11, _state: { tenantMode: 'fill', prop: { gramPanchayat: false } } },
+      details: { ownerName: 'Revised Terms Owner', rent: 20000, deposit: 60000, months: 11, _state: { tenantMode: 'fill', prop: { gramPanchayat: false }, owner: { oMobile: mobile } } },
     });
     settle(request.id);
     const staff = (await apiLogin(STAFF.rental)).accessToken;

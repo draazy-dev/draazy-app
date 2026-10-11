@@ -16,6 +16,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.JwtService;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -26,15 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-/**
- * Contract + behaviour proof for the finalization sub-slice (A3), driven through the real filter
- * chain against the live Flyway'd Postgres under {@code ddl-auto=validate}.
- *
- * <p>Covers every test in the §11 bar: request with registered counterparty, unregistered mobile,
- * body propertyId mismatch, auto-decline atomicity, initiator self-accept, stranger scoping,
- * soft cancel, /me/finalization-requests scoping, mobile masking, duplicate prevention, illegal
- * transition, and money round-trip.
- */
+/** Finalization lifecycle through the real filter chain against Postgres. */
 class FinalizationEndpointsTest extends AbstractApiTest {
 
     @Autowired MockMvc mvc;
@@ -115,10 +108,7 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"counterpartyMobile\":\"9999999999\",\"agreedPrice\":5000000}"))
                 .andExpect(status().isBadRequest())
-                // Deliberately NOT "does not belong to a registered user". That phrasing turned
-                // the endpoint into an account-enumeration oracle: a caller could probe any mobile
-                // and learn from the wording whether it had an account. The message now describes
-                // only what the caller got wrong about *this listing*.
+                // Must not say whether the mobile has an account, or the endpoint becomes an enumeration oracle.
                 .andExpect(jsonPath("$.message").value(
                         org.hamcrest.Matchers.containsString("listing owner")));
     }
@@ -283,7 +273,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
         assertThat(count).isEqualTo(1);
     }
 
-    // ---- §11 test 8b: declined request stays readable via status (D111) ----
 
     @Test
     void statusAfterDecline_returnsDeclinedRow() throws Exception {
@@ -300,8 +289,7 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                         .content("{}"))
                 .andExpect(status().isOk());
 
-        // Buyer reads status — previously 404 (pending-only), now returns the declined row so the
-        // property page can explain the refusal and offer to ask again.
+        // The declined row stays readable so the page can explain the refusal.
         mvc.perform(get("/finalization/" + p.getId() + "/status")
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
@@ -338,18 +326,8 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].propertyId").value(p2.getId().toString()));
     }
 
-    // ---- D77: the counterparty inbox is paged, and its count query agrees with its read query ----
 
-    /**
-     * {@code findPendingByCounterparty} is the one paged finder here that carries a hand-written
-     * {@code countQuery}, so its read and its count are two separate pieces of JPQL that can drift.
-     * If they do, the drift is silent: the rows are right and only {@code totalElements} lies, which
-     * is precisely the number a "3 waiting on you" badge renders.
-     *
-     * <p>The declined row is the trap. It must be counted by neither half — a count query that
-     * dropped the {@code status = 'pending'} predicate would still return the correct page and an
-     * inflated total, and no assertion on {@code content} alone would notice.
-     */
+    // The inbox read and count queries are separate JPQL; a declined row must be counted by neither.
     @Test
     void myFinalizationRequests_isPaged_andTheTotalCountsOnlyPendingRows() throws Exception {
         User owner = user("9830100040", "owner");
@@ -463,14 +441,6 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-    // ---- Regression: the counterparty is derived from the listing, not the request body ----
-    //
-    // The first cut resolved the counterparty by looking up whatever mobile arrived in the body,
-    // checking only that it belonged to *some* registered user. That let a buyer aim a
-    // finalization request at any account on the platform -- filling a stranger's inbox with
-    // proposals about a listing that was nothing to do with them -- and turned the endpoint into
-    // an account-enumeration oracle, on a platform where a registered mobile is exactly the thing
-    // worth harvesting.
 
     @Test
     void cannotAimAFinalizationRequestAtSomeoneWhoIsNotTheOwner() throws Exception {
@@ -494,10 +464,7 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
-    /**
-     * An unregistered mobile and a registered-but-wrong one must be indistinguishable, otherwise
-     * the endpoint answers "does this number have an account?" for any number the caller likes.
-     */
+    // An unregistered mobile and a wrong registered one must look identical.
     @Test
     void wrongMobileAndUnregisteredMobileAreIndistinguishable() throws Exception {
         User owner = user("9820100094", "owner");
@@ -532,5 +499,28 @@ class FinalizationEndpointsTest extends AbstractApiTest {
 
     private static String errorOf(String json) {
         return json.replaceAll("^.*\"error\":\"([^\"]*)\".*$", "$1");
+    }
+
+    @Test
+    void requestFinalization_onAListingThatIsNotLive_is404LikeThePublicRead() throws Exception {
+        User owner = user("9830100071", "owner");
+        User buyer = user("9830100072", "buyer");
+        for (String state : List.of("pending", "rejected", "flagged", "paused", "archived")) {
+            Property p = listing(owner, "Not live " + state);
+            if ("archived".equals(state)) {
+                p.archive("Taken down by the owner");
+            } else {
+                p.setStatus(state);
+            }
+            properties.saveAndFlush(p);
+
+            mvc.perform(post(Routes.Finalization.REQUEST.replace("{propId}", p.getId().toString()))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"counterpartyMobile\":\"" + owner.getMobile()
+                                    + "\",\"agreedPrice\":5000000}"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error").value("not_found"));
+        }
     }
 }

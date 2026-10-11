@@ -139,11 +139,22 @@ public class ListingService {
     /** Trust-critical fields are server-set, so a listing cannot be born approved or attributed to someone else. */
     @Transactional
     public Property create(UUID userId, ListingCreate in) {
+        requireAllowance(userId);
+        requirePhotosOnCreate(in.images());
+        return createOnBehalf(userId, in, userId);
+    }
+
+    /** An owner's own posting, held to the freemium ceiling and daily pace; {@link #createOnBehalf} is not. */
+    @Transactional
+    public Property createWithinAllowance(UUID userId, ListingCreate in, String existingLocalitySlug) {
+        requireAllowance(userId);
+        return createOnBehalf(userId, in, existingLocalitySlug, userId);
+    }
+
+    private void requireAllowance(UUID userId) {
         locks.holdUntilCommit(RateLimitLock.Limit.LISTING_CREATE, userId.toString());
         quota.require(userId);
         quota.requirePace(userId);
-        requirePhotosOnCreate(in.images());
-        return createOnBehalf(userId, in, userId);
     }
 
     @Transactional

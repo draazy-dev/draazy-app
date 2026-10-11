@@ -1,39 +1,61 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router';
+import { useTranslation } from 'react-i18next';
+import { useToast } from '../../../context/ToastContext.jsx';
 import Icon from '../../../components/Icon.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
 import HScroll from '../../../components/ui/HScroll.jsx';
 import { Card, SectionHead } from './components.jsx';
 import { fmtINR } from '../../../lib/format.js';
 import {
-  toRentalCards, tenancyStatus,
+  toRentalCard, toRentalCards, tenancyStatus,
 } from '../../../lib/data/tenancy.js';
 import {
-  myTenantProfile, myTenancies, myRentAgreements,
+  myTenantProfile, myTenancies, myRentAgreements, confirmTenancy, declineTenancy,
 } from '../../../services/rentService.js';
 import { inviteRouteFor } from '../../../lib/serviceRequestStatus.js';
 import { listMyServiceRequestInvites } from '../../../services/serviceRequestService.js';
 
-/* "My Rental" — the tenant mirror of My Properties. One hub for the home you rent:
-   its lease at a glance, when the next rent falls due, and one-tap access to the
-   rent-agreement flow, plus your Verified-Tenant score. Source of truth is the
-   tenant's finalised tenancy, not owner-side managed props.
-
-   No rent moves through the platform, so there is no payment history and no HRA receipt to hand
-   out here — a receipt is a document the tenant files with their employer, and the platform has no
-   evidence any money changed hands. A tenant who wants their rent on the dashboard records it
-   themselves in the Finances tab, where it is plainly their own figure. */
+/* The tenant hub. No rent moves through Draazy, so there is no payment history or HRA receipt here. */
 export default function MyRentalPanel({ user }) {
+  const { t: tr } = useTranslation();
+  const { toast } = useToast();
   const [tenancies, setTenancies] = useState([]);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
+  const headingRef = useRef(null);
   const [idx, setIdx] = useState(0);
-  /* Whether the reads have come back at all. Without this the empty state below renders on the
-     first paint of every visit, so a tenant who *does* have a tenancy is told for a moment that
-     they have none — and if `myTenancies()` rejects, that momentary lie becomes a permanent one
-     indistinguishable from the truth. */
+  /* Gates the empty state: before the reads land, "no rental" would be a false claim. */
   const [loaded, setLoaded] = useState(false);
 
-  const t = tenancies[idx] || tenancies[0] || null;
+  const pendingRows = tenancies.filter((x) => x.pending);
+  const live = tenancies.filter((x) => !x.pending);
+  const t = live[idx] || live[0] || null;
 
+  const answer = async (row, accept) => {
+    if (sending.current) return;
+    if (!accept && !window.confirm(tr('dash.tenancy.declineConfirm'))) return;
+    sending.current = true;
+    setBusy(true);
+    let refresh = true;
+    try {
+      const saved = await (accept ? confirmTenancy : declineTenancy)(row.id);
+      setTenancies((rows) => (accept
+        ? rows.map((x) => (x.id === row.id ? { ...x, ...toRentalCard(saved, x) } : x))
+        : rows.filter((x) => x.id !== row.id)));
+      toast(tr(accept ? 'dash.tenancy.confirmedToast' : 'dash.tenancy.declinedToast'), 'success');
+    } catch (err) {
+      const settled = err?.status === 404 || err?.status === 409;
+      refresh = settled;
+      toast(settled && err.message ? err.message : tr('dash.tenancy.failedToast'), 'error');
+    } finally {
+      sending.current = false;
+      setBusy(false);
+      if (refresh) setReloadKey((k) => k + 1);
+      headingRef.current?.focus();
+    }
+  };
   /* The tenant's own tenancy, profile and agreements — four caller-scoped reads, issued together
      because none depends on another and the panel blocks on all of them. */
   const [rent, setRent] = useState({ profile: null, agreements: [] });
@@ -44,10 +66,7 @@ export default function MyRentalPanel({ user }) {
       myTenancies().catch(() => []),
       myTenantProfile().catch(() => null),
       myRentAgreements().catch(() => []),
-      /* Sixth caller-scoped read, and the reason this is a request rather than a local lookup:
-         the invitation is a row the *owner* created against this account, so this browser has
-         never seen it. Reading it from `localStorage` meant the card below could only appear to
-         someone who had already been invited in this same browser — that is, never. */
+      /* The invite is created by the owner, so it can only come from the server, never local storage. */
       listMyServiceRequestInvites().catch(() => []),
     ]).then(async ([rows, profileRow, agreementRows, inviteRows]) => {
       if (!alive) return;
@@ -67,15 +86,11 @@ export default function MyRentalPanel({ user }) {
       });
       setLoaded(true);
     })
-      // The individual reads already swallow their own rejections, so reaching here means the card
-      // hydration itself failed. Release the gate anyway: a permanent skeleton is no kinder than
-      // the empty state, and it gives the tenant nothing to act on.
+      // Release the gate so a failed card hydration is not a permanent skeleton.
       .catch(() => { if (alive) setLoaded(true); });
     return () => { alive = false; };
-    // Keyed on the mobile rather than the user object: the background /auth/me refresh replaces
-    // the object on every tick, and re-issuing five reads for an unchanged identity would re-flash
-    // this panel for nothing.
-  }, [user?.mobile]);
+    // Keyed on the mobile: the /auth/me refresh swaps the user object every tick and would re-flash the panel.
+  }, [user?.mobile, reloadKey]);
 
   // Lease dates only. Nothing here knows whether the rent was actually paid — that money never
   // touches the platform — so this is a schedule, not a settlement status.
@@ -83,9 +98,7 @@ export default function MyRentalPanel({ user }) {
 
   const agreement = rent.agreements[0] || null;
   const profile = rent.profile;
-  // The server computes the score from evidence the client cannot see (verified identity, confirmed
-  // tenancies, payment history), so there is nothing to fall back to: until the profile arrives the
-  // meter has no number to show.
+  // Server-computed, so there is no fallback; a dash means not known yet.
   const score = profile?.score ?? null;
   // Rent-agreement co-fill requests addressed to this user (owner invited them to
   // add their tenant details). Fetched with the panel's other reads, above.
@@ -95,7 +108,7 @@ export default function MyRentalPanel({ user }) {
   if (!loaded) {
     return (
       <div className="space-y-6">
-        <Hero />
+        <Hero headingRef={headingRef} />
         <Card className="p-8">
           <div className="h-4 w-40 rounded bg-white/10 animate-pulse" />
           <div className="h-3 w-64 rounded bg-white/5 animate-pulse mt-3" />
@@ -109,8 +122,10 @@ export default function MyRentalPanel({ user }) {
   if (loaded && !t) {
     return (
       <div className="space-y-6">
-        <Hero />
+        <Hero headingRef={headingRef} />
         <PendingInvites invites={invites} />
+        <PendingTenancies rows={pendingRows} busy={busy} onAnswer={answer} />
+        {pendingRows.length === 0 && (
         <Card className="p-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-brand-teal/10 flex items-center justify-center mx-auto mb-4">
             <Icon name="key-round" className="w-7 h-7 text-brand-teal-3" />
@@ -126,6 +141,7 @@ export default function MyRentalPanel({ user }) {
             </Link>
           </div>
         </Card>
+        )}
       </div>
     );
   }
@@ -136,11 +152,12 @@ export default function MyRentalPanel({ user }) {
 
   return (
     <div className="space-y-6">
-      <Hero />
+      <Hero headingRef={headingRef} />
       <PendingInvites invites={invites} />
-      {tenancies.length > 1 && (
+      <PendingTenancies rows={pendingRows} busy={busy} onAnswer={answer} />
+      {live.length > 1 && (
         <HScroll wrapClassName="-mx-1" className="flex gap-1.5 px-1">
-          {tenancies.map((x, i) => (
+          {live.map((x, i) => (
             <button key={x.id} onClick={() => setIdx(i)} className={'inline-flex min-h-[40px] items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-medium transition ' + (i === idx ? 'border-brand-teal/30 bg-brand-teal/15 text-brand-teal' : 'border-transparent bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white')}>
               <Icon name="house" className="w-4 h-4" /> {x.locality || x.title}
             </button>
@@ -198,12 +215,7 @@ export default function MyRentalPanel({ user }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        {/* Where rent history lives now.
-
-            There is no payment history to show: no rent has ever moved through Draazy, so any
-            list here would be empty forever, and an HRA receipt issued from it would be a tax
-            document asserting a payment the platform never witnessed. The tenant's own record —
-            which is honestly labelled as self-entered — lives in the Finances tab. */}
+        {/* No payment history: no rent moves through Draazy, so the tenant's own record lives in Finances. */}
         <Card className="p-6">
           <SectionHead
             icon="receipt-indian-rupee"
@@ -260,9 +272,26 @@ export default function MyRentalPanel({ user }) {
   );
 }
 
-/* Pending rent-agreement co-fill requests. The owner started the agreement and
-   asked this user to add their tenant details — shown here first, then routed to
-   the rent-agreement page (their step only is editable). */
+function PendingTenancies({ rows, busy, onAnswer }) {
+  const { t: tr } = useTranslation();
+  if (!rows.length) return null;
+  return (
+    <div className="space-y-3" data-testid="pending-tenancies">
+      {rows.map((row) => (
+        <Card key={row.id} className="p-4">
+          <h2 className="text-white font-bold text-base">{tr('dash.tenancy.pendingTitle')}</h2>
+          <p className="text-gray-400 text-sm mt-0.5">{tr('dash.tenancy.pendingLine', { owner: row.ownerName, home: row.title })}</p>
+          <div className="grid grid-cols-2 gap-2.5 mt-3">
+            <button type="button" disabled={busy} aria-busy={busy} onClick={() => onAnswer(row, true)} className="btn-teal min-h-[44px] rounded-xl text-white text-sm font-semibold disabled:opacity-60">{busy ? tr('dash.tenancy.saving') : tr('dash.tenancy.confirm')}</button>
+            <button type="button" disabled={busy} aria-busy={busy} onClick={() => onAnswer(row, false)} className="min-h-[44px] rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 text-sm font-semibold border border-white/10 disabled:opacity-60">{busy ? tr('dash.tenancy.saving') : tr('dash.tenancy.decline')}</button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+/* Co-fill requests: the owner started the agreement and asked this tenant to fill their own details. */
 function PendingInvites({ invites }) {
   if (!invites || !invites.length) return null;
   return (
@@ -297,17 +326,13 @@ function PendingInvites({ invites }) {
   );
 }
 
-function Hero() {
+function Hero({ headingRef }) {
   return (
     <div className="glass-card rounded-2xl p-6">
       <div className="flex items-center gap-2 mb-1.5">
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 text-xs font-medium"><Icon name="key-round" className="w-3.5 h-3.5" /> For tenants</span>
       </div>
-      <h1 className="text-xl sm:text-2xl font-bold text-white">The home you rent</h1>
-      {/* Deliberately does not promise online rent payment. The subtitle used to open with "Pay
-          rent online with an instant HRA receipt", which is the one thing on this screen a tenant
-          cannot do: there is no rail, and the receipt it named would have asserted a payment the
-          platform never witnessed. What is left is what the panel actually delivers. */}
+      <h1 ref={headingRef} tabIndex={-1} className="text-xl sm:text-2xl font-bold text-white outline-none">The home you rent</h1>
       <p className="text-gray-400 text-sm mt-1.5 max-w-2xl">Keep your agreement and deposit sorted, track the rent you already pay, and stay on top of every due date — all in one place.</p>
     </div>
   );

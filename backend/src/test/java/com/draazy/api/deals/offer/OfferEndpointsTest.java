@@ -511,4 +511,35 @@ class OfferEndpointsTest extends AbstractApiTest {
         assertThat(notificationsFor(owner)).extracting(row -> row.get("type"))
                 .containsExactly("offer.received");
     }
+
+    @Test
+    void submitOffer_onAListingThatIsNotLive_is404LikeThePublicRead() throws Exception {
+        User owner = user("9820100071", "owner");
+        User buyer = user("9820100072", "buyer");
+        for (String state : List.of("pending", "rejected", "flagged", "archived")) {
+            Property p = listing(owner, "Not live " + state);
+            if ("archived".equals(state)) {
+                p.archive("Taken down by the owner");
+            } else {
+                p.setStatus(state);
+            }
+            properties.saveAndFlush(p);
+
+            mvc.perform(post(Routes.Offers.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"propertyId\":\"" + p.getId() + "\",\"amount\":20000}"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error").value("not_found"));
+        }
+        Property paused = listing(owner, "Not live paused");
+        paused.setStatus("paused");
+        properties.saveAndFlush(paused);
+        mvc.perform(post(Routes.Offers.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + paused.getId() + "\",\"amount\":20000}"))
+                .andExpect(status().isConflict());
+        assertThat(offerRepo.count()).isZero();
+    }
 }

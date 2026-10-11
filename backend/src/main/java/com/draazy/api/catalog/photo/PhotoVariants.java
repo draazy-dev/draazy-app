@@ -19,10 +19,7 @@ import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
 
-/**
- * Card-sized JPEG copies of a listing photo, so a results page never downloads the full original.
- * Made server-side so the picture on a card is always the picture the gallery and moderators see.
- */
+// Card-sized JPEG copies, made server-side so a card shows exactly the picture the gallery and moderators see.
 final class PhotoVariants {
 
     // Must match cardSrcSet in frontend/src/lib/imgSrcSet.js. Widest first: each is scaled from the last.
@@ -52,9 +49,8 @@ final class PhotoVariants {
         return variants;
     }
 
-    // Subsampled at decode so a 40 MP upload never becomes a bitmap of hundreds of MB, whatever its
-    // aspect ratio; at least twice the widest variant across when the budget allows, so the
-    // averaging in `scale` still has real pixels to work with.
+    // Subsampled at decode so a 24 MP upload never becomes a huge bitmap; kept at least twice the widest
+    // variant across when the budget allows, so the averaging in `scale` still has real pixels.
     private static BufferedImage decode(byte[] photo, int widest) throws IOException {
         try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(photo))) {
             Iterator<ImageReader> readers = in == null ? null : ImageIO.getImageReaders(in);

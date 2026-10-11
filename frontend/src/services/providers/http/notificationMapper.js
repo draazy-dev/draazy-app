@@ -36,6 +36,7 @@ const TYPE_PREFIXES = [
   /** Load-bearing rather than cosmetic: this notification is the *only* thing that tells a customer a draft is
    * waiting on their decision, and the request cannot progress until they act on it. */
   ['service', 'service'],
+  ['tenancy', 'service'],
 ];
 
 /** UI types that already mean what they say — passed through untouched. */

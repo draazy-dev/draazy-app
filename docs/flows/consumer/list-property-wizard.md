@@ -197,7 +197,7 @@ advance on any error (scrolling to the first error via `scrollToError`).
   25,000,000 bytes; advertised image dimensions are capped at 48 megapixels before decoding. Neither
   bound is quoted in the wizard's guidance: they are decode-memory guards, and only the file that
   actually hits one is told about it. The server reads the upload's header before decoding it and
-  refuses (413) a canvas over 10,000 px on a side or 40 megapixels (`PhotoUploads`). The server itself
+  refuses (413) a canvas over 10,000 px on a side or 24 megapixels (`PhotoUploads`). The server itself
   takes only JPEG or PNG, since the browser has already converted any HEIC; it keeps only an allowlist
   (JFIF, ICC and Adobe colour segments and the image data; PNG rendering chunks), drops everything after
   the end marker (motion-photo video, MPF images), and refuses (415) a file it cannot walk to that

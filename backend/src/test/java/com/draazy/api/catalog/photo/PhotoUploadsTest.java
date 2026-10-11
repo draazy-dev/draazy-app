@@ -57,16 +57,16 @@ class PhotoUploadsTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"10001, 1", "1, 10001", "6400, 6400"})
+    @CsvSource({"10001, 1", "1, 10001", "6400, 6400", "5000, 4801"})
     void refusesACanvasThatWouldTakeGigabytesToDecode(int width, int height) {
         byte[] bomb = pngDeclaring(width, height);
         assertThatExceptionOfType(PayloadTooLargeException.class)
                 .isThrownBy(() -> PhotoUploads.validate("image/png", bomb.length, bomb))
-                .withMessageContaining("10,000 pixels");
+                .withMessageContaining("24 megapixels");
     }
 
     @ParameterizedTest
-    @CsvSource({"4000, 3000", "10000, 4000"})
+    @CsvSource({"4000, 3000", "6000, 4000"})
     void acceptsAPhoneCameraCanvas(int width, int height) {
         byte[] photo = pngDeclaring(width, height);
         assertThat(PhotoUploads.validate("image/png", photo.length, photo)).isEqualTo("image/png");

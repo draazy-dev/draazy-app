@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
@@ -27,6 +29,8 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
     UserRepository users;
     @Autowired
     ManagedPropertyRepository managed;
+    @Autowired
+    PropertyRepository properties;
 
     private User user(String mobile) {
         User u = new User(mobile, "owner");
@@ -272,6 +276,44 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
         mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
                         .header(HttpHeaders.AUTHORIZATION, bearer(other)))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void publish_isHeldToTheDailyPostingCap() throws Exception {
+        User owner = user("9831003042");
+        for (int i = 0; i < 3; i++) {
+            Property p = new Property(owner, "Turned down " + i, "rent", "apartment", 25000L,
+                    "Baner", "Pune");
+            p.setStatus(PropertyStatus.REJECTED);
+            properties.saveAndFlush(p);
+        }
+        String id = register(owner, flat("Baner", 25000));
+
+        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + id + "/publish")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error").value("rate_limited"));
+    }
+
+    @Test
+    void publish_rePublishOfAPublishedRecordSpendsNoQuota() throws Exception {
+        User owner = user("9831003043");
+        for (int i = 0; i < 2; i++) {
+            Property p = new Property(owner, "Turned down " + i, "rent", "apartment", 25000L,
+                    "Baner", "Pune");
+            p.setStatus(PropertyStatus.REJECTED);
+            properties.saveAndFlush(p);
+        }
+        String id = register(owner, flat("Baner", 25000));
+        String publish = Routes.MeManagedProperties.BASE + "/" + id + "/publish";
+
+        mvc.perform(post(publish).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk());
+
+        // The window now holds three posts, so a second creation would be paced; an idempotent return must not.
+        mvc.perform(post(publish).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("published"));
     }
 
     @Test

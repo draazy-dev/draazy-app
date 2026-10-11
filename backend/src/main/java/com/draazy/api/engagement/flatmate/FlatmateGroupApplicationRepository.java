@@ -29,6 +29,15 @@ public interface FlatmateGroupApplicationRepository
     /** Check first so duplicate applications return the contract's 409 sentence. */
     boolean existsByListingIdAndGroupId(UUID listingId, UUID groupId);
 
+    /** Callers pass the public moderation states: a removed application does not hold the flat. */
+    boolean existsByListingIdAndStatusAndModStatusIn(UUID listingId, String status,
+            Collection<String> modStatuses);
+
+    boolean existsByListingIdAndStatusAndModStatusInAndIdNot(UUID listingId, String status,
+            Collection<String> modStatuses, UUID id);
+
+    List<FlatmateGroupApplication> findByListingIdAndStatus(UUID listingId, String status);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update FlatmateGroupApplication app

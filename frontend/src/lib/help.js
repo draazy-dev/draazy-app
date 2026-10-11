@@ -1,10 +1,11 @@
-/* English help content is canonical; staff-only content loads after staff sign-in. */
+/* English help content is canonical; staff-only content comes from the API after staff sign-in. */
 import {
   sections as rawSections,
   categories as rawCategories,
   articles as rawArticles,
   changelog as rawChangelog,
 } from 'virtual:help-content';
+import { staffHelpContent } from '../services/contentService.js';
 
 export const changelog = rawChangelog;
 
@@ -21,26 +22,21 @@ let staffContent = NO_STAFF_CONTENT;
 let staffRequest = null;
 const staffListeners = new Set();
 
-/** Whatever staff content has arrived. One stable identity until the chunk lands. */
+/** Whatever staff content has arrived. One stable identity until the response lands. */
 export function getStaffContent() {
   return staffContent;
 }
 
-/** Once per session. The caller establishes that the reader is staff; this only knows how to load. */
+/** Once per session. The caller establishes that the reader is staff; the API enforces it. */
 export function loadStaffContent() {
-  // Cleared on failure so a later attempt can retry — a dropped connection during
-  // one render should not make the runbooks unreachable for the rest of the session.
-  staffRequest ??= import('virtual:help-content-staff')
-    .then((mod) => {
-      staffContent = {
-        sections: mod.sections,
-        categories: mod.categories,
-        articles: mod.articles,
-        loaded: true,
-      };
-      staffListeners.forEach((notify) => notify());
+  // A failure settles as "loaded, empty" so pages stop waiting, and clears the request so the next mount retries.
+  staffRequest ??= staffHelpContent()
+    .then((content) => { staffContent = { ...content, loaded: true }; })
+    .catch(() => {
+      staffRequest = null;
+      staffContent = { ...NO_STAFF_CONTENT, loaded: true };
     })
-    .catch(() => { staffRequest = null; });
+    .finally(() => staffListeners.forEach((notify) => notify()));
   return staffRequest;
 }
 

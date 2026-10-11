@@ -185,6 +185,8 @@ function licensorErrors(e, f, today) {
     if (isForeignParty(owner) && blank(owner.visaOci)) e.visaOci = 'required';
   } else if (!isAadhaar(owner.oAadhaar)) e.oAadhaar = 'format';
   if (!isMobile(owner.oMobile)) e.oMobile = 'format';
+  // Mirrors the server: without one of the requester's own listings, only a licensor fills the owner's part.
+  else if (!f.listed && f.selfMobile && ![owner.oMobile, ...coOwners.map((c) => c.mobile)].some((m) => digits(m).slice(-10) === digits(f.selfMobile).slice(-10))) e.oMobile = 'notOwner';
   checkEmail(e, 'oEmail', owner.oEmail);
   if (blank(owner.oAddr)) e.oAddr = 'required';
   const cap = owner.capacity || 'owner';

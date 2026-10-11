@@ -170,7 +170,7 @@ public class ManagedPropertyService {
      * facts and link back to it. Idempotent — a record already published is returned unchanged. */
     @Transactional
     public ManagedPropertyDto publish(UUID ownerId, String id) {
-        ManagedProperty m = ownedRecord(ownerId, id);
+        ManagedProperty m = ownedRecordForUpdate(ownerId, id);
         if (m.getPublishedListingId() != null) {
             return mapper.toDto(m);
         }
@@ -199,9 +199,17 @@ public class ManagedPropertyService {
         if (!violations.isEmpty()) {
             throw new ConstraintViolationException(violations);
         }
-        Property created = listingService.createOnBehalf(ownerId, listing, m.getLocalitySlug(), ownerId);
+        Property created = listingService.createWithinAllowance(ownerId, listing, m.getLocalitySlug());
         m.markPublished(created.getId());
         return mapper.toDto(records.saveAndFlush(m));
+    }
+
+    // Row lock, so two concurrent publishes of one record cannot both see it unpublished.
+    private ManagedProperty ownedRecordForUpdate(UUID ownerId, String id) {
+        return Ids.parseUuid(id)
+                .flatMap(records::findByIdForUpdate)
+                .filter(m -> m.getOwnerId().equals(ownerId))
+                .orElseThrow(() -> NotFoundException.of("Managed property"));
     }
 
     private ManagedProperty ownedRecord(UUID ownerId, String id) {

@@ -10,12 +10,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.draazy.api.common.web.Routes;
+import jakarta.servlet.http.HttpServletRequest;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.mock.web.MockFilterChain;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest(properties = "draazy.security.origin-secret=" + OriginGateTest.SECRET)
@@ -78,4 +82,47 @@ class OriginGateTest {
     void noneTurnsTheGateOff() {
         assertThat(OriginGateFilter.fromSetting("NONE")).isEmpty();
     }
-}
+
+    @Test
+    void downstreamSeesTheFirstForwardedHopAsTheCaller() throws Exception {
+        MockHttpServletRequest request = proxied("1.2.3.4, 5.6.7.8", SECRET);
+
+        HttpServletRequest seen = run(request).request;
+
+        assertThat(seen.getRemoteAddr()).isEqualTo("1.2.3.4");
+        assertThat(seen.getRemoteHost()).isEqualTo("1.2.3.4");
+    }
+
+    @Test
+    void theSocketAddressStandsWhenNothingWasForwarded() throws Exception {
+        assertThat(run(proxied(null, SECRET)).request.getRemoteAddr()).isEqualTo("10.9.8.7");
+        assertThat(run(proxied("  ", SECRET)).request.getRemoteAddr()).isEqualTo("10.9.8.7");
+    }
+
+    @Test
+    void aForgedForwardedHeaderWithoutTheSecretIsStillRefused() throws Exception {
+        Outcome outcome = run(proxied("1.2.3.4", SECRET + "x"));
+
+        assertThat(outcome.request).isNull();
+        assertThat(outcome.response.getStatus()).isEqualTo(403);
+    }
+
+    private record Outcome(HttpServletRequest request, MockHttpServletResponse response) {
+    }
+
+    private static MockHttpServletRequest proxied(String forwardedFor, String secret) {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/anything");
+        request.setRemoteAddr("10.9.8.7");
+        request.addHeader(OriginGateFilter.HEADER, secret);
+        if (forwardedFor != null) {
+            request.addHeader("X-Forwarded-For", forwardedFor);
+        }
+        return request;
+    }
+
+    private static Outcome run(MockHttpServletRequest request) throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        MockFilterChain chain = new MockFilterChain();
+        OriginGateFilter.fromSetting(SECRET).orElseThrow().doFilter(request, response, chain);
+        return new Outcome((HttpServletRequest) chain.getRequest(), response);
+    }}

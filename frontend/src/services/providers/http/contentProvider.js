@@ -51,3 +51,9 @@ export async function listHelpFeedbackComments({ slug, page = 0, size = 20 } = {
   if (slug) query.slug = slug;
   return unwrapPage(await get('/admin/help-feedback/comments', query), { page, size });
 }
+
+export async function staffHelpContent() {
+  const body = await get('/admin/help/staff');
+  const list = (v) => (Array.isArray(v) ? v : []);
+  return { sections: list(body?.sections), categories: list(body?.categories), articles: list(body?.articles) };
+}

@@ -134,7 +134,7 @@ public class ServiceRequestDrafting {
             throw new ConflictException(
                     "This request is " + request.getStatus() + " \u2014 start a new one to continue.");
         }
-        String wanted = category == null ? "" : category.strip();
+        String wanted = RentAgreementReadiness.canonical(category);
         if (DRAFT.equals(wanted) || FINAL_DOCUMENT.equals(wanted)) {
             throw new ValidationException("Drafts and the registered copy are filed by our team.");
         }

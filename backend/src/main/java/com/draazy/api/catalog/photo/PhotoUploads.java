@@ -23,7 +23,7 @@ public final class PhotoUploads {
     public static final long MAX_BYTES = Routes.MePhotos.MAX_FILE_BYTES;
 
     static final int MAX_EDGE = 10_000;
-    static final long MAX_PIXELS = 40_000_000L;
+    static final long MAX_PIXELS = 24_000_000L;
 
     private static final Set<String> ALLOWED = Set.of(MediaSignatures.JPEG, MediaSignatures.PNG);
 
@@ -60,9 +60,16 @@ public final class PhotoUploads {
 
     private static void requireSaneCanvas(byte[] content) {
         long[] size = declaredSize(content);
-        if (size != null && (size[0] > MAX_EDGE || size[1] > MAX_EDGE || size[0] * size[1] > MAX_PIXELS)) {
+        if (size != null) {
+            requireSaneSize(size[0], size[1]);
+        }
+    }
+
+    /** Called with dimensions read from the header, before any pixel is decoded. */
+    public static void requireSaneSize(long width, long height) {
+        if (width > MAX_EDGE || height > MAX_EDGE || width * height > MAX_PIXELS) {
             throw new PayloadTooLargeException(
-                    "Photos can be at most 10,000 pixels on a side and 40 megapixels in all.");
+                    "Photos can be at most 10,000 pixels on a side and 24 megapixels in all.");
         }
     }
 

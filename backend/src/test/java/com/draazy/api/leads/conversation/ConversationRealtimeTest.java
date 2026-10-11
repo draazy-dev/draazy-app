@@ -149,10 +149,10 @@ class ConversationRealtimeTest extends AbstractApiTest {
         Property property = listing(owner);
         approve(buyer, property);
 
-        start(buyer, owner, null, "Call me 9876543210");
+        start(owner, buyer, null, "Call me 9876543210");
 
         mvc.perform(get(Routes.Conversations.BASE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].lastMessage").value(containsString("98XXXXX210")))
                 .andExpect(jsonPath("$.content[0].lastMessage").value(not(containsString("9876543210"))));

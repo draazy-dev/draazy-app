@@ -231,7 +231,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
       myRentAgreements().catch(() => []),
     ]).then(async ([rows, agreementRows]) => {
       if (!alive) return;
-      const tenancies = await toRentalCards(rows);
+      const tenancies = await toRentalCards((rows || []).filter((row) => row.confirmed));
       if (!alive) return;
       setRental({
         tenancies,

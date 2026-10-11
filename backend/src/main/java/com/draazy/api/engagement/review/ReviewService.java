@@ -8,6 +8,7 @@ import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ReviewNotEligibleException;
 import com.draazy.api.common.persistence.LikePatterns;
+import com.draazy.api.common.trust.OwnerRelationship;
 import com.draazy.api.common.trust.PropertyExperience;
 import com.draazy.api.common.trust.ReviewerStanding;
 import com.draazy.api.identity.user.User;
@@ -46,15 +47,18 @@ public class ReviewService {
     private final PropertyRepository properties;
     private final PropertyExperience experience;
     private final UserRepository users;
+    private final OwnerRelationship ownerRelationship;
 
     public ReviewService(ReviewRepository reviews, ReviewMapper mapper, ReviewTargetKey targetKey,
-            PropertyRepository properties, PropertyExperience experience, UserRepository users) {
+            PropertyRepository properties, PropertyExperience experience, UserRepository users,
+            OwnerRelationship ownerRelationship) {
         this.reviews = reviews;
         this.mapper = mapper;
         this.targetKey = targetKey;
         this.properties = properties;
         this.experience = experience;
         this.users = users;
+        this.ownerRelationship = ownerRelationship;
     }
 
     // ------------------------------------------------------------------ reads
@@ -130,16 +134,30 @@ public class ReviewService {
         return mapper.toResponse(review, displayName(authorId));
     }
 
-    /** No standing check or {@code context} badge: a neighbourhood has no visit or tenancy to evidence. */
+    /** No {@code context} badge: a neighbourhood has no visit or tenancy to evidence, and an owner
+     * review is gated by {@link OwnerRelationship} instead. */
     @Transactional
     public ReviewResponse createForEntity(UUID authorId, String entityType, String entityId,
             ReviewCreateRequest body) {
         String key = targetKey.resolve(entityType, entityId);
+        if (ReviewTargetTypes.OWNER.equals(entityType)) {
+            requireOwnerReviewable(authorId, UUID.fromString(key));
+        }
         Review review = persist(authorId, entityType, key, body, null);
         return mapper.toResponse(review, displayName(authorId));
     }
 
     // ---------------------------------------------------------------- helpers
+
+    private void requireOwnerReviewable(UUID authorId, UUID ownerId) {
+        if (authorId.equals(ownerId)) {
+            throw new ReviewNotEligibleException("You cannot review yourself");
+        }
+        if (!ownerRelationship.exists(authorId, ownerId)) {
+            throw new ReviewNotEligibleException(
+                    "Only someone who has dealt with this owner can review them");
+        }
+    }
 
     private Review persist(UUID authorId, String targetType, String targetId,
             ReviewCreateRequest body, String context) {

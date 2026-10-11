@@ -192,8 +192,10 @@ export function useFormDraft(key, form, setForm, { debounce = 400, ignore = ['na
     if (!enabled || restoredKey.current === key) return;
     restoredKey.current = key;
     try {
-      const saved = JSON.parse(localStorage.getItem(key));
-      if (saved && typeof saved === 'object' && draftHasContent(saved, ignore)) {
+      const parsed = JSON.parse(localStorage.getItem(key));
+      // Drafts written before a field joined `omit` still hold it on disk.
+      const saved = parsed && typeof parsed === 'object' ? omitKeys(parsed, omit) : null;
+      if (saved && draftHasContent(saved, ignore)) {
         const nonEmptyFields = {};
         for (const k in saved) {
           const v = saved[k];

@@ -223,6 +223,7 @@ public class CoFillServiceRequests {
         if (request.getAmount() == null || request.getAmount() <= 0) {
             throw new ConflictException("This request has no payable amount.");
         }
+        readiness.requireOwnerSide(request);
         var rows = partyRows.findByRequestId(request.getId());
         if (!rows.isEmpty()) {
             if (rows.stream().anyMatch(p -> CoFillParties.INVITED.equals(p.getStatus()))) {

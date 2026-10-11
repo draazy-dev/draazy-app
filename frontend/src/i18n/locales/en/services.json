@@ -361,6 +361,7 @@
         "mobile": "Mobile",
         "mobilePlaceholder": "10-digit mobile",
         "mobileErr": "Enter a valid 10-digit mobile number.",
+        "mobileNotYou": "Only the owner fills this part. Use your own number if you own the flat, or invite the owner.",
         "email": "Email",
         "address": "Permanent Address",
         "addressPlaceholder": "Full permanent address",

@@ -34,7 +34,7 @@ test.describe('Identity numbers after a retention purge (D282)', () => {
     const { accessToken: customer } = await apiLogin(mobile);
     const request = await ok('POST', '/service-requests', customer, {
       type: 'rent-agreement',
-      details: { ownerName: OWNER, _state: { owner: { oName: OWNER }, tenants: [{ name: TENANT }] } },
+      details: { ownerName: OWNER, _state: { owner: { oName: OWNER, oMobile: mobile }, tenants: [{ name: TENANT }] } },
     });
     await ok('PUT', `/service-requests/${request.id}/identities`, customer, {
       parties: [{ partyRole: 'owner', partyIndex: 0, partyName: OWNER, aadhaar: '211122223335' }],

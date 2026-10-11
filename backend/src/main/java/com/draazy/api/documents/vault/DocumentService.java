@@ -10,13 +10,16 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.PayloadTooLargeException;
 import com.draazy.api.common.error.UnsupportedMediaTypeException;
 import com.draazy.api.common.trust.BadgeEvidenceLookup;
+import com.draazy.api.common.trust.UnsubmittedRequestLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.verification.IdentityFilePurgeService;
 import com.draazy.api.provider.DocumentScanner;
 import com.draazy.api.provider.FileStorage;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,6 +38,7 @@ public class DocumentService {
     private final BadgeEvidenceLookup badgeEvidence;
     private final AuditService audit;
     private final IdentityFilePurgeService filePurge;
+    private final UnsubmittedRequestLookup unsubmittedRequests;
 
     // Scanners are cumulative: adding one must never replace the existing security checks.
     public DocumentService(DocumentRepository documents,
@@ -42,7 +46,7 @@ public class DocumentService {
             ManagedPropertyDocumentRepository managedDocuments, PropertyRepository properties,
             ManagedPropertyRepository managedProperties, DocumentMapper mapper, FileStorage storage,
             List<DocumentScanner> scanners, BadgeEvidenceLookup badgeEvidence, AuditService audit,
-            IdentityFilePurgeService filePurge) {
+            IdentityFilePurgeService filePurge, UnsubmittedRequestLookup unsubmittedRequests) {
         this.documents = documents;
         this.personalDocuments = personalDocuments;
         this.managedDocuments = managedDocuments;
@@ -54,6 +58,7 @@ public class DocumentService {
         this.badgeEvidence = badgeEvidence;
         this.audit = audit;
         this.filePurge = filePurge;
+        this.unsubmittedRequests = unsubmittedRequests;
     }
 
     @Transactional(readOnly = true)
@@ -181,8 +186,21 @@ public class DocumentService {
                 .flatMap(personalDocuments::findById)
                 .filter(d -> d.getOwnerId().equals(ownerId))
                 .orElseThrow(() -> NotFoundException.of("Document"));
+        removeUnsubmittedCopies(doc.getStorageKey());
         personalDocuments.delete(doc);
         purgeIfUnreferenced(doc.getStorageKey());
+    }
+
+    // The storage key is minted per vault upload, so it identifies the copies filed from this
+    // document. Copies on paid or submitted requests stay as the record.
+    private void removeUnsubmittedCopies(String key) {
+        List<Document> filed = documents.findByStorageKeyAndServiceRequestIdIsNotNull(key);
+        if (filed.isEmpty()) {
+            return;
+        }
+        Set<UUID> open = unsubmittedRequests.unsubmitted(
+                filed.stream().map(Document::getServiceRequestId).collect(Collectors.toSet()));
+        documents.deleteAll(filed.stream().filter(d -> open.contains(d.getServiceRequestId())).toList());
     }
 
     @Transactional(readOnly = true)

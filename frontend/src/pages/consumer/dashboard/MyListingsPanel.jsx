@@ -160,7 +160,7 @@ export default function MyListingsPanel({ listings, setListings, managed = [], o
       toast(err?.body?.error || err?.message || 'Could not finalize the deal', 'error');
       return;
     }
-    toast(`${l.title} finalized as ${isSale ? 'Sold' : 'Rented'}!`, 'success');
+    toast(isSale ? `${l.title} finalized as Sold!` : t('dash.tenancy.ownerClosedToast', { title: l.title }), 'success');
     setShowDealModal(null);
     await reloadRow(l);
   };

@@ -1,14 +1,20 @@
 package com.draazy.api.services.request;
 
+import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.documents.vault.DocumentRepository;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
@@ -23,8 +29,15 @@ class RentAgreementReadiness {
     private static final Set<String> RESIDENTIAL =
             Set.of("Flat / Apartment", "Independent House / Bungalow", "Row House");
 
+    private static final Pattern INDEXED = Pattern.compile("(?:licensor|tenant)-(0|[1-9]\\d{0,2})-[a-z]+");
+    private static final Pattern INDEXED_LOOKING = Pattern.compile("(?:licensor|tenant)-\\d");
+
+    static String canonical(String category) {
+        return category == null ? "" : category.strip().toLowerCase(Locale.ROOT);
+    }
+
     static String sideOf(String category) {
-        String c = category == null ? "" : category.strip().toLowerCase(Locale.ROOT);
+        String c = canonical(category);
         if (c.startsWith("licensor-") || "ownership-proof".equals(c)) {
             return "owner";
         }
@@ -32,22 +45,47 @@ class RentAgreementReadiness {
     }
 
     static String identityScanSide(String category) {
-        String c = category == null ? "" : category.strip().toLowerCase(Locale.ROOT);
+        String c = canonical(category);
         return PERSON_PAPERS.stream().anyMatch(paper -> c.endsWith("-" + paper)) ? sideOf(c) : null;
+    }
+
+    // Categories with no index in their name (ownership-proof, tenant-id) belong to slot 0.
+    static int partyIndex(String category) {
+        String c = canonical(category);
+        Matcher indexed = INDEXED.matcher(c);
+        if (indexed.matches()) {
+            return Integer.parseInt(indexed.group(1));
+        }
+        if (INDEXED_LOOKING.matcher(c).lookingAt()) {
+            throw new BadRequestException("'" + c + "' is not a valid document category.");
+        }
+        return 0;
+    }
+
+    static boolean isIdentityScanFor(String category, String side, int index) {
+        if (!side.equals(identityScanSide(category))) {
+            return false;
+        }
+        Matcher indexed = INDEXED.matcher(canonical(category));
+        return (indexed.matches() ? Integer.parseInt(indexed.group(1)) : 0) == index;
     }
 
     private final ServiceRequestIdentityRepository identities;
     private final DocumentRepository documents;
+    private final RentAgreementOwnerSide ownerSide;
 
-    RentAgreementReadiness(ServiceRequestIdentityRepository identities, DocumentRepository documents) {
+    RentAgreementReadiness(ServiceRequestIdentityRepository identities, DocumentRepository documents,
+            RentAgreementOwnerSide ownerSide) {
         this.identities = identities;
         this.documents = documents;
+        this.ownerSide = ownerSide;
     }
 
     void require(ServiceRequest request) {
         if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType())) {
             return;
         }
+        requireOwnerSide(request);
         List<String> missingDocuments = missingDocuments(request);
         if (!missingDocuments.isEmpty()) {
             throw new ConflictException("Upload required documents before checkout: "
@@ -62,6 +100,24 @@ class RentAgreementReadiness {
         if (!missingParticulars.isEmpty()) {
             throw new ConflictException("Complete the agreement before checkout: "
                     + summarise(missingParticulars) + ".");
+        }
+    }
+
+    // A tenant-side requester cannot file owner papers, so what the owner side lacks is the owner's to supply.
+    void requireOwnerSide(ServiceRequest request) {
+        if (!ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType()) || ownerSide.requesterIsOwner(request)) {
+            return;
+        }
+        Set<String> waiting = new LinkedHashSet<>(ownerSide.licensorsAwaitingOwner(request));
+        missingDocumentItems(request).forEach((key, label) -> {
+            if ("owner".equals(sideOf(key))) {
+                waiting.add(label);
+            }
+        });
+        missingIdentities(request).stream().filter(label -> label.startsWith("Licensor ")).forEach(waiting::add);
+        if (!waiting.isEmpty()) {
+            throw new ConflictException(ErrorCodes.OWNER_SIDE_PENDING,
+                    "Waiting for the owner to fill their part: " + summarise(List.copyOf(waiting)) + ".");
         }
     }
 
@@ -149,8 +205,14 @@ class RentAgreementReadiness {
     }
 
     List<String> missingDocuments(ServiceRequest request) {
-        Set<String> filed = documents.findByServiceRequestIdOrderByUploadedAtDesc(request.getId()).stream().map(com.draazy.api.documents.vault.Document::getCategory).filter(Objects::nonNull).map(category -> category.strip().toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
-        return ServiceRequestChecklist.itemsFor(request).entrySet().stream().filter(entry -> !filed.contains(entry.getKey())).map(Map.Entry::getValue).toList();
+        return List.copyOf(missingDocumentItems(request).values());
+    }
+
+    private Map<String, String> missingDocumentItems(ServiceRequest request) {
+        Set<String> filed = documents.findByServiceRequestIdOrderByUploadedAtDesc(request.getId()).stream().map(com.draazy.api.documents.vault.Document::getCategory).filter(Objects::nonNull).map(RentAgreementReadiness::canonical).collect(Collectors.toSet());
+        Map<String, String> missing = new LinkedHashMap<>(ServiceRequestChecklist.itemsFor(request));
+        missing.keySet().removeAll(filed);
+        return missing;
     }
 
     List<String> missingIdentities(ServiceRequest request) {

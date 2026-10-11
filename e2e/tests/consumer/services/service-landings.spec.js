@@ -174,6 +174,24 @@ test.describe('property valuation landing, live', () => {
     await expect(page.getByRole('heading', { name: 'Request received!' })).toBeVisible();
     await expect(page).not.toHaveURL(/\/signin/);
   });
+
+  test('the autosaved draft keeps the property details but never the name or mobile', async ({ page }) => {
+    const KEY = 'dzDraft:property-valuation';
+    await page.goto(PAGE);
+    await page.evaluate((key) => localStorage.setItem(key, JSON.stringify({ name: 'Stale Visitor', mobile: '9876543210', area: '1234' })), KEY);
+    await page.reload();
+
+    const form = page.locator('form');
+    await expect(form.locator('input[type=number]')).toHaveValue('1234');
+    await expect(form.locator('input[data-err="name"]')).toHaveValue('');
+
+    await form.locator('input[data-err="name"]').fill('Typed Visitor');
+    await form.locator('input[type=number]').fill('2000');
+    await expect.poll(() => page.evaluate((key) => JSON.parse(localStorage.getItem(key) || '{}').area, KEY)).toBe('2000');
+    const saved = JSON.parse(await page.evaluate((key) => localStorage.getItem(key), KEY));
+    expect(saved).not.toHaveProperty('name');
+    expect(saved).not.toHaveProperty('mobile');
+  });
 });
 
 test.describe('interior & renovation landing, live', () => {

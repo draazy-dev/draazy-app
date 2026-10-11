@@ -10,6 +10,8 @@ export function toTenancyViewModel(row) {
     endDate: row?.endDate || null,
     status: row?.status || 'active',
     active: (row?.status || 'active') === 'active',
+    pending: row?.status === 'pending',
+    confirmed: ['active', 'ended', 'terminated'].includes(row?.status || 'active'),
     tenantId: row?.tenant?.id || '',
     tenantName: row?.tenant?.name || '',
     // Contact-gated server-side; passed through as it arrives. Masking is the server's decision.

@@ -85,8 +85,8 @@ spec:
             - name: BOOTSTRAP_ADMIN_RECOVER
               value: "${BOOTSTRAP_ADMIN_RECOVER}"
 
-            # `none` collapses every anonymous caller into one rate-limit bucket.
-            # Safe only because the origin gate already checked the real request chain.
+            # `none` is correct here: the origin gate trusts only the first X-Forwarded-For hop the edge
+            # proxy wrote and rate-limits anonymous callers on it, so visitors do not share a bucket.
             - name: INTERNAL_PROXIES
               value: none
 

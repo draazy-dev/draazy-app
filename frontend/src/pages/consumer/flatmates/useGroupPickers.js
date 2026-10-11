@@ -14,7 +14,7 @@ export function useGroupPickers(user, groupOpen) {
   );
   const [myTenancies, myTenanciesStatus, , retryMyTenancies, myTenanciesError] = useAsyncList(
     () => rentService.myTenancies()
-      .then((list) => list.filter((tenancy) => tenancy.status !== 'ended'))
+      .then((list) => list.filter((tenancy) => tenancy.active))
       .then(toRentalCards),
     [user?.mobile, groupOpen],
     enabled,

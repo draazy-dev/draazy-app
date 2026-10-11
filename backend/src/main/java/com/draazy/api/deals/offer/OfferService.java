@@ -62,12 +62,18 @@ public class OfferService {
         // below needs its owner and title. Same query, one fewer round trip than fetching it twice.
         Property property = Ids.parseUuid(body.propertyId())
                 .flatMap(properties::findById)
+                .filter(Property::isDirectlyReachable)
                 .orElseThrow(() -> NotFoundException.of("Property"));
         UUID propertyId = property.getId();
 
         // Closed deal blocks new offers.
         if (deals.findClosedByPropertyId(propertyId).isPresent()) {
             throw new ConflictException("A closed deal exists on this property");
+        }
+
+        // Sold, rented and paused listings stay reachable by link, so they answer 409 rather than 404.
+        if (!property.isPubliclyVisible()) {
+            throw new ConflictException("This listing is not open to offers");
         }
 
         // Duplicate prevention: service-level check for a clean error message.

@@ -47,7 +47,7 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger(WriteRateLimitFilter.class);
 
-    private static final String FORWARDED_FOR = "X-Forwarded-For";
+    static final String FORWARDED_FOR = "X-Forwarded-For";
 
     private final WriteRateLimitStore limiter;
     private final WriteRateLimitStore callbackLimiter;

@@ -15,7 +15,7 @@ import {
   onStaffContent,
 } from './help.js';
 
-/** `staff` is the empty set until the chunk arrives, so a staff account's first paint is public. */
+/** `staff` is the empty set until the API answers, so a staff account's first paint is public. */
 function useHelpAudience() {
   const { user } = useAuth();
   const staff = useSyncExternalStore(onStaffContent, getStaffContent, getStaffContent);
@@ -31,7 +31,7 @@ function useHelpAudience() {
   };
 }
 
-/* `pending` is true only while a staff account waits for its chunk. Pages that would otherwise
+/* `pending` is true only while a staff account waits for its runbooks. Pages that would otherwise
    render "no such article" must honour it, or a runbook link reads as broken for half a second. */
 export function useHelpTree() {
   const { staff, pending } = useHelpAudience();

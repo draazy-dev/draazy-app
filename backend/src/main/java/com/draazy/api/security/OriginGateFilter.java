@@ -4,6 +4,7 @@ import com.draazy.api.common.error.ErrorCodes;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -65,10 +66,31 @@ public class OriginGateFilter extends OncePerRequestFilter {
         String presented = request.getHeader(HEADER);
         if (presented != null
                 && MessageDigest.isEqual(secret, presented.getBytes(StandardCharsets.UTF_8))) {
-            chain.doFilter(request, response);
+            chain.doFilter(edgeAddressed(request), response);
             return;
         }
         SecurityErrors.write(response, 403, ErrorCodes.FORBIDDEN,
                 ErrorCodes.Messages.ACCESS_DENIED);
+    }
+
+    // The edge proxy writes the visitor's address as the first X-Forwarded-For hop;
+    // Cloud Run's front end may append more.
+    private static HttpServletRequest edgeAddressed(HttpServletRequest request) {
+        String forwarded = request.getHeader(WriteRateLimitFilter.FORWARDED_FOR);
+        String client = forwarded == null ? "" : forwarded.split(",", 2)[0].trim();
+        if (client.isEmpty()) {
+            return request;
+        }
+        return new HttpServletRequestWrapper(request) {
+            @Override
+            public String getRemoteAddr() {
+                return client;
+            }
+
+            @Override
+            public String getRemoteHost() {
+                return client;
+            }
+        };
     }
 }
