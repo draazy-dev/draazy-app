@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../../../helpers/moderation.js';
 import { openBadgeVault, uploadBadgeProof } from '../../../helpers/badgeVault.js';
 import { PHOTO_PNG } from '../../../helpers/listingPhotos.helper.js';
@@ -61,7 +61,7 @@ test.afterEach(async ({ request }) => {
 });
 
 test('the overview shows the optional Verified badge nudge before profile completion', async ({ page }) => {
-  const seeker = await newActor(`Zztest Dashboard Seeker ${Date.now()}`, {
+  const seeker = await newActor(`Zztest Dashboard Seeker ${letterTag()}`, {
     email: `dashboard-${Date.now()}@example.test`,
     city: 'Pune',
   });
@@ -77,7 +77,7 @@ test('the overview shows the optional Verified badge nudge before profile comple
 
 // Ownership evidence is optional at posting time, so an owner who skipped it needs a way back to it.
 test('an owner with an approved listing gets Requests navigation and a Verified property badge CTA that opens that listing in the document vault', async ({ page, request }) => {
-  const owner = await newActor(`Zztest Dashboard Verify ${Date.now()}`);
+  const owner = await newActor(`Zztest Dashboard Verify ${letterTag()}`);
   await createApprovedListing(request, owner);
 
   await signedInAs(page, owner.mobile);
@@ -105,7 +105,7 @@ test('an owner with an approved listing gets Requests navigation and a Verified 
 });
 
 test('the vault badge request goes under review, and a staff decline comes back with its reason', async ({ page, request }) => {
-  const owner = await newActor(`Zztest Dashboard Badge ${Date.now()}`);
+  const owner = await newActor(`Zztest Dashboard Badge ${letterTag()}`);
   const listingId = await createApprovedListing(request, owner);
 
   await signedInAs(page, owner.mobile);
@@ -136,7 +136,7 @@ test('the vault badge request goes under review, and a staff decline comes back 
 });
 
 test('on a phone the identity banner and listing status card leave no dead rows', async ({ page, request }) => {
-  const owner = await newActor(`Zztest Dashboard Banner ${Date.now()}`);
+  const owner = await newActor(`Zztest Dashboard Banner ${letterTag()}`);
   await createApprovedListing(request, owner);
   await page.setViewportSize({ width: 440, height: 956 });
 

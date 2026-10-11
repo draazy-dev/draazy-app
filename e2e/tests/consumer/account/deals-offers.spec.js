@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const createdListings = new Map();
@@ -84,8 +84,8 @@ test.afterEach(async () => {
 });
 
 test('a buyer offer is countered, agreed and accepted through the real deal API', async ({ page }) => {
-  const owner = await newActor(`Zztest Deal Owner ${Date.now()}`);
-  const buyer = await newActor(`Zztest Deal Buyer ${Date.now()}`);
+  const owner = await newActor(`Zztest Deal Owner ${letterTag()}`);
+  const buyer = await newActor(`Zztest Deal Buyer ${letterTag()}`);
   const listing = await createApprovedListing(owner);
 
   await signedInAs(page, buyer.mobile);
@@ -134,8 +134,8 @@ test('a buyer offer is countered, agreed and accepted through the real deal API'
 });
 
 test('an owner can decline a real finalization request and later accept the buyer retry', async ({ page }) => {
-  const owner = await newActor(`Zztest Finalize Owner ${Date.now()}`);
-  const buyer = await newActor(`Zztest Finalize Buyer ${Date.now()}`);
+  const owner = await newActor(`Zztest Finalize Owner ${letterTag()}`);
+  const buyer = await newActor(`Zztest Finalize Buyer ${letterTag()}`);
   const listing = await createApprovedListing(owner);
   await approveContact(owner, buyer, listing.id);
 

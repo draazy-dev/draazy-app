@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
 /* Each test creates a thread for a unique buyer: the named seed conversation is shared by other
    specs, so writing to it would leak messages across retries and suppress the next run's replies. */
 
@@ -16,7 +16,7 @@ async function actor(request, name) {
 
 async function liveThread(request) {
   const suffix = Date.now();
-  const buyer = await actor(request, `Live Inbox Buyer ${suffix}`);
+  const buyer = await actor(request, `Live Inbox Buyer ${letterTag(suffix)}`);
   const ownerHeaders = await authHeaders(ACTORS.owner);
   const ownerProfile = await request.patch(`${API}/auth/me`, {
     headers: ownerHeaders,
@@ -127,8 +127,8 @@ test.describe('Messages inbox — live API', () => {
   });
 
   test('staged chats stay in Requests and are scoped to the signed-in user', async ({ page, request }) => {
-    const first = await actor(request, `Staged Buyer A ${Date.now()}`);
-    const second = await actor(request, `Staged Buyer B ${Date.now()}`);
+    const first = await actor(request, `Staged Buyer A ${letterTag()}`);
+    const second = await actor(request, `Staged Buyer B ${letterTag()}`);
     const title = `Private staged chat ${Date.now()}`;
 
     await signedInAs(page, first.mobile);

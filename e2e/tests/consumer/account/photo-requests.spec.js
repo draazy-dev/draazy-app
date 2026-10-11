@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signedInAs } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signedInAs, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 /* Buyer and owner are separate accounts in separate contexts, so every hand-off is read back from a
  * place the writing side does not own — and both terminal decisions are pressed, not just present. */
@@ -28,7 +28,7 @@ async function actor(name) {
 /* Not a seeded anchor listing: the inbox is keyed by ownership, so sharing one would make "exactly
  * one request" depend on whatever else ran that day. */
 async function isolatedListing() {
-  const owner = await actor(`Zztest Photo Owner ${Date.now()}`);
+  const owner = await actor(`Zztest Photo Owner ${letterTag()}`);
   const created = await api('POST', '/me/listings', owner.headers, {
     title: `Zztest photo requests listing ${Date.now()}`,
     deal: 'rent',
@@ -82,7 +82,7 @@ test.afterEach(async () => {
 
 test('a buyer asking for photos reaches the owner, and asking twice does not', async ({ page }) => {
   const listing = await isolatedListing();
-  const buyer = await actor(`Zztest Photo Buyer ${Date.now()}`);
+  const buyer = await actor(`Zztest Photo Buyer ${letterTag()}`);
   /* BEFORE. Without this the "exactly one row" assertion below cannot tell a working write from an
      inbox that was already holding a row for some other reason. */
 
@@ -122,7 +122,7 @@ test('a buyer asking for photos reaches the owner, and asking twice does not', a
 
 test('the owner marks photos added, and the buyer is told where to look', async ({ page }) => {
   const listing = await isolatedListing();
-  const buyer = await actor(`Zztest Photo Buyer Added ${Date.now()}`);
+  const buyer = await actor(`Zztest Photo Buyer Added ${letterTag()}`);
 
   const asked = await api('POST', `/properties/${listing.id}/photo-requests`, buyer.headers);
   expect(asked.status, 'seeding the buyer ask').toBe(200);
@@ -159,7 +159,7 @@ test('the owner marks photos added, and the buyer is told where to look', async 
 
 test('the owner declines, and the buyer is told there are none coming', async ({ page }) => {
   const listing = await isolatedListing();
-  const buyer = await actor(`Zztest Photo Buyer Declined ${Date.now()}`);
+  const buyer = await actor(`Zztest Photo Buyer Declined ${letterTag()}`);
 
   const asked = await api('POST', `/properties/${listing.id}/photo-requests`, buyer.headers);
   expect(asked.status, 'seeding the buyer ask').toBe(200);

@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, grantIdentityBadge, uploadedListingPhotos, uniqueMobile, signedInAs } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, grantIdentityBadge, uploadedListingPhotos, uniqueMobile, signedInAs, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const createdListings = new Set();
@@ -23,7 +23,7 @@ async function actor(name) {
 }
 
 async function isolatedListing() {
-  const owner = await actor(`Zztest Verified Badge Owner ${Date.now()}`);
+  const owner = await actor(`Zztest Verified Badge Owner ${letterTag()}`);
   const created = await api('POST', '/me/listings', owner.headers, {
     title: `Zztest verified badge listing ${Date.now()}`,
     deal: 'rent',
@@ -71,8 +71,8 @@ test.afterEach(async () => {
 
 test('a pending verified buyer keeps the server-provided Serious Buyer badge before approval', async ({ page, request }) => {
   const fixture = await isolatedListing();
-  const buyer = await actor(`Zztest Verified Buyer ${Date.now()}`);
-  const unverifiedBuyer = await actor(`Zztest Unverified Buyer ${Date.now()}`);
+  const buyer = await actor(`Zztest Verified Buyer ${letterTag()}`);
+  const unverifiedBuyer = await actor(`Zztest Unverified Buyer ${letterTag()}`);
 
   await grantIdentityBadge(buyer.mobile);
   const profile = await api('PUT', '/me/tenant-profile', buyer.headers, {

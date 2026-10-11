@@ -1,5 +1,5 @@
 import { test, expect } from '../../../fixtures/live.js';
-import { API, authHeaders, uniqueMobile, signedInAs } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uniqueMobile, signedInAs, letterTag } from '../../../helpers/liveAuth.js';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScL9QQAAAABJRU5ErkJggg==', 'base64');
 const createdDocumentIds = new Set();
@@ -44,7 +44,7 @@ test.afterEach(async () => {
 test.describe('Document viewer — live storage and content rules', () => {
   test('a stored PNG opens through the vetted viewer URL, an HTML upload is refused, and the viewer guard never opens an active data URL', async ({ page, context }) => {
     await test.step('a server-stored PNG opens through the vetted viewer URL', async () => {
-      const owner = await actor(`Zztest Document Viewer ${Date.now()}`);
+      const owner = await actor(`Zztest Document Viewer ${letterTag()}`);
       const uploaded = await upload(owner.headers, {
         name: 'identity.png',
         type: 'image/png',
@@ -70,7 +70,7 @@ test.describe('Document viewer — live storage and content rules', () => {
     });
 
     await test.step('an HTML upload is rejected and never becomes a personal-vault row', async () => {
-      const owner = await actor(`Zztest Document Reject ${Date.now()}`);
+      const owner = await actor(`Zztest Document Reject ${letterTag()}`);
       const before = await fetch(`${API}/me/documents/personal`, { headers: owner.headers });
       expect(before.status, 'reading the empty personal vault').toBe(200);
       const initial = await before.json();

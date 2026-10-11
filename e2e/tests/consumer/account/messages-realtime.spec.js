@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
 
 const BANER_FLAT_ID = '615287b3-7a3b-530f-84aa-773753e8682b';
 
@@ -13,7 +13,7 @@ async function actor(request, name) {
 
 async function liveThread(request) {
   const suffix = Date.now();
-  const buyer = await actor(request, `Realtime Buyer ${suffix}`);
+  const buyer = await actor(request, `Realtime Buyer ${letterTag(suffix)}`);
   const ownerHeaders = await authHeaders(ACTORS.owner);
   await request.patch(`${API}/auth/me`, { headers: ownerHeaders, data: { shareActivityStatus: true, shareReadReceipts: true, hideNumber: false } });
 

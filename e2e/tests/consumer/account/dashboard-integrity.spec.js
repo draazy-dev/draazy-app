@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const createdListingIds = new Set();
@@ -82,7 +82,7 @@ test.afterEach(async () => {
 });
 
 test('Action Center count, Requests rows and nav badge agree for mixed pending leads', async ({ page }) => {
-  const owner = await actor(`Zztest Integrity Owner ${Date.now()}`);
+  const owner = await actor(`Zztest Integrity Owner ${letterTag()}`);
   const listing = await approvedListing(owner);
   await makeContact(owner, listing.id, 'Zztest Contact Buyer');
   await makePhoto(listing.id, 'Zztest Photo Buyer');
@@ -102,11 +102,11 @@ test('Action Center count, Requests rows and nav badge agree for mixed pending l
 });
 
 test('more than 20 pending contact requests all appear oldest first', async ({ page }) => {
-  const owner = await actor(`Zztest Many Owner ${Date.now()}`);
+  const owner = await actor(`Zztest Many Owner ${letterTag()}`);
   const listing = await approvedListing(owner);
   const names = [];
   for (let i = 0; i < 21; i += 1) {
-    const name = `Zztest Old Contact ${String(i).padStart(2, '0')}`;
+    const name = `Zztest Old Contact ${letterTag(String(i).padStart(2, '0'))}`;
     names.push(name);
     const row = await makeContact(owner, listing.id, name);
     expect(row).toBeTruthy();
@@ -125,7 +125,7 @@ test('more than 20 pending contact requests all appear oldest first', async ({ p
 });
 
 test('double-tapping Accept sends one successful contact decision', async ({ page }) => {
-  const owner = await actor(`Zztest Double Owner ${Date.now()}`);
+  const owner = await actor(`Zztest Double Owner ${letterTag()}`);
   const listing = await approvedListing(owner);
   const row = await makeContact(owner, listing.id, 'Zztest Double Buyer');
   expect(row).toBeTruthy();
@@ -163,7 +163,7 @@ test('aborted contact request inbox shows LoadError with retry on All leads', as
 });
 
 test('document requests from two buyers stay separate and Grant all affects one group', async ({ page, request }) => {
-  const owner = await actor(`Zztest Docs Owner ${Date.now()}`);
+  const owner = await actor(`Zztest Docs Owner ${letterTag()}`);
   const listing = await approvedListing(owner);
   const first = await makeDoc(listing.id, 'Zztest Doc Buyer A', ['Index II']);
   const second = await makeDoc(listing.id, 'Zztest Doc Buyer B', ['Encumbrance Certificate']);

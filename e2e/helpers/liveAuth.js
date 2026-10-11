@@ -21,6 +21,10 @@ export function uniqueMobile() {
   return `97${String(lastIssued).slice(-8)}`;
 }
 
+// Profile names are letters only (UserUpdate), so a unique suffix spells its digits a–j.
+export const letterTag = (value = uniqueMobile().slice(2)) =>
+  String(value).replace(/\d/g, (d) => 'abcdefghij'[d]);
+
 export const storedPhotoUrl = (hash = '', ownerId = crypto.randomUUID()) =>
   `/api/dev/storage/public/photos/${ownerId}/${crypto.randomUUID()}${hash ? `-${hash}` : ''}`;
 

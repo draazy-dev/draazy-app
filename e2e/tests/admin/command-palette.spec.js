@@ -1,11 +1,11 @@
 // The admin Ctrl+K palette and the bell, against the live API.
 import { test, expect, ACTORS, STAFF } from '../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, uniqueMobile } from '../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, uniqueMobile, letterTag } from '../../helpers/liveAuth.js';
 
 const UNIQUE_PAGE_TERM = 'Referrals';
 
 // One token per run, so every `(1)` below is about the row this test made.
-const tag = () => `zzp${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`;
+const tag = () => `zzp${letterTag(`${Date.now()}${Math.floor(Math.random() * 1e4)}`)}`;
 
 const palette = (page) => page.getByTestId('admin-palette');
 const bell = (page) => page.getByTestId('admin-notifications');

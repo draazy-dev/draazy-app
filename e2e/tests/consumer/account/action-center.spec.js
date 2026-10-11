@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const createdListingIds = new Set();
@@ -66,8 +66,8 @@ test.afterEach(async () => {
 });
 
 test('an owner shares a real contact request from the Action Center and clears the Requests badge', async ({ page }) => {
-  const owner = await newActor(`Zztest Action Owner ${Date.now()}`);
-  const buyer = await newActor(`Zztest Action Buyer ${Date.now()}`);
+  const owner = await newActor(`Zztest Action Owner ${letterTag()}`);
+  const buyer = await newActor(`Zztest Action Buyer ${letterTag()}`);
   const listing = await createApprovedListing(owner);
 
   const requested = await api('POST', '/contacts/request', buyer.headers, {
@@ -110,7 +110,7 @@ test('an owner shares a real contact request from the Action Center and clears t
 });
 
 test('a fresh seeker has an honest empty Action Center and no owner-only Requests navigation', async ({ page }) => {
-  const seeker = await newActor(`Zztest Action Seeker ${Date.now()}`);
+  const seeker = await newActor(`Zztest Action Seeker ${letterTag()}`);
 
   await signedInAs(page, seeker.mobile);
   const inboxRead = page.waitForResponse((response) =>

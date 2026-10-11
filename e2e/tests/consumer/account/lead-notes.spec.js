@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signedInAs } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signedInAs, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 
@@ -26,7 +26,7 @@ async function actor(name) {
 }
 
 async function isolatedListing() {
-  const owner = await actor(`Zztest Lead Notes Owner ${Date.now()}`);
+  const owner = await actor(`Zztest Lead Notes Owner ${letterTag()}`);
   const created = await api('POST', '/me/listings', owner.headers, {
     title: `Zztest lead notes listing ${Date.now()}`,
     deal: 'rent',
@@ -59,7 +59,7 @@ test.afterEach(async () => {
 
 test('an owner note and follow-up date are stored on the server, not in the browser', async ({ page, request }) => {
   const fixture = await isolatedListing();
-  const buyer = await actor(`Zztest Lead Notes Buyer ${Date.now()}`);
+  const buyer = await actor(`Zztest Lead Notes Buyer ${letterTag()}`);
 
   const requested = await request.post(`${API}/contacts/request`, {
     headers: buyer.headers,
@@ -138,7 +138,7 @@ test('an owner note and follow-up date are stored on the server, not in the brow
 
 test('clearing both fields deletes the annotation instead of storing a blank one', async ({ page, request }) => {
   const fixture = await isolatedListing();
-  const buyer = await actor(`Zztest Lead Notes Clearing Buyer ${Date.now()}`);
+  const buyer = await actor(`Zztest Lead Notes Clearing Buyer ${letterTag()}`);
 
   const requested = await request.post(`${API}/contacts/request`, {
     headers: buyer.headers,

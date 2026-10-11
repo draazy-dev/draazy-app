@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, signedInAs, uniqueMobile, uploadedListingPhotos, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 /* One recipient per event, never the actor, and nothing in a body that the contact gate protects.
@@ -83,9 +83,9 @@ test.afterEach(async () => {
 
 test.describe('Notification types - live API', () => {
   test('contact, visit, photo and document requests tell the owner, and a cancelled visit tells the other side', async () => {
-    const owner = await actor(`Zztest Notif Owner ${Date.now()}`);
-    const buyer = await actor(`Zztest Notif Buyer ${Date.now()}`);
-    const second = await actor(`Zztest Notif Second ${Date.now()}`);
+    const owner = await actor(`Zztest Notif Owner ${letterTag()}`);
+    const buyer = await actor(`Zztest Notif Buyer ${letterTag()}`);
+    const second = await actor(`Zztest Notif Second ${letterTag()}`);
     const listing = await approvedListing(owner);
 
     expect((await api('POST', '/contacts/request', buyer.headers, { propertyId: listing.id, message: 'Is it available?' })).status).toBe(200);
@@ -118,8 +118,8 @@ test.describe('Notification types - live API', () => {
   });
 
   test('an accepted, declined and countered offer each tell the buyer, and a buyer counter tells the owner', async () => {
-    const owner = await actor(`Zztest Offer Owner ${Date.now()}`);
-    const buyers = [await actor(`Zztest Offer A ${Date.now()}`), await actor(`Zztest Offer B ${Date.now()}`), await actor(`Zztest Offer C ${Date.now()}`)];
+    const owner = await actor(`Zztest Offer Owner ${letterTag()}`);
+    const buyers = [await actor(`Zztest Offer A ${letterTag()}`), await actor(`Zztest Offer B ${letterTag()}`), await actor(`Zztest Offer C ${letterTag()}`)];
     const listing = await approvedListing(owner);
 
     const offers = [];
@@ -150,8 +150,8 @@ test.describe('Notification types - live API', () => {
   });
 
   test('messages raise one bell row per unread run, and reading the chat clears it', async () => {
-    const owner = await actor(`Zztest Msg Owner ${Date.now()}`);
-    const buyer = await actor(`Zztest Msg Buyer ${Date.now()}`);
+    const owner = await actor(`Zztest Msg Owner ${letterTag()}`);
+    const buyer = await actor(`Zztest Msg Buyer ${letterTag()}`);
     const listing = await approvedListing(owner);
 
     expect((await api('POST', '/contacts/request', buyer.headers, { propertyId: listing.id })).status).toBe(200);
@@ -174,8 +174,8 @@ test.describe('Notification types - live API', () => {
   });
 
   test('the inbox renders every new type under a known chip, without falling back to the unknown-type path', async ({ page }) => {
-    const owner = await actor(`Zztest Inbox Owner ${Date.now()}`);
-    const buyer = await actor(`Zztest Inbox Buyer ${Date.now()}`);
+    const owner = await actor(`Zztest Inbox Owner ${letterTag()}`);
+    const buyer = await actor(`Zztest Inbox Buyer ${letterTag()}`);
     const listing = await approvedListing(owner);
 
     expect((await api('POST', '/contacts/request', buyer.headers, { propertyId: listing.id })).status).toBe(200);
