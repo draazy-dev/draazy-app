@@ -12,9 +12,9 @@ export async function listReferralQueue({ status, risk, q, page = 0, size = 20, 
   return toViewModelPage(await get('/referrals', query), { page, size });
 }
 
-/** A 409 means no identity badge or an undecidable state; its message is the sentence to show. */
-export async function approveReferral(id) {
-  return toDecision(await post(`/referrals/${encodeURIComponent(id)}/approve`));
+/** A 409 means the row cannot be approved from its state; its message is the sentence to show. */
+export async function approveReferral(id, reason) {
+  return toDecision(await post(`/referrals/${encodeURIComponent(id)}/approve`, reasonBody(reason)));
 }
 
 /** Reject — `POST /referrals/{id}/reject`. The reason is audit context, not a gate. */
@@ -33,12 +33,31 @@ function reasonBody(reason) {
   return text ? { reason: text } : undefined;
 }
 
-/** Returned verbatim: the DTO already matches the page's shape, and a copying mapper is a place to drift. */
+const count = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+/** Tolerant of a missing counter: the page renders zeros rather than failing on a half-deployed server. */
 export async function getMyReferralSummary() {
-  return get('/me/referrals');
+  const s = await get('/me/referrals');
+  if (!s) return s;
+  const earned = s.earned || {};
+  const friend = s.friendReward || {};
+  return {
+    code: s.code || '',
+    invited: count(s.invited),
+    converted: count(s.converted),
+    held: count(s.held),
+    earnedContacts: count(earned.seeker?.contacts),
+    earnedAgreements: count(earned.owner?.agreements),
+    friendReward: {
+      redeemed: !!friend.redeemed,
+      status: friend.status || '',
+      contacts: count(friend.contacts),
+      featuredDays: count(friend.featuredDays),
+    },
+  };
 }
 
-/** `shareChannel` is deliberately unvalidated; a 409 (unknown, self or used code) isn't shown at sign-up. */
+/** `shareChannel` is deliberately unvalidated; one generic 409 covers every refusal and is shown as a neutral line. */
 export async function redeemReferral(code, shareChannel) {
   const channel = String(shareChannel || '').trim();
   return post('/referrals/redeem', { code, ...(channel ? { shareChannel: channel } : {}) });

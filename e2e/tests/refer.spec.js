@@ -26,6 +26,9 @@ test.describe('refer page, live', () => {
     expect(summary.code).toBeTruthy();
     expect(typeof summary.invited).toBe('number');
     expect(typeof summary.converted).toBe('number');
+    expect(typeof summary.held).toBe('number');
+    expect(summary.earned).toEqual({ owner: { referrals: expect.any(Number), agreements: expect.any(Number) }, seeker: { referrals: expect.any(Number), contacts: expect.any(Number) } });
+    expect(summary.friendReward).toMatchObject({ redeemed: false });
     expect(summary).not.toHaveProperty('contactsEarned');
     expect(summary.code).not.toBe(BROWSER_MINTED);
 
@@ -68,6 +71,31 @@ test.describe('refer page, live', () => {
       expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(summary.code);
       await expect(counter).toContainText('0');
     });
+  });
+  test('both reward tracks are pitched with the admin numbers, and the stats are the server\'s', async ({ page, request, flags }) => {
+    await flags.enable('referralRewards');
+    const { accessToken } = await apiLogin(REFERRER);
+    const headers = { authorization: `Bearer ${accessToken}` };
+    const summary = await (await request.get(`${API}/me/referrals`, { headers })).json();
+    const { referral } = (await (await request.get(`${API}/bootstrap`)).json()).pricing;
+
+    await signIn(page, REFERRER);
+    await page.goto('/refer');
+    await appReady(page);
+
+    await expect(page.getByTestId('refer-owner-track')).toContainText(`Featured placement for ${referral.ownerFeaturedDays} days`);
+    await expect(page.getByTestId('refer-owner-track')).toContainText(/free rent agreements?/);
+    await expect(page.getByTestId('refer-seeker-track')).toContainText(`${referral.seekerBonusContacts} extra free contact`);
+    await expect(page.getByTestId('refer-seeker-track')).toContainText(`${referral.contactBonus} owner contacts`);
+
+    await expect(page.getByTestId('refer-invited')).toHaveText(String(summary.invited));
+    await expect(page.getByTestId('refer-held')).toHaveText(String(summary.held));
+    await expect(page.getByTestId('refer-contacts-earned')).toHaveText(String(summary.earned.seeker.contacts));
+    await expect(page.getByTestId('refer-agreements')).toHaveText(/^\d+ \/ \d+$/);
+
+    // The retired quota-balance block and the every-three-referrals promise are gone.
+    await expect(page.getByTestId('refer-balance')).toHaveCount(0);
+    await expect(page.getByText(/every 3 referrals/i)).toHaveCount(0);
   });
   test('the invite count is the server\'s redemptions, and sharing does not inflate it', async ({ page }) => {
     await page.addInitScript(() => {

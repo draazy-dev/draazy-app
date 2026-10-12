@@ -74,7 +74,9 @@ NoBroker (~$1B+ valuation) and MagicBricks/Housing.com have huge war chests. You
 - **Local SEO moat.** Programmatic locality + society landing pages ("Rent in <Society>, <Locality>") — your descriptive H1s already do this.
 
 ### 4.4 Viral & referral loops (always on)
-- **Two-sided cash referral.** ₹X to referrer + ₹X to referee on a closed deal. Both owner→owner and tenant→tenant.
+- **Two-sided referral, paid in product, not cash.** Owner→owner: the referrer gets a free rent agreement, the
+  friend 14 days Featured. Anyone→seeker: the referrer gets 15 contacts, the friend 5 extra. Verified automatically;
+  every listing share link carries the sharer's code.
 - **"Move-in money-back guarantee."** If a verified listing turns out fake, refund + ₹ credit. Converts trust skeptics; near-zero payout if verification works.
 - **Free rent agreement as a hook.** People search "rent agreement Pune" constantly. Give it free → capture the lead → upsell registration, tenant verification, packers.
 - **HRA rent-receipt generator** (already built) — viral every Jan–Mar tax season; pure top-of-funnel.

@@ -65,8 +65,9 @@ public class ReferralsController {
     /** {@code POST /referrals/{id}/approve} (contract {@code approveReferral}). */
     @PostMapping(Routes.Referrals.APPROVE)
     @PreAuthorize(WRITE)
-    public ReferralDto approve(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
-        return service.approve(principal, id);
+    public ReferralDto approve(@CurrentUser AuthPrincipal principal, @PathVariable String id,
+            @RequestBody(required = false) ReasonRequest body) {
+        return service.approve(principal, id, body == null ? null : body.reason());
     }
 
     /** {@code POST /referrals/{id}/reject} (contract {@code rejectReferral}). */

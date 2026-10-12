@@ -138,6 +138,11 @@ public interface PropertyRepository
     @Query("update Property p set p.ownerVerified = false where p.owner.id = :ownerId and p.ownerVerified = true")
     int markOwnerUnverified(@Param("ownerId") UUID ownerId);
 
+    // Native on purpose: featured_days is not mapped, so an entity flush can never overwrite it.
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update properties set featured_days = :days where id = :id", nativeQuery = true)
+    int setFeaturedDays(@Param("id") UUID id, @Param("days") Integer days);
+
     /** Featured-first live listings for the homepage strip; the {@link Pageable} caps the result
      * because the contract endpoint takes no limit. Summary projection, so no owner graph. */
     List<Property> findByStatusAndArchivedFalseAndOwner_StatusNotOrderByFeaturedDescCreatedAtDesc(

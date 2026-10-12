@@ -4,11 +4,14 @@ import { API_BASE } from './config.js';
 import {
   isInternal, localStorageWritable, logoutUser, readAccessToken, readUser, sessionRemembered, writeTokens,
 } from '../lib/auth.js';
+import { deviceId } from '../lib/deviceId.js';
 
 const TRACE_HEADER = 'X-Trace-Id';
 /** Opaque id of the build that answered. Set by the backend's `BuildStampFilter`. */
 const BUILD_HEADER = 'X-Draazy-Build';
 const REFRESH_PATH = '/auth/refresh';
+// Sign-in, refresh and referral calls only: the id is a fraud signal, so the rest of the API never sees it.
+const DEVICE_ID_PATH = /^\/(auth\/|referrals\/|me\/referrals)/;
 /** Name of the cross-tab Web Lock that serialises token refreshes. */
 const REFRESH_LOCK = 'draazy:auth-refresh';
 
@@ -263,6 +266,7 @@ async function send(path, { method = 'GET', body, query, headers: extra, signal 
   // Caller headers are merged *before* Authorization, so a stray `Authorization` in `extra` cannot
   // displace the real session token — the one header that must never be a per-call decision.
   if (extra) Object.assign(headers, extra);
+  if (DEVICE_ID_PATH.test(path)) headers['X-Device-Id'] = deviceId();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {

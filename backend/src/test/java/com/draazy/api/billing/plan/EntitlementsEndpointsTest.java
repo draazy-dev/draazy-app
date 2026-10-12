@@ -32,6 +32,7 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     /** {@code fees.freeContactLimit} and {@code fees.referralContactBonus} in the seeded row. */
     private static final int FREE_LIMIT = 15;
     private static final int REFERRAL_BONUS = 15;
+    private static final int FRIEND_BONUS = 5;
 
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
@@ -132,10 +133,11 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT))
                 .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT))
                 .andExpect(jsonPath("$.contacts.referralBonus").value(0))
+                .andExpect(jsonPath("$.contacts.friendBonus").value(0))
                 // Owner Free's listing_limit. Reported even to a buyer, because the number is a
                 // property of the account rather than of the role it is browsing under.
                 .andExpect(jsonPath("$.listings.allowance").value(1))
-                .andExpect(jsonPath("$.listings.referralBonus").value(0))
+                .andExpect(jsonPath("$.listings.referralBonus").doesNotExist())
                 .andExpect(jsonPath("$.listings.used").value(0));
     }
 
@@ -259,42 +261,62 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT + REFERRAL_BONUS))
                 .andExpect(jsonPath("$.contacts.referralBonus").value(REFERRAL_BONUS));
 
-        // Three referrals buy one listing slot, so one buys none. Integer division on purpose:
-        // part of a listing slot is not a thing.
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
-                .andExpect(jsonPath("$.listings.referralBonus").value(0))
-                // Same threshold, asserted separately because these are two offers sharing a
-                // divisor, not one offer read twice.
+                .andExpect(jsonPath("$.listings.referralBonus").doesNotExist())
+                .andExpect(jsonPath("$.listings.allowance").value(1))
                 .andExpect(jsonPath("$.agreements.free").value(0));
     }
 
-    /** Asserted at two and three: a wrong-operator bonus passes tests that only earn; the last earns nothing. */
     @Test
-    @DisplayName("the third qualified referral is the one that pays — two earn nothing")
-    void threeReferralsBuyASlotAndAFreeAgreement() throws Exception {
+    @DisplayName("each owner-track referral buys one free agreement and no contacts; no listing slots")
+    void ownerTrackReferralsBuyAgreements() throws Exception {
         User referrer = user("9844403100", "owner");
         User staff = user("9844403109", "staff");
-        referralApprovedFor(referrer, "9844403101", staff);
-        referralApprovedFor(referrer, "9844403102", staff);
+        String first = referralApprovedFor(referrer, "9844403101", staff);
+        jdbc.update("update referrals set track = 'owner' where id = ?::uuid", first);
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.listings.referralBonus").value(0))
+                .andExpect(jsonPath("$.contacts.referralBonus").value(0))
                 .andExpect(jsonPath("$.listings.allowance").value(1))
-                .andExpect(jsonPath("$.agreements.free").value(0));
+                .andExpect(jsonPath("$.agreements.free").value(1));
 
-        referralApprovedFor(referrer, "9844403103", staff);
+        String second = referralApprovedFor(referrer, "9844403102", staff);
+        jdbc.update("update referrals set track = 'owner' where id = ?::uuid", second);
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.listings.referralBonus").value(1))
-                // The bonus is *inside* the allowance — a client that adds the two grants every
-                // earned slot twice.
-                .andExpect(jsonPath("$.listings.allowance").value(2))
-                .andExpect(jsonPath("$.agreements.free").value(1));
+                .andExpect(jsonPath("$.listings.allowance").value(1))
+                .andExpect(jsonPath("$.agreements.free").value(2));
+    }
+
+    @Test
+    @DisplayName("the friend gets extra free contacts while the redeemed code stands, and loses them on rejection")
+    void theFriendBonusFollowsTheReferral() throws Exception {
+        User referrer = user("9844403200", "owner");
+        User referee = user("9844403201", "buyer");
+        String code = mvc.perform(get(Routes.Referrals.MINE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andReturn().getResponse().getContentAsString()
+                .replaceAll("^.*?\"code\":\"([^\"]+)\".*$", "$1");
+        mvc.perform(post(Routes.Referrals.REDEEM)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(referee))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(referee)))
+                .andExpect(jsonPath("$.contacts.friendBonus").value(FRIEND_BONUS))
+                .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT + FRIEND_BONUS))
+                .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT + FRIEND_BONUS));
+
+        jdbc.update("update referrals set status = 'rejected' where referred_mobile = ?", referee.getMobile());
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(referee)))
+                .andExpect(jsonPath("$.contacts.friendBonus").value(0))
+                .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT));
     }
 
     @Test

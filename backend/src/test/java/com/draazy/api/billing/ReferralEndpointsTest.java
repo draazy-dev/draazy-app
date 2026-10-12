@@ -14,7 +14,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.JwtService;
 import com.draazy.api.security.Roles;
-import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -27,9 +26,6 @@ import org.springframework.test.web.servlet.MockMvc;
  *  identical so codes cannot be probed, the desk is staff-only and shows both mobiles in full. */
 class ReferralEndpointsTest extends AbstractApiTest {
 
-    /** {@code fees.referralContactBonus} in the seeded settings row — owner contacts, not rupees. */
-    private static final int REWARD = 15;
-
     @Autowired MockMvc mvc;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
@@ -41,13 +37,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
         User u = new User(mobile, role);
         u.setName("Referral User " + mobile.substring(6));
         u.setMobileVerified(true);
-        return users.saveAndFlush(u);
-    }
-
-    /** Applied after the referral row exists in some tests: {@code approve} reads the badge now, not
-     *  the snapshot frozen at redeem time, and redeem-then-verify is the ordinary order. */
-    private User identityVerified(User u) {
-        u.setVerified(true);
         return users.saveAndFlush(u);
     }
 
@@ -104,6 +93,12 @@ class ReferralEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.invited").value(0))
                 .andExpect(jsonPath("$.converted").value(0))
+                .andExpect(jsonPath("$.held").value(0))
+                .andExpect(jsonPath("$.earned.owner.referrals").value(0))
+                .andExpect(jsonPath("$.earned.owner.agreements").value(0))
+                .andExpect(jsonPath("$.earned.seeker.referrals").value(0))
+                .andExpect(jsonPath("$.earned.seeker.contacts").value(0))
+                .andExpect(jsonPath("$.friendReward.redeemed").value(false))
                 .andExpect(jsonPath("$.contactsEarned").doesNotExist())
                 .andExpect(jsonPath("$.contactsPending").doesNotExist());
     }
@@ -121,6 +116,21 @@ class ReferralEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.invited").value(1))
                 .andExpect(jsonPath("$.converted").value(0));
+    }
+
+    @Test
+    void theRedeemerSeesTheirFriendRewardPromise() throws Exception {
+        User referrer = user("9866600012", "owner");
+        User referred = user("9866600013", "buyer");
+
+        redeem(referred, codeOf(referrer), 200);
+
+        mvc.perform(get(Routes.Referrals.MINE).header(HttpHeaders.AUTHORIZATION, bearer(referred)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.friendReward.redeemed").value(true))
+                .andExpect(jsonPath("$.friendReward.status").value(ReferralStatuses.PENDING))
+                .andExpect(jsonPath("$.friendReward.contacts").value(5))
+                .andExpect(jsonPath("$.friendReward.featuredDays").value(14));
     }
 
     @Test
@@ -183,7 +193,10 @@ class ReferralEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.page").exists())
                 .andExpect(jsonPath("$.content[0].status").value(ReferralStatuses.PENDING))
-                .andExpect(jsonPath("$.content[0].rewardAmount").value(REWARD))
+                .andExpect(jsonPath("$.content[0].rewardAmount").value(0))
+                .andExpect(jsonPath("$.content[0].track").doesNotExist())
+                .andExpect(jsonPath("$.content[0].holdUntil").doesNotExist())
+                .andExpect(jsonPath("$.content[0].autoReason").doesNotExist())
                 .andExpect(jsonPath("$.content[0].referrerMobile").value(referrer.getMobile()))
                 .andExpect(jsonPath("$.content[0].referredMobile").value(referred.getMobile()))
                 // False because the fixture redeems from a different address than the code was
@@ -214,6 +227,7 @@ class ReferralEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.counts.all").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.counts.pending").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)))
                 .andExpect(jsonPath("$.counts.highRisk").exists())
+                .andExpect(jsonPath("$.counts.held").exists())
                 .andExpect(jsonPath("$.counts.rewarded").exists())
                 .andExpect(jsonPath("$.counts.refused").exists());
 
@@ -243,7 +257,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
         User referred = user("9866600051", "buyer");
         User staff = user("9866600052", "staff");
         String id = referralFrom(referrer, referred);
-        identityVerified(referred);
 
         mvc.perform(post("/referrals/" + id + "/approve")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
@@ -260,28 +273,37 @@ class ReferralEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-    /** The refusal carries its own sentence rather than the transition one: {@code pending} is
-     *  exactly the state approve works from, so "cannot be rewarded" would send a desk hunting. */
     @Test
-    void anUnverifiedRefereeCannotBeApprovedUntilTheBadgeArrives() throws Exception {
+    void approvingARejectedReferralIsAnAppealThatNeedsAReason() throws Exception {
         User referrer = user("9866600055", "owner");
         User referred = user("9866600056", "buyer");
         User staff = user("9866600057", "staff");
         String id = referralFrom(referrer, referred);
         String auth = bearer(staff);
 
-        mvc.perform(post("/referrals/" + id + "/approve").header(HttpHeaders.AUTHORIZATION, auth))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message",
-                        Matchers.containsString("not identity-verified")));
-
-        // Verifying afterwards is the ordinary order of events and unblocks the reward: the check
-        // reads the badge now, not the snapshot frozen at redeem time.
-        identityVerified(referred);
+        mvc.perform(post("/referrals/" + id + "/reject")
+                        .header(HttpHeaders.AUTHORIZATION, auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"first look\"}"))
+                .andExpect(status().isOk());
 
         mvc.perform(post("/referrals/" + id + "/approve").header(HttpHeaders.AUTHORIZATION, auth))
+                .andExpect(status().isUnprocessableEntity());
+        mvc.perform(post("/referrals/" + id + "/approve")
+                        .header(HttpHeaders.AUTHORIZATION, auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"  \"}"))
+                .andExpect(status().isUnprocessableEntity());
+        mvc.perform(post("/referrals/" + id + "/approve")
+                        .header(HttpHeaders.AUTHORIZATION, auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Appeal: separate households\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(ReferralStatuses.REWARDED));
+        org.assertj.core.api.Assertions.assertThat(jdbc.queryForObject(
+                "select count(*) from audit_log where entity = 'referral' and entity_id = ? "
+                        + "and action = 'referral.approve' and metadata::text like '%Appeal: separate households%'",
+                Long.class, id)).isEqualTo(1L);
     }
 
     @Test
@@ -309,7 +331,6 @@ class ReferralEndpointsTest extends AbstractApiTest {
         User referred = user("9866600071", "buyer");
         User staff = user("9866600072", "staff");
         String id = referralFrom(referrer, referred);
-        identityVerified(referred);
         String auth = bearer(staff);
 
         // Nothing was ever paid, so there is nothing to recover.

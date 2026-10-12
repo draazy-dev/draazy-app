@@ -8,6 +8,8 @@ import { confirmListingFresh, confirmOwnerListing, takeListingDown, pauseListing
 import { deleteGroup, deletePost, deleteRoom, renewFlatmate, splitProperty, unsplitProperty } from '../../../services/flatmateService.js';
 import { closeDeal, reopenDeal, reserveDeal } from '../../../services/dealService.js';
 import { composeOwnerProperties } from '../../../lib/data/ownerProperties.js';
+import { referralShareUrlNow } from '../../../lib/referralShare.js';
+import { usePrefetchReferralCode } from '../../../lib/usePrefetchReferralCode.js';
 import { getMyRooms, withRooms } from '../../../lib/data/myListings.js';
 import { publishManaged, deleteManaged, ensureManagedForListing } from '../../../services/managedService.js';
 import { listingFreshness } from '../../../lib/freshness.js';
@@ -28,6 +30,7 @@ import { useFlatmateEditing } from './myListings/useFlatmateEditing.jsx';
 const rowKey = (l) => `${l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : 'property'}:${l.uuid || l.id}`;
 
 export default function MyListingsPanel({ listings, listingsLoaded, setListings, managed = [], onManagedChanged, user, toast, openReview, reviewsByProp, onChanged }) {
+  usePrefetchReferralCode();
   const { t } = useTranslation();
   const { fee } = usePricing();
   const listingsState = useMemo(() => composeOwnerProperties(listings, managed), [listings, managed]);
@@ -307,7 +310,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   };
 
   const handleShare = async (l, viewHref) => {
-    const url = `${window.location.origin}${viewHref}`;
+    const url = referralShareUrlNow(`${window.location.origin}${viewHref}`);
     try {
       if (navigator.share) {
         await navigator.share({ title: l.title, url });

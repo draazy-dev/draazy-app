@@ -10,10 +10,10 @@ test.describe('Listing quota — live', () => {
     const ent = await request.get(`${API}/me/entitlements`, { headers });
     expect(ent.status()).toBe(200);
     const { listings, agreements } = await ent.json();
-    // Free tier, no granting referrals. Asserted as a number rather than "is defined": the dashboard
+    // Free tier; referrals buy no slots. Asserted as a number rather than "is defined": the dashboard
     // decides whether to offer a pass from it, and a null would silently hide the offer.
     expect(listings.allowance).toBe(1);
-    expect(listings.referralBonus).toBe(0);
+    expect(listings).not.toHaveProperty('referralBonus');
     expect(listings.passes).toEqual([]);
     // Present and zero, not absent.
     expect(agreements.free).toBe(0);

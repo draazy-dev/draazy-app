@@ -7,7 +7,7 @@ import { API, apiLogin, authHeaders, seedConsent, staffSignInUi } from '../../he
 const STAFF_USER_KEYS = ['id', 'name', 'mobile', 'email', 'role', 'permissions', 'desks'];
 const REFERRAL_KEYS = ['id', 'referrer', 'referrerMobile', 'referred', 'referredMobile', 'channel', 'reward',
   'rewardAmount', 'status', 'risk', 'identityVerified', 'identityUnique', 'sameDevice', 'sameIp', 'velocityHigh',
-  'activated', 'at'];
+  'activated', 'at', 'track', 'holdUntil', 'autoReason'];
 
 const searchOf = (url) => new URL(url).searchParams;
 
@@ -117,16 +117,17 @@ test('the referral desk pages and filters on the server, with counts only when a
   });
 
   await page.goto('/ops/referrals');
-  await expect(page.getByRole('heading', { name: 'Referral Verification' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Referral audit' })).toBeVisible();
   await expect.poll(() => reads.length).toBe(1);
   expect(reads[0].get('size')).toBe('20');
-  expect(reads[0].get('status')).toBe('pending,qualified');
+  // The desk opens on Held, the one queue that needs a person's eye.
+  expect(reads[0].get('status')).toBe('held');
   expect(reads[0].get('counts')).toBe('true');
-  await expect(page.getByTestId('tab-count-pending')).toHaveText(/^[\d,]+$/);
+  await expect(page.getByTestId('tab-count-held')).toHaveText(/^[\d,]+$/);
 
   await page.getByRole('tab', { name: /^Rewarded/ }).click();
   await expect.poll(() => reads.length).toBe(2);
-  expect(reads[1].get('status')).toBe('rewarded');
+  expect(reads[1].get('status')).toBe('qualified,rewarded');
   expect(reads[1].get('counts')).toBeNull();
 
   await page.getByPlaceholder('Referrer, referred or ID').fill('zz-no-such-person');

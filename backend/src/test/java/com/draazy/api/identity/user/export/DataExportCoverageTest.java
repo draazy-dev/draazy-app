@@ -180,6 +180,26 @@ class DataExportCoverageTest extends AbstractApiTest {
                 .hasSize(DataExportScope.all().size());
     }
 
+    // A seeker row's property is the third-party listing the friend contacted, which the referrer must not learn.
+    @Test
+    @DisplayName("a seeker referral withholds the contacted listing; an owner referral exports its own")
+    void aSeekerReferralDoesNotRevealTheContactedListing() throws Exception {
+        User subject = user(SUBJECT_MOBILE, SUBJECT_NAME);
+        UUID contacted = UUID.randomUUID();
+        UUID own = UUID.randomUUID();
+        for (Object[] row : new Object[][] {{"seeker", "9711111101", contacted}, {"owner", "9711111102", own}}) {
+            jdbc.update("""
+                    insert into referrals (referrer_id, referrer_mobile, referred_mobile, channel, status, track,
+                                           qualified_property_id)
+                    values (?, ?, ?, 'owner', 'qualified', ?, ?)
+                    """, subject.getId(), subject.getMobile(), row[1], row[0], row[2]);
+        }
+
+        String body = export(subject);
+
+        assertThat(body).contains(own.toString()).doesNotContain(contacted.toString());
+    }
+
     // Behavioural — presence
 
     // Asserted across several domains because a misplaced predicate (owner_id where requester_id

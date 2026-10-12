@@ -1,6 +1,6 @@
 /** `clawed-back` is distinct from `rejected` because money left the building; risk is separate from status. */
 
-/** Wire timestamps are ISO; the desk formats dates and sorts on epoch millis. */
+/** Wire timestamps are ISO; the desk formats dates and sorts on epoch millis (0 when absent). */
 const epoch = (iso) => (iso ? Date.parse(iso) || 0 : 0);
 
 /** `rewardAmount` rides beside the server-composed `reward` label because CSV totals need the number;
@@ -13,7 +13,7 @@ export function toViewModel(dto) {
     referrerMobile: dto.referrerMobile || '',
     referred: dto.referred || '',
     referredMobile: dto.referredMobile || '',
-    channel: dto.channel || null,
+    track: dto.track || null,
     reward: dto.reward || '',
     rewardAmount: dto.rewardAmount ?? 0,
     status: dto.status || 'pending',
@@ -24,6 +24,8 @@ export function toViewModel(dto) {
     sameIp: !!dto.sameIp,
     velocityHigh: !!dto.velocityHigh,
     activated: !!dto.activated,
+    holdUntil: epoch(dto.holdUntil),
+    autoReason: dto.autoReason || '',
     at: epoch(dto.at),
   };
 }

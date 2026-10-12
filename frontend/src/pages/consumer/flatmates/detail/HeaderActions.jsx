@@ -2,8 +2,10 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../../components/Icon.jsx';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import { shareOrCopy } from '../../../../lib/share.js';
+import { usePrefetchReferralCode } from '../../../../lib/usePrefetchReferralCode.js';
 
 export default function HeaderActions({ saved, onSave, shareText, onReport, reportLabel }) {
+  usePrefetchReferralCode();
   const { t } = useTranslation();
   const { toast } = useToast();
   const share = async () => {

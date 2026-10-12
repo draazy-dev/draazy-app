@@ -11,6 +11,7 @@ import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.ContactAllowanceLookup;
 import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.common.trust.VerifiedTenantLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
@@ -42,11 +43,12 @@ public class ContactService {
     private final ContactAllowanceLookup allowances;
     private final AuditService audit;
     private final RateLimitLock locks;
+    private final ReferralTriggers referralTriggers;
 
     public ContactService(ContactRequestRepository contactRequests, PropertyRepository properties,
             UserRepository users, ContactMapper contactMapper, Notifier notifier,
             VerifiedTenantLookup verifiedTenants, ContactAllowanceLookup allowances,
-            AuditService audit, RateLimitLock locks) {
+            AuditService audit, RateLimitLock locks, ReferralTriggers referralTriggers) {
         this.contactRequests = contactRequests;
         this.properties = properties;
         this.users = users;
@@ -56,6 +58,7 @@ public class ContactService {
         this.allowances = allowances;
         this.audit = audit;
         this.locks = locks;
+        this.referralTriggers = referralTriggers;
     }
 
     @Transactional(readOnly = true)
@@ -184,6 +187,8 @@ public class ContactService {
                     "Your contact request was approved",
                     "You can now message the owner and see their number unless they keep it hidden \u2014 open the listing.",
                     "/property/" + row.getPropertyId());
+            referralTriggers.contactAccepted(
+                    row.getRequesterId(), owner.userId(), row.getPropertyId(), Instant.now());
         }
     }
 

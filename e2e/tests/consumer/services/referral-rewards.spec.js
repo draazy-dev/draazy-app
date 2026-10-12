@@ -133,34 +133,45 @@ test.describe('the free-contact wall, on screen', () => {
 });
 
 test.describe('referralRewards is a server document', () => {
-  test('/refer shows the server\'s balance with the flag on, and hides the quota tracks but keeps the base programme with it off', async ({ page, flags }) => {
+  test('/refer shows the contact track and its earnings with the flag on, and keeps only the owner track with it off', async ({ page, flags }) => {
     const mobile = uniqueMobile();
     const { accessToken } = await apiLogin(mobile);
     const [only] = await someListings(1);
     expect((await askFor(accessToken, only.id)).status).toBe(200);
 
     await flags.enable('referralRewards');
-    const { contacts } = await entitlements(accessToken);
+    const summary = await fetch(`${API}/me/referrals`, { headers: auth(accessToken) }).then((r) => r.json());
 
     await signedInAs(page, mobile);
     await page.goto('/refer', { waitUntil: 'networkidle' });
 
     await expect(page.getByTestId('refer-seeker-track')).toBeVisible();
-    /* Allowance minus spent, taken from the same read the page makes, so the assertion moves with the
-       seed instead of pinning 15/30 into a second place they would have to be kept in step. */
-    await expect(page.getByTestId('refer-balance-contacts')).toHaveText(String(contacts.remaining));
+    /* The number on screen is the server's, read from the same endpoint rather than pinned to a literal. */
+    await expect(page.getByTestId('refer-contacts-earned')).toHaveText(String(summary.earned.seeker.contacts));
+    await expect(page.getByTestId('refer-owner-track')).toBeVisible();
 
     await flags.disable('referralRewards');
     await page.reload({ waitUntil: 'networkidle' });
 
     /* Asserted **first**: `toHaveCount(0)` is satisfied the instant it is asked on a page that has
-       not finished rendering, so the two negatives below need something real to wait behind. */
-    await expect(page.getByText(/free rent agreement/i).first()).toBeVisible();
+       not finished rendering, so the negatives below need something real to wait behind. */
+    await expect(page.getByTestId('refer-owner-track')).toContainText(/free rent agreement/i);
+    await expect(page.getByTestId('refer-agreements')).toBeVisible();
 
-    await expect(page.getByTestId('refer-balance')).toHaveCount(0);
     await expect(page.getByTestId('refer-seeker-track')).toHaveCount(0);
+    await expect(page.getByTestId('refer-contacts-earned')).toHaveCount(0);
   });
 
+  test('the switch is the server\'s too: a switched-off programme refuses a redeem', async ({ flags }) => {
+    const referrer = uniqueMobile();
+    const { accessToken: referrerToken } = await apiLogin(referrer);
+    const { code } = await fetch(`${API}/me/referrals`, { headers: auth(referrerToken) }).then((r) => r.json());
+    const { accessToken } = await apiLogin(uniqueMobile());
+
+    await flags.disable('referralRewards');
+    const refused = await fetch(`${API}/referrals/redeem`, { method: 'POST', headers: auth(accessToken), body: JSON.stringify({ code }) });
+    expect(refused.status).toBe(409);
+  });
   test('Ops switching it off is a confirmed write that lands on the server', async ({ page, flags }) => {
     await flags.enable('referralRewards');
     await signIn(page, ACTORS.admin, { screen: 'staff' });

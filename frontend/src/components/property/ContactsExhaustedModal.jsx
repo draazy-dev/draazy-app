@@ -4,17 +4,16 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { usePricing } from '../../context/PricingContext';
-import { referralContactsPerReward } from '../../lib/referralConfig.js';
 import { getEntitlements } from '../../services/entitlementService.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import useModalDialog from '../../hooks/useModalDialog.js';
 
-/* Shown when a seeker has no owner contacts left: refer a friend (+15 contacts each, off when Ops disables
+/* Shown when a seeker has no owner contacts left: refer a friend (off when Ops disables
    `referralRewards`) or buy a Contact Pack. The used/allowance line renders only once the server answers. */
 export default function ContactsExhaustedModal({ onClose }) {
   const { t } = useTranslation();
   const { pathname, search } = useLocation();
-  const { fee } = usePricing();
+  const { fee, referral } = usePricing();
   const { flagEnabled } = useAppFlags();
   const canRefer = flagEnabled('referralRewards');
   const [counts, setCounts] = useState(null);
@@ -54,7 +53,7 @@ export default function ContactsExhaustedModal({ onClose }) {
               <span className="text-sm font-bold text-white">{t('property.contactsExhausted.referTitle')}</span>
               <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/15">{t('property.contactsExhausted.freeBadge')}</span>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">{t('property.contactsExhausted.referBody', { count: referralContactsPerReward })}</p>
+            <p className="text-xs text-slate-300 leading-relaxed">{t('property.contactsExhausted.referBody', { count: referral.contactBonus })}</p>
             <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-teal-300">
               {t('property.contactsExhausted.referCta')} <Icon name="arrow-right" className="w-4 h-4" />
             </span>

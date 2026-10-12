@@ -19,6 +19,8 @@ import { resolveAuthIntent, postAuthDest } from '../../lib/authIntent.js';
 import { classifyOtpVerifyError } from '../../lib/otpVerifyError.js';
 import { healStaleShell } from '../../lib/seamErrors.js';
 import { redeemReferral } from '../../services/referralService.js';
+import { clearReferral, isReferralCode, storedReferral } from '../../lib/referralAttribution.js';
+import { useToast } from '../../context/ToastContext.jsx';
 import { isValidName } from '../../lib/auth.js';
 import { track } from '../../lib/pmf.js';
 
@@ -73,6 +75,8 @@ export default function Signup() {
   const [role] = useState('buyer');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const { toast } = useToast();
+  const [referral, setReferral] = useState(() => storedReferral() || (isReferralCode(params.get('ref')?.trim()) ? params.get('ref').trim() : ''));
   const mobile = useMobileInput(params.get('mobile') || '');
   // Set when Sign In redirects a visitor here because no account matched their number.
   const isNew = params.get('new') === '1';
@@ -142,13 +146,13 @@ export default function Signup() {
           otp: otp.otp,
         });
       setDone(true);
-      const ref = params.get('ref');
-      if (wasNew) track('signup_completed', { role, referred: Boolean(ref) });
-      if (ref) {
-        /* Attribution is the server's job. Un-awaited and silent on failure: a 409 means a code the
-           person who just signed up neither chose nor can fix — see the flow doc, § Sign up. */
-        redeemReferral(ref, 'link').catch(() => {});
+      const code = referral.trim();
+      if (wasNew) track('signup_completed', { role, referred: Boolean(code) });
+      if (wasNew && code) {
+        // One generic refusal for every reason: the server never says which check failed.
+        redeemReferral(code, 'link').catch(() => toast(t('auth.referralNotApplied'), 'info'));
       }
+      clearReferral();
       /* Keyed on `wasNew`, not on "this is the sign-up screen": a mobile that already has an
          account passes straight through `register`, and both doors must agree on a destination. */
       redirectTimer.current = setTimeout(
@@ -219,6 +223,11 @@ export default function Signup() {
               <input id="signup-email" autoComplete="email" enterKeyHint="next" value={email} onChange={(e) => { setEmail(e.target.value); setErrs((x) => ({ ...x, email: false })); }} type="email" placeholder={t('auth.emailPlaceholder')} className={'w-full pl-10 pr-4 py-3.5 bg-white/5 border rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none transition-all ' + (errs.email ? 'border-red-400' : 'border-white/10 focus:border-teal-400')} />
             </div>
             {errs.email ? <p className="text-red-400 text-xs mt-1.5 ml-1">{t('auth.errEmail')}</p> : null}
+          </div>
+
+          <div className="slide-up slide-up-delay-3">
+            <label htmlFor="signup-referral" className="block text-sm font-medium text-gray-300 mb-2">{t('auth.referralCode')} <span className="text-gray-500 font-normal">{t('auth.emailOptional')}</span></label>
+            <input id="signup-referral" autoComplete="off" autoCapitalize="characters" maxLength={32} value={referral} onChange={(e) => setReferral(e.target.value.replace(/\s/g, ''))} type="text" placeholder={t('auth.referralPlaceholder')} className="w-full px-4 py-3.5 bg-white/5 border border-white/10 focus:border-teal-400 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none transition-all" />
           </div>
 
           <div className="slide-up slide-up-delay-3">

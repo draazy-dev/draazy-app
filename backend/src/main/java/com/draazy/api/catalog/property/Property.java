@@ -386,9 +386,13 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String dealStatus = "active";
 
-    // Featured is a reward for verifying ownership, not something a listing can be bought into.
+    // Featured is a reward for verifying ownership, not something a listing can be bought into; the
+    // window is the per-listing referral bonus, else the platform setting, else seven days.
     public static final String FEATURED_SQL = """
-            coalesce(ownership_verified = true and ownership_verified_at > now() - interval '7 days', false)""";
+            coalesce(ownership_verified = true and ownership_verified_at > now() - interval '1 day' \
+            * coalesce(featured_days, \
+            (select cast(s.value ->> 'featuredDays' as integer) from settings s \
+            where s.key = 'fees' and s.value ->> 'featuredDays' ~ '^[0-9]{1,3}$'), 7), false)""";
 
     @Formula("(" + FEATURED_SQL + ")")
     private boolean featured;

@@ -23,6 +23,10 @@ export const PRICING_DEFAULTS = Object.freeze({
   listingPass: 999,
   contactPack: 199,
   rentAgreementPlatform: 499,
+  referral: Object.freeze({
+    contactBonus: 15, seekerBonusContacts: 5, ownerFeaturedDays: 14, ownerRewardAgreements: 1,
+    featuredDays: 7, qualifyPerMonth: 10, qualifyPerYear: 50, holdDays: 7, clawbackDays: 30, signupWindowHours: 24,
+  }),
 });
 
 /** The `pricing` section of `GET /bootstrap`. */

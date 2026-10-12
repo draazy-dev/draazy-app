@@ -63,7 +63,6 @@ Tiles exist only for these desks:
 | Enquiries | Contact requests still pending |
 | Flatmates | Flatmate posts, rooms, groups, applications and badge claims awaiting review |
 | Societies | Member-added societies not yet merged or archived |
-| Referrals | Referrals that are pending or qualified, awaiting a decision |
 | Each service desk | Open service requests (not awaiting payment, draft shared, completed or cancelled) and open, in-progress or waiting tickets |
 
 A tile with a count but no **Oldest** age reads **Waiting**. **No tile exists** for Users, Content, Localities, Analytics or Post on behalf. If you hold one of these, open the desk at the start of the shift and look for yourself.

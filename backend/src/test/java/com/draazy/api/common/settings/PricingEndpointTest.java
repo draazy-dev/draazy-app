@@ -72,6 +72,46 @@ class PricingEndpointTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.pricing.referralQualifyPerMonth").doesNotExist())
                 .andExpect(jsonPath("$.pricing.referralContactBonus").doesNotExist())
-                .andExpect(jsonPath("$.pricing.freeContactLimit").doesNotExist());
+                .andExpect(jsonPath("$.pricing.freeContactLimit").doesNotExist())
+                .andExpect(jsonPath("$.pricing.referral.velocityPerDay").doesNotExist())
+                .andExpect(jsonPath("$.pricing.referral.signalRetentionDays").doesNotExist());
+    }
+
+    @Test
+    void theReferralNumbersAreAdminSettingsPublishedForTheClient() throws Exception {
+        mvc.perform(put(Routes.Admin.SETTINGS)
+                        .header(HttpHeaders.AUTHORIZATION, adminToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fees\":{\"referralSeekerBonusContacts\":8,"
+                                + "\"referralOwnerFeaturedDays\":21,\"featuredDays\":10}}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(Routes.Bootstrap.BASE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pricing.referral.contactBonus").value(15))
+                .andExpect(jsonPath("$.pricing.referral.seekerBonusContacts").value(8))
+                .andExpect(jsonPath("$.pricing.referral.ownerFeaturedDays").value(21))
+                .andExpect(jsonPath("$.pricing.referral.ownerRewardAgreements").value(1))
+                .andExpect(jsonPath("$.pricing.referral.featuredDays").value(10))
+                .andExpect(jsonPath("$.pricing.referral.qualifyPerMonth").value(10))
+                .andExpect(jsonPath("$.pricing.referral.qualifyPerYear").value(50))
+                .andExpect(jsonPath("$.pricing.referral.holdDays").value(7))
+                .andExpect(jsonPath("$.pricing.referral.clawbackDays").value(30))
+                .andExpect(jsonPath("$.pricing.referral.signupWindowHours").value(24));
+    }
+
+    @Test
+    void anOutOfBoundsReferralNumberIsRefused() throws Exception {
+        String admin = adminToken();
+        for (String bad : new String[] {"\"referralHoldDays\":0", "\"referralQualifyPerMonth\":-1",
+                "\"referralOwnerFeaturedDays\":365", "\"featuredDays\":0",
+                "\"referralSignalRetentionDays\":\"x\"", "\"referralSignalRetentionDays\":181",
+                "\"referralSignalRetentionDays\":29"}) {
+            mvc.perform(put(Routes.Admin.SETTINGS)
+                            .header(HttpHeaders.AUTHORIZATION, admin)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"fees\":{" + bad + "}}"))
+                    .andExpect(status().is4xxClientError());
+        }
     }
 }

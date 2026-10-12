@@ -1,124 +1,105 @@
 package com.draazy.api.billing.referral;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.PlatformTime;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.trust.VerificationAnnouncer;
-import com.draazy.api.identity.user.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Turns "this owner's listing cleared the document gate" into a referral state change (Q17).
- *
- * <p>This is the {@code billing} end of {@link VerificationAnnouncer}. It exists so that
- * {@code catalog} can announce a verification without importing {@code billing}, which ranks above
- * it and would fail {@code ArchitectureBoundaryTest}.
- *
- * <p><strong>The rule.</strong> A referrer is credited when the referee's <em>first</em> listing
- * passes verification — the referral moves from {@link ReferralStatuses#PENDING} to
- * {@link ReferralStatuses#QUALIFIED}, the status the contract has always declared and no code path
- * ever produced (D56). Q17 rejected the cheaper triggers on record and they should not come back:
- * a verified mobile costs less than the credit it mints, verifying the referee's identity puts
- * friction on the exact surface being used to buy liquidity, and manual review does not scale.
- * Clearing the ownership-document gate is already expensive to fake, so it does the anti-fraud work
- * twice and this class needs no fraud machinery of its own.
- *
- * <p><strong>"First" and "idempotent" are the same guard here, deliberately.</strong> The
- * announcement runs inside the verifying transaction, so a retried write announces again, and an
- * owner who verifies a second listing announces a different property against the same referral —
- * two different stories with the same required ending, which is that nothing further is minted.
- * Rather than ask {@code catalog} how many verified listings an owner has (a question whose answer
- * races with the write in progress, and which would put a second source of truth beside the
- * referral row), first-ness is read off the row itself: {@code qualifiedAt} moves from null exactly
- * once, under a row lock, and every later announcement finds a row that is no longer pending and
- * does nothing. One guard, both invariants, nothing to drift.
- *
- * <p><strong>Exceeding the monthly cap defers; it never rejects (D61).</strong> Automated velocity
- * blocks were avoided in this scheme on purpose, because they "would reject genuine roommates and
- * flatmates, which is the platform's most common referral". That reasoning still holds and the cap
- * is built not to break it: past the limit the referral simply stays {@code pending} for the fraud
- * desk — exactly how every referral behaved before this class did anything — so the cost of the cap
- * is a human glance, never a lost reward. The limit itself is configuration
- * ({@code settings.fees.referralQualifyPerMonth}, default ten a month) so that moving it is a
- * deployment decision rather than a release.
- *
- * <p><strong>No audit row.</strong> {@code AuditService} records what a <em>person</em> decided, and
- * nobody decided this. The evidence lives on the referral itself — {@code qualified_at} and
- * {@code qualified_property_id} say when it happened and which listing caused it — and no money
- * moves until a checker calls {@code approve}, which does audit.
- */
+/** Settles a pending referral on the referee's first verified listing or accepted contact request. */
 @Service
 public class ReferralQualification implements VerificationAnnouncer {
 
-    private static final Logger log = LoggerFactory.getLogger(ReferralQualification.class);
-
-    /**
-     * The rolling window the D61 cap counts over.
-     *
-     * <p>Thirty days rather than a calendar month: a calendar boundary is a published gap somebody
-     * can wait for, and a referrer holding verifications until the first of the month would collect
-     * two allowances inside forty-eight hours.
-     */
-    private static final Duration CAP_WINDOW = Duration.ofDays(30);
+    private static final long SAME_OWNER_WINDOW_DAYS = 30;
 
     private final ReferralRepository referrals;
-    private final UserRepository users;
     private final PlatformSettings settings;
+    private final ReferralOutcomes outcomes;
+    private final PropertyRepository properties;
+    private final RateLimitLock locks;
 
-    public ReferralQualification(ReferralRepository referrals, UserRepository users,
-            PlatformSettings settings) {
+    public ReferralQualification(ReferralRepository referrals, PlatformSettings settings,
+            ReferralOutcomes outcomes, PropertyRepository properties, RateLimitLock locks) {
         this.referrals = referrals;
-        this.users = users;
         this.settings = settings;
+        this.outcomes = outcomes;
+        this.properties = properties;
+        this.locks = locks;
     }
 
-    /**
-     * {@inheritDoc}
-     *
-     * <p>{@link Propagation#REQUIRED}, so this joins the caller's transaction rather than opening
-     * its own. That is the point: if the verification write rolls back, the qualification it
-     * announced has to roll back with it, or a referral is credited for a listing the platform does
-     * not consider verified. {@code REQUIRES_NEW} would commit the credit independently, and this
-     * note exists to stop someone reaching for it the first time a lock timeout shows up here.
-     */
     @Override
     @Transactional(propagation = Propagation.REQUIRED)
     public void announceOwnershipVerified(UUID ownerId, UUID propertyId, Instant verifiedAt) {
-        Optional<String> mobile = users.findById(ownerId).map(owner -> owner.getMobile());
-        if (mobile.isEmpty()) {
-            // An owner id identity does not know. Nothing to qualify, and not worth failing a
-            // verification over.
+        qualify(ownerId, ReferralStatuses.TRACK_OWNER, propertyId, null, verifiedAt);
+    }
+
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void announceContactAccepted(UUID requesterId, UUID ownerId, UUID propertyId, Instant at) {
+        if (properties.findById(propertyId).filter(Property::isPubliclyVisible).isEmpty()) {
             return;
         }
+        qualify(requesterId, ReferralStatuses.TRACK_SEEKER, propertyId, ownerId, at);
+    }
 
-        Optional<Referral> pending = referrals.findPendingForQualification(mobile.get());
+    private void qualify(UUID refereeId, String track, UUID propertyId, UUID approvingOwnerId, Instant at) {
+        if (!settings.referralRewardsEnabled()) {
+            return;
+        }
+        Optional<Referral> pending = referrals.findPendingForQualification(refereeId);
         if (pending.isEmpty()) {
-            // The overwhelmingly common path: this owner was never referred. It also covers both
-            // repeat cases -- an already-qualified row, and a second verified listing -- because
-            // neither is pending any more. Indistinguishable here on purpose; see the class Javadoc
-            // on why one guard serves both invariants.
             return;
         }
-
         Referral referral = pending.get();
-        long cap = settings.referralQualifyPerMonth();
-        long recent = referrals.countByReferrerIdAndQualifiedAtAfter(
-                referral.getReferrerId(), verifiedAt.minus(CAP_WINDOW));
-        if (recent >= cap) {
-            log.info("Referral {} left pending for review: referrer {} has {} qualification(s) in "
-                            + "the last {} days, cap {}",
-                    referral.getId(), referral.getReferrerId(), recent, CAP_WINDOW.toDays(), cap);
-            return;
-        }
+        // After the row lock, so every path takes referral row then referrer; counts below see a rival's commit.
+        locks.holdUntilCommit(RateLimitLock.Limit.REFERRER_QUALIFY, referral.getReferrerId().toString());
+        boolean owner = ReferralStatuses.TRACK_OWNER.equals(track);
+        long amount = owner ? settings.referralOwnerRewardAgreements() : settings.referralContactBonus();
+        referral.qualifyOn(track, propertyId, at,
+                "+" + amount + (owner ? " free rent agreement" + (amount == 1 ? "" : "s") : " owner contacts"),
+                amount);
 
-        if (referral.qualify(propertyId, verifiedAt)) {
-            referrals.saveAndFlush(referral);
+        if (!owner && referral.getReferrerId().equals(approvingOwnerId)) {
+            outcomes.rejected(referral, ReferralClawbacks.SELF_DEALING, "Automatic: the referrer approved the contact",
+                    "A referral could not be verified. Contact support if you think this is wrong.");
+        } else if (ReferralStatuses.RISK_HIGH.equals(referral.getRisk())
+                || (!owner && sameOwnerQualifiedOthers(referral, approvingOwnerId, at))) {
+            outcomes.rejected(referral, "high_risk", "Automatic: high-risk signals at redeem",
+                    "A referral could not be verified. Contact support if you think this is wrong.");
+        } else if (overCap(referral, at)) {
+            outcomes.rejected(referral, "cap_reached", "Automatic: referral cap reached",
+                    "A referral did not count because you reached the referral limit for this period.");
+        } else if (ReferralStatuses.RISK_MEDIUM.equals(referral.getRisk())) {
+            outcomes.held(referral, at.plus(Duration.ofDays(settings.referralHoldDays())),
+                    "Automatic: held for review of medium-risk signals");
+        } else {
+            outcomes.granted(referral, "Automatic: low risk");
         }
+    }
+
+    // One owner vouching for several of the same referrer's referees is a ring, not independent demand.
+    private boolean sameOwnerQualifiedOthers(Referral referral, UUID ownerId, Instant at) {
+        return referrals.countSeekerQualifiedByOwner(referral.getReferrerId(), ownerId, referral.getId(),
+                at.minus(Duration.ofDays(SAME_OWNER_WINDOW_DAYS))) > 0;
+    }
+
+    // Calendar month and year in IST, so a referrer cannot bank a window by waiting for a rolling edge.
+    private boolean overCap(Referral referral, Instant at) {
+        ZonedDateTime local = at.atZone(PlatformTime.IST);
+        ZonedDateTime month = local.toLocalDate().withDayOfMonth(1).atStartOfDay(PlatformTime.IST);
+        ZonedDateTime year = local.toLocalDate().withDayOfYear(1).atStartOfDay(PlatformTime.IST);
+        UUID referrer = referral.getReferrerId();
+        return referrals.countCappedBetween(referrer, month.toInstant(), month.plusMonths(1).toInstant())
+                        >= settings.referralQualifyPerMonth()
+                || referrals.countCappedBetween(referrer, year.toInstant(), year.plusYears(1).toInstant())
+                        >= settings.referralQualifyPerYear();
     }
 }

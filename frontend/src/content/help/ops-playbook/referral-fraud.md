@@ -5,8 +5,8 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 13
-updated: 2026-10-10
-summary: How staff review referral rewards, high-risk signals, approvals, rejections, and clawbacks.
+updated: 2026-10-12
+summary: How the automatic referral checks work and when staff audit, override or claw back a reward.
 tags: [ops, referrals, fraud, rewards, internal]
 modules: [referrals]
 ---
@@ -14,33 +14,45 @@ modules: [referrals]
 > [!IMPORTANT]
 > Internal runbook. Visible to Draazy staff only.
 
+## What the desk is
+
+Referral rewards are decided automatically. The desk is an audit and override view: nobody works a queue, and referrals are not part of anyone's daily work list. Open it to answer a support appeal, check a pattern, or reverse a reward.
+
 ## Daily checklist
 
 **Monitor**
 
-- **Pending** tab count, then **High risk** tab count.
-- Signal chips: **Same device**, **Same IP**, and **High velocity** (referrer redeemed 5 or more in 24 h).
-- Red **Identity verified** or **Identity unique** ? approval is blocked.
-- A referrer at the 30-day qualification cap (ten by default) stays **Pending** for a person to review.
+- The **Held** tab only when a referrer writes in; the sweep releases or rejects held rows by itself.
+- **High risk** rows for repeat devices, networks or fast redemptions, when investigating.
 
 **Work on**
 
-- Work **Pending** first: check the chips, then **Approve** or **Reject**.
-- Then open **High risk** and look for repeat devices, networks or fast redemptions.
-- Use **Clawback** only on a **Rewarded** row where the released reward must be reversed.
+- Appeals from a referrer whose reward was auto-rejected: read the **Auto reason** and answer from it. To reverse a rejection, use **Appeal: approve** on the row and give a reason.
+- **Clawback** only on a **Rewarded** or **Qualified** row where the granted reward must be reversed.
 
 ## Desk and access
 
 Use **Referrals** in the sidebar (`/admin/referrals`; staff open it under `/staff/referrals`). You need the **Referrals** function (`referrals:read` to view, `referrals:write` to decide).
 
-The desk reviews referral reward rows. It shows both mobiles in full but no raw device or IP evidence; work from the server-computed signals and the decision buttons.
+The desk shows both mobiles in full but no raw device or IP evidence; work from the server-computed signals and the decision buttons.
 
-## Queue tabs and counts
+## How a referral is decided
+
+1. **At redemption** the server refuses outright: the referrer's own code, an account that was already referred, a sign-up outside the allowed window, an account that already has a listing or contact request, the same first-party device id as the referrer, or referral rewards being switched off. Refused codes never become desk rows, and the person sees one generic message.
+2. **At qualification** the server scores risk from the shared network, shared browser, redemption velocity and the referrer's account age: low, medium or high.
+3. **Low** is granted immediately. **Medium** is `held` for the hold period, then released or rejected by the sweep. **High** is rejected automatically and the referrer is told to contact support.
+4. Monthly and yearly caps apply; overflow is rejected with the auto reason **Cap reached** and does not queue.
+5. A referee found to be abusive is suspended within the clawback window, which automatically reverses the reward and takes the qualifying listing down.
+
+All limits, windows and reward sizes are set in **Settings → Fees → Referrals**.
+
+## Tabs and counts
 
 Rows are paged 20 at a time, with server-side counts on each tab and a search box (referrer, referred or id).
 
 | Tab | What it shows |
 | --- | --- |
+| **Held** | `held` referrals, with the date the hold ends |
 | **Pending** | `pending` and `qualified` referrals |
 | **High risk** | Any referral with `risk = high` |
 | **Rewarded** | `rewarded` referrals |
@@ -51,58 +63,33 @@ Rows are paged 20 at a time, with server-side counts on each tab and a search bo
 
 | Status | Meaning | Available actions |
 | --- | --- | --- |
-| `pending` | Redeemed and waiting for review or qualification | Approve when eligible, or Reject |
-| `qualified` | Referee's first listing passed ownership verification | Approve, or Reject |
-| `rewarded` | Checker released the reward | Clawback |
-| `rejected` | Checker refused before reward release | None |
+| `pending` | Redeemed; the qualifying event has not happened yet | Approve (override), or Reject |
+| `held` | Qualified but waiting out the hold | Approve (override), or Reject |
+| `qualified` | Qualified and granted | Approve, Reject, or Clawback |
+| `rewarded` | Reward released | Clawback |
+| `rejected` | Refused before release, with an auto reason when automatic | Appeal: approve (reason required) |
 | `clawed-back` | Reward was released and reversed | None |
 
 Keep `rejected` and `clawed-back` separate. One means never paid; the other means paid and recovered.
 
-## Background checks
+## Auto reasons
 
-| Signal | Green means | Red means |
-| --- | --- | --- |
-| **Identity verified** | Referred user holds the identity badge | Approval is blocked |
-| **Identity unique** | Identity uniqueness check passed | Approval is blocked |
-| **Activated** | Referral qualification activity exists | Review context only |
-| **Same device** | No device match with referrer | Shared device risk |
-| **Same IP** | No IP match with referrer | Shared network risk |
-| **High velocity** | Referrer is under the daily velocity threshold | Farming risk |
-
-High risk is computed from velocity and correlation signals; it is not a status.
+The **Auto reason** on a row is one of: High risk, Needs review (one risk signal, so the row is held), Cap reached, Referee suspended, Listing taken down, Verification revoked, Listing not live, Self-dealing (the referrer approved their own referee's contact).
 
 ## Reward rules
 
-The reward label is server-composed, for example **+15 owner contacts**. `rewardAmount` counts owner contacts, not rupees.
+The reward label is server-composed, for example **+15 owner contacts** or **1 free rent agreement**. `rewardAmount` counts contacts or agreements, not rupees.
 
-A `qualified` referral already grants owner-contact entitlement from the qualifying event. A checker approval moves it to `rewarded` without changing the unit. A clawback removes the derived entitlement because only `qualified` and `rewarded` grant contacts.
-
-## Decision procedure
-
-1. Open the **Pending** tab first.
-2. Check the background chips before acting.
-3. Use **Approve** only when the row is `pending` or `qualified` and both identity checks are green.
-4. Use **Reject** for `pending` or `qualified` rows that should never release.
-5. Use **Clawback** only on `rewarded` rows when a released reward must be reversed.
-6. Export CSV (current page) only for investigation; keep it internal.
-
-The server re-checks identity at approval time. If the referred party no longer holds the identity badge, approval is refused even when the old row chip looked eligible.
-
-## Holds and review triggers
-
-Referral qualification can leave a row `pending` for human review when the referrer exceeds the rolling 30-day qualification cap. The cap window is 30 days and the default cap is ten qualifications.
-
-Self-referrals, duplicate redeemed mobiles, unknown codes, and already-used referral codes are refused at redemption and do not become desk rows.
+A clawback removes the derived entitlement. An agreement already delivered stays with the user. Rows from before tracks existed have no track and earn contacts only.
 
 ## What never to do
 
-- Never approve when **Identity verified** or **Identity unique** is red
 - Never treat **High risk** as a terminal status
 - Never format `rewardAmount` as money
 - Never reject a paid reward when the correct action is **Clawback**
 - Never export referral CSV outside the fraud investigation
 - Never promise a reward release outside the in-app referral status
+- Never tell a user which check refused their code
 
 ## Related
 

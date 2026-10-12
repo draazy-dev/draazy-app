@@ -5,6 +5,7 @@ import { usePricing } from '../../context/PricingContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { fmtDate, fmtINR } from '../../lib/format.js';
 import { shareOrCopy } from '../../lib/share.js';
+import { usePrefetchReferralCode } from '../../lib/usePrefetchReferralCode.js';
 
 const LIVE = new Set(['registered', 'active']);
 const DAY = 86400000;
@@ -19,6 +20,7 @@ function renewalState(ra, now = Date.now()) {
 }
 
 export default function AgreementPerks({ ra, isOwner = false }) {
+  usePrefetchReferralCode();
   const { t } = useTranslation();
   const { toast } = useToast();
   const { fee } = usePricing();

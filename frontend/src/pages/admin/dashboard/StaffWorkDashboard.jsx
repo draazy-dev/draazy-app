@@ -23,7 +23,6 @@ const FUNCTIONS = {
   content: { label: 'Content', path: '/admin/content' },
   societies: { label: 'Societies', path: '/admin/societies' },
   reports: { label: 'Reports', path: '/admin/reports' },
-  referrals: { label: 'Referrals', path: '/admin/referrals' },
   analytics: { label: 'Analytics', path: '/admin/analytics' },
 };
 

@@ -7778,6 +7778,12 @@ paths:
       tags: [Billing & Growth]
       summary: My referral code + rewards
       operationId: getReferrals
+      description: >-
+        Refreshes the caller's own network and device digests on every read, so a same-device
+        redemption can be refused. Send `X-Device-Id` (opaque, at most 64 characters, a longer
+        or blank value is ignored); only a salted hash is stored.
+      parameters:
+        - { $ref: '#/components/parameters/DeviceId' }
       responses:
         '200': { description: Referrals, content: { application/json: { schema: { $ref: '#/components/schemas/ReferralSummary' } } } }
   /referrals/redeem:
@@ -7785,6 +7791,12 @@ paths:
       tags: [Billing & Growth]
       summary: Redeem a referral code
       operationId: redeemReferral
+      description: >-
+        Allowed only within `referralSignupWindowHours` of account creation, before the account has
+        any listing or contact request, while the `referralRewards` flag is on, and not from the
+        referrer's own device. Every refusal is the same 409.
+      parameters:
+        - { $ref: '#/components/parameters/DeviceId' }
       requestBody:
         required: true
         content:
@@ -7797,7 +7809,7 @@ paths:
                 shareChannel: { type: string, enum: [whatsapp, sms, email, copy, qr, other] }
       responses:
         '200': { description: Redeemed }
-        '409': { description: Already redeemed / invalid }
+        '409': { description: 'Refused — one indistinguishable error for every reason: unknown or own code, already referred, outside the signup window, account already active, same device, or rewards switched off.' }
   /referrals:
     get:
       tags: [Billing & Growth]
@@ -7807,13 +7819,13 @@ paths:
       # signals saying which of them we suspect. The decision endpoints below are guarded alike.
       x-roles: [staff, admin]
       parameters:
-        - { name: status, in: query, schema: { type: string }, description: 'One status or a comma-separated set of pending, qualified, rewarded, rejected, clawed-back.' }  # Slice-13 spec fix S52
+        - { name: status, in: query, schema: { type: string }, description: 'One status or a comma-separated set of pending, qualified, held, rewarded, rejected, clawed-back.' }  # Slice-13 spec fix S52
         - { name: risk, in: query, schema: { type: string, enum: [low, medium, high] } }
         - { name: q, in: query, schema: { type: string }, description: 'Matches the referrer or referred name, either mobile, or the referral id.' }
         - name: counts
           in: query
           schema: { type: boolean, default: false }
-          description: 'Add the tab totals (`all`, `pending`, `highRisk`, `rewarded`, `refused`) over the whole table.'
+          description: 'Add the tab totals (`all`, `pending`, `held`, `highRisk`, `rewarded`, `refused`) over the whole table.'
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
       responses:
@@ -7834,14 +7846,27 @@ paths:
     post:
       tags: [Billing & Growth]
       summary: Approve a referral (checker) - credits the referrer's reward ledger
+      description: >
+        Allowed from pending, held, qualified and rejected. The body is optional and so is `reason`, except
+        that approving a rejected referral is an appeal and needs a non-blank `reason` (422 `VALIDATION_FAILED`
+        without one); the reason is kept on the row and in the audit trail.
       operationId: approveReferral
       x-roles: [staff, admin]  # Slice-13 spec fix S53
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string }
       responses:
         '200':
           description: Approved
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Referral' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /referrals/{id}/reject:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -10758,6 +10783,12 @@ components:
       in: path
       required: true
       schema: { type: string }
+    DeviceId:
+      name: X-Device-Id
+      in: header
+      required: false
+      description: An opaque first-party device id, at most 64 characters. Only a salted hash is stored; a longer or blank value is ignored. On redeem, omitting it counts as a risk signal.
+      schema: { type: string, maxLength: 64 }
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -15361,7 +15392,8 @@ components:
         used: { type: integer, description: Contact requests opened, for all time }
         allowance: { type: [integer, 'null'] }
         remaining: { type: [integer, 'null'] }
-        referralBonus: { type: integer, description: Part of allowance earned by referrals }
+        referralBonus: { type: integer, description: Part of allowance earned by the caller's seeker-track referrals }
+        friendBonus: { type: integer, description: Extra free contacts the caller got for joining through a code; 0 once rejected or clawed back. }
         freeWindowEndsAt:
           type: [string, 'null']
           format: date-time
@@ -15373,8 +15405,7 @@ components:
     ListingEntitlement:
       type: object
       properties:
-        allowance: { type: integer, description: Live listings allowed without a pass (1 plus referral slots). }
-        referralBonus: { type: integer }
+        allowance: { type: integer, description: Live listings allowed without a pass. }
         used:
           type: integer
           description: Live listings not covered by a listing pass — the count `PUT /me/listings/{id}/resume` checks against `allowance`.
@@ -15392,7 +15423,7 @@ components:
         free:
           type: integer
           minimum: 0
-          description: Rent agreements earned via referrals.
+          description: Free rent agreements earned by owner-track referrals.
         used:
           type: integer
           minimum: 0
@@ -15405,12 +15436,36 @@ components:
             service fee and its GST. Never negative, even after a referral clawback.
     ReferralSummary:
       type: object
-      # Rewards count owner contacts, not rupees: there is no wallet anywhere, while every
-      # referrer-facing screen promises contacts. `converted` counts qualified *or* approved.
+      description: >-
+        The caller's own view of the scheme. The contacts and agreements earned are spendable through
+        `GET /me/entitlements`, derived from the same referrals.
       properties:
         code: { type: string, example: PUNE-AB12 }
-        invited: { type: integer }
-        converted: { type: integer }
+        invited: { type: integer, description: People who redeemed the caller's code. }
+        converted: { type: integer, description: Referrals that qualified (granted, including rewarded). }
+        held: { type: integer, description: Referrals held for the hold period before a decision. }
+        earned:
+          type: object
+          properties:
+            owner:
+              type: object
+              properties:
+                referrals: { type: integer }
+                agreements: { type: integer, description: Free rent agreements earned. }
+            seeker:
+              type: object
+              properties:
+                referrals: { type: integer }
+                contacts: { type: integer, description: Owner contacts earned. }
+        friendReward:
+          type: object
+          description: What the caller gets for having joined through a code.
+          properties:
+            redeemed: { type: boolean }
+            status: { type: [string, 'null'], description: The caller's own referral status; null when none. }
+            track: { type: [string, 'null'], enum: [owner, seeker, null] }
+            contacts: { type: integer, description: Extra free contacts standing now. }
+            featuredDays: { type: integer, description: Featured days promised on their first verified listing. }
     Referral:
       type: object
       description: A single referral record with anti-fraud signals (admin/ops view).
@@ -15422,8 +15477,9 @@ components:
         referredMobile: { $ref: '#/components/schemas/Mobile' }
         channel: { type: string, enum: [seeker, owner] }
         reward: { type: string, description: "Human label, e.g. '+15 owner contacts'" }
-        rewardAmount: { type: integer, description: Owner contacts granted by this referral }
-        status: { type: string, enum: [pending, qualified, rewarded, rejected, clawed-back] }
+        rewardAmount: { type: integer, description: Owner contacts or free agreements granted; 0 until it qualifies. }
+        status: { type: string, enum: [pending, qualified, held, rewarded, rejected, clawed-back] }
+        track: { type: [string, 'null'], enum: [owner, seeker, null], description: Decided by whichever qualifying event came first. }
         risk: { type: string, enum: [low, medium, high] }
         identityVerified: { type: boolean, description: The referred account held the Verified badge when the referral qualified. }
         identityUnique: { type: boolean }
@@ -15431,6 +15487,8 @@ components:
         sameIp: { type: boolean }
         velocityHigh: { type: boolean }
         activated: { type: boolean }
+        holdUntil: { type: [string, 'null'], format: date-time, description: When a held referral is re-checked. }
+        autoReason: { type: [string, 'null'], description: 'Why the system decided: high_risk, medium_risk (held), cap_reached, self_dealing, referee_suspended, listing_taken_down (a moderation reject or flag; seeker rows react only to this), verification_revoked, listing_not_live (owner track only).' }
         at: { type: string, format: date-time }
     SavedSearch:
       type: object
@@ -16761,10 +16819,9 @@ components:
 
 
         Four named fields rather than an open map, and the reason is the document they come out of:
-        the same settings block also holds the free contact allowance, the referral bonus and the
-        referral auto-qualify threshold, and that last one is the line past which a referral goes to
-        the fraud desk. A projection of the block would publish it. This shape cannot, and neither
-        can it publish the next key ops adds.
+        the same settings block also holds the free contact allowance and the referral fraud
+        thresholds (velocity, retention). A projection of the block would publish them. This shape
+        cannot, and neither can it publish the next key ops adds.
 
 
         Prices are **whole rupees** — there are no paise anywhere on this platform. The one
@@ -16800,6 +16857,26 @@ components:
             GST charged on top of the platform's fees. Every price already includes GST, so this
             is 0 unless an admin sets a rate.
           example: 0
+        referral:
+          type: object
+          description: >-
+            The referral numbers the Refer screen quotes. Each is an admin setting under `fees`
+            (`referralContactBonus`, `referralSeekerBonusContacts`, `referralOwnerFeaturedDays`,
+            `referralOwnerRewardAgreements`, `featuredDays`, `referralQualifyPerMonth`,
+            `referralQualifyPerYear`, `referralHoldDays`, `referralClawbackDays`,
+            `referralSignupWindowHours`). Velocity, retention and new-referrer thresholds are not published.
+          required: [contactBonus, seekerBonusContacts, ownerFeaturedDays, ownerRewardAgreements, featuredDays, qualifyPerMonth, qualifyPerYear, holdDays, clawbackDays, signupWindowHours]
+          properties:
+            contactBonus: { type: integer, description: Owner contacts the referrer earns per seeker-track referral. }
+            seekerBonusContacts: { type: integer, description: Extra free contacts the friend gets on joining through a code. }
+            ownerFeaturedDays: { type: integer, description: Days the friend's qualifying listing stays Featured. }
+            ownerRewardAgreements: { type: integer, description: Free rent agreements the referrer earns per owner-track referral. }
+            featuredDays: { type: integer, description: Days any listing stays Featured after its ownership is verified. }
+            qualifyPerMonth: { type: integer, description: Referrals that can pay out per calendar month (IST). }
+            qualifyPerYear: { type: integer, description: Referrals that can pay out per calendar year (IST). }
+            holdDays: { type: integer, description: How long a medium-risk referral is held before it is re-checked. }
+            clawbackDays: { type: integer, description: Days after a grant during which a problem takes the reward back. }
+            signupWindowHours: { type: integer, description: A code can be redeemed only this long after the account was created. }
     SocietyAdminEdit:
       type: object
       description: >

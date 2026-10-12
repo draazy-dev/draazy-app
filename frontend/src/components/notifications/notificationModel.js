@@ -16,6 +16,7 @@ export const TYPE_META = {
   share: { icon: 'users-round', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'flatmate leads' },
   document: { icon: 'folder-check', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'document updates' },
   service: { icon: 'file-signature', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'service updates' },
+  referral: { icon: 'gift', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'referral updates' },
   system: { icon: 'info', iconCls: 'text-gray-400', bgCls: 'bg-white/10', plural: 'updates' },
 };
 

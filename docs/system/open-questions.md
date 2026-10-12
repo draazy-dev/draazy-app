@@ -293,10 +293,19 @@ takes its contacts back with no grant to reverse. The old module now lives at
 `services/providers/mock/contactQuota.js` as the mock server's state and is not re-exported from
 `lib/store.js`.
 
-**Deliberately still open, and narrower than it was:** the **listing** ceiling is *reported* by
-`GET /me/entitlements` (`listings.allowance`, `listings.referralBonus`) but is **not enforced** —
-`POST /me/listings` does not check it. The wizard's paywall remains a client-side courtesy. That is a
-separate piece of work from the contact quota and was not smuggled into this one.
+**Deliberately still open, and narrower than it was:** superseded by Q17a below.
+
+### Q17a — Two-sided, automatically verified referrals *(closed 2026-10-12)*
+
+**Answer:** two tracks, both sides rewarded, no manual desk. Every number is a `settings.fees.referral*` key.
+- **Owner track:** qualifies when the referee's first listing passes ownership verification (Q17 trigger). The
+  referrer gets a free rent agreement per referral; the referee's listing is Featured 14 days instead of 7.
+- **Seeker track (new):** qualifies when the referee's first contact request is accepted. The referrer gets 15
+  contacts; the referee gets 5 extra free contacts.
+- **Automatic verification:** a code redeems only at signup (24 h, no listing or contact yet, not the referrer's
+  device). At qualification a risk check grants (low), holds 7 days (medium) or rejects (high); calendar-month and
+  yearly caps reject the overflow; suspension, take-down or revoked verification claws back within 30 days. The ops
+  desk is audit plus override (an appeal needs a reason). The listing-slot reward is gone (pay-per-use, Q16b).
 
 ### Q18 — What should the ops console be allowed to see and act on? *(closed 2026-08-11)*
 

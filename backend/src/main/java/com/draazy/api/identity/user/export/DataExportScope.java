@@ -1046,10 +1046,12 @@ public final class DataExportScope {
                 "People you referred. Their name is included because the referrals screen already "
                         + "shows it to you; their phone number is not, because that screen masks it.",
                 """
-                select id, referred, channel, reward, reward_amount, status, risk,
+                select id, referred, channel, reward, reward_amount, status, track, risk,
                        identity_verified, identity_unique, same_device, same_ip, velocity_high,
-                       activated, at, qualified_at, qualified_property_id, share_channel,
-                       referrer_mobile, created_at, updated_at
+                       activated, at, qualified_at,
+                       case when track = 'owner' then qualified_property_id end as qualified_property_id,
+                       share_channel,
+                       hold_until, granted_at, referrer_mobile, created_at, updated_at
                   from referrals
                  where referrer_id = :subjectId
                  order by created_at desc
@@ -1058,18 +1060,21 @@ public final class DataExportScope {
                         "referred_mobile", "The referred person's phone number. The product masks "
                                 + "it on screen; an export that unmasked it would be a way to turn "
                                 + "a referral link into a contact list.",
-                        "referred_ip_hash / referred_device_hash", "Salted digests of the address "
-                                + "and browser the referral was redeemed from, held only to detect "
-                                + "referral fraud and cleared automatically after ninety days. They "
+                        "referred_ip_hash / referred_device_hash / referred_device_id_hash",
+                                "Salted digests of the address, browser and device the referral was "
+                                + "redeemed from, held only to detect referral fraud and cleared "
+                                + "automatically after the retention window the platform sets. They "
                                 + "describe the person you referred, not you.",
+                        "auto_reason", "The automatic fraud check's reason code. Naming the signal "
+                                + "that tripped is how a detection system gets tuned against itself.",
                         "handled_by / handled_reason", "Which staff member reviewed a flagged "
                                 + "referral, and their note.")));
 
         out.add(new Dataset("flatmate", "referrals_received",
                 "The referral you joined under, matched by your phone number.",
                 """
-                select id, referred, referred_mobile, channel, reward, status, activated, at,
-                       created_at, updated_at, referrer_id as party_ref_src
+                select id, referred, referred_mobile, channel, reward, status, track, activated, at,
+                       hold_until, granted_at, created_at, updated_at, referrer_id as party_ref_src
                   from referrals
                  where referred_mobile = :subjectMobile
                  order by created_at desc
@@ -1077,7 +1082,7 @@ public final class DataExportScope {
                 withheld(
                         "referrer_mobile", "The referrer's phone number.",
                         "referrer_id", "Replaced by partyRef.",
-                        "risk, same_device, same_ip, velocity_high, handled_by",
+                        "risk, same_device, same_ip, velocity_high, auto_reason, handled_by",
                         "Fraud-detection signals and the staff review of them. Returning a "
                                 + "would-be fraudster the exact list of signals that caught them is "
                                 + "how a detection system gets tuned against itself.")));
@@ -1089,9 +1094,10 @@ public final class DataExportScope {
                   from referral_codes
                  where user_id = :subjectId
                 """,
-                withheld("referrer_ip_hash / referrer_device_hash", "Salted digests of the address "
-                        + "and browser your code was minted from. Irreversible, cleared "
-                        + "automatically after ninety days, and readable by nobody including you — "
+                withheld("referrer_ip_hash / referrer_device_hash / referrer_device_id_hash",
+                        "Salted digests of the address, browser and device your code was used from. "
+                        + "Irreversible, cleared automatically after the retention window the "
+                        + "platform sets, and readable by nobody including you — "
                         + "returning them would create a correlation token and disclose nothing.")));
     }
 

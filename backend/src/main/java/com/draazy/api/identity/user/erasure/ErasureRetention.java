@@ -93,13 +93,13 @@ public final class ErasureRetention {
         return List.of(
                 "referrals — referrer_mobile and referred_mobile are stored numbers, not references,"
                         + " so they survive pseudonymisation of the users row. The same rows also"
-                        + " hold two salted digests of the address and browser the referral was"
+                        + " hold three salted digests of the address, browser and device the referral was"
                         + " redeemed from, used only to detect referral fraud; those are cleared"
-                        + " automatically ninety days after the referral, whether or not erasure is"
-                        + " ever requested.",
-                "referral_codes — the referrer's half of the same two salted fraud digests, captured"
-                        + " when their code was minted. Cleared automatically ninety days after"
-                        + " capture. The code itself stays: it is not personal data, and it is what"
+                        + " automatically after the retention window the platform sets (180 days by default),"
+                        + " whether or not erasure is ever requested.",
+                "referral_codes — the referrer's half of the same salted fraud digests, refreshed"
+                        + " whenever they open the referral screen. Cleared automatically after the same"
+                        + " window. The code itself stays: it is not personal data, and it is what"
                         + " every link already shared points at.",
                 "flatmate_group_members.name — a NOT NULL denormalised copy of users.name, written"
                         + " at join time.",

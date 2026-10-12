@@ -18,8 +18,19 @@ INSERT INTO settings (key, value) VALUES
         "rentAgreementPlatform": 499,
         "gstPercent": 0,
         "freeContactLimit": 15,
+        "featuredDays": 7,
         "referralContactBonus": 15,
-        "referralQualifyPerMonth": 10
+        "referralSeekerBonusContacts": 5,
+        "referralOwnerFeaturedDays": 14,
+        "referralOwnerRewardAgreements": 1,
+        "referralQualifyPerMonth": 10,
+        "referralQualifyPerYear": 50,
+        "referralHoldDays": 7,
+        "referralClawbackDays": 30,
+        "referralVelocityPerDay": 5,
+        "referralSignupWindowHours": 24,
+        "referralSignalRetentionDays": 180,
+        "referralNewReferrerDays": 7
     }'::jsonb)
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value || settings.value;
 

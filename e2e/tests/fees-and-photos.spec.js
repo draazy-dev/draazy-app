@@ -71,19 +71,29 @@ test.describe('Fees — the rent-agreement sidebar prices from the admin fee sch
     }
   });
 
-  test('the referral pitch quotes the admin fee for the agreement it gives away', async ({ page }) => {
-    const { rentAgreementPlatform: fee } = await adminPrices();
+  test('the referral pitch quotes the admin\'s reward numbers and no stale rent fee', async ({ page }) => {
+    const { referral } = await adminPrices();
     await signedInAs(page, OWNER.mobile);
     await page.goto('/refer');
 
-    const body = page.locator('body');
-    await expect(body).toContainText(rupees(fee), { timeout: 20_000 });
-    await expect(body).not.toContainText(STALE_RENT_FEE);
-
-    // Proves the assertions ran on the referral page, not a sign-in redirect.
-    await expect(body).toContainText(/refer/i);
+    const owner = page.getByTestId('refer-owner-track');
+    await expect(owner).toContainText(`Featured placement for ${referral.ownerFeaturedDays} days`, { timeout: 20_000 });
+    await expect(owner).toContainText(/free rent agreements?/);
+    await expect(page.locator('body')).not.toContainText(STALE_RENT_FEE);
   });
-});
+
+  test('a repriced Featured window for invited owners is what the referral pitch quotes', async ({ page }) => {
+    const { referral } = await adminPrices();
+    const repriced = referral.ownerFeaturedDays === 21 ? 20 : 21;
+    await saveFees({ referralOwnerFeaturedDays: repriced });
+    try {
+      await signedInAs(page, OWNER.mobile);
+      await page.goto('/refer');
+      await expect(page.getByTestId('refer-owner-track')).toContainText(`${repriced} days`, { timeout: 20_000 });
+    } finally {
+      await saveFees({ referralOwnerFeaturedDays: referral.ownerFeaturedDays });
+    }
+  });});
 
 test.describe('Photos — the listing wizard uploads to the server (live)', () => {
   test('stores the file through /me/photos and renders the URL the server returned', async ({ page }) => {
@@ -190,9 +200,10 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
     // Keys as a set because a missing fee renders as "₹0", not as missing UI.
     // `gstPercent` is a leftover that may go; prices include GST either way.
     expect(Object.keys(prices).filter((key) => key !== 'gstPercent').sort()).toEqual([
-      'contactPack', 'listingPass', 'rentAgreementPlatform',
+      'contactPack', 'listingPass', 'referral', 'rentAgreementPlatform',
     ]);
-    for (const [key, value] of Object.entries(prices)) {
+    expect(typeof prices.referral, 'the referral programme rides along as one object').toBe('object');
+    for (const [key, value] of Object.entries(prices).filter(([k]) => k !== 'referral')) {
       expect(typeof value, `${key} is a number`).toBe('number');
       // Every price includes GST, so the schedule's GST is 0.
       if (key === 'gstPercent') expect(value).toBe(0);

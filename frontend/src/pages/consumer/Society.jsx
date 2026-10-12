@@ -5,6 +5,7 @@ import LoadError from '../../components/LoadError.jsx';
 import HScroll from '../../components/ui/HScroll.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { shareOrCopy } from '../../lib/share.js';
+import { usePrefetchReferralCode } from '../../lib/usePrefetchReferralCode.js';
 import { Stars } from './property/Stars.jsx';
 import { useSocietyHub } from './society/useSocietyHub.js';
 import { REVIEW_CATS, REVIEW_CAT_KEYS } from './society/constants.js';
@@ -18,6 +19,7 @@ import usePageHead from '../../lib/usePageHead.js';
 import { societyHead } from '../../lib/listingSeo.js';
 
 export default function Society() {
+  usePrefetchReferralCode();
   const { t } = useTranslation();
   const { toast } = useToast();
   const hub = useSocietyHub();

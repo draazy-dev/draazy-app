@@ -1,5 +1,5 @@
-/* The quota lives on the server: "used" counts contact_requests rows and referralBonus is recomputed, not stored;
-   specs mint their own accounts (uniqueMobile) because spending a quota mutates the account it runs as. */
+/* The quota lives on the server: "used" counts contact_requests rows; referralBonus and friendBonus are recomputed.
+   Specs mint their own accounts (uniqueMobile) because spending a quota mutates the account it runs as. */
 import { test, expect } from '../../fixtures/live.js';
 import { API, apiLogin, uniqueMobile } from '../../helpers/liveAuth.js';
 
@@ -41,11 +41,12 @@ test('a fresh account starts on the free allowance and nothing is stored to make
   expect(ent.contacts.allowance).toBe(FREE_LIMIT);
   expect(ent.contacts.remaining).toBe(FREE_LIMIT);
   expect(ent.contacts.referralBonus, 'no referrals, no bonus').toBe(0);
+  expect(ent.contacts.friendBonus, 'a code that was never redeemed gives no starting bonus').toBe(0);
   expect(ent.contacts.freeWindowEndsAt, 'the 30-day window starts at the first contact, not at signup').toBeNull();
   expect(ent.contacts.packExpiresAt).toBeNull();
 
   expect(ent.listings.allowance).toBeGreaterThanOrEqual(1);
-  expect(ent.listings.referralBonus).toBe(0);
+  expect(ent.listings, 'a referral never buys a listing slot').not.toHaveProperty('referralBonus');
   expect(ent.listings.passes).toEqual([]);
 });
 

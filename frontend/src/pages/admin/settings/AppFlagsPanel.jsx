@@ -35,7 +35,7 @@ const APP_FLAG_SECTIONS = [
     icon: CreditCard,
     flags: [
       { key: 'subscriptionPlans', label: 'Plan purchases', desc: 'Buying plans and top-ups at checkout. Off pauses new purchases; active plans keep working.' },
-      { key: 'referralRewards', label: 'Referral rewards', desc: 'Show the refer-and-earn routes to free owner contacts and listing slots. Off hides them; bonuses already earned still count.' },
+      { key: 'referralRewards', label: 'Referral rewards', desc: 'Show the refer-and-earn routes to free owner contacts and rent agreements. Off hides them; bonuses already earned still count.' },
     ],
   },
   {

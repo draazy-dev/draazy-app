@@ -6,6 +6,7 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
@@ -23,13 +24,15 @@ public class ListingArchiveService {
     private final ListingDuplicateProbe duplicates;
     private final PropertyLifecycle lifecycle;
     private final AccountPermissions permissions;
+    private final ReferralTriggers referralTriggers;
 
     public ListingArchiveService(PropertyRepository properties, ListingDuplicateProbe duplicates,
-            PropertyLifecycle lifecycle, AccountPermissions permissions) {
+            PropertyLifecycle lifecycle, AccountPermissions permissions, ReferralTriggers referralTriggers) {
         this.properties = properties;
         this.duplicates = duplicates;
         this.lifecycle = lifecycle;
         this.permissions = permissions;
+        this.referralTriggers = referralTriggers;
     }
 
     /** Unauthorized callers get {@code 404}, not {@code 403}, to avoid listing enumeration. */
@@ -38,6 +41,9 @@ public class ListingArchiveService {
         Property p = resolvePermitted(principal, idOrSlug);
         p.archive(reason);
         properties.endListingPasses(p.getId());
+        if (!p.getOwner().getId().equals(principal.userId())) {
+            referralTriggers.listingTakenDown(p.getId());
+        }
         lifecycle.announceArchived(p);
         return p;
     }

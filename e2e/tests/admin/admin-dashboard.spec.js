@@ -144,14 +144,16 @@ test.describe('/admin dashboard — the scorecard is the server\'s', () => {
   test('a scoped staffer gets a queue tile for each queue function they hold, and for no other', async ({ page, login }) => {
     const { mobile } = await login.scopeStaff('rental', ['reports', 'referrals', 'societies']);
     const mine = await fetch(`${API}/admin/my-work`, { headers: await authHeaders(mobile) }).then((r) => r.json());
-    expect(mine.queues.map((q) => q.function).sort()).toEqual(['referrals', 'reports', 'societies']);
+    // Referrals are audited after the fact now, so holding the function adds no queue.
+    expect(mine.queues.map((q) => q.function).sort()).toEqual(['reports', 'societies']);
 
     await login.asStaff('rental');
     await page.goto('/staff');
     const queues = page.getByTestId('my-queues');
-    for (const [label, path] of [['Referrals', '/staff/referrals'], ['Societies', '/staff/societies'], ['Reports', '/staff/reports']]) {
+    for (const [label, path] of [['Societies', '/staff/societies'], ['Reports', '/staff/reports']]) {
       await expect(queues.getByRole('link', { name: new RegExp(label) })).toHaveAttribute('href', path);
     }
+    await expect(queues.getByText('Referrals')).toHaveCount(0);
     await expect(queues.getByText('Enquiries')).toHaveCount(0);
     await expect(queues.getByText('Flatmates')).toHaveCount(0);
     await expect(queues.getByText('Review moderation')).toHaveCount(0);

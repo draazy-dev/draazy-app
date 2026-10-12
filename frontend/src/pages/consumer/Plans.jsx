@@ -15,7 +15,7 @@ const seekerPlans = (t, fee, n) => [
   { id: 'contact-pack', name: t('misc1.plansContactPackName'), price: fee('contactPack'), sub: t('misc1.plansContactPackSub', { count: n.contacts, days: n.packDays }), tag: t('misc1.plansContactPackTag'), feats: [t('misc1.plansContactPackFeat1', { count: n.contacts }), t('misc1.plansContactPackFeat2', { days: n.packDays }), t('misc1.plansContactPackFeat3'), t('misc1.plansContactPackFeat4')], cta: t('misc1.plansContactPackCta'), href: '/checkout?plan=contact-pack', pop: true, badge: t('misc1.plansContactPackBadge') },
 ];
 const ownerPlans = (t, fee, n) => [
-  { id: 'owner-free', free: true, name: t('misc1.plansOwnerFreeName'), price: '₹0', sub: t('misc1.plansOwnerFreeSub'), tag: t('misc1.plansOwnerFreeTag'), feats: [t('misc1.plansOwnerFreeFeat1'), t('misc1.plansOwnerFreeFeat2'), t('misc1.plansOwnerFreeFeat3'), t('misc1.plansOwnerFreeFeat4'), t('misc1.plansOwnerFreeFeat5')], cta: t('misc1.plansOwnerFreeCta'), href: '/list-property' },
+  { id: 'owner-free', free: true, name: t('misc1.plansOwnerFreeName'), price: '₹0', sub: t('misc1.plansOwnerFreeSub'), tag: t('misc1.plansOwnerFreeTag'), feats: [t('misc1.plansOwnerFreeFeat1'), t('misc1.plansOwnerFreeFeat2'), t('misc1.plansOwnerFreeFeat3'), t('misc1.plansOwnerFreeFeat4', { days: n.featuredDays }), t('misc1.plansOwnerFreeFeat5')], cta: t('misc1.plansOwnerFreeCta'), href: '/list-property' },
   { id: 'listing-pass', name: t('misc1.plansListingPassName'), price: fee('listingPass'), sub: t('misc1.plansListingPassSub', { days: n.passDays }), tag: t('misc1.plansListingPassTag'), feats: [t('misc1.plansListingPassFeat1', { days: n.passDays }), t('misc1.plansListingPassFeat2'), t('misc1.plansListingPassFeat3'), t('misc1.plansListingPassFeat4')], cta: t('misc1.plansListingPassCta'), href: '/dashboard#properties', pop: true },
 ];
 /** `price` resolves a plan slug to the card's price so FAQ prose can't quote a different number. */
@@ -119,7 +119,7 @@ export default function Plans() {
   const { t } = useTranslation();
   const { hasEverListed } = useAuth();
   // Fallback price list from `GET /bootstrap`; a compiled-in constant would quote a price nobody could change.
-  const { fee } = usePricing();
+  const { fee, referral } = usePricing();
   // The live catalogue, keyed by slug. Empty until it resolves and after a failure; both cases
   // fall through to `fee()` below.
   const [catalogue, setCatalogue] = useState({});
@@ -144,6 +144,7 @@ export default function Plans() {
     contacts: catalogue['contact-pack']?.contactLimit ?? 15,
     packDays: catalogue['contact-pack']?.termDays ?? 30,
     passDays: catalogue['listing-pass']?.termDays ?? 60,
+    featuredDays: referral.featuredDays,
   };
   const SEEKER = seekerPlans(t, fee, n).map(priced);
   const OWNER = ownerPlans(t, fee, n).map(priced);

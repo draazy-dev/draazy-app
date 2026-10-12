@@ -51,14 +51,27 @@ const TABS = [['general', 'General'], ['fees', 'Fees'], ['maps', 'Maps'], ['flag
 const DEFAULT_GROUPS_PER_PERSON = 2;
 const MAX_GROUPS_CEILING = 10;
 
-const COUNT_FEES = new Set(['freeContactLimit', 'referralContactBonus', 'referralQualifyPerMonth']);
+const COUNT_FEES = new Set(['freeContactLimit', 'featuredDays']);
 const FEE_FIELDS = [
   ['listingPass', 'Listing pass (60 days)'],
   ['contactPack', 'Contact pack (15 contacts, 30 days)'],
   ['rentAgreementPlatform', 'Rent agreement platform fee'],
   ['freeContactLimit', 'Free owner contacts'],
-  ['referralContactBonus', 'Contacts per referral'],
-  ['referralQualifyPerMonth', 'Referral rewards per month'],
+  ['featuredDays', 'Featured days after verification', 1, 90],
+];
+const REFERRAL_FIELDS = [
+  ['referralContactBonus', 'Contacts for the referrer', 0, 1000, 'Owner contacts earned per qualified seeker referral.'],
+  ['referralSeekerBonusContacts', 'Contacts for an invited seeker', 0, 1000, 'Extra free contacts a referred seeker starts with.'],
+  ['referralOwnerFeaturedDays', 'Featured days for an invited owner', 1, 90, 'Featured placement on their first verified listing.'],
+  ['referralOwnerRewardAgreements', 'Free agreements for the referrer', 0, 10, 'Per qualified owner referral.'],
+  ['referralQualifyPerMonth', 'Rewards per referrer, per month', 1, 1000, 'Further referrals are rejected as over the cap.'],
+  ['referralQualifyPerYear', 'Rewards per referrer, per year', 1, 10000, 'Calendar-year cap on rewarded referrals.'],
+  ['referralHoldDays', 'Hold days (medium risk)', 1, 60, 'A held referral is released or rejected after this.'],
+  ['referralClawbackDays', 'Clawback window (days)', 1, 365, 'A suspended referee reverses the reward inside this window.'],
+  ['referralVelocityPerDay', 'High velocity (redeems per day)', 1, 1000, 'A referrer above this in 24 hours is rated high risk.'],
+  ['referralSignupWindowHours', 'Redeem window (hours)', 1, 720, 'How long after sign-up a code can still be redeemed.'],
+  ['referralSignalRetentionDays', 'Keep device and network signals (days)', 30, 180, 'Then the fraud signals are erased.'],
+  ['referralNewReferrerDays', 'New referrer account (days)', 0, 90, 'A referrer account younger than this counts as a risk signal.'],
 ];
 
 const saveError = (err) => (err?.status === 412
@@ -225,8 +238,16 @@ export default function AdminSettings() {
 
   const saveSite = () => persist({ site: settings.site }, 'Site details saved');
   const feeFields = FEE_FIELDS.filter(([k]) => k in settings.fees);
-  const saveFees = () => requireFilled('fees', feeFields.map(([k]) => settings.fees[k]))
-    && persist({ fees: Object.fromEntries(feeFields.map(([k]) => [k, settings.fees[k]])) }, 'Fee schedule saved');
+  const referralFields = REFERRAL_FIELDS.filter(([k]) => k in settings.fees);
+  const saveFeeGroup = (scope, fields, okMessage) => {
+    if (!requireFilled(scope, fields.map(([k]) => settings.fees[k]))) return false;
+    const outOfRange = fields.some(([k, , min, max]) => min != null && !(Number.isInteger(settings.fees[k]) && settings.fees[k] >= min && settings.fees[k] <= max));
+    setFormError((e) => ({ ...e, [scope]: outOfRange ? 'A value is outside its allowed range.' : '' }));
+    return !outOfRange
+      && persist({ fees: Object.fromEntries(fields.map(([k]) => [k, settings.fees[k]])) }, okMessage);
+  };
+  const saveFees = () => saveFeeGroup('fees', feeFields, 'Fee schedule saved');
+  const saveReferrals = () => saveFeeGroup('referrals', referralFields, 'Referral settings saved');
 
   const maxPhotos = settings.listings?.maxPhotos ?? DEFAULT_MAX_PHOTOS;
   const setMaxPhotos = (v) => setSettings((s) => ({ ...s, listings: { ...s.listings, maxPhotos: v === '' ? '' : Number(v) } }));
@@ -397,6 +418,27 @@ export default function AdminSettings() {
             </button>
             {formError.fees ? <p role="alert" className="mt-3 text-xs text-rose-300">{formError.fees}</p> : null}
           </div>
+
+          {referralFields.length > 0 && (
+            <div className="dz-card p-5">
+              <h3 className="text-sm font-semibold text-white">Referrals</h3>
+              <div className="mt-3 space-y-3">
+                {referralFields.map(([k, label, min, max, help]) => (
+                  <label key={k} className="flex items-center justify-between gap-4 text-sm">
+                    <span>
+                      <span className="block text-gray-300">{label}</span>
+                      <span className="block text-xs text-gray-500">{help}</span>
+                    </span>
+                    <input type="number" min={min} max={max} step="1" value={settings.fees[k]} onChange={(e) => setFee(k, e.target.value)} className="dz-input w-28 shrink-0 text-right" />
+                  </label>
+                ))}
+              </div>
+              <button onClick={saveReferrals} className="dz-btn dz-btn-primary mt-5">
+                <Save className="h-4 w-4" /> Save referrals
+              </button>
+              {formError.referrals ? <p role="alert" className="mt-3 text-xs text-rose-300">{formError.referrals}</p> : null}
+            </div>
+          )}
 
           {/* Move-in Pack — prices + launch toggle for the consumer /services bundle */}
           <div className="dz-card p-5">

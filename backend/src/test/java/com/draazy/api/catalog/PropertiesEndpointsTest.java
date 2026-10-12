@@ -429,6 +429,32 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void aListingsOwnFeaturedDaysOverrideTheStandardWindow() throws Exception {
+        Property p = save(owner("9810000028"), "Referred", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
+        jdbc.update("update properties set ownership_verified = true, ownership_verified_at = now() - interval '10 days' where id = ?", p.getId());
+        em.clear();
+        assertThat(properties.findById(p.getId()).orElseThrow().isFeatured()).isFalse();
+
+        jdbc.update("update properties set featured_days = 14 where id = ?", p.getId());
+        em.clear();
+        assertThat(properties.findById(p.getId()).orElseThrow().isFeatured()).isTrue();
+
+        jdbc.update("update properties set ownership_verified_at = now() - interval '15 days' where id = ?", p.getId());
+        em.clear();
+        assertThat(properties.findById(p.getId()).orElseThrow().isFeatured()).isFalse();
+    }
+
+    @Test
+    void theStandardFeaturedWindowIsTheFeaturedDaysSetting() throws Exception {
+        Property p = save(owner("9810000029"), "Standard", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
+        jdbc.update("update properties set ownership_verified = true, ownership_verified_at = now() - interval '10 days' where id = ?", p.getId());
+        jdbc.update("update settings set value = jsonb_set(value, '{featuredDays}', '12') where key = 'fees'");
+        em.clear();
+
+        assertThat(properties.findById(p.getId()).orElseThrow().isFeatured()).isTrue();
+    }
+
+    @Test
     void cardsAnswerOnlyPublicRowsAmongTheIds() throws Exception {
         User o = owner("9810000092");
         Property live = save(o, "Live", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);

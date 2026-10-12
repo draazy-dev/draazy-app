@@ -9,6 +9,7 @@ import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.moderation.verification.ApprovalGate;
 import com.draazy.api.moderation.verification.PropertyOverrideRequest;
@@ -42,11 +43,12 @@ public class PropertyModerationService {
     private final PropertyReviewRepository reviews;
     private final ListingSignalService signals;
     private final PropertyOverrideRequestRepository overrideRequests;
+    private final ReferralTriggers referralTriggers;
 
     public PropertyModerationService(PropertyRepository properties, AuditService audit,
             Notifier notifier, PropertyLifecycle lifecycle, VerificationCases cases,
             PropertyReviewRepository reviews, ListingSignalService signals,
-            PropertyOverrideRequestRepository overrideRequests) {
+            PropertyOverrideRequestRepository overrideRequests, ReferralTriggers referralTriggers) {
         this.properties = properties;
         this.audit = audit;
         this.notifier = notifier;
@@ -55,6 +57,7 @@ public class PropertyModerationService {
         this.reviews = reviews;
         this.signals = signals;
         this.overrideRequests = overrideRequests;
+        this.referralTriggers = referralTriggers;
     }
 
     @Transactional
@@ -108,6 +111,7 @@ public class PropertyModerationService {
             review.addMessage(actor.userId(), rejectionMessage(normalizedReason, reason));
             reviews.saveAndFlush(review);
             property.setStatus(status);
+            referralTriggers.listingTakenDown(property.getId());
         } else {
             if (property.isArchived() || PropertyStatus.SOLD.equals(property.getStatus())
                     || PropertyStatus.RENTED.equals(property.getStatus())) {
@@ -153,6 +157,7 @@ public class PropertyModerationService {
         String from = property.getStatus();
         property.setStatus(PropertyStatus.FLAGGED);
         property.setFlagReason(reason == null || reason.isBlank() ? "Flagged" : reason);
+        referralTriggers.listingTakenDown(property.getId());
         audit.record(actor, "property.flag", "property", id, "from", from, "reason", reason,
                 "owner", String.valueOf(property.getOwner().getId()));
         return property;

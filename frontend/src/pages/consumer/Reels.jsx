@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import '../../styles/routes/reels.css';
 import { fmtINR, rentLabel } from '../../lib/format.js';
+import { referralShareUrlNow } from '../../lib/referralShare.js';
+import { usePrefetchReferralCode } from '../../lib/usePrefetchReferralCode.js';
 import { propertyReels } from '../../services/propertyService.js';
 import { RESIDENTIAL_KEYS } from '../../data/propertyTypes.js';
 import { useSaved } from '../../context/SavedContext.jsx';
@@ -47,6 +49,7 @@ const compact = (n) => {
 const priceLabel = (r) => (r.deal === 'rent' ? rentLabel(r.price) : fmtINR(r.price));
 
 export default function Reels() {
+  usePrefetchReferralCode();
   const { t } = useTranslation();
   const { toast } = useToast();
   const [reduced, setReduced] = useState(prefersReducedMotion);
@@ -184,7 +187,7 @@ export default function Reels() {
   };
 
   const shareReel = async (r) => {
-    const url = window.location.origin + '/property/' + r.id;
+    const url = referralShareUrlNow(window.location.origin + '/property/' + r.id);
     const text = t('reels.shareText', { title: r.title, price: priceLabel(r) });
     if (navigator.share) {
       try { await navigator.share({ title: r.title, text, url }); return; } catch (err) { if (err?.name === 'AbortError') return; }

@@ -59,6 +59,7 @@ public class ReferralMapper {
                 r.getReward(),
                 r.getRewardAmount(),
                 r.getStatus(),
+                r.getTrack(),
                 r.getRisk(),
                 r.isIdentityVerified(),
                 r.isIdentityUnique(),
@@ -66,6 +67,8 @@ public class ReferralMapper {
                 r.isSameIp(),
                 r.isVelocityHigh(),
                 r.isActivated(),
+                r.getHoldUntil(),
+                r.getAutoReason(),
                 r.getAt())).toList();
     }
 

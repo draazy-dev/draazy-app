@@ -198,6 +198,45 @@ test('the settings API refuses an anonymous caller and a signed-in buyer', async
   expect(asBuyer.status).toBe(403);
 });
 
+test('a referral setting saves from its own card and reaches the public referral pricing', async ({ page, login }) => {
+  await login.asAdmin();
+  await page.goto('/admin/settings?tab=fees');
+
+  const days = page.getByRole('spinbutton', { name: 'Featured days for an invited owner' });
+  await expect(days).toBeVisible();
+  const before = Number(await days.inputValue());
+  const next = before === 21 ? 20 : 21;
+  await days.fill(String(next));
+
+  const saved = page.waitForResponse(
+    (res) => res.url().includes('/api/admin/settings') && res.request().method() === 'PUT',
+  );
+  await page.getByRole('button', { name: 'Save referrals' }).click();
+  expect((await saved).status()).toBe(200);
+  await expect(page.getByRole('alert')).toContainText('Referral settings saved');
+
+  expect(Number((await settingsDoc()).fees.referralOwnerFeaturedDays)).toBe(next);
+  // `pricing.referral` is what the refer page and the exhausted-contacts modal quote.
+  expect((await publicPricing()).referral.ownerFeaturedDays).toBe(next);
+});
+
+test('a referral value outside its range is refused with a message and nothing is written', async ({ page, login }) => {
+  await login.asAdmin();
+  await page.goto('/admin/settings?tab=fees');
+
+  const writes = [];
+  page.on('request', (req) => {
+    if (req.method() === 'PUT' && req.url().includes('/api/admin/settings')) writes.push(req.postDataJSON());
+  });
+
+  const hours = page.getByRole('spinbutton', { name: 'Redeem window (hours)' });
+  await expect(hours).toBeVisible();
+  await hours.fill('0');
+  await page.getByRole('button', { name: 'Save referrals' }).click();
+
+  await expect(page.getByRole('alert')).toContainText('A value is outside its allowed range.');
+  expect(writes).toEqual([]);
+});
 test('a blank fee is refused with a message and nothing is written', async ({ page, login }) => {
   await login.asAdmin();
   await page.goto('/admin/settings?tab=fees');

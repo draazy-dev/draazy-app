@@ -60,30 +60,36 @@ they lapse but never sold.
   Packs stack.
 - **Rent agreement**: Rs 499 + government charges (stamp duty, registration), first or renewal.
 - Free: 1 live listing, unlimited flatmate posts, 15 owner contacts in the first 30 days, referral
-  rewards, 7 days of Featured after ownership verification.
+  rewards, `featuredDays` (7) of Featured after ownership verification.
 
 ### Platform fees (`settings.fees`)
 - Keys: `listingPass`, `contactPack`, `rentAgreementPlatform`, `gstPercent` (0: prices include GST),
-  `freeContactLimit`, `referralContactBonus`, `referralQualifyPerMonth`. Published by `GET /pricing`;
+  `freeContactLimit`, `featuredDays`, and the referral numbers `referralContactBonus`,
+  `referralSeekerBonusContacts`, `referralOwnerFeaturedDays`, `referralOwnerRewardAgreements`,
+  `referralQualifyPerMonth`, `referralQualifyPerYear`, `referralHoldDays`, `referralClawbackDays`,
+  `referralVelocityPerDay`, `referralSignupWindowHours`, `referralSignalRetentionDays`,
+  `referralNewReferrerDays`. Admin PATCH validates each against fixed bounds. `GET /pricing`
+  publishes the prices and a `referral` block (not velocity, retention or new-referrer days);
   editable in Admin → Settings → Fees. The charged amount is always the plan row's `price`.
 
 ### Entitlements / gating
-- **Listing tier (soft gate).** 1 free live listing (live = approved or flagged), plus the referral
-  bonus, plus one per active pass. Posting and drafting are never refused. When moderation approves
+- **Listing tier (soft gate).** 1 free live listing (live = approved or flagged), plus one per
+  active pass. Posting and drafting are never refused. When moderation approves
   a listing that would exceed the tier it is stored **paused**; My Listings offers "Get a pass" →
   `/checkout?plan=listing-pass&property=<id>`, and a paid pass resumes it. An owner resume over the
   tier is a **422 `listing_quota_exhausted`**; pausing or archiving another listing frees the slot.
-  `GET /me/entitlements` → `listings {allowance, referralBonus, used, passes[{propertyId, expiresAt}]}`
+  `GET /me/entitlements` → `listings {allowance, used, passes[{propertyId, expiresAt}]}`
   (`used` = live listings no pass covers). Flatmate posts never count; the 3-active-post cap on
   non-owner hosts stays as an anti-broker guard.
 - **Owner-contact quota (derived, D31b + Q16b).** A "contact" is the right to open one
   `contact_requests` row. `ContactAllocator` replays the caller's contacts, oldest first, against
-  buckets: **free** (`settings.fees.freeContactLimit` = 15, usable until 30 days after the first
-  contact, once per account), each paid **pack** (15, valid 30 days from payment) and **referral**
+  buckets: **free** (`settings.fees.freeContactLimit` = 15 plus the friend bonus, usable until 30 days
+  after the first contact, once per account), each paid **pack** (15, valid 30 days from payment) and
+  **referral**
   contacts (never expire). Each contact spends the valid bucket that expires soonest; `remaining` is
   what is left in buckets valid now. Nothing is stored, so a repeat press on the same listing and a
   refused press cost nothing. A legacy unlimited plan stays unlimited until it lapses. Read from
-  `GET /me/entitlements` → `contacts {unlimited, used, allowance, remaining, referralBonus,
+  `GET /me/entitlements` → `contacts {unlimited, used, allowance, remaining, referralBonus, friendBonus,
   freeWindowEndsAt, packExpiresAt}`; the refusal is a **422 `contact_quota_exhausted`** from
   `POST /contacts/request`, and `ContactsExhaustedModal` offers the pack.
 
@@ -166,81 +172,60 @@ and reading that file; the constructor check is what states the rule.
 
 ### Referral program (`Refer.jsx` + `store/referrals.js`)
 
-> **Corrected 2026 (D233).** The two bullets below used to read, without qualification:
->
-> > **Code:** `referralCode()` = up-to-4 uppercase letters from the user's name (else `PUNE`) + last
-> > 4 digits of mobile (or a random 4-digit number), persisted at `dzReferralCode:<mobile>`.
-> >
-> > **Stats:** `dzReferralStats:<mobile> = { invited, joined, listed }`.
->
-> That described the whole product, and it was the bug. The server mints its own permanent code in
-> `referral_codes` (V23), format `PUNE-AB12`, and `POST /referrals/redeem` resolves only that one —
-> so every link the product produced pointed at a scheme that could not recognise it. `Refer.jsx`
-> now reads `code` and `invited` from `GET /me/referrals`.
+The server mints each user's permanent code in `referral_codes` (format `PUNE-AB12`);
+`POST /referrals/redeem` resolves only that. `Refer.jsx` reads everything from `GET /me/referrals`.
 
-- **Code:** `GET /me/referrals` → `{ code, invited, converted, contactsEarned,
-  contactsPending }`. The page renders nothing in the share card until it resolves, because a Copy
-  button that writes `""` and then reports "Copied" is the quiet kind of wrong.
+- **Summary:** `GET /me/referrals` → `{ code, invited, converted, held, earned: { owner: { referrals,
+  agreements }, seeker: { referrals, contacts } }, friendReward: { redeemed, status, track, contacts,
+  featuredDays } }`. Every reward number on the page comes from `GET /pricing` → `referral`
+  (admin settings under `fees`); nothing is hardcoded in the client.
 - **Link:** `referralLink(code)` = `<origin>/signup?ref=<code>` (drives `?ref` capture on signup).
-- **Redemption:** `Signup.jsx` calls `POST /referrals/redeem` when a `?ref=` is present, alongside
-  the local `setReferredBy`. Un-awaited and silent on failure — a 409 means the code was unknown,
-  self-referred or already used, none of which the new account holder chose or can fix.
-- **Stats:** the whole progress narrative is the server's since D234. `invited` is
-  `ReferralSummaryDto.invited` (people who have redeemed the code), `listed` is `converted` (those
-  that qualified or were approved). `dzReferralStats:<mobile> = { invited, joined, listed }` is
-  written by nothing. Its incrementers are gone:
-  `addReferralInvite` counted button presses under the name "You've invited N", and
-  `addReferralJoin` / `addReferralListing` were ungated ways to mint quota that nothing ever called.
-- **Invite counting is honest:** a share opens WhatsApp or the OS sheet and then simply re-reads
-  `GET /me/referrals`. Nothing this page does to itself moves the number — previously a completed
-  share bumped a local tally, which drifted further from the truth the more the page was used.
-  Copying the code or link has never counted, for the same reason.
-- **Reward rules (targets in code):**
-  - `referralListingsTarget = 3` — **owner track:** every 3 qualified referrals = 1 free rent
-    agreement, reported as `agreements.free` on `GET /me/entitlements` and derived per request like
-    every other bonus, so a clawback takes it back. The progress bar shows `converted % 3 / 3`.
-    Until D234 this was `floor(listed / 3)` over a localStorage counter — it survived clawbacks and
-    could be re-minted by clearing site data. **There is no `used` or `remaining`**, deliberately:
-    agreements are not sold through this codebase yet, so a consumption tally would be a number
-    nothing decrements. `REFERRALS_PER_FREE_AGREEMENT` is a separate constant from
-    `REFERRALS_PER_LISTING_SLOT` even though both are 3, because they are two offers sharing a
-    divisor rather than one offer read twice.
-  - `referralContactsPerReward = 15` - **seeker track:** each qualified referral = **+15 owner
-    contacts**, and since D31b that grant is the server's. `GET /me/entitlements` reports
-    `contacts.referralBonus`, derived as `count(referrals that are qualified or rewarded) ×
-    settings.fees.referralContactBonus` — recomputed on every read rather than added to a balance,
-    which is what makes a clawback whole: there is no grant to reverse. The listing-slot bonus is
-    `count / 3` from the same read.
-  - **Currency, settled (D31b).** The server used to pay ₹500 of platform credit, which nothing could
-    be spent on, while this page granted quota — "two different currencies, and no arithmetic turns
-    one into the other" (register item 31). It was closed by moving the server onto the browser's
-    unit rather than the reverse: `referrals.reward_amount` is now a **count of owner contacts** and
-    `reward` reads `"+15 owner contacts"`. `settings.fees.referralReward` is gone; `freeContactLimit`
-    and `referralContactBonus` replace it.
-- **Attribution honesty:** `setReferredBy(code)` records who referred a new signup
-  (`dzReferredBy:<mobile>`) and deliberately credits nobody. `POST /referrals/redeem` carries the
-  attribution, and `ReferralQualification` credits the referrer when the referee's first listing
-  passes ownership verification — "the only qualifying action a browser cannot fake". D234 removed
-  the browser-side credit ledger that used to sit alongside it (`creditReferrerForJoin` on signup,
-  `creditReferrerForListing` on a first post, drained by `claimReferralCredits()` in `AuthContext`):
-  it granted quota on the same machine that spent it, paid twice if the referee posted from a second
-  device, and went on paying forever after the fraud desk clawed the referral back.
+- **Redemption:** `POST /referrals/redeem` (with an optional `X-Device-Id` header, opaque, at most 64
+  characters, stored only as a salted hash). Allowed only within `referralSignupWindowHours` of
+  account creation, while the account has no listing and no contact request, while the
+  `referralRewards` flag is on, and not from the referrer's own device. Every refusal is the same
+  `409`, so the response never says which rule failed.
+- **Tracks** (the first qualifying event decides and is stored on the row):
+  - **Owner:** the friend's listing passes ownership verification. The referrer earns
+    `referralOwnerRewardAgreements` free rent agreement(s) (`agreements.free` on
+    `GET /me/entitlements`); the listing is Featured for `referralOwnerFeaturedDays`.
+  - **Seeker:** an owner accepts the friend's first contact request. The referrer earns
+    `referralContactBonus` owner contacts (`contacts.referralBonus`, never expiring); the friend's
+    one-time free bucket gains `referralSeekerBonusContacts` (`contacts.friendBonus`) from redemption,
+    for as long as the referral is not rejected or clawed back.
+  - There is no listing-slot reward.
+- **Automatic decision at qualification:** signals are same IP /64, same User-Agent, same device,
+  velocity (`referralVelocityPerDay`), a referrer account under `referralNewReferrerDays` old, and a
+  redeem with no usable `X-Device-Id`. Seeker acceptances count only on an approved live listing; a
+  referrer approving their own referee's contact is rejected `self_dealing`, and one owner qualifying a
+  second referee of the same referrer within 30 days is high.
+  Two or more signals (or velocity) = high, rejected with a notification to the referrer; one = medium,
+  `held` for `referralHoldDays` and re-checked by an hourly sweep; none = low, granted at once. Past
+  `referralQualifyPerMonth` (calendar month, IST) or `referralQualifyPerYear` = rejected
+  `cap_reached`. Each decision is audited as `referral.auto.*` with actor `system`.
+- **Automatic clawback** within `referralClawbackDays` of the grant when the referee is suspended or
+  the qualifying listing is taken down or its ownership verification revoked (for a seeker referral only
+  a moderation reject/flag of the contacted listing counts, not its archive or revoke); the referrer is
+  notified. A held referral meeting the same events is rejected instead. Staff overrides are never
+  undone by the hourly sweep.
+- **Kill switch:** the `referralRewards` flag off refuses redeem and stops new grants.
+- **Digests:** the referrer's IP/UA/device digests refresh on every `GET /me/referrals`; all digests
+  are cleared after `referralSignalRetentionDays`.
 
-### Referral fraud signals
-Each referral carries the fields an ops fraud queue scores on: `risk` (low/high), `channel`
-(owner/seeker), `reward`, `identityVerified`, `identityUnique`, `sameDevice`, `sameIp`, `velocityHigh`,
-`activated`, and `status` (`qualified` -> `rewarded`, or `pending`/`flagged`/`rejected`), plus
-`handledBy`/`handledAt`. These drive the admin/ops referrals-fraud review (self-clone, the same
-document behind two accounts, same-device/IP, high velocity = flagged/rejected). The identity check
-here is a **reward-payout uniqueness** guard (`identity_hash`), part of the opt-in reward flow (L2/L3)
-— **not** a browse/post/contact gate, which stay at L1 mobile (ADR-019).
+### Referral fraud signals and desk
+Each referral carries `risk` (low/medium/high), `channel`, `track`, `reward`, `rewardAmount`,
+`identityVerified`, `identityUnique`, `sameDevice`, `sameIp`, `velocityHigh`, `activated`, `holdUntil`,
+`autoReason` and `status` (`pending`, `qualified`, `held`, `rewarded`, `rejected`, `clawed-back`),
+plus `handledBy`/`handledAt` (`system` for automatic decisions). The desk at `GET /referrals` is a
+review and override surface, not a work queue: referrals are not in staff "My work". The identity
+check is a **reward-payout uniqueness** guard (`identity_hash`) — **not** a browse/post/contact gate,
+which stay at L1 mobile (ADR-019).
 
 ## 6. Maker-checker / approval
 - **Plans/checkout:** no maker-checker (self-serve purchase).
-- **Referral rewards:** effectively maker-checker at the ops layer - the consumer records the
-  invite/join/listing (maker), but qualifying and paying out a reward is gated by fraud review
-  (checker) before `status` moves to `qualified`/`rewarded`. See
-  [`../ops/referrals-fraud.md`](../ops/referrals-fraud.md) (planned) and
+- **Referral rewards:** decided automatically at qualification (risk band, hold, caps) and taken
+  back automatically on clawback events; staff approve/reject/clawback are overrides. See
+  [`../ops/referrals-fraud.md`](../ops/referrals-fraud.md) and
   [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.
 
 ## 7. State machine
@@ -248,8 +233,10 @@ here is a **reward-payout uniqueness** guard (`identity_hash`), part of the opt-
 Pass / pack:    pending (Cashfree order) --signed webhook--> active --term ends--> expired
                 listing pass also ends when its listing is rented, sold or archived
 Over-tier listing: pending --approve--> paused --pass paid / slot freed--> approved
-Referral:       (per RF row) pending -> qualified -> rewarded
-                            \-> flagged -> rejected   (fraud signals)
+Referral:       (per RF row) pending -> qualified (granting) -> rewarded
+                            pending -> held --hold elapses--> qualified | rejected
+                            pending -> rejected (high risk / cap_reached)
+                            qualified | rewarded -> clawed-back   (inside the clawback window)
 ```
 
 ## 8. Edge cases, validation & error states
@@ -258,7 +245,8 @@ Referral:       (per RF row) pending -> qualified -> rewarded
 - **Second pass for the same listing** -> 409; packs are deliberately re-purchasable and stack.
 - **Over the free tier** -> the listing is saved and approved into `paused`; resuming it without a
   pass or a free slot is `422 listing_quota_exhausted`.
-- **Featured** is never sold: 7 days from ownership verification, re-granted on re-verification.
+- **Featured** is never sold: `featuredDays` (7) from ownership verification, re-granted on
+  re-verification; the friend's qualifying listing gets `referralOwnerFeaturedDays` (14).
 - **Referral vanity guard:** nothing the page does moves the invite count — it is the server's count
   of redeemed codes, so neither a copy nor a completed share nor a cancelled OS share can inflate it.
 - **Cross-device attribution:** closed. Referrer counters and every earned balance are derived from
@@ -308,13 +296,11 @@ collapses to empty and lands on this same default, so a null limit grants the fr
 than lifting the ceiling — the safe direction, and the one V24 writes down.
 
 ### Referral bonuses
-`REFERRALS_PER_LISTING_SLOT = 3` matches the "refer three owners, list one free" offer. Integer
-division: the fourth referral earns nothing extra until the sixth — the offer is a whole slot or
-none.
-
-`REFERRALS_PER_FREE_AGREEMENT = 3` matches the "refer three, get an agreement free" track. It is
-a separate constant from the listing one even though the values are equal today: they are two
-offers, and pricing may move either without meaning to move the other.
+Each granting owner-track referral earns `referralOwnerRewardAgreements` free rent agreements;
+each granting seeker-track (or legacy untracked) referral earns `referralContactBonus` contacts.
+There is no listing-slot reward. The friend's side is `referralSeekerBonusContacts` extra free
+contacts while the redeemed code stands, and the qualifying listing's Featured window is
+`referralOwnerFeaturedDays` instead of `featuredDays`.
 
 `forUser` computes both halves together so the contact and listing sides come from one plan read
 and one referral count. Splitting into two endpoints would run the same two queries twice and
@@ -334,18 +320,18 @@ was the only thing releasing a reward. Now that `QUALIFIED` grants on its own, a
 friend has verified a listing would otherwise read "0 converted" beside fifteen contacts they can
 already spend. The two numbers on the Refer screen have to be able to explain each other.
 
-### Referral scheme: automatic qualification (Q17, D31b)
-The reward is owner contacts, not money (D31b). Redemption stamps a label and a magnitude onto
-the row and those two are what the fraud desk reads and the audit trail records; nothing here
-pays anything out. The referrer's actual entitlement is derived from these rows by
-`billing.entitlement`, by counting the ones `ReferralStatuses#isGranting` accepts.
+### Referral scheme: automatic decision
+The reward is owner contacts or free rent agreements, not money. The referrer's entitlement is
+derived from the referral rows by `billing.entitlement`, counting those `ReferralStatuses#isGranting`
+accepts, so a clawback needs no compensating write.
 
-Q17's automatic `QUALIFIED` transition — the referee's first listing passing ownership
-verification — used to be a hint for the checker and is now the grant point. `approve` still
-matters: a fraud desk uses it to bless a referral that did not qualify on its own, and `clawback`
-takes a grant back. What changed is that an honest referrer no longer waits in a queue for
-something the platform already verified for itself. The exposure is bounded by the D61 monthly
-cap and by what is being handed over: the right to ask fifteen owners a question.
+A referral qualifies on its first qualifying event: an owner's ownership verification (owner track)
+or a first contact request accepted by an owner (seeker track). `ReferralQualification` then decides
+without a desk queue, by risk band: high rejects, over the month or year cap rejects (`cap_reached`),
+medium holds for `referralHoldDays`, low grants. `ReferralHoldSweep` releases or rejects due holds
+hourly. `ReferralClawbacks` takes a reward back inside `referralClawbackDays` when the referee is
+suspended or the qualifying listing is taken down or loses its verification. Staff `approve`,
+`reject` and `clawback` remain overrides.
 
 ### Plan model
 `Plan` maps `plans` (V8), seeded as reference data. Read-only from the app's point of view:
@@ -378,9 +364,9 @@ unlimited; `contactLimit` is null for unlimited / not-applicable.
 `ReferralDto` is the admin/ops fraud-desk view (spec fixes S52, S53, S54). Both mobiles are
 masked because it is a paginated privileged list, following the same rule as `UserAdminService`
 — unmasked reads are a separate, audited, single-record operation the contract does not declare
-for referrals. `rewardAmount` is a count of owner contacts, not money (was rupees pre-D31b — see
-`Referral` rationale for the two-era column). `channel` is which side the referred party joined
+for referrals. `rewardAmount` is the count the track grants (owner contacts or free agreements), 0
+until the referral qualifies; `track` (`owner`/`seeker`), `holdUntil` and `autoReason` show the
+system's decision. `channel` is which side the referred party joined
 on (not `shareChannel`, which is how the link travelled — D60). `sameDevice` / `sameIp` false
 means "no evidence", never "proved different" — a code minted before V64 or a request without a
-User-Agent produces no digest. `qualifiedAt` (Q17) is null until the referee's first listing
-passes ownership verification.
+User-Agent produces no digest. `qualifiedAt` is null until the first qualifying event.

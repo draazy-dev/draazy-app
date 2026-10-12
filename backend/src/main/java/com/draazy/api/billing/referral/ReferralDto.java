@@ -2,7 +2,7 @@ package com.draazy.api.billing.referral;
 
 import java.time.Instant;
 
-/** Contract {@code Referral} — the admin/ops fraud-desk view. Rationale: docs/flows/ops/referrals-fraud.md. */
+/** Contract {@code Referral}: the fraud desk's audit row. Rationale: docs/flows/ops/referrals-fraud.md. */
 public record ReferralDto(
         String id,
         String referrer,
@@ -13,6 +13,7 @@ public record ReferralDto(
         String reward,
         long rewardAmount,
         String status,
+        String track,
         String risk,
         boolean identityVerified,
         boolean identityUnique,
@@ -20,5 +21,7 @@ public record ReferralDto(
         boolean sameIp,
         boolean velocityHigh,
         boolean activated,
+        Instant holdUntil,
+        String autoReason,
         Instant at) {
 }

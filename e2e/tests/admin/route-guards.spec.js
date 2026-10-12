@@ -1,6 +1,5 @@
-/* Every back-office route is mounted under one RoleRoute (`/admin/*`, with `/ops/*` redirecting into it),
- * so the router's two refusals are asserted once per route here instead of once per desk. The API-side
- * refusals each desk also owns stay in that desk's own spec. */
+/* Every back-office route sits under one RoleRoute (`/admin/*`, `/ops/*` redirects into it), so the router's two
+ * refusals are asserted once per route here; each desk's API-side refusals stay in its own spec. */
 import { test, expect } from '../../fixtures/live.js';
 
 const ROUTES = [
@@ -12,7 +11,7 @@ const ROUTES = [
   { path: '/admin/properties', heading: null },
   { path: '/ops', heading: { name: 'My Dashboard' } },
   { path: '/ops/rent-agreement', heading: { name: 'Rent Agreement' } },
-  { path: '/ops/referrals', heading: { name: 'Referral Verification' } },
+  { path: '/ops/referrals', heading: { name: 'Referral audit' } },
   { path: '/ops/support', heading: { name: 'Support queue' } },
   { path: '/ops/drafting-desk', heading: { name: 'Property Valuation' } },
 ];

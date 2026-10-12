@@ -11,6 +11,7 @@ import { applyAppPrefs } from './lib/localPrefs.js';
 import { DESK_BY_VALUE, portalBase, portalPath } from './lib/adminModules.js';
 import { recordPageView, startPageViewBeacon } from './lib/telemetry/pageViewBeacon.js';
 import usePageHead from './lib/usePageHead.js';
+import { captureReferral } from './lib/referralAttribution.js';
 import { ROUTE_HEADS } from './data/routeHeads.js';
 
 import Home from './pages/consumer/Home.jsx';
@@ -146,6 +147,12 @@ function ScrollToTop() {
   return null;
 }
 
+function ReferralCapture() {
+  const { search } = useLocation();
+  useEffect(() => { captureReferral(search); }, [search]);
+  return null;
+}
+
 /* Separate from `ScrollToTop` because it is permanent and sends to our own API. The beacon reduces
    the pathname to a pattern and never emits back-office routes. */
 function PageViewTelemetry() {
@@ -257,6 +264,7 @@ export default function App() {
       <PreviewBanner />
       <ScrollToTop />
       <PageViewTelemetry />
+      <ReferralCapture />
       <StaticRouteHead />
       <Suspense fallback={<LoadingFallback />}>
       <Routes>

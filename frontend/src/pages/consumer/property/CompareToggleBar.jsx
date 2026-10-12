@@ -7,10 +7,12 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { shareOrCopy } from '../../../lib/share.js';
+import { usePrefetchReferralCode } from '../../../lib/usePrefetchReferralCode.js';
 
 // The shortlist is one shared set, so threading `saved`/`setSaved` in from the property page would
 // be a second source of the same truth, free to disagree with the heart on the card behind it.
 export function CompareToggleBar({ p }) {
+  usePrefetchReferralCode();
   const { t } = useTranslation();
   const { has, toggle, count } = useCompare();
   const savedList = useSaved();

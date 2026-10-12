@@ -35,7 +35,7 @@ Tenants abandon a platform after two or three wasted calls on properties that ar
 
 On the default **Relevance** sort, listings are scored. In descending order of weight:
 
-1. **Featured placement** — given for 7 days after your listing's ownership is verified, then it ends; it outranks everything below it
+1. **Featured placement** — given for a limited time (shown on the [Plans page](/plans)) after your listing's ownership is verified, then it ends; it outranks everything below it
 2. **ID verified owner** — ID and selfie reviewed by our trust team
 3. **Verified property** — ownership documents seen, and still current
 4. **Freshness** — Active, then Ageing, then Stale. Dormant scores zero.

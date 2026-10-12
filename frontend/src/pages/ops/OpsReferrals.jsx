@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, Download, Lock, RefreshCw, ShieldAlert, Undo2, X } from 'lucide-react';
+import { Check, Download, RefreshCw, ShieldAlert, Undo2, X } from 'lucide-react';
 import { approveReferral, clawbackReferral, listReferralQueue, rejectReferral } from '../../services/referralService.js';
 import { classNames } from '../../lib/format.js';
 import { exportCsv } from '../../lib/csv.js';
@@ -21,30 +21,40 @@ const SEARCH_DEBOUNCE_MS = 250;
 
 /* Background-check signals. goodWhenTrue=true → green when present; false → red when present. */
 const SIGNALS = [
-  ['identityVerified', 'Identity verified', true],
-  ['identityUnique', 'Identity unique', true],
   ['activated', 'Activated', true],
   ['sameDevice', 'Same device', false],
   ['sameIp', 'Same IP', false],
   ['velocityHigh', 'High velocity', false],
 ];
 
-/* A mirror of `ReferralService.approve`, never the rule itself: the server refuses with a sentence
-   and this only spares the desk a pointless round trip. */
-const canQualify = (r) => !!(r.identityVerified && r.identityUnique);
-const isOpen = (r) => r.status === 'pending' || r.status === 'qualified';
+const isOpen = (r) => r.status === 'pending' || r.status === 'held' || r.status === 'qualified';
+const canClawback = (r) => r.status === 'rewarded' || r.status === 'qualified';
+
+const AUTO_REASONS = {
+  high_risk: 'High risk',
+  medium_risk: 'Needs review',
+  cap_reached: 'Cap reached',
+  referee_suspended: 'Referee suspended',
+  listing_taken_down: 'Listing taken down',
+  verification_revoked: 'Verification revoked',
+  listing_not_live: 'Listing not live',
+  self_dealing: 'Self-dealing',
+};
+const autoReasonLabel = (code) => AUTO_REASONS[code] || code.replace(/_/g, ' ');
+const TRACK_LABELS = { owner: 'Owner referral', seeker: 'Seeker referral' };
 
 /* Risk is a separate field, so **High risk** is a risk filter rather than a status one;
    a status tab for it would stay permanently empty. */
 const TABS = [
-  { key: 'pending', label: 'Pending', count: 'pending', filter: { status: 'pending,qualified' }, match: isOpen },
+  { key: 'held', label: 'Held', count: 'held', filter: { status: 'held' }, match: (r) => r.status === 'held' },
+  { key: 'pending', label: 'Pending', count: 'pending', filter: { status: 'pending' }, match: (r) => r.status === 'pending' },
   { key: 'high-risk', label: 'High risk', count: 'highRisk', filter: { risk: 'high' }, match: (r) => r.risk === 'high' },
-  { key: 'rewarded', label: 'Rewarded', count: 'rewarded', filter: { status: 'rewarded' }, match: (r) => r.status === 'rewarded' },
+  { key: 'rewarded', label: 'Rewarded', count: 'rewarded', filter: { status: 'qualified,rewarded' }, match: (r) => r.status === 'qualified' || r.status === 'rewarded' },
   { key: 'refused', label: 'Refused', count: 'refused', filter: { status: 'rejected,clawed-back' }, match: (r) => r.status === 'rejected' || r.status === 'clawed-back' },
   { key: 'all', label: 'All', count: 'all', filter: {}, match: () => true },
 ];
 const TAB_KEYS = TABS.map((t) => t.key);
-const NOTE = 'A reward is released only once the referred person holds the Verified badge. Same device, same IP and high velocity score as high risk.';
+const NOTE = 'Rewards are decided automatically. Held rows release or reject on their own once the hold ends; use this desk to audit, override or claw back.';
 
 /* Tab totals after one row changed from `before` to `after`. */
 const shiftCounts = (counts, before, after) => {
@@ -60,13 +70,15 @@ export default function OpsReferrals() {
   const { toast } = useToast();
   const [state, setState] = useState({ status: 'loading', items: [], total: 0, error: '' });
   const [counts, setCounts] = useState({});
-  const [tab, setTab] = useTabParam(TAB_KEYS, 'pending');
+  const [tab, setTab] = useTabParam(TAB_KEYS, 'held');
   const [page, setPage] = useState(0);
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
   const [reloading, setReloading] = useState(false);
   const [nonce, setNonce] = useState(0);
   const wantCounts = useRef(true);
+  const busy = useRef(false);
+  const [busyId, setBusyId] = useState(null);
 
   useEffect(() => {
     const t = setTimeout(() => { setQuery(q.trim()); setPage(0); }, SEARCH_DEBOUNCE_MS);
@@ -106,10 +118,18 @@ export default function OpsReferrals() {
   const switchTab = (key) => { setTab(key); setPage(0); };
 
   const doAction = async (r, act) => {
+    if (busy.current) return;
+    busy.current = true;
+    setBusyId(r.id);
     try {
       let decided;
       if (act === 'approve') {
-        decided = await approveReferral(r.id);
+        let reason;
+        if (r.status === 'rejected') {
+          reason = (window.prompt('Reason for reversing this rejection (required):') || '').trim();
+          if (!reason) return;
+        }
+        decided = await approveReferral(r.id, reason);
         toast('Approved — reward released');
       } else if (act === 'reject') {
         decided = await rejectReferral(r.id);
@@ -128,9 +148,11 @@ export default function OpsReferrals() {
       }));
       setCounts((c) => shiftCounts(c, r, decided));
     } catch (e) {
-      // The server's own sentence. Its refusals name the reason - an unverified referee, or a
-      // state this decision cannot be made from - and paraphrasing them here would lose that.
+      // The server's own sentence names the refusal; paraphrasing it here would lose that.
       toast(e.message || 'That decision was refused.', 'error');
+    } finally {
+      busy.current = false;
+      setBusyId(null);
     }
   };
 
@@ -149,7 +171,7 @@ export default function OpsReferrals() {
   if (state.status === 'error') {
     return (
       <div>
-        <PageHeader title="Referral Verification" subtitle="Keep referrals genuine — verify before reward." />
+        <PageHeader title="Referral audit" subtitle="Rewards are automatic; override or claw back here." />
         <div className="dz-card flex items-start gap-3 p-6 text-sm text-gray-300">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
           <div>
@@ -167,29 +189,28 @@ export default function OpsReferrals() {
   if (state.status === 'loading') return <Loading />;
 
   const doExport = () => exportCsv('draazy-referrals.csv',
-    ['ID', 'Referrer', 'Referred', 'Channel', 'Reward', 'Amount', 'Risk', 'Status', 'Identity verified', 'Identity unique', 'Same device', 'Same IP', 'High velocity', 'Redeemed'],
-    rows.map((r) => [r.id, r.referrer, r.referred, r.channel, r.reward, r.rewardAmount, r.risk, r.status, r.identityVerified ? 'Yes' : 'No', r.identityUnique ? 'Yes' : 'No', r.sameDevice ? 'Yes' : 'No', r.sameIp ? 'Yes' : 'No', r.velocityHigh ? 'Yes' : 'No', fmtDate(r.at)]));
+    ['ID', 'Referrer', 'Referred', 'Track', 'Reward', 'Amount', 'Risk', 'Status', 'Auto reason', 'Hold until', 'Same device', 'Same IP', 'High velocity', 'Redeemed'],
+    rows.map((r) => [r.id, r.referrer, r.referred, r.track || 'contacts only', r.reward, r.rewardAmount, r.risk, r.status, r.autoReason ? autoReasonLabel(r.autoReason) : '', r.holdUntil ? fmtDate(r.holdUntil) : '', r.sameDevice ? 'Yes' : 'No', r.sameIp ? 'Yes' : 'No', r.velocityHigh ? 'Yes' : 'No', fmtDate(r.at)]));
 
   const decisions = (r) => {
-    if (isOpen(r)) {
-      return (
-        <>
-          {canQualify(r)
-            ? <button type="button" onClick={() => doAction(r, 'approve')} className={BTN.primary}><Check className="h-3.5 w-3.5" />Approve</button>
-            : <button type="button" disabled title="The server refuses to release a reward until the referred party holds the Verified badge" className={classNames(BTN.ghost, 'cursor-not-allowed opacity-50')}><Lock className="h-3.5 w-3.5" />Blocked</button>}
-          <button type="button" onClick={() => doAction(r, 'reject')} className={BTN.ghost}><X className="h-3.5 w-3.5" />Reject</button>
-        </>
-      );
-    }
-    if (r.status === 'rewarded') {
-      return <button type="button" onClick={() => doAction(r, 'clawback')} className={BTN.danger}><Undo2 className="h-3.5 w-3.5" />Clawback</button>;
-    }
-    return null;
+    const off = busyId === r.id;
+    const rejected = r.status === 'rejected';
+    return (
+      <>
+        {(isOpen(r) || rejected) && (
+          <button type="button" disabled={off} onClick={() => doAction(r, 'approve')} className={classNames(BTN.primary, off && 'opacity-50')}>
+            <Check className="h-3.5 w-3.5" />{rejected ? 'Appeal: approve' : 'Approve'}
+          </button>
+        )}
+        {isOpen(r) && <button type="button" disabled={off} onClick={() => doAction(r, 'reject')} className={classNames(BTN.ghost, off && 'opacity-50')}><X className="h-3.5 w-3.5" />Reject</button>}
+        {canClawback(r) && <button type="button" disabled={off} onClick={() => doAction(r, 'clawback')} className={classNames(BTN.danger, off && 'opacity-50')}><Undo2 className="h-3.5 w-3.5" />Clawback</button>}
+      </>
+    );
   };
 
   return (
     <div>
-      <PageHeader title="Referral Verification" subtitle="Keep referrals genuine — verify before reward." />
+      <PageHeader title="Referral audit" subtitle="Rewards are automatic; override or claw back here." />
 
       <QueueTabs
         label="Referral queues"
@@ -220,11 +241,13 @@ export default function OpsReferrals() {
               id={r.id}
               title={<>{r.referrer} <span className="font-normal text-gray-500">→</span> {r.referred}</>}
               badges={<><Badge status={r.status} /><span className={classNames(CHIP, 'capitalize', RISK_TONE[r.risk] || CHIP_TONE.neutral)}>{r.risk} risk</span></>}
-              meta={<><span className="font-mono">{r.id}</span><Dot /><span>{r.channel === 'owner' ? 'Owner referral' : 'Seeker referral'}</span><Dot /><span>Redeemed {fmtDate(r.at)}</span></>}
+              meta={<><span className="font-mono">{r.id}</span><Dot /><span>{TRACK_LABELS[r.track] || 'Contacts-only referral'}</span><Dot /><span>Redeemed {fmtDate(r.at)}</span></>}
               facts={(
                 <>
                   <FactRow label="Mobiles"><span className="col-span-full tabular-nums">{r.referrerMobile || '—'} → {r.referredMobile || '—'}</span></FactRow>
                   <FactRow label="Reward"><span className="col-span-full">{r.reward || '—'}</span></FactRow>
+                  {r.holdUntil ? <FactRow label="Held until"><span className="col-span-full">{fmtDate(r.holdUntil)}</span></FactRow> : null}
+                  {r.autoReason ? <FactRow label="Auto reason"><span className="col-span-full">{autoReasonLabel(r.autoReason)}</span></FactRow> : null}
                 </>
               )}
               chips={SIGNALS.map(([key, label, goodWhenTrue]) => {

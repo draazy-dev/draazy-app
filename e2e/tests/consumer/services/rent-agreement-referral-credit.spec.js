@@ -22,8 +22,8 @@ test('a free rent agreement from referrals strikes the Draazy fee but keeps gove
   await page.route('**/api/me/entitlements', (route) => route.fulfill({
     status: 200, contentType: 'application/json',
     body: JSON.stringify({
-      contacts: { limit: 5, used: 0, bonus: 0, plan: 'free' },
-      listings: { limit: 1, bonus: 0, held: 0 },
+      contacts: { unlimited: false, used: 0, allowance: 15, remaining: 15, referralBonus: 0, friendBonus: 0, freeWindowEndsAt: null, packExpiresAt: null },
+      listings: { allowance: 1, used: 0, passes: [] },
       agreements: { free: 1, used: 1 - remaining, remaining },
     }),
   }));

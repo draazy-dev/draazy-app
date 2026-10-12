@@ -5,6 +5,8 @@ import { useScrollReveal } from '../../../lib/useScrollReveal.js';
 import { recordSignal } from '../../../services/demandService.js';
 import { getProperty } from '../../../services/propertyService.js';
 import { track } from '../../../lib/pmf.js';
+import { referralShareUrlNow } from '../../../lib/referralShare.js';
+import { usePrefetchReferralCode } from '../../../lib/usePrefetchReferralCode.js';
 import { fmtArea, fmtINR, fmtNum, isSqftUnit } from '../../../lib/format.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
@@ -22,6 +24,7 @@ import { propertyKey } from '../../../lib/listingSeo.js';
 const PROP_TAB_IDS = ['overview', 'amenities', 'location', 'pricing', 'trust'];
 
 export default function useProperty() {
+  usePrefetchReferralCode();
   const { t: tr } = useTranslation();
   const id = propertyKey(useParams().id);
   const [p, setP] = useState(undefined);
@@ -274,7 +277,7 @@ export default function useProperty() {
         });
 
   const waShare = () => {
-    const msg = `${title} ${priceStr} on Draazy (₹0 brokerage): ${window.location.href}`;
+    const msg = `${title} ${priceStr} on Draazy (₹0 brokerage): ${referralShareUrlNow(window.location.href)}`;
     window.open('https://wa.me/?text=' + encodeURIComponent(msg), '_blank', 'noopener');
   };
 

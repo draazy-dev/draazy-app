@@ -3,6 +3,7 @@ package com.draazy.api.common.settings;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,17 +31,28 @@ public class PlatformSettings {
     /** Owner contacts a caller with no subscription may open, before any referral bonus. */
     private static final long DEFAULT_FREE_CONTACT_LIMIT = 15L;
 
-    private static final long DEFAULT_REFERRAL_CONTACT_BONUS = 15L;
-
-    // Ceiling on both contact numbers above.
+    // Ceiling on the contact numbers.
     // Past a thousand means "no limit"; that belongs in `plans.unlimited_contacts`.
     private static final long MAX_CONTACT_GRANT = 1_000L;
 
-    // Referrals one referrer may have auto-qualify in a rolling month before the rest go to a human.
-    // Deliberately generous; setting it low costs review time, not honest referrers their reward.
-    private static final long DEFAULT_REFERRAL_QUALIFY_PER_MONTH = 10L;
+    public record Bound(long fallback, long min, long max) {
+    }
 
-    private static final long MAX_REFERRAL_QUALIFY_PER_MONTH = 1_000L;
+    // Every referral and Featured number an admin may set; an out-of-range stored value reads as the fallback.
+    public static final Map<String, Bound> FEE_BOUNDS = Map.ofEntries(
+            Map.entry("featuredDays", new Bound(7, 1, 90)),
+            Map.entry("referralContactBonus", new Bound(15, 0, MAX_CONTACT_GRANT)),
+            Map.entry("referralSeekerBonusContacts", new Bound(5, 0, MAX_CONTACT_GRANT)),
+            Map.entry("referralOwnerFeaturedDays", new Bound(14, 1, 90)),
+            Map.entry("referralOwnerRewardAgreements", new Bound(1, 0, 10)),
+            Map.entry("referralQualifyPerMonth", new Bound(10, 1, 1_000)),
+            Map.entry("referralQualifyPerYear", new Bound(50, 1, 10_000)),
+            Map.entry("referralHoldDays", new Bound(7, 1, 60)),
+            Map.entry("referralClawbackDays", new Bound(30, 1, 365)),
+            Map.entry("referralVelocityPerDay", new Bound(5, 1, 1_000)),
+            Map.entry("referralSignupWindowHours", new Bound(24, 1, 720)),
+            Map.entry("referralSignalRetentionDays", new Bound(180, 30, 180)),
+            Map.entry("referralNewReferrerDays", new Bound(7, 0, 90)));
 
     // The product prices, in whole rupees.
     // Defaults match a healthy install so broken rows fail instead of changing prices.
@@ -111,14 +123,65 @@ public class PlatformSettings {
                 MAX_CONTACT_GRANT);
     }
 
+    public long featuredDays() {
+        return fee("featuredDays");
+    }
+
     public long referralContactBonus() {
-        return wholeNumber(FEES_KEY, "referralContactBonus", DEFAULT_REFERRAL_CONTACT_BONUS,
-                MAX_CONTACT_GRANT);
+        return fee("referralContactBonus");
+    }
+
+    public long referralSeekerBonusContacts() {
+        return fee("referralSeekerBonusContacts");
+    }
+
+    public long referralOwnerFeaturedDays() {
+        return fee("referralOwnerFeaturedDays");
+    }
+
+    public long referralOwnerRewardAgreements() {
+        return fee("referralOwnerRewardAgreements");
     }
 
     public long referralQualifyPerMonth() {
-        return wholeNumber(FEES_KEY, "referralQualifyPerMonth", DEFAULT_REFERRAL_QUALIFY_PER_MONTH,
-                MAX_REFERRAL_QUALIFY_PER_MONTH);
+        return fee("referralQualifyPerMonth");
+    }
+
+    public long referralQualifyPerYear() {
+        return fee("referralQualifyPerYear");
+    }
+
+    public long referralHoldDays() {
+        return fee("referralHoldDays");
+    }
+
+    public long referralClawbackDays() {
+        return fee("referralClawbackDays");
+    }
+
+    public long referralVelocityPerDay() {
+        return fee("referralVelocityPerDay");
+    }
+
+    public long referralSignupWindowHours() {
+        return fee("referralSignupWindowHours");
+    }
+
+    public long referralSignalRetentionDays() {
+        return fee("referralSignalRetentionDays");
+    }
+
+    public long referralNewReferrerDays() {
+        return fee("referralNewReferrerDays");
+    }
+
+    public boolean referralRewardsEnabled() {
+        return flag(FLAGS_KEY, "referralRewards", true);
+    }
+
+    private long fee(String field) {
+        Bound bound = FEE_BOUNDS.get(field);
+        return wholeNumber(FEES_KEY, field, bound.fallback(), bound.min(), bound.max());
     }
 
     public int maxListingPhotos() {

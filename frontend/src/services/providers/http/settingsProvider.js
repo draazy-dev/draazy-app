@@ -69,6 +69,10 @@ export async function getPricing() {
   for (const key of Object.keys(PRICING_DEFAULTS)) {
     if (Number.isFinite(raw[key])) out[key] = raw[key];
   }
+  out.referral = { ...PRICING_DEFAULTS.referral };
+  for (const key of Object.keys(PRICING_DEFAULTS.referral)) {
+    if (Number.isFinite(raw.referral?.[key])) out.referral[key] = raw.referral[key];
+  }
   return out;
 }
 

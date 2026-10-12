@@ -7,6 +7,7 @@ public record ContactEntitlementDto(
         Integer allowance,
         Integer remaining,
         int referralBonus,
+        int friendBonus,
         String freeWindowEndsAt,
         String packExpiresAt) {
 }

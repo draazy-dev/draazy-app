@@ -392,21 +392,26 @@ class ErasureCoverageTest extends AbstractApiTest {
                         + "compute the same_ip fraud signal. Not swept on request: the row is "
                         + "reached by mobile rather than by user id, the same reason its two "
                         + "mobiles are gaps. It expires anyway — ReferralSignalRetentionSweep "
-                        + "blanks it ninety days after the referral, so the exposure is bounded "
+                        + "blanks it after referralSignalRetentionDays (180 by default), so the "
+                        + "exposure is bounded "
                         + "without an erasure request. Closing it properly means giving the sweep a "
-                        + "way to reach this table at all, which is one change for all four of "
-                        + "these columns and both mobiles above.");
+                        + "way to reach this table at all, which is one change for all the digest "
+                        + "columns and both mobiles above.");
         map.put("referrals.referred_device_hash", "As referrals.referred_ip_hash, for the "
                 + "User-Agent behind same_device.");
+        map.put("referrals.referred_device_id_hash", "As referrals.referred_ip_hash, for the "
+                + "first-party X-Device-Id the referee redeemed from.");
         map.put("referral_codes.referrer_ip_hash",
-                "The referrer's half of the same comparison, stamped when their code was minted "
-                        + "(V64). Reachable by user id, unlike the referrals rows — listed as a gap "
-                        + "rather than swept because a sweep that names a column wrongly fails "
-                        + "halfway through the one operation that must not, and this table has "
-                        + "never been in the sweep's UPDATE. Expires ninety days after capture "
-                        + "regardless.");
+                "The referrer's half of the same comparison, refreshed on every read of their "
+                        + "referral page. Reachable by user id, unlike the referrals rows — listed "
+                        + "as a gap rather than swept because a sweep that names a column wrongly "
+                        + "fails halfway through the one operation that must not, and this table "
+                        + "has never been in the sweep's UPDATE. Expires after "
+                        + "referralSignalRetentionDays regardless.");
         map.put("referral_codes.referrer_device_hash",
                 "As referral_codes.referrer_ip_hash, for the User-Agent.");
+        map.put("referral_codes.referrer_device_id_hash",
+                "As referral_codes.referrer_ip_hash, for the X-Device-Id.");
 
         map.put("flatmate_group_members.name",
                 "A NOT NULL denormalised copy of users.name, written at join time.");

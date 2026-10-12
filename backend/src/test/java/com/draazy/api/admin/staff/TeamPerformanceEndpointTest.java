@@ -153,23 +153,18 @@ class TeamPerformanceEndpointTest extends AbstractApiTest {
                 BackOfficeFunctions.FLATMATES);
         jdbc.update("INSERT INTO reviews (target_type, target_id, rating, status) VALUES ('property', 'p-1', 4, 'pending')");
         jdbc.update("INSERT INTO societies (slug, name, source) VALUES ('team-perf-society', 'Team Perf Society', 'community')");
-        jdbc.update("INSERT INTO referrals (referred, status) VALUES ('Referee', 'pending')");
 
         mvc.perform(get(Routes.Admin.MY_WORK)
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.queues[*].function", Matchers.containsInAnyOrder(
                         BackOfficeFunctions.REVIEWS, BackOfficeFunctions.ENQUIRIES,
-                        BackOfficeFunctions.SOCIETIES, BackOfficeFunctions.REFERRALS,
-                        BackOfficeFunctions.FLATMATES)))
+                        BackOfficeFunctions.SOCIETIES, BackOfficeFunctions.FLATMATES)))
                 .andExpect(jsonPath("$.queues[?(@.function == 'reviews')].open",
                         hasItem(Matchers.greaterThanOrEqualTo(1))))
                 .andExpect(jsonPath("$.queues[?(@.function == 'societies')].open",
                         hasItem(Matchers.greaterThanOrEqualTo(1))))
-                .andExpect(jsonPath("$.queues[?(@.function == 'referrals')].open",
-                        hasItem(Matchers.greaterThanOrEqualTo(1))))
-                .andExpect(jsonPath("$.queues[?(@.function == 'referrals')].oldestWaitingSince")
-                        .isNotEmpty());
+                .andExpect(jsonPath("$.queues[?(@.function == 'referrals')]").isEmpty());
     }
 
     @Test

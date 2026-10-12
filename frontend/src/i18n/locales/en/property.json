@@ -29,7 +29,7 @@
     "contactsLeft_other": "{{count}} owner contacts left",
     "contactsLeftTill_one": "{{count}} owner contact left · free ones valid till {{date}}",
     "contactsLeftTill_other": "{{count}} owner contacts left · free ones valid till {{date}}",
-    "contactsLeftNoneReferHint": "No contacts left — refer a friend for 15 more or buy a pack",
+    "contactsLeftNoneReferHint": "No contacts left — refer a friend for {{count}} more or buy a pack",
     "contactsLeftNone": "No contacts left — buy a Contact Pack to keep going",
     "contactsExhausted": {
       "title": "You're out of owner contacts",

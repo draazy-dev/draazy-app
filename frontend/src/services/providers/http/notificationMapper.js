@@ -37,11 +37,12 @@ const TYPE_PREFIXES = [
    * waiting on their decision, and the request cannot progress until they act on it. */
   ['service', 'service'],
   ['tenancy', 'service'],
+  ['referral', 'referral'],
 ];
 
 /** UI types that already mean what they say — passed through untouched. */
 const PASSTHROUGH = new Set([
-  'match', 'enquiry', 'price', 'visit', 'share', 'document', 'service', 'system',
+  'match', 'enquiry', 'price', 'visit', 'share', 'document', 'service', 'referral', 'system',
 ]);
 
 const warned = new Set();

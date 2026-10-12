@@ -17,7 +17,7 @@ tags: [plans, pricing, owner, contacts, referral]
 - One live listing at a time
 - Verification, and the badges it earns
 - Receiving and replying to enquiries — owners are never charged to answer
-- Featured placement for 7 days after your listing's ownership is verified
+- Featured placement for a limited time after your listing's ownership is verified (the [Plans page](/plans) shows how long)
 - Free flatmate posts
 - Site-visit scheduling and tenant profiles attached to every enquiry
 - 15 owner contacts, if you are the one searching — use them within 30 days of the first
@@ -42,7 +42,7 @@ The free account includes 15 owner contacts, usable within 30 days of your first
 
 ## Earning allowance instead of buying it
 
-Every qualified referral adds **+15 owner contacts** for free, and every three qualified referrals add one extra free listing slot and one free rent agreement (it waives Draazy's service fee at checkout; government charges still apply). Your code is on the [Plans page](/plans). Referrals are reviewed for fraud, so a reward appears once the referral qualifies, not the moment someone signs up.
+Referring a friend who is looking for a home adds owner contacts for free, and referring an owner earns a free rent agreement (it waives Draazy's service fee at checkout; government charges still apply). Your code is on the [Refer a friend](/refer) page. Referrals are checked for fraud, so a reward appears once the referral qualifies, not the moment someone signs up. See [Referrals and rewards](/help/a/referrals-and-rewards).
 
 ## Billing
 

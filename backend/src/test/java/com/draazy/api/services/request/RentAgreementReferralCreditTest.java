@@ -40,8 +40,8 @@ class RentAgreementReferralCreditTest extends AbstractApiTest {
         User saved = users.saveAndFlush(u);
         for (int i = 0; i < qualifiedReferrals; i++) {
             jdbc.update("""
-                    insert into referrals (referrer_id, referrer_mobile, referred_mobile, channel, status)
-                    values (?, ?, ?, 'owner', 'qualified')
+                    insert into referrals (referrer_id, referrer_mobile, referred_mobile, channel, status, track)
+                    values (?, ?, ?, 'owner', 'qualified', 'owner')
                     """, saved.getId(), mobile, "97" + mobile.substring(4) + "0" + i);
         }
         return saved;
@@ -96,7 +96,7 @@ class RentAgreementReferralCreditTest extends AbstractApiTest {
     @Test
     @DisplayName("takes only Draazy's fee and its GST off, bills the government charges, and spends the credit once")
     void spendsOneCreditAndKeepsGovernmentCharges() throws Exception {
-        User caller = owner("9820100001", 3);
+        User caller = owner("9820100001", 1);
         agreements(caller)
                 .andExpect(jsonPath("$.agreements.free").value(1))
                 .andExpect(jsonPath("$.agreements.used").value(0))
@@ -124,7 +124,7 @@ class RentAgreementReferralCreditTest extends AbstractApiTest {
     @Test
     @DisplayName("reopening an open checkout does not take a second credit")
     void resumingDoesNotSpendAgain() throws Exception {
-        User caller = owner("9820100002", 6);
+        User caller = owner("9820100002", 2);
         String id = file(caller, details());
         checkout(caller, id);
         long charged = amount(id);
@@ -138,7 +138,7 @@ class RentAgreementReferralCreditTest extends AbstractApiTest {
     @Test
     @DisplayName("a caller with no earned credit pays the full price")
     void noCreditNoWaiver() throws Exception {
-        User caller = owner("9820100003", 2);
+        User caller = owner("9820100003", 0);
         String id = file(caller, details());
         long full = amount(id);
 
@@ -152,7 +152,7 @@ class RentAgreementReferralCreditTest extends AbstractApiTest {
     @DisplayName("a request whose whole price was Draazy's fee skips the gateway and is filed as paid")
     void zeroTotalSkipsTheGateway() throws Exception {
         jdbc.update("update platform_fees set stamp_duty = 0, registration = 0 where deal = 'rent'");
-        User caller = owner("9820100004", 3);
+        User caller = owner("9820100004", 1);
         String id = file(caller, null);
 
         checkout(caller, id)
@@ -172,7 +172,7 @@ class RentAgreementReferralCreditTest extends AbstractApiTest {
     @Test
     @DisplayName("a cancelled request gives its credit back")
     void cancellingReleasesTheCredit() throws Exception {
-        User caller = owner("9820100005", 3);
+        User caller = owner("9820100005", 1);
         String id = file(caller, details());
         checkout(caller, id);
 
@@ -185,7 +185,7 @@ class RentAgreementReferralCreditTest extends AbstractApiTest {
     @Test
     @DisplayName("a clawed-back referral leaves remaining at zero, never negative, and the issued agreement stays")
     void clawbackNeverGoesNegative() throws Exception {
-        User caller = owner("9820100006", 3);
+        User caller = owner("9820100006", 1);
         String id = file(caller, details());
         checkout(caller, id);
         long charged = amount(id);
@@ -203,7 +203,7 @@ class RentAgreementReferralCreditTest extends AbstractApiTest {
     @Test
     @DisplayName("only rent agreements can hold a credit")
     void otherServicesAreUntouched() {
-        User caller = owner("9820100007", 3);
+        User caller = owner("9820100007", 1);
         ServiceRequest other = new ServiceRequest(caller.getId(), ServiceRequestTypes.PACKERS, null, null, null);
         other.awaitPayment(1000L);
 

@@ -26,10 +26,10 @@ export default function Privacy() {
         <li>Device type, operating system, browser, IP address, and approximate geolocation.</li>
         <li>Pages visited, search queries, time spent, and interaction events (clicks, scrolls).</li>
         <li>
-          <strong>Referral fraud signals</strong> — when you create a referral code or sign up using someone else's, we
-          record a salted one-way hash of your IP address and browser User-Agent. We never store the raw values, and the
+          <strong>Referral fraud signals</strong> — when you open your referral code or sign up using someone else's, we
+          record a salted one-way hash of your IP address and browser User-Agent, plus a random device identifier kept on your device. We never store the raw IP or User-Agent, and the
           hashes are used for one purpose only: to tell whether a referral and its reward came from the same person or
-          device. They are erased 90 days after they are recorded.
+          device. They are erased within 180 days of being recorded.
         </li>
         <li>Cookies and similar tracking technologies (see Section 6).</li>
       </ul>

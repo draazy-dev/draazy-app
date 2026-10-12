@@ -146,6 +146,8 @@ public class AdminSettingsService {
         for (String price : PlatformSettings.PRICE_FIELDS) {
             rejectOutOfRange(patch, PlatformSettings.FEES_KEY, price, 1, PlatformSettings.MAX_PRICE);
         }
+        PlatformSettings.FEE_BOUNDS.forEach((field, bound) -> rejectOutOfRange(
+                patch, PlatformSettings.FEES_KEY, field, (int) bound.min(), (int) bound.max()));
     }
 
     private static void rejectOutOfRange(Map<String, Object> patch, String key, String field,

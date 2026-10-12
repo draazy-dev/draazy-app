@@ -6,6 +6,7 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.trust.OwnerBadgeSink;
+import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.identity.auth.RefreshTokenService;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserStatuses;
@@ -33,11 +34,13 @@ public class UserModerationService {
     private final OwnerBadgeSink ownerBadges;
     private final IdentityVerificationService identity;
     private final AdminActionNotifier adminNotifications;
+    private final ReferralTriggers referralTriggers;
 
     public UserModerationService(BackOfficeUserView view, AuditService audit,
             AdministratorGuard administrators, RefreshTokenService sessions,
             UserTimelineRepository timelines, OwnerBadgeSink ownerBadges,
-            IdentityVerificationService identity, AdminActionNotifier adminNotifications) {
+            IdentityVerificationService identity, AdminActionNotifier adminNotifications,
+            ReferralTriggers referralTriggers) {
         this.view = view;
         this.audit = audit;
         this.administrators = administrators;
@@ -46,6 +49,7 @@ public class UserModerationService {
         this.ownerBadges = ownerBadges;
         this.identity = identity;
         this.adminNotifications = adminNotifications;
+        this.referralTriggers = referralTriggers;
     }
 
     // Ends sign-in; Property#isOwnerSuspended hides an owner's listings until reactivation.
@@ -62,6 +66,7 @@ public class UserModerationService {
         }
         sessions.revokeAllForUser(user.getId());
         user.setStatus(UserStatuses.SUSPENDED);
+        referralTriggers.refereeSuspended(user.getId());
         audit.record(actor, "user.suspend", "user", id, "reason", reason, "role", user.getRole());
         adminNotifications.managerAction(actor, "Suspended staff account", user);
     }

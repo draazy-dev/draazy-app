@@ -111,7 +111,7 @@ test('Ctrl+K opens the palette, page results navigate, Escape clears the term, a
     await palette(page).getByRole('button', { name: /^Referrals\s*\/admin\/referrals/ }).click();
 
     await page.waitForURL('**/admin/referrals');
-    await expect(page.getByRole('heading', { name: 'Referral Verification' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Referral audit' })).toBeVisible();
     expect(consoleErrors).toHaveLength(0);
   });
   await test.step('Escape closes the palette and clears the term', async () => {

@@ -166,12 +166,6 @@ class TeamPerformanceRepository {
                     select 'societies', count(*), min(created_at)
                     from societies
                     where source = 'community' and merged_into is null and archived_at is null
-                    """),
-            Map.entry("referrals", """
-                    select 'referrals',
-                           count(*) filter (where status in ('pending', 'qualified')),
-                           min("at") filter (where status in ('pending', 'qualified'))
-                    from referrals
                     """));
 
     private static final List<String> DESK_TEAMS =

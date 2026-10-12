@@ -11,6 +11,7 @@ import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.common.trust.VerificationAnnouncer;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.documents.vault.Document;
@@ -49,11 +50,12 @@ public class OwnershipVerificationService {
     private final AccountPermissions permissions;
     private final OwnershipDocumentAccess documentAccess;
     private final Notifier notifier;
+    private final ReferralTriggers referralTriggers;
 
     public OwnershipVerificationService(OwnershipEvidenceRepository evidence,
             PropertyRepository properties, DocumentRepository documents, DocumentMapper documentMapper,
             AuditService audit, VerificationAnnouncer announcer, AccountPermissions permissions,
-            OwnershipDocumentAccess documentAccess, Notifier notifier) {
+            OwnershipDocumentAccess documentAccess, Notifier notifier, ReferralTriggers referralTriggers) {
         this.evidence = evidence;
         this.properties = properties;
         this.documents = documents;
@@ -63,6 +65,7 @@ public class OwnershipVerificationService {
         this.permissions = permissions;
         this.documentAccess = documentAccess;
         this.notifier = notifier;
+        this.referralTriggers = referralTriggers;
     }
 
     // Participant-or-staff so owners can see which fact is still missing.
@@ -195,6 +198,7 @@ public class OwnershipVerificationService {
             property.revokeOwnershipVerification();
             audit.record(actor, "property.ownership.revoked", "property", propertyId,
                     "reason", reason, "owner", String.valueOf(property.getOwner().getId()));
+            referralTriggers.ownershipRevoked(property.getId());
         }
         return OwnershipGate.toResponse(property,
                 evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, true);

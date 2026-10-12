@@ -8,9 +8,9 @@ export async function listReferralQueue(params) {
   return (await provider()).listReferralQueue(params);
 }
 
-/** Approve — releases the reward. 409s when the referred party is not Aadhaar-verified. */
-export async function approveReferral(id) {
-  return (await provider()).approveReferral(id);
+/** Approve: staff override; a reason is required on a `rejected` row (an appeal). */
+export async function approveReferral(id, reason) {
+  return (await provider()).approveReferral(id, reason);
 }
 
 /** Reject — refuses the reward. The reason is best-effort audit context, not a gate. */

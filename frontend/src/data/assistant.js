@@ -217,7 +217,7 @@ export const KB = [
     id: 'refer',
     keywords: ['refer', 'referral', 'invite', 'friend', 'reward', 'earn', 'bonus'],
     q: 'Is there a referral programme?',
-    a: "Yes — share your link from the Refer page. A referral counts once your friend qualifies — for an owner, when their first listing is verified. Each qualified friend earns you 15 extra owner contacts, and every 3 also earn a free rent agreement (we waive our fee at checkout; government charges still apply) and an extra listing slot. Up to 10 referrals can qualify in 30 days. Rewards are non-cash.",
+    a: "Yes — share your link from the Refer page. A referral counts once your friend qualifies — for an owner, when their first listing is verified. Refer an owner and you both get a reward when their first listing is verified: they get longer Featured placement, you get a free rent agreement. Refer a friend looking for a home and they get extra free contacts, you get owner contacts. The Refer page shows the current numbers; some referrals are checked briefly before the reward lands. Rewards are non-cash.",
     actions: [{ label: 'Refer & earn', to: '/refer', icon: 'gift' }],
   },
   {

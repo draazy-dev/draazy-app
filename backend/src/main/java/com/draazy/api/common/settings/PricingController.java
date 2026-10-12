@@ -2,8 +2,7 @@ package com.draazy.api.common.settings;
 
 import org.springframework.stereotype.Component;
 
-/** Four named fields rather than the {@code fees} block, so a key ops adds there
- * (e.g. {@code referralQualifyPerMonth}) is never published. */
+/** Builds the public {@link PricingResponse}; never the raw {@code fees} block. */
 @Component
 public class PricingController {
 
@@ -19,6 +18,17 @@ public class PricingController {
                 settings.listingPass(),
                 settings.contactPack(),
                 settings.rentAgreementPlatform(),
-                settings.gstPercent());
+                settings.gstPercent(),
+                new PricingResponse.Referral(
+                        settings.referralContactBonus(),
+                        settings.referralSeekerBonusContacts(),
+                        settings.referralOwnerFeaturedDays(),
+                        settings.referralOwnerRewardAgreements(),
+                        settings.featuredDays(),
+                        settings.referralQualifyPerMonth(),
+                        settings.referralQualifyPerYear(),
+                        settings.referralHoldDays(),
+                        settings.referralClawbackDays(),
+                        settings.referralSignupWindowHours()));
     }
 }
