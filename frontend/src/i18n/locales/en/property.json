@@ -150,6 +150,8 @@
     "amenitiesHeading": "Amenities",
     "locationHeading": "Location",
     "directions": "Get directions",
+    "streetView": "Street view",
+    "streetViewOpen": "Open in Google Maps",
     "chat": "Chat",
     "whatsapp": "WhatsApp",
     "visit": "Visit",

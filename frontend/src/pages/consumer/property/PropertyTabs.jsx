@@ -7,6 +7,7 @@ import { FloorPlan } from './FloorPlan.jsx';
 import { SocietySection } from './SocietySection.jsx';
 import { ReviewsSection } from './ReviewsSection.jsx';
 import LocationInsights from './LocationInsights.jsx';
+import StreetView from './StreetView.jsx';
 import { RentDetails } from './RentDetails.jsx';
 import { PriceInsights } from './PriceInsights.jsx';
 import { VerificationSection } from './VerificationSection.jsx';
@@ -134,6 +135,7 @@ export default function PropertyTabs({ ctx }) {
                 </Suspense>
               </div>
               <p className="text-xs text-slate-400 mt-2.5 flex items-center gap-1.5"><Icon name="map-pin" className="w-3.5 h-3.5 text-brand-teal-3 flex-shrink-0" /> {p.locality}, {cityLabelFor(p)}</p>
+              <StreetView lat={p.lat} lng={p.lng} tr={tr} />
               <LocationInsights p={p} lat={p.lat || 18.5590} lng={p.lng || 73.7868} />
             </section>
           ) : null}
