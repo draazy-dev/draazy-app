@@ -9,7 +9,7 @@ summary: Request a callback from the relocation desk, compare mover quotes, and 
 tags: [packers, movers, shifting, quote]
 ---
 
-[Packers & movers](/services/packers-movers) takes your service type, from and to locations, home size and preferred move date, then the relocation desk calls you back within 24 hours with a quote from a moving partner. Getting a quote is free and Draazy charges no platform fee — you pay the mover for the service you confirm.
+[Packers & movers](/services/packers-movers) takes your service type, from and to locations, home size and preferred move date, then the relocation desk calls you back within 24 hours with a quote from a moving partner. Getting a quote is free — you pay the mover for the service you confirm.
 
 ## Getting a quote
 

@@ -37,6 +37,8 @@ public class PaymentWebhookController {
 
     private static final String REFUND_EVENT = "REFUND_STATUS_WEBHOOK";
 
+    private static final String PASS_REFUND_PREFIX = "lp_";
+
     private final BillingPayments billingPayments;
     private final ServiceRequestService serviceRequests;
     private final ServiceRequestAmendments amendments;
@@ -88,14 +90,17 @@ public class PaymentWebhookController {
 
             String paymentTime = payment.path("payment_time").asString(null);
             Instant settledAt = settlementInstant(paymentTime);
-            long amount = toWholeRupees(payment.path("payment_amount").asString(null));
+            BigDecimal exactAmount = exactAmount(payment.path("payment_amount").asString(null));
+            String currency = payment.path("payment_currency").asString(null);
 
             // Three families settle here; each ignores an order id it does not own. Each gets its
             // own try/catch so a failure in one cannot rob the others of the event.
             List<Settlement> outcomes = List.of(
-                    settle("subscription", () -> billingPayments.settleSubscription(orderId, paid, settledAt)),
-                    settle("service-request", () -> serviceRequests.applyWebhookOutcome(orderId, paid, amount)),
-                    settle("amendment", () -> amendments.applyWebhookOutcome(orderId, paid, amount)));
+                    settle("subscription",
+                            () -> billingPayments.settleSubscription(orderId, paid, settledAt, exactAmount, currency)),
+                    settle("service-request",
+                            () -> serviceRequests.applyWebhookOutcome(orderId, paid, exactAmount, currency)),
+                    settle("amendment", () -> amendments.applyWebhookOutcome(orderId, paid, exactAmount, currency)));
 
             boolean unreconciled = paid && !outcomes.contains(Settlement.CLAIMED);
             if (unreconciled) {
@@ -126,7 +131,10 @@ public class PaymentWebhookController {
     private void settleRefund(JsonNode refund) {
         String refundId = refund.path("refund_id").asString(null);
         String status = refund.path("refund_status").asString(null);
-        Settlement outcome = settle("refund", () -> refunds.applyWebhookOutcome(refundId, status));
+        String gatewayRef = refund.path("cf_refund_id").asString(null);
+        Settlement outcome = settle("refund", () -> refundId != null && refundId.startsWith(PASS_REFUND_PREFIX)
+                ? billingPayments.settleRefund(refundId, status, gatewayRef)
+                : refunds.applyWebhookOutcome(refundId, status));
         boolean ok = outcome == Settlement.CLAIMED;
         if (outcome == Settlement.NOT_MINE) {
             log.warn("Refund webhook {} matched no refund of ours", refundId);
@@ -183,20 +191,15 @@ public class PaymentWebhookController {
         }
     }
 
-    // Decimal-rupee string → whole rupees; checks the provider, never overwrites the ledger.
-    // Rationale: docs/flows/admin/finance.md#payment-webhook-signature-raw-body-idempotent-always-200
-    static long toWholeRupees(String decimalAmount) {
+    // Null when absent or unreadable, so a payload that omits the sum is not mistaken for an underpayment.
+    private static BigDecimal exactAmount(String decimalAmount) {
         if (decimalAmount == null || decimalAmount.isBlank()) {
-            return 0L;
+            return null;
         }
         try {
-            return new BigDecimal(decimalAmount.trim())
-                    .setScale(0, java.math.RoundingMode.HALF_UP)
-                    .longValueExact();
-        } catch (ArithmeticException | NumberFormatException notANumber) {
-            log.warn("Unparseable provider amount '{}'; skipping the reconciliation check",
-                    decimalAmount);
-            return 0L;
+            return new BigDecimal(decimalAmount.trim());
+        } catch (NumberFormatException notANumber) {
+            return null;
         }
     }
 }

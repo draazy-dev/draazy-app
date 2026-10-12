@@ -4,49 +4,33 @@ import Icon from '../../components/Icon.jsx';
 import { Link } from 'react-router';
 import { usePricing } from '../../context/PricingContext.jsx';
 import { listPlans } from '../../services/planService.js';
-import { usePlan } from '../../context/PlanContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 
 /** Prices come from the `GET /bootstrap` `plans` catalogue, which is what `POST /me/subscription` bills;
  * `fee()` is only the fallback, because a stale price still converts and a blank one does not. */
 const rupees = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 
-const FREE_IDS = ['free', 'seeker-free', 'owner-free'];
-
-const seekerPlans = (t, fee) => [
-  { id: 'seeker-free', name: t('misc1.plansSeekerFreeName'), price: '₹0', sub: t('misc1.plansSeekerFreeSub'), tag: t('misc1.plansSeekerFreeTag'), feats: [t('misc1.plansSeekerFreeFeat1'), t('misc1.plansSeekerFreeFeat2'), t('misc1.plansSeekerFreeFeat3'), t('misc1.plansSeekerFreeFeat4')], cta: t('misc1.plansSeekerFreeCta'), href: '/listings', pop: false },
-  { id: 'seeker-plus', name: t('misc1.plansSeekerPlusName'), price: fee('seekerPlusTopup'), sub: t('misc1.plansSeekerPlusSub'), tag: t('misc1.plansSeekerPlusTag'), feats: [t('misc1.plansSeekerPlusFeat1'), t('misc1.plansSeekerPlusFeat2'), t('misc1.plansSeekerPlusFeat3'), t('misc1.plansSeekerPlusFeat4')], cta: t('misc1.plansSeekerPlusCta'), href: '/checkout?plan=seeker-plus', pop: true, badge: t('misc1.plansSeekerPlusBadge') },
+const seekerPlans = (t, fee, n) => [
+  { id: 'seeker-free', free: true, name: t('misc1.plansSeekerFreeName'), price: '₹0', sub: t('misc1.plansSeekerFreeSub'), tag: t('misc1.plansSeekerFreeTag'), feats: [t('misc1.plansSeekerFreeFeat1'), t('misc1.plansSeekerFreeFeat2'), t('misc1.plansSeekerFreeFeat3'), t('misc1.plansSeekerFreeFeat4')], cta: t('misc1.plansSeekerFreeCta'), href: '/listings' },
+  { id: 'contact-pack', name: t('misc1.plansContactPackName'), price: fee('contactPack'), sub: t('misc1.plansContactPackSub', { count: n.contacts, days: n.packDays }), tag: t('misc1.plansContactPackTag'), feats: [t('misc1.plansContactPackFeat1', { count: n.contacts }), t('misc1.plansContactPackFeat2', { days: n.packDays }), t('misc1.plansContactPackFeat3'), t('misc1.plansContactPackFeat4')], cta: t('misc1.plansContactPackCta'), href: '/checkout?plan=contact-pack', pop: true, badge: t('misc1.plansContactPackBadge') },
 ];
-/** `listings(slug)` is the plan's live-listing ceiling: the catalogue's number, else the seeded one. */
-const ownerPlans = (t, fee, listings) => [
-  { id: 'owner-free', name: t('misc1.plansOwnerFreeName'), price: '₹0', sub: t('misc1.plansOwnerFreeSub'), tag: t('misc1.plansOwnerFreeTag'), feats: [t('misc1.plansOwnerFreeFeat1', { count: listings('owner-free') }), t('misc1.plansOwnerFreeFeat2'), t('misc1.plansOwnerFreeFeat3'), t('misc1.plansOwnerFreeFeat4')], cta: t('misc1.plansOwnerFreeCta'), href: '/list-property', pop: false },
-  { id: 'owner2', name: t('misc1.plansOwnerName'), price: fee('ownerPlanYearly'), sub: t('misc1.plansOwnerSub'), tag: t('misc1.plansOwnerTag'), feats: [t('misc1.plansOwnerFeat1', { count: listings('owner2') }), t('misc1.plansOwnerFeat2'), t('misc1.plansOwnerFeat3')], cta: t('misc1.plansOwnerCta'), href: '/checkout?plan=owner2', pop: true, badge: t('misc1.plansOwnerBadge') },
-  { id: 'owner5', name: t('misc1.plansOwnerProName'), price: fee('ownerProYearly'), sub: t('misc1.plansOwnerProSub'), tag: t('misc1.plansOwnerProTag'), feats: [t('misc1.plansOwnerProFeat1', { count: listings('owner5') }), t('misc1.plansOwnerProFeat2'), t('misc1.plansOwnerProFeat3'), t('misc1.plansOwnerProFeat4')], cta: t('misc1.plansOwnerProCta'), href: '/checkout?plan=owner5', pop: false, badge: t('misc1.plansOwnerProBadge') },
+const ownerPlans = (t, fee, n) => [
+  { id: 'owner-free', free: true, name: t('misc1.plansOwnerFreeName'), price: '₹0', sub: t('misc1.plansOwnerFreeSub'), tag: t('misc1.plansOwnerFreeTag'), feats: [t('misc1.plansOwnerFreeFeat1'), t('misc1.plansOwnerFreeFeat2'), t('misc1.plansOwnerFreeFeat3'), t('misc1.plansOwnerFreeFeat4'), t('misc1.plansOwnerFreeFeat5')], cta: t('misc1.plansOwnerFreeCta'), href: '/list-property' },
+  { id: 'listing-pass', name: t('misc1.plansListingPassName'), price: fee('listingPass'), sub: t('misc1.plansListingPassSub', { days: n.passDays }), tag: t('misc1.plansListingPassTag'), feats: [t('misc1.plansListingPassFeat1', { days: n.passDays }), t('misc1.plansListingPassFeat2'), t('misc1.plansListingPassFeat3'), t('misc1.plansListingPassFeat4')], cta: t('misc1.plansListingPassCta'), href: '/dashboard#properties', pop: true },
 ];
-const SEEDED_LISTING_LIMITS = { 'owner-free': 1, owner2: 2, owner5: 5 };
 /** `price` resolves a plan slug to the card's price so FAQ prose can't quote a different number. */
-const plansFaqs = (t, rentFee, price) => [
-  [t('misc1.plansFaq1Q'), t('misc1.plansFaq1A')],
+const plansFaqs = (t, rentFee, price, n) => [
+  [t('misc1.plansFaq1Q'), t('misc1.plansFaq1A', { fee: price('contactPack'), count: n.contacts, days: n.packDays })],
   [t('misc1.plansFaq2Q'), t('misc1.plansFaq2A')],
   [t('misc1.plansFaq3Q'), t('misc1.plansFaq3A')],
   [t('misc1.plansFaq4Q'), t('misc1.plansFaq4A', { fee: rentFee })],
-  [t('misc1.plansFaq5Q'), t('misc1.plansFaq5A', { fee1: price('owner2'), fee2: price('owner5') })],
+  [t('misc1.plansFaq5Q'), t('misc1.plansFaq5A', { fee: price('listingPass'), days: n.passDays })],
 ];
 
-function PlanCard({ p, current }) {
-  const { t } = useTranslation();
-  const { isIn, hasEverListed } = useAuth();
-  const isFree = FREE_IDS.includes(p.id);
-  const isCur = p.id === current || (isFree && FREE_IDS.includes(current));
-  const paidCurrent = isCur && !isFree; // a paid plan the user is on → lock the CTA against re-purchase
-  // A signed-in user's free tier gets a subtle marker (matched to their persona) while
-  // keeping the CTA actionable, since the default plan id is 'free' for everyone.
-  const roleMatches = p.id === 'owner-free' ? hasEverListed : p.id === 'seeker-free' ? !hasEverListed : true;
-  const freeCurrent = isCur && isFree && isIn && roleMatches;
+function PlanCard({ p }) {
   return (
     <div className={'glass rounded-2xl p-6 flex flex-col h-full ' + (p.pop ? 'plan-pop relative' : '')}>
       {p.badge && <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-teal-300 mb-2 px-2 py-0.5 rounded-full bg-teal-500/15 self-start">{p.badge}</span>}
-      {freeCurrent && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300 mb-2 px-2 py-0.5 rounded-full bg-emerald-500/15 self-start"><Icon name="check-circle" className="w-3 h-3" /> {t('misc1.plansCurrentPlan')}</span>}
       <h3 className="text-xl font-extrabold">{p.name}</h3>
       <p className="mt-1"><span className="text-3xl font-extrabold">{p.price}</span> <span className="text-gray-500 text-sm">{p.sub}</span></p>
       <p className="text-teal-300 text-sm font-medium mt-1 mb-4">{p.tag}</p>
@@ -54,18 +38,14 @@ function PlanCard({ p, current }) {
         {p.feats.map((f) => <li key={f} className="flex gap-2 text-sm text-gray-300"><Icon name="check" className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" /> {f}</li>)}
       </ul>
       <div className="mt-auto pt-1">
-        {paidCurrent ? (
-          <button disabled className="w-full py-2.5 rounded-xl font-semibold text-sm border border-white/10 text-gray-400 cursor-default flex items-center justify-center gap-1.5"><Icon name="check-circle" className="w-4 h-4 text-emerald-400" /> {t('misc1.plansCurrentPlan')}</button>
-        ) : (
-          <Link to={p.href} className={'block text-center w-full py-2.5 rounded-xl font-semibold text-sm ' + (isFree ? 'btn-outline' : 'btn-teal')}>{p.cta}</Link>
-        )}
+        <Link to={p.href} className={'block text-center w-full py-2.5 rounded-xl font-semibold text-sm ' + (p.free ? 'btn-outline' : 'btn-teal')}>{p.cta}</Link>
       </div>
     </div>
   );
 }
 
 // Cards are 82% wide so the next plan peeks as a swipe affordance; desktop keeps the plain grid below.
-function PlanCarousel({ plans, current }) {
+function PlanCarousel({ plans }) {
   const scrollRef = useRef(null);
   const [active, setActive] = useState(0);
 
@@ -83,11 +63,12 @@ function PlanCarousel({ plans, current }) {
   };
 
   // Reset to the first card whenever the persona (plan set) changes.
+  const plansKey = plans.map((p) => p.id).join('|');
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ left: 0 });
     setActive(0);
-  }, [plans]);
+  }, [plansKey]);
 
   const goTo = (i) => {
     const child = scrollRef.current?.children[i];
@@ -104,7 +85,7 @@ function PlanCarousel({ plans, current }) {
       >
         {plans.map((p) => (
           <div key={p.id} className="flex-shrink-0 w-[82%]" style={{ scrollSnapAlign: 'start' }}>
-            <PlanCard p={p} current={current} />
+            <PlanCard p={p} />
           </div>
         ))}
       </div>
@@ -139,9 +120,6 @@ export default function Plans() {
   const { hasEverListed } = useAuth();
   // Fallback price list from `GET /bootstrap`; a compiled-in constant would quote a price nobody could change.
   const { fee } = usePricing();
-  // The plan the caller holds, from the same context the paywall and the Feature action read, so
-  // the "Current plan" lock on a card cannot disagree with the entitlement it implies.
-  const { planId: current } = usePlan();
   // The live catalogue, keyed by slug. Empty until it resolves and after a failure; both cases
   // fall through to `fee()` below.
   const [catalogue, setCatalogue] = useState({});
@@ -162,15 +140,20 @@ export default function Plans() {
   const RENT_FEE = fee('rentAgreementPlatform');
   /** Server price when the catalogue has this plan, otherwise the card's configured fallback. */
   const priced = (p) => (catalogue[p.id] ? { ...p, price: rupees(catalogue[p.id].price) } : p);
-  const SEEKER = seekerPlans(t, fee).map(priced);
-  const listings = (slug) => catalogue[slug]?.listingLimit ?? SEEDED_LISTING_LIMITS[slug];
-  const OWNER = ownerPlans(t, fee, listings).map(priced);
+  const n = {
+    contacts: catalogue['contact-pack']?.contactLimit ?? 15,
+    packDays: catalogue['contact-pack']?.termDays ?? 30,
+    passDays: catalogue['listing-pass']?.termDays ?? 60,
+  };
+  const SEEKER = seekerPlans(t, fee, n).map(priced);
+  const OWNER = ownerPlans(t, fee, n).map(priced);
   /** Falls back to the configured fee only while the catalogue is
    * unreachable, so prose can't quote a different number than the card. */
-  const priceOf = (slug) => (catalogue[slug]
-    ? rupees(catalogue[slug].price)
-    : fee(slug === 'owner5' ? 'ownerProYearly' : 'ownerPlanYearly'));
-  const FAQS = plansFaqs(t, RENT_FEE, priceOf);
+  const priceOf = (key) => {
+    const slug = key === 'listingPass' ? 'listing-pass' : 'contact-pack';
+    return catalogue[slug] ? rupees(catalogue[slug].price) : fee(key);
+  };
+  const FAQS = plansFaqs(t, RENT_FEE, priceOf, n);
   /* `null` means 'not chosen', not 'seeker': seeding from `hasEverListed` would latch a first-render false while
      auth still loads. Deriving follows auth until the user touches the toggle. */
   const [persona, setPersona] = useState(null);
@@ -207,19 +190,19 @@ export default function Plans() {
             );
           })}
         </div>
-        <PlanCarousel plans={activePlans} current={current} />
+        <PlanCarousel plans={activePlans} />
       </div>
 
       {/* Desktop: both persona sections as grids */}
       <div className="hidden md:block">
         <section className="mb-12">
           <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-4 flex items-center gap-2"><Icon name="search" className="w-4 h-4 text-teal-400" /> {t('misc1.plansForSeekers')}</h2>
-          <div className="grid md:grid-cols-2 gap-5">{SEEKER.map((p) => <PlanCard key={p.id} p={p} current={current} />)}</div>
+          <div className="grid md:grid-cols-2 gap-5">{SEEKER.map((p) => <PlanCard key={p.id} p={p} />)}</div>
         </section>
 
         <section className="mb-12">
           <h2 className="text-sm font-bold uppercase tracking-wider text-gray-500 mb-4 flex items-center gap-2"><Icon name="building-2" className="w-4 h-4 text-teal-400" /> {t('misc1.plansForOwners')}</h2>
-          <div className="grid md:grid-cols-3 gap-5">{OWNER.map((p) => <PlanCard key={p.id} p={p} current={current} />)}</div>
+          <div className="grid md:grid-cols-2 gap-5">{OWNER.map((p) => <PlanCard key={p.id} p={p} />)}</div>
         </section>
       </div>
 
@@ -246,6 +229,7 @@ export default function Plans() {
         </div>
       </section>
 
+      <p className="text-center text-gray-500 text-sm mb-2">{t('misc1.plansPricesIncludeGst')}</p>
       <p className="text-center text-gray-500 text-sm">{t('misc1.plansFooter1')}<span className="text-gray-300 font-medium">{t('misc1.plansFooterBold')}</span></p>
     </div>
   );

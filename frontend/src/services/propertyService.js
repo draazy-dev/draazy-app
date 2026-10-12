@@ -67,7 +67,7 @@ export const myListingCard = async (id) => (await provider()).myListingCard(id);
 /** Owner: create a listing. It enters the catalogue as `pending`. */
 export const addListing = async (listing) => (await provider()).addListing(listing);
 
-/** `{ allowance, used }` — the wizard paywall's two numbers; same values as `/me/entitlements`' `listings`. */
+/** `{ allowance, used }`: the free live slots and the live listings no pass covers. */
 export const listingSlots = async () => (await provider()).listingSlots();
 
 // Scoped to the caller's own listings. The address must be composed exactly as `toListingCreate`

@@ -50,13 +50,14 @@ public class ServiceRequestAmendments {
     private final UserRepository users;
     private final AuditService audit;
     private final Notifier notifier;
+    private final ServiceRequestAmountGuard amountGuard;
     private final TransactionTemplate transactions;
 
     public ServiceRequestAmendments(ServiceRequestService requests, ServiceRequestRepository requestRows,
             ServiceRequestAmendmentRepository amendments, ServiceRequestRefundRepository refunds,
             ServiceRequestPartyRepository parties, ServiceRequestPricing pricing,
             ServiceRequestMapper mapper, PaymentGateway gateway, UserRepository users, AuditService audit,
-            Notifier notifier, PlatformTransactionManager transactionManager) {
+            Notifier notifier, ServiceRequestAmountGuard amountGuard, PlatformTransactionManager transactionManager) {
         this.requests = requests;
         this.requestRows = requestRows;
         this.amendments = amendments;
@@ -68,6 +69,7 @@ public class ServiceRequestAmendments {
         this.users = users;
         this.audit = audit;
         this.notifier = notifier;
+        this.amountGuard = amountGuard;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -215,7 +217,7 @@ public class ServiceRequestAmendments {
     }
 
     @Transactional
-    public boolean applyWebhookOutcome(String orderId, boolean paid, long providerAmount) {
+    public boolean applyWebhookOutcome(String orderId, boolean paid, BigDecimal providerAmount, String currency) {
         if (orderId == null || orderId.isBlank()) {
             return false;
         }
@@ -232,11 +234,10 @@ public class ServiceRequestAmendments {
                     + " against service request {}", orderId, requestId);
             return true;
         }
-        if (paid && providerAmount > 0 && providerAmount != amendment.delta()) {
-            log.error("Amount mismatch on amendment {}: billed {} but provider charged {}",
-                    amendment.getId(), amendment.delta(), providerAmount);
-        }
         boolean firstPayment = paid && amendment.getPaidAt() == null;
+        if (firstPayment && amountGuard.refuses(orderId, requestId, amendment.delta(), providerAmount, currency)) {
+            return true;
+        }
         if (firstPayment) {
             amendment.markPaid(Instant.now());
         }

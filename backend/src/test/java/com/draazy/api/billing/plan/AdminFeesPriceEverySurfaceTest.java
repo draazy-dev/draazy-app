@@ -9,6 +9,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -23,12 +25,12 @@ import org.springframework.test.web.servlet.ResultActions;
 /** The admin Fees tab is the only price source: the catalogue, the fee schedule and the charge follow it. */
 class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
 
-    private static final String OWNER_FREE = "b1000000-0000-4000-8000-000000000001";
+    private static final String LISTING_PASS = "b1000000-0000-4000-8000-000000000005";
+    private static final String CONTACT_PACK = "b1000000-0000-4000-8000-000000000006";
     private static final String OWNER_PLUS = "b1000000-0000-4000-8000-000000000002";
-    private static final String OWNER_PRO = "b1000000-0000-4000-8000-000000000003";
-    private static final String SEEKER_PLUS = "b1000000-0000-4000-8000-000000000004";
 
     @Autowired UserRepository users;
+    @Autowired PropertyRepository properties;
     @Autowired SubscriptionRepository subscriptions;
 
     /** Mobile block 98691200xx — used by no other test class. */
@@ -56,29 +58,36 @@ class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
     }
 
     @Test
-    void repricedPlansAreWhatTheCatalogueQuotes() throws Exception {
-        saveFees("{\"ownerPlanYearly\":1299,\"ownerProYearly\":2999,\"seekerPlusTopup\":249}")
-                .andExpect(status().isOk());
+    void repricedPassAndPackAreWhatTheCatalogueQuotes() throws Exception {
+        saveFees("{\"listingPass\":1299,\"contactPack\":249}").andExpect(status().isOk());
 
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath(planPrice(OWNER_FREE)).value(hasItem(0)))
-                .andExpect(jsonPath(planPrice(OWNER_PLUS)).value(hasItem(1299)))
-                .andExpect(jsonPath(planPrice(OWNER_PRO)).value(hasItem(2999)))
-                .andExpect(jsonPath(planPrice(SEEKER_PLUS)).value(hasItem(249)))
-                .andExpect(jsonPath("$.plans[0].id").value(OWNER_FREE))
-                .andExpect(jsonPath("$.plans[3].id").value(OWNER_PRO));
+                .andExpect(jsonPath(planPrice(LISTING_PASS)).value(hasItem(1299)))
+                .andExpect(jsonPath(planPrice(CONTACT_PACK)).value(hasItem(249)));
     }
 
     @Test
-    void aRepricedPlanIsWhatTheCustomerIsCharged() throws Exception {
-        saveFees("{\"ownerPlanYearly\":1299}").andExpect(status().isOk());
+    void retiredPlansAreNotInTheCatalogue() throws Exception {
+        mvc.perform(get(Routes.Bootstrap.BASE))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.plans.length()").value(2))
+                .andExpect(jsonPath("$.plans[0].id").value(CONTACT_PACK))
+                .andExpect(jsonPath("$.plans[1].id").value(LISTING_PASS));
+    }
+
+    @Test
+    void aRepricedPassIsWhatTheCustomerIsCharged() throws Exception {
+        saveFees("{\"listingPass\":1299}").andExpect(status().isOk());
         User owner = user("9869120002", Roles.Wire.OWNER);
+        Property listing = properties.saveAndFlush(new Property(owner, "Fee home", "rent", "Flat",
+                20000L, "Baner", "Pune"));
 
         mvc.perform(post(Routes.Plans.SUBSCRIPTION)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"planId\":\"" + OWNER_PLUS + "\",\"paymentMethod\":\"upi\"}"))
+                        .content("{\"planId\":\"" + LISTING_PASS + "\",\"propertyId\":\"" + listing.getId()
+                                + "\",\"paymentMethod\":\"upi\"}"))
                 .andExpect(status().isCreated());
 
         assertThat(subscriptions.findByUserIdOrderByStartedAtDesc(owner.getId()))
@@ -88,8 +97,19 @@ class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
     }
 
     @Test
+    void aRetiredPlanCannotBeBought() throws Exception {
+        User owner = user("9869120003", Roles.Wire.OWNER);
+
+        mvc.perform(post(Routes.Plans.SUBSCRIPTION)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"planId\":\"" + OWNER_PLUS + "\",\"paymentMethod\":\"upi\"}"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void theRentAgreementFeeAndItsGstFollowTheAdminFee() throws Exception {
-        saveFees("{\"rentAgreementPlatform\":750}").andExpect(status().isOk());
+        saveFees("{\"rentAgreementPlatform\":750,\"gstPercent\":18}").andExpect(status().isOk());
 
         mvc.perform(get(Routes.Fees.BASE))
                 .andExpect(status().isOk())
@@ -100,25 +120,25 @@ class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
     @Test
     void theSeededScheduleAgreesEverywhere() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
-                .andExpect(jsonPath(planPrice(OWNER_PLUS)).value(hasItem(999)))
-                .andExpect(jsonPath(planPrice(OWNER_PRO)).value(hasItem(2499)))
-                .andExpect(jsonPath(planPrice(SEEKER_PLUS)).value(hasItem(199)));
+                .andExpect(jsonPath(planPrice(LISTING_PASS)).value(hasItem(999)))
+                .andExpect(jsonPath(planPrice(CONTACT_PACK)).value(hasItem(199)));
         mvc.perform(get(Routes.Fees.BASE))
-                .andExpect(jsonPath("$[?(@.deal=='rent')].platformFee").value(hasItem(500)))
-                .andExpect(jsonPath("$[?(@.deal=='rent')].gst").value(hasItem(90)));
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[?(@.deal=='rent')].platformFee").value(hasItem(499)))
+                .andExpect(jsonPath("$[?(@.deal=='rent')].gst").value(hasItem(0)));
     }
 
     // Stored but unreadable, it would sit in the admin panel while the site charged the default.
     @Test
     void aPriceTheSiteWouldIgnoreIsRefused() throws Exception {
-        saveFees("{\"ownerProYearly\":150000}")
+        saveFees("{\"contactPack\":150000}")
                 .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.message", containsString("fees.ownerProYearly")));
-        saveFees("{\"seekerPlusTopup\":-1}").andExpect(status().isUnprocessableEntity());
-        saveFees("{\"ownerPlanYearly\":0}").andExpect(status().isUnprocessableEntity());
+                .andExpect(jsonPath("$.message", containsString("fees.contactPack")));
+        saveFees("{\"contactPack\":-1}").andExpect(status().isUnprocessableEntity());
+        saveFees("{\"listingPass\":0}").andExpect(status().isUnprocessableEntity());
         saveFees("{\"rentAgreementPlatform\":499.5}").andExpect(status().isUnprocessableEntity());
 
         mvc.perform(get(Routes.Bootstrap.BASE))
-                .andExpect(jsonPath(planPrice(OWNER_PRO)).value(hasItem(2499)));
+                .andExpect(jsonPath(planPrice(LISTING_PASS)).value(hasItem(999)));
     }
 }

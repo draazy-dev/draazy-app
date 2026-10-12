@@ -63,6 +63,7 @@ public class PropertyQueueRowMapper {
                 p.getAgeYears(),
                 p.getDeposit(),
                 p.getAvailableFrom(),
+                p.getAvailableOn(),
                 p.getPossession(),
                 properties.toOwner(p.getOwner(), ContactVisibility.REVEALED),
                 properties.toAdminPipeline(p, BackOfficeVisibility.VISIBLE, outreach),

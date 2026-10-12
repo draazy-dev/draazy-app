@@ -545,6 +545,21 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
     expect(written).not.toContain('VWXYZ9876L');
   });
 
+  test('an owner mobile that is not yours is refused on a flat you have not listed, until you are among the owners', async ({ page }) => {
+    await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
+    await fillProperty(page);
+    await fillOwner(page, { next: false });
+    const p = active(page);
+    const mobile = p.getByPlaceholder('10-digit mobile').first();
+    await mobile.fill(MOBILE.tenant);
+    await clickNext(page);
+    await stillOn(page, 1);
+    await expect(p.getByText(/Only the owner fills this part/)).toBeVisible();
+
+    await mobile.fill(MOBILE.owner);
+    await clickNext(page, 2);
+  });
+
   test('a restored draft names the identity fields to re-enter without storing the numbers', async ({ page }) => {
     await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
     await fillProperty(page);

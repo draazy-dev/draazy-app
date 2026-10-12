@@ -10,6 +10,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -182,11 +183,14 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private List<String> tenants = new ArrayList<>();
 
-    /** Move-in bucket: {@code now}, {@code 15} or {@code 30} days; null when unstated. A bucket
-     * because a date nobody edits goes stale; the filter is cumulative and widened by the query. */
-    @Column(name = "available_from")
+    /** The exact move-in date; null when unstated. The legacy now/15/30 bucket is derived from it. */
+    @Column(name = "available_on")
     @Setter
-    private String availableFrom;
+    private LocalDate availableOn;
+
+    public String getAvailableFrom() {
+        return AvailableOn.bucketOf(availableOn, AvailableOn.today());
+    }
 
     /** Pets allowed; null when the owner did not answer. "No" and "unstated" are different facts, and
      * the pet-friendly filter matches true only, so null is never advertised either way. */
@@ -381,13 +385,11 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String dealStatus = "active";
 
-    public static final String OWNER_ON_PAID_PLAN_SQL = """
-            exists (select 1 from subscriptions sub join plans pl on pl.id = sub.plan_id
-                    where sub.user_id = owner_id and pl.audience = 'owner' and pl.price > 0
-                      and (sub.status = 'past-due'
-                           or (sub.status = 'active' and (sub.renews_at is null or sub.renews_at > now()))))""";
+    // Featured is a reward for verifying ownership, not something a listing can be bought into.
+    public static final String FEATURED_SQL = """
+            coalesce(ownership_verified = true and ownership_verified_at > now() - interval '7 days', false)""";
 
-    @Formula("(" + OWNER_ON_PAID_PLAN_SQL + ")")
+    @Formula("(" + FEATURED_SQL + ")")
     private boolean featured;
 
     @Column(name = "flag_reason")

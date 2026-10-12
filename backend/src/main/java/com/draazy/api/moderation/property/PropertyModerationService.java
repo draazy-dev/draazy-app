@@ -129,10 +129,7 @@ public class PropertyModerationService {
         // A rejected listing is not publicly viewable, so its link points at the dashboard.
         UUID ownerId = property.getOwner().getId();
         if (PropertyStatus.APPROVED.equals(status) && !clearingApprovedRecheck) {
-            notifier.notify(ownerId, "listing.approved",
-                    "Your listing is approved",
-                    "It is now live and visible to buyers.",
-                    "/property/" + property.getId());
+            lifecycle.announceApproval(property);
         } else if (PropertyStatus.REJECTED.equals(status)) {
             String ownerMessage = ReviewReasonCodes.ownerMessage(reasonCode, reason);
             notifier.notify(ownerId, "listing.rejected",

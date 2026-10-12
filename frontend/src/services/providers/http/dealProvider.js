@@ -46,8 +46,8 @@ export async function closeDeal(propId, { agreedPrice, counterpartyMobile, note 
 }
 
 /** `POST /me/deals/{propId}/reopen` — reopen a closed or reserved deal. */
-export async function reopenDeal(propId) {
-  await post(`/me/deals/${encodeURIComponent(propId)}/reopen`, {});
+export async function reopenDeal(propId, availableOn) {
+  await post(`/me/deals/${encodeURIComponent(propId)}/reopen`, availableOn ? { availableOn } : {});
 }
 
 /** `GET /me/deals/{propId}/parties` — off-platform interested parties on a reserved listing. */

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MapPin, Users, ArrowLeft, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
-import DateField from '../../../components/ui/DateField';
+import AvailabilityField from '../../../components/ui/AvailabilityField.jsx';
 import { FieldError } from './controls.jsx';
 import StepHeader from './StepHeader.jsx';
 import LocationPicker from './LocationPicker.jsx';
@@ -139,7 +139,7 @@ const FlatmateFlow = ({
           </div>
           <div>
             <label className={lbl}>{t('listProperty.fields.availableFrom')}</label>
-            <DateField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} dataErr="availableFrom" ariaLabel={t('listProperty.aria.availableFrom')} invalid={!!errors.availableFrom} className={fld} />
+            <AvailabilityField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} dataErr="availableFrom" ariaLabel={t('listProperty.aria.availableFrom')} invalid={!!errors.availableFrom} className={fld} />
             <FieldError show={!!errors.availableFrom}>{t('listProperty.err.availableRoom')}</FieldError>
           </div>
         </div>

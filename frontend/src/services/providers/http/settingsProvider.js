@@ -6,11 +6,17 @@ import { DEFAULT_MAX_PHOTOS, MAX_PHOTOS_CEILING } from '../../../lib/uploads/pol
 /** The `ETag` of the last document read or written, sent back as `If-Match` so a stale save answers 412. */
 let settingsEtag = null;
 
-/** The whole configuration document. */
-export async function getSettings() {
-  const { data: doc, etag } = await get('/admin/settings', undefined, { withStatus: true });
-  settingsEtag = etag;
-  return doc && typeof doc === 'object' ? doc : {};
+let settingsRead = null;
+
+/** The whole configuration document; concurrent callers share one read, which withStatus would otherwise bypass. */
+export function getSettings() {
+  settingsRead ??= get('/admin/settings', undefined, { withStatus: true })
+    .then(({ data: doc, etag }) => {
+      settingsEtag = etag;
+      return doc && typeof doc === 'object' ? doc : {};
+    })
+    .finally(() => { settingsRead = null; });
+  return settingsRead;
 }
 
 /** Only the console module switches (`adminFlags`) - the shell reads this, not the whole document. */

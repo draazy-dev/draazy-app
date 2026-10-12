@@ -676,7 +676,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.status").value("awaiting-payment"))
 
-                    .andExpect(jsonPath("$.amount").value(590))
+                    .andExpect(jsonPath("$.amount").value(499))
                     .andExpect(jsonPath("$.paymentSessionId").doesNotExist());
         }
 

@@ -30,7 +30,7 @@ export const TRUST_PAGES = {
         title: 'How Draazy makes money',
         body: [
           'Draazy never takes a share of your rent, deposit or sale price. Searching and posting a basic listing are free, and so are your first 15 owner contacts.',
-          'We earn from optional extras: paid plans (more live listings and featured placement for owners, unlimited owner contacts for seekers) and services such as rent agreements. The price is shown before you pay.',
+          'We earn from three optional things: a Listing Pass for each extra live listing, a Contact Pack of 15 owner contacts, and rent agreements. None renews by itself, and the price is shown before you pay.',
         ],
         links: [['See plans and pricing', '/plans'], ['Explore services', '/services'], ['Draazy vs NoBroker', '/compare/nobroker']],
       },

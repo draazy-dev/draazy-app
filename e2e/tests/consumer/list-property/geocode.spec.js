@@ -84,7 +84,7 @@ const pickOption = async (page, dataErr, label) => {
 async function gotoStep2(page) {
   await signedInAsNew(page);
   await page.goto('/list-property');
-  // Use .lp-steps: .lp-meter also appears on listing-limit paywall.
+  // `.lp-steps` is the wizard's own step rail, so waiting on it means the form has mounted.
   await page.waitForSelector('.lp-steps', { timeout: 20000 });
   await page.locator('input[data-err="carpetArea"]').fill('1050');
   await page.locator('[data-err="propertyType"]').click();

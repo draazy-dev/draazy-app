@@ -4,6 +4,7 @@ import com.draazy.api.catalog.property.ListingProgress;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 /** The owner's My Listings row: what the card, its chips and the quality score read, and nothing else.
  * The full record is {@code GET /me/listings/{id}}. */
@@ -49,5 +50,6 @@ public record OwnerListingCard(
         Integer ageYears,
         Long deposit,
         String availableFrom,
+        LocalDate availableOn,
         String possession) {
 }

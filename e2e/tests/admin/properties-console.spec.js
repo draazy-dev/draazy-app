@@ -500,13 +500,21 @@ test.describe('LIVE: the properties console', () => {
 
   test('the public search cannot be turned into an owner directory', async () => {
     const admin = await authHeaders(ACTORS.admin);
-    const publicList = await api('GET', '/properties?page=0&size=1&sort=newest');
-    const listed = publicList.body.content[0];
-    expect(listed).toBeTruthy();
+    const publicList = await api('GET', '/properties?page=0&size=30&sort=newest');
+    expect(publicList.body.content[0]).toBeTruthy();
 
-    // The owner's real details, read from the side that is allowed to have them.
-    const full = await api('GET', `/admin/properties?page=0&size=1&q=${encodeURIComponent(listed.id)}`, admin);
-    const owner = full.body.content[0]?.owner;
+    // The owner's real details, read from the side that is allowed to have them. Accounts filed by other specs
+    // have no name yet, so the newest listing whose owner has one is the subject.
+    let listed;
+    let owner;
+    for (const candidate of publicList.body.content) {
+      const full = await api('GET', `/admin/properties?page=0&size=1&q=${encodeURIComponent(candidate.id)}`, admin);
+      if (full.body.content[0]?.owner?.name) {
+        listed = candidate;
+        owner = full.body.content[0].owner;
+        break;
+      }
+    }
     expect(owner?.name).toBeTruthy();
     expect(owner?.mobile).toBeTruthy();
 

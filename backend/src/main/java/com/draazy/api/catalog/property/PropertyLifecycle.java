@@ -2,6 +2,8 @@ package com.draazy.api.catalog.property;
 
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
+import com.draazy.api.common.settings.PlatformSettings;
+import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.BackOfficePermissions;
@@ -14,12 +16,19 @@ public class PropertyLifecycle {
     private final AccountPermissions permissions;
     private final ApplicationEventPublisher events;
     private final PropertyPublicationGate publicationGate;
+    private final ListingLiveGate liveGate;
+    private final Notifier notifier;
+    private final PlatformSettings settings;
 
     public PropertyLifecycle(AccountPermissions permissions, ApplicationEventPublisher events,
-            PropertyPublicationGate publicationGate) {
+            PropertyPublicationGate publicationGate, ListingLiveGate liveGate, Notifier notifier,
+            PlatformSettings settings) {
         this.permissions = permissions;
         this.events = events;
         this.publicationGate = publicationGate;
+        this.liveGate = liveGate;
+        this.notifier = notifier;
+        this.settings = settings;
     }
 
     public void requireChecker(AuthPrincipal actor, Property property) {
@@ -69,10 +78,28 @@ public class PropertyLifecycle {
                     "The owner has not confirmed this listing yet. Send the claim link and wait for them to confirm.");
         }
         publicationGate.requirePublishable(actor, property, secondApprovalSatisfied);
-        property.setStatus(PropertyStatus.APPROVED);
+        boolean alreadyLive = PropertyStatus.APPROVED.equals(property.getStatus());
+        boolean live = alreadyLive || liveGate.mayGoLive(property);
+        property.setStatus(live ? PropertyStatus.APPROVED : PropertyStatus.PAUSED);
         property.setFlagReason(null);
         property.clearRecheck();
-        events.publishEvent(new PropertyPublished(property.getId()));
+        if (live) {
+            events.publishEvent(new PropertyPublished(property.getId()));
+        }
+    }
+
+    /** Tells the owner their listing was approved, or that the free tier held it back. */
+    public void announceApproval(Property property) {
+        UUID ownerId = property.getOwner().getId();
+        if (PropertyStatus.PAUSED.equals(property.getStatus())) {
+            notifier.notify(ownerId, "listing.approved_paused", "Your listing is approved",
+                    "Approved — you're on the free tier (1 live listing). Buy a ₹" + settings.listingPass()
+                    + " listing pass or pause another listing to make it live.",
+                    "/dashboard");
+            return;
+        }
+        notifier.notify(ownerId, "listing.approved", "Your listing is approved",
+                "It is now live and visible to buyers.", "/property/" + property.getId());
     }
 
     public void start(AuthPrincipal actor, Property property) {

@@ -51,6 +51,6 @@ class ListingOwnershipRecheckTest {
         return new ListingUpdate(null, deal, null, null, price, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, description, null, null, null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 }

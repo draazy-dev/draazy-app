@@ -71,7 +71,7 @@ export default function HomeLoans() {
           { name: 'city', label: t('services.homeLoans.fCity'), placeholder: 'Pune', value: 'Pune' },
         ],
       }}
-      stats={[['₹0', t('services.homeLoans.stat.advisoryFee')], ['Free', t('services.homeLoans.stat.eligibility')], ['24 hrs', t('services.homeLoans.stat.callback')], ['1', t('services.homeLoans.stat.oneForm')]]}
+      stats={[['Many', t('services.homeLoans.stat.lenders')], ['Quick', t('services.homeLoans.stat.eligibility')], ['24 hrs', t('services.homeLoans.stat.callback')], ['1', t('services.homeLoans.stat.oneForm')]]}
       services={[
         [t('services.homeLoans.service.0.name'), 'home', t('services.homeLoans.service.0.desc')],
         [t('services.homeLoans.service.1.name'), 'map', t('services.homeLoans.service.1.desc')],

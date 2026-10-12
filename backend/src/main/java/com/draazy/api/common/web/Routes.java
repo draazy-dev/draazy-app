@@ -763,6 +763,8 @@ public final class Routes {
         }
 
         public static final String BASE = "/me/rent-agreements";
+
+        public static final String RENEWAL = BASE + "/{id}/renewal";
     }
 
     public static final class ServiceRequests {

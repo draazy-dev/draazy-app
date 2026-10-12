@@ -150,6 +150,7 @@
     "ra": {
       "trackerTitle": "Your rent agreement requests",
       "reissueHint": "Reissuing the agreement for this flat — we've prefilled the property so you can update the group.",
+      "renewHint": "Renewal — check the rent and dates, then submit. {{price}} + government charges.",
       "listingOtherFlat": "Your saved draft is for a different flat, so we kept it. To use this listing instead, pick it from your listings on the Property step.",
       "back": "Back",
       "next": "Next",
@@ -738,7 +739,6 @@
         "stampDuty": "Stamp Duty (0.25%)",
         "registrationFee": "Registration Fee",
         "serviceFee": "Draazy Service Fee",
-        "gst": "GST",
         "referralWaiver": "Free with your referral reward (\u2212{{amount}})",
         "estimatedTotal": "Estimated Total",
         "totalPayable": "Total Payable",
@@ -1311,8 +1311,8 @@
       "titleTop": "Home loans made",
       "titleAccent": "simple & affordable",
       "subtitle": "Share a few details and our loan desk compares offers from partner banks & NBFCs for your profile, and calls you back — paperwork handled at your doorstep.",
-      "feature1": "Free eligibility check",
-      "feature2": "Zero processing-fee deals",
+      "feature1": "Eligibility check",
+      "feature2": "Many lenders compared",
       "feature3": "Doorstep documentation",
       "quoteTitle": "Check Your Eligibility",
       "quoteSub": "Get personalised loan offers — our expert calls you back within 24 hours.",
@@ -1329,7 +1329,7 @@
       "fIncomePlaceholder": "e.g. 90,000",
       "fCity": "City",
       "stat": {
-        "advisoryFee": "Advisory fee",
+        "lenders": "Lenders compared",
         "eligibility": "Eligibility check",
         "callback": "Callback",
         "oneForm": "Form for all lenders"
@@ -1370,8 +1370,8 @@
           "d": "See rates, fees and EMIs from different lenders together before you choose."
         },
         {
-          "t": "Free Eligibility Check",
-          "d": "Know how much you qualify for upfront — no cost, no impact, no obligation."
+          "t": "Eligibility Check",
+          "d": "Know how much you qualify for upfront — no impact on your credit score, no obligation."
         },
         {
           "t": "One Point of Contact",
@@ -1399,7 +1399,7 @@
       "faq": [
         {
           "q": "Does Draazy charge for loan assistance?",
-          "a": "No. Our advisory and eligibility check are completely free — you only pay the lender's standard charges on the loan you choose."
+          "a": "Draazy does not take brokerage on your home. Our loan desk compares offers and guides you through the application; the lender's own charges apply to the loan you choose."
         },
         {
           "q": "How much loan can I get?",
@@ -1419,7 +1419,7 @@
         }
       ],
       "ctaTitle": "Ready to finance your dream home?",
-      "ctaSub": "Get a free eligibility check and matched offers — our loan expert calls you back within 24 hours.",
+      "ctaSub": "Check your eligibility and get matched offers — our loan expert calls you back within 24 hours.",
       "ctaPrimary": "Check Eligibility",
       "emiCalc": {
         "title": "Plan your EMI before you apply",
@@ -1612,7 +1612,7 @@
         "survey": "Survey & quote",
         "callback": "Callback",
         "allIn": "Quotes, no hidden charges",
-        "platformFee": "Platform fee"
+        "contact": "Point of contact"
       },
       "service": [
         {

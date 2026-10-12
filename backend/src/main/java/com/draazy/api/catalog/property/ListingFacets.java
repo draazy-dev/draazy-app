@@ -68,19 +68,16 @@ public record ListingFacets(
                 null, null, null, null, null, null, null, null, null, ids, null);
     }
 
-    /** Widest-first, or empty when unfiltered; kept here so the cumulative rule sits next to the field. */
-    public List<String> availableFromBuckets() {
+    /** Days ahead a listing may become available within, or null when unfiltered; -1 for an unknown bucket. */
+    public Integer availableWithinDays() {
         if (availableFrom == null || availableFrom.isBlank()) {
-            return List.of();
+            return null;
         }
         return switch (availableFrom) {
-            case "now" -> List.of("now");
-            case "15" -> List.of("now", "15");
-            case "30" -> List.of("now", "15", "30");
-
-            // An unknown bucket must match nothing, never everything: the CHECK admits only the
-            // three buckets above, so this ordinary-looking token can never be a row's value.
-            default -> List.of("no.such.bucket");
+            case "now" -> 0;
+            case "15" -> 15;
+            case "30" -> 30;
+            default -> -1;
         };
     }
 

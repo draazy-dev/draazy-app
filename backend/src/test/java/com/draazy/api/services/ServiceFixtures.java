@@ -120,7 +120,7 @@ abstract class ServiceFixtures extends AbstractApiTest {
         // exactly as the live webhook would.
         requestRepo.findById(UUID.fromString(id))
                 .filter(r -> r.getStatus() == ServiceRequestStatus.AWAITING_PAYMENT)
-                .ifPresent(r -> serviceRequests.applyWebhookOutcome(paymentRef(id), true, 0));
+                .ifPresent(r -> serviceRequests.applyWebhookOutcome(paymentRef(id), true, null, null));
         return id;
     }
 
@@ -143,10 +143,18 @@ abstract class ServiceFixtures extends AbstractApiTest {
     }
 
     void deliverSigned(String orderId, boolean paid) throws Exception {
+        em.flush();
+        String billed = requestRepo.findByPaymentRef(orderId).map(r -> r.getAmount() + ".00")
+                .orElseGet(() -> jdbc.queryForObject("select coalesce(max(amount_after - amount_before), 0) || '.00'"
+                        + " from service_request_amendments where payment_ref = ?", String.class, orderId));
+        deliverSigned(orderId, paid, billed, "INR");
+    }
+
+    void deliverSigned(String orderId, boolean paid, String amount, String currency) throws Exception {
         String body = "{\"type\":\"PAYMENT_SUCCESS_WEBHOOK\",\"data\":{"
                 + "\"order\":{\"order_id\":\"" + orderId + "\"},"
                 + "\"payment\":{\"payment_status\":\"" + (paid ? "SUCCESS" : "FAILED") + "\","
-                + "\"payment_amount\":590.00,"
+                + "\"payment_amount\":" + amount + ",\"payment_currency\":\"" + currency + "\","
                 + "\"payment_time\":\"2025-03-05T11:20:00+05:30\"}}}";
         deliverBody(body);
     }

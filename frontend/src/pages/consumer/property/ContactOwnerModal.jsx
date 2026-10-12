@@ -8,7 +8,7 @@ import { maskPhone, fmtPhone } from '../../../lib/contact.js';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { requestContact } from '../../../services/contactService.js';
 import { useContactGate } from './useContactGate.js';
-import { useEntitlements, contactsLeft } from './useEntitlements.js';
+import { useEntitlements, contactsLeft, freeContactsTill } from './useEntitlements.js';
 import { useAppFlags } from '../../../context/AppFlagsContext.jsx';
 import { messagesLinkForProp } from '../../../lib/chatFormat.js';
 import { queuePendingChat } from '../../../services/conversationService.js';
@@ -38,6 +38,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
   // `isIn` gates the fetch: signed out there is no quota to report, and no token to ask with.
   const { entitlements } = useEntitlements(isIn);
   const left = contactsLeft(entitlements);
+  const freeTill = freeContactsTill(entitlements);
   const status = gate.status;
   const ownerHides = status === 'approved' && gate.ownerHidesNumber;
   const revealed = status === 'owner' || (status === 'approved' && !ownerHides);
@@ -54,7 +55,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
       if (sendToSignIn('contact')) onClose();
       return;
     }
-    // Free contact quota spent, so offer the referral or Seeker Plus route. The refusal is the
+    // Contact quota spent, so offer the referral or Contact Pack route. The refusal is the
     // server's, caught below: a browser that could pre-check this could also answer it generously.
     track('contact_click', { action: 'request_number', id: propId });
     captureLead({ context: 'request_number', property: propId });
@@ -237,7 +238,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
                       {isIn && Number.isFinite(left) && (
                         <p className="text-[11px] mt-1.5" data-testid="contacts-left">
                           {left > 0 ? (
-                            <span className="text-slate-500">{t('property.contactsLeft', { count: left })}</span>
+                            <span className="text-slate-500">{freeTill ? t('property.contactsLeftTill', { count: left, date: freeTill }) : t('property.contactsLeft', { count: left })}</span>
                           ) : (
                             <span className="text-amber-300">{t(flagEnabled('referralRewards') ? 'property.contactsLeftNoneReferHint' : 'property.contactsLeftNone')}</span>
                           )}

@@ -172,7 +172,7 @@ export default function useProperty() {
   const perUnitVal = '₹' + (p.area ? fmtNum(Math.round(p.price / p.area)) : '0');
   const showPerUnit = !isRent && isSqftUnit(p.areaUnit) && p.area > 0;
   let details;
-  const landPossession = possessionDateLabel(tr, p.availableDate) || availableLabel(tr, p.availableFrom);
+  const landPossession = possessionDateLabel(tr, p.availableDate) || availableLabel(tr, p);
   if (isLand) {
     /* `naSanctioned` is the retired boolean, read only when the three-state is unanswered so a
      * listing published under it keeps saying what its owner said. */
@@ -214,7 +214,7 @@ export default function useProperty() {
       ['eye', tr('property.overlooking'), deriveOverlooking(p), 'keydetail.overlooking'],
       ['car-front', tr('property.parking'), parkingLabel, 'keydetail.parking'],
       isRent
-        ? ['calendar-check', tr('property.available'), availableLabel(tr, p.availableFrom, p.availableDate), 'keydetail.available']
+        ? ['calendar-check', tr('property.available'), availableLabel(tr, p), 'keydetail.available']
         : ['calendar-days', tr('property.age'), deriveAge(p), 'keydetail.age'],
       ...specs,
     ];
@@ -229,7 +229,7 @@ export default function useProperty() {
       ['eye', tr('property.overlooking'), deriveOverlooking(p), 'keydetail.overlooking'],
       ['car-front', tr('property.parking'), parkingLabel, 'keydetail.parking'],
       isRent
-        ? ['calendar-check', tr('property.available'), availableLabel(tr, p.availableFrom, p.availableDate), 'keydetail.available']
+        ? ['calendar-check', tr('property.available'), availableLabel(tr, p), 'keydetail.available']
         : ['calendar-days', tr('property.age'), deriveAge(p), 'keydetail.age'],
     ];
   }

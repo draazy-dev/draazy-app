@@ -44,7 +44,7 @@ export default function Terms() {
       <h3>3.3 No brokerage</h3>
       <p>
         Draazy does not charge brokerage or commission from buyers or tenants for property transactions. Revenue is
-        generated through premium listing plans, subscription packages, and referral fees from service partners.
+        generated through Listing Passes, Contact Packs, rent agreements, and referral fees from service partners.
       </p>
 
       <h2>4. User obligations</h2>
@@ -79,11 +79,11 @@ export default function Terms() {
         remove the content or delete your account.
       </p>
 
-      <h2>7. Payments and subscriptions</h2>
+      <h2>7. Payments</h2>
       <ul>
-        <li>Subscription plans are billed in advance as per the plan selected (monthly or annual).</li>
-        <li>Prices are inclusive of applicable GST (currently 18%).</li>
-        <li>Plans do not renew automatically. When the term you paid for ends, the plan ends unless you buy it again.</li>
+        <li>Listing Passes, Contact Packs and rent agreements are one-off purchases, paid in advance. There are no subscriptions and nothing renews automatically.</li>
+        <li>Prices include GST. Rent agreements cost extra only for government charges (stamp duty and registration).</li>
+        <li>A Listing Pass ends early when its listing is rented, sold or archived; unused days are not refunded.</li>
         <li>Refunds are governed by our <Link to="/refund-policy">Refund Policy</Link>.</li>
       </ul>
 

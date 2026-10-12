@@ -2,6 +2,7 @@
    quietly assert the opposite of what `no-gate` proves. */
 import { test, expect } from '../../../fixtures/live.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { displayDate, istInDays } from '../../../helpers/availability.js';
 import { signedInAsNew } from '../../../helpers/liveAuth.js';
 import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { fillSociety } from '../../../helpers/places.js';
@@ -176,8 +177,9 @@ test('a flat sale: the pricing step (possession, price, RERA, handover date) and
     await dateField.click();
     await expect(page.locator('.dz-cal')).toBeVisible();
     await expect(page.locator('.dz-cal__title')).toHaveText('Select Date');
-    await pickInOpenCalendar(page, '2027-03-14');
-    await expect(dateField.locator('.dz-datefield__text')).toHaveText('14/03/2027');
+    const handover = istInDays(200);
+    await pickInOpenCalendar(page, handover);
+    await expect(dateField.locator('.dz-datefield__text')).toHaveText(displayDate(handover));
   });
 
   await test.step('the photo step asks for no ownership papers, and photos are compulsory until uploaded', async () => {
@@ -209,7 +211,7 @@ test('MahaRERA field is hidden for a flat rental', async ({ page }) => {
   await flatToPricing(page, 'rent');
   await page.locator('input[data-err="monthlyRent"]').fill('25000');
   await page.locator('input[data-err="deposit"]').fill('75000');
-  await pickDate(page, '[data-err="availableFrom"]', '2027-08-01');
+  await pickDate(page, '[data-err="availableFrom"]', istInDays(45));
   await expect(page.getByPlaceholder(RERA_BOX)).toHaveCount(0);
 });
 

@@ -10,6 +10,7 @@ import jakarta.persistence.criteria.Root;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -334,6 +335,17 @@ final class PropertySpecs {
                 cb.like(idAsText, like, LIKE_ESCAPE)));
     }
 
+    /** A null date matches nothing; an unknown bucket (negative) matches nothing at all. */
+    private static void availableWithin(Integer days, Root<Property> root, CriteriaBuilder cb,
+            List<Predicate> where) {
+        if (days == null) {
+            return;
+        }
+        where.add(days < 0
+                ? cb.disjunction()
+                : cb.lessThanOrEqualTo(root.<LocalDate>get("availableOn"), AvailableOn.today().plusDays(days)));
+    }
+
     /** Applied only by {@link #publicSearch}: a predicate the database cannot see cannot page correctly. */
     private static void listingFacets(ListingFacets f, Root<Property> root, CriteriaBuilder cb,
             List<Predicate> where) {
@@ -355,7 +367,7 @@ final class PropertySpecs {
         in(f.landUse(), root.get("landUse"), cb, where);
         in(f.room(), root.get("room"), cb, where);
         in(f.construction(), root.get("possession"), cb, where);
-        in(f.availableFromBuckets(), root.get("availableFrom"), cb, where);
+        availableWithin(f.availableWithinDays(), root, cb, where);
         inJsonLowerWhitelisted(f.shell(), SHELL, "shellType", root, cb, where);
         inJsonLowerWhitelisted(f.na(), NA, "naStatus", root, cb, where);
         if (Boolean.TRUE.equals(f.preLeased())) {

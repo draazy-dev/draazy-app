@@ -100,7 +100,7 @@ class ListingSanityLimitsTest {
                 deposit, null, null, bd(carpetArea), "sqft", null, "Baner", null, "Pune",
                 null, null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, bd(carpetArea),
-                bd(builtUpArea), bd(superBuiltUpArea), null, null, null, null);
+                bd(builtUpArea), bd(superBuiltUpArea), null, null, null, null, null);
     }
 
     private static ListingCreate create(String deal, String propertyType, Long price, Long deposit,
@@ -110,7 +110,7 @@ class ListingSanityLimitsTest {
                 deposit, null, null, bd(carpetArea), "sqft", null, "Baner", null, "Pune",
                 null, null, reraId, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null, bd(carpetArea),
-                bd(builtUpArea), bd(superBuiltUpArea), null, null, formDetails, null);
+                bd(builtUpArea), bd(superBuiltUpArea), null, null, null, formDetails, null);
     }
 
     private static ListingCreate plottedProject(String reraId) {
@@ -118,7 +118,7 @@ class ListingSanityLimitsTest {
                 null, null, null, bd("50"), "sqft", null, "Baner", null, "Pune",
                 null, null, reraId, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null, bd("50"),
-                null, null, null, null, Map.of("plottedProject", "yes"), null);
+                null, null, null, null, null, Map.of("plottedProject", "yes"), null);
     }
 
     private static ListingUpdate update(String deal, String propertyType, Long price, Long deposit,
@@ -128,7 +128,7 @@ class ListingSanityLimitsTest {
                 null, null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null, null,
                 null, null, null, null, bd(carpetArea), bd(builtUpArea), bd(superBuiltUpArea), null,
-                null, null, null, null, null);
+                null, null, null, null, null, null);
     }
 
     private static BigDecimal bd(String value) {

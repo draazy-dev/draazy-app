@@ -94,7 +94,7 @@ class TenancyConfirmRaceTest {
                 if (index == 0) {
                     tenancyService.confirm(tenant.getId(), tenancyId);
                 } else {
-                    dealService.reopen(caller, p.getId());
+                    dealService.reopen(caller, p.getId(), null);
                 }
             });
 

@@ -6,6 +6,7 @@ import com.draazy.api.moderation.signal.ListingSignals;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 
 /** The owner's number stays because the row prints it for the call;
  * the full record is {@code GET /admin/properties/{id}}. */
@@ -50,6 +51,7 @@ public record PropertyQueueRow(
         Integer ageYears,
         Long deposit,
         String availableFrom,
+        LocalDate availableOn,
         String possession,
         PropertyResponse.Owner owner,
         PropertyResponse.AdminPipeline adminPipeline,

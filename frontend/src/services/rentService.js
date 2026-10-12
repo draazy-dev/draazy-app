@@ -50,3 +50,5 @@ export const dues = async (propId) => (await provider()).dues(propId);
 
 /* Agreements stay in the rent domain because they record the same tenancy relationship. */
 export const myRentAgreements = async () => (await provider()).myRentAgreements();
+/** What a renewal starts from: the parties, rent, deposit, term and the day after the old agreement ends. */
+export const rentAgreementRenewal = async (id) => (await provider()).rentAgreementRenewal(id);

@@ -9,7 +9,6 @@ import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { useCompare } from '../../context/CompareContext.jsx';
 import { useConversationUnread } from '../../context/ConversationContext.jsx';
 import { useSaved } from '../../context/SavedContext.jsx';
-import { usePlan } from '../../context/PlanContext.jsx';
 import { TOPBAR_SCROLL } from '../../lib/chrome.js';
 import { firstName, initial, roleLabel } from '../../lib/auth.js';
 import { setAppPrefs } from '../../lib/localPrefs.js';
@@ -27,7 +26,6 @@ export default function Navbar() {
   const { flagEnabled } = useAppFlags();
   const { count: compareCount } = useCompare();
   const saved = useSaved();
-  const { listingLimit, isPaidOwner } = usePlan();
   const { unread: chatUnread } = useConversationUnread();
   const light = useIsLightTheme();
   const location = useLocation();
@@ -36,9 +34,7 @@ export default function Navbar() {
   const [acctOpen, setAcctOpen] = useState(false);
   /* Help is the one area whose URL carries the language, and HelpLangRoute treats that prefix as authoritative — it
      calls changeLanguage() and i18n persists it device-wide. */
-  const postLabel = !isPaidOwner && listingLimit === 1
-    ? t('chrome.postPropertyFree')
-    : t('nav.postProperty');
+  const postLabel = t('chrome.postPropertyFree');
   // Bump on any local-prefs write so the badges below refresh live in the same tab, without
   // waiting for a route change.
   const [, setStoreTick] = useState(0);

@@ -4,6 +4,7 @@ import com.draazy.api.common.persistence.AuditedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
 import lombok.Getter;
@@ -56,6 +57,9 @@ public class RentAgreement extends AuditedEntity {
     @Column(name = "verified_by")
     private UUID verifiedBy;
 
+    @Column(name = "renewal_reminded_at")
+    private Instant renewalRemindedAt;
+
     protected RentAgreement() {
         // JPA
     }
@@ -71,6 +75,16 @@ public class RentAgreement extends AuditedEntity {
         this.serviceRequestId = prepared.serviceRequestId();
         this.finalDocumentId = prepared.finalDocumentId();
         this.preparedBy = prepared.preparedBy();
+    }
+
+    void markRenewalReminded(Instant at) {
+        this.renewalRemindedAt = at;
+    }
+
+    /** Last day of the term; null while the draft has no start or length. */
+    public LocalDate endDate() {
+        return startDate == null || durationMonths == null
+                ? null : startDate.plusMonths(durationMonths).minusDays(1);
     }
 
     /** No plain {@code setStatus}: readers treat the field as evidence, so the only writer is a move

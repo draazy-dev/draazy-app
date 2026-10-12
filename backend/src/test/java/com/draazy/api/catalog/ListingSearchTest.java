@@ -5,7 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.draazy.api.billing.plan.TestPlanGrants;
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyPossession;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -37,8 +37,6 @@ class ListingSearchTest extends AbstractApiTest {
     PropertyRepository properties;
     @Autowired
     EntityManager em;
-    @Autowired
-    TestPlanGrants grants;
 
     private User seller;
 
@@ -233,14 +231,19 @@ class ListingSearchTest extends AbstractApiTest {
         @DisplayName("the move-in filter is cumulative — a month also takes what is free today")
         void availableFromIsCumulative() throws Exception {
             Property now = rent("Free today");
-            now.setAvailableFrom("now");
+            now.setAvailableOn(AvailableOn.today().minusDays(3));
             Property fortnight = rent("Free in a fortnight");
-            fortnight.setAvailableFrom("15");
+            fortnight.setAvailableOn(AvailableOn.today().plusDays(15));
             Property month = rent("Free in a month");
-            month.setAvailableFrom("30");
+            month.setAvailableOn(AvailableOn.today().plusDays(30));
+            Property undated = rent("No date stated");
+            Property beyond = rent("Free in two months");
+            beyond.setAvailableOn(AvailableOn.today().plusDays(60));
             persist(now);
             persist(fortnight);
             persist(month);
+            persist(undated);
+            persist(beyond);
 
             String owner = "&owner=" + seller.getId();
             assertThat(count("availableFrom=now" + owner)).isEqualTo(1);
@@ -688,11 +691,11 @@ class ListingSearchTest extends AbstractApiTest {
             payer.setName("Paying Owner");
             payer.setMobileVerified(true);
             payer = users.saveAndFlush(payer);
-            grants.grant(payer.getId(), TestPlanGrants.OWNER_PLUS);
             Property p = new Property(payer, title, "rent", "apartment", 25000L, tag, "Pune");
             p.setBhk(new BigDecimal("2"));
             p.setPriceUnit("per-month");
             p.setStatus(PropertyStatus.APPROVED);
+            p.verifyOwnership(Instant.now(), null);
             return p;
         }
 
@@ -716,7 +719,7 @@ class ListingSearchTest extends AbstractApiTest {
             Property plain = featuredRent("Featured but plain");
             Property decorated = plainRent("Verified and complete");
             decorated.setOwnerVerified(true);
-            decorated.verifyOwnership(Instant.now(), null);
+            decorated.verifyOwnership(Instant.now().minus(30, java.time.temporal.ChronoUnit.DAYS), null);
             decorated.setReraId("P52100012345");
             decorated.setImages(List.of("a", "b", "c"));
             persist(plain);
@@ -792,7 +795,8 @@ class ListingSearchTest extends AbstractApiTest {
         @Test
         @DisplayName("rank=verified puts verified rows before the default order")
         void verifiedRankGroupsVerifiedRowsFirst() throws Exception {
-            Property featured = featuredRent("Featured but unverified");
+            Property featured = plainRent("Rera but unverified");
+            featured.setReraId("P52100099999");
             Property verified = plainRent("Verified but plain");
             verified.setOwnerVerified(true);
             persist(featured);

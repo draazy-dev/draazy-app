@@ -5,7 +5,7 @@ import { API, STAFF_PASSWORD, authHeaders, apiLogin, staffEmail, uniqueMobile } 
 // The fixture restores shared settings after each test to avoid cross-spec contamination.
 
 const BUY = 'p5021';
-const FREE_PLAN = 'b1000000-0000-4000-8000-000000000001';
+const CONTACT_PACK_PLAN = 'b1000000-0000-4000-8000-000000000006';
 
 const ALL_FLAGS = [
   'mapSearch', 'scheduleVisit', 'reviewsEnabled', 'inAppMessaging', 'assistant',
@@ -185,17 +185,17 @@ test('the slug-less /society route is gone, and the retired societySaaS flag is 
 });
 
 test('subscriptionPlans flag pauses checkout on the page and at the server', async ({ page, flags, login }) => {
-  const pausedHeading = page.getByRole('heading', { name: 'Plan purchases are paused' });
+  const pausedHeading = page.getByRole('heading', { name: 'Purchases are paused right now' });
   const pay = page.getByRole('button', { name: /^Pay/ }).first();
 
   await flags.disable('subscriptionPlans');
   await login.asBuyer();
-  await page.goto('/checkout?plan=seeker-plus');
+  await page.goto('/checkout?plan=contact-pack');
   await expect(pausedHeading).toBeVisible();
   await expect(page.getByRole('button', { name: /^Pay/ })).toHaveCount(0);
 
   const { accessToken } = await apiLogin(uniqueMobile());
-  const refused = await post('/me/subscription', { planId: FREE_PLAN }, { authorization: `Bearer ${accessToken}` });
+  const refused = await post('/me/subscription', { planId: CONTACT_PACK_PLAN }, { authorization: `Bearer ${accessToken}` });
   expect(refused.status).toBe(403);
   expect((await refused.json()).error).toBe('purchases_paused');
 

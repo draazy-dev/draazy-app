@@ -1,37 +1,36 @@
 # Flow: Plans, Billing & Refer-a-Friend
 
-> The monetisation and growth surface: subscription tiers (owner + seeker), a simulated checkout, the
-> per-user billing view, platform fees, and a two-track referral program with non-monetary rewards.
-> **Status:** documented from React source · re-synced to ADR-019 (badge-not-gate) - **Primary role(s):** owner + seeker (buyer/tenant)
+> The monetisation and growth surface: pay-per-use products (listing pass, contact pack), the rent
+> agreement fee, checkout, the per-user billing view, and a two-track referral program with
+> non-monetary rewards. Nothing auto-renews and every price includes GST (Q16b).
+> **Status:** re-synced to Q16b (pay-per-use MVP) - **Primary role(s):** owner + seeker (buyer/tenant)
 
 ---
 
 ## 1. Purpose & user problem
-- **Persona:** an owner who needs more listing slots / a free rent agreement; a seeker who
-  wants more owner contacts; any user who wants to earn rewards by inviting friends.
-- **Job-to-be-done:** "Understand what I get on each plan, upgrade if it's worth it, see my billing,
-  and get rewarded for bringing friends who list or search."
-- **Why it matters:** this is how zero-brokerage is funded (platform fees, plans, service orders) and
-  how the marketplace grows virally. Entitlements (listing limits and contact unlocks) are the
-  levers that turn free users into paying ones.
+- **Persona:** an owner who wants a second property live at once; a seeker who has used the free
+  owner contacts; any user who wants to earn rewards by inviting friends.
+- **Job-to-be-done:** "Use Draazy free, pay a small one-off amount only when I need more, see my
+  billing, and get rewarded for bringing friends who list or search."
+- **Why it matters:** this is how zero-brokerage is funded at MVP (rent agreements, listing passes,
+  contact packs) and how the marketplace grows virally.
 
 ## 2. Entry points
-- **Routes:** `/plans` (public), `/checkout?plan=<id>` (`ProtectedRoute`; redirects to
-  `/signin?next=...` if signed out), `/refer` (signed-in), and the Dashboard "Plan & Billing" tab
-  (`#billing`).
-- **Tiles / triggers:** BillingPanel "Change plan ->" (`/plans`); each plan card CTA (free plans link
-  to `/list-property` or `/listings`, paid plans link to `/checkout?plan=...`); Refer page share
-  buttons; the Plans "Create rent agreement" CTA (`/services/rent-agreement`); the Checkout success
-  screen links to `/dashboard#billing`.
+- **Routes:** `/plans` (public), `/checkout?plan=contact-pack|listing-pass[&property=<id>]`
+  (signed-in; redirects to `/signin?next=...`), `/refer` (signed-in), and the Dashboard "Plan &
+  Billing" tab (`#billing`).
+- **Tiles / triggers:** BillingPanel "Change plan ->" (`/plans`); My Listings "Get a pass" on a
+  paused listing; `ContactsExhaustedModal` "Get 15 more"; Refer page share buttons; the Plans
+  "Create rent agreement" CTA (`/services/rent-agreement`); agreement renewal strips in the dashboard.
 - **Source components:** `src/pages/consumer/Plans.jsx`, `src/pages/consumer/Checkout.jsx`,
   `src/pages/consumer/Refer.jsx`, `src/pages/consumer/dashboard/BillingPanel.jsx`,
-  `src/lib/store/billing.js`, `src/lib/store/referrals.js`.
-- **Data/seed:** the `plans` seed in `R__DML_seed_reference_data.sql`, referral admin rows from `GET /referrals`,
-  `src/pages/consumer/dashboard/constants.js` (`BILLING_HISTORY`).
+  `src/components/dashboard/AgreementPerks.jsx`, `src/context/PlanContext.jsx`.
+- **Data/seed:** the `plans` seed in `R__DML_seed_reference_data.sql` and V107, referral admin rows
+  from `GET /referrals`, `src/pages/consumer/dashboard/constants.js` (`BILLING_HISTORY`).
 
 ## 3. Actors & roles
-- **Seeker vs owner plans** are shown side by side; the mobile view toggles persona (defaults to the
-  user's `role`, seeker-first for signed-out visitors).
+- **Owner products** (listing pass, rent agreement) and **seeker products** (contact pack) are shown
+  side by side; the mobile view toggles persona (defaults to the user's `role`).
 - **Checkout** requires sign-in. **Referral rewards** are role-tracked (owner track vs seeker track).
 - **Fraud review** of referrals is an ops/admin responsibility (see
   [`../ops/referrals-fraud.md`](../ops/referrals-fraud.md), planned) - the consumer app only records
@@ -39,90 +38,63 @@
 
 ## 4. Entities touched
 Links go to [`../../system/data-model.md`](../../system/data-model.md).
-- `plans` (seed `R__DML_seed_reference_data.sql`) - read (catalog metadata).
-- User plan (runtime `dzPlan:<mobile>`, ids `free`/`owner-free`/`owner2`/`owner5`) - read + written
-  by Checkout (`setPlan`).
-- Platform fees / `settings.fees` (admin DB, read via `getFees`) - read.
-- `service_orders` (runtime `dzServiceOrders:<mobile>`) - created by Checkout (`addServiceOrder`).
-- `referrals` (`GET /referrals`, `RF3###`; runtime stats `dzReferralStats:<mobile>`) - read +
-  incremented; plus `dzReferralCode:<mobile>` and `dzReferredBy:<mobile>` capture.
+- `plans` (`kind`, `term_days`, `active`) - read.
+- `subscriptions` (`property_id` for a listing pass) - created by `POST /me/subscription`,
+  activated by the Cashfree webhook, expired by `SubscriptionSweeper`.
+- `settings.fees` - read via `GET /pricing`.
+- `contact_requests`, `properties` - read to derive entitlements; `rent_agreements` - read and
+  stamped by the renewal sweep.
+- `referrals` (`GET /referrals`) - read.
 - `BILLING_HISTORY` (static seed constant) - read for the payment-history table.
 
 ## 5. Business rules & logic  *(the meat)*
 
-### Plan catalog (`Plans.jsx`)
-The cards read the live plan catalogue (`GET /bootstrap`, `plans`); `fee()` remains only as the fallback when it has not
-resolved, which is why the two tables must agree and are pinned together by
-`PlanPriceMatchesFeeScheduleTest`:
-- **Seeker:** `seeker-free` (Rs 0, the free contact allowance: 15 in total) and `seeker-plus` (Rs 199/mo; unlimited owner
-  contacts, instant alerts, saved-search priority).
-- **Owner:** `owner-free` (Rs 0, 1 listing, Verified owner badge), `owner2` (Rs 999/yr, 2 listings, featured placement),
-  `owner5` (Rs 2499/yr, 5 listings, featured placement, dedicated manager, rent agreement included). Listing counts
-  render from the catalogue's `listingLimit`; the seed is the source of truth for every claim on the cards.
-- The active plan (`getPlan().id`) is marked "Current plan"; a **paid** current plan locks its CTA
-  against re-purchase; a free current plan keeps the CTA actionable (default id is `free` for all).
+### Price list (`Plans.jsx`)
+The page reads the active catalogue (`GET /plans`, also in `GET /bootstrap`); each row carries
+`kind` and `termDays`. Retired subscription rows (`kind = plan`, `active = false`) are honoured until
+they lapse but never sold.
+- **Listing pass** (`b1…005`, `kind = listing-pass`, Rs 999, 60 days): one extra *live* rent/sell
+  listing, bound to one property (`subscriptions.property_id`). It ends early when that listing is
+  rented, sold or archived. Re-listing later is free if it fits the free tier.
+- **Contact pack** (`b1…006`, `kind = contact-pack`, Rs 199, 15 contacts, 30 days from payment).
+  Packs stack.
+- **Rent agreement**: Rs 499 + government charges (stamp duty, registration), first or renewal.
+- Free: 1 live listing, unlimited flatmate posts, 15 owner contacts in the first 30 days, referral
+  rewards, 7 days of Featured after ownership verification.
 
-### Platform fees (`store/billing.js`)
-- Single source of truth = admin DB `settings.fees` (read via `rawDb()`), with a legacy
-  `draazyAdminDB_v7` fallback, over `FEE_DEFAULTS = { ownerPlanYearly: 999, ownerProYearly: 2499,
-  rentAgreementPlatform: 500, seekerPlusTopup: 199, gstPercent: 18 }`.
-  `fee(key)` formats as `Rs N` (`en-IN`).
-- (Note: `data-model.md` shows a different sample `ownerPlanYearly` value; the
-  authoritative default in code is 999, overridable by admin settings.)
+### Platform fees (`settings.fees`)
+- Keys: `listingPass`, `contactPack`, `rentAgreementPlatform`, `gstPercent` (0: prices include GST),
+  `freeContactLimit`, `referralContactBonus`, `referralQualifyPerMonth`. Published by `GET /pricing`;
+  editable in Admin → Settings → Fees. The charged amount is always the plan row's `price`.
 
 ### Entitlements / gating
-- **Listing quota (server-side since D234).** The plan's cap lives in `plans.listing_limit`
-  (`free`/`owner-free` = 1, `owner2` = 2, `owner5` = 5) and the referral bonus is derived from
-  qualified referrals; `GET /me/entitlements` returns their sum as `listings.allowance`, alongside
-  the `listings.referralBonus` already contained in it, and `listings.used` — the same count
-  `POST /me/listings` refuses on: listings in the statuses that occupy a slot — pending, approved, flagged, sold,
-  rented. **Rejected does not count**: a listing moderation refused is not occupying anything the
-  owner can use, and charging a slot for it would let a moderator permanently spend a free-tier
-  owner's whole allowance. Flatmate posts never consume quota, and editing an existing listing never
-  does either — only a genuinely new property.
-
-  The refusal is a **422 `listing_quota_exhausted`** from `POST /me/listings`, whose message names
-  the arithmetic ("You already have 1 of 1 listings live"). The wizard's paywall
-  (`lib/data/listingQuota.js`) is a **mirror** of that gate, there so the owner sees the ceiling
-  before filling in three steps of a form; every failure path in it is permissive, because the
-  server says no anyway.
-
-  This replaces `canPostListing()` in `lib/store/billing.js`, which compared a count of the listings
-  *this browser's localStorage happened to hold* against a limit that added a locally-minted
-  referral bonus. Both halves were a browser's opinion and they were wrong in opposite directions:
-  an owner who posted from their laptop and opened the wizard on their phone had a used-count of
-  zero, while an owner who cleared site data lost slots they had genuinely earned. The endpoint
-  itself accepted any number of listings from anyone, so the paywall was in practice a paywall
-  against clearing your cookies.
-
-  **The exit is `DELETE /me/listings/{id}`** — the owner takes their own listing down, soft-archived
-  with the reason recorded, and the slot is free immediately. It had to be built alongside the gate:
-  `ListingUpdate` deliberately omits `status` so a `PATCH` cannot self-escalate, so before D234 an
-  owner had no way back under the ceiling at all, and the new limit would have meant one listing
-  *ever*. There is no button for it yet; the endpoint is ahead of the UI.
-- **Owner-contact quota (server-side since D31b).** The free tier is 15 owner contacts
-  (`settings.fees.freeContactLimit`), a "contact" is the right to open one `contact_requests` row,
-  and the three priced plans carry `plans.unlimited_contacts = true` (V91). The numbers are read
-  from `GET /me/entitlements`; the refusal is a **422 `contact_quota_exhausted`** from
-  `POST /contacts/request`. `used` is `count(contact_requests where requester = me)` rather than a
-  stored counter, so a repeat press on the same listing costs nothing and a refused press costs
-  nothing. This replaces the old `lib/store/contactQuota.js` — a `dzContactsUsed:<mobile>` counter
-  that the browser wrote, added a locally-minted referral bonus to, and enforced *before* making any
-  request. Clearing site data restored it in full and a second device never knew about the first.
-  The `lib/store.js` barrel has itself since been deleted — its last two importers now name the
-  `lib/store/*` slices directly.
+- **Listing tier (soft gate).** 1 free live listing (live = approved or flagged), plus the referral
+  bonus, plus one per active pass. Posting and drafting are never refused. When moderation approves
+  a listing that would exceed the tier it is stored **paused**; My Listings offers "Get a pass" →
+  `/checkout?plan=listing-pass&property=<id>`, and a paid pass resumes it. An owner resume over the
+  tier is a **422 `listing_quota_exhausted`**; pausing or archiving another listing frees the slot.
+  `GET /me/entitlements` → `listings {allowance, referralBonus, used, passes[{propertyId, expiresAt}]}`
+  (`used` = live listings no pass covers). Flatmate posts never count; the 3-active-post cap on
+  non-owner hosts stays as an anti-broker guard.
+- **Owner-contact quota (derived, D31b + Q16b).** A "contact" is the right to open one
+  `contact_requests` row. `ContactAllocator` replays the caller's contacts, oldest first, against
+  buckets: **free** (`settings.fees.freeContactLimit` = 15, usable until 30 days after the first
+  contact, once per account), each paid **pack** (15, valid 30 days from payment) and **referral**
+  contacts (never expire). Each contact spends the valid bucket that expires soonest; `remaining` is
+  what is left in buckets valid now. Nothing is stored, so a repeat press on the same listing and a
+  refused press cost nothing. A legacy unlimited plan stays unlimited until it lapses. Read from
+  `GET /me/entitlements` → `contacts {unlimited, used, allowance, remaining, referralBonus,
+  freeWindowEndsAt, packExpiresAt}`; the refusal is a **422 `contact_quota_exhausted`** from
+  `POST /contacts/request`, and `ContactsExhaustedModal` offers the pack.
 
 ### Checkout (`Checkout.jsx`)
-- Reads `?plan=` (`seeker-plus` | `owner2` | `owner5`); unknown -> `Navigate('/plans')`. Requires
-  sign-in -> else redirect to `/signin?next=/checkout?plan=...`.
-- `pay()` simulates a gateway round-trip (`setTimeout 900ms`), then: for `kind: 'plan'` calls
-  `setPlan({ id: planId, name: P.planName })`; always records a `service_order` via `addServiceOrder({
-  type: plan?'subscription':'topup', plan, title, amount, method })` and shows the order ref.
-- **Re-purchase guard:** `alreadyOnThisPlan = kind==='plan' && !paid && getPlan().id === planId`
-  short-circuits to an "already active" screen. Subscriptions persist via `getPlan()`; the one-time
-  Seeker Plus top-up has no lasting ownership, so it stays **re-purchasable**.
-- Payment methods: `UPI` (default), `Card`, `Netbanking`. Taxes shown as "included" (GST is a fee
-  field, not added on top here). Prototype does not take real payment.
+- `/checkout?plan=contact-pack` or `/checkout?plan=listing-pass&property=<id>`; anything else →
+  `/plans`. Requires sign-in (`/signin?next=…`). A pass for a listing that is not the caller's, is
+  archived or is already covered is refused (409/422) and the page sends the owner back to My Listings.
+- `POST /me/subscription {planId, propertyId?, paymentMethod}` with an Idempotency-Key unique to the
+  checkout screen: a double tap returns the same order, a second pack is a new purchase. A pending
+  order opens Cashfree; only the signed webhook activates it. One open unpaid order per user (409).
+- The page shows the flat price (GST included) and, once paid, the expiry date. Nothing auto-renews.
 
 ### The Cashfree webhook signature (`WebhookSignature`)
 
@@ -173,10 +145,24 @@ with the variable unset fails in the binder first — but that only fires for a 
 and reading that file; the constructor check is what states the rule.
 
 ### Billing view (`BillingPanel.jsx`)
-- Current plan from `getPlan()` (single source of truth, not inferred from inventory). Sub-line
-  depends on `isPaidOwnerPlan()` / `isOwner`. Payment history is the static `BILLING_HISTORY` seed
-  (`INV-2041` owner yearly Rs 999, `INV-1899` rent agreement Rs 500, all
-  "Paid"). "Change plan ->" links to `/plans`.
+- Current product from `usePlan()`: a pass or pack shows its term; otherwise the free tier line
+  ("1 live listing free · Rs 999 pass for each extra" / "15 free owner contacts in your first 30
+  days"). Payment history is still the static `BILLING_HISTORY` seed. "Change plan ->" links to `/plans`.
+
+### Rent-agreement retention (`AgreementPerks.jsx`, `RentAgreementRenewalSweeper`)
+- A daily 09:00 IST sweep notifies the owner (once per agreement) and each tenant whose mobile
+  matches, 60 days before a registered/active agreement ends (`rent_agreements.renewal_reminded_at`
+  makes it once). `GET /me/rent-agreements` rows carry `serviceRequestId` and `endDate`.
+- Agreement rows ending within 60 days (or up to 30 days past) show "Renew for Rs 499" →
+  `/services/rent-agreement?listing=<pid>&renew=<agreementId>`, which loads
+  `GET /me/rent-agreements/{id}/renewal` (owner or the tenant whose verified mobile is on the agreement;
+  404 otherwise) and prefills owner, tenants, rent, deposit and months, starting the day after the old end.
+  Owners also get "Tenant moving out? List it again" → `/dashboard?relist=<pid>&from=<date>#properties`;
+  `RelistModal` picks the available date (default the day after the end) and calls
+  `POST /me/deals/{pid}/reopen {availableOn}`, which ends the tenancy the day before that date.
+- A listing pass checkout still unpaid when its listing is archived, rented or sold is cancelled; a payment
+  that lands anyway grants nothing and is refunded through the gateway (retried by the hourly sweep).
+- Registered/active rows show "You saved Rs <rent> in brokerage" with a Share button.
 
 ### Referral program (`Refer.jsx` + `store/referrals.js`)
 
@@ -259,9 +245,9 @@ here is a **reward-payout uniqueness** guard (`identity_hash`), part of the opt-
 
 ## 7. State machine
 ```
-User plan:      free/owner-free  --Checkout pay (owner2/owner5)-->  paid (persists via dzPlan)
-                seeker-plus: one-time top-up, no lasting plan state (re-purchasable)
-Checkout:       select plan -> (guard: alreadyOnThisPlan?) -> paying -> paid (order ref)
+Pass / pack:    pending (Cashfree order) --signed webhook--> active --term ends--> expired
+                listing pass also ends when its listing is rented, sold or archived
+Over-tier listing: pending --approve--> paused --pass paid / slot freed--> approved
 Referral:       (per RF row) pending -> qualified -> rewarded
                             \-> flagged -> rejected   (fraud signals)
 ```
@@ -269,21 +255,17 @@ Referral:       (per RF row) pending -> qualified -> rewarded
 ## 8. Edge cases, validation & error states
 - **Unknown/missing `?plan=`** -> redirect to `/plans`. **Signed-out checkout** -> redirect to signin
   with `next`.
-- **Already on a paid plan** -> both Plans (locked CTA) and Checkout (already-active screen) prevent
-  double-purchase; Seeker Plus stays re-purchasable by design.
-- **Listing paywall:** the wizard blocks a new listing and routes to upgrade when
-  `GET /me/listings` count ≥ `GET /me/entitlements` allowance; `POST /me/listings` refuses it with
-  `422 listing_quota_exhausted` regardless of what the wizard did.
-- **Featuring on a free plan:** blocked by `isPaidOwnerPlan()`; user prompted to upgrade.
+- **Second pass for the same listing** -> 409; packs are deliberately re-purchasable and stack.
+- **Over the free tier** -> the listing is saved and approved into `paused`; resuming it without a
+  pass or a free slot is `422 listing_quota_exhausted`.
+- **Featured** is never sold: 7 days from ownership verification, re-granted on re-verification.
 - **Referral vanity guard:** nothing the page does moves the invite count — it is the server's count
   of redeemed codes, so neither a copy nor a completed share nor a cancelled OS share can inflate it.
 - **Cross-device attribution:** closed. Referrer counters and every earned balance are derived from
   the server's referral rows, so a friend signing up on another device counts and clearing site data
   loses nothing.
-- **Fee source fallback:** if the admin DB is unreadable, fees fall back to `FEE_DEFAULTS` (never
-  zero/blank).
-- **Prototype payments** are simulated; the success screen still renders for a purchase just made this
-  session (guard is `!paid`).
+- **Fee source fallback:** if `GET /pricing` is unreachable, the frontend falls back to its bundled
+  defaults; the charge is always the server's plan row.
 
 
 ## Appendix: entitlement and plan-model rationale (moved from source Javadoc)
@@ -380,11 +362,13 @@ plan states a large number, and V24's CHECK forbids an owner plan from leaving i
 `Plan.unlimitedContacts` (V91, D31b) is a separate column from `contactLimit` rather than a
 convention over it, because `contactLimit` is nullable and its own comment admits `null` means
 "unlimited or not-applicable" — two different answers stored identically, which is exactly the
-question an entitlement check asks. `contactLimit` stayed as display data on the pricing page;
-nothing reads it to decide anything. `unlimitedContacts` is `false` on Owner Free and `true` on
-the three priced plans. Set from seeded ids rather than from `price > 0`: priced and unlimited
-coincide today but are two decisions, and a promotional free month must not withdraw the
-entitlement it is promoting.
+question an entitlement check asks. It is `true` only on the three retired priced plans, which keep
+it until they lapse. Since V107 a contact pack's `contactLimit` *is* read: it is the pack's bucket
+size in `ContactAllocator`.
+
+`Plan.kind` (V107) separates the retired subscription tiers (`plan`) from the one-off products
+(`listing-pass`, `contact-pack`); `term_days` overrides `billing_cycle` for the latter, and
+`active = false` takes a row off sale without touching what was already bought.
 
 ### Contract DTOs
 `PlanDto` mirrors `plans` on the wire: `price` is whole rupees per `billingCycle` (`0` is the

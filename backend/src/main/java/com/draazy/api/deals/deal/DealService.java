@@ -1,6 +1,7 @@
 package com.draazy.api.deals.deal;
 
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.PropertyLifecycle;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -14,6 +15,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -96,8 +98,7 @@ public class DealService {
         deal.setStatus(DealStatuses.CLOSED);
         deal.setClosedAt(Instant.now());
 
-        property.setStatus(terminalStatusFor(property));
-        property.setDealStatus(DealStatuses.CLOSED);
+        closeOut(property);
 
         users.findByMobile(normalised)
                 .ifPresent(user -> deal.setCounterpartyId(user.getId()));
@@ -116,9 +117,10 @@ public class DealService {
     }
 
     @Transactional
-    public void reopen(AuthPrincipal caller, UUID propertyId) {
+    public void reopen(AuthPrincipal caller, UUID propertyId, String availableOnRaw) {
         Property property = ownedProperty(caller.userId(), propertyId);
         requireReopenable(property);
+        LocalDate availableOn = AvailableOn.resolve(availableOnRaw, null, false, property.getDeal());
         Deal deal = deals.findByPropertyId(propertyId)
                 .orElseThrow(() -> new ConflictException(
                         "Cannot reopen a deal in status " + DealStatuses.ACTIVE));
@@ -141,10 +143,15 @@ public class DealService {
             property.recordResubmission();
         }
         property.setDealStatus(DealStatuses.ACTIVE);
+        if (availableOn != null) {
+            property.setAvailableOn(availableOn);
+        }
 
         // Otherwise the active-tenancy unique index stays occupied and the next tenant can never be let in.
         if (DealIntent.RENT.equals(property.getDeal())) {
-            tenancyService.endActiveTenancy(propertyId);
+            LocalDate today = AvailableOn.today();
+            tenancyService.endActiveTenancy(propertyId,
+                    availableOn != null && availableOn.isAfter(today) ? availableOn.minusDays(1) : today);
         }
     }
 
@@ -176,8 +183,13 @@ public class DealService {
         deal.setClosedAt(Instant.now());
         deals.save(deal);
 
+        closeOut(property);
+    }
+
+    private void closeOut(Property property) {
         property.setStatus(terminalStatusFor(property));
         property.setDealStatus(DealStatuses.CLOSED);
+        properties.endListingPasses(property.getId());
     }
 
     private Property ownedProperty(UUID callerId, UUID propertyId) {

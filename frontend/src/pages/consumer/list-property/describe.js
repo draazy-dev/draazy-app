@@ -1,4 +1,5 @@
 import { commercialLabelOf } from './constants.js';
+import { daysUntil, shortDate } from '../../../lib/availability.js';
 
 const TYPE_LABEL = {
   flat: 'flat',
@@ -36,7 +37,7 @@ export function describeListing(form) {
     ? [
         form.monthlyRent && `${money(form.monthlyRent)}/month`,
         form.deposit && `${money(form.deposit)} deposit`,
-        form.availableFrom && `available from ${form.availableFrom}`,
+        form.availableFrom && (daysUntil(form.availableFrom) <= 0 ? 'available now' : `available from ${shortDate(form.availableFrom)}`),
         form.preferredTenants?.length && `preferred tenants: ${form.preferredTenants.join(', ')}`,
       ]
     : [

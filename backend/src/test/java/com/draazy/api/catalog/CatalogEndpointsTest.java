@@ -67,25 +67,21 @@ class CatalogEndpointsTest extends AbstractApiTest {
 
     /** An array, because the table is keyed by deal and one object cannot say which. */
     @Test
-    void feesReturnsOneEntryPerDealIntent() throws Exception {
+    void feesReturnsTheRentRowOnly() throws Exception {
         mvc.perform(get("/fees"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].deal").value("buy"))
-                .andExpect(jsonPath("$[0].brokerage").value(0))
-                .andExpect(jsonPath("$[1].deal").value("rent"))
-                .andExpect(jsonPath("$[1].platformFee").value(500));
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].deal").value("rent"))
+                .andExpect(jsonPath("$[0].platformFee").value(499))
+                .andExpect(jsonPath("$[0].brokerage").value(0));
     }
 
     @Test
-    void neitherDealPublishesAFlatStampDuty() throws Exception {
+    void theRentFeePublishesNoFlatStampDuty() throws Exception {
         mvc.perform(get("/fees"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].deal").value("buy"))
-                .andExpect(jsonPath("$[0].stampDuty").doesNotExist())
-                .andExpect(jsonPath("$[0].registration").value(30000))
-                .andExpect(jsonPath("$[1].deal").value("rent"))
-                .andExpect(jsonPath("$[1].stampDuty").doesNotExist());
+                .andExpect(jsonPath("$[0].deal").value("rent"))
+                .andExpect(jsonPath("$[0].stampDuty").doesNotExist());
     }
 
     @Test

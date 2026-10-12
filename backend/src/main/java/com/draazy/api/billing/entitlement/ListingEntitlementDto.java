@@ -1,8 +1,14 @@
 package com.draazy.api.billing.entitlement;
 
-/** {@code used} is the count {@code ListingQuota.require} refuses a post on, so the wizard paywall mirrors the gate. */
+import java.util.List;
+
+/** {@code used} counts live listings no pass covers; {@code passes} lists the listings an unexpired pass covers. */
 public record ListingEntitlementDto(
         int allowance,
         int referralBonus,
-        long used) {
+        long used,
+        List<Pass> passes) {
+
+    public record Pass(String propertyId, String expiresAt) {
+    }
 }

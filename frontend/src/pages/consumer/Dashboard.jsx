@@ -85,7 +85,7 @@ export default function Dashboard() {
   }, []);
 
   const {
-    listings, visits, recent, recommended, alertMatches,
+    listings, listingsLoaded, visits, recent, recommended, alertMatches,
     contactReqs, photoReqs, flatmateReqs, docReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
     apps, decideApp,
@@ -196,7 +196,7 @@ export default function Dashboard() {
     if (tab === 'overview' && personaPending) return <DashboardOverviewSkeleton />;
     switch (tab) {
       case 'properties':
-        return <MyPropertiesPanel key={'prop:' + (sub || '')} initialSub={sub} isOwner={isOwner} listings={listings} setListings={setListings} managed={managedProps} onManagedChanged={refreshManaged} user={user} toast={toast} REVIEW_STATUS={REVIEW_STATUS} openReview={openReview} reviewsByProp={reviewsByProp} onChanged={refreshData} />;
+        return <MyPropertiesPanel key={'prop:' + (sub || '')} initialSub={sub} isOwner={isOwner} listings={listings} listingsLoaded={listingsLoaded} setListings={setListings} managed={managedProps} onManagedChanged={refreshManaged} user={user} toast={toast} REVIEW_STATUS={REVIEW_STATUS} openReview={openReview} reviewsByProp={reviewsByProp} onChanged={refreshData} />;
       case 'rental':
         return <MyRentalPanel user={user} toast={toast} />;
       case 'activity':
@@ -210,7 +210,7 @@ export default function Dashboard() {
       case 'visits':
         return <VisitsTab visits={visits} toast={toast} isOwner={isOwner} onUpdate={mutateVisit} />;
       case 'billing':
-        return <BillingPanel isOwner={isOwner} />;
+        return <BillingPanel isOwner={isOwner} listings={listings} />;
       case 'profile':
         return <ProfileTab user={user} update={update} toast={toast} isOwner={isOwner} />;
       default:

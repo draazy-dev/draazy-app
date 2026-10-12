@@ -41,10 +41,24 @@ test('a fresh account starts on the free allowance and nothing is stored to make
   expect(ent.contacts.allowance).toBe(FREE_LIMIT);
   expect(ent.contacts.remaining).toBe(FREE_LIMIT);
   expect(ent.contacts.referralBonus, 'no referrals, no bonus').toBe(0);
+  expect(ent.contacts.freeWindowEndsAt, 'the 30-day window starts at the first contact, not at signup').toBeNull();
+  expect(ent.contacts.packExpiresAt).toBeNull();
 
-  /* The listing ceiling is reported but not enforced on POST /me/listings; see docs/system/open-questions.md. */
   expect(ent.listings.allowance).toBeGreaterThanOrEqual(1);
   expect(ent.listings.referralBonus).toBe(0);
+  expect(ent.listings.passes).toEqual([]);
+});
+
+test('the free window opens at the first contact and lasts thirty days', async () => {
+  const { accessToken } = await apiLogin(uniqueMobile());
+  const [first] = await someListingIds(1);
+
+  expect((await askFor(accessToken, first)).status).toBe(200);
+  const { contacts } = await entitlements(accessToken);
+
+  const days = (Date.parse(contacts.freeWindowEndsAt) - Date.now()) / 86_400_000;
+  expect(days).toBeGreaterThan(29.9);
+  expect(days).toBeLessThanOrEqual(30);
 });
 
 test('opening a contact spends exactly one, and re-opening the same one spends nothing', async () => {

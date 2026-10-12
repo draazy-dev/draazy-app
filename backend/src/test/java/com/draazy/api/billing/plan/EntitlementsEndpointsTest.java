@@ -38,6 +38,7 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     @Autowired SubscriptionRepository subscriptions;
 
     @Autowired PlanRepository plans;
+    @Autowired TestPlanGrants grants;
 
     // ---- fixtures ----
 
@@ -81,7 +82,7 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     }
 
     private void unlimitedPlan(User u) {
-        subscriptions.saveAndFlush(new Subscription(u.getId(), UUID.fromString(UNLIMITED_PLAN),
+        subscriptions.saveAndFlush(new Subscription(u.getId(), UUID.fromString(UNLIMITED_PLAN), null,
                 SubscriptionStatuses.ACTIVE, priceOf(UNLIMITED_PLAN), Instant.now(),
                 Instant.now().plus(30, ChronoUnit.DAYS), null, null));
     }
@@ -136,6 +137,39 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.listings.allowance").value(1))
                 .andExpect(jsonPath("$.listings.referralBonus").value(0))
                 .andExpect(jsonPath("$.listings.used").value(0));
+    }
+
+    @Test
+    @DisplayName("the free window opens at the first contact; a pack adds its contacts and its expiry")
+    void freeWindowAndPackAreReported() throws Exception {
+        User buyer = user("9844400030", "buyer");
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.freeWindowEndsAt").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.contacts.packExpiresAt").value(org.hamcrest.Matchers.nullValue()));
+
+        spend(buyer, 1, 9844400031L);
+        grants.grantPack(buyer.getId(), Instant.now(), Instant.now().plus(30, ChronoUnit.DAYS));
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.unlimited").value(false))
+                .andExpect(jsonPath("$.contacts.used").value(1))
+                .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT + 15 - 1))
+                .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT + 15))
+                .andExpect(jsonPath("$.contacts.freeWindowEndsAt").isString())
+                .andExpect(jsonPath("$.contacts.packExpiresAt").isString());
+    }
+
+    @Test
+    @DisplayName("a pack lets a buyer whose free contacts are spent carry on")
+    void aPackReopensAnExhaustedBuyer() throws Exception {
+        User buyer = user("9844400040", "buyer");
+        spend(buyer, FREE_LIMIT, 9844400041L);
+        assertThat(ask(buyer, listing(user("9844400070", "owner"), "One too many"))).isEqualTo(422);
+
+        grants.grantPack(buyer.getId(), Instant.now(), Instant.now().plus(30, ChronoUnit.DAYS));
+
+        assertThat(ask(buyer, listing(user("9844400071", "owner"), "Now allowed"))).isEqualTo(200);
     }
 
     @Test
@@ -309,7 +343,7 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     @DisplayName("an unpaid order confers nothing — capability is not the same question as standing")
     void aPendingSubscriptionEntitlesNothing() throws Exception {
         User u = user("9844406000", "owner");
-        subscriptions.saveAndFlush(new Subscription(u.getId(), UUID.fromString(UNLIMITED_PLAN),
+        subscriptions.saveAndFlush(new Subscription(u.getId(), UUID.fromString(UNLIMITED_PLAN), null,
                 SubscriptionStatuses.PENDING, priceOf(UNLIMITED_PLAN), Instant.now(), null, null, null));
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(u)))

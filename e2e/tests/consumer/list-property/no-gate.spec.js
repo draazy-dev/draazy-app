@@ -1,5 +1,5 @@
 /* ADR-019: an owner who has never started a verification can post, so no badge is granted here.
-   The second test holds a listing because the listing-limit paywall must not read as an identity wall. */
+   The second test holds a listing to show the tier is never mistaken for an identity wall. */
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { signedInAsNew, authHeaders, API, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 
@@ -62,10 +62,10 @@ test('a signed-in owner reaches the wizard form immediately and after a reload ?
   await expect(gateHeading(page)).toHaveCount(0);
 });
 
-test('an existing listing never triggers an identity gate (limit paywall is not KYC)', async ({ page }) => {
+test('an existing listing never triggers an identity gate and does not block the form', async ({ page }) => {
   await gotoOwner(page, { withListing: true });
-  // Whatever shows (form or the listing-limit paywall), it is NEVER an identity wall.
   await expect(page.locator('.lp-meter')).toBeVisible({ timeout: 20000 });
+  await expect(formLocator(page)).toBeVisible({ timeout: 20000 });
   await expect(gateHeading(page)).toHaveCount(0);
   await expect(page.getByText('Is this the mobile number linked to your identity document?')).toHaveCount(0);
 });

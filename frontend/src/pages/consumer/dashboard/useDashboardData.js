@@ -58,6 +58,7 @@ async function loadFeed(withRecommended) {
 
 export function useDashboardData({ user, toast, ownsProperty }) {
   const [listings, setListings] = useState([]);
+  const [listingsLoaded, setListingsLoaded] = useState(false);
   // Every owner inbox is scoped to the caller's property listings, so a known non-owner skips them and their
   // refreshes until one appears (e.g. published in another tab).
   const ownerReads = !!user?.mobile && (ownsProperty !== false || listings.some((l) => !l.flatmate));
@@ -337,6 +338,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     if (bundle.length < 3) return;
     const [shownListings, mine, onMine] = bundle;
     setListings(shownListings);
+    setListingsLoaded(true);
     setVisits(mergeVisits(mine, onMine));
   }, [bundle]);
 
@@ -411,7 +413,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   }, [reviewRows, listings]);
 
   return {
-    listings, visits, recent, recommended, alertMatches,
+    listings, listingsLoaded, visits, recent, recommended, alertMatches,
     contactReqs, photoReqs, flatmateReqs, docReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
     apps, decideApp,

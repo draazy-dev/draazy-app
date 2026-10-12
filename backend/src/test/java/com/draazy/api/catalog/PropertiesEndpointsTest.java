@@ -1,13 +1,13 @@
 package com.draazy.api.catalog;
 
 import com.draazy.api.support.AbstractApiTest;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.draazy.api.billing.plan.TestPlanGrants;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyPossession;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -34,8 +34,6 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     UserRepository users;
     @Autowired
     PropertyRepository properties;
-    @Autowired
-    TestPlanGrants grants;
     @Autowired
     EntityManager em;
 
@@ -383,9 +381,10 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     @Test
     void featuredReturnsFeaturedFirst() throws Exception {
         User o = owner("9810000005");
-        User paying = owner("9810000025");
-        grants.grant(paying.getId(), TestPlanGrants.OWNER_PLUS);
-        save(paying, "Featured", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
+        User verifier = owner("9810000025");
+        Property featured = save(verifier, "Featured", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
+        featured.verifyOwnership(Instant.now(), null);
+        properties.saveAndFlush(featured);
         save(o, "Plain", "rent", "apartment", new BigDecimal("2"), 25000, "Kothrud", "approved", false);
 
         em.clear();
@@ -400,18 +399,33 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void featuredLapsesWithTheOwnerPlan() throws Exception {
-        User paying = owner("9810000026");
-        grants.grant(paying.getId(), TestPlanGrants.OWNER_PLUS);
-        save(paying, "Was featured", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
+    void featuredLapsesSevenDaysAfterVerification() throws Exception {
+        User verifier = owner("9810000026");
+        Property was = save(verifier, "Was featured", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
+        was.verifyOwnership(Instant.now(), null);
+        properties.saveAndFlush(was);
         save(owner("9810000091"), "Plain", "rent", "apartment", new BigDecimal("2"), 25000, "Kothrud", "approved", false);
-        jdbc.update("update subscriptions set renews_at = now() - interval '1 day' where user_id = ?", paying.getId());
+        jdbc.update("update properties set ownership_verified_at = now() - interval '8 days' where id = ?", was.getId());
         em.clear();
 
         mvc.perform(get("/properties/featured"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Plain"))
                 .andExpect(jsonPath("$[1].title").value("Was featured"));
+    }
+
+    @Test
+    void verifiedOwnershipWithoutATimestampIsNotFeaturedAndDoesNotBreakReads() throws Exception {
+        Property p = save(owner("9810000027"), "Untimed", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
+        jdbc.update("update properties set ownership_verified = true, ownership_verified_at = null where id = ?", p.getId());
+        em.clear();
+
+        mvc.perform(get("/properties/featured"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].title").value("Untimed"));
+        mvc.perform(get("/properties"))
+                .andExpect(status().isOk());
+        assertThat(properties.findById(p.getId()).orElseThrow().isFeatured()).isFalse();
     }
 
     @Test

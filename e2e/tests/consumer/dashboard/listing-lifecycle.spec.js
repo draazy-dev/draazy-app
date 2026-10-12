@@ -61,7 +61,7 @@ test('owner can pause and resume an approved listing from My listings', async ({
 
   await signedInAs(page, me.mobile);
   await page.goto('/dashboard#listings');
-  await expect(page.getByText('1 of 1 free listing used')).toBeVisible();
+  await expect(page.getByText('1 of 1 free live listing used')).toBeVisible();
 
   page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Pause', exact: true }).click();

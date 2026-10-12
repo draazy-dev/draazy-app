@@ -31,7 +31,7 @@ class ListingEditPrefillTest extends AbstractApiTest {
     private static final String DETAILS = """
             {"flatNumber":"C-901","tower":"North","society":"Edit Homes",
              "street":"Baner Road","landmark":"Near library","ownership":"Freehold",
-             "loanAvailable":false,"agreementDuration":"24","lockIn":"0","availableFrom":"2027-01-20",
+             "loanAvailable":false,"agreementDuration":"24","lockIn":"0",
              "foodPref":"veg","bestTimeToCall":"evening","listerRelation":"family",
              "furniture":["Study Table"],"preferredTenants":["family","bachelors"],"fixtures":[]}
             """;
@@ -69,7 +69,7 @@ class ListingEditPrefillTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.formDetails.listerRelation").value("family"))
                 .andExpect(jsonPath("$.formDetails.fixtures").isEmpty())
                 .andExpect(jsonPath("$.electricityMeterNo").value("00123456789"));
-        jdbc.update("update properties set status = 'approved' where id = ?", id);
+        jdbc.update("update properties set status = 'approved', available_on = date '2027-01-20' where id = ?", id);
         em.clear();
         mvc.perform(get("/properties/" + id)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.ownership").value("Freehold"))
@@ -78,6 +78,7 @@ class ListingEditPrefillTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.foodPref").value("veg"))
                 .andExpect(jsonPath("$.bestTimeToCall").value("evening"))
                 .andExpect(jsonPath("$.availableDate").value("2027-01-20"))
+                .andExpect(jsonPath("$.availableOn").value("2027-01-20"))
                 .andExpect(jsonPath("$.furniture[0]").value("Study Table"))
                 .andExpect(jsonPath("$.maintenance").value(2500))
                 .andExpect(jsonPath("$.negotiable").value(true))

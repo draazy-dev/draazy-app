@@ -567,9 +567,9 @@ paths:
         - name: availableFrom
           in: query
           description: >
-            Move-in bucket, **cumulative**: `30` also matches `15` and `now`. A tenant who can wait
-            a month can obviously also take a flat that is free today, and an exact match on the
-            bucket would deny them it.
+            Move-in window, **cumulative**: a date predicate on `availableOn` in IST — `now` is on or
+            before today, `15` within 15 days, `30` within 30 days. A tenant who can wait a month can
+            also take a flat that is free today. Listings with no stated date match no bucket.
           schema: { type: string, enum: [now, '15', '30'] }
         - name: pets
           in: query
@@ -1611,8 +1611,8 @@ paths:
       description: >-
         Owner-scoped pause for a live approved listing. Paused listings leave public search, counts,
         sitemap-style discovery and similar-listing surfaces, but the detail URL still resolves so a
-        held link can explain that the owner paused the listing. Pausing keeps the listing in the
-        owner's quota; it is not an exit from the free-tier ceiling.
+        held link can explain that the owner paused the listing. A paused listing does not count
+        against the free-tier ceiling, so pausing frees the slot for another listing.
       operationId: pauseMyListing
       responses:
         '200':
@@ -1632,7 +1632,9 @@ paths:
       description: >-
         Owner-scoped resume for a listing paused by its owner. Resuming returns the listing to
         `approved` without re-moderation; edits that require re-moderation move the listing back to
-        `pending` instead, so only an unchanged paused listing can use this shortcut.
+        `pending` instead, so only an unchanged paused listing can use this shortcut. Refused with
+        `422 listing_quota_exhausted` when the owner already has their free live listing(s) and the
+        listing has no active listing pass.
       operationId: resumeMyListing
       responses:
         '200':
@@ -1643,6 +1645,11 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422':
+          description: '`listing_quota_exhausted` — pause another listing or buy a listing pass for this one'
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /me/managed-properties:
     get:
       tags: [Listings]
@@ -1851,10 +1858,24 @@ paths:
       tags: [Listings]
       summary: Reopen property
       operationId: reopenDeal
+      description: >
+        Optional body `{availableOn}` (same validation as a listing create: today to today + 365 days
+        for rent, today + 5 years for sale, IST)
+        sets the date the home is free again. For a rent listing with a future date the active tenancy
+        ends the day before it, rather than today, so the next tenant can be added from that date.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                availableOn: { type: string, format: date, nullable: true }
       responses:
         '200': { description: Reopened }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /me/deals/{propId}/parties:
     parameters: [ { $ref: '#/components/parameters/PropId' } ]
     get:
@@ -4807,8 +4828,8 @@ paths:
         a prerequisite (ADR-019). Returns `401` if unauthenticated. Returns
         `403 verification_required` **only** when the target owner has opted into
         "verified contact only" and the caller has no Verified badge (L2). Returns
-        `422 contact_quota_exhausted` when the caller has used every owner contact their plan and
-        referrals allow — see `GET /me/entitlements` (D31b).
+        `422 contact_quota_exhausted` when the caller has used every owner contact their free
+        allowance, contact packs and referrals allow — see `GET /me/entitlements`.
       requestBody:
         required: true
         content:
@@ -4846,7 +4867,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
-              example: { error: contact_quota_exhausted, message: You have used all 15 of your owner contacts. Subscribe for unlimited contacts, or refer a friend to earn more., status: 422 }
+              example: { error: contact_quota_exhausted, message: You have used all your owner contacts. Buy a contact pack, or refer a friend to earn more., status: 422 }
   /me/contact-requests:
     get:
       tags: [Leads & Contact]
@@ -7634,6 +7655,30 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/RentAgreement' }
+  /me/rent-agreements/{id}/renewal:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: A rent_agreements row id from `myRentAgreements`.
+        schema: { type: string }
+    get:
+      tags: [Services & Support]
+      summary: Terms to prefill a renewal from
+      description: >
+        For the owner of the row, or a signed-in caller whose verified mobile is the row's tenant
+        mobile, and only while the row is registered or active; anyone else, and a draft, gets 404.
+        Both parties signed the same registered document, so mobiles are unmasked. `startDate` is the
+        day after the agreement's end date. The renewal itself is an ordinary rent-agreement service
+        request at the normal platform fee.
+      operationId: getRentAgreementRenewal
+      responses:
+        '200':
+          description: Renewal prefill
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RentAgreementRenewal' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /me/bootstrap:
     get:
       tags: [Engagement]
@@ -11902,6 +11947,7 @@ components:
         ageYears: { type: integer }
         deposit: { type: integer }
         availableFrom: { type: string }
+        availableOn: { type: [string, 'null'], format: date }
         possession: { type: string }
     SavedCard:
       type: object
@@ -12051,6 +12097,11 @@ components:
           type: string
           enum: [now, '15', '30']
           nullable: true
+          description: Derived live from `availableOn` in IST; null beyond 30 days or when no date is stated.
+        availableOn:
+          type: string
+          format: date
+          nullable: true
         pets: { type: boolean }
         locality: { type: string, example: Koregaon Park }
         localitySlug:
@@ -12095,9 +12146,9 @@ components:
         featured:
           type: boolean
           description: >
-            The owner holds an entitling paid Owner plan (D292): derived on every read, so it ends
-            when the plan does and nobody can set it by hand. Covers every listing of a subscribed
-            owner. Present on the card because that is where the badge renders.
+            The owner's listing was verified in the last 7 days — featured is a reward for verifying
+            ownership, derived on every read so it lapses on its own and nobody can set it by hand.
+            Present on the card because that is where the badge renders.
     Property:
       allOf:
         - $ref: '#/components/schemas/PropertySummary'
@@ -12249,17 +12300,19 @@ components:
               enum: [now, '15', '30']
               nullable: true
               description: >
-                Move-in bucket. A bucket rather than a date because a date on a listing nobody edits
-                is wrong within a fortnight, and wrong in the direction that wastes a tenant's visit.
-                Filtering on it is cumulative — see the `availableFrom` query parameter.
+                Move-in bucket, derived live from `availableOn` in IST (≤ today `now`, ≤ +15 days
+                `15`, ≤ +30 days `30`, otherwise null). Filtering on it is cumulative — see the
+                `availableFrom` query parameter.
+            availableOn:
+              type: string
+              format: date
+              nullable: true
+              description: The date the owner stated the home is free from; the stored truth.
             availableDate:
               type: string
               format: date
               nullable: true
-              description: >
-                Owner-stated available-from or possession date from `formDetails.availableFrom`.
-                Public detail uses it for display only; search continues to filter on
-                `availableFrom` buckets.
+              description: Equal to `availableOn`; kept for display clients.
             pets:
               type: boolean
               nullable: true
@@ -12533,7 +12586,7 @@ components:
             Awaiting a first moderation decision. `pending` is the only spelling of that state;
             `PropertyStatus` has no `Under Review`.
         flagged: { type: integer, description: Taken out of search by a moderator. }
-        featured: { type: integer, description: Live listings whose owner holds a paid Owner plan (D292). }
+        featured: { type: integer, description: Live listings whose ownership was verified in the last 7 days. }
         recheck:
           type: integer
           description: >
@@ -12603,6 +12656,7 @@ components:
         ageYears: { type: integer }
         deposit: { type: integer }
         availableFrom: { type: string }
+        availableOn: { type: [string, 'null'], format: date }
         possession: { type: string }
         owner:
           type: object
@@ -13256,10 +13310,19 @@ components:
         availableFrom:
           type: string
           enum: ['', now, '15', '30']
+          deprecated: true
           description: >-
-            Move-in bucket the search filters on. Empty withdraws a previously stated one; absent on
-            an update leaves it alone. A bare date is not accepted — it goes stale and cannot be
-            filtered cumulatively.
+            Legacy move-in bucket, accepted for one release and converted to a date (now = today,
+            15 = today + 15, 30 = today + 30, IST). Ignored when `availableOn` is sent.
+        availableOn:
+          type: string
+          pattern: '^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+          description: >-
+            ISO date the home is free from (for a sale, the possession date). On create it must be today
+            (IST) up to today + 365 days for rent or today + 5 years for sale; an update accepts any date
+            up to the same limit so an echoed stale value does not fail an
+            unrelated edit. Empty on update clears it; absent leaves it alone. Not a foundation
+            edit, so it never re-enters moderation. A ready-to-move sale carries no date; it is cleared.
         pets:
           type: boolean
           nullable: true
@@ -15342,14 +15405,37 @@ components:
         durationMonths: { type: integer }
         status: { type: string, enum: [draft, e-sign-pending, registered, active, expired] }
         documentUrl: { type: [string, 'null'], format: uri }
+        serviceRequestId: { type: [string, 'null'], description: The paid rent-agreement request that produced the row; null for rows filed outside one. }
+        endDate: { type: [string, 'null'], format: date, description: Last day of the term (start + months - 1 day); null while the start or length is unknown. }
+    RentAgreementRenewal:
+      type: object
+      properties:
+        propertyId: { type: string }
+        serviceRequestId: { type: [string, 'null'] }
+        rent: { type: [integer, 'null'] }
+        deposit: { type: [integer, 'null'] }
+        months: { type: [integer, 'null'] }
+        startDate: { type: [string, 'null'], format: date, description: The day after the current agreement ends. }
+        owner: { $ref: '#/components/schemas/RentAgreementRenewalParty' }
+        tenants:
+          type: array
+          description: Tenants on the same registered document, from the agreement rows that are registered or active.
+          items: { $ref: '#/components/schemas/RentAgreementRenewalParty' }
+    RentAgreementRenewalParty:
+      type: object
+      properties:
+        name: { type: [string, 'null'] }
+        mobile: { type: [string, 'null'] }
     Plan:
       type: object
       properties:
         id: { type: string }
-        name: { type: string, example: Owner Pro }
-        audience: { type: string, enum: [owner, tenant, buyer, agent] }
+        name: { type: string, example: Listing Pass }
+        audience: { type: [string, 'null'], enum: [owner, tenant, buyer, null], description: Null means anyone. }
         price: { $ref: '#/components/schemas/Money' }
-        billingCycle: { type: string, enum: [monthly, quarterly, yearly] }
+        billingCycle: { type: [string, 'null'], enum: [monthly, quarterly, yearly, null] }
+        termDays: { type: [integer, 'null'], description: Fixed term from payment; overrides billingCycle when set. }
+        kind: { type: string, enum: [plan, listing-pass, contact-pack] }
         listingLimit: { type: [integer, 'null'] }
         contactLimit: { type: [integer, 'null'] }
         features: { type: array, items: { type: string } }
@@ -15362,6 +15448,7 @@ components:
       properties:
         id: { type: [string, 'null'] }
         planId: { type: [string, 'null'] }
+        propertyId: { type: [string, 'null'], description: The listing a listing pass covers; null otherwise. }
         status: { type: [string, 'null'], enum: [pending, active, past-due, cancelled, expired] }
         # The gateway order id. Null
         # once nothing is owed; the durable handle the payment webhook correlates against.
@@ -15374,6 +15461,7 @@ components:
       required: [planId]
       properties:
         planId: { type: string }
+        propertyId: { type: string, description: Required for a listing pass — the owner's listing it covers. }
         paymentMethod: { type: string, enum: [upi, card, netbanking] }
     Entitlements:
       type: object
@@ -15392,14 +15480,30 @@ components:
         allowance: { type: [integer, 'null'] }
         remaining: { type: [integer, 'null'] }
         referralBonus: { type: integer, description: Part of allowance earned by referrals }
+        freeWindowEndsAt:
+          type: [string, 'null']
+          format: date-time
+          description: When the one-time free contacts lapse (30 days after the first contact); null until the first contact.
+        packExpiresAt:
+          type: [string, 'null']
+          format: date-time
+          description: Soonest expiry among contact packs that still have contacts left; null when none.
     ListingEntitlement:
       type: object
       properties:
-        allowance: { type: integer }
+        allowance: { type: integer, description: Live listings allowed without a pass (1 plus referral slots). }
         referralBonus: { type: integer }
         used:
           type: integer
-          description: Listings occupying a slot — the count `POST /me/listings` refuses on.
+          description: Live listings not covered by a listing pass — the count `PUT /me/listings/{id}/resume` checks against `allowance`.
+        passes:
+          type: array
+          description: Unexpired listing passes, one per covered listing.
+          items:
+            type: object
+            properties:
+              propertyId: { type: string }
+              expiresAt: { type: string, format: date-time }
     AgreementEntitlement:
       type: object
       properties:
@@ -16774,7 +16878,7 @@ components:
         transaction costs and is mostly the state's money.
 
 
-        Six named fields rather than an open map, and the reason is the document they come out of:
+        Four named fields rather than an open map, and the reason is the document they come out of:
         the same settings block also holds the free contact allowance, the referral bonus and the
         referral auto-qualify threshold, and that last one is the line past which a referral goes to
         the fraud desk. A projection of the block would publish it. This shape cannot, and neither
@@ -16784,40 +16888,36 @@ components:
         Prices are **whole rupees** — there are no paise anywhere on this platform. The one
         percentage is a decimal because it is multiplied by an amount rather than typed as one.
       required:
-        - ownerPlanYearly
-        - ownerProYearly
+        - listingPass
+        - contactPack
         - rentAgreementPlatform
-        - seekerPlusTopup
         - gstPercent
       properties:
-        ownerPlanYearly:
+        listingPass:
           type: integer
           minimum: 0
-          description: Yearly price of the entry owner plan. `0` is a real answer — it is the free tier.
-          example: 0
-        ownerProYearly:
+          description: Price of one listing pass, GST included — an extra live listing for 60 days.
+          example: 999
+        contactPack:
           type: integer
           minimum: 0
-          description: Yearly price of the top owner plan.
-          example: 2499
+          description: Price of one contact pack, GST included — 15 owner contacts for 30 days.
+          example: 199
         rentAgreementPlatform:
           type: integer
           minimum: 0
           description: >
             The platform's share of a rent agreement. Stamp duty and registration are the state's,
             are computed per agreement from its own terms, and are quoted on `/fees` instead.
-          example: 1999
-        seekerPlusTopup:
-          type: integer
-          minimum: 0
-          description: What a seeker pays to top up their owner-contact allowance.
-          example: 199
+          example: 499
         gstPercent:
           type: number
           minimum: 0
           maximum: 100
-          description: Statutory GST on the platform's fees.
-          example: 18
+          description: >
+            GST charged on top of the platform's fees. Every price already includes GST, so this
+            is 0 unless an admin sets a rate.
+          example: 0
     SocietyAdminEdit:
       type: object
       description: >
@@ -17878,6 +17978,7 @@ components:
               name: { type: string, example: Owner Plus }
               audience: { type: string, example: owner }
               billingCycle: { type: string, enum: [monthly, quarterly, yearly] }
+              termDays: { type: [integer, 'null'], description: Fixed term of a pass or pack; null for cycle-billed plans. }
               price:
                 allOf:
                   - $ref: '#/components/schemas/Money'
@@ -17998,11 +18099,10 @@ components:
           type: object
           description: Platform fee configuration (INR); read by the billing layer.
           properties:
-            ownerPlanYearly: { type: integer }
-            ownerProYearly: { type: integer }
+            listingPass: { type: integer }
+            contactPack: { type: integer }
             rentAgreementPlatform: { type: integer }
-            seekerPlusTopup: { type: integer }
-            gstPercent: { type: number, example: 18 }
+            gstPercent: { type: number, example: 0 }
           additionalProperties: true
         movePack:
           type: object

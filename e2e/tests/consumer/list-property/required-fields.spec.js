@@ -1,5 +1,6 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { istInDays } from '../../../helpers/availability.js';
 import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { signedInAsNew, authHeaders, API } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch } from '../../../helpers/moderation.js';
@@ -145,7 +146,7 @@ test('a sale\'s pricing step: no past handover date, MahaRERA optional but forma
 
   await test.step('an under-construction sale treats MahaRERA as optional but validates the format if present', async () => {
     await page.getByRole('button', { name: 'Under Construction', exact: true }).click();
-    await pickDate(page, '[data-err="availableFrom"]', '2027-06-30');
+    await pickDate(page, '[data-err="availableFrom"]', istInDays(240));
     await page.locator('input[data-err="reraId"]').fill('P5210001234');
     await page.getByRole('button', { name: /Next Step/i }).click();
     await expect(page.locator('input[data-err="reraId"]')).toBeFocused();
@@ -171,7 +172,7 @@ test('a sale\'s pricing step: no past handover date, MahaRERA optional but forma
 test('a zero deposit is a real offer, not a missing answer', async ({ page }) => {
   await gotoPricing(page, undefined, 'rent');
   await page.locator('input[data-err="monthlyRent"]').fill('30000');
-  await pickDate(page, '[data-err="availableFrom"]', '2027-12-31');
+  await pickDate(page, '[data-err="availableFrom"]', istInDays(60));
   // Every sibling money field here rejects zero. Deposit must not, or a genuine zero-deposit
   // rental can only be posted by inventing a number the owner is not asking for.
   await page.locator('input[data-err="deposit"]').fill('0');
@@ -304,7 +305,7 @@ test('a commercial rental publishes the owner\'s own fit-out, not a tier-keyed g
 
   await page.locator('input[data-err="monthlyRent"]').fill('180000');
   await page.locator('input[data-err="deposit"]').fill('1080000');
-  await pickDate(page, '[data-err="availableFrom"]', '2027-12-31');
+  await pickDate(page, '[data-err="availableFrom"]', istInDays(60));
   await page.locator('[data-err="gstOnRent"]').getByText('Yes', { exact: true }).click();
   await page.locator('input[data-err="escalationPct"]').fill('5');
   /* Deliberately off the standard terms: a lock-in left at its default is indistinguishable from one the wire

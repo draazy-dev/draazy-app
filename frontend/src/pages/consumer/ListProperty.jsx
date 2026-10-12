@@ -1,13 +1,13 @@
 import { Sparkles, CheckCircle2, LayoutDashboard } from 'lucide-react';
-import { useSearchParams } from 'react-router';
+import { useSearchParams, Link } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
+import { usePricing } from '../../context/PricingContext';
 import '../../styles/routes/list-property.css';
 import useListProperty from './list-property/useListProperty';
 import ListPropertyModals from './list-property/ListPropertyModals';
 import ProgressMeter from './list-property/ProgressMeter.jsx';
 import StepNav, { LISTING_STEPS } from './list-property/StepNav.jsx';
 import EditPolicyBanner from './list-property/EditPolicyBanner.jsx';
-import ListingPaywall from './list-property/ListingPaywall.jsx';
 import PropertyDetailsStep from './list-property/PropertyDetailsStep.jsx';
 import LocationStep from './list-property/LocationStep.jsx';
 import PricingStep from './list-property/PricingStep.jsx';
@@ -19,12 +19,13 @@ import ListingStatusCard from '../../components/listing/ListingStatusCard.jsx';
 
 const ListPropertyForm = () => {
   const vm = useListProperty();
+  const { fee } = usePricing();
   const {
-    t, navigate, showSuccess, isFlatmateMode, flatmateMode, editId, editRoomId, editApproved, editChanges,
+    t, navigate, showSuccess, isFlatmateMode, editId, editRoomId, editApproved, editChanges,
     postedListing, savedListingStatus, editReady, editLoading, editLoadError, retryEditLoad, legacyAddress,
     authPromptOpen, closeAuthPrompt,
-    progressState, canPost,
-    activeListingCount, listingLimit, currentStep, setCurrentStep,
+    progressState, passListingId,
+    activeListingCount, listingLimit, quotaFull, currentStep, setCurrentStep,
     form, set, changePropertyType, changeCommercialType, rentMode, setRentMode, errors,
     isResidential, isLand, isCommercial, isHouse,
     toggleInArray, toggleTenant, nextStep, prevStep, dupPending, money, setDepositMonths, openResetConfirm,
@@ -101,6 +102,14 @@ const ListPropertyForm = () => {
               className="mb-6"
             />
           )}
+          {passListingId && !isFlatmateMode && !editId && (
+            <div className="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 text-left">
+              <p className="text-sm text-amber-100">{t('listProperty.success.passNote', { price: fee('listingPass') })}</p>
+              <Link to={`/checkout?plan=listing-pass&property=${encodeURIComponent(passListingId)}`} className="btn-teal mt-3 inline-flex min-h-[44px] items-center justify-center px-5 py-2.5 rounded-xl text-white font-semibold text-sm">
+                {t('listProperty.success.passCta', { price: fee('listingPass') })}
+              </Link>
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button onClick={() => navigate('/dashboard#properties')} className="btn-teal inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl text-white font-semibold text-sm">
               <LayoutDashboard className="w-4 h-4" /> {t('listProperty.success.goToListings')}
@@ -142,20 +151,14 @@ const ListPropertyForm = () => {
         />
 
         {listingLimit != null && !editId && !isFlatmateMode && (
-          <p className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-semibold text-gray-300">
-            {activeListingCount > 0
-              ? t('listProperty.quota.entryUsed', { used: activeListingCount, allowance: listingLimit })
-              : t('listProperty.quota.entryAvailable', { allowance: listingLimit })}
-          </p>
+          <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-semibold text-gray-300">
+            <p>{t('listProperty.quota.entry', { count: listingLimit, used: activeListingCount, allowance: listingLimit })}</p>
+            {quotaFull && <p className="mt-1 font-normal text-amber-200">{t('listProperty.success.passNote', { price: fee('listingPass') })}</p>}
+          </div>
         )}
 
-        {/* The freemium ceiling counts whole-property listings, and only those: a flatmate room is a `FlatmateRoom`,
-           posted through `createRoom` and never measured against the allowance. */}
         {editId && <EditPolicyBanner approved={editApproved} changes={editChanges} />}
 
-        {(!editId && !canPost && !flatmateMode) ? (
-          <ListingPaywall count={activeListingCount} limit={listingLimit} />
-        ) : (<>
             <StepNav current={currentStep} steps={LISTING_STEPS} onJump={jumpTo} />
             {/* Narrow mobile gutters leave room for paired fields. */}
 
@@ -287,7 +290,6 @@ const ListPropertyForm = () => {
                 />
               )}
             </div>
-            </>)}
       </div>
 
       <ListPropertyModals ctx={vm} />

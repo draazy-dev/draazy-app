@@ -8,12 +8,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.billing.plan.TestPlanGrants;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,6 +41,8 @@ class ContactGateEndpointsTest extends AbstractApiTest {
     ContactRequestRepository contactRequests;
     @Autowired
     jakarta.persistence.EntityManager em;
+    @Autowired
+    TestPlanGrants grants;
     @Autowired
     @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping")
     RequestMappingHandlerMapping handlerMapping;
@@ -279,6 +284,32 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                     assertThat(row.getMessage()).isEqualTo("Still keen");
                     assertThat(row.getCreatedAt()).isAfter(java.time.Instant.now().minusSeconds(60));
                 });
+    }
+
+    @Test
+    void renewingTheEarliestRequest_neitherReopensTheFreeWindowNorChargesAPack() throws Exception {
+        User owner = user("9820000098", "owner");
+        User buyer = user("9820000099", "buyer");
+        Property p = listing(owner, "Renewed late");
+        ask(buyer, p);
+        jdbc.update("update contact_requests set created_at = now() - interval '31 days',"
+                + " first_requested_at = now() - interval '31 days' where property_id = ?", p.getId());
+        grants.grantPack(buyer.getId(), Instant.now().minus(10, ChronoUnit.DAYS),
+                Instant.now().plus(20, ChronoUnit.DAYS));
+        em.clear();
+
+        mvc.perform(post(Routes.Contacts.REQUEST).header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + p.getId() + "\",\"message\":\"Still keen\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contacts.remaining").value(15))
+                .andExpect(jsonPath("$.contacts.used").value(1));
+        assertThat(contactRequests.findByPropertyIdInOrderByCreatedAtDesc(List.of(p.getId()),
+                Pageable.unpaged())).allSatisfy(row ->
+                assertThat(row.getFirstRequestedAt()).isBefore(Instant.now().minus(30, ChronoUnit.DAYS)));
     }
 
     @Test

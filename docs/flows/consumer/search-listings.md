@@ -406,7 +406,8 @@ it deterministically.
   single-valued `bhk` on the same endpoint; two parameters of one name and different arity is worse
   than ambiguous, since Spring binds the scalar first and `?bhk=2,3` becomes an equality against the
   literal string.
-- **`availableFrom` is cumulative**: `30` also matches `now` and `15`. A tenant who can wait a month
+- **`availableFrom` is cumulative** and judged on the stored date: `15` means `available_on <= today+15`
+  (IST), so `30` also matches `now` and `15`; an undated listing matches no bucket. A tenant who can wait a month
   can also take a flat free today. An unknown bucket resolves to a token no row can hold rather than
   to a wildcard, so a bad request cannot read as the whole catalogue.
 - **The near-radius is clamped, not rejected** (50 km). The radius sizes a bounding box, and an

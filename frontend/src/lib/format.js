@@ -8,6 +8,11 @@ export function isoToDisplay(iso) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
 }
 
+export function fmtDate(iso) {
+  const d = iso ? new Date(iso) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+}
+
 export function fmtINR(n) {
   const num = Number(n) || 0;
   if (num >= 10000000) return '₹' + (num / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { PDFDocument } from '../../frontend/node_modules/pdf-lib/cjs/index.js';
 import { uploadPublishablePhotos } from '../helpers/listingPhotos.helper.js';
 import { LIST_PROPERTY_DRAFT_KEY } from '../helpers/listingForm.helper.js';
+import { istInDays } from '../helpers/availability.js';
 import { fillSociety } from '../helpers/places.js';
 import { IGNORE as SHARED_IGNORE } from '../helpers/console.js';
 import { signedInAs, signedInAsNew, apiLogin, authHeaders, ownerIdOf, API, uploadedListingPhotos } from '../helpers/liveAuth.js';
@@ -194,17 +195,17 @@ test.describe('LIVE: property domain against the real API', () => {
     const ownerMobile = await signedInAsNew(page);
     const ownerId = ownerIdOf(await authHeaders(ownerMobile));
 
-    await page.addInitScript(({ key, ownerId }) => {
+    await page.addInitScript(({ key, ownerId, availableFrom }) => {
       localStorage.setItem(key, JSON.stringify({
         propertyType: 'flat', bhk: '2', bathrooms: '2', carpetArea: '850', deal: 'rent',
-        floor: '9', totalFloors: '14', availableFrom: '2026-09-01',
+        floor: '9', totalFloors: '14', availableFrom,
         __owner: ownerId,
       }));
       // Seed consent so the delayed banner cannot intercept the wizard controls.
       localStorage.setItem('dz_cookie_consent_v1', JSON.stringify({
         necessary: true, functional: true, analytics: true, marketing: false, version: 1, ts: Date.now(),
       }));
-    }, { key: LIST_PROPERTY_DRAFT_KEY, ownerId });
+    }, { key: LIST_PROPERTY_DRAFT_KEY, ownerId, availableFrom: istInDays(30) });
 
     // One sign-in preserves the OTP budget across the dependent dashboard checks.
     const calls = [];
@@ -297,7 +298,7 @@ test.describe('LIVE: property domain against the real API', () => {
     return JSON.parse(text);
   }
 
-  test('an owner listing prefills the edit form from the server, can be taken down, and frees a quota slot (D237, D238)', async ({ page }) => {
+  test('an owner listing prefills the edit form from the server, and can be taken down without being destroyed (D237, D238)', async ({ page }) => {
     test.slow();
     const mobile = await signedInAsNew(page);
     const first = await fileListing(mobile, 'Take Down Proof Flat');
@@ -310,17 +311,6 @@ test.describe('LIVE: property domain against the real API', () => {
     });
 
     const headers = await authHeaders(mobile);
-    // The single-listing quota makes the final retry observable.
-    const blocked = await fetch(`${API}/me/listings`, {
-      method: 'POST',
-      headers: { ...headers, 'content-type': 'application/json' },
-      body: JSON.stringify({
-        title: 'Second Flat, Blocked', deal: 'rent', propertyType: 'flat', bhk: 2,
-        price: 25000, locality: 'Baner', city: 'Pune', images: await uploadedListingPhotos(headers),
-      }),
-    });
-    expect(blocked.status).toBe(422);
-
     await page.goto('/dashboard');
     // Navigate to My Properties because Overview contains no listing actions.
     await page.getByRole('link', { name: /My Properties/i })
@@ -343,15 +333,16 @@ test.describe('LIVE: property domain against the real API', () => {
     expect(taken, 'the listing should still be on file').toBeTruthy();
     expect(taken.archived).toBe(true);
 
-    const retried = await fetch(`${API}/me/listings`, {
+    // Filing is never refused for the free tier; the tier bites when a listing goes live.
+    const second = await fetch(`${API}/me/listings`, {
       method: 'POST',
       headers: { ...headers, 'content-type': 'application/json' },
       body: JSON.stringify({
-        title: 'Second Flat, Allowed', deal: 'rent', propertyType: 'flat', bhk: 2,
+        title: 'Second Flat, Filed', deal: 'rent', propertyType: 'flat', bhk: 2,
         price: 25000, locality: 'Baner', city: 'Pune', images: await uploadedListingPhotos(headers),
       }),
     });
-    expect(retried.status, await retried.text()).toBe(201);
+    expect(second.status, await second.text()).toBe(201);
   });
 });
 

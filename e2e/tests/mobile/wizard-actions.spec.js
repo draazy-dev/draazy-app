@@ -12,7 +12,7 @@ async function withConsent(page) {
   });
 }
 
-// Use `asNewOwner`; seeded owners hit the paywall instead of `.lp-step-actions`.
+// Use `asNewOwner`: a fresh account keeps the draft and quota reads isolated from the seeded owner.
 async function openWizard(page) {
   await page.goto('/list-property');
   await page.locator('.lp-step-actions').first().waitFor({ timeout: 15000 });
@@ -34,7 +34,7 @@ test.describe('Mobile listing wizard', () => {
       });
       expect(pad, 'only the horizontal gutter was halved').toEqual({ left: '12px', right: '12px', top: '24px' });
 
-      // Asserted against the input's own size rather than a literal, so this stays true if the base field type scale moves.
+      // Asserted against the input's own size, not a literal, so it survives a change to the base field type scale.
       const suffix = page.getByText('sq.ft.', { exact: true }).first();
       const chrome = await suffix.evaluate((el) => {
         const s = getComputedStyle(el);

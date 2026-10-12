@@ -24,10 +24,10 @@ import org.springframework.test.web.servlet.MockMvc;
 @DisplayName("D171 — a failed payment releases its idempotency key so the customer can retry")
 class FailedPaymentKeyReleaseTest extends AbstractApiTest {
 
-    private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000002";
+    private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000006";
 
     /** Not asserted anywhere — the decline branch settles on the order id alone, so it only parses. */
-    private static final String WEBHOOK_AMOUNT = "999.00";
+    private static final String WEBHOOK_AMOUNT = "199.00";
 
     @Autowired MockMvc mvc;
     @Autowired UserRepository users;
@@ -38,9 +38,7 @@ class FailedPaymentKeyReleaseTest extends AbstractApiTest {
     @DisplayName("subscriptions")
     class Subscriptions {
 
-        /** Without the key release the second call replays the cancelled row: 201, same id, no new
-         *  order, and a card that worked on the second try is still not subscribed. Releasing the
-         *  key must free the customer, not rewrite the audit of what happened. */
+        /** Without the key release the retry replays the cancelled row: same id, no new order. */
         @Test
         @DisplayName("after a declined payment the same key opens a fresh order and the declined row stays cancelled")
         void aDeclinedSubscriptionCanBeRetriedWithTheSameKey() throws Exception {

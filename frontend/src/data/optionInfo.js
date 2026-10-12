@@ -8,7 +8,7 @@ export const OPTION_INFO = {
   'keydetail.overlooking': { title: 'Overlooking', body: 'What the windows and balcony actually look out onto. Separate from the facing direction — a north-facing home can overlook a garden or a main road, and the two affect light, noise and resale differently.' },
   'keydetail.parking': { title: 'Parking', body: 'Number of dedicated car-parking spaces that come with the property.' },
   'keydetail.age': { title: 'Property age', body: 'How old the building is. Newer builds need less upkeep; older ones often have larger layouts in settled localities.' },
-  'keydetail.available': { title: 'Availability', body: "When the home is free to take, as a window rather than a date: 'Immediately' means it is vacant now; 'Within 15/30 days' means the owner needs that long. On a sale this row shows possession status instead. A dash means the owner hasn't said." },
+  'keydetail.available': { title: 'Availability', body: "When the home is free to take: 'Available now' means it is vacant today, otherwise the date the owner gave. On a sale this row shows possession status instead. A dash means the owner hasn't said." },
   'keydetail.plotArea': { title: 'Plot area', body: 'The size of the land parcel in square feet — the actual ground you own.' },
   'keydetail.plotZone': { title: 'Plot zone', body: 'The land-use zone on the Zone Certificate the planning authority issues — R1, C-1, Green Zone and so on. It decides what you are legally allowed to build, and Green Zone means nothing at all.' },
   'keydetail.title': { title: 'Title status', body: 'Whether ownership records are clear and verified. A clear title means no disputes, loans or dues attached to the land.' },

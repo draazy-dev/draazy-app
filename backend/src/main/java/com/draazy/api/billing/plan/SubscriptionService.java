@@ -12,6 +12,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.provider.PaymentGateway;
 import com.draazy.api.security.AuthPrincipal;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -50,24 +51,27 @@ public class SubscriptionService {
     private final PaymentGateway gateway;
     private final UserRepository users;
     private final PlatformSettings platformSettings;
+    private final ListingPasses passes;
 
     private final TransactionTemplate transactions;
 
     public SubscriptionService(PlanRepository plans, SubscriptionRepository subscriptions,
             PlanMapper mapper, PaymentGateway gateway, UserRepository users,
-            PlatformSettings platformSettings, PlatformTransactionManager transactionManager) {
+            PlatformSettings platformSettings, ListingPasses passes,
+            PlatformTransactionManager transactionManager) {
         this.plans = plans;
         this.subscriptions = subscriptions;
         this.mapper = mapper;
         this.gateway = gateway;
         this.users = users;
         this.platformSettings = platformSettings;
+        this.passes = passes;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
     @Transactional(readOnly = true)
     public List<PlanDto> listPlans() {
-        return mapper.toPlanDtos(plans.findAllByOrderByPriceAsc());
+        return mapper.toPlanDtos(plans.findAllByActiveTrueOrderByPriceAsc());
     }
 
     @Transactional(readOnly = true)
@@ -112,7 +116,11 @@ public class SubscriptionService {
 
         Plan plan = Ids.parseUuid(body.planId())
                 .flatMap(plans::findById)
+                .filter(Plan::isActive)
                 .orElseThrow(() -> NotFoundException.of("Plan"));
+        UUID propertyId = Plan.KIND_LISTING_PASS.equals(plan.getKind())
+                ? passes.requireBuyable(caller.userId(), body.propertyId())
+                : null;
 
         Instant now = Instant.now();
         long price = mapper.price(plan);
@@ -130,10 +138,11 @@ public class SubscriptionService {
         Subscription subscription = new Subscription(
                 caller.userId(),
                 plan.getId(),
+                propertyId,
                 free ? SubscriptionStatuses.ACTIVE : SubscriptionStatuses.PENDING,
                 price,
                 now,
-                free ? renewalFrom(now, plan.getBillingCycle()) : null,
+                free ? renewalFrom(now, plan.getTermDays(), plan.getBillingCycle()) : null,
                 null,
                 key);
         Subscription saved;
@@ -149,7 +158,6 @@ public class SubscriptionService {
             throw violation;
         }
         if (free) {
-            supersedeOthers(caller.userId(), saved.getId());
             return Opened.settled(mapper.toDto(saved));
         }
 
@@ -159,7 +167,8 @@ public class SubscriptionService {
 
         // Use the saved amount so the gateway order and later ledger report one number.
         return new Opened(null, saved.getId(), saved.getAmount(),
-                "subscription:" + caller.userId() + ":" + plan.getId(),
+                "subscription:" + caller.userId() + ":" + plan.getId()
+                        + (propertyId == null ? "" : ":" + propertyId),
                 new PaymentGateway.Customer(caller.userId().toString(), phone));
     }
 
@@ -202,7 +211,13 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public boolean applyWebhookOutcome(String orderId, boolean paid, Instant paidAt) {
+    public boolean applyRefundWebhook(String refundId, String status, String gatewayRef) {
+        return passes.applyRefundWebhook(refundId, status, gatewayRef);
+    }
+
+    @Transactional
+    public boolean applyWebhookOutcome(String orderId, boolean paid, Instant paidAt, BigDecimal paidAmount,
+            String currency) {
         if (orderId == null || orderId.isBlank()) {
             return false;
         }
@@ -211,6 +226,17 @@ public class SubscriptionService {
             return false;
         }
         Subscription subscription = found.get();
+        if (subscription.getPropertyId() != null) {
+            passes.lock(subscription);
+        }
+        if (paid && !SubscriptionStatuses.isEntitling(subscription.getStatus())
+                && passes.refundIfMismatched(subscription, paidAt, paidAmount, currency)) {
+            return true;
+        }
+        if (paid && subscription.getPropertyId() != null && passes.isDead(subscription)) {
+            passes.refund(subscription, paidAt);
+            return true;
+        }
         if (!paid) {
             if (subscription.fail()) {
                 log.info("Subscription {} cancelled: payment failed", subscription.getId());
@@ -218,22 +244,30 @@ public class SubscriptionService {
             return true;
         }
         Optional<Plan> plan = plans.findById(subscription.getPlanId());
-        String cycle = plan.map(Plan::getBillingCycle).orElse(null);
+        Instant renewal;
         if (plan.isEmpty()) {
 
             log.warn("Plan {} not found while settling subscription {}; granting the default "
                     + "{}-month term instead of the purchased one",
                     subscription.getPlanId(), subscription.getId(), YEARLY);
-        } else if (monthsIn(cycle) == YEARLY && !"yearly".equals(cycle)) {
-            log.warn("Plan {} has billing cycle {} which is not one of monthly/quarterly/yearly; "
-                    + "granting {} months on subscription {}",
-                    subscription.getPlanId(), cycle, YEARLY, subscription.getId());
+            renewal = renewalFrom(paidAt, null, null);
+        } else {
+            Plan bought = plan.get();
+            if (bought.getTermDays() == null && monthsIn(bought.getBillingCycle()) == YEARLY
+                    && !"yearly".equals(bought.getBillingCycle())) {
+                log.warn("Plan {} has billing cycle {} which is not one of monthly/quarterly/yearly; "
+                        + "granting {} months on subscription {}",
+                        subscription.getPlanId(), bought.getBillingCycle(), YEARLY, subscription.getId());
+            }
+            renewal = renewalFrom(paidAt, bought.getTermDays(), bought.getBillingCycle());
         }
-        if (!subscription.activate(paidAt, renewalFrom(paidAt, cycle))) {
+        if (!subscription.activate(paidAt, renewal)) {
             reportRefusedSettlement(subscription);
             return true;
         }
-        supersedeOthers(subscription.getUserId(), subscription.getId());
+        if (subscription.getPropertyId() != null) {
+            passes.resumeIfPaused(subscription);
+        }
         log.info("Subscription {} activated by provider callback", subscription.getId());
         return true;
     }
@@ -263,12 +297,26 @@ public class SubscriptionService {
     }
 
     // Standing may include pending orders; entitlement answers only what is usable now.
-    // `PAST_DUE` entitles, which is a deliberate grace: a failed renewal is usually an expired card.
+    // Only the retired subscription tiers count: passes and packs are priced by their own readers.
     @Transactional(readOnly = true)
     public Optional<Plan> entitlingPlan(UUID userId) {
-        return currentFor(userId)
-                .filter(s -> SubscriptionStatuses.isEntitling(s.getStatus()))
-                .flatMap(s -> plans.findById(s.getPlanId()));
+        Instant now = Instant.now();
+        return subscriptions.findByUserIdOrderByStartedAtDesc(userId).stream()
+                .filter(s -> SubscriptionStatuses.isEntitling(s.getStatus()) && !s.hasLapsed(now))
+                .flatMap(s -> plans.findById(s.getPlanId()).stream())
+                .filter(p -> Plan.KIND_PLAN.equals(p.getKind()))
+                .findFirst();
+    }
+
+    /** The caller's unexpired listing passes, soonest to lapse first. */
+    @Transactional(readOnly = true)
+    public List<Subscription> listingPasses(UUID userId) {
+        return subscriptions.findEntitlingPasses(userId, SubscriptionStatuses.ENTITLED, Instant.now());
+    }
+
+    @Transactional(readOnly = true)
+    public List<ContactPackTerm> contactPacks(UUID userId) {
+        return subscriptions.findContactPackTerms(userId);
     }
 
     private Optional<Subscription> currentFor(UUID userId) {
@@ -282,14 +330,6 @@ public class SubscriptionService {
                 .or(() -> live.stream().findFirst());
     }
 
-    private void supersedeOthers(UUID userId, UUID keepId) {
-        for (Subscription other : subscriptions.findByUserIdOrderByStartedAtDesc(userId)) {
-            if (!other.getId().equals(keepId) && other.supersede()) {
-                log.info("Subscription {} superseded by {}", other.getId(), keepId);
-            }
-        }
-    }
-
     private PaymentGateway.PaymentOrder createOrder(Opened opened) {
         PaymentGateway.PaymentOrder order =
                 gateway.createOrder(opened.price(), opened.reference(), opened.customer());
@@ -299,9 +339,10 @@ public class SubscriptionService {
         return order;
     }
 
-    private static Instant renewalFrom(Instant from, String billingCycle) {
+    private static Instant renewalFrom(Instant from, Integer termDays, String billingCycle) {
         ZonedDateTime start = from.atZone(TERM_ZONE);
-        return start.plusMonths(monthsIn(billingCycle)).toInstant();
+        return (termDays != null ? start.plusDays(termDays) : start.plusMonths(monthsIn(billingCycle)))
+                .toInstant();
     }
 
     private static int monthsIn(String billingCycle) {

@@ -1,6 +1,7 @@
 package com.draazy.api.catalog.listing;
 
 import com.draazy.api.catalog.locality.LocalityBinding;
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyPossession;
@@ -46,9 +47,11 @@ public class ListingEditRules {
 
     static void clearReadyToMoveSaleAvailableDate(Property property) {
         if (!DealIntent.BUY.equals(property.getDeal())
-                || !PropertyPossession.READY_TO_MOVE.equals(property.getPossession())
-                || property.getFormDetails() == null
-                || !property.getFormDetails().containsKey("availableFrom")) {
+                || !PropertyPossession.READY_TO_MOVE.equals(property.getPossession())) {
+            return;
+        }
+        property.setAvailableOn(null);
+        if (property.getFormDetails() == null || !property.getFormDetails().containsKey("availableFrom")) {
             return;
         }
         property.setFormDetails(property.getFormDetails().entrySet().stream()
@@ -221,9 +224,9 @@ public class ListingEditRules {
             p.setVideo(video);
         }
 
-        // Blank is how an owner withdraws a move-in claim; the column admits only the three buckets.
-        if (in.availableFrom() != null) {
-            p.setAvailableFrom(in.availableFrom().isBlank() ? null : in.availableFrom());
+        // Blank is how an owner withdraws a move-in claim.
+        if (AvailableOn.isStated(in.availableOn(), in.availableFrom())) {
+            p.setAvailableOn(AvailableOn.resolve(in.availableOn(), in.availableFrom(), true, p.getDeal()));
         }
         if (Boolean.TRUE.equals(in.clearPets())) {
             p.setPets(null);
@@ -505,8 +508,8 @@ public class ListingEditRules {
         return societyId.isBlank() ? null : UUID.fromString(societyId);
     }
 
-    /** A stale society id is a {@code 404} rather than an FK {@code 409}; an archived society is refused only for a new binding.
-     * Stamps the slug and name formulas so the writer's own response carries them. */
+    /** A stale society id is a {@code 404}, not an FK {@code 409}; an archived society is refused only for a
+     * new binding. Stamps the slug and name formulas so the response carries them. */
     void stampSociety(Property p, UUID societyId, boolean newBinding) {
         if (societyId == null) {
             p.setSocietySlug(null);

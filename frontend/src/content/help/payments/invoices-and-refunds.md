@@ -29,9 +29,8 @@ The binding terms are in the [Refund Policy](/refund-policy). In summary:
 
 | Situation | Refundable |
 | --- | --- |
-| Subscription cancelled within 7 days, unused | Full |
-| Annual subscription within 30 days, with fewer than 3 premium features used | Pro-rata |
-| Subscription after 7 days, or used | Not refundable |
+| Listing Pass or Contact Pack cancelled within 7 days, unused | Full |
+| Pass or pack after 7 days, or used | Not refundable |
 | Service request cancelled before a partner is assigned | Full |
 | Rent agreement, before the stamp duty is paid on GRAS | Refundable up to what you paid |
 | Rent agreement, after the stamp duty is paid | Government charges are spent; only eligible service-fee or overpayment refunds can come back |

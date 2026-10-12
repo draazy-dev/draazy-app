@@ -52,6 +52,14 @@ async function publishListing(request, id, headers, reason) {
   return approveListing(request, id, headers, { reason });
 }
 
+// `featured` is not on the public document; the owner's own listings carry it.
+async function featuredFor(request, listing) {
+  const response = await request.get(`${API}/me/listings`, { headers: listing.headers });
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+  return (Array.isArray(body) ? body : body.content).find((row) => row.id === listing.id)?.featured;
+}
+
 async function uploadDocument(request, listing, category, fileName) {
   const issueDate = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10);
   const pdf = await PDFDocument.create();
@@ -162,6 +170,7 @@ test('rent: retry vault read, record a real bill, explicitly grant the public ba
     await expect(guest.getByRole('heading', { level: 1 })).toBeVisible();
     const badge = guest.locator('.tag-strip').getByText('Verified property', { exact: true });
     await expect(badge).toBeVisible();
+    expect(await featuredFor(request, listing), 'featured is the reward for the grant just made, with no paid plan involved').toBe(true);
     await expect(panelOf(guest)).toHaveCount(0);
     await expect(guest.getByText(bill.fileName, { exact: true })).toHaveCount(0);
     const forbidden = await guestContext.request.get(`${API}${ownershipPath(listing.id)}/documents`);
@@ -190,6 +199,7 @@ test('rent: retry vault read, record a real bill, explicitly grant the public ba
     const publicListing = await guestContext.request.get(`${API}/properties/${listing.id}`);
     expect(publicListing.status()).toBe(200);
     expect(await publicListing.json()).toMatchObject({ ownershipVerified: false });
+    expect(await featuredFor(request, listing), 'withdrawing the badge withdraws the reward').toBe(false);
   } finally {
     await guestContext.close();
   }

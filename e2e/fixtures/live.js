@@ -198,7 +198,7 @@ export const test = base.extend({
       asBuyer: () => signedInAs(page, ACTORS.buyer),
       asOwner: () => signedInAs(page, ACTORS.owner),
       asTenant: () => signedInAs(page, ACTORS.tenant),
-      // `ACTORS.owner` has spent her allowance, so paywall specs need a new owner.
+      // `ACTORS.owner` already holds four listings, so specs that need a clean slate use a new owner.
       asNewOwner: () => signedInAsNew(page),
       // Back-office sign-ins go through `/staff-login` rather than the session cache, because the
       // screen decides where you land and that redirect is part of what the spec is asserting.

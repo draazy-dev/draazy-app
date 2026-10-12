@@ -43,7 +43,7 @@ export function RentDetails({ p }) {
   const moveIn = deposit == null ? null : rent + deposit;
   const savings = rent;
 
-  const available = availableLabel(tr, p.availableFrom, p.availableDate);
+  const available = availableLabel(tr, p);
   const furnishing = tr('property.rentFurnishing.' + (['furnished', 'semi', 'unfurnished'].includes(p.furnishing) ? p.furnishing : 'semi'));
   /* Filtered to the profile's valid options so a stale cross-profile pick never shows. */
   const commercialFitOut = () => {

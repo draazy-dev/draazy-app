@@ -1,6 +1,7 @@
 package com.draazy.api.catalog.listing;
 
 import com.draazy.api.catalog.property.AreaUnit;
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Furnishing;
 import com.draazy.api.catalog.property.LandUse;
@@ -93,6 +94,7 @@ public record ListingCreate(
         @Positive BigDecimal superBuiltUpArea,
 
         @Pattern(regexp = "^$|now|15|30") String availableFrom,
+        @Pattern(regexp = AvailableOn.PATTERN, message = AvailableOn.PATTERN_MESSAGE) String availableOn,
 
         Boolean pets,
         @ListingFormDetails Map<String, Object> formDetails,

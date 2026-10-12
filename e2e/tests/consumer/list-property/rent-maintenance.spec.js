@@ -1,6 +1,7 @@
 // Read maintenance back through the API so a dropped mode-dependent amount cannot pass as saved.
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { istInDays } from '../../../helpers/availability.js';
 import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { signedInAsNew, authHeaders, API } from '../../../helpers/liveAuth.js';
 import { fillSociety } from '../../../helpers/places.js';
@@ -77,7 +78,7 @@ test('Pill selection is keyboard-operable, and a rent "Charged Extra" maintenanc
   await page.locator('input[data-err="deposit"]').fill('60000');
   await page.locator('.radio-pill', { hasText: 'Charged Extra' }).click();
   await page.locator('input[placeholder="e.g. 2,500"]').fill('2500');
-  await pickDate(page, '[data-err="availableFrom"]', '2027-12-31');
+  await pickDate(page, '[data-err="availableFrom"]', istInDays(60));
   await page.getByRole('button', { name: /Next Step/i }).click();
   await page.waitForSelector('text=/Photos & description/i', { timeout: 15000 });
 

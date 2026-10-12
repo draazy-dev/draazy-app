@@ -25,7 +25,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @DisplayName("D161 — abandoned subscription checkouts are retired")
 class BillingCheckoutSweepTest extends AbstractApiTest {
 
-    private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000002";
+    private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000006";
 
     @Autowired MockMvc mvc;
     @Autowired UserRepository users;
@@ -37,13 +37,12 @@ class BillingCheckoutSweepTest extends AbstractApiTest {
     @DisplayName("subscriptions")
     class Subscriptions {
 
-        /** A guard on {@code paymentRef == null} would skip exactly these rows: the order was
-         *  opened, the customer just closed the modal. */
+        /** A guard on {@code paymentRef == null} would skip the orders whose modal was merely closed. */
         @Test
         @DisplayName("a pending order past its TTL is cancelled once, and the customer can buy again")
         void staleOrdersAreCancelled() throws Exception {
             User u = owner("9866600101");
-            // The whole point: the unpaid-order cap no longer holds a customer who never came back.
+            // The unpaid-order cap must not hold a customer who never came back.
             subscribe(u, 201);
 
             assertThat(subscriptionSweeper.expireAbandonedCheckouts(future())).isEqualTo(1);
@@ -116,7 +115,7 @@ class BillingCheckoutSweepTest extends AbstractApiTest {
         String body = "{\"type\":\"PAYMENT_SUCCESS_WEBHOOK\",\"data\":{"
                 + "\"order\":{\"order_id\":\"" + orderId + "\"},"
                 + "\"payment\":{\"payment_status\":\"SUCCESS\","
-                + "\"payment_amount\":999.00,"
+                + "\"payment_amount\":199.00,"
                 + "\"payment_time\":\"" + paidAt + "\"}}}";
         String ts = String.valueOf(System.currentTimeMillis());
         mvc.perform(post(Routes.Webhooks.CASHFREE_PAYMENT)

@@ -1,14 +1,14 @@
 // @ts-check
 import { test, expect } from '../../../fixtures/live.js';
-import { signedInAsNew, authHeaders, API } from '../../../helpers/liveAuth.js';
+import { signedInAs, signedInAsNew, authHeaders, API, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { approve, newListing, openOrder, pendingOrderId, settleOrder, CONTACT_PACK_PLAN, LISTING_PASS_PLAN } from '../../../helpers/monetisation.js';
 
-/* Everything upstream of Pay. The catalogue's paid-plan prices are the admin fee schedule's, so the
+/* Everything upstream of Pay. The catalogue's paid prices are the admin fee schedule's, so the
    page quotes the same figure whether the catalogue or its `pricing` fallback rendered it. */
 
-/** What Owner Plus costs, in both tables. Formatted as the page formats it (`en-IN` grouping). */
-const OWNER_PLUS = '₹999';
-/** Owner Pro's price. Note it is Owner Plus's *old*, drifted catalogue figure — see `SENTINEL` below. */
-const OWNER_PRO = '₹2,499';
+/** The two products on sale, in both tables. Formatted as the page formats it (`en-IN` grouping). */
+const LISTING_PASS = '₹999';
+const CONTACT_PACK = '₹199';
 
 /** A price in neither table, via intercepting the catalogue: catalogue and fee schedule quote the same numbers, so
  * only a sentinel shows which was read. It must not collide with any real price on the page. */
@@ -46,104 +46,110 @@ async function seedConsent(page) {
   });
 }
 
+/* Both the swipeable mobile carousel and the desktop grid render the cards; the grid comes last in the DOM. */
+const desktopLink = (page, name) => page.getByRole('link', { name }).last();
+
 test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
-  test('the catalogue and the fee schedule quote the same owner prices', async () => {
+  test('the catalogue and the fee schedule quote the same prices, and the retired subscriptions are gone from it', async () => {
     /* `AdminFeesPriceEverySurfaceTest` pins this in the backend suite; repeated here against the
        database the rest of this file talks to. */
     const { plans, pricing } = await (await fetch(`${API}/bootstrap`)).json();
 
-    const priceOf = (name) => {
+    const planNamed = (name) => {
       const plan = plans.find((p) => p.name === name);
       expect(plan, `the seeded catalogue must carry a plan named ${name}`).toBeTruthy();
-      return plan.price;
+      return plan;
     };
 
-    expect(priceOf('Owner Plus'), 'Owner Plus is charged the catalogue price, so the schedule the page\n'
-      + 'falls back to must name the same number').toBe(pricing.ownerPlanYearly);
-    expect(priceOf('Owner Pro')).toBe(pricing.ownerProYearly);
+    expect(planNamed('Listing Pass').price, 'the pass is charged the catalogue price, so the schedule the page\n'
+      + 'falls back to must name the same number').toBe(pricing.listingPass);
+    expect(planNamed('Contact Pack').price).toBe(pricing.contactPack);
     // And they are the numbers this file asserts on screen, so a repricing fails here rather than
-    // in four separate UI assertions whose messages would blame the rendering.
-    expect(priceOf('Owner Plus')).toBe(999);
-    expect(priceOf('Owner Pro')).toBe(2499);
+    // in several UI assertions whose messages would blame the rendering.
+    expect(planNamed('Listing Pass').price).toBe(999);
+    expect(planNamed('Contact Pack').price).toBe(199);
+
+    expect(planNamed('Listing Pass')).toMatchObject({ kind: 'listing-pass', termDays: 60 });
+    expect(planNamed('Contact Pack')).toMatchObject({ kind: 'contact-pack', termDays: 30, contactLimit: 15 });
+    expect(plans.map((p) => p.name).sort(), 'Owner Plus, Owner Pro and Seeker Plus no longer sell').toEqual(['Contact Pack', 'Listing Pass']);
   });
 
   test('/plans is public and quotes the catalogue price on the cards and in the FAQ, and /checkout sends a signed-out visitor to sign-in', async ({ page }) => {
     await page.context().clearCookies();
     await seedConsent(page);
     /* The catalogue differs from the fee schedule, so the card's price identifies which table was read. */
-    const substituted = await catalogueQuoting(page, 'Owner Plus', SENTINEL);
+    const substituted = await catalogueQuoting(page, 'Contact Pack', SENTINEL);
     await page.goto('/plans');
 
     await expect(page.getByRole('heading', { name: 'Plans & Pricing' })).toBeVisible({ timeout: 20000 });
     await expect(page.getByRole('heading', { name: 'For seekers' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'For owners' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Get Seeker Plus' }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Upgrade to Owner Plus' }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Go Pro' }).first()).toBeVisible();
+    await expect(desktopLink(page, 'Get a Contact Pack')).toBeVisible();
+    await expect(desktopLink(page, 'Open My Listings')).toBeVisible();
 
     /* Polled, not asserted once: the first paint legitimately shows the fallback. What must not survive is the
        fallback still being on screen once the catalogue has landed. */
     await expect.poll(
       async () => page.getByText(SENTINEL_TEXT, { exact: false }).count(),
-      { timeout: 20000, message: 'the Owner Plus card never showed the catalogue price' },
+      { timeout: 20000, message: 'the Contact Pack card never showed the catalogue price' },
     ).toBeGreaterThan(0);
-    // ?999 is the fee-schedule price: seeing it means the catalogue read was skipped.
-    await expect(page.getByText(OWNER_PLUS, { exact: false })).toHaveCount(0);
-    // The untouched rows still come through the same read, so this is not an interceptor that
+    // ₹199 is the fee-schedule price: seeing it means the catalogue read was skipped.
+    await expect(page.getByText(CONTACT_PACK, { exact: false })).toHaveCount(0);
+    // The untouched row still comes through the same read, so this is not an interceptor that
     // replaced the catalogue with one plan.
-    await expect(page.getByText(OWNER_PRO, { exact: false }).first()).toBeVisible();
+    await expect(page.getByText(LISTING_PASS, { exact: false }).first()).toBeVisible();
 
-    // The answers live in collapsed `<details>` cards, so open the one quoting the plan prices.
+    // The answers live in collapsed `<details>` cards, so open the one quoting the pack price.
     // Clicking the summary rather than setting `open` keeps this honest about the disclosure.
-    const question = page.getByText('What do the owner plans cost?');
+    const question = page.getByText('How do owner contacts work?');
     await expect(question).toBeVisible({ timeout: 20000 });
     await question.click();
 
-    const faq = page.getByText(/Owner Plus is .* per year and Owner Pro is .* per year/);
-    await expect(faq).toBeVisible({ timeout: 20000 });
-
+    const faq = page.locator('details').filter({ hasText: 'How do owner contacts work?' });
     // With both tables agreeing, an FAQ that had gone back to reading the fee schedule would quote
     // the right number anyway, so it too is checked against the substituted catalogue.
     await expect.poll(
       async () => (await faq.textContent())?.replace(/\s+/g, ' ').trim() ?? '',
-      { timeout: 20000, message: 'the FAQ never picked up the catalogue prices' },
-    ).toContain(`Owner Plus is ${SENTINEL_TEXT} per year`);
-    // Owner Pro stays at its real price: the substitution replaced one row, not the whole catalogue.
-    await expect(faq).toContainText(`Owner Pro is ${OWNER_PRO} per year`);
+      { timeout: 20000, message: 'the FAQ never picked up the catalogue price' },
+    ).toContain(`Contact Pack (${SENTINEL_TEXT})`);
     substituted();
 
-    await page.goto('/checkout?plan=owner2');
+    const body = page.locator('body');
+    await expect(body).not.toContainText(/owner plus|owner pro|seeker plus/i);
+    await expect(body).not.toContainText(/\+ ?GST/i);
+
+    await page.goto('/checkout?plan=contact-pack');
     await expect(page).toHaveURL(/\/signin/);
     // A guard that bounced to a bare /signin would strand the customer on the dashboard mid-purchase.
-    await expect(page).toHaveURL(/next=.*checkout.*owner2/);
+    await expect(page).toHaveURL(/next=.*checkout.*contact-pack/);
     await expect(page.getByRole('heading', { name: 'Checkout' })).toHaveCount(0);
   });
 
-  test('a new account is on the free tier, and its plan CTA hands off to checkout where the Pay button quotes the same price the card did', async ({ page }) => {
-    /* A fresh account, because a seeded actor's subscription state is an invariant other specs rely on — and
-       it is the only way to be sure the re-purchase guard is not what renders. */
+  test('a new account holds the free tier, and its Contact Pack CTA hands off to checkout where Pay quotes the price the card did', async ({ page }) => {
+    /* A fresh account, because a seeded actor's contact and listing state is an invariant other specs rely on. */
     const mobile = await signedInAsNew(page);
     /* The wire half first: a 404 would render the same free tier through the catch path, so the UI assertion
        alone cannot tell an empty document from an error. */
     const res = await fetch(`${API}/me/subscription`, { headers: await authHeaders(mobile) });
     expect(res.status).toBe(200);
-    const sub = await res.json();
-    expect(sub?.status ?? null, 'a brand-new account must hold no subscription').not.toBe('active');
+    expect((await res.json())?.status ?? null, 'a brand-new account must hold no plan').not.toBe('active');
+
+    const ent = await (await fetch(`${API}/me/entitlements`, { headers: await authHeaders(mobile) })).json();
+    expect(ent.listings).toMatchObject({ allowance: 1, used: 0, passes: [] });
+    expect(ent.contacts).toMatchObject({ unlimited: false, allowance: 15, used: 0, remaining: 15, packExpiresAt: null });
 
     await seedConsent(page);
-    const substituted = await catalogueQuoting(page, 'Owner Plus', SENTINEL);
+    const substituted = await catalogueQuoting(page, 'Contact Pack', SENTINEL);
     await page.goto('/plans');
-    // The badge renders in both the hidden mobile carousel and the visible desktop grid, so take
-    // the desktop one (last in DOM).
-    await expect(page.getByText('Current plan').last()).toBeVisible({ timeout: 20000 });
-    // A "Current plan" lock on a plan nobody bought would be an entitlement bug.
-    await expect(page.getByRole('link', { name: 'Upgrade to Owner Plus' }).first()).toBeVisible();
+    await expect(desktopLink(page, 'Get a Contact Pack')).toBeVisible({ timeout: 20000 });
+    // Nobody is "on" a pass or a pack; there is no Current-plan lock to render.
+    await expect(page.getByText('Current plan')).toHaveCount(0);
 
-    await page.getByRole('link', { name: 'Upgrade to Owner Plus' }).first().click();
+    await desktopLink(page, 'Get a Contact Pack').click();
 
-    await expect(page).toHaveURL(/\/checkout\?plan=owner2/);
+    await expect(page).toHaveURL(/\/checkout\?plan=contact-pack/);
     await expect(page.getByRole('heading', { name: 'Checkout' })).toBeVisible({ timeout: 20000 });
-    await expect(page.getByRole('heading', { name: 'Owner', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Contact Pack', exact: true })).toBeVisible();
     await expect(page.getByText('Order summary')).toBeVisible();
 
     // Both pages resolve the catalogue independently; the substituted price makes agreement a catalogue claim.
@@ -152,27 +158,50 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
       async () => (await payButton.first().textContent())?.trim() ?? '',
       { timeout: 20000, message: 'the Pay button never picked up the catalogue price' },
     ).toContain(SENTINEL_TEXT);
-    await expect(page.getByRole('button', { name: new RegExp(`Pay ${OWNER_PLUS}`) })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: new RegExp(`Pay ${CONTACT_PACK}`) })).toHaveCount(0);
     substituted();
   });
 
-  test('a second checkout while an order is still unpaid names that order, instead of inviting a retry that cannot work; an unknown plan goes back to /plans', async ({ page }) => {
+  test('checkout shows one flat price with no GST line, for a pack and for a pass', async ({ page }) => {
+    const mobile = await signedInAsNew(page);
+    await seedConsent(page);
+    const listing = await newListing(mobile, { title: 'Flat price probe' });
+
+    await page.goto('/checkout?plan=contact-pack');
+    await expect(page.getByText('Order summary')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('button', { name: new RegExp(`^Pay ${CONTACT_PACK}$`) }).first()).toBeVisible();
+
+    await page.goto(`/checkout?plan=listing-pass&property=${listing.id}`);
+    await expect(page.getByText('Order summary')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(listing.title).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: new RegExp(`^Pay ${LISTING_PASS}$`) }).first()).toBeVisible();
+
+    // The summary line and the total are the same figure: nothing is added on top at the door.
+    const summary = page.locator('div.glass').filter({ hasText: 'Order summary' }).first();
+    await expect(summary.getByText(LISTING_PASS, { exact: true })).toHaveCount(2);
+    await expect(page.getByText('Prices include GST.')).toBeVisible();
+    await expect(page.locator('div.max-w-4xl')).not.toContainText(/\+\s*GST|GST\s*[(@:]|18\s*%/);
+  });
+
+  test('a second checkout while an order is still unpaid names that order, instead of inviting a retry that cannot work; a retired or unknown plan goes back to /plans', async ({ page }) => {
     /* The server caps a user at one open unpaid order and answers 409, so a generic "please try again" tells
        the customer to retry from the one state where retrying cannot work. */
     await signedInAsNew(page);
     await seedConsent(page);
 
-    await page.goto('/checkout?plan=not-a-plan');
-    await expect(page).toHaveURL(/\/plans$/);
-    await expect(page.getByRole('heading', { name: 'Plans & Pricing' })).toBeVisible({ timeout: 20000 });
+    for (const plan of ['not-a-plan', 'owner2', 'seeker-plus']) {
+      await page.goto(`/checkout?plan=${plan}`, { waitUntil: 'commit' });
+      await expect(page).toHaveURL(/\/plans$/);
+      await expect(page.getByRole('heading', { name: 'Plans & Pricing' })).toBeVisible({ timeout: 20000 });
+    }
 
-    await page.goto('/checkout?plan=owner2');
+    await page.goto('/checkout?plan=contact-pack');
     await page.getByRole('button', { name: /^Pay ₹/ }).first().click();
     // The mock gateway hands back a `mock_session_*`, which the checkout lib short-circuits, so the
     // page settles on the pending screen without a real hosted checkout being opened.
     await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
 
-    await page.goto('/checkout?plan=owner5');
+    await page.goto('/checkout?plan=contact-pack');
     await page.getByRole('button', { name: /^Pay ₹/ }).first().click();
 
     const alert = page.getByRole('alert');
@@ -182,32 +211,54 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     await expect(alert).not.toContainText('please try again');
   });
 
-  test('the plan cards state the seeded entitlements, with listing counts read from the catalogue', async ({ page }) => {
+  test('a payment that clears while the pending screen is open turns into the success screen once the entitlement shows', async ({ page }) => {
+    const mobile = await signedInAsNew(page);
+    await seedConsent(page);
+
+    await page.goto('/checkout?plan=contact-pack');
+    await page.getByRole('button', { name: /^Pay ₹/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/Prototype|saved locally/)).toHaveCount(0);
+
+    settleOrder(await pendingOrderId(mobile), 30);
+    await expect(page.getByRole('heading', { name: 'Payment successful!' })).toBeVisible({ timeout: 40000 });
+    await expect(page.getByText(/15 contacts added, valid till/)).toBeVisible();
+  });
+
+  test('the plan cards state what each product grants, with the counts read from the catalogue', async ({ page }) => {
     await page.context().clearCookies();
     await seedConsent(page);
     const { plans } = await (await fetch(`${API}/bootstrap`)).json();
-    const limit = (name) => plans.find((p) => p.name === name).listingLimit;
+    const pack = plans.find((p) => p.name === 'Contact Pack');
+    const pass = plans.find((p) => p.name === 'Listing Pass');
     await page.goto('/plans');
 
     const card = (name) => page.locator('h3', { hasText: new RegExp(`^${name}$`) }).last().locator('xpath=ancestor::div[contains(@class,"glass")][1]');
-    await expect(card('Seeker Free')).toContainText('15 owner contacts in total', { timeout: 20000 });
-    await expect(card('Seeker Plus')).toContainText('Unlimited owner contacts');
-    await expect(card('Owner Free')).toContainText('Verified owner badge');
-    await expect(card('Owner Plus')).toContainText(`List up to ${limit('Owner Plus')} properties`);
-    await expect(card('Owner Plus')).not.toContainText('Verified owner badge');
-    await expect(card('Owner Pro')).toContainText(`List up to ${limit('Owner Pro')} properties`);
-    await expect(card('Owner Pro')).toContainText('Rent agreement included');
+    // Three "Free" cards render: the mobile carousel, then the desktop seeker and owner grids.
+    const free = page.locator('h3', { hasText: /^Free$/ });
+    const cardOf = (heading) => heading.locator('xpath=ancestor::div[contains(@class,"glass")][1]');
+    await expect(cardOf(free.nth(1))).toContainText('15 owner contacts within 30 days of your first contact', { timeout: 20000 });
+    await expect(cardOf(free.last())).toContainText('Featured for 7 days after verification');
+    await expect(cardOf(free.last())).toContainText('1 live listing at a time');
+    await expect(card('Contact Pack')).toContainText(`${pack.contactLimit} more owner contacts`);
+    await expect(card('Contact Pack')).toContainText(`Valid for ${pack.termDays} days`);
+    await expect(card('Contact Pack')).toContainText('No auto-renewal');
+    await expect(card('Listing Pass')).toContainText(`Keeps one more listing live for ${pass.termDays} days`);
+    await expect(card('Listing Pass')).toContainText('No auto-renewal');
   });
 
-  test('a held paid plan carries its own listing limit, not the one-listing floor', async ({ page }) => {
-    await signedInAsNew(page);
+  test('what a buyer holds is named in billing, as a dated purchase and not a subscription', async ({ page }) => {
+    const mobile = `${uniqueMobile().slice(0, -1)}7`;
+    const listing = await newListing(mobile, { title: 'Billing pass' });
+    await approve(listing.id);
+    settleOrder((await openOrder(mobile, CONTACT_PACK_PLAN)).id, 30);
+    settleOrder((await openOrder(mobile, LISTING_PASS_PLAN, listing.id)).id, 60);
+
+    await signedInAs(page, mobile);
     await seedConsent(page);
-    const { plans } = await (await fetch(`${API}/bootstrap`)).json();
-    const pro = plans.find((p) => p.name === 'Owner Pro');
-    await page.route('**/api/me/subscription', (route) => (route.request().method() === 'GET'
-      ? route.fulfill({ json: { id: 's1', planId: pro.id, status: 'active', paymentRef: null, paymentSessionId: null } })
-      : route.continue()));
     await page.goto('/dashboard#billing');
-    await expect(page.getByText(`Up to ${pro.listingLimit} properties`)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/^Contact pack · till /)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/^Listing pass · Billing pass \d+ · till /)).toBeVisible();
+    await expect(page.getByText(/subscription|auto-renew|renews/i)).toHaveCount(0);
   });
 });

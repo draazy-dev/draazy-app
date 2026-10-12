@@ -9,7 +9,7 @@ import { maskPhone, fmtPhone } from '../../../lib/contact.js';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { requestContact } from '../../../services/contactService.js';
 import { useContactGate } from './useContactGate.js';
-import { useEntitlements, contactsLeft } from './useEntitlements.js';
+import { useEntitlements, contactsLeft, freeContactsTill } from './useEntitlements.js';
 import { useAppFlags } from '../../../context/AppFlagsContext.jsx';
 import { track, captureLead } from '../../../lib/pmf.js';
 import { dialableMobile, telHref } from './contactPhone.js';
@@ -29,6 +29,7 @@ export function ContactBox({ p, isIn, toast }) {
   const [busy, setBusy] = useState(false);
   const { entitlements, refresh: refreshEntitlements } = useEntitlements(isIn);
   const left = contactsLeft(entitlements);
+  const freeTill = freeContactsTill(entitlements);
   const status = gate.status;
   // An owner can approve a request yet still keep their number masked (Settings ▸
   // Owner phone privacy) — approved buyers are routed to in-app chat instead.
@@ -119,7 +120,7 @@ export function ContactBox({ p, isIn, toast }) {
               {isIn && Number.isFinite(left) && (
                 <p className="text-[11px] mt-1.5 text-center" data-testid="contacts-left">
                   {left > 0 ? (
-                    <span className="text-slate-500">{t('property.contactsLeft', { count: left })}</span>
+                    <span className="text-slate-500">{freeTill ? t('property.contactsLeftTill', { count: left, date: freeTill }) : t('property.contactsLeft', { count: left })}</span>
                   ) : (
                     <span className="text-amber-300">{t(flagEnabled('referralRewards') ? 'property.contactsLeftNoneReferHint' : 'property.contactsLeftNone')}</span>
                   )}

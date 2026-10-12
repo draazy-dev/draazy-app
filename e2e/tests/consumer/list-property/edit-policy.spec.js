@@ -57,27 +57,26 @@ test.afterEach(async () => {
   created.clear();
 });
 
-test('a first free listing is NOT paywalled and shows no edit banner', async ({ page }) => {
+test('a first free listing is not gated and shows no edit banner', async ({ page }) => {
   await signedInAsNew(page); // a brand-new owner, so no existing listings
   await page.goto('/list-property');
   await expect(formLocator(page)).toBeVisible({ timeout: 20000 });
-  // … editing an existing listing is never paywalled, and the form is available.
   await expect(page.getByText(/used your free listing/i)).toHaveCount(0);
   await expect(page.getByText('Publishes instantly')).toHaveCount(0);
 });
 
-test('a live listing is paywalled for a second new post, and editing it shows the tiered banner with a price edit staying live', async ({ page, request }) => {
+test('a live listing does not stop a second new post, and editing it shows the tiered banner with a price edit staying live', async ({ page, request }) => {
   test.slow();
   const { id } = await ownerWithLiveListing(page, request);
 
-  await test.step('P2 ? a second new listing is paywalled on the free plan', async () => {
+  await test.step('a second new listing opens the form: the tier is applied at approval, not at the door', async () => {
     await page.goto('/list-property');
-    await expect(page.getByRole('heading', { name: /used your free listing/i })).toBeVisible({ timeout: 20000 });
-    await expect(page.getByRole('link', { name: /Upgrade & post/i })).toBeVisible();
-    await expect(formLocator(page)).toHaveCount(0);
+    await expect(formLocator(page)).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/used your free listing/i)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /Upgrade & post/i })).toHaveCount(0);
   });
 
-  await test.step('P1 ? editing a live listing shows the tiered edit banner (and no paywall)', async () => {
+  await test.step('P1 ? editing a live listing shows the tiered edit banner', async () => {
     await page.goto(`/list-property?edit=${id}`);
     await expect(page.getByText('Publishes instantly')).toBeVisible({ timeout: 20000 });
     await expect(page.getByText('Needs a re-check')).toBeVisible();

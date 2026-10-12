@@ -20,7 +20,6 @@ export default function RentAgreementCost() {
   const stamp = leaveLicenceStamp(rentTotal, 0, toNum(deposit), years);
   const govt = stamp + REGISTRATION_FEE + DOCUMENT_HANDLING;
   const service = prices.rentAgreementPlatform;
-  const gst = Math.round((service * prices.gstPercent) / 100);
 
   return (
     <ToolShell path="/tools/rent-agreement-cost-pune">
@@ -42,8 +41,7 @@ export default function RentAgreementCost() {
               ['Registration fee', rupees(REGISTRATION_FEE)],
               ['Document handling', rupees(DOCUMENT_HANDLING)],
               ['Draazy service fee', rupees(service)],
-              [`GST on service fee (${prices.gstPercent}%)`, rupees(gst)],
-              ['Total with Draazy', rupees(govt + service + gst)],
+              ['Total with Draazy', rupees(govt + service)],
             ]}
             note="The Draazy rows apply only if you book the agreement through Draazy. Final amounts are confirmed at registration."
           />

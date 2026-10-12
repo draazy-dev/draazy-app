@@ -89,11 +89,11 @@ export const ROUTE_HEADS = {
   },
   '/plans': {
     title: 'Plans and Pricing | Draazy',
-    description: 'What Draazy costs for owners, buyers and tenants in Pune. Owners list one property free. No brokerage, no hidden fees.',
+    description: 'What Draazy costs for owners, buyers and tenants in Pune. Owners list one property at a time free. No brokerage, no hidden fees.',
   },
   '/compare/nobroker': {
     title: 'Draazy vs NoBroker: Plans and Fees Compared (Pune)',
-    description: 'Draazy and NoBroker plans and fees side by side for Pune: owner contacts, owner plans, number privacy, rent agreements. Facts as of October 2026, each linked.',
+    description: 'Draazy and NoBroker plans and fees side by side for Pune: owner contacts, listing passes, number privacy, agreements. Facts as of October 2026, each linked.',
     schema: 'WebPage',
   },
   '/contact': {

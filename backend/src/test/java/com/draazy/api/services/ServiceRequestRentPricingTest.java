@@ -17,8 +17,8 @@ import org.springframework.http.MediaType;
 @DisplayName("Rent agreement pricing — the statutory charges are computed, not published")
 class ServiceRequestRentPricingTest extends ServiceFixtures {
 
-    // The seeded admin fee (₹500) plus 18% GST.
-    private static final int PLATFORM_HALF = 590;
+    // The seeded admin fee: ₹499, GST included.
+    private static final int PLATFORM_HALF = 499;
 
     @Test
     @DisplayName("the published rent schedule states no flat stamp duty or registration")
@@ -26,11 +26,11 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
 
         mvc.perform(get("/fees"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[1].deal").value("rent"))
-                .andExpect(jsonPath("$[1].platformFee").value(500))
-                .andExpect(jsonPath("$[1].gst").value(90))
-                .andExpect(jsonPath("$[1].stampDuty").doesNotExist())
-                .andExpect(jsonPath("$[1].registration").doesNotExist());
+                .andExpect(jsonPath("$[0].deal").value("rent"))
+                .andExpect(jsonPath("$[0].platformFee").value(499))
+                .andExpect(jsonPath("$[0].gst").value(0))
+                .andExpect(jsonPath("$[0].stampDuty").doesNotExist())
+                .andExpect(jsonPath("$[0].registration").doesNotExist());
     }
 
     // The non-refundable deposit lives only in the wizard's `_state` snapshot, so a pricer reading the top level

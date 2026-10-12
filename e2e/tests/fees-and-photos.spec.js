@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { appReady } from '../helpers/app.js';
 import { API, apiLogin, authHeaders, ownerIdOf, signedInAs, signedInAsNew, uniqueMobile, uploadedListingPhotos } from '../helpers/liveAuth.js';
 import { LIST_PROPERTY_DRAFT_KEY } from '../helpers/listingForm.helper.js';
+import { istInDays } from '../helpers/availability.js';
 import { PHOTO_PNG } from '../helpers/listingPhotos.helper.js';
 import { fillSociety } from '../helpers/places.js';
 
@@ -15,7 +16,7 @@ const ADMIN = '9000000000';
 const rupees = (n) => '₹' + Number(n).toLocaleString('en-IN');
 const adminPrices = async () => (await (await fetch(`${API}/bootstrap`)).json()).pricing;
 const gstOn = (fee, percent) => Math.round((fee * percent) / 100);
-// A fee that disagrees with the admin schedule's ₹500, so it must never appear.
+// A fee that disagrees with the admin schedule's ₹499, so it must never appear.
 const STALE_RENT_FEE = '₹1,999';
 
 async function saveFees(fees) {
@@ -30,17 +31,21 @@ async function saveFees(fees) {
 const costSidebar = (page) =>
   page.locator('aside, [class*="sticky"]').filter({ hasText: /Draazy Service Fee/i }).first();
 const costRow = (sidebar, label) => sidebar.locator('div.justify-between').filter({ hasText: label }).first();
+// Prices include GST (the schedule's gstPercent is 0), so no GST line is drawn unless an admin sets one.
+const expectGstLine = (sidebar, fee, percent) => (percent > 0
+  ? expect(costRow(sidebar, /^GST/)).toContainText(rupees(gstOn(fee, percent)))
+  : expect(sidebar.locator('div.justify-between').filter({ hasText: /^GST/ })).toHaveCount(0));
 
 test.describe('Fees — the rent-agreement sidebar prices from the admin fee schedule (live)', () => {
-  test('shows the admin service fee and its GST, and calls the total an estimate', async ({ page }) => {
-    const { rentAgreementPlatform: fee, gstPercent } = await adminPrices();
+  test('shows the admin service fee with no GST line (the price includes GST), and calls the total an estimate', async ({ page }) => {
+    const { rentAgreementPlatform: fee, gstPercent = 0 } = await adminPrices();
     // `GET /fees` is public, so this runs signed out — the state of the visitor it exists to convince.
     await page.goto('/services/rent-agreement');
 
     const sidebar = costSidebar(page);
     await expect(sidebar).toBeVisible({ timeout: 20_000 });
     await expect(costRow(sidebar, /^Draazy Service Fee/)).toContainText(rupees(fee));
-    await expect(costRow(sidebar, /^GST/)).toContainText(rupees(gstOn(fee, gstPercent)));
+    await expectGstLine(sidebar, fee, gstPercent);
     await expect(sidebar).not.toContainText(STALE_RENT_FEE);
 
     // A failed read must not pass merely by lacking a wrong number.
@@ -53,14 +58,14 @@ test.describe('Fees — the rent-agreement sidebar prices from the admin fee sch
   });
 
   test('a fee repriced in the admin Fees tab is what the wizard quotes', async ({ page }) => {
-    const { rentAgreementPlatform: before, gstPercent } = await adminPrices();
+    const { rentAgreementPlatform: before, gstPercent = 0 } = await adminPrices();
     const repriced = 777;
     await saveFees({ rentAgreementPlatform: repriced });
     try {
       await page.goto('/services/rent-agreement');
       const sidebar = costSidebar(page);
       await expect(costRow(sidebar, /^Draazy Service Fee/)).toContainText(rupees(repriced), { timeout: 20_000 });
-      await expect(costRow(sidebar, /^GST/)).toContainText(rupees(gstOn(repriced, gstPercent)));
+      await expectGstLine(sidebar, repriced, gstPercent);
     } finally {
       await saveFees({ rentAgreementPlatform: before });
     }
@@ -85,17 +90,17 @@ test.describe('Photos — the listing wizard uploads to the server (live)', () =
     const mobile = await signedInAsNew(page);
     const ownerId = ownerIdOf(await authHeaders(mobile));
 
-    await page.addInitScript(({ key, ownerId }) => {
+    await page.addInitScript(({ key, ownerId, availableFrom }) => {
       localStorage.setItem(key, JSON.stringify({
         propertyType: 'flat', bhk: '2 BHK', bathrooms: '2', carpetArea: '850', deal: 'rent',
       // A tower's floors are answered on step 1, so a draft without them never gets past it.
       floor: '9', totalFloors: '14',
         // `availableFrom` is a `DateField` — a button opening a calendar, not a text input — so it
         // has to arrive through the draft.
-        availableFrom: '2026-09-01',
+        availableFrom,
         __owner: ownerId,
       }));
-    }, { key: LIST_PROPERTY_DRAFT_KEY, ownerId });
+    }, { key: LIST_PROPERTY_DRAFT_KEY, ownerId, availableFrom: istInDays(30) });
     await page.goto('/list-property');
 
     // Wait for restored draft state because immediate Next races the effect render.
@@ -183,13 +188,15 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
     const prices = (await (await fetch(`${API}/bootstrap`)).json()).pricing;
 
     // Keys as a set because a missing fee renders as "₹0", not as missing UI.
-    expect(Object.keys(prices).sort()).toEqual([
-      'gstPercent', 'ownerPlanYearly', 'ownerProYearly',
-      'rentAgreementPlatform', 'seekerPlusTopup',
+    // `gstPercent` is a leftover that may go; prices include GST either way.
+    expect(Object.keys(prices).filter((key) => key !== 'gstPercent').sort()).toEqual([
+      'contactPack', 'listingPass', 'rentAgreementPlatform',
     ]);
     for (const [key, value] of Object.entries(prices)) {
       expect(typeof value, `${key} is a number`).toBe('number');
-      expect(value, `${key} is positive`).toBeGreaterThan(0);
+      // Every price includes GST, so the schedule's GST is 0.
+      if (key === 'gstPercent') expect(value).toBe(0);
+      else expect(value, `${key} is positive`).toBeGreaterThan(0);
     }
 
     // The page, not one node: the figure sits in a translated string in one place and a bare span in another.
@@ -197,27 +204,28 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
     await expect(body).toContainText(rupees(prices.rentAgreementPlatform), { timeout: 20_000 });
     await expect(body).not.toContainText(STALE_RENT_FEE);
 
-    // The FAQ, in a collapsed <details>, so open it first.
-    const faq = page.locator('details').filter({ hasText: /per year/i }).first();
-    await expect(faq).toBeVisible({ timeout: 20000 });
-    await faq.locator('summary').click();
-
-    await expect(faq).toContainText(rupees(prices.ownerPlanYearly));
-    await expect(faq).toContainText(rupees(prices.ownerProYearly));
+    // The FAQs, in collapsed <details>, so open each first.
+    const faq = (question) => page.locator('details').filter({ hasText: question }).first();
+    for (const [question, fee] of [['How do owner contacts work?', prices.contactPack], ['What does a second live listing cost?', prices.listingPass]]) {
+      await expect(faq(question)).toBeVisible({ timeout: 20000 });
+      await faq(question).locator('summary').click();
+      await expect(faq(question)).toContainText(rupees(fee));
+    }
+    await expect(body).not.toContainText(/owner plus|owner pro|seeker plus|\+ ?GST|per year/i);
   });
 
-  test('a plan repriced in the admin Fees tab is what the plan card and the catalogue quote', async ({ page }) => {
-    const { ownerPlanYearly: before } = await adminPrices();
+  test('a pass repriced in the admin Fees tab is what the plan card and the catalogue quote', async ({ page }) => {
+    const { listingPass: before } = await adminPrices();
     const repriced = 1_234;
-    await saveFees({ ownerPlanYearly: repriced });
+    await saveFees({ listingPass: repriced });
     try {
       const { plans } = await (await fetch(`${API}/bootstrap`)).json();
-      expect(plans.find((p) => p.name === 'Owner Plus')?.price, 'the catalogue charges the admin price').toBe(repriced);
+      expect(plans.find((p) => p.name === 'Listing Pass')?.price, 'the catalogue charges the admin price').toBe(repriced);
 
       await page.goto('/plans');
       await expect(page.locator('body')).toContainText(rupees(repriced), { timeout: 20_000 });
     } finally {
-      await saveFees({ ownerPlanYearly: before });
+      await saveFees({ listingPass: before });
     }
   });
 
@@ -235,7 +243,7 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
     await expect.poll(() => asks, { message: 'home boots from one bootstrap read' }).toBe(1);
 
     await page.goto('/plans');
-    await expect(page.locator('details').filter({ hasText: /per year/i }).first())
+    await expect(page.locator('details').filter({ hasText: /How do owner contacts work/ }).first())
       .toBeVisible({ timeout: 20000 });
     expect(asks, 'a fresh load reads it again, once').toBe(2);
   });

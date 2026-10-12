@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.billing.plan.TestPlanGrants;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
@@ -17,18 +18,20 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 
-// The quota is enforced server-side because browser localStorage counted only
-// that device and `POST /me/listings` is reachable without the wizard.
+// The free tier is one live listing; posting is unlimited and the gate is going live (approval and resume).
 @DisplayName("Listing quota — the ceiling the browser used to keep")
 class ListingQuotaTest extends AbstractApiTest {
 
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
+    @Autowired TestPlanGrants grants;
 
     private static final String BODY = """
             {"title":"%s","deal":"rent","propertyType":"apartment","price":25000,
@@ -61,36 +64,70 @@ class ListingQuotaTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("the first listing is free and the second is refused, on a browser that posted neither")
-    void theFreeTierIsOneListingAtATime() throws Exception {
+    @DisplayName("posting never refuses on the free tier — the gate is going live, not being created")
+    void aSecondListingCanBePosted() throws Exception {
         User o = owner("9861000001");
         existing(o, "Posted from the laptop", PropertyStatus.APPROVED);
 
-        mvc.perform(post("/me/listings").header("Authorization", bearer(o))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(BODY.formatted("Posted from the phone", listingImages(o))))
+        assertThat(tryPost(o, "Posted from the phone")).isEqualTo(201);
+    }
+
+    @Test
+    @DisplayName("a second listing cannot resume while the first is live, and the refusal names the pass price")
+    void resumeIsRefusedOverTheFreeTier() throws Exception {
+        User o = owner("9861000002");
+        existing(o, "Live flat", PropertyStatus.APPROVED);
+        Property paused = existing(o, "Paused flat", PropertyStatus.PAUSED);
+
+        mvc.perform(post(Routes.MeListings.RESUME.replace("{id}", paused.getId().toString()))
+                        .header("Authorization", bearer(o)))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.error").value("listing_quota_exhausted"))
-
-                .andExpect(jsonPath("$.message").value(containsString("1 of 1")));
+                .andExpect(jsonPath("$.message").value(containsString("₹999")));
+        assertThat(properties.findById(paused.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.PAUSED);
     }
 
     @Test
-    @DisplayName("a listing still in the moderation queue holds its slot")
-    void pendingCountsTowardsTheCeiling() throws Exception {
-        User o = owner("9861000002");
-        existing(o, "Awaiting review", PropertyStatus.PENDING);
-
-        assertThat(tryPost(o, "And another")).isEqualTo(422);
-    }
-
-    @Test
-    @DisplayName("a paused listing still holds its slot")
-    void pausedCountsTowardsTheCeiling() throws Exception {
+    @DisplayName("a listing pass on the paused listing lets it resume beside the free one")
+    void aPassLetsTheSecondListingResume() throws Exception {
         User o = owner("9861000009");
-        existing(o, "Paused flat", PropertyStatus.PAUSED);
+        existing(o, "Live flat", PropertyStatus.APPROVED);
+        Property paused = existing(o, "Paused flat", PropertyStatus.PAUSED);
+        grants.grantPass(o.getId(), paused.getId(), Instant.now().plus(60, ChronoUnit.DAYS));
 
-        assertThat(tryPost(o, "And another")).isEqualTo(422);
+        mvc.perform(post(Routes.MeListings.RESUME.replace("{id}", paused.getId().toString()))
+                        .header("Authorization", bearer(o)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"));
+    }
+
+    @Test
+    @DisplayName("an expired pass covers nothing")
+    void anExpiredPassDoesNotCover() throws Exception {
+        User o = owner("9861000014");
+        existing(o, "Live flat", PropertyStatus.APPROVED);
+        Property paused = existing(o, "Paused flat", PropertyStatus.PAUSED);
+        grants.grantPass(o.getId(), paused.getId(), Instant.now().minus(1, ChronoUnit.DAYS));
+
+        mvc.perform(post(Routes.MeListings.RESUME.replace("{id}", paused.getId().toString()))
+                        .header("Authorization", bearer(o)))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @DisplayName("pausing the live listing frees the free slot for the other one")
+    void pausingFreesTheSlot() throws Exception {
+        User o = owner("9861000015");
+        Property live = existing(o, "Live flat", PropertyStatus.APPROVED);
+        Property paused = existing(o, "Paused flat", PropertyStatus.PAUSED);
+
+        mvc.perform(post(Routes.MeListings.PAUSE.replace("{id}", live.getId().toString()))
+                        .header("Authorization", bearer(o)))
+                .andExpect(status().isOk());
+        mvc.perform(post(Routes.MeListings.RESUME.replace("{id}", paused.getId().toString()))
+                        .header("Authorization", bearer(o)))
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -103,46 +140,37 @@ class ListingQuotaTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("taking a listing down frees the slot")
-    void archivingReturnsTheSlot() throws Exception {
-        User o = owner("9861000004");
-        Property first = existing(o, "The old flat", PropertyStatus.APPROVED);
-
-        assertThat(tryPost(o, "The new flat")).isEqualTo(422);
-
-        mvc.perform(delete("/me/listings/" + first.getId())
-                        .header("Authorization", bearer(o)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.archived").value(true));
-
-        assertThat(tryPost(o, "The new flat")).isEqualTo(201);
-    }
-
-    @Test
-    @DisplayName("entitlements report the same held count the gate refuses on")
+    @DisplayName("entitlements count only live listings a pass does not cover, and list the passes")
     void entitlementsReportTheHeldCount() throws Exception {
         User o = owner("9861000010");
         existing(o, "Live", PropertyStatus.APPROVED);
+        existing(o, "Flagged", PropertyStatus.FLAGGED);
         existing(o, "Queued", PropertyStatus.PENDING);
+        existing(o, "Paused", PropertyStatus.PAUSED);
         existing(o, "Turned down", PropertyStatus.REJECTED);
+        Property covered = existing(o, "Covered", PropertyStatus.APPROVED);
         Property gone = existing(o, "Taken down", PropertyStatus.APPROVED);
         mvc.perform(delete("/me/listings/" + gone.getId()).header("Authorization", bearer(o)))
                 .andExpect(status().isOk());
+        grants.grantPass(o.getId(), covered.getId(), Instant.now().plus(60, ChronoUnit.DAYS));
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS).header("Authorization", bearer(o)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.listings.used").value(2));
+                .andExpect(jsonPath("$.listings.used").value(2))
+                .andExpect(jsonPath("$.listings.allowance").value(1))
+                .andExpect(jsonPath("$.listings.passes.length()").value(1))
+                .andExpect(jsonPath("$.listings.passes[0].propertyId").value(covered.getId().toString()));
     }
 
     @Test
-    @DisplayName("the wizard's quota read gives the caller's own allowance and held count, nothing else")
+    @DisplayName("the wizard's quota read gives the caller's own allowance and live count, nothing else")
     void theQuotaReadMatchesEntitlementsAndIsScopedToTheCaller() throws Exception {
         User o = owner("9861000011");
         User other = owner("9861000012");
         existing(o, "Live", PropertyStatus.APPROVED);
         existing(o, "Turned down", PropertyStatus.REJECTED);
         existing(other, "Theirs one", PropertyStatus.APPROVED);
-        existing(other, "Theirs two", PropertyStatus.PENDING);
+        existing(other, "Theirs two", PropertyStatus.FLAGGED);
 
         mvc.perform(get(Routes.MeListings.QUOTA).header("Authorization", bearer(o)))
                 .andExpect(status().isOk())
@@ -190,14 +218,17 @@ class ListingQuotaTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a refused post leaves nothing behind")
-    void aRefusedPostIsNotAHalfWrittenListing() throws Exception {
+    @DisplayName("a refused resume leaves the listing as it was")
+    void aRefusedResumeChangesNothing() throws Exception {
         User o = owner("9861000005");
-        existing(o, "The only one", PropertyStatus.APPROVED);
+        existing(o, "The only live one", PropertyStatus.APPROVED);
+        Property paused = existing(o, "Still paused", PropertyStatus.PAUSED);
 
-        assertThat(tryPost(o, "Never created")).isEqualTo(422);
-        assertThat(properties.findAll().stream().map(Property::getTitle))
-                .doesNotContain("Never created");
+        mvc.perform(post(Routes.MeListings.RESUME.replace("{id}", paused.getId().toString()))
+                        .header("Authorization", bearer(o)))
+                .andExpect(status().isUnprocessableEntity());
+        assertThat(properties.findAll().stream().filter(p -> p.getId().equals(paused.getId()))
+                .map(Property::getStatus)).containsExactly(PropertyStatus.PAUSED);
     }
 
     @Test

@@ -16,8 +16,8 @@ export const reserveDeal = async (propId) => (await provider()).reserveDeal(prop
  * rather than stored as somebody's identity. */
 export const closeDeal = async (propId, body) => (await provider()).closeDeal(propId, body);
 
-/** Reopen a closed or reserved deal. */
-export const reopenDeal = async (propId) => (await provider()).reopenDeal(propId);
+/** Reopen a closed or reserved deal, optionally with the date it is next available. */
+export const reopenDeal = async (propId, availableOn) => (await provider()).reopenDeal(propId, availableOn);
 
 /** Off-platform interested parties on a reserved listing. */
 export const listParties = async (propId) => (await provider()).listParties(propId);

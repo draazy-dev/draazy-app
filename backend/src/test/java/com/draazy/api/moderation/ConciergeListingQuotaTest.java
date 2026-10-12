@@ -139,33 +139,14 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
         assertThat(postOnBehalf(staff, "9853900004", "Their third flat")).isEqualTo(201);
     }
 
-    // Desk posting must not make the owner's own wizard more permissive.
-    @Test
-    @DisplayName("the exemption does not follow the owner back to their own wizard")
-    void theOwnersOwnPostIsStillRefused() throws Exception {
-        User staff = user("9853900005", "staff");
-        User owner = user("9853900006", "owner");
-
-        assertThat(postOnBehalf(staff, owner.getMobile(), "Phoned in")).isEqualTo(201);
-
-        mvc.perform(post("/me/listings")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"Typed in myself","deal":"rent","propertyType":"apartment",
-                                 "price":25000,"locality":"Kothrud","city":"Pune"}
-                                """))
-                .andExpect(status().isUnprocessableEntity())
-                .andExpect(jsonPath("$.error").value("listing_quota_exhausted"));
-    }
-
     @Test
     @DisplayName("the standing read names both numbers, and says when one is past the other")
     void standingReportsTheOverage() throws Exception {
         User staff = user("9853900007", "staff");
         User owner = user("9853900008", "owner");
         held(owner, "One", PropertyStatus.APPROVED);
-        held(owner, "Two", PropertyStatus.PENDING);
+        held(owner, "Two", PropertyStatus.FLAGGED);
+        held(owner, "Three", PropertyStatus.PENDING);
 
         mvc.perform(get("/admin/properties/owner-standing")
                         .param("mobile", owner.getMobile())

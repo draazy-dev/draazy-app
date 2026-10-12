@@ -100,14 +100,6 @@ payoff is a phone number or a thread.
 
 **Owner:** product. **Status:** OPEN.
 
-### Q8 — Broker-lane timing
-
-Brokers are explicitly *not* excluded by the thesis (the incumbent analysis concluded brokers are
-paying customers and liquidity beats purity). When the broker lane opens — and whether it is a
-distinct role or a flag — is undecided.
-
-**Owner:** product. **Status:** OPEN.
-
 ### Q9 — Which five localities launch first?
 
 Corridor GTM (Hinjewadi–Wakad–Baner) is the recommendation on record; the actual five are not
@@ -177,6 +169,13 @@ contract bug either way; this decides whether anything is built *on top of* it.
 
 Q20 is decided but not yet built, so it stays in the open section above rather than here.
 
+### Q8 — Do brokers have a place on Draazy? *(closed 2026-10-11)*
+
+**Answer: no.** Draazy is strictly broker-free: owners, buyers and tenants only, with no broker role,
+flag, plan or listing label.
+
+**Owner:** founder. **Status:** CLOSED.
+
 ### Q15 — What must a listing carry before it can claim "verified"? *(closed 2026-08-11)*
 
 **Answer: three required artefacts — ownership proof, owner identity, physical existence.** RERA
@@ -238,6 +237,16 @@ Two constraints on whoever sets it, recorded now while the reasoning is fresh:
 
 Q10's "50 hand-recruited owners" and Q11's flatmates gate remain the two numbers already on record.
 **Owner:** founder. **Status:** mechanism decided; threshold OPEN, deliberately.
+
+**Follow-on (Q16b) — the MVP price list *(decided 2026-10-11)*.** Subscriptions are retired; nothing
+auto-renews. The only paid items are the rent agreement (₹499 + government charges, first or
+renewal), a listing pass (₹999, each extra *live* rent/sell listing beyond 1 free, 60 days) and a
+contact pack (₹199, 15 contacts for 30 days, after 15 free in the first 30 days). All prices include
+GST. Flatmate posts
+are free and unlimited; the 3-active-post cap on non-owner hosts stays as an anti-broker guard. Over
+the free tier a listing is never refused: it waits paused until the owner buys a pass or pauses
+another. Featured is a 7-day reward for ownership verification, not a paid boost. Lawyer and loan
+partners are commission-only and carry no user-facing price. Target: ~₹10,000/month covers infra.
 
 ### Q17 — What counts as a genuine referral? *(closed 2026-08-11)*
 

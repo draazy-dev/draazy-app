@@ -3,7 +3,6 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { usePostChooser, usePostChooserOpen } from '../../context/PostChooserContext.jsx';
-import { usePlan } from '../../context/PlanContext.jsx';
 /* Mobile bottom tab bar (below lg), the primary wayfinding surface on phones. */
 
 function Tab({ to, icon, label, active, onClick, slotRef, ...rest }) {
@@ -34,16 +33,13 @@ export default function BottomNav() {
   const { pathname } = useLocation();
   const { openPostChooser } = usePostChooser();
   const postChooserOpen = usePostChooserOpen();
-  const { listingLimit, isPaidOwner } = usePlan();
 
   const path = pathname.toLowerCase();
   /* One indicator that travels, because the tabs are siblings in a single control. */
 
   const SLOTS = useMemo(() => ['/reels', '/listings', null, '/flatmates', '/services'], []);
   const activeIndex = SLOTS.findIndex((p) => p && path.startsWith(p));
-  const postLabel = !isPaidOwner && listingLimit === 1
-    ? t('chrome.postPropertyFree')
-    : t('nav.postProperty');
+  const postLabel = t('chrome.postPropertyFree');
 
   const navRef = useRef(null);
   const tabRefs = useRef([]);

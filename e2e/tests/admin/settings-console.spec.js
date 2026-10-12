@@ -99,8 +99,8 @@ test('saving the fee schedule changes the price the public route quotes', async 
   // the supported entry point and it removes a click that can land before the strip has mounted.
   await page.goto('/admin/settings?tab=fees');
 
-  // `seekerPlusTopup` is safe to nudge and republishes through the anonymous `/bootstrap`.
-  const fee = page.getByRole('spinbutton', { name: 'Seeker Plus Topup' });
+  // `contactPack` is safe to nudge and republishes through the anonymous `/bootstrap`.
+  const fee = page.getByRole('spinbutton', { name: 'Contact pack' });
   await expect(fee).toBeVisible();
   const before = Number(await fee.inputValue());
   // Relative to whatever is stored, so the test carries no opinion about the seeded price, and well
@@ -117,10 +117,10 @@ test('saving the fee schedule changes the price the public route quotes', async 
 
   await expect(page.getByRole('alert')).toContainText('Fee schedule saved');
 
-  expect(Number((await settingsDoc()).fees.seekerPlusTopup)).toBe(next);
+  expect(Number((await settingsDoc()).fees.contactPack)).toBe(next);
 
   // Anonymous `/bootstrap` catches wrong keys and stale public settings caches.
-  expect(Number((await publicPricing()).seekerPlusTopup)).toBe(next);
+  expect(Number((await publicPricing()).contactPack)).toBe(next);
 });
 
 test('saving the photo limit writes the listings block the public policy route answers from', async ({ page, login }) => {
@@ -207,7 +207,7 @@ test('a blank fee is refused with a message and nothing is written', async ({ pa
     if (req.method() === 'PUT' && req.url().includes('/api/admin/settings')) writes.push(req.postDataJSON());
   });
 
-  const fee = page.getByRole('spinbutton', { name: 'Seeker Plus Topup' });
+  const fee = page.getByRole('spinbutton', { name: 'Contact pack' });
   await expect(fee).toBeVisible();
   await fee.fill('');
   await page.getByRole('button', { name: 'Save fees' }).click();
@@ -220,10 +220,10 @@ test('count fees carry no rupee sign and a stale save is told to reload', async 
   await login.asAdmin();
   await page.goto('/admin/settings?tab=fees');
 
-  const count = page.getByRole('spinbutton', { name: 'Free Contact Limit' });
+  const count = page.getByRole('spinbutton', { name: 'Free owner contacts' });
   await expect(count).toBeVisible();
   await expect(page.locator('label').filter({ has: count })).not.toContainText('₹');
-  await expect(page.locator('label').filter({ has: page.getByRole('spinbutton', { name: 'Seeker Plus Topup' }) })).toContainText('₹');
+  await expect(page.locator('label').filter({ has: page.getByRole('spinbutton', { name: 'Contact pack' }) })).toContainText('₹');
 
   await writeSettings({ site: { tagline: `changed-elsewhere-${Date.now()}` } });
   await page.getByRole('button', { name: 'Save fees' }).click();

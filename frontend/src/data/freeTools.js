@@ -74,7 +74,7 @@ export const FREE_TOOLS = [
     how: [
       'Stamp duty = 0.25% of (rent for the whole term, including any yearly increase, + 10% a year of the refundable deposit), rounded up to the next ₹100, with a minimum of ₹100. This is Article 36A of the Maharashtra Stamp Act, for agreements of up to 60 months.',
       'The 10% on the deposit is counted for each year or part of a year of the term, so an 11-month agreement counts as one year. A non-refundable deposit or premium is added to the total in the same way. This tool leaves it out.',
-      'Registration fee: ₹1,000 for urban areas such as Pune, plus ₹300 document handling for e-registration, as in Draazy\'s rent agreement service. If you book through Draazy there is also our service fee plus GST, shown separately below.',
+      'Registration fee: ₹1,000 for urban areas such as Pune, plus ₹300 document handling for e-registration, as in Draazy\'s rent agreement service. If you book through Draazy there is also our service fee, shown separately below.',
     ],
     sources: ['igrSchedule', 'igr'],
     faq: [

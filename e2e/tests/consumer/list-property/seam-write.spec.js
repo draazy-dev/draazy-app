@@ -2,6 +2,7 @@
 // anonymous responses intentionally withhold the electricity meter number.
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { istInDays } from '../../../helpers/availability.js';
 import { signedInAsNew, authHeaders, API } from '../../../helpers/liveAuth.js';
 import { PHOTO_PNG, uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { approveListingWithFetch } from '../../../helpers/moderation.js';
@@ -49,7 +50,7 @@ async function pickFloor(page, value, label = 'Floor No. *') {
 /* Both date fields are bounded at today, so a literal is a fixture with an expiry date: the calendar
    day renders `disabled` once the date passes and the click waits out its whole timeout. */
 
-const inDays = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+const inDays = istInDays;
 
 async function postAFlat(page, { flat, society, deal = 'rent', furniture = [], agreementDuration = '', monthlyMaintenance = '', priceNegotiable = false, loanAvailable = true, bhk = '2', construction = '', preferredTenants = [], superBuiltUp = '', availableFrom = inDays(120), petsPolicy = '', rentMaintMode = 'extra' }) {
   const mobile = await signedInAsNew(page);
@@ -161,6 +162,7 @@ test('a rental post reaches the seam, the vault, the public read, the facets and
     expect(row.tenants).toEqual(['bachelor-male']);
     expect(Number(row.superBuiltUpArea)).toBe(1400);
     expect(row.availableFrom).toBe('15');
+    expect(row.availableOn).toBe(inDays(10));
     expect(row.pets).toBe(true);
     expect(row.ownershipVerified).toBe(false);
   });

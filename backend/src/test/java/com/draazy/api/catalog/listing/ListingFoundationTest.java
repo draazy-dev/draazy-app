@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyController;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -241,11 +242,12 @@ class ListingFoundationTest extends AbstractApiTest {
                         .content("""
                                 {"title":"Ready sale flat","deal":"buy","propertyType":"apartment","price":5000000,
                                  "bhk":2,"locality":"Kothrud","city":"Pune","possession":"ready-to-move",
-                                 "images":["%s"],"formDetails":{"availableFrom":"2027-01-20"}}
-                                """.formatted(upload(o))))
+                                 "images":["%s"],"availableOn":"%s","formDetails":{"availableFrom":"2027-01-20"}}
+                                """.formatted(upload(o), AvailableOn.today().plusDays(40))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.resubmittedAt").doesNotExist())
                 .andExpect(jsonPath("$.availableDate").doesNotExist())
+                .andExpect(jsonPath("$.availableOn").doesNotExist())
                 .andExpect(jsonPath("$.formDetails.availableFrom").doesNotExist());
 
         assertThat(properties.findAll().stream()
@@ -410,6 +412,7 @@ class ListingFoundationTest extends AbstractApiTest {
         Property p = approvedSaleListing(o);
         p.setPossession("under-construction");
         p.setFormDetails(Map.of("availableFrom", "2027-01-20", "ownership", "Freehold"));
+        p.setAvailableOn(AvailableOn.today().plusDays(40));
         properties.saveAndFlush(p);
 
         mvc.perform(patch("/me/listings/" + p.getId())
@@ -419,6 +422,7 @@ class ListingFoundationTest extends AbstractApiTest {
                 .andExpect(status().isOk());
         storedListing(o, p.getId())
                 .andExpect(jsonPath("$.availableDate").doesNotExist())
+                .andExpect(jsonPath("$.availableOn").doesNotExist())
                 .andExpect(jsonPath("$.formDetails.availableFrom").doesNotExist())
                 .andExpect(jsonPath("$.formDetails.ownership").value("Freehold"));
     }

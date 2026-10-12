@@ -2,6 +2,7 @@
    render nothing rather than "0 left". This hook reports only — `POST /contacts/request` refuses. */
 import { useCallback, useEffect, useState } from 'react';
 import { getEntitlements } from '../../../services/entitlementService.js';
+import { fmtDate } from '../../../lib/format.js';
 
 export function useEntitlements(enabled = true) {
   const [entitlements, setEntitlements] = useState(null);
@@ -44,4 +45,10 @@ export const contactsLeft = (entitlements) => {
   const c = entitlements?.contacts;
   if (!c || c.unlimited) return null;
   return Number.isFinite(c.remaining) ? c.remaining : null;
+};
+
+/** The free-contacts deadline as a short date, only while it is still ahead. */
+export const freeContactsTill = (entitlements) => {
+  const at = entitlements?.contacts?.freeWindowEndsAt;
+  return at && new Date(at).getTime() > Date.now() ? fmtDate(at) : '';
 };

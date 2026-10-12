@@ -76,7 +76,8 @@ public class AdminFinanceService {
                         (String) row[2],
                         ((Number) row[3]).longValue(),
                         ((Number) row[4]).longValue(),
-                        ((Number) row[5]).longValue()))
+                        ((Number) row[5]).longValue(),
+                        row[6] == null ? null : ((Number) row[6]).intValue()))
                 .toList();
         return new AdminFinance(revenue, 0L, breakdown,
                 refundsMeasured, serviceOrdersCounted,

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useScrollReveal } from '../../../../lib/useScrollReveal.js';
 import { useSignInGate } from '../../../../lib/useSignInGate.js';
 import { useAuth } from '../../../../context/AuthContext.jsx';
+import { usePricing } from '../../../../context/PricingContext.jsx';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import { inviteRouteFor, isActive } from '../../../../lib/serviceRequestStatus.js';
 import { listDocuments, uploadDocument } from '../../../../services/documentService.js';
@@ -18,6 +19,7 @@ import { useEntitlements } from '../../property/useEntitlements.js';
 import { getDealFees } from '../../../../services/feesService.js';
 import { leaveLicenceStamp } from '../../../../lib/toolCalc.js';
 import { myListing, myListings } from '../../../../services/propertyService.js';
+import { rentAgreementRenewal } from '../../../../services/rentService.js';
 import {
   addServiceRequestDoc,
   addServiceRequestDocFromVault,
@@ -48,9 +50,10 @@ export function useRentAgreement() {
   const { t: tr } = useTranslation();
   const { user, isIn, loading } = useAuth();
   const { toast } = useToast();
+  const { fee } = usePricing();
   const formRef = useRef(null);
   const { mountedRef, paymentPending, paymentConfirming, payAndConfirm, resetPayment } = useRaPayment({ tr, toast });
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const sendToSignIn = useSignInGate();
 
@@ -474,7 +477,7 @@ export function useRentAgreement() {
     // the schedule is loading or unavailable. Only the money we would be taking goes blank.
     const answers = { rent, dep, months, status: feeStatus, retry: retryFees };
     if (feeStatus !== 'ready' || !feeRow) {
-      return { ...answers, stamp: null, reg: null, dhc: null, service: null, gst: null, total: null, computed: [], notes: null };
+      return { ...answers, stamp: null, reg: null, dhc: null, service: null, total: null, computed: [], notes: null };
     }
     const years = Math.ceil(months / 12);
     /* `stampDuty`/`registration` arrive `null` because neither is a flat figure; anything derived here lands in
@@ -486,12 +489,11 @@ export function useRentAgreement() {
     if (reg == null) { reg = regArea === 'rural' ? 500 : 1000; computed.push('reg'); }
     const dhc = 300;
     const service = feeRow.platformFee;
-    const gst = feeRow.gst;
-    const waived = referralCredit ? service + gst : 0;
+    const waived = referralCredit ? service : 0;
     return {
       ...answers,
-      stamp, reg, dhc, service, gst, waived,
-      total: service + stamp + reg + dhc + gst - waived,
+      stamp, reg, dhc, service, waived,
+      total: service + stamp + reg + dhc - waived,
       computed,
       notes: feeRow.notes || null,
     };
@@ -696,6 +698,43 @@ export function useRentAgreement() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- consume listing URL once without overwriting edits
   }, [searchParams, mode, myProperties]);
 
+  const renewId = searchParams.get('renew');
+  const renewAppliedRef = useRef(null);
+  useEffect(() => {
+    if (!renewId || mode === 'invite' || !isIn || renewAppliedRef.current === renewId) return;
+    renewAppliedRef.current = renewId;
+    rentAgreementRenewal(renewId).catch(() => null).then((res) => {
+      if (!mountedRef.current) return;
+      if (res) {
+        const tenantRows = res.tenants.filter((p) => p.name || digits(p.mobile)).slice(0, MAX_TENANTS);
+        if (tenantRows.length) {
+          setTenants(tenantRows.map((p) => ({ ...emptyTenant(), name: p.name, mobile: digits(p.mobile).slice(-10) })));
+          setTenantMode('fill');
+        }
+        const ownerMobile = digits(res.owner?.mobile);
+        if (ownerMobile.length >= 10 && ownerMobile.slice(-10) !== digits(user?.mobile).slice(-10)) {
+          setOwnerMode('invite');
+          setInvite((cur) => ({ ...cur, invName: res.owner.name || '', invMobile: ownerMobile.slice(-10) }));
+        }
+        const start = res.startDate;
+        const startDate = start && (start < startBounds.min ? startBounds.min : start > startBounds.max ? startBounds.max : start);
+        setTerms((cur) => ({
+          ...cur,
+          ...(res.rent ? { rent: String(res.rent) } : {}),
+          ...(res.deposit ? { deposit: String(res.deposit) } : {}),
+          ...(res.months ? { months: String(res.months) } : {}),
+          ...(startDate ? { startDate } : {}),
+        }));
+      }
+      toast(tr('services.ra.renewHint', { price: fee('rentAgreementPlatform') }));
+      setSearchParams((cur) => {
+        const rest = new URLSearchParams(cur);
+        rest.delete('renew');
+        return rest;
+      }, { replace: true });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- consume the renewal URL once without overwriting edits
+  }, [renewId, mode, isIn]);
   const stepErrors = (s) => formStepErrors(s, {
     ...formSnapshot(), listed: !!selectedPropertyId, selfMobile: mode === 'invite' ? undefined : user?.mobile,
   });

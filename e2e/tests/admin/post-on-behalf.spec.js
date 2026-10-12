@@ -1,4 +1,6 @@
-import { test, expect } from '../../fixtures/live.js';
+import { ACTORS, test, expect } from '../../fixtures/live.js';
+import { sql } from '../../helpers/monetisation.js';
+import { istInDays } from '../../helpers/availability.js';
 import { API, authHeaders, apiLogin, uniqueMobile } from '../../helpers/liveAuth.js';
 import { pickGoogleSociety } from '../../helpers/places.js';
 import { pickGoogleLocality, pickPlaceholderLocality } from '../../helpers/locality.js';
@@ -46,6 +48,26 @@ test('the listing belongs to the owner, not the operator who typed it', async ()
   // And the other half, which is the actual regression: the operator must not end up owning it.
   const operators = await myListings('9000000000');
   expect(operators.map((l) => l.title)).not.toContain(title);
+});
+
+test('the exact move-in date an operator types is stored on the owner\'s listing, with its bucket derived', async () => {
+  const ownerMobile = uniqueMobile();
+  const title = `On behalf dated ${Date.now()}`;
+  const date = istInDays(12);
+
+  const created = await postOnBehalf(await admin(), {
+    ownerMobile, ownerName: 'Ravi Kulkarni', listing: { ...listing(title), availableOn: date },
+  });
+  expect(created.status).toBe(201);
+
+  const mine = (await myListings(ownerMobile)).find((l) => l.title === title);
+  expect(mine.availableOn).toBe(date);
+  expect(mine.availableFrom).toBe('15');
+
+  const tooFar = await postOnBehalf(await admin(), {
+    ownerMobile, ownerName: 'Ravi Kulkarni', listing: { ...listing(`${title} far`), availableOn: istInDays(400) },
+  });
+  expect(tooFar.status).toBe(422);
 });
 
 test('the funnel is opened, and it names the staff member by id', async () => {
@@ -106,12 +128,12 @@ test('posting in somebody else\u2019s name needs more than a signed-in session',
   expect(refused.status).toBe(403);
 });
 
-test('the desk can see when an owner is past their plan', async () => {
+test('the desk can see how much of the free tier an owner is using, and when they are past it', async () => {
   const ownerMobile = uniqueMobile();
   const headers = await admin();
 
-  const standing = async () => {
-    const res = await fetch(`${API}/admin/properties/owner-standing?mobile=${ownerMobile}`, { headers });
+  const standing = async (mobile = ownerMobile) => {
+    const res = await fetch(`${API}/admin/properties/owner-standing?mobile=${mobile}`, { headers });
     return { status: res.status, body: await res.json().catch(() => ({})) };
   };
 
@@ -119,27 +141,32 @@ test('the desk can see when an owner is past their plan', async () => {
   expect(before.status).toBe(200);
   expect(before.body.known).toBe(false);
 
-  await postOnBehalf(headers, {
+  const first = await postOnBehalf(headers, {
     ownerMobile, ownerName: 'Over Their Plan', listing: listing(`Standing one ${Date.now()}`),
   });
+  const queued = await standing();
+  expect(queued.body).toMatchObject({ known: true, allowance: 1, held: 0, pending: 1, overAllowance: false });
 
+  // The poster cannot review their own listing, so the moderator's outcome is written directly.
+  const setStatus = (id, status) => sql(`update properties set status = '${status}' where id = '${id}'`);
+  setStatus(first.body.id, 'approved');
   const atLimit = await standing();
-  expect(atLimit.body.known).toBe(true);
-  expect(atLimit.body.allowance).toBe(1);
-  expect(atLimit.body.held).toBe(1);
-  expect(atLimit.body.overAllowance).toBe(false);
+  expect(atLimit.body).toMatchObject({ held: 1, overAllowance: false });
 
-  await postOnBehalf(headers, {
+  // A second approval lands paused rather than live past the tier.
+  const second = await postOnBehalf(headers, {
     ownerMobile, ownerName: 'Over Their Plan', listing: listing(`Standing two ${Date.now()}`),
   });
+  setStatus(second.body.id, 'paused');
+  expect((await standing()).body).toMatchObject({ held: 1, overAllowance: false });
 
-  const over = await standing();
-  expect(over.body.held).toBe(2);
-  expect(over.body.overAllowance).toBe(true);
-  expect(over.body.plan).toBeUndefined();
-  expect(over.body.price).toBeUndefined();
+  // The seeded owner holds four live listings from before the tier: that is "past it".
+  const legacy = await standing(ACTORS.owner);
+  expect(legacy.body).toMatchObject({ known: true, allowance: 1, overAllowance: true });
+  expect(legacy.body.held).toBeGreaterThan(legacy.body.allowance);
+  expect(legacy.body.plan).toBeUndefined();
+  expect(legacy.body.price).toBeUndefined();
 });
-
 // The owner step is the desk's chance to catch duplicate pending listings.
 test('the owner step warns about listings the server is already holding', async ({ page, login }) => {
   const ownerMobile = uniqueMobile();

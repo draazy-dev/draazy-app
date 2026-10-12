@@ -50,7 +50,7 @@ export default function PackersMovers() {
         ],
         successMessage: t('services.packers.successMessage'),
       }}
-      stats={[['Free', t('services.packers.stat.survey')], ['24 hrs', t('services.packers.stat.callback')], ['All-in', t('services.packers.stat.allIn')], ['₹0', t('services.packers.stat.platformFee')]]}
+      stats={[['Free', t('services.packers.stat.survey')], ['24 hrs', t('services.packers.stat.callback')], ['All-in', t('services.packers.stat.allIn')], ['1', t('services.packers.stat.contact')]]}
       services={[
         [t('services.packers.service.0.name'), 'home', t('services.packers.service.0.desc')],
         [t('services.packers.service.1.name'), 'map-pinned', t('services.packers.service.1.desc')],

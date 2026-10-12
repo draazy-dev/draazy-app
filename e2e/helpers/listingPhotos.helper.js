@@ -2,6 +2,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import { expect } from '@playwright/test';
 import { authHeaders, ownerIdOf, seedConsent, signedInAsNew } from './liveAuth.js';
 import { LIST_PROPERTY_DRAFT_KEY } from './listingForm.helper.js';
+import { istInDays } from './availability.js';
 import { fillSociety } from './places.js';
 import { pickLocality } from './locality.js';
 
@@ -43,13 +44,13 @@ export async function openPhotoStep(page) {
   await seedConsent(page);
   const mobile = await signedInAsNew(page);
   const ownerId = ownerIdOf(await authHeaders(mobile));
-  await page.evaluate(({ key, ownerId }) => localStorage.setItem(key, JSON.stringify({
+  await page.evaluate(({ key, ownerId, availableFrom }) => localStorage.setItem(key, JSON.stringify({
     deal: 'rent', propertyType: 'flat', carpetArea: '900', bhk: '2', bathrooms: '2',
     floor: '9', totalFloors: '14',
     flatNumber: 'P-301', society: 'Photo UX Home', pincode: '411045',
-    monthlyRent: '24000', deposit: '48000', availableFrom: '2026-12-01',
+    monthlyRent: '24000', deposit: '48000', availableFrom,
     __owner: ownerId,
-  })), { key: LIST_PROPERTY_DRAFT_KEY, ownerId });
+  })), { key: LIST_PROPERTY_DRAFT_KEY, ownerId, availableFrom: istInDays(30) });
   await page.goto('/list-property');
   await expect(page.locator('.lp-steps')).toBeVisible();
   await page.getByRole('button', { name: /Next Step/i }).click();

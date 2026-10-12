@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 
 public interface PaymentGateway {
 
@@ -35,6 +36,9 @@ public interface PaymentGateway {
     boolean paid(String orderId);
 
     String refund(String orderId, long amountInr, String refundId, String note);
+
+    /** The provider's id for a refund we already sent under {@code refundId}; empty when it never arrived. */
+    Optional<String> findRefund(String orderId, String refundId);
 
     /** A created payment order. {@code paymentSessionId} is single-use and must not be stored. */
     record PaymentOrder(String orderId, String paymentSessionId) {
@@ -81,6 +85,11 @@ class MockPaymentGateway implements PaymentGateway {
     public String refund(String orderId, long amountInr, String refundId, String note) {
         calls.record(ProviderCalls.CASHFREE, REFUND, ProviderCalls.Outcome.SKIPPED, null, orderId, "mock", null);
         return "mock_refund_" + refundId;
+    }
+
+    @Override
+    public Optional<String> findRefund(String orderId, String refundId) {
+        return Optional.empty();
     }
 }
 
@@ -196,6 +205,21 @@ class CashfreePaymentGateway implements PaymentGateway {
             }
             return response.cf_refund_id();
         });
+    }
+
+    @Override
+    public Optional<String> findRefund(String orderId, String refundId) {
+        try {
+            RefundResponse response = cashfree.get("/pg/orders/" + orderId + "/refunds/" + refundId, API_VERSION,
+                    RefundResponse.class);
+            return response == null || response.cf_refund_id() == null || response.cf_refund_id().isBlank()
+                    ? Optional.empty() : Optional.of(response.cf_refund_id());
+        } catch (CashfreeClient.CashfreeException failed) {
+            if (failed.getCause() instanceof HttpClientErrorException.NotFound) {
+                return Optional.empty();
+            }
+            throw failed;
+        }
     }
 
     record RefundResponse(String cf_refund_id, String refund_id, String refund_status) {

@@ -117,21 +117,18 @@ export default function useListProperty() {
   const [dupPending, setDupPending] = useState(false);
   const dupSeq = useRef(0);
   const stepRef = useRef(1);
-  // Avoid a false paywall while quota loads; the server also enforces it on submit.
-  const [canPost, setCanPost] = useState(true);
   const [quota, setQuota] = useState({ used: 0, allowance: null });
+  const [passListingId, setPassListingId] = useState('');
   useEffect(() => {
     if (editId || editRoomId || authLoading) return undefined;
     if (!user) {
       setQuota({ used: 0, allowance: null });
-      setCanPost(true);
       return undefined;
     }
     let live = true;
     loadWizardQuota().then((q) => {
       if (!live) return;
-      setQuota({ used: q.used, allowance: q.allowance });
-      setCanPost(q.canPost);
+      setQuota(q);
     });
     return () => { live = false; };
   }, [editId, editRoomId, authLoading, user]);
@@ -260,6 +257,7 @@ export default function useListProperty() {
     setRentMode(flatmateMode && !editId ? 'flatmate' : 'whole');
     setShowSuccess(false);
     setPostedListing(null);
+    setPassListingId('');
     setSavedListingStatus('');
     setShowResetConfirm(false);
     setErrors({});
@@ -271,7 +269,6 @@ export default function useListProperty() {
     setDupExistingId('');
     setDupPending(false);
     setQuota({ used: 0, allowance: null });
-    setCanPost(true);
     writeStepParam(1, { replace: true });
   }, [discardFormDraft, editId, flatmateMode, media, ownerId, writeStepParam]);
   const [draftHydrated, setDraftHydrated] = useState(false);
@@ -689,6 +686,7 @@ export default function useListProperty() {
     triggerConfetti();
     const splittable = !editId && canSplitIntoRooms(res?.listing);
     if (splittable) setPostedListing(res.listing);
+    if (!editId && quota.full) setPassListingId(String(res?.listing?.uuid || res?.listing?.id || ''));
     setSavedListingStatus(res?.listing?.status || '');
     setShowSuccess(true);
   };
@@ -716,13 +714,6 @@ export default function useListProperty() {
       return;
     }
 
-    /* Reachable because the flatmate entry point is exempt from the paywall; the server refuses
-     * the same post identically. */
-    if (!editId && !canPost) {
-      toast(`You already have ${quota.used} of ${quota.allowance} listings live. Take one down to post another — letting a room stays free.`, 'error');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
     if (editId && editChanges?.identityChanged) { setShowIdentityGuard(true); return; }
 
     setPosting(true);
@@ -849,7 +840,7 @@ export default function useListProperty() {
     needsAuthForMedia: !signedIn,
     savedListingStatus,
     editApproved, editChanges, showIdentityGuard, setShowIdentityGuard,
-    showDupGuard, setShowDupGuard, dupExistingId, dupPending, canPost,
+    showDupGuard, setShowDupGuard, dupExistingId, dupPending, passListingId,
     form, progressState,
     toggleInArray, toggleTenant, changePropertyType, changeCommercialType,
     isResidential, isLand, isCommercial, isHouse,
@@ -857,6 +848,6 @@ export default function useListProperty() {
     nextStep, prevStep, openResetConfirm, confirmReset, submitProperty, submitFlatmate,
     postAnother,
     posting,
-    activeListingCount: quota.used, listingLimit: quota.allowance,
+    activeListingCount: quota.used, listingLimit: quota.allowance, quotaFull: quota.full,
   };
 }

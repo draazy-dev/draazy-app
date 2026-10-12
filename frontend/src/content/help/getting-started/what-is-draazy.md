@@ -38,7 +38,7 @@ Start at [Listing your property](/help/c/listing).
 
 ### If you need help around the move
 
-Rent agreements, packers and movers, legal title checks, home loans and valuations are available as optional add-ons. Most are paid or quote-based; home-loan advice has no advisory fee. The core marketplace stays free.
+Rent agreements, packers and movers, legal title checks, home loans and valuations are available as optional add-ons. Most are paid or quote-based. The core marketplace stays free.
 
 > [!NOTE]
 > Draazy currently operates in Pune and PCMC. We expand to a new city only once supply in the current one is genuinely deep.

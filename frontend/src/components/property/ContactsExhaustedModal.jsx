@@ -1,26 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
+import { usePricing } from '../../context/PricingContext';
 import { referralContactsPerReward } from '../../lib/referralConfig.js';
 import { getEntitlements } from '../../services/entitlementService.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import useModalDialog from '../../hooks/useModalDialog.js';
 
-/* Shown when a seeker has spent every free owner contact. Two honest ways out:
-   refer a friend (free, +15 contacts each) or buy Seeker Plus (unlimited).
-   Referrals only ever lift the contact quota — priority visit slots and the
-   rest of the Seeker Plus perks remain paid-only, and the whole free route is
-   withdrawn when Ops turns off the `referralRewards` flag.
-
-   The used/allowance line is fetched rather than read from localStorage (D31b):
-   this modal only ever opens in response to the server refusing a request, so
-   the numbers it shows must come from the same place that refused. They arrive a
-   moment after the modal does, which is why the sub-line renders only once they
-   have — an invented "0 of 0" while waiting would be worse than nothing. */
+/* Shown when a seeker has no owner contacts left: refer a friend (+15 contacts each, off when Ops disables
+   `referralRewards`) or buy a Contact Pack. The used/allowance line renders only once the server answers. */
 export default function ContactsExhaustedModal({ onClose }) {
   const { t } = useTranslation();
+  const { pathname, search } = useLocation();
+  const { fee } = usePricing();
   const { flagEnabled } = useAppFlags();
   const canRefer = flagEnabled('referralRewards');
   const [counts, setCounts] = useState(null);
@@ -67,20 +61,20 @@ export default function ContactsExhaustedModal({ onClose }) {
           </Link>
         )}
 
-        {/* Paid path — always available; the premium perks never move behind a referral. */}
+        {/* Paid path — always available. */}
         <Link
-          to="/checkout?plan=seeker-plus"
+          to={`/checkout?plan=contact-pack&next=${encodeURIComponent(pathname + search)}`}
           onClick={onClose}
           data-testid="contacts-exhausted-plan"
           className="block rounded-xl border border-white/10 bg-white/[0.04] p-4 transition-colors hover:bg-white/[0.07]"
         >
           <div className="flex items-center gap-2 mb-1">
-            <Icon name="crown" className="w-4 h-4 text-amber-300" />
+            <Icon name="ticket" className="w-4 h-4 text-amber-300" />
             <span className="text-sm font-bold text-white">{t('property.contactsExhausted.planTitle')}</span>
           </div>
-          <p className="text-xs text-slate-400 leading-relaxed">{t('property.contactsExhausted.planBody')}</p>
+          <p className="text-xs text-slate-400 leading-relaxed">{t('property.contactsExhausted.planBody', { price: fee('contactPack') })}</p>
           <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-gray-300">
-            {t('property.contactsExhausted.planCta')} <Icon name="arrow-right" className="w-4 h-4" />
+            {t('property.contactsExhausted.planCta', { price: fee('contactPack') })} <Icon name="arrow-right" className="w-4 h-4" />
           </span>
         </Link>
       </div>

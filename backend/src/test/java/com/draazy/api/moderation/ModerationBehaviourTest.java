@@ -127,6 +127,29 @@ class ModerationBehaviourTest extends AbstractApiTest {
         assertThat(metadataField(rows.get(0), "reason")).isEqualTo("docs verified");
     }
 
+    @Test
+    @DisplayName("approving a second listing over the free tier parks it paused, and the first stays live")
+    void approvalOverTheFreeTierPausesTheListing() throws Exception {
+        User owner = user("9800000103", "owner", "Owner");
+        User staff = user("9800000104", "staff", "Ops");
+        Property live = listing(owner);
+        live.setStatus(PropertyStatus.APPROVED);
+        properties.saveAndFlush(live);
+        Property second = listing(owner);
+        tickChecklist(second, staff);
+
+        mvc.perform(patch("/properties/{id}/status", second.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"docs verified\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(properties.findById(second.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.PAUSED);
+        assertThat(properties.findById(live.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.APPROVED);
+    }
+
     private String metadataField(Map<String, Object> auditRow, String key) {
         return jdbc.queryForObject("select metadata->>? from audit_log where id = ?",
                 String.class, key, auditRow.get("id"));

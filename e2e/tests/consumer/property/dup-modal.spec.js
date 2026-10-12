@@ -2,11 +2,12 @@
 // Different addresses isolate photo matching from address matching.
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { istInDays } from '../../../helpers/availability.js';
 import { uniquePhotoPng, uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { signIn, signedInAsNew, authHeaders, API } from '../../../helpers/liveAuth.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
-// Kunal has one listing against two slots, so quota cannot mask the duplicate guard.
+// Kunal has one listing and creation is never refused for the tier, so only the duplicate guard can stop a repost.
 const KUNAL = '9700000090';
 const KUNAL_LISTING = 'd0000000-0000-4000-8000-0000000000d1';
 
@@ -77,7 +78,7 @@ async function driveTheWizard(page, { flat, society, street, locality = 'Baner',
   await page.waitForSelector('text=/Price & terms/i', { timeout: 15000 });
   await page.locator('input[data-err="monthlyRent"]').fill('30000');
   await page.locator('input[data-err="deposit"]').fill('60000');
-  await pickDate(page, '[data-err="availableFrom"]', '2027-12-31');
+  await pickDate(page, '[data-err="availableFrom"]', istInDays(60));
   await page.getByRole('button', { name: /Next Step/i }).click();
   await page.waitForSelector('text=/Photos & description/i', { timeout: 15000 });
 

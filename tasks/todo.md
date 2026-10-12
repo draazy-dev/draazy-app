@@ -8,17 +8,19 @@
 ## Open
 
 ### Backend: API, data and schema
+- [x] **QA-06** webhook amount/currency checked: a mismatched pass/pack is not granted and is refunded (V116 `refund_amount`); a mismatched rent-agreement or amendment payment stays unsettled, audited once, admins notified to refund from the gateway.
 
 ### Admin and ops UI
 - [x] **A01** back-office functions split so each feature is its own checkbox: `flatmates`, `referrals` (from reports), `localities` + `reviews` (from listingModeration), `enquiries` (from support), `societies` (from content), `users`; V103/V104 carry holders; Add-member groups come from the catalogue (Analytics was never rendered). Verified 2026-10-10: back-office-functions, reports, localities-console, referrals, admin-content-reports-payload, support-referrals-payload specs green; full backend suite green. PENDING AGENT REVIEW
 
 ### Consumer UI
 - [x] **C04** sign-in/sign-up/staff error copy: plain, actionable, rate limits state the wait (`busyMessage`, `lib/staffAuthError.js`); no raw `err.message` on auth pages; Signup retry after a refused profile save patches instead of re-spending the OTP; `OwnerConsentModal` uses `classifyOtpVerifyError`; Turnstile challenges only the OTP send step (`AuthController`, not `BotDefenceFilter`); suspension answers 403 `account_suspended` (staff told to ask an administrator); `http.js` no longer refresh-replays a wrong-code 401 (`attemptsRemaining`), which spent two guesses. Verified 2026-10-10: backend auth/bot-defence/moderation/guard tests, e2e staff-two-factor, signin-otp-session, owner-consent (exact "2 attempts left"), users, improvements, inline-otp-gate green. Follow-up: Turnstile tokens are single-use but Signin/Signup/InlineOtpSheet keep the first one, so once enforced a Resend is refused; reset the widget after each send. Possible flake: signin-otp-session "a sign-out the server never hears about…" failed twice in a shard run (Log out click intercepted), green alone and on the next run.
+- [x] **M01** pay-per-use MVP (Q16b): listing pass ₹999/60d, contact pack ₹199/15/30d (V107), soft listing gate, derived contact buckets (V111), Featured = 7 days after ownership verification, GST included (V110), rent-agreement renewal + tenant-safe prefill, exact `availableOn` with now/15/30 chips (V112), relist with date, unpaid/late pass refunds (V113–V114). Targeted e2e 176/176 green; user waived `-Full`.
 ### e2e and test health
-- [ ] **E02** fail on repeat, outside the security diff: `maps-geo-console` city-limit re-save 412 (stale settings version), `api-call-budget` admin page reads `/admin/settings` twice, `filter-request-volume` drag/sort issue an extra `GET /properties`.
+- [ ] **E02** fail on repeat, outside the security diff: `maps-geo-console` city-limit re-save 412 (stale settings version), `filter-request-volume` drag/sort issue an extra `GET /properties`. The 412 comes from the in-flight If-Match/ETag work in `settingsProvider.js` / `AdminSettings.jsx`; retest once that lands.
 ## Waiting by design
 - Web push and the WhatsApp digest are server-only (backend tests cover them); the live check needs the owner's VAPID pair — see OWNER-CHECKLIST.
-- V95 society contract step: move `db/pending/V95__…` into `db/migration` once V94 is live everywhere; drop the society_* `ErasureCoverageTest` entries.
+- V95 society contract step: move `db/pending/V95__…` into `db/migration` once V94 is live everywhere; drop the society_* `ErasureCoverageTest` entries. Until then a fresh e2e DB fails `check-seed-coverage` on the 9 empty society_* tables.
 - SSE hub is single-instance; multi-node needs LISTEN/NOTIFY.
 - Owner-deferred: city selector (then move `ACTIVE_CITY`/Pune bounds in `LocalityPlaceService`/`SocietyPlaceRules` onto `cities`), SMS/WhatsApp, 1.5/2.5 BHK.
 - Accepted race: vault pick while a camera file is still compressing.

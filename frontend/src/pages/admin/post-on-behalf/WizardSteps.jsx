@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { ImagePlus } from 'lucide-react';
 import { classNames, parseAmount } from '../../../lib/format.js';
-import { todayIso } from '../../../lib/visitWhen.js';
 import Select from '../../../components/ui/Select.jsx';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import SocietySelect from '../../consumer/list-property/SocietySelect.jsx';
 import FieldError from '../../../components/ui/FieldError.jsx';
+import AvailabilityField from '../../../components/ui/AvailabilityField.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
+import i18n from '../../../i18n/index.js';
+import { addDaysIso, availabilityLabel, istToday, MAX_POSSESSION_DAYS, shortDate } from '../../../lib/availability.js';
 import {
   floorOptions, totalFloorsOptions,
   typeOptions, commercialSubtypeOptions, commercialLabelOf, NONRES_TYPES, isLandType,
@@ -146,7 +148,7 @@ export function PricingStep({ form, set, errors }) {
       {rent && (
         <>
           <div><label htmlFor="pob-deposit" className={label}>Security Deposit</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</span><input id="pob-deposit" inputMode="numeric" {...money('deposit')} placeholder="e.g. 50,000" className={classNames(fld, 'pl-10')} /></div>{moneyWords(form.deposit) && <p className="text-xs text-gray-400 mt-1.5 ml-1">{moneyWords(form.deposit)}</p>}<div className="flex flex-wrap gap-2 mt-2">{DEPOSIT_MONTHS[land ? 'land' : commercial ? 'commercial' : 'residential'].map((m) => <button key={m} type="button" onClick={() => setDepositMonths(m)} className="text-[11px] px-2.5 py-1 rounded-full border border-white/10 text-gray-400 hover:border-teal-400/40 hover:text-teal-300 transition-all">{m} month{m > 1 ? 's' : ''} rent</button>)}</div></div>
-          <div><label className={label}>Available From</label><DateField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} min={todayIso()} ariaLabel="Available from date" className={fld} /></div>
+          <div><label className={label}>Available From</label><AvailabilityField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} ariaLabel="Available from date" className={fld} /></div>
         </>
       )}
       {!rent && !land && (
@@ -154,7 +156,7 @@ export function PricingStep({ form, set, errors }) {
           <div><label className={label}>Possession</label><ChoiceBoxes value={form.possession} onChange={(v) => set('possession', v)} options={possessionOptions} ariaLabel="Possession status" cols="grid-cols-3" /></div>
           <div><label htmlFor="pob-rera" className={label}>RERA ID</label><input id="pob-rera" value={form.reraId} onChange={(e) => set('reraId', e.target.value)} placeholder="e.g. P52100012345" className={fld} /></div>
           {(form.possession === 'new' || form.possession === 'under') && (
-            <div><label className={label}>Available From</label><DateField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} min={todayIso()} ariaLabel="Available from date" className={fld} /></div>
+            <div><label className={label}>Available From</label><DateField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} min={istToday()} max={addDaysIso(istToday(), MAX_POSSESSION_DAYS)} ariaLabel="Possession date" className={fld} /></div>
           )}
         </>
       )}
@@ -218,7 +220,7 @@ export function ReviewStep({ form }) {
         {rent && form.deposit && <ReviewRow label="Deposit" value={`₹${formatIndian(form.deposit)}`} />}
         {!rent && !land && form.possession && <ReviewRow label="Possession" value={optLabel(possessionOptions, form.possession)} />}
         {!rent && !land && form.reraId && <ReviewRow label="RERA" value={form.reraId} />}
-        {form.availableFrom && (rent || (!land && (form.possession === 'new' || form.possession === 'under'))) && <ReviewRow label="Available" value={form.availableFrom} />}
+        {form.availableFrom && (rent || (!land && (form.possession === 'new' || form.possession === 'under'))) && <ReviewRow label="Available" value={rent ? availabilityLabel(i18n.t.bind(i18n), { availableOn: form.availableFrom }) : shortDate(form.availableFrom)} />}
         <ReviewRow label="Photos" value={`${form.photos.length} photo${form.photos.length === 1 ? '' : 's'} added`} />
       </div>
       <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200 mt-6">

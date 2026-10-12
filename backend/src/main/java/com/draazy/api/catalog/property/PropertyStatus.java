@@ -33,7 +33,6 @@ public final class PropertyStatus {
 
     public static final List<String> OCCUPYING_DUPLICATE_STATUSES = List.of(PENDING, APPROVED, PAUSED);
 
-    /** Rejected rows do not occupy a slot; otherwise one rejection would exhaust the free tier. */
-    public static final Set<String> OCCUPIES_LISTING_SLOT =
-            Set.of(PENDING, APPROVED, PAUSED, FLAGGED, SOLD, RENTED);
+    /** The statuses that count against the free tier's live-listing ceiling; a listing a pass covers does not. */
+    public static final Set<String> OCCUPIES_LISTING_SLOT = Set.of(APPROVED, FLAGGED);
 }

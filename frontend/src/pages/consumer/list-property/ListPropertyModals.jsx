@@ -8,8 +8,6 @@ export default function ListPropertyModals({ ctx }) {
     showLeaveConfirm, setShowLeaveConfirm, confirmLeave, editId,
   } = ctx;
 
-  /* "Go to the listing you already have." This used to check `getListing(dupExistingId)` first and fall back to the
-     dashboard, because the edit route prefilled from the local store only. */
   const goToExisting = () => {
     if (dupExistingId) {
       navigate(`/list-property?edit=${dupExistingId}`);
@@ -22,8 +20,6 @@ export default function ListPropertyModals({ ctx }) {
     <>
       {/* Duplicate-property guard — this owner already has this exact unit (same electricity meter /
          society+unit+pincode) listed, so we stop the second post and point them to the one they already have. */}
-      {/* Changing property type / locality makes this a different property, so we stop the edit and point the owner
-         to a plan rather than silently repurposing their listing to skip the paywall. */}
       <Modal
         open={showResetConfirm}
         onClose={() => setShowResetConfirm(false)}
@@ -69,7 +65,7 @@ export default function ListPropertyModals({ ctx }) {
             </button>
             <button
               type="button"
-              onClick={() => { setShowIdentityGuard(false); navigate('/plans'); }}
+              onClick={() => { setShowIdentityGuard(false); navigate('/list-property'); }}
               className="btn-teal px-5 py-2.5 rounded-xl text-white font-semibold text-sm inline-flex items-center gap-2"
             >
               <Sparkles className="w-4 h-4" /> {t('listProperty.modal.postAsNew')}

@@ -25,7 +25,7 @@ Costs are calculated under Maharashtra Article 36A. As a rough guide:
 - **Stamp duty** — 0.25% of the rent for the whole term (with any agreed increases), plus any non-refundable deposit, plus 10% of the refundable deposit for each year, rounded up to the next ₹100 (never less than ₹100)
 - **Registration fee** — ₹1,000 in municipal / urban areas, ₹500 in rural (Gram Panchayat) areas
 - **Document handling charge** — ₹300, levied by the Sub-Registrar on every e-registered agreement
-- **Service fee** — the Draazy service fee plus GST, shown before you pay
+- **Service fee** — the Draazy service fee, shown before you pay
 
 ## What the agreement must contain
 

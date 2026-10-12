@@ -10,14 +10,15 @@ import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * A subscription plan on the public price list. Maps {@code plans} (V8), seeded reference data.
- * Rationale: docs/flows/consumer/plans-billing-refer.md.
- */
+/** A plan on the public price list; maps {@code plans}. */
 @Entity
 @Table(name = "plans")
 @Getter
 public class Plan extends AuditedEntity {
+
+    public static final String KIND_PLAN = "plan";
+    public static final String KIND_LISTING_PASS = "listing-pass";
+    public static final String KIND_CONTACT_PACK = "contact-pack";
 
     @Column(name = "name", nullable = false)
     private String name;
@@ -33,10 +34,18 @@ public class Plan extends AuditedEntity {
     @Column(name = "billing_cycle")
     private String billingCycle;
 
-    /**
-     * The paywall's real ceiling; {@code null} resolves to the free-tier floor of one, never
-     * unlimited. Rationale: docs/flows/consumer/plans-billing-refer.md.
-     */
+    /** Paid term in days from payment; when set it overrides {@link #billingCycle}. */
+    @Column(name = "term_days")
+    private Integer termDays;
+
+    @Column(name = "kind", nullable = false)
+    private String kind;
+
+    /** Whether the plan is on sale; one already bought is honoured either way. */
+    @Column(name = "active", nullable = false)
+    private boolean active;
+
+    /** The paywall's real ceiling; {@code null} resolves to the free-tier floor of one, never unlimited. */
     @Column(name = "listing_limit")
     private Integer listingLimit;
 
@@ -44,10 +53,7 @@ public class Plan extends AuditedEntity {
     @Column(name = "contact_limit")
     private Integer contactLimit;
 
-    /**
-     * Whether this plan lifts the owner-contact ceiling (V91, D31b). Separate column from
-     * {@link #contactLimit} which is display-only. Rationale: docs/flows/consumer/plans-billing-refer.md.
-     */
+    /** Lifts the owner-contact ceiling; separate from {@link #contactLimit}, which is display-only. */
     @Column(name = "unlimited_contacts", nullable = false)
     private boolean unlimitedContacts;
 

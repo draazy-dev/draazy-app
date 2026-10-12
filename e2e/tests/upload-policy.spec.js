@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { test, expect } from '../fixtures/live.js';
 import { authHeaders, uploadedListingPhotos, ownerIdOf, signedInAsNew } from '../helpers/liveAuth.js';
 import { LIST_PROPERTY_DRAFT_KEY } from '../helpers/listingForm.helper.js';
+import { istInDays } from '../helpers/availability.js';
 import { PHOTO_PNG } from '../helpers/listingPhotos.helper.js';
 import { openBadgeVault } from '../helpers/badgeVault.js';
 import { fillSociety } from '../helpers/places.js';
@@ -18,14 +19,14 @@ const photoInput = (page) => page.locator('[data-err="photos"] label.upload-zone
 async function openPhotos(page) {
   const mobile = await signedInAsNew(page);
   const ownerId = ownerIdOf(await authHeaders(mobile));
-  await page.evaluate(({ key, ownerId }) => localStorage.setItem(key, JSON.stringify({
+  await page.evaluate(({ key, ownerId, availableFrom }) => localStorage.setItem(key, JSON.stringify({
     deal: 'rent', propertyType: 'flat', carpetArea: '900', bhk: '2', bathrooms: '2',
     // A tower's floors are answered on step 1, so a draft without them never gets past it.
     floor: '9', totalFloors: '14',
     flatNumber: 'M-101', society: 'Media Test Home', pincode: '411045',
-    monthlyRent: '23000', deposit: '46000', availableFrom: '2026-12-01',
+    monthlyRent: '23000', deposit: '46000', availableFrom,
     __owner: ownerId,
-  })), { key: LIST_PROPERTY_DRAFT_KEY, ownerId });
+  })), { key: LIST_PROPERTY_DRAFT_KEY, ownerId, availableFrom: istInDays(30) });
   await page.goto('/list-property');
   await expect(page.locator('.lp-steps')).toBeVisible();
   // The draft already carries the rent, deposit and date, so the pricing step needs no answers.

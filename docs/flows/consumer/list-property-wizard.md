@@ -161,9 +161,11 @@ advance on any error (scrolling to the first error via `scrollToError`).
   rent ≥ ₹1,000, residential carpet 100–20,000 sq.ft, built-up ≥ carpet, super built-up ≥ built-up
   (≥ carpet when built-up is blank), deposit ≤ 24 × rent. An edit is checked only on the fields it
   changes, so an untouched legacy value never blocks a save.
-- The real available date lives in `formDetails.availableFrom` and is public as `availableDate`; the
-  detail page shows "From Mon YYYY" for a future date — on a sale only when the possession is a new
-  launch or under construction. The top-level `availableFrom` stays a search bucket (`now`, `15`, `30`).
+- Availability is entered with `AvailabilityField`: chips "Available now" / "In 15 days" / "In 30 days"
+  set the date (IST), or the owner picks any date up to a year out. It is sent as `availableOn` and stored
+  in `properties.available_on`; a ready-to-move sale clears it. Every surface shows "Available now" or
+  "Available from 27 Oct" (`lib/availability.js`). The `availableFrom` bucket is derived live from the
+  date for search, so it never goes stale.
 
 **Step 4 - Photos & description (`validateStep3`):**
 - **Photos:** one is the floor; under three, a hint says "Add at least 3 photos — listings with 3+

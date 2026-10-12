@@ -38,7 +38,7 @@ class RentAgreementRefundTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON).content(TERMS))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String id = field(json, "id");
-        serviceRequests.applyWebhookOutcome(paymentRef(id), true, 0);
+        serviceRequests.applyWebhookOutcome(paymentRef(id), true, null, null);
         return id;
     }
 
@@ -135,7 +135,7 @@ class RentAgreementRefundTest extends ServiceFixtures {
         decideRefund(checker, id, openRefund(checker, id), false).andExpect(status().isOk())
                 .andExpect(jsonPath("$.refunds[0].status").value("rejected"))
                 .andExpect(jsonPath("$.refunded").value(0));
-        ask(maker, id, 500, true, GRN).andExpect(status().isCreated());
+        ask(maker, id, fee, true, GRN).andExpect(status().isCreated());
     }
 
     private String approvedRefund(User maker, User checker, String id, long amount) throws Exception {

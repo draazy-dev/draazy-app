@@ -40,7 +40,7 @@ class RentAgreementOverlapTest extends ServiceFixtures {
         if (paid) {
             requestRepo.findById(UUID.fromString(id))
                     .filter(r -> r.getStatus() == ServiceRequestStatus.AWAITING_PAYMENT)
-                    .ifPresent(r -> serviceRequests.applyWebhookOutcome(paymentRef(id), true, 0));
+                    .ifPresent(r -> serviceRequests.applyWebhookOutcome(paymentRef(id), true, null, null));
         }
         return id;
     }

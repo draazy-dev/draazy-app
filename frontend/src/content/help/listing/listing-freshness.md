@@ -35,20 +35,20 @@ Tenants abandon a platform after two or three wasted calls on properties that ar
 
 On the default **Relevance** sort, listings are scored. In descending order of weight:
 
-1. **Featured placement** — comes with an active Owner Plus or Pro plan, lapses with it, and outranks everything below it
+1. **Featured placement** — given for 7 days after your listing's ownership is verified, then it ends; it outranks everything below it
 2. **ID verified owner** — ID and selfie reviewed by our trust team
 3. **Verified property** — ownership documents seen, and still current
 4. **Freshness** — Active, then Ageing, then Stale. Dormant scores zero.
 5. **RERA registered** — a valid registration number on the project
 6. **Completeness** — photos, description, key details and amenities
 
-Every term except the first is free and within your control, and no amount of completeness substitutes for a verification. See [Plans explained](/help/a/plans-explained) before assuming visibility is something you have to buy.
+Every term except the first is free and within your control, and no amount of completeness substitutes for a verification. Visibility is not something you buy — see [Plans explained](/help/a/plans-explained).
 
 Switching the sort to **Newest** or a price order turns all of this off — including featured placement. A buyer who picks an order gets that order.
 
 ## Pause, rented or take down
 
-Use **Pause** when you are temporarily not taking enquiries. A paused listing is hidden from search but still counts toward your plan limit, and its direct link can still resolve for someone who already has it.
+Use **Pause** when you are temporarily not taking enquiries. A paused listing is hidden from search and does not count toward your free live listing, and its direct link can still resolve for someone who already has it.
 
 Use **Resume** when you are ready again. It returns a paused live listing to search without a new moderation decision, unless an edit already queued a re-check.
 

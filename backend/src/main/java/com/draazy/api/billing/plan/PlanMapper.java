@@ -4,6 +4,7 @@ import com.draazy.api.common.settings.PlatformSettings;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.ToLongFunction;
 import org.springframework.stereotype.Component;
@@ -14,9 +15,8 @@ import org.springframework.stereotype.Component;
 public class PlanMapper {
 
     private static final Map<UUID, ToLongFunction<PlatformSettings>> ADMIN_PRICED = Map.of(
-            UUID.fromString("b1000000-0000-4000-8000-000000000002"), PlatformSettings::ownerPlanYearly,
-            UUID.fromString("b1000000-0000-4000-8000-000000000003"), PlatformSettings::ownerProYearly,
-            UUID.fromString("b1000000-0000-4000-8000-000000000004"), PlatformSettings::seekerPlusTopup);
+            UUID.fromString("b1000000-0000-4000-8000-000000000005"), PlatformSettings::listingPass,
+            UUID.fromString("b1000000-0000-4000-8000-000000000006"), PlatformSettings::contactPack);
 
     private final PlatformSettings settings;
 
@@ -36,6 +36,8 @@ public class PlanMapper {
                 plan.getAudience(),
                 price(plan),
                 plan.getBillingCycle(),
+                plan.getTermDays(),
+                plan.getKind(),
                 plan.getListingLimit(),
                 plan.getContactLimit(),
                 List.copyOf(plan.getFeatures()));
@@ -53,6 +55,7 @@ public class PlanMapper {
                 subscription.getPlanId().toString(),
                 subscription.getStatus(),
                 subscription.getPaymentRef(),
-                null);
+                null,
+                Objects.toString(subscription.getPropertyId(), null));
     }
 }

@@ -189,9 +189,9 @@ public class ManagedPropertyService {
                 // are not collected here, and publishing must not invent them.
                 null, null, null, null, null, null, null,
 
-                // Postcode, exact areas, move-in bucket, pet policy and supplemental wizard answers
+                // Postcode, exact areas, move-in date, pet policy and supplemental wizard answers
                 // were not collected here, and a managed record is never a plot.
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null);
 
         // Publish is the boundary between a freely captured record and the stricter marketplace
         // contract, so re-run the listing's bean-validation here — ListingService.create does not.

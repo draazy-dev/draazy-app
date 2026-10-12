@@ -22,8 +22,8 @@ import org.springframework.test.web.servlet.ResultActions;
 @DisplayName("The subscriptionPlans kill switch refuses new purchases at the server")
 class PurchasesPausedTest extends AbstractApiTest {
 
-    /** Seeded by {@code R__DML_seed_reference_data.sql}; free, so with the switch on it activates without a gateway. */
-    private static final String FREE_PLAN = "b1000000-0000-4000-8000-000000000001";
+    /** Seeded by {@code R__DML_seed_reference_data.sql}; priced, so a purchase opens a gateway order. */
+    private static final String PACK = "b1000000-0000-4000-8000-000000000006";
 
     @Autowired UserRepository users;
     @Autowired SubscriptionRepository subscriptions;
@@ -49,7 +49,7 @@ class PurchasesPausedTest extends AbstractApiTest {
         return mvc.perform(post(Routes.Plans.SUBSCRIPTION)
                 .header(HttpHeaders.AUTHORIZATION, bearer(u))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"planId\":\"" + FREE_PLAN + "\"}"));
+                .content("{\"planId\":\"" + PACK + "\"}"));
     }
 
     @Test

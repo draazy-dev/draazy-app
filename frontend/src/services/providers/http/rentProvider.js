@@ -238,3 +238,17 @@ export async function myRentAgreements() {
   if (!signedIn()) return [];
   return toList(await get('/me/rent-agreements'), toRentAgreementViewModel);
 }
+
+/** `GET /me/rent-agreements/{id}/renewal` — what a renewal starts from; the owner and the tenant may both read it. */
+export async function rentAgreementRenewal(id) {
+  const r = await get(`/me/rent-agreements/${encodeURIComponent(id)}/renewal`);
+  const party = (p) => ({ name: p?.name || '', mobile: String(p?.mobile || '') });
+  return {
+    rent: Number(r?.rent) || 0,
+    deposit: Number(r?.deposit) || 0,
+    months: Number(r?.months) || 0,
+    startDate: r?.startDate || null,
+    owner: r?.owner ? party(r.owner) : null,
+    tenants: Array.isArray(r?.tenants) ? r.tenants.map(party) : [],
+  };
+}

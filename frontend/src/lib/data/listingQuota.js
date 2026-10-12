@@ -1,12 +1,14 @@
-/** Feeds the wizard's paywall only, never the gate, so it fails open. */
+/** Feeds the quota line and the pass prompts only, never the gate, so it fails open. */
 import { getEntitlements } from '../../services/entitlementService.js';
 import { listingSlots } from '../../services/propertyService.js';
 
-/** `{ used, allowance, canPost }`; an unknown `allowance` is `null` and `canPost` then stays `true`. */
+/** `{ used, allowance, full, passes }`: `used` counts live listings no pass covers; an unknown `allowance` is `null`.
+ * `passes` maps a property id to the ISO instant its pass expires. */
 function standing(listings) {
   const allowance = Number.isFinite(listings?.allowance) ? listings.allowance : null;
   const used = Number(listings?.used) || 0;
-  return { used, allowance, canPost: allowance == null || used < allowance };
+  const passes = Object.fromEntries((listings?.passes || []).map((p) => [String(p.propertyId), p.expiresAt]));
+  return { used, allowance, full: allowance != null && used >= allowance, passes };
 }
 
 /** For a screen the dashboard aggregate already primed `/me/entitlements` for. */

@@ -68,18 +68,18 @@ public class AdminMetricsRepository {
                        when 'quarterly' then round(s.amount / 3.0)
                        when 'yearly'    then round(s.amount / 12.0)
                        else s.amount
-                     end), 0)::bigint as monthly
+                     end), 0)::bigint as monthly,
+                   p.term_days
               from subscriptions s
               join plans p on p.id = s.plan_id
              where s.status = 'active'
                and s.payment_ref is not null
                and s.amount > 0
-             group by p.id, p.name, p.audience, p.billing_cycle, s.amount
+             group by p.id, p.name, p.audience, p.billing_cycle, p.term_days, s.amount
              order by p.name, s.amount
             """;
 
-    // The denominator of ARPPU, and deliberately a different question from `countUsers` — which is the denominator of ARPU.
-    // Both totals are exposed because one cannot safely stand in for the other.
+    // ARPPU's denominator, deliberately not `countUsers` (ARPU's): one cannot stand in for the other.
     private static final String PAYING_USERS = """
             select count(distinct s.user_id)
               from subscriptions s

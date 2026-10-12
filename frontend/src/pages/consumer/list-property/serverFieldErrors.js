@@ -8,6 +8,7 @@ const FIELD_ALIASES = {
   reraNumber: 'reraId',
   electricityMeterNo: 'electricityConsumerNo',
   construction: 'possession',
+  availableOn: 'availableFrom',
 };
 
 const STEP_BY_FIELD = {

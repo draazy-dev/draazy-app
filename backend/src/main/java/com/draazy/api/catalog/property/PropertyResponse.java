@@ -3,6 +3,7 @@ package com.draazy.api.catalog.property;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,6 +62,7 @@ public record PropertyResponse(
         String room,
         List<String> tenants,
         String availableFrom,
+        LocalDate availableOn,
         String availableDate,
         Boolean pets,
 

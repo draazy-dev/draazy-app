@@ -56,8 +56,7 @@ async function pickType(page, label) {
 test('switching property type clears the previous type-specific answers, but keeps a bedroom count through a non-residential detour', async ({ page }) => {
   await signedInAsNew(page);
   await page.goto('/list-property');
-  /* `.lp-steps` rather than `.lp-meter`: the meter renders on the listing-limit paywall as well as
-     on the wizard, so it cannot tell the two branches apart. */
+  /* `.lp-steps` is the wizard's own step rail, so waiting on it means the form has mounted. */
   await page.waitForSelector('.lp-steps', { timeout: 20000 });
 
   await test.step('switching property type clears the previous type-specific answers (cascade reset)', async () => {

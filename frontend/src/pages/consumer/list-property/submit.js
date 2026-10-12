@@ -40,7 +40,7 @@ const withoutFormDetails = (form, keys) => pickListingFormDetails(Object.fromEnt
 ));
 
 const formDetailsForPropertyType = (form) => {
-  const excluded = isCommercialType(form.propertyType) ? RESIDENTIAL_DETAIL_KEYS : COMMERCIAL_DETAIL_KEYS;
+  const excluded = new Set([...(isCommercialType(form.propertyType) ? RESIDENTIAL_DETAIL_KEYS : COMMERCIAL_DETAIL_KEYS), 'availableFrom']);
   const normalized = form.loanAvailable === '' || form.loanAvailable == null
     ? Object.fromEntries(Object.entries(form).filter(([key]) => key !== 'loanAvailable'))
     : form;

@@ -38,7 +38,7 @@ export const COMPARE_NOBROKER = {
         src: ['tenant', 'buyer'],
       },
       draazy: {
-        text: 'The first 15 owner contacts are free. Seeker Plus, at \u20B9199, adds more. Checkout shows taxes as included.',
+        text: 'The first 15 owner contacts are free for 30 days. A Contact Pack, at \u20B9199, adds 15 more for 30 days and does not renew by itself.',
         link: ['See plans and pricing', '/plans'],
       },
     },
@@ -49,7 +49,7 @@ export const COMPARE_NOBROKER = {
         src: ['home', 'owner'],
       },
       draazy: {
-        text: 'The first listing is free. Owner Plus is \u20B9999 a year and Owner Pro is \u20B92,499 a year.',
+        text: 'One live listing at a time is free. Each extra live listing needs a Listing Pass at \u20B9999, live for 60 days with no auto-renewal.',
         link: ['List your property', '/list-property'],
       },
     },
@@ -60,7 +60,7 @@ export const COMPARE_NOBROKER = {
         src: ['tenant', 'owner', 'terms'],
       },
       draazy: {
-        text: 'Seeker Plus adds owner contacts. Owner Plus and Owner Pro add live listings and featured placement, and Owner Pro adds a dedicated manager. A plan with no premium feature used can be refunded in full within 7 days of purchase.',
+        text: 'Only three things cost money: a Contact Pack, a Listing Pass for each extra live listing, and a rent agreement. None renews by itself. A pass or pack with no premium feature used can be refunded in full within 7 days of purchase.',
         link: ['Read the refund policy', '/refund-policy'],
       },
     },
@@ -92,7 +92,7 @@ export const COMPARE_NOBROKER = {
         src: ['agreement'],
       },
       draazy: {
-        text: 'A Maharashtra leave and licence agreement, drafted and e-registered online, with an optional doorstep biometric visit. The platform fee is \u20B9500, with GST, stamp duty and registration charges itemised before you pay.',
+        text: 'A Maharashtra leave and licence agreement, drafted and e-registered online, with an optional doorstep biometric visit. The platform fee is \u20B9499, with stamp duty and registration charges itemised before you pay.',
         link: ['Rent agreement service', '/services/rent-agreement'],
       },
     },
@@ -120,17 +120,17 @@ export const COMPARE_NOBROKER = {
   draazyFit: {
     title: 'When Draazy may suit you',
     list: [
-      'You are renting, buying or listing in Pune and want to start without paying: the first 15 owner contacts and the first listing are free.',
+      'You are renting, buying or listing in Pune and want to start without paying: the first 15 owner contacts and one live listing are free.',
       'You want an owner\u2019s number hidden until the owner approves your request, and your own number hidden until then.',
       'You want a person on the team to review each listing before it appears in search.',
-      'You prefer a yearly owner plan at \u20B9999 or \u20B92,499 to a 45-day plan.',
+      'You prefer a 60-day pass for an extra listing at \u20B9999 to a 45-day plan.',
     ],
     links: [['Browse homes in Pune', '/listings'], ['See plans and pricing', '/plans']],
   },
   faq: [
     {
       q: 'Is Draazy cheaper than NoBroker?',
-      a: 'The two publish different plans, so there is no single answer. NoBroker lists \u20B91,649 plus 18% GST for 25 owner contacts over 90 days. Draazy makes the first 15 owner contacts free and sells Seeker Plus at \u20B9199. Compare them against the number of owner contacts you expect to need and the city you are searching in.',
+      a: 'The two publish different plans, so there is no single answer. NoBroker lists \u20B91,649 plus 18% GST for 25 owner contacts over 90 days. Draazy makes the first 15 owner contacts free and sells a 15-contact Contact Pack at \u20B9199. Compare them against the number of owner contacts you expect to need and the city you are searching in.',
     },
     {
       q: 'Does Draazy charge brokerage?',
@@ -138,7 +138,7 @@ export const COMPARE_NOBROKER = {
     },
     {
       q: 'Do I need a paid plan to contact owners on Draazy?',
-      a: 'No. The first 15 owner contacts are free. After that, a seeker plan adds more contacts.',
+      a: 'No. The first 15 owner contacts are free. After that, a Contact Pack adds more contacts.',
     },
     {
       q: 'Where do the NoBroker details on this page come from?',

@@ -5,7 +5,7 @@ import { approveListingWithFetch, rejectListingWithFetch } from '../../helpers/m
 /** Request budget on load: public config is one GET /bootstrap, dashboard/owner hub use one GET /me/dashboard
  * that primes per-section reads, and similar listings (ranked server-side) load only when scrolled near. */
 
-const RETIRED = /^\/api\/(flags|geo|cities|plans|pricing|move-pack|listing-policy)$/;
+const RETIRED = /^\/api\/(flags|geo|cities|plans|pricing|move-pack|listing-policy|me\/subscription)$/;
 
 function countGets(page) {
   const seen = new Map();
@@ -397,7 +397,7 @@ test('an owner create, edit and take-down answer identity and verdict only, and 
   await page.goto('/list-property');
   const quota = await (await quotaRead).json();
   expect(Object.keys(quota).sort()).toEqual(['allowance', 'used']);
-  expect(quota.used).toBe(1);
+  expect(quota.used, 'only a live listing holds the free slot, and this one is still pending').toBe(0);
   await page.waitForTimeout(1500);
   expect(gets.timesPath('/api/me/listings/quota')).toBe(1);
   expect(gets.timesPath('/api/me/entitlements')).toBe(0);

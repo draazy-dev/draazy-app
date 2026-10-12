@@ -4,6 +4,7 @@ import Modal from '../../../components/ui/Modal.jsx';
 import { formatIndian, perUnit } from './format.js';
 import { listingLabels } from './submit.js';
 import { headlineOf } from '../../../lib/headline.js';
+import { availabilityLabel } from '../../../lib/availability.js';
 import { isLandType, isResidentialType, plotUnitOptions, farmUnitOptions } from './constants.js';
 
 const UNIT_LABELS = Object.fromEntries([...plotUnitOptions, ...farmUnitOptions]);
@@ -12,7 +13,6 @@ const POSSESSION_KEYS = { ready: 'readyToMove', new: 'newLaunch', under: 'underC
 const TENANT_KEYS = { family: 'family', bachelors: 'bachelors', 'bachelor-male': 'bachelorMale', 'bachelor-female': 'bachelorFemale', company: 'companyLease', anyone: 'anyone' };
 
 const rupees = (v) => (formatIndian(v) ? `₹${formatIndian(v)}` : '');
-const dateIn = (iso) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 const fallbackUnitLabel = (unit) => ({
   sqft: 'sq.ft', sqm: 'sq.m', sqyd: 'sq.yd', guntha: 'guntha', acre: 'acre', hectare: 'hectare',
 }[unit] || 'sq.ft');
@@ -43,7 +43,7 @@ function sectionsFor(form, t) {
       [label('monthlyRent'), form.monthlyRent && `${rupees(form.monthlyRent)} ${t('listProperty.unit.perMonth')}`],
       [label('securityDeposit'), rupees(form.deposit)],
       [label('maintenanceCharges'), maintenance],
-      [label('availableFrom'), dateIn(form.availableFrom)],
+      [label('availableFrom'), availabilityLabel(t, { availableOn: form.availableFrom })],
       [label('preferredTenants'), form.preferredTenants.map((v) => opt(TENANT_KEYS[v])).filter(Boolean).join(', ')],
     ] : [
       [label('expectedPrice'), form.price && `${rupees(form.price)}${form.priceNegotiable ? ` · ${label('priceNegotiable')}` : ''}`],

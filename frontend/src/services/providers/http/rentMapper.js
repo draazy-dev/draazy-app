@@ -131,22 +131,11 @@ export function toBasisViewModel(row) {
   };
 }
 
-/** `endDate` is derived rather than carried, because the record stores a start plus a term in months and an end date
- * computed anywhere else would be a second, driftable copy of the same fact. */
+/** `endDate` is the server's (start plus term, less a day), never recomputed here: client month arithmetic rolls
+ * over where the server clamps. */
 export function toRentAgreementViewModel(row) {
   const startDate = row?.startDate || null;
   const months = Number(row?.durationMonths) || 0;
-  let endDate = null;
-  if (startDate && months > 0) {
-    const start = new Date(`${startDate}T00:00:00Z`);
-    if (!Number.isNaN(start.getTime())) {
-      // A lease running `months` from the 1st ends on the last day of the final month, so step to
-      // the month after and back off one day rather than landing on the start-of-month boundary.
-      const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + months, start.getUTCDate()));
-      end.setUTCDate(end.getUTCDate() - 1);
-      endDate = end.toISOString().slice(0, 10);
-    }
-  }
   return {
     id: row?.id || '',
     propId: row?.propertyId || '',
@@ -156,7 +145,7 @@ export function toRentAgreementViewModel(row) {
     deposit: Number(row?.deposit) || 0,
     startDate,
     durationMonths: months || null,
-    endDate,
+    endDate: row?.endDate || null,
     date: startDate,
     status: row?.status || 'draft',
     documentUrl: row?.documentUrl || null,

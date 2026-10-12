@@ -425,7 +425,6 @@
       "perMo": "/mo",
       "perMonth": "/month",
       "perMonthSpaced": "/ month",
-      "perYr": "/yr",
       "sqft": "sq.ft",
       "sqm": "sq.m",
       "sqyd": "sq.yd",
@@ -505,27 +504,6 @@
       "underReviewStaysLive": "Live — being re-checked",
       "underReviewOffSearch": "Under review — off search"
     },
-    "paywall": {
-      "title": "You've used your free listing",
-      "bodyPre": "Your plan includes",
-      "liveListing_one": "live listing",
-      "liveListing_other": "live listings",
-      "bodyMid": "and you currently have",
-      "bodyEnd": "Upgrade to an Owner plan to post more — your existing listing stays live and free.",
-      "bodyEndRefer": "Refer another owner or upgrade to post more — your existing listing stays live and free.",
-      "tip": "Tip: editing your current listing is always free and doesn't use a slot.",
-      "ownerPlan": "Owner plan",
-      "feat1": "List up to 2 properties",
-      "feat2": "Priority verification",
-      "feat3": "All owner tools included",
-      "upgradePost": "Upgrade & post",
-      "comparePlans": "Compare plans",
-      "referTitle": "Refer an owner",
-      "referFree": "Free",
-      "referBody": "Invite another owner. Every 3 referrals that qualify (their first listing verified) unlock one extra free listing slot. No payment needed.",
-      "referCta": "Get my referral link",
-      "orPay": "Or upgrade"
-    },
     "success": {
       "flatmateTitle": "Flatmate Listing Posted!",
       "updatedTitle": "Listing Updated!",
@@ -535,7 +513,9 @@
       "editBody": "Your changes are saved and live. Everything you updated is now visible to buyers and tenants.",
       "editReviewBody": "Your changes are saved and back under review. We'll publish them once our team approves the listing.",
       "newBody": "Our team will verify and publish your listing within 24 hours. You'll receive a notification once it's live.",
-      "goToListings": "Go to My Listings"
+      "goToListings": "Go to My Listings",
+      "passNote": "You already have a free live listing — this one stays paused after approval. Go live with a {{price}} pass or pause the other.",
+      "passCta": "Go live — {{price}} pass"
     },
     "split": {
       "nudgeTitle": "Want to let it one room at a time?",
@@ -556,7 +536,7 @@
       "postAsNew": "Post as a new property",
       "identityBodyPre": "You've changed the",
       "identityBodyTerm": "property type or locality",
-      "identityBodyPost": ", which makes this a different property rather than an update to your existing one. Keep your current listing as it is and post this one separately. Your free listing stays yours — additional listings need an Owner plan.",
+      "identityBodyPost": ", which makes this a different property rather than an update to your existing one. Keep your current listing as it is and post this one separately.",
       "dupTitle": "You've already listed this property",
       "goExisting": "Go to my existing listing",
       "dupBodyPre": "This property is",
@@ -572,8 +552,8 @@
       "evening": "Evening (5–9)"
     },
     "quota": {
-      "entryUsed": "{{used}} of {{allowance}} free listing used",
-      "entryAvailable": "You can post {{allowance}} free listing"
+      "entry_one": "{{used}} of {{allowance}} free live listing used",
+      "entry_other": "{{used}} of {{allowance}} free live listings used"
     },
     "content": {
       "describe": {

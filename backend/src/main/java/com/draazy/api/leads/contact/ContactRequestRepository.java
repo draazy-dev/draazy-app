@@ -17,8 +17,12 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
 
     Optional<ContactRequest> findByRequesterIdAndPropertyId(UUID requesterId, UUID propertyId);
 
-    // Read under RateLimitLock.Limit.CONTACT_REQUEST; the count alone does not stop concurrent overshoot.
-    long countByRequesterId(UUID requesterId);
+    // The contact quota is derived from these instants; read under RateLimitLock.Limit.CONTACT_REQUEST.
+    // first_requested_at, not created_at: a renewal moves created_at and must not restart or recharge a window.
+    @Query("""
+            select cr.firstRequestedAt from ContactRequest cr
+            where cr.requesterId = :requesterId order by cr.firstRequestedAt""")
+    List<Instant> findFirstRequestedAtByRequesterId(@Param("requesterId") UUID requesterId);
 
     // The mapper asks this on every detail render, so an existence check is enough.
     boolean existsByRequesterIdAndPropertyIdAndStatus(UUID requesterId, UUID propertyId, String status);

@@ -244,7 +244,7 @@ public final class DataExportScope {
                        enquiries, archived, archived_at, deal_status,
                        ownership_verified_at, ownership_verified_until, electricity_meter_no,
                        address_key, last_confirmed_at, owner_confirmed_at, quality_score, land_use,
-                       age_years, room, tenants, available_from, pets, property_type_key,
+                       age_years, room, tenants, available_on, pets, property_type_key,
                        commercial_use_key, share_type, created_at, updated_at
                   from properties
                  where owner_id = :subjectId
@@ -258,8 +258,8 @@ public final class DataExportScope {
                                 + "they are handling the listing rather than about you.",
                         "posted_by_admin", "Whether a staff member posted on your behalf; it names "
                                 + "the operating model, not you.",
-                        "featured", "No longer read (D292): featured now follows your Owner plan, "
-                                + "which the subscriptions dataset already exports.")));
+                        "featured", "No longer read (D292): featured now follows ownership "
+                                + "verification, which the listing's verification fields already export.")));
 
         out.add(new Dataset("listings", "ownership_basis",
                 "What you told us you paid for a property, and what you think it is worth now. "

@@ -18,6 +18,6 @@ public record AdminFinance(
     }
 
     public record PlanLine(String name, String audience, String billingCycle, long price,
-            long active, long monthlyValue) {
+            long active, long monthlyValue, Integer termDays) {
     }
     }

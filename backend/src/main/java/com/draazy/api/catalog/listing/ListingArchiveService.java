@@ -37,6 +37,7 @@ public class ListingArchiveService {
     public Property archive(AuthPrincipal principal, String idOrSlug, String reason) {
         Property p = resolvePermitted(principal, idOrSlug);
         p.archive(reason);
+        properties.endListingPasses(p.getId());
         return p;
     }
 

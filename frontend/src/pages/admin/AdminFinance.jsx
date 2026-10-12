@@ -35,6 +35,8 @@ const TX_STATUSES = [
 ];
 
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
+const CYCLE_ABBR = { yearly: 'yr', quarterly: 'qtr' };
+const termLabel = (p) => (p.termDays ? ` / ${p.termDays} days` : p.billingCycle ? `/${CYCLE_ABBR[p.billingCycle] ?? 'mo'}` : '');
 
 async function fetchWholeLedger(filters) {
   const rows = [];
@@ -329,7 +331,7 @@ export default function AdminFinance() {
             <div key={`${p.name}:${p.price}`} className="flex items-center justify-between border-b border-white/5 py-2 text-sm">
               <div>
                 <div className="font-medium">{p.name}</div>
-                <div className="text-xs text-gray-500">{fmtNum(p.active)} active · {fmtINR(p.price)}/{p.billingCycle === 'yearly' ? 'yr' : p.billingCycle === 'quarterly' ? 'qtr' : 'mo'}</div>
+                <div className="text-xs text-gray-500">{fmtNum(p.active)} active · {fmtINR(p.price)}{termLabel(p)}</div>
               </div>
               <div className="font-semibold">{fmtINR(p.monthlyValue)}</div>
             </div>

@@ -16,7 +16,7 @@ class PropertyModerationSummaryRepository {
               count(*) filter (where not archived and status = 'approved')             as approved,
               count(*) filter (where not archived and status = 'pending')              as pending,
               count(*) filter (where not archived and status = 'flagged')              as flagged,
-              count(*) filter (where not archived and\s""" + Property.OWNER_ON_PAID_PLAN_SQL + """
+              count(*) filter (where not archived and\s""" + Property.FEATURED_SQL + """
             )                                                                          as featured,
               count(*) filter (where not archived and recheck_requested_at is not null
                                  and coalesce(recheck_reason, '') <> :badgeItem)       as recheck,

@@ -1,16 +1,7 @@
 import { expect, test } from '../fixtures/live.js';
 import { ACTORS } from '../fixtures/live.js';
-import { signedInAs, authHeaders, API, uploadedListingPhotos, uniqueMobile } from '../helpers/liveAuth.js';
-
-const BODY = async (title, auth) => ({
-  title,
-  deal: 'rent',
-  propertyType: 'apartment',
-  price: 25000,
-  locality: 'Kothrud',
-  city: 'Pune',
-  images: await uploadedListingPhotos(auth),
-});
+import { signedInAs, authHeaders, API, uniqueMobile } from '../helpers/liveAuth.js';
+import { newListing } from '../helpers/monetisation.js';
 
 test.describe('Listing quota — live', () => {
   test('the server, not the browser, decides the ceiling and the count', async ({ request }) => {
@@ -19,10 +10,11 @@ test.describe('Listing quota — live', () => {
     const ent = await request.get(`${API}/me/entitlements`, { headers });
     expect(ent.status()).toBe(200);
     const { listings, agreements } = await ent.json();
-    // Free tier, no granting referrals. Asserted as a number rather than "is defined", because the
-    // wizard now branches on it and a null would silently un-gate the paywall.
+    // Free tier, no granting referrals. Asserted as a number rather than "is defined": the dashboard
+    // decides whether to offer a pass from it, and a null would silently hide the offer.
     expect(listings.allowance).toBe(1);
     expect(listings.referralBonus).toBe(0);
+    expect(listings.passes).toEqual([]);
     // Present and zero, not absent.
     expect(agreements.free).toBe(0);
 
@@ -38,64 +30,46 @@ test.describe('Listing quota — live', () => {
     expect(listings.used).toBe(4);
     // The whole point: four against a ceiling of one. Nothing in the browser was consulted.
     expect(occupying.length).toBeGreaterThan(listings.allowance);
+
+    const slots = await request.get(`${API}/me/listings/quota`, { headers });
+    expect(await slots.json()).toEqual({ used: 4, allowance: 1 });
   });
 
-  test('an over-quota owner is paywalled on a browser that has never posted, yet reaches the flatmate flow free', async ({ page }) => {
+  test('an over-tier owner still reaches the wizard for a whole flat and for a flatmate room', async ({ page }) => {
     await signedInAs(page, ACTORS.owner);
 
-    await test.step('the paywall quotes the server\'s numbers', async () => {
+    await test.step('the form opens: the tier is applied when a listing is approved, not when it is drafted', async () => {
       await page.goto('/list-property', { waitUntil: 'networkidle' });
-
-      await expect(page.getByTestId('listing-paywall')).toBeVisible({ timeout: 15000 });
-      // A fresh context must still see 4 against 1.
-      const paywall = page.getByTestId('listing-paywall');
-      await expect(paywall).toContainText('4');
-      await expect(paywall).toContainText('1');
+      await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('[data-err="propertyType"]')).toBeVisible({ timeout: 15000 });
+      await expect(page.getByText(/used your free listing/i)).toHaveCount(0);
+      await expect(page.getByText(/^\d+ of 1 free live listing used$/)).toBeVisible();
+      await expect(page.getByText(/Go live with a ₹999 pass or pause the other/)).toBeVisible();
     });
 
-    // Flatmate rooms do not occupy paid listing slots, so this path stays free.
-    await test.step('a capped owner reaches the flatmate flow free, and is told why whole-flat is refused', async () => {
+    // Flatmate rooms do not occupy listing slots, so this path was never tiered.
+    await test.step('the flatmate flow opens, and the whole-flat flow is one tap away', async () => {
       await page.goto('/list-property?flatmate=1', { waitUntil: 'networkidle' });
-
-      // Wait on the wizard before asserting the paywall's absence — `toHaveCount(0)` is true of a
-      // page that has not finished deciding, and passed against this exact bug.
       await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
-      await expect(page.getByTestId('listing-paywall')).toHaveCount(0);
-
-      // Switching back keeps the wizard rather than trapping them behind the paywall...
       await page.getByText('Rent out the whole place').click();
       await expect(page.getByTestId('listing-wizard')).toBeVisible();
-      await expect(page.getByTestId('listing-paywall')).toHaveCount(0);
-      // ...and the way back to the free flow is still on the page, which is the point of not swapping.
       await expect(page.getByText('Find a flatmate')).toBeVisible();
     });
   });
-  test('an owner with nothing listed still gets their first post free', async ({ page }) => {
-    await signedInAs(page, ACTORS.buyer);
-    await page.goto('/list-property', { waitUntil: 'networkidle' });
 
-    // The opposite failure mode, and the reason the quota load fails permissive: a slow or failed
-    // entitlements call must not paywall somebody who is entitled to post.
-    await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('listing-paywall')).toHaveCount(0);
-  });
-
-  // The exit from the ceiling, seen from the wizard rather than the API.
-  test('a withdrawn listing frees the slot in the wizard, not just in the API', async ({ page, request }) => {
+  test('an owner with nothing listed gets the wizard, and a withdrawn listing leaves the count at zero', async ({ page, request }) => {
     const mobile = uniqueMobile();
     const headers = await authHeaders(mobile);
 
-    const posted = await request.post(`${API}/me/listings`, { headers, data: await BODY('Withdrawal probe', headers) });
-    expect(posted.status()).toBe(201);
-    const taken = await request.delete(`${API}/me/listings/${(await posted.json()).id}`, { headers });
+    const posted = await newListing(mobile, { title: 'Withdrawal probe' });
+    const taken = await request.delete(`${API}/me/listings/${posted.id}`, { headers });
     expect(taken.status()).toBe(200);
 
     await signedInAs(page, mobile);
+    const slots = page.waitForResponse((r) => new URL(r.url()).pathname === '/api/me/listings/quota');
     await page.goto('/list-property', { waitUntil: 'networkidle' });
 
-    // Wait for the wizard before asserting the paywall is gone. `toHaveCount(0)` is satisfied the
-    // instant the page mounts, so without this the test passes against the very bug it describes.
     await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('listing-paywall')).toHaveCount(0);
+    expect(await (await slots).json()).toEqual({ used: 0, allowance: 1 });
   });
 });

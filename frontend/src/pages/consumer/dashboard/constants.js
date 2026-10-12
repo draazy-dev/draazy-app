@@ -92,7 +92,7 @@ export const VISIT_STATUS_CLS = {
 };
 
 export const BILLING_HISTORY = [
-  { id: 'INV-2041', plan: 'Owner plan (yearly)', amount: 999, at: '2026-01-14', status: 'Paid' },
-  { id: 'INV-1980', plan: 'Featured listing', amount: 999, at: '2025-11-02', status: 'Paid' },
-  { id: 'INV-1899', plan: 'Rent agreement', amount: 500, at: '2025-09-21', status: 'Paid' },
+  { id: 'INV-2041', plan: 'Listing Pass · 60 days', amount: 999, at: '2026-01-14', status: 'Paid' },
+  { id: 'INV-1980', plan: 'Contact Pack · 15 contacts', amount: 199, at: '2025-11-02', status: 'Paid' },
+  { id: 'INV-1899', plan: 'Rent agreement', amount: 499, at: '2025-09-21', status: 'Paid' },
 ];

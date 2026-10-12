@@ -14,6 +14,7 @@ import { AMEN_LBL, FURN_LBL } from './constants.js';
 import { cityLabelFor } from '../../../lib/geoConfig.js';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { propertyHref } from '../../../lib/listingSeo.js';
+import { availabilityLabel } from '../../../lib/availability.js';
 
 const isLandListing = (p) => {
   const type = (p.type || '').toLowerCase();
@@ -69,7 +70,7 @@ const Card = memo(function Card({ p, locName, index = 0, list = false, linkState
   if (isRent) {
     const tl = tenantLabel(p.tenants);
     if (tl) chips.push(['users', tl]);
-    const av = { now: t('listings.availableNow'), '15': t('listings.availableIn15'), '30': t('listings.availableIn30') }[p.availableFrom];
+    const av = availabilityLabel(t, p);
     if (av) chips.push(['calendar-check', av]);
     if (p.pets) chips.push(['paw-print', t('listings.petFriendly')]);
   } else {
@@ -85,7 +86,7 @@ const Card = memo(function Card({ p, locName, index = 0, list = false, linkState
     const loc = locName || p.locality;
     const furn = FURN_LBL[p.furnishing] || '';
     const status = isRent
-      ? ({ now: t('listings.listStatusAvailableNow'), '15': t('listings.listStatusAvailable15'), '30': t('listings.listStatusAvailable30') }[p.availableFrom] || t('listings.listStatusAvailable'))
+      ? (availabilityLabel(t, p) || t('listings.listStatusAvailable'))
       : ({ ready: t('listings.readyToMove'), under: t('listings.underConstruction'), new: t('listings.newLaunch') }[p.construction] || '');
     const sub = isRent
       ? (maintenance ? t('listings.maintenanceExtra', { amount: maintenance.toLocaleString('en-IN') }) : '')

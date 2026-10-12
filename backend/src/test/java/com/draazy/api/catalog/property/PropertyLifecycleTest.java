@@ -2,6 +2,8 @@ package com.draazy.api.catalog.property;
 
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
+import com.draazy.api.common.settings.PlatformSettings;
+import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
@@ -14,10 +16,14 @@ import static org.mockito.Mockito.*;
 
 class PropertyLifecycleTest {
     private final AccountPermissions permissions = mock(AccountPermissions.class);
+    private final ListingLiveGate liveGate = mock(ListingLiveGate.class);
+    private final Notifier notifier = mock(Notifier.class);
+    private final PlatformSettings settings = mock(PlatformSettings.class);
+    private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final PropertyLifecycle lifecycle =
-            new PropertyLifecycle(permissions, mock(ApplicationEventPublisher.class),
+            new PropertyLifecycle(permissions, events,
                     (actor, property, secondApprovalSatisfied) -> {
-                    });
+                    }, liveGate, notifier, settings);
     private final AuthPrincipal staff = new AuthPrincipal(UUID.randomUUID(), "staff", null, true, false);
     private Property property;
 
@@ -25,8 +31,27 @@ class PropertyLifecycleTest {
         User owner = mock(User.class);
         when(owner.getId()).thenReturn(UUID.randomUUID());
         when(permissions.granted(eq(staff), anyString())).thenReturn(true);
+        when(liveGate.mayGoLive(any())).thenReturn(true);
+        when(settings.listingPass()).thenReturn(999L);
         property = new Property(owner, "Home", "rent", "Flat", 20000L, "Baner", "Pune");
         property.setLocalitySlug("baner");
+    }
+
+    @Test void approvalOverTheFreeTierPausesInsteadOfGoingLive() {
+        when(liveGate.mayGoLive(property)).thenReturn(false);
+        lifecycle.publish(staff, property);
+        assertThat(property.getStatus()).isEqualTo(PropertyStatus.PAUSED);
+        verifyNoInteractions(events);
+        lifecycle.announceApproval(property);
+        verify(notifier).notify(any(), eq("listing.approved_paused"), anyString(),
+                contains("free tier (1 live listing). Buy a ₹999 listing pass"), anyString());
+    }
+
+    @Test void republishingAnAlreadyLiveListingIsNotGated() {
+        property.setStatus(PropertyStatus.APPROVED);
+        when(liveGate.mayGoLive(property)).thenReturn(false);
+        lifecycle.publish(staff, property);
+        assertThat(property.getStatus()).isEqualTo(PropertyStatus.APPROVED);
     }
 
     @Test void staffListingCannotPublishUntilTheOwnerConfirms() {

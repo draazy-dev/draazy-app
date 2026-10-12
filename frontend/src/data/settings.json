@@ -19,11 +19,9 @@
     }
   },
   "fees": {
-    "ownerPlanYearly": 999,
-    "ownerProYearly": 2499,
-    "rentAgreementPlatform": 500,
-    "seekerPlusTopup": 199,
-    "gstPercent": 18
+    "listingPass": 999,
+    "contactPack": 199,
+    "rentAgreementPlatform": 499
   },
   "movePack": {
     "enabled": false,

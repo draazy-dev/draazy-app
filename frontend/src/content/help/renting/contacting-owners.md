@@ -37,17 +37,17 @@ The single exception is an owner who has switched on **verified enquirers only**
 
 ## How many owners can I contact?
 
-Owner contacts are capped per account, not per day:
+Owner contacts are counted per account, not per day:
 
-| Plan | Owner contacts |
+| Source | Owner contacts |
 | --- | --- |
-| Free | 15 in total |
-| Any paid plan | Unlimited |
-| Referral reward | +15 on top of the free allowance, per qualified referral |
+| Free | 15, usable within 30 days of your first contact |
+| Contact Pack | 15 more, valid 30 days; packs stack |
+| Referral reward | +15 per qualified referral |
 
-The count is a **lifetime total**, not a monthly or daily refill. One listing costs one contact however many times you open it, and whether the owner approves or declines does not change the number — you are charged for asking, once, per property.
+One listing costs one contact however many times you open it, and whether the owner approves or declines does not change the number — you are charged for asking, once, per property.
 
-The listing shows "N free owner contacts left" beside **Request number**, and your balance is on the [Refer](/refer) page. When the allowance runs out the app says so and offers a referral link (while referral rewards are on) or [Seeker Plus](/plans).
+The listing shows "N owner contacts left" beside **Request number**, and your balance is on the [Refer](/refer) page. When the allowance runs out the app says so and offers a referral link (while referral rewards are on) or a [Contact Pack](/plans).
 
 ## Writing an enquiry that gets answered
 

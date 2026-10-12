@@ -22,7 +22,7 @@ Buying is where the money and the risk both scale. Two services matter here.
 - **Mutation and society transfer support** — municipal records, 7/12 records and society share-certificate transfer after registration
 - **Gift deed, power of attorney and will** — drafting and registration for family and estate transfers
 
-The legal desk charges a fixed professional fee, shared with you before you proceed. It is separate from government stamp duty and registration charges.
+The legal desk confirms its terms with you before you proceed. Government stamp duty and registration charges are separate.
 
 The page also has a stamp duty estimator. Within PMC and PCMC limits stamp duty is 7% and the registration fee is 1% of the value, capped at ₹30,000, on the higher of the agreement value or the ready-reckoner rate. The figure is indicative; the legal desk confirms the exact amount before registration.
 
@@ -31,7 +31,7 @@ The page also has a stamp duty estimator. Within PMC and PCMC limits stamp duty 
 
 ## Home loans
 
-[Home loans](/home-loans) compares offers across lenders on the same inputs. Choose the loan type (home purchase, plot, construction, balance transfer, top-up or loan against property), then add the loan amount, employment type, net monthly income and city. The advisory and eligibility check are free — you pay only the lender's charges — and the loan desk calls you back within 24 hours.
+[Home loans](/home-loans) compares offers across lenders on the same inputs. Choose the loan type (home purchase, plot, construction, balance transfer, top-up or loan against property), then add the loan amount, employment type, net monthly income and city. The loan desk calls you back within 24 hours.
 
 ### What determines your rate
 

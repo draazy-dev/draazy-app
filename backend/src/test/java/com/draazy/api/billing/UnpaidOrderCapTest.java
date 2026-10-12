@@ -26,10 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @DisplayName("D160 — one outstanding unpaid subscription order per user")
 class UnpaidOrderCapTest extends AbstractApiTest {
 
-    private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000002";
-
-    /** Free, so it never opens an order and the cap must not apply to it. */
-    private static final String FREE_PLAN = "b1000000-0000-4000-8000-000000000001";
+    private static final String PAID_PLAN = "b1000000-0000-4000-8000-000000000006";
 
     @Autowired MockMvc mvc;
     @Autowired UserRepository users;
@@ -113,16 +110,6 @@ class UnpaidOrderCapTest extends AbstractApiTest {
         }
 
         @Test
-        @DisplayName("a free plan opens no order, so the cap does not apply to it")
-        void freePlansAreNotCapped() throws Exception {
-            User u = owner("9866600006");
-            subscribe(u, FREE_PLAN, 201);
-
-            assertThat(pendingSubscriptions(u)).isZero();
-            subscribe(u, FREE_PLAN, 201);
-        }
-
-        @Test
         @DisplayName("an Idempotency-Key replay returns the original rather than tripping the cap")
         void theReplayStillWorks() throws Exception {
             User u = owner("9866600007");
@@ -177,7 +164,7 @@ class UnpaidOrderCapTest extends AbstractApiTest {
         String body = "{\"type\":\"PAYMENT_SUCCESS_WEBHOOK\",\"data\":{"
                 + "\"order\":{\"order_id\":\"" + orderId + "\"},"
                 + "\"payment\":{\"payment_status\":\"SUCCESS\","
-                + "\"payment_amount\":999.00,"
+                + "\"payment_amount\":199.00,"
                 + "\"payment_time\":\"" + paidAt + "\"}}}";
         String ts = String.valueOf(System.currentTimeMillis());
         mvc.perform(post(Routes.Webhooks.CASHFREE_PAYMENT)

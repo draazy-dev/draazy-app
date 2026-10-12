@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.trust.ReviewerStanding;
@@ -19,6 +20,7 @@ import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.JwtService;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -161,6 +163,77 @@ class TenancyEndpointsTest extends AbstractApiTest {
         closeDeal(owner, p, next.getMobile(), 30000L);
         assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
         assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
+    }
+
+    @Test
+    void reopeningARentDeal_withAFutureDate_endsTheTenancyTheDayBeforeAndSetsTheDate() throws Exception {
+        User owner = user("9822200041", "owner");
+        User tenant = user("9822200042", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+        confirm(tenant, pendingId(p));
+        LocalDate on = AvailableOn.today().plusDays(20);
+
+        mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"availableOn\":\"" + on + "\"}"))
+                .andExpect(status().isOk());
+
+        em.clear();
+        assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
+        assertThat(tenancies.findByPropertyId(p.getId())).singleElement().satisfies(t -> {
+            assertThat(t.getStatus()).isEqualTo(TenancyStatuses.ENDED);
+            assertThat(t.getEndDate()).isEqualTo(on.minusDays(1));
+        });
+        assertThat(properties.findById(p.getId()).orElseThrow().getAvailableOn()).isEqualTo(on);
+    }
+
+    @Test
+    void reopeningARentDeal_withATodayDate_endsTheTenancyToday() throws Exception {
+        User owner = user("9822200043", "owner");
+        User tenant = user("9822200044", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+        confirm(tenant, pendingId(p));
+
+        mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"availableOn\":\"" + AvailableOn.today() + "\"}"))
+                .andExpect(status().isOk());
+
+        em.clear();
+        assertThat(tenancies.findByPropertyId(p.getId())).singleElement()
+                .satisfies(t -> assertThat(t.getEndDate()).isEqualTo(AvailableOn.today()));
+    }
+
+    @Test
+    void reopeningADeal_withAPastDate_isRefused() throws Exception {
+        User owner = user("9822200045", "owner");
+        User tenant = user("9822200046", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+
+        mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"availableOn\":\"" + AvailableOn.today().minusDays(1) + "\"}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void reopeningARentDeal_beyondAYear_isRefused() throws Exception {
+        User owner = user("9822200047", "owner");
+        User tenant = user("9822200048", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+
+        mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"availableOn\":\"" + AvailableOn.today().plusDays(366) + "\"}"))
+                .andExpect(status().isUnprocessableEntity());
     }
 
     @Test

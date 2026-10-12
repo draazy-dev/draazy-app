@@ -4,6 +4,7 @@ import {
 } from './constants.js';
 import { ADDRESS_PARTS } from '../../../lib/listingFormDetails.js';
 import { hasContactDetails } from './contactDetails.js';
+import { addDaysIso, istToday, MAX_AVAILABLE_DAYS, MAX_POSSESSION_DAYS } from '../../../lib/availability.js';
 import { YOUTUBE_ID_RE, normalizeYouTubeId } from './video.js';
 
 const hasText = (v) => typeof v === 'string' && v.trim().length > 0;
@@ -144,6 +145,7 @@ export const validateLocationStep = (form, original) => {
   }
   return validated;
 };
+const outOfRange = (iso, maxDays) => !!iso && (iso < istToday() || iso > addDaysIso(istToday(), maxDays));
 export const validatePricingStep = (form, original) => {
   const err = {};
   const land = isLandType(form.propertyType);
@@ -153,13 +155,13 @@ export const validatePricingStep = (form, original) => {
     else if (rent < MONTHLY_RENT_MIN) err.monthlyRent = 'min';
     if (!isNonNegative(form.deposit)) err.deposit = true;
     else if (Number(form.deposit) > rent * DEPOSIT_RENT_MULTIPLE_MAX) err.deposit = 'max';
-    if (!form.availableFrom) err.availableFrom = true;
+    if (!form.availableFrom || outOfRange(form.availableFrom, MAX_AVAILABLE_DAYS)) err.availableFrom = true;
   } else {
     const price = Number(form.price);
     if (!isPositive(form.price)) err.price = true;
     else if (price < SALE_PRICE_MIN) err.price = 'min';
     if (!land && !form.construction) err.possession = true;
-    if (isPreCompletion(form) && !form.availableFrom) err.availableFrom = true;
+    if (isPreCompletion(form) && (!form.availableFrom || outOfRange(form.availableFrom, MAX_POSSESSION_DAYS))) err.availableFrom = true;
     if (!form.ownership) err.ownership = true;
     if (isPlotSale(form) && !hasText(form.plottedProject)) err.plottedProject = true;
     if (hasText(form.reraId) && !RERA_ID.test(form.reraId)) err.reraId = 'format';

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import BadgeRequestCard from './BadgeRequestCard.jsx';
+import AgreementPerks from './AgreementPerks.jsx';
 import PropertyImage from '../ui/PropertyImage.jsx';
 import Select from '../ui/Select.jsx';
 import Tip from '../ui/Tip.jsx';
@@ -180,7 +181,7 @@ const pill = (cls, children) => <span className={'text-[10px] px-2 py-0.5 rounde
 /* Shared renderer for a list of rent agreements, used by both the tenant "Personal" vault and the owner per-property
    vault so the two can never drift apart. */
 
-function AgreementList({ ras, emptyText }) {
+function AgreementList({ ras, emptyText, ownerView = false }) {
   const { t } = useTranslation();
   if (!ras.length) {
     return (
@@ -193,10 +194,13 @@ function AgreementList({ ras, emptyText }) {
   return (
     <div className="space-y-2">
       {ras.map((ra, i) => (
-        <div key={ra.id || i} className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-          <div className="w-9 h-9 rounded-lg bg-teal-400/15 flex items-center justify-center flex-shrink-0"><Icon name="file-text" className="w-4 h-4 text-teal-400" /></div>
-          <div className="flex-1 min-w-0"><p className="text-white text-sm font-medium truncate">{ra.property || ra.title || t('dash.agreementFallback')}</p><p className="text-gray-500 text-[11px] truncate">{ra.tenant || t('dash.tenantFallback')} · {ra.date || 'N/A'}</p></div>
-          <button className="text-[10px] px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 font-semibold hover:bg-white/10 flex-shrink-0">{t('dash.download')}</button>
+        <div key={ra.id || i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+          <div className="flex items-center gap-4">
+            <div className="w-9 h-9 rounded-lg bg-teal-400/15 flex items-center justify-center flex-shrink-0"><Icon name="file-text" className="w-4 h-4 text-teal-400" /></div>
+            <div className="flex-1 min-w-0"><p className="text-white text-sm font-medium truncate">{ra.property || ra.title || t('dash.agreementFallback')}</p><p className="text-gray-500 text-[11px] truncate">{ra.tenant || t('dash.tenantFallback')} · {ra.date || 'N/A'}</p></div>
+            <button className="text-[10px] px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 font-semibold hover:bg-white/10 flex-shrink-0">{t('dash.download')}</button>
+          </div>
+          <AgreementPerks ra={ra} isOwner={ownerView} />
         </div>
       ))}
     </div>
@@ -479,7 +483,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
             sub={selectedListing ? t('dash.agreementForProp', { title: selectedListing.title }) : t('dash.agreementForThis')}
             badge={propAgreements.length ? pill('bg-teal-500/15 text-teal-300', String(propAgreements.length)) : null}
             open={!!openSections.ownerAgreements} onToggle={toggle}>
-            <AgreementList ras={propAgreements} emptyText={t('dash.noAgreementProp')} />
+            <AgreementList ras={propAgreements} ownerView emptyText={t('dash.noAgreementProp')} />
           </PanelCard>
           {/* The loan checklist is derived from the vault, so it only means anything once the vault is read — hiding
              it while loading/errored avoids a confident, wrong progress count. */}

@@ -20,11 +20,9 @@ export const getGeo = async () => (await provider()).getGeo();
 
 /** What a healthy install charges, and the answer when the server cannot be reached. */
 export const PRICING_DEFAULTS = Object.freeze({
-  ownerPlanYearly: 999,
-  ownerProYearly: 2499,
-  rentAgreementPlatform: 500,
-  seekerPlusTopup: 199,
-  gstPercent: 18,
+  listingPass: 999,
+  contactPack: 199,
+  rentAgreementPlatform: 499,
 });
 
 /** The `pricing` section of `GET /bootstrap`. */

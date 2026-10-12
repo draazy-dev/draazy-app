@@ -1,6 +1,7 @@
 package com.draazy.api.documents.agreement;
 
 import jakarta.persistence.LockModeType;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -50,4 +51,15 @@ public interface RentAgreementRepository extends JpaRepository<RentAgreement, UU
               and a.verifiedBy is not null
             """)
     boolean hasRegisteredTenancy(@Param("propertyId") UUID propertyId, @Param("mobile") String mobile);
+
+    /** Terms ending within the window and not yet reminded; the end is the term's last day, as {@code endDate()}. */
+    @Query(value = """
+            select * from rent_agreements
+            where status in ('registered', 'active')
+              and start_date is not null and duration_months is not null
+              and renewal_reminded_at is null
+              and (start_date + duration_months * interval '1 month')::date - 1 between :from and :to
+            order by created_at
+            """, nativeQuery = true)
+    List<RentAgreement> findEndingBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 }

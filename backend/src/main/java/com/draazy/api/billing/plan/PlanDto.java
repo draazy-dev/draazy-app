@@ -9,6 +9,8 @@ public record PlanDto(
         String audience,
         long price,
         String billingCycle,
+        Integer termDays,
+        String kind,
         Integer listingLimit,
         Integer contactLimit,
         List<String> features) {

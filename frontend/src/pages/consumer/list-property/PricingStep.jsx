@@ -3,6 +3,8 @@ import { ArrowLeft, ArrowRight, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Select from '../../../components/ui/Select';
 import DateField from '../../../components/ui/DateField';
+import AvailabilityField from '../../../components/ui/AvailabilityField.jsx';
+import { addDaysIso, istToday, MAX_POSSESSION_DAYS } from '../../../lib/availability.js';
 import { Pill, Toggle, FieldError } from './controls.jsx';
 import StepHeader from './StepHeader.jsx';
 import { fld, lbl, lbl3 } from './styles.js';
@@ -161,7 +163,7 @@ const PricingStep = ({
                 <FieldError show={!!errors.possession}>{t('listProperty.err.possession')}</FieldError>
                 {preCompletion && (
                   <>
-                    <DateField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} min={todayIso()} dataErr="availableFrom" ariaLabel={t('listProperty.aria.availableFrom')} invalid={!!errors.availableFrom} className={`${fld} mt-2.5`} />
+                    <DateField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} min={istToday()} max={addDaysIso(istToday(), MAX_POSSESSION_DAYS)} dataErr="availableFrom" ariaLabel={t('listProperty.aria.availableFrom')} invalid={!!errors.availableFrom} className={` mt-2.5`} />
                     <FieldError show={!!errors.availableFrom}>{t('listProperty.err.availableFromDate')}</FieldError>
                   </>
                 )}
@@ -279,7 +281,7 @@ const PricingStep = ({
             )}
             <div>
               <label className={lbl3}>{t('listProperty.fields.availableFrom')}</label>
-              <DateField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} min={todayIso()} dataErr="availableFrom" ariaLabel={t('listProperty.aria.availableFrom')} invalid={!!errors.availableFrom} className={fld} />
+              <AvailabilityField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} dataErr="availableFrom" ariaLabel={t('listProperty.aria.availableFrom')} invalid={!!errors.availableFrom} className={fld} />
               <FieldError show={!!errors.availableFrom}>{t('listProperty.err.availableFromDate')}</FieldError>
             </div>
           </div>
@@ -313,7 +315,7 @@ const PricingStep = ({
               )}
             </div>
 
-            {/* Two columns on a phone: lock-in and notice are read against each other, so stacking them hides the deal. */}
+            {/* Two columns on a phone: lock-in and notice are read against each other. */}
             <div id="lp-rental-terms-fields" className={`mt-3 grid-cols-2 sm:grid-cols-3 gap-4 ${showTerms ? 'grid' : 'hidden'}`}>
               <div className="col-span-2 sm:col-span-1">
                 <label className={lbl}>{t('listProperty.fields.agreementDuration')}</label>

@@ -11,13 +11,13 @@ const TERMS = { startDate: '', months: '11', rent: '20000', deposit: '100000', n
 
 const rupees = (text) => Number(String(text).replace(/[^\d]/g, ''));
 
-test('a free rent agreement from referrals strikes the Draazy fee and GST but keeps government charges', async ({ page }) => {
+test('a free rent agreement from referrals strikes the Draazy fee but keeps government charges', async ({ page }) => {
   let remaining = 0;
   await page.route('**/api/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(BUYER) }));
   await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ accessToken: 'e2e-nobackend-token' }) }));
   await page.route('**/api/fees', (route) => route.fulfill({
     status: 200, contentType: 'application/json',
-    body: JSON.stringify([{ deal: 'rent', brokerage: 0, platformFee: 1999, stampDuty: null, registration: null, gst: 360, notes: null }]),
+    body: JSON.stringify([{ deal: 'rent', brokerage: 0, platformFee: 499, stampDuty: null, registration: null, gst: 0, notes: null }]),
   }));
   await page.route('**/api/me/entitlements', (route) => route.fulfill({
     status: 200, contentType: 'application/json',
@@ -45,8 +45,8 @@ test('a free rent agreement from referrals strikes the Draazy fee and GST but ke
 
   remaining = 1;
   await page.reload({ waitUntil: 'networkidle' });
-  await expect(waiver).toContainText('₹2,359');
+  await expect(waiver).toContainText('₹499');
   await expect(fee.locator('span').last(), 'the Draazy fee is struck through, not hidden').toHaveClass(/line-through/);
   await expect.poll(async () => rupees(await total.locator('span').last().textContent()),
-    'only the Draazy fee and its GST come off').toBe(fullTotal - 2359);
+    'only the Draazy fee comes off; its GST is already inside it').toBe(fullTotal - 499);
 });

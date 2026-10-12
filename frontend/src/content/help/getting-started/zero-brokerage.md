@@ -15,25 +15,24 @@ Zero brokerage means exactly one thing: **Draazy never takes a percentage of you
 ## What is always free
 
 - Browsing and searching every listing
-- Sending owner contact requests and chatting after the owner approves (the free allowance is 15 owner contacts; Seeker Plus removes the cap)
+- Sending owner contact requests and chatting after the owner approves (the free allowance is 15 owner contacts; a Contact Pack adds 15 more for ₹199)
 - Shortlisting, comparing and saving searches
 - Scheduling a site visit
-- Posting a basic property listing as an owner
+- Posting one live property listing at a time as an owner
 - Pausing, resuming and editing your own listing
 - Raising a support ticket
-- Home-loan eligibility check and advice (no advisory fee)
+- Home-loan eligibility check and advice
 
 ## What is paid, and why
 
-We charge for optional things that cost us real money to deliver:
+We charge for optional things that cost us real money to deliver. None renews by itself:
 
-| What | Who buys it | Roughly |
+| What | Who buys it | Price |
 | --- | --- | --- |
-| More live listings and featured placement | Owners | Plan-based |
-| Unlimited owner contacts and saved-search priority | Seekers | Plan-based |
-| Rent agreement with e-stamp and delivery | Either party | Fee plus statutory charges |
+| Listing Pass — one extra live listing for 60 days | Owners | ₹999 |
+| Contact Pack — 15 owner contacts for 30 days | Seekers | ₹199 |
+| Rent agreement with e-stamp and delivery | Either party | ₹499 plus government charges |
 | Packers & movers, interiors, valuation | Movers | Quote-based |
-| Legal title verification | Buyers | Quote-based |
 
 The price you pay is shown on the plan or service checkout, and the detail is in [Plans explained](/help/a/plans-explained).
 

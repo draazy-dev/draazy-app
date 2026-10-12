@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { LISTING_PASS_PLAN, newListing } from '../../../helpers/monetisation.js';
 
 /* One open unpaid order per user (subscriptions) or per user and type (service requests).
    The mock gateway never settles, so the first order stays open for the whole test. */
@@ -21,28 +22,28 @@ const rentAgreement = () => ({
   details: { ownerName: 'Anita Verma', property: 'B-1204, Skyline Heights', rent: '30000', deposit: '150000', _state: { prop: { gramPanchayat: false } } },
 });
 
-async function paidPlanIds() {
+async function packPlanId() {
   const { plans } = await (await fetch(`${API}/bootstrap`)).json();
-  return plans.filter((p) => p.price > 0).map((p) => p.id);
+  return plans.find((p) => p.price > 0 && p.contactLimit > 0).id;
 }
 
-test('a second subscription order is refused while the first is unpaid, and the message says so', async () => {
-  const token = await freshToken();
-  const [first, second] = await paidPlanIds();
-  expect(second, 'the catalogue needs two paid plans').toBeTruthy();
+test('a second order, of any product, is refused while the first is unpaid, and the message says so', async () => {
+  const mobile = uniqueMobile();
+  const token = (await apiLogin(mobile, { api: API })).accessToken;
+  const listing = await newListing(mobile, { title: 'Order cap probe' });
 
-  const opened = await post(token, '/me/subscription', { planId: first });
+  const opened = await post(token, '/me/subscription', { planId: await packPlanId() });
   expect(opened.status, await opened.clone().text()).toBe(201);
   expect((await opened.json()).status).toBe('pending');
 
-  const refused = await post(token, '/me/subscription', { planId: second });
+  const refused = await post(token, '/me/subscription', { planId: LISTING_PASS_PLAN, propertyId: listing.id });
   expect(refused.status).toBe(409);
   expect((await refused.json()).message).toMatch(/already have a subscription order waiting for payment/i);
 });
 
 test('two simultaneous subscription orders open exactly one', async () => {
   const token = await freshToken();
-  const [plan] = await paidPlanIds();
+  const plan = await packPlanId();
 
   const results = await Promise.all([post(token, '/me/subscription', { planId: plan }), post(token, '/me/subscription', { planId: plan })]);
   expect(results.map((r) => r.status).sort()).toEqual([201, 409]);
@@ -58,7 +59,7 @@ test('two simultaneous requests for the same priced desk open exactly one', asyn
 });
 
 test('the cap is per user: another account can open its own order at the same time', async () => {
-  const [plan] = await paidPlanIds();
+  const plan = await packPlanId();
   const [a, b] = [await freshToken(), await freshToken()];
 
   expect((await post(a, '/me/subscription', { planId: plan })).status).toBe(201);

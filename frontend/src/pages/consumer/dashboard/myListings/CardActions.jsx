@@ -20,16 +20,19 @@ function Action({ it }) {
   return <button type="button" onClick={it.onClick} disabled={it.disabled} className={cls}>{body}</button>;
 }
 
+function PrimaryAction({ primary }) {
+  const cls = PRIMARY + (PRIMARY_TONE[primary.tone] || PRIMARY_TONE.teal);
+  const body = <><Icon name={primary.icon} className="w-3.5 h-3.5" /> {primary.label}</>;
+  if (primary.to) return <Link to={primary.to} className={cls}>{body}</Link>;
+  return <button type="button" onClick={primary.onClick} className={cls}>{body}</button>;
+}
+
 export default function CardActions({ primary, items }) {
   const actions = items.filter(Boolean);
   if (!primary && actions.length === 0) return null;
   return (
     <div className="flex flex-col gap-1.5 p-3 border-t border-white/6 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:px-4">
-      {primary && (
-        <button type="button" onClick={primary.onClick} className={PRIMARY + (PRIMARY_TONE[primary.tone] || PRIMARY_TONE.teal)}>
-          <Icon name={primary.icon} className="w-3.5 h-3.5" /> {primary.label}
-        </button>
-      )}
+      {primary && <PrimaryAction primary={primary} />}
       <div className="grid grid-cols-3 gap-1.5 sm:contents">
         {actions.map((it) => <Action key={it.label} it={it} />)}
       </div>

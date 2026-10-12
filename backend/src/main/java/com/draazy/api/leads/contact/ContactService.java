@@ -112,14 +112,11 @@ public class ContactService {
     }
 
     private void requireContactAllowance(UUID viewerId) {
-        OptionalInt allowance = allowances.contactAllowance(viewerId);
-        if (allowance.isEmpty()) {
-            return;
-        }
-        if (contactRequests.countByRequesterId(viewerId) >= allowance.getAsInt()) {
+        OptionalInt remaining = allowances.contactsRemaining(viewerId);
+        if (remaining.isPresent() && remaining.getAsInt() <= 0) {
             throw new ContactQuotaExhaustedException(
-                    "You have used all " + allowance.getAsInt() + " of your owner contacts. "
-                            + "Subscribe for unlimited contacts, or refer a friend to earn more.");
+                    "You have used all your owner contacts. "
+                            + "Buy a contact pack, or refer a friend to earn more.");
         }
     }
 

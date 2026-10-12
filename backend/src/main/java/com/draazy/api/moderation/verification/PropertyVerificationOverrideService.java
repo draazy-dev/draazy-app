@@ -9,7 +9,6 @@ import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
-import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.moderation.signal.ListingSignalService;
 import com.draazy.api.security.AuthPrincipal;
@@ -30,13 +29,12 @@ public class PropertyVerificationOverrideService {
     private final PropertyLifecycle lifecycle;
     private final ListingSignalService signals;
     private final AuditService audit;
-    private final Notifier notifier;
     private final PropertyVerificationService verification;
 
     public PropertyVerificationOverrideService(PropertyRepository properties, VerificationCases cases,
             PropertyReviewRepository reviews, PropertyOverrideRequestRepository overrideRequests,
             PropertyLifecycle lifecycle, ListingSignalService signals, AuditService audit,
-            Notifier notifier, PropertyVerificationService verification) {
+            PropertyVerificationService verification) {
         this.properties = properties;
         this.cases = cases;
         this.reviews = reviews;
@@ -44,7 +42,6 @@ public class PropertyVerificationOverrideService {
         this.lifecycle = lifecycle;
         this.signals = signals;
         this.audit = audit;
-        this.notifier = notifier;
         this.verification = verification;
     }
 
@@ -116,9 +113,7 @@ public class PropertyVerificationOverrideService {
                 "decision", PropertyOverrideRequest.APPROVE, "note", note, "reasonCode", null,
                 "checklist", checklistSnapshot(review),
                 "owner", String.valueOf(property.getOwner().getId()));
-        notifier.notify(property.getOwner().getId(), "listing.approved",
-                "Your listing is approved", "It is now live and visible to buyers.",
-                "/property/" + property.getId());
+        lifecycle.announceApproval(property);
     }
 
     private void reopenFinalReject(AuthPrincipal actor, Property property) {

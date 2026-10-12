@@ -48,7 +48,7 @@ A viewer without `settings:write` can open **Settings** but cannot save. The sys
 | **General** | Site name, Legal name, Tagline, Support email, Support phone, WhatsApp, Support hours, Address, GST number | **Save details** |
 | **General** | **Max photos per listing** (3 to 20) | **Save photo limit** |
 | **General** | **Max flatmate groups per person** (1 to 10) | **Save group limit** |
-| **Fees** | Plan prices, rent agreement fee, GST percent, free contact limit and referral numbers | **Save fees** |
+| **Fees** | Listing Pass, Contact Pack, rent agreement fee, GST percent, free contact limit and referral numbers | **Save fees** |
 | **Fees** | **Move-in Pack**: a **Live** / **Coming soon** switch and six service prices | **Save Move-in Pack** |
 | **Maps** | **Restrict Places to the selected city**; per-city live switch, centre and bounds; blacklist | **Save** (with the city name) **coverage**, **Reset to default**, **Add** |
 | **Feature flags** | **Application** and **Admin Modules** switches | Each switch asks you to confirm |

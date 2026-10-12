@@ -369,7 +369,7 @@ test.describe('Mobile-only rules do not leak to desktop', () => {
   });
 
   test('the wizard step actions are not sticky on desktop', async ({ page, login }) => {
-    // Use a new signed-in owner so auth and paywall gates do not intercept the page.
+    // A new signed-in owner keeps the page free of the seeded owner's four-listing history.
     await login.asNewOwner();
     await page.goto('/list-property');
     const actions = page.locator('.lp-step-actions').first();

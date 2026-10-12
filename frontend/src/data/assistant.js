@@ -67,7 +67,7 @@ export const KB = [
     id: 'contact-gate',
     keywords: ['contact', 'owner', 'call', 'number', 'phone', 'details', 'request', 'reveal', 'reach', 'message', 'connect', 'masked', 'limit'],
     q: 'How do I contact an owner?',
-    a: "Open a property and tap Contact Owner (or Request number) — you only need to be signed in with your mobile number. That sends the owner a contact request; your number stays private. Once they accept, you can chat in Messages and you see their number, unless the owner keeps it private. A request with no answer lapses after 30 days. A free account includes 15 owner contacts for life (asking again on the same home is free); referring friends or Seeker Plus gets you more. A few owners only accept people with the Verified badge.",
+    a: "Open a property and tap Contact Owner (or Request number) — you only need to be signed in with your mobile number. That sends the owner a contact request; your number stays private. Once they accept, you can chat in Messages and you see their number, unless the owner keeps it private. A request with no answer lapses after 30 days. A free account includes 15 owner contacts, usable within 30 days of your first (asking again on the same home is free); referring friends or a Contact Pack gets you more. A few owners only accept people with the Verified badge.",
     actions: [
       { label: 'Browse listings', to: '/listings', icon: 'search' },
       { label: 'My messages', to: '/messages', icon: 'message-circle' },
@@ -122,9 +122,9 @@ export const KB = [
   },
   {
     id: 'plans',
-    keywords: ['plan', 'plans', 'price', 'pricing', 'paid', 'premium', 'featured', 'subscription', 'cost', 'upgrade', 'package', 'seeker', 'plus'],
-    q: 'What do the paid plans include?',
-    a: "Starting is free: 1 listing for owners and 15 owner contacts for home-seekers. Seeker Plus removes the contact limit for 1 month on one payment and does not renew by itself. Owner Plus and Owner Pro add more listings, featured placement so your home shows higher, and unlimited contacts. Compare current prices on the Plans page.",
+    keywords: ['plan', 'plans', 'price', 'pricing', 'paid', 'premium', 'subscription', 'cost', 'upgrade', 'package', 'contact pack', 'pass'],
+    q: 'What costs money on Draazy?',
+    a: "Only three things: a Contact Pack (15 owner contacts for 30 days), a Listing Pass for each extra live listing beyond your one free listing (60 days), and a rent agreement. None renews by itself. Everything else, including enquiries, the verified badge and flatmate posts, is free. Compare current prices on the Plans page.",
     actions: [{ label: 'View Plans', to: '/plans', icon: 'badge-check' }],
   },
   {
@@ -142,7 +142,7 @@ export const KB = [
     id: 'rent-agreement',
     keywords: ['rent', 'agreement', 'lease', 'e-stamp', 'stamp', 'registration', 'register', 'legal', 'draft', 'notarise', 'contract', 'leave', 'licence', 'license', 'biometric'],
     q: 'Can you help with a rent agreement?',
-    a: "Yes, for residential homes. Fill one guided form for a Maharashtra Leave & Licence agreement — or invite your tenant to fill their half. You see the stamp duty, registration and our ₹500 + GST fee before you pay; our team drafts it, every party approves the draft, and we register it with a biometric visit at your door, no office trip. Track every step online. This is document help, not legal advice.",
+    a: "Yes, for residential homes. Fill one guided form for a Maharashtra Leave & Licence agreement — or invite your tenant to fill their half. You see the stamp duty, registration and our ₹499 fee plus government charges before you pay; our team drafts it, every party approves the draft, and we register it with a biometric visit at your door, no office trip. Track every step online. This is document help, not legal advice.",
     actions: [{ label: 'Rent agreement', to: '/services/rent-agreement', icon: 'file-signature' }],
   },
   {
@@ -217,7 +217,7 @@ export const KB = [
     id: 'refer',
     keywords: ['refer', 'referral', 'invite', 'friend', 'reward', 'earn', 'bonus'],
     q: 'Is there a referral programme?',
-    a: "Yes — share your link from the Refer page. A referral counts once your friend qualifies — for an owner, when their first listing is verified. Each qualified friend earns you 15 extra owner contacts, and every 3 also earn a free rent agreement (we waive our fee and GST at checkout; government charges still apply) and an extra listing slot. Up to 10 referrals can qualify in 30 days. Rewards are non-cash.",
+    a: "Yes — share your link from the Refer page. A referral counts once your friend qualifies — for an owner, when their first listing is verified. Each qualified friend earns you 15 extra owner contacts, and every 3 also earn a free rent agreement (we waive our fee at checkout; government charges still apply) and an extra listing slot. Up to 10 referrals can qualify in 30 days. Rewards are non-cash.",
     actions: [{ label: 'Refer & earn', to: '/refer', icon: 'gift' }],
   },
   {

@@ -22,8 +22,8 @@ public class PlatformSettings {
     /** The seeded key holding the feature-toggle block, the same one {@code GET /bootstrap} publishes. */
     static final String FLAGS_KEY = "flags";
 
-    /** Indian GST, as a percentage. Statutory, and 18% is the current rate for these services. */
-    private static final BigDecimal DEFAULT_GST_PERCENT = new BigDecimal("18");
+    /** Every Draazy price already includes GST, so nothing is added on top unless an admin sets a rate. */
+    private static final BigDecimal DEFAULT_GST_PERCENT = BigDecimal.ZERO;
 
     private static final BigDecimal MAX_PERCENT = new BigDecimal("100");
 
@@ -42,21 +42,19 @@ public class PlatformSettings {
 
     private static final long MAX_REFERRAL_QUALIFY_PER_MONTH = 1_000L;
 
-    // The four product prices and the listing feature fee, in whole rupees.
+    // The product prices, in whole rupees.
     // Defaults match a healthy install so broken rows fail instead of changing prices.
-    private static final long DEFAULT_OWNER_PLAN_YEARLY = 999L;
+    private static final long DEFAULT_LISTING_PASS = 999L;
 
-    private static final long DEFAULT_OWNER_PRO_YEARLY = 2_499L;
+    private static final long DEFAULT_CONTACT_PACK = 199L;
 
-    private static final long DEFAULT_RENT_AGREEMENT_PLATFORM = 500L;
-
-    private static final long DEFAULT_SEEKER_PLUS_TOPUP = 199L;
+    private static final long DEFAULT_RENT_AGREEMENT_PLATFORM = 499L;
 
     public static final int MAX_PRICE = 100_000;
 
     // An out-of-range price falls back to its default here, so the admin write must refuse one.
-    public static final List<String> PRICE_FIELDS = List.of("ownerPlanYearly", "ownerProYearly",
-            "rentAgreementPlatform", "seekerPlusTopup");
+    public static final List<String> PRICE_FIELDS = List.of("listingPass", "contactPack",
+            "rentAgreementPlatform");
 
     public static final String LISTINGS_KEY = "listings";
 
@@ -95,21 +93,17 @@ public class PlatformSettings {
                 .divide(MAX_PERCENT, 0, RoundingMode.HALF_UP).longValueExact();
     }
 
-    public long ownerPlanYearly() {
-        return wholeNumber(FEES_KEY, "ownerPlanYearly", DEFAULT_OWNER_PLAN_YEARLY, MAX_PRICE);
+    public long listingPass() {
+        return wholeNumber(FEES_KEY, "listingPass", DEFAULT_LISTING_PASS, MAX_PRICE);
     }
 
-    public long ownerProYearly() {
-        return wholeNumber(FEES_KEY, "ownerProYearly", DEFAULT_OWNER_PRO_YEARLY, MAX_PRICE);
+    public long contactPack() {
+        return wholeNumber(FEES_KEY, "contactPack", DEFAULT_CONTACT_PACK, MAX_PRICE);
     }
 
     public long rentAgreementPlatform() {
         return wholeNumber(FEES_KEY, "rentAgreementPlatform", DEFAULT_RENT_AGREEMENT_PLATFORM,
                 MAX_PRICE);
-    }
-
-    public long seekerPlusTopup() {
-        return wholeNumber(FEES_KEY, "seekerPlusTopup", DEFAULT_SEEKER_PLUS_TOPUP, MAX_PRICE);
     }
 
     public long freeContactLimit() {

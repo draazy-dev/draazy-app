@@ -1,4 +1,15 @@
 {
+  "availability": {
+    "now": "Available now",
+    "in15": "Available in 15 days",
+    "in30": "Available in 30 days",
+    "from": "Available from {{date}}",
+    "inDays_one": "in {{count}} day",
+    "inDays_other": "in {{count}} days",
+    "chip_now": "Available now",
+    "chip_in15": "In 15 days",
+    "chip_in30": "In 30 days"
+  },
   "common": {
     "myPostsAria": "Your posts",
     "myPostsViewAll": "View all ({{count}})",
@@ -63,8 +74,7 @@
     "saved": "Saved",
     "account": "Account",
     "primaryMobile": "Primary",
-    "breadcrumb": "Breadcrumb",
-    "postProperty": "Post Property"
+    "breadcrumb": "Breadcrumb"
   },
   "postChooser": {
     "title": "What do you want to post?",

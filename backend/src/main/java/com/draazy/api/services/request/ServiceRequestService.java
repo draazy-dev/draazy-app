@@ -18,6 +18,7 @@ import com.draazy.api.provider.PaymentGateway;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.Roles;
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -79,6 +80,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
     private final ServiceRequestDraftApprovals draftApprovals;
     private final AccountPermissions accountPermissions;
     private final RentAgreementOwnerSide ownerSide;
+    private final ServiceRequestAmountGuard amountGuard;
 
     private final TransactionTemplate transactions;
 
@@ -99,6 +101,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
             ServiceRequestDraftApprovals draftApprovals,
             AccountPermissions accountPermissions,
             RentAgreementOwnerSide ownerSide,
+            ServiceRequestAmountGuard amountGuard,
             PlatformTransactionManager transactionManager) {
         this.requests = requests;
         this.events = events;
@@ -117,6 +120,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
         this.draftApprovals = draftApprovals;
         this.accountPermissions = accountPermissions;
         this.ownerSide = ownerSide;
+        this.amountGuard = amountGuard;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -280,7 +284,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
 
     // Webhook handling is idempotent by status; unknown order ids belong to other payers.
     @Transactional
-    public boolean applyWebhookOutcome(String orderId, boolean paid, long providerAmount) {
+    public boolean applyWebhookOutcome(String orderId, boolean paid, BigDecimal providerAmount, String currency) {
         if (orderId == null || orderId.isBlank()) {
             return false;
         }
@@ -289,17 +293,13 @@ public class ServiceRequestService implements AbandonedCheckouts {
             return false;
         }
 
-        // Check amount before idempotence; conflicting redeliveries are worth logging.
-        Long billed = request.getAmount();
-        if (paid && providerAmount > 0 && billed != null && providerAmount != billed) {
-            log.error("Amount mismatch on service request {}: billed {} but provider charged {}",
-                    request.getId(), billed, providerAmount);
-        }
         if (request.getStatus() != ServiceRequestStatus.AWAITING_PAYMENT) {
             reportRefusedSettlement(request, paid);
             return true;
         }
-
+        if (paid && amountGuard.refuses(orderId, request.getId(), request.getAmount(), providerAmount, currency)) {
+            return true;
+        }
         if (paid) {
             transition(request, ServiceRequestStatus.NEW);
             record(request, "payment.received", null);
@@ -322,7 +322,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 || !paymentRef.startsWith("mock_order_")) {
             throw new ConflictException("Only an awaiting-payment mock checkout can be simulated.");
         }
-        applyWebhookOutcome(paymentRef, paid, request.getAmount() == null ? 0 : request.getAmount());
+        applyWebhookOutcome(paymentRef, paid, null, null);
         return mapper.toDto(request, caller);
     }
 

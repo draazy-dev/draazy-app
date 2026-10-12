@@ -31,6 +31,7 @@ export async function getFinanceOverview() {
         name: p.name,
         audience: p.audience,
         billingCycle: p.billingCycle,
+        termDays: p.termDays ?? null,
         price: rupees(p.price),
         active: count(p.active),
         monthlyValue: rupees(p.monthlyValue),

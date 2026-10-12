@@ -188,9 +188,7 @@ public class PropertyVerificationService {
 
     private void announce(Property property, String decision, String reasonCode, String note) {
         if ("approve".equals(decision)) {
-            notifier.notify(property.getOwner().getId(), "listing.approved",
-                    "Your listing is approved", "It is now live and visible to buyers.",
-                    "/property/" + property.getId());
+            lifecycle.announceApproval(property);
         } else if ("needs_info".equals(decision)) {
             notifier.notify(property.getOwner().getId(), "listing.needs_info", "Your listing needs info",
                     ReviewReasonCodes.ownerMessage(reasonCode, note), "/dashboard?review=" + property.getId());

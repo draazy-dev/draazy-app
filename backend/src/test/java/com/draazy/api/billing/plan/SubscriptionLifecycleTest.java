@@ -5,6 +5,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -21,24 +23,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/**
- * A paid plan stops working when the term ends — on the clock, not on the sweep (D57).
- *
- * <p><strong>What this is really guarding.</strong> The defect was that nothing ever aged a
- * subscription out, so a lapsed plan entitled its holder forever. The obvious fix — a scheduled job
- * — only shrinks that window to one tick, and a test that proved "the job expires rows" would pass
- * while an unpaid plan still worked for an hour. So the entitlement assertions here deliberately do
- * <em>not</em> run the sweep first: they prove the read path refuses a lapsed row on its own, and
- * the sweep is then proved separately to be honest bookkeeping on top.
- *
- * <p>Lives in {@code billing.plan} so it can build a {@link Subscription} through the
- * package-private constructor and set a term in the past directly. Going through the API and
- * backdating with SQL would test the same thing more slowly and less legibly.
- *
- * <p>The sweep's timer is off in the test run
- * ({@code draazy.billing.subscription-sweep.enabled=false}); {@link SubscriptionSweeper#expireLapsed}
- * is called here with an explicit instant instead, so nothing waits on a wall clock.
- */
+/** A paid plan stops working when its term ends, on the clock rather than the sweep; the sweep is proved separately. */
 @DisplayName("Subscription lifecycle — a term that ends, ends")
 class SubscriptionLifecycleTest extends AbstractApiTest {
 
@@ -53,6 +38,7 @@ class SubscriptionLifecycleTest extends AbstractApiTest {
     @Autowired SubscriptionRepository subscriptions;
 
     @Autowired PlanRepository plans;
+    @Autowired com.draazy.api.catalog.property.PropertyRepository properties;
     @Autowired SubscriptionSweeper sweeper;
 
     private User subscriber(String mobile) {
@@ -69,7 +55,7 @@ class SubscriptionLifecycleTest extends AbstractApiTest {
         // here claiming a subscription was sold for something it never cost.
         long price = plans.findById(planId).orElseThrow().getPrice();
         return subscriptions.saveAndFlush(new Subscription(owner.getId(),
-                planId, status, price, startedAt, renewsAt, null, null));
+                planId, null, status, price, startedAt, renewsAt, null, null));
     }
 
     // ---- 1: the sweep ends what has run out, and only what has run out ----
@@ -117,6 +103,85 @@ class SubscriptionLifecycleTest extends AbstractApiTest {
         subscription(u, SubscriptionStatuses.ACTIVE, LAST_MONTH, NOW);
 
         assertThat(sweeper.expireLapsed(NOW)).isEqualTo(1);
+    }
+
+    // ---- 1b: a lapsed listing pass pauses the listing it covered, unless the free slot has room ----
+
+    private Property listing(User owner, String status) {
+        Property p = new Property(owner, "Pass flat", "rent", "apartment", 25000L, "Baner", "Pune");
+        p.setBhk(new java.math.BigDecimal("2"));
+        p.setPriceUnit("per-month");
+        p.setArea(new java.math.BigDecimal("900"));
+        p.setStatus(status);
+        return properties.saveAndFlush(p);
+    }
+
+    private void lapsedPass(User owner, Property covered) {
+        subscriptions.saveAndFlush(new Subscription(owner.getId(),
+                UUID.fromString("b1000000-0000-4000-8000-000000000005"), covered.getId(),
+                SubscriptionStatuses.ACTIVE, 999L, LAST_MONTH, NOW.minus(1, ChronoUnit.DAYS), null, null));
+    }
+
+    @Test
+    @DisplayName("a lapsed pass pauses its listing when another live listing holds the free slot")
+    void aLapsedPassPausesTheListingOverTheFreeTier() {
+        User u = subscriber("9876540011");
+        listing(u, PropertyStatus.APPROVED);
+        Property covered = listing(u, PropertyStatus.APPROVED);
+        lapsedPass(u, covered);
+
+        assertThat(sweeper.expireLapsed(NOW)).isEqualTo(1);
+
+        assertThat(properties.findById(covered.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.PAUSED);
+    }
+
+    @Test
+    @DisplayName("a lapsed pass leaves the listing live when it is the owner's only live one")
+    void aLapsedPassKeepsTheOnlyLiveListing() {
+        User u = subscriber("9876540012");
+        Property only = listing(u, PropertyStatus.APPROVED);
+        lapsedPass(u, only);
+
+        assertThat(sweeper.expireLapsed(NOW)).isEqualTo(1);
+
+        assertThat(properties.findById(only.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.APPROVED);
+    }
+
+    @Test
+    @DisplayName("a lapsed legacy plan keeps the oldest live listing and pauses the rest, except pass-covered ones")
+    void aLapsedPlanReappliesTheFreeTier() {
+        User u = subscriber("9876540013");
+        Property oldest = listing(u, PropertyStatus.APPROVED);
+        Property newer = listing(u, PropertyStatus.APPROVED);
+        Property covered = listing(u, PropertyStatus.APPROVED);
+        jdbc.update("update properties set created_at = now() - interval '5 days' where id = ?", oldest.getId());
+        subscriptions.saveAndFlush(new Subscription(u.getId(),
+                UUID.fromString("b1000000-0000-4000-8000-000000000005"), covered.getId(),
+                SubscriptionStatuses.ACTIVE, 999L, NOW, NEXT_MONTH, null, null));
+        subscription(u, SubscriptionStatuses.ACTIVE, LAST_MONTH, NOW.minus(1, ChronoUnit.DAYS));
+
+        assertThat(sweeper.expireLapsed(NOW)).isEqualTo(1);
+        properties.flush();
+        jdbc.query("select id, status from properties where owner_id = ?", rs -> {
+            String expected = rs.getString("id").equals(newer.getId().toString())
+                    ? PropertyStatus.PAUSED : PropertyStatus.APPROVED;
+            assertThat(rs.getString("status")).isEqualTo(expected);
+        }, u.getId());
+    }
+
+    @Test
+    @DisplayName("a lapsed legacy plan leaves an owner already within the free tier alone")
+    void aLapsedPlanKeepsAnOwnerWithinTheFreeTier() {
+        User u = subscriber("9876540014");
+        Property only = listing(u, PropertyStatus.APPROVED);
+        subscription(u, SubscriptionStatuses.ACTIVE, LAST_MONTH, NOW.minus(1, ChronoUnit.DAYS));
+
+        assertThat(sweeper.expireLapsed(NOW)).isEqualTo(1);
+
+        assertThat(properties.findById(only.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.APPROVED);
     }
 
     // ---- 2: entitlement is decided against the clock, not against the sweep ----

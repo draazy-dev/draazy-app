@@ -9,7 +9,6 @@ import { CompareProvider } from './context/CompareContext.jsx';
 import { SavedProvider } from './context/SavedContext.jsx';
 import { FollowProvider } from './context/FollowContext.jsx';
 import { SavedSearchProvider } from './context/SavedSearchContext.jsx';
-import { PlanProvider } from './context/PlanContext.jsx';
 import { VerificationProvider } from './context/VerificationContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { ConversationProvider } from './context/ConversationContext.jsx';
@@ -62,8 +61,6 @@ const app = (
             <SavedSearchProvider>
               {/* One follow-state request here prevents per-card requests. */}
               <FollowProvider>
-              {/* Plan is read during render by paywall and pricing surfaces. */}
-              <PlanProvider>
               {/* One verification request feeds badges across profile, dashboard and contact flows. */}
               <VerificationProvider>
               {/* The inbox is caller-scoped, so unread counts load on sign-in and zero on sign-out.
@@ -78,7 +75,6 @@ const app = (
                 </NotificationProvider>
               </ConversationProvider>
               </VerificationProvider>
-              </PlanProvider>
               </FollowProvider>
             </SavedSearchProvider>
           </SavedProvider>

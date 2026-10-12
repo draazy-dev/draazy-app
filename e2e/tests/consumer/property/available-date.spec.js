@@ -1,18 +1,12 @@
 import { ACTORS, expect, test } from '../../../fixtures/live.js';
 import { API, authHeaders, ownerIdOf, storedPhotoUrl, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../../../helpers/moderation.js';
+import { istInDays } from '../../../helpers/availability.js';
 
 const created = new Set();
 let seq = 0;
 
 const nextOwner = () => `${uniqueMobile().slice(0, -1)}${(seq++) % 10}`;
-
-const isoInDays = (days) => {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-};
 
 const monthYear = (iso) => {
   const [year, month, day] = iso.split('-').map(Number);
@@ -20,7 +14,7 @@ const monthYear = (iso) => {
     .format(new Date(year, month - 1, day));
 };
 
-async function publish(request, availableFrom) {
+async function publish(request, availableOn) {
   const headers = await authHeaders(nextOwner());
   const create = await request.post(`${API}/me/listings`, {
     headers,
@@ -35,11 +29,9 @@ async function publish(request, availableFrom) {
       areaUnit: 'sqm',
       landUse: 'residential',
       possession: 'under-construction',
+      availableOn,
       images: [storedPhotoUrl('', ownerIdOf(headers))],
-      formDetails: {
-        availableFrom,
-        plotZone: 'Residential',
-      },
+      formDetails: { plotZone: 'Residential' },
     },
   });
   expect(create.status(), await create.text()).toBe(201);
@@ -61,12 +53,12 @@ test.afterEach(async ({ request }) => {
 });
 
 test('a plot shows the real possession date and square metre unit', async ({ page, request }) => {
-  const availableFrom = isoInDays(90);
-  const id = await publish(request, availableFrom);
+  const availableOn = istInDays(90);
+  const id = await publish(request, availableOn);
 
   await page.goto(`/property/${id}`);
 
   const detail = (label) => page.locator('.detail-card', { hasText: label });
-  await expect(detail('Possession')).toContainText(`From ${monthYear(availableFrom)}`);
+  await expect(detail('Possession')).toContainText(`From ${monthYear(availableOn)}`);
   await expect(detail('Plot Area')).toContainText('450 sq.m.');
 });

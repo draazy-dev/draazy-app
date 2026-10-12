@@ -5,7 +5,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import com.draazy.api.billing.plan.TestPlanGrants;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
@@ -13,6 +12,8 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,8 +29,6 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
     UserRepository users;
     @Autowired
     PropertyRepository properties;
-    @Autowired
-    TestPlanGrants grants;
 
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
@@ -79,16 +78,19 @@ class PropertyModerationSummaryTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("featured counts the live listings of owners on a paid Owner plan (D292)")
-    void featuredFollowsThePaidPlan() throws Exception {
-        User free = user("9851000011", "owner");
-        User paying = user("9851000012", "owner");
-        grants.grant(paying.getId(), TestPlanGrants.OWNER_PLUS);
+    @DisplayName("featured counts live listings whose ownership was verified in the last seven days")
+    void featuredFollowsRecentOwnershipVerification() throws Exception {
+        User owner = user("9851000011", "owner");
         User staff = user("9851000013", "staff");
         String before = summary(staff);
 
-        listing(free, "Summary free owner", PropertyStatus.APPROVED);
-        listing(paying, "Summary paying owner", PropertyStatus.APPROVED);
+        listing(owner, "Summary unverified", PropertyStatus.APPROVED);
+        Property fresh = listing(owner, "Summary fresh", PropertyStatus.APPROVED);
+        fresh.verifyOwnership(Instant.now(), null);
+        properties.saveAndFlush(fresh);
+        Property stale = listing(owner, "Summary stale", PropertyStatus.APPROVED);
+        stale.verifyOwnership(Instant.now().minus(8, ChronoUnit.DAYS), null);
+        properties.saveAndFlush(stale);
 
         moved(before, summary(staff), "featured", 1);
     }

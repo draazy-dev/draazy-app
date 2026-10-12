@@ -38,7 +38,7 @@ export function computeQualityScore(l) {
     // `ageYears` (`propertyMapper.js:334`). There is no `age` on the view model; the wizard writes
     // one and `toListingCreate` converts it away (`ageToYears`), so it never survives a round trip.
     if (l.ageYears != null) score += 5;
-    if (l.deposit || l.availableFrom) score += 5;
+    if (l.deposit || l.availableOn || l.availableFrom) score += 5;
   } else {
     if (l.furnishing && l.furnishing !== 'unfurnished') score += 4;
     else if (l.furnishing) score += 2;

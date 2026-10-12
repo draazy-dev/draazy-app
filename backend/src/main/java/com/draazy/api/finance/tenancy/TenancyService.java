@@ -107,9 +107,9 @@ public class TenancyService {
 
     // Pending is declined before active is ended: a confirm that lands between the two is still ended.
     @Transactional
-    public void endActiveTenancy(UUID propertyId) {
+    public void endActiveTenancy(UUID propertyId, LocalDate endDate) {
         tenancies.declinePendingByPropertyId(propertyId);
-        tenancies.endActiveByPropertyId(propertyId, LocalDate.now(PlatformTime.IST));
+        tenancies.endActiveByPropertyId(propertyId, endDate);
     }
     // Resolve participants in one query so this otherwise-simple read avoids N+1.
     private List<TenancyDto> project(List<Tenancy> rows) {

@@ -1,9 +1,8 @@
 -- Repeatable reference/config seed; keep statements idempotent and never add user data. A statutory
 -- charge is seeded only where it is a flat published figure, so a percentage stays NULL.
 INSERT INTO platform_fees (deal, brokerage, platform_fee, stamp_duty, registration, gst, notes) VALUES
-    ('rent', 0, 500, NULL,  NULL,  90, 'Zero brokerage; flat rent-agreement platform fee + 18% GST. Maharashtra stamp duty (0.25% of rent for the term + non-refundable deposit + 10% of the refundable deposit per year, rounded up to the next Rs 100, minimum Rs 100), registration (Rs 1,000 municipal / Rs 500 rural) and the Rs 300 document handling charge are statutory, computed per agreement from your terms, and collected on top.'),
-    ('buy',  0, 4999, NULL,  30000, 900, 'Zero brokerage; the platform fee and GST are ours, the rest is the state''s. Maharashtra stamp duty is a percentage (5-7% incl. cess) of the higher of agreement value and ready reckoner rate, so it is calculated on your property, not published here; registration is 1% capped at Rs 30,000.')
-ON CONFLICT (deal) DO UPDATE SET
+    ('rent', 0, 499, NULL,  NULL,  0, 'Zero brokerage; flat Rs 499 platform fee, GST included. Maharashtra stamp duty (0.25% of rent for the term + non-refundable deposit + 10% of the refundable deposit per year, rounded up to the next Rs 100, minimum Rs 100), registration (Rs 1,000 municipal / Rs 500 rural) and the Rs 300 document handling charge are statutory, computed per agreement from your terms, and     collected on top.')
+    ON CONFLICT (deal) DO UPDATE SET
     brokerage    = EXCLUDED.brokerage,
     platform_fee = EXCLUDED.platform_fee,
     stamp_duty   = EXCLUDED.stamp_duty,
@@ -14,11 +13,10 @@ ON CONFLICT (deal) DO UPDATE SET
 -- Admin settings seed: a re-run only adds missing keys (`||` keeps stored values), so repricing survives.
 INSERT INTO settings (key, value) VALUES
     ('fees', '{
-        "ownerPlanYearly": 999,
-        "ownerProYearly": 2499,
-        "rentAgreementPlatform": 500,
-        "seekerPlusTopup": 199,
-        "gstPercent": 18,
+        "listingPass": 999,
+        "contactPack": 199,
+        "rentAgreementPlatform": 499,
+        "gstPercent": 0,
         "freeContactLimit": 15,
         "referralContactBonus": 15,
         "referralQualifyPerMonth": 10
@@ -238,20 +236,27 @@ ON CONFLICT (id) DO UPDATE SET
     likes = EXCLUDED.likes, views = EXCLUDED.views, tag = EXCLUDED.tag;
 
 -- `price` is a fallback only: paid plans are priced from `settings('fees')` by `PlanMapper`.
-INSERT INTO plans (id, name, audience, price, billing_cycle, listing_limit, contact_limit, unlimited_contacts, features) VALUES
-    ('b1000000-0000-4000-8000-000000000001', 'Owner Free',  'owner',     0, 'yearly',    1, NULL, false,
+INSERT INTO plans (id, name, audience, price, billing_cycle, term_days, kind, active, listing_limit, contact_limit, unlimited_contacts, features) VALUES
+    ('b1000000-0000-4000-8000-000000000001', 'Owner Free',  'owner',     0, 'yearly',  NULL, 'plan', false,    1, NULL, false,
      '["1 live listing", "Verified owner badge", "Unlimited enquiries"]'::jsonb),
-    ('b1000000-0000-4000-8000-000000000002', 'Owner Plus',  'owner',   999, 'yearly',    2, NULL, true,
+    ('b1000000-0000-4000-8000-000000000002', 'Owner Plus',  'owner',   999, 'yearly',  NULL, 'plan', false,    2, NULL, true,
      '["2 live listings", "Featured placement on every listing", "Priority support"]'::jsonb),
-    ('b1000000-0000-4000-8000-000000000003', 'Owner Pro',   'owner',  2499, 'yearly',    5, NULL, true,
+    ('b1000000-0000-4000-8000-000000000003', 'Owner Pro',   'owner',  2499, 'yearly',  NULL, 'plan', false,    5, NULL, true,
      '["5 live listings", "Featured placement on every listing", "Rent agreement included", "Dedicated manager"]'::jsonb),
-    ('b1000000-0000-4000-8000-000000000004', 'Seeker Plus', 'tenant',  199, 'monthly', NULL, NULL, true,
-     '["Unlimited owner contacts", "Instant alerts", "Saved-search priority"]'::jsonb)
+    ('b1000000-0000-4000-8000-000000000004', 'Seeker Plus', 'tenant',  199, 'monthly', NULL, 'plan', false, NULL, NULL, true,
+     '["Unlimited owner contacts", "Instant alerts", "Saved-search priority"]'::jsonb),
+    ('b1000000-0000-4000-8000-000000000005', 'Listing Pass', 'owner',  999, NULL,        60, 'listing-pass', true, NULL, NULL, false,
+     '["1 extra live listing", "Live for 60 days", "No auto-renewal"]'::jsonb),
+    ('b1000000-0000-4000-8000-000000000006', 'Contact Pack', NULL,     199, NULL,        30, 'contact-pack', true, NULL, 15, false,
+     '["15 owner contacts", "Valid for 30 days", "No auto-renewal"]'::jsonb)
 ON CONFLICT (id) DO UPDATE SET
     name               = EXCLUDED.name,
     audience           = EXCLUDED.audience,
     price              = EXCLUDED.price,
     billing_cycle      = EXCLUDED.billing_cycle,
+    term_days          = EXCLUDED.term_days,
+    kind               = EXCLUDED.kind,
+    active             = EXCLUDED.active,
     listing_limit      = EXCLUDED.listing_limit,
     contact_limit      = EXCLUDED.contact_limit,
     unlimited_contacts = EXCLUDED.unlimited_contacts,

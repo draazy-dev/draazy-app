@@ -3,6 +3,7 @@ import { Pencil } from 'lucide-react';
 import { Block } from '../board.jsx';
 import LocalitySelect from '../../../../components/ui/LocalitySelect.jsx';
 import DateField from '../../../../components/ui/DateField.jsx';
+import AvailabilityField from '../../../../components/ui/AvailabilityField.jsx';
 
 const isoDate = (v) => (/^\d{4}-\d{2}-\d{2}/.test(v || '') ? v.slice(0, 10) : '');
 
@@ -78,10 +79,14 @@ export default function EditDetails({ detail, busy, onSave, onCancel }) {
           </div>
         </div>
         {form.moveIn !== null ? (
-        <label className="block text-xs text-gray-300">
+        <div className="block text-xs text-gray-300">
           {detail.room ? 'Available from' : 'Move-in by'}
-          <DateField value={form.moveIn} onChange={(moveIn) => setForm({ ...form, moveIn })} ariaLabel={detail.room ? 'Available from' : 'Move-in by'} className="dz-input mt-1 w-full" />
-        </label>
+          <div className="mt-1">
+            {detail.room
+              ? <AvailabilityField value={form.moveIn} onChange={(moveIn) => setForm({ ...form, moveIn })} ariaLabel="Available from" className="dz-input w-full" />
+              : <DateField value={form.moveIn} onChange={(moveIn) => setForm({ ...form, moveIn })} ariaLabel="Move-in by" className="dz-input w-full" />}
+          </div>
+        </div>
       ) : null}
       </div>
       {problem ? <p className="mt-2 text-xs text-amber-300" role="alert">{problem}</p> : null}

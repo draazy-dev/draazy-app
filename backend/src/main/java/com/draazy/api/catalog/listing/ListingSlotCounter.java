@@ -1,8 +1,8 @@
 package com.draazy.api.catalog.listing;
 
 import com.draazy.api.catalog.property.PropertyRepository;
-import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.trust.ListingSlotLookup;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +19,6 @@ class ListingSlotCounter implements ListingSlotLookup {
 
     @Override
     public long listingSlotsHeld(UUID userId) {
-        return properties.countOccupyingListingSlots(userId, PropertyStatus.OCCUPIES_LISTING_SLOT);
+        return properties.countLiveUncovered(userId, Instant.now());
     }
 }

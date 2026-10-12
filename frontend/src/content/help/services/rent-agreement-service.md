@@ -21,7 +21,7 @@ tags: [rent agreement, e-stamp, service, legal, co-fill]
 - Draft review, amendments and approval before registration
 - Registered copy upload and tracking after the Sub-Registrar step
 
-The Draazy service fee **plus GST** is shown in the cost breakdown before you pay, with Article 36A stamp duty, registration fee, the document handling charge and any other statutory charges itemised separately. Stamp duty is rounded up to the next ₹100.
+The Draazy service fee is shown in the cost breakdown before you pay, with Article 36A stamp duty, registration fee, the document handling charge and any other statutory charges itemised separately. Stamp duty is rounded up to the next ₹100.
 
 ## The process
 

@@ -52,6 +52,14 @@ const DEFAULT_GROUPS_PER_PERSON = 2;
 const MAX_GROUPS_CEILING = 10;
 
 const COUNT_FEES = new Set(['freeContactLimit', 'referralContactBonus', 'referralQualifyPerMonth']);
+const FEE_FIELDS = [
+  ['listingPass', 'Listing pass (60 days)'],
+  ['contactPack', 'Contact pack (15 contacts, 30 days)'],
+  ['rentAgreementPlatform', 'Rent agreement platform fee'],
+  ['freeContactLimit', 'Free owner contacts'],
+  ['referralContactBonus', 'Contacts per referral'],
+  ['referralQualifyPerMonth', 'Referral rewards per month'],
+];
 
 const saveError = (err) => (err?.status === 412
   ? 'Someone else changed these settings — reload to see their changes.'
@@ -216,8 +224,9 @@ export default function AdminSettings() {
   };
 
   const saveSite = () => persist({ site: settings.site }, 'Site details saved');
-  const saveFees = () => requireFilled('fees', Object.values(settings.fees))
-    && persist({ fees: settings.fees }, 'Fee schedule saved');
+  const feeFields = FEE_FIELDS.filter(([k]) => k in settings.fees);
+  const saveFees = () => requireFilled('fees', feeFields.map(([k]) => settings.fees[k]))
+    && persist({ fees: Object.fromEntries(feeFields.map(([k]) => [k, settings.fees[k]])) }, 'Fee schedule saved');
 
   const maxPhotos = settings.listings?.maxPhotos ?? DEFAULT_MAX_PHOTOS;
   const setMaxPhotos = (v) => setSettings((s) => ({ ...s, listings: { ...s.listings, maxPhotos: v === '' ? '' : Number(v) } }));
@@ -373,13 +382,12 @@ export default function AdminSettings() {
         <div className="max-w-xl space-y-5">
           <div className="dz-card p-5">
             <div className="space-y-3">
-              {Object.entries(settings.fees).map(([k, v]) => (
+              {feeFields.map(([k, label]) => (
                 <label key={k} className="flex items-center justify-between gap-4 text-sm">
-                  <span className="text-gray-300">{humanize(k)}</span>
+                  <span className="text-gray-300">{label}</span>
                   <div className="flex items-center gap-1">
-                    {!k.toLowerCase().includes('percent') && !COUNT_FEES.has(k) && <span className="text-gray-500">&#8377;</span>}
-                    <input type="number" value={v} onChange={(e) => setFee(k, e.target.value)} className="dz-input w-32 text-right" />
-                    {k.toLowerCase().includes('percent') && <span className="text-gray-500">%</span>}
+                    {!COUNT_FEES.has(k) && <span className="text-gray-500">&#8377;</span>}
+                    <input type="number" value={settings.fees[k]} onChange={(e) => setFee(k, e.target.value)} className="dz-input w-32 text-right" />
                   </div>
                 </label>
               ))}

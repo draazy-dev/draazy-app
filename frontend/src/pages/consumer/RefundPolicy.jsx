@@ -5,40 +5,35 @@ export default function RefundPolicy() {
   return (
     <LegalPage title="Refund Policy" lastUpdated="10 October 2026" current="refund-policy">
       <p>
-        This Refund Policy applies to all paid services and subscription plans purchased through draazy.com
-        ("<strong>Platform</strong>") operated by Draazy Technologies ("<strong>Draazy</strong>").
+        This Refund Policy applies to all paid services purchased through draazy.com
+        ("<strong>Platform</strong>") operated by Draazy Technologies ("<strong>Draazy</strong>"). Every purchase is
+        one-off: there are no subscriptions and nothing renews automatically.
       </p>
 
       <h2>1. Scope</h2>
       <p>This policy covers:</p>
       <ul>
-        <li>Premium listing plans (Owner Pro, Owner Plus).</li>
-        <li>Subscription packages (monthly and annual).</li>
-        <li>Pay-per-service charges for home loans, legal assistance, rent agreements, and other ancillary services.</li>
+        <li>Listing Passes (₹999, 60 days, one per extra live listing).</li>
+        <li>Contact Packs (₹199, 15 owner contacts, 30 days).</li>
+        <li>Pay-per-service charges for rent agreements and other ancillary services.</li>
       </ul>
       <p>
         Property transactions between buyers, tenants, and owners are direct contracts between those parties. Draazy
         is not liable for refunds related to rent deposits, token amounts, or property sale advances exchanged between users.
       </p>
 
-      <h2>2. Subscription refunds</h2>
+      <h2>2. Pass and pack refunds</h2>
       <h3>2.1 Within 7 days (cooling-off period)</h3>
       <p>
-        If you purchased a subscription plan and have not utilised any premium feature (e.g., featured listing, contact
-        reveal, verified badge display), you may request a full refund within 7 calendar days of purchase.
+        If you bought a Listing Pass or Contact Pack and have not used it (for a pass, the listing has not gone live
+        on it; for a pack, no contact has been used), you may request a full refund within 7 calendar days of purchase.
       </p>
 
       <h3>2.2 After 7 days</h3>
       <p>
-        Subscriptions are non-refundable after the 7-day cooling-off period. Plans do not renew automatically;
-        access continues until the end of the term you paid for.
-      </p>
-
-      <h3>2.3 Annual plans</h3>
-      <p>
-        Annual plans paid upfront may be refunded on a pro-rata basis (unused full months remaining) if requested within
-        30 days of purchase, provided fewer than 3 premium features have been consumed. After 30 days, annual plans
-        are non-refundable.
+        Passes and packs are non-refundable after the 7-day cooling-off period. Access continues until the end of the
+        term you paid for. A Listing Pass ends early if its listing is rented, sold or archived, with no refund for
+        the unused days.
       </p>
 
       <h2>3. Service request refunds</h2>
@@ -75,7 +70,7 @@ export default function RefundPolicy() {
 
       <h2>4. Non-refundable items</h2>
       <ul>
-        <li>Contact reveal credits once consumed (phone number or email viewed).</li>
+        <li>Contact Pack contacts once used (phone number or email viewed).</li>
         <li>Government fees, stamp duty, or registration charges paid on your behalf.</li>
         <li>Convenience or payment gateway charges.</li>
       </ul>

@@ -10,8 +10,6 @@ import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.trust.OutreachCounts;
 import com.draazy.api.common.trust.PrivateFieldVisibility;
 import com.draazy.api.identity.user.User;
-import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -113,7 +111,8 @@ public interface PropertyMapper {
     @Mapping(target = "noticePeriod", expression = "java(formDetailText(property, \"noticePeriod\"))")
     @Mapping(target = "foodPref", expression = "java(foodPref(property))")
     @Mapping(target = "bestTimeToCall", expression = "java(formDetailText(property, \"bestTimeToCall\"))")
-    @Mapping(target = "availableDate", expression = "java(formDetailIsoDate(property, \"availableFrom\"))")
+    @Mapping(target = "availableDate",
+            expression = "java(property.getAvailableOn() == null ? null : property.getAvailableOn().toString())")
     @Mapping(target = "furniture", expression = "java(formDetailStrings(property, \"furniture\"))")
     @Mapping(target = "commercial", expression = "java(toCommercial(property))")
     @Mapping(target = "land", expression = "java(toLand(property))")
@@ -142,7 +141,6 @@ public interface PropertyMapper {
     @Mapping(target = "carpetArea", source = "carpetArea")
     @Mapping(target = "builtUpArea", source = "builtUpArea")
     @Mapping(target = "superBuiltUpArea", source = "superBuiltUpArea")
-    @Mapping(target = "availableFrom", source = "availableFrom")
     @Mapping(target = "pets", source = "pets")
     @Mapping(target = "pincode", source = "pincode")
     @Mapping(target = "formDetails", source = "formDetails")
@@ -210,18 +208,6 @@ public interface PropertyMapper {
     default Boolean formDetailBoolean(Property property, String key) {
         Object value = formDetail(property, key);
         return value instanceof Boolean flag ? flag : null;
-    }
-
-    default String formDetailIsoDate(Property property, String key) {
-        String value = formDetailText(property, key);
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        try {
-            return LocalDate.parse(value).toString();
-        } catch (DateTimeParseException ex) {
-            return null;
-        }
     }
 
     default List<String> formDetailStrings(Property property, String key) {

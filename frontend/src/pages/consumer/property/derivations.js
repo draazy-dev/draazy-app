@@ -11,8 +11,8 @@ export const AMEN_LABEL = {
   power: 'Power Backup', garden: 'Landscaped Garden', club: 'Clubhouse', play: "Kids' Play Area",
 };
 
-/* A bucket, not a date, because a date on a listing nobody edits is wrong within a fortnight. */
-const AVAILABLE_FROM_KEY = { now: 'immediately', 15: 'within15Days', 30: 'within30Days' };
+import { availabilityLabel } from '../../../lib/availability.js';
+
 const AVAILABLE_DATE = new Intl.DateTimeFormat('en-IN', { month: 'short', year: 'numeric' });
 
 function isoDate(value) {
@@ -42,23 +42,7 @@ export function possessionDateLabel(tr, value) {
   return dateLabel(tr, value, 'readyToMove');
 }
 
-// Bounded, because a flatmate `availableFrom` — a real LocalDate — would otherwise mint one
-// permanent entry per distinct date.
-const WARN_CAP = 20;
-const warnedBuckets = new Set();
-export function availableLabel(tr, value, date) {
-  const dated = dateLabel(tr, date, 'immediately');
-  if (dated) return dated;
-  if (!value) return '\u2014';
-  if (!Object.hasOwn(AVAILABLE_FROM_KEY, value)) {
-    if (!warnedBuckets.has(value) && warnedBuckets.size < WARN_CAP) {
-      warnedBuckets.add(value);
-      console.warn(`[property] unmapped availableFrom bucket "${value}" — add it to AVAILABLE_FROM_KEY`);
-    }
-    return '\u2014';
-  }
-  return tr('property.' + AVAILABLE_FROM_KEY[value]);
-}
+export const availableLabel = (tr, p) => availabilityLabel(tr, p, { detail: true }) || '\u2014';
 
 const LAND_MATCHES = ['plot', 'land', 'farm'];
 const COMMERCIAL_MATCHES = ['office', 'shop', 'showroom', 'retail', 'mall', 'warehouse', 'godown', 'industrial', 'factory', 'co-working', 'coworking', 'commercial'];

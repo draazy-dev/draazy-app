@@ -357,25 +357,26 @@ test.describe('LIVE: subscription plans against the real API', () => {
   test.afterEach(() => {
     expect(errors.filter((e) => !IGNORE.test(e)), `failed API calls: ${apiFails.join(', ') || 'none'}`).toEqual([]);
   });
-  test('buying a paid plan leaves it pending, and the entitlement it gates stays shut', async ({ page }) => {
-    await signedInAs(page, CHATTER.mobile);
+  test('buying a pack leaves it pending, and the entitlement it gates stays shut', async ({ page }) => {
+    const mobile = await signedInAsNew(page);
 
     const posted = page.waitForResponse(
       (r) => /\/api\/me\/subscription$/.test(r.url()) && r.request().method() === 'POST',
       { timeout: 20000 },
     );
-    await page.goto('/checkout?plan=owner2');
+    await page.goto('/checkout?plan=contact-pack');
     await page.getByRole('button', { name: /Pay/i }).first().click();
 
     const res = await posted;
     expect(res.status()).toBe(201);
     const body = await res.json();
     expect(body.status).toBe('pending');
+    expect(body.planId).toBe('b1000000-0000-4000-8000-000000000006');
 
     await expect(page.getByText(/pending/i).first()).toBeVisible({ timeout: 15000 });
 
-    await page.goto('/dashboard#billing');
-    await expect(page.getByText(/Payment pending/i).first()).toBeVisible({ timeout: 20000 });
+    const held = await fetch(`${API}/me/entitlements`, { headers: await authHeaders(mobile) });
+    expect((await held.json()).contacts.packExpiresAt, 'nothing is held until the payment settles').toBeNull();
   });
 });
 

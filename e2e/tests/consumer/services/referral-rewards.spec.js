@@ -80,7 +80,8 @@ test.describe('the free-contact wall, on screen', () => {
     expect((await refused.json()).error).toBe('contact_quota_exhausted');
 
     await expect(exhaustedModal(page)).toBeVisible();
-    await expect(exhaustedModal(page).getByTestId('contacts-exhausted-plan')).toBeVisible();
+    await expect(exhaustedModal(page).getByTestId('contacts-exhausted-plan')).toHaveAttribute('href', /^\/checkout\?plan=contact-pack&next=/);
+    await expect(exhaustedModal(page).getByTestId('contacts-exhausted-plan')).toContainText('₹199');
     await expect(exhaustedModal(page).getByTestId('contacts-exhausted-refer')).toHaveAttribute('href', '/refer');
 
     /* The two sheets only stack below `lg`. On desktop the press comes from the sidebar card, which

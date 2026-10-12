@@ -63,7 +63,7 @@ The browser autosaves a draft under `dz_pob_draft_v2`. Use **Resume** to continu
 
 ## Duplicate and plan warnings
 
-The desk checks pending listings under the same mobile and shows an advisory warning. It also checks the owner's listing allowance. Staff-posted creation is exempt from the freemium ceiling, but overage is an owner-plan conversation before submission.
+The desk checks pending listings under the same mobile and shows an advisory warning. It also checks the owner's listing allowance. Staff-posted creation is exempt from the freemium ceiling, but overage is a Listing Pass conversation before submission.
 
 Do not ignore a pending-listing warning. Open **Admin → Properties** and confirm you are not recreating the same property.
 

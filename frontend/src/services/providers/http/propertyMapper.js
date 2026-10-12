@@ -1,5 +1,6 @@
 import { canonicalTypeKey, matchTypeKey, COMMERCIAL_SUBTYPES } from '../../../data/propertyTypes.js';
 import { ADDRESS_PARTS, pickListingFormDetails, splitStoredAddress } from '../../../lib/listingFormDetails.js';
+import { istToday } from '../../../lib/availability.js';
 
 // The catalogue uses shorthand; the public API uses explicit construction and furnishing values.
 const CONSTRUCTION_FROM_WIRE = {
@@ -189,7 +190,8 @@ export function toViewModel(p) {
     room: p.room ?? null,
     tenants: Array.isArray(p.tenants) ? p.tenants : [],
     availableFrom: p.availableFrom ?? null,
-    availableDate: p.availableDate ?? null,
+    availableOn: p.availableOn ?? p.availableDate ?? null,
+    availableDate: p.availableOn ?? p.availableDate ?? null,
     // Null stays null: the detail page renders it as a question, and `?? false` would publish the
     // owner's silence as "not allowed".
     pets: p.pets ?? null,
@@ -317,8 +319,7 @@ export function toEditForm(vm = {}) {
     ownership: '', agreementDuration: '', lockIn: '', noticePeriod: '', foodPref: '',
     // Three states: the owner's yes, the owner's no, and a question they have not answered.
     petsPolicy: vm.pets === true ? 'yes' : vm.pets === false ? 'no' : '',
-    // Search availability is a bucket; handover timing is not construction status.
-    availableFrom: '', construction: vm.construction ?? '',
+    construction: vm.construction ?? '',
     plotArea: '', floorsInHouse: '', washrooms: '', shellType: '', camCharges: '',
     gstOnRent: '', fitOutMonths: '', escalationPct: '', tenancyStatus: '', inPlaceRent: '', leaseExpiry: '',
     seatCount: '', frontage: '', floorLoad: '', clearHeight: '', sanctionedPower: '', dockCount: '',
@@ -330,6 +331,7 @@ export function toEditForm(vm = {}) {
     preferredTenants: (vm.tenants ?? []).filter((value) => ['family', 'company', 'bachelors', 'bachelor-male', 'bachelor-female', 'anyone'].includes(value)),
     // A saved answer always outranks a part recovered from the composed line.
     ...stored,
+    availableFrom: vm.availableOn ? (vm.availableOn > istToday() ? vm.availableOn : istToday()) : '',
   };
 }
 
@@ -352,19 +354,6 @@ export function yearsToAgeBand(years) {
   if (y >= 5) return '5-10';
   if (y >= 1) return '1-5';
   return 'new';
-}
-
-/* The wizard collects a date; the search filters on cumulative buckets. A date beyond the widest bucket is
-   left unstated rather than widened, or the filter returns a flat nobody can move into for a year. */
-export function dateToMoveInBucket(date) {
-  if (!date) return undefined;
-  const when = new Date(date);
-  if (Number.isNaN(when.getTime())) return undefined;
-  const days = Math.ceil((when.setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
-  if (days <= 0) return 'now';
-  if (days <= 15) return '15';
-  if (days <= 30) return '30';
-  return undefined;
 }
 
 /* Silence is not "no". The wizard asks, so an owner who skipped the question has not answered it,
@@ -393,7 +382,7 @@ export function toListingCreate(listing = {}) {
     carpetArea: positiveArea(listing.carpetArea),
     builtUpArea: positiveArea(listing.builtUpArea ?? listing.builtUp),
     superBuiltUpArea: positiveArea(listing.superBuiltUpArea ?? listing.superBuiltUp),
-    availableFrom: dateToMoveInBucket(listing.available),
+    availableOn: listing.available || undefined,
     pets: typeof listing.pets === 'boolean' ? listing.pets : petsFromPolicy(listing.petsPolicy),
     furnishing: translateFurnishing(FURNISHING_TO_WIRE, listing.furnishing, 'for write'),
     deposit: listing.deposit,
@@ -436,10 +425,8 @@ export function toListingUpdate(patch = {}) {
     /* And again for zoning: a plot re-typed to a flat has none to send, and the column admits no
        blank, so without a word for it the old zoning goes on answering the Land-use filter. */
     clearLandUse: patch.clearLandUse === true ? true : undefined,
-    /* A date the owner removed, or moved past the widest bucket, must withdraw the stored claim —
-       dropping the key would leave "moving in within 15 days" standing on a stale listing. */
-    ...('available' in patch && dateToMoveInBucket(patch.available) === undefined
-      ? { availableFrom: '' } : {}),
+    // '' is the PATCH word for clearing the date; undefined would leave the old one standing.
+    ...('available' in patch && !patch.available ? { availableOn: '' } : {}),
     /* Same reasoning for the pet policy: an absent `pets` means "leave it alone", so an owner who
        cleared their answer needs a word for it or the old claim stands. */
     ...('pets' in patch && typeof patch.pets !== 'boolean' ? { clearPets: true } : {}),

@@ -46,8 +46,9 @@ public class MeDealsController {
 
     @PostMapping(Routes.Deals.REOPEN)
     public void reopen(@CurrentUser AuthPrincipal principal,
-                       @PathVariable("propId") String propId) {
-        dealService.reopen(principal, parseUuid(propId));
+                       @PathVariable("propId") String propId,
+                       @Valid @RequestBody(required = false) DealReopenRequest body) {
+        dealService.reopen(principal, parseUuid(propId), body == null ? null : body.availableOn());
     }
 
     @GetMapping(Routes.Deals.PARTIES)

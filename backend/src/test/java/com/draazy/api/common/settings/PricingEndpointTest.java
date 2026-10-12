@@ -33,8 +33,8 @@ class PricingEndpointTest extends AbstractApiTest {
     void anonymousCallersGetThePriceList() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.pricing.ownerProYearly").value(2499))
-                .andExpect(jsonPath("$.pricing.gstPercent").value(18));
+                .andExpect(jsonPath("$.pricing.listingPass").value(999))
+                .andExpect(jsonPath("$.pricing.gstPercent").value(0));
     }
 
     /** Checked per key with {@code exists()}: defaults equal the seed row, so a value check proves no read. */
@@ -42,11 +42,11 @@ class PricingEndpointTest extends AbstractApiTest {
     void everyPriceTheClientNeedsIsPublished() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.pricing.ownerPlanYearly").exists())
-                .andExpect(jsonPath("$.pricing.ownerProYearly").exists())
+                .andExpect(jsonPath("$.pricing.listingPass").exists())
+                .andExpect(jsonPath("$.pricing.contactPack").exists())
                 .andExpect(jsonPath("$.pricing.rentAgreementPlatform").exists())
-                .andExpect(jsonPath("$.pricing.seekerPlusTopup").exists())
-                .andExpect(jsonPath("$.pricing.gstPercent").exists());
+                .andExpect(jsonPath("$.pricing.gstPercent").exists())
+                .andExpect(jsonPath("$.pricing.ownerProYearly").doesNotExist());
     }
 
     /** Only test that tells a real row read from literals; the untouched sibling proves the write deep-merges. */
@@ -55,14 +55,14 @@ class PricingEndpointTest extends AbstractApiTest {
         mvc.perform(put(Routes.Admin.SETTINGS)
                         .header(HttpHeaders.AUTHORIZATION, adminToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"fees\":{\"ownerProYearly\":5499,\"seekerPlusTopup\":349}}"))
+                        .content("{\"fees\":{\"listingPass\":1499,\"contactPack\":349}}"))
                 .andExpect(status().isOk());
 
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.pricing.ownerProYearly").value(5499))
-                .andExpect(jsonPath("$.pricing.seekerPlusTopup").value(349))
-                .andExpect(jsonPath("$.pricing.rentAgreementPlatform").value(500));
+                .andExpect(jsonPath("$.pricing.listingPass").value(1499))
+                .andExpect(jsonPath("$.pricing.contactPack").value(349))
+                .andExpect(jsonPath("$.pricing.rentAgreementPlatform").value(499));
     }
 
     /** The fraud threshold and contact allowances share the prices block but must never be published. */

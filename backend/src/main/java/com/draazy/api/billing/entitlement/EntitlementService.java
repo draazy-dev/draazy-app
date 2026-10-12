@@ -9,13 +9,16 @@ import com.draazy.api.common.trust.ContactAllowanceLookup;
 import com.draazy.api.common.trust.ContactUsageLookup;
 import com.draazy.api.common.trust.ListingAllowanceLookup;
 import com.draazy.api.common.trust.ListingSlotLookup;
+import java.time.Instant;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Owner contacts and listing slots from plan + referrals (docs/flows/consumer/plans-billing-refer.md). */
+/** Owner contacts and listing slots from the free tier, passes, packs and referrals. */
 @Service
 public class EntitlementService implements ContactAllowanceLookup, ListingAllowanceLookup {
 
@@ -53,28 +56,44 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
         long granting = referrals.countGrantingFor(userId);
 
         int contactBonus = Math.toIntExact(granting * settings.referralContactBonus());
-        long used = usage.contactsUsed(userId);
+        List<Instant> contacted = usage.contactTimes(userId);
+        long used = contacted.size();
 
         ContactEntitlementDto contacts;
         if (plan.map(Plan::isUnlimitedContacts).orElse(false)) {
             // Still reports the bonus so an unlimited subscriber sees their referrals honoured
             // when they downgrade.
-            contacts = new ContactEntitlementDto(true, used, null, null, contactBonus);
+            contacts = new ContactEntitlementDto(true, used, null, null, contactBonus, null, null);
         } else {
-            int allowance = Math.toIntExact(settings.freeContactLimit()) + contactBonus;
-            int remaining = (int) Math.max(0, allowance - used);
-            contacts = new ContactEntitlementDto(false, used, allowance, remaining, contactBonus);
+            ContactAllocator.Standing standing = standingOf(userId, contacted, contactBonus);
+            contacts = new ContactEntitlementDto(false, used, Math.toIntExact(used) + standing.remaining(),
+                    standing.remaining(), contactBonus, iso(standing.freeWindowEndsAt()),
+                    iso(standing.packExpiresAt()));
         }
 
         int listingBonus = Math.toIntExact(granting / REFERRALS_PER_LISTING_SLOT);
-        int listingBase = plan.map(Plan::getListingLimit)
-                .orElse(DEFAULT_FREE_LISTING_LIMIT);
+        List<ListingEntitlementDto.Pass> passes = subscriptions.listingPasses(userId).stream()
+                .map(s -> new ListingEntitlementDto.Pass(s.getPropertyId().toString(), iso(s.getRenewsAt())))
+                .toList();
         ListingEntitlementDto listings = new ListingEntitlementDto(
-                listingBase + listingBonus, listingBonus, slots.listingSlotsHeld(userId));
+                freeListingSlots(plan, listingBonus), listingBonus, slots.listingSlotsHeld(userId), passes);
 
         AgreementEntitlementDto agreements = agreementsOf(userId, granting);
 
         return new EntitlementsDto(contacts, listings, agreements);
+    }
+
+    private ContactAllocator.Standing standingOf(UUID userId, List<Instant> contacted, int contactBonus) {
+        return ContactAllocator.allocate(contacted, Math.toIntExact(settings.freeContactLimit()),
+                subscriptions.contactPacks(userId), contactBonus, Instant.now());
+    }
+
+    private static int freeListingSlots(Optional<Plan> plan, int listingBonus) {
+        return plan.map(Plan::getListingLimit).orElse(DEFAULT_FREE_LISTING_LIMIT) + listingBonus;
+    }
+
+    private static String iso(Instant at) {
+        return Objects.toString(at, null);
     }
 
     /** Spendable at rent-agreement checkout; zero when every earned credit is already held by a request. */
@@ -93,22 +112,18 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
     @Override
     @Transactional(readOnly = true)
     public int listingAllowance(UUID userId) {
-        long granting = referrals.countGrantingFor(userId);
-        int base = subscriptions.entitlingPlan(userId)
-                .map(Plan::getListingLimit)
-                .orElse(DEFAULT_FREE_LISTING_LIMIT);
-        return base + Math.toIntExact(granting / REFERRALS_PER_LISTING_SLOT);
+        return freeListingSlots(subscriptions.entitlingPlan(userId),
+                Math.toIntExact(referrals.countGrantingFor(userId) / REFERRALS_PER_LISTING_SLOT));
     }
 
-    /** Ceiling-only path for the contact gate; calling {@link #forUser} would add a needless usage read. */
+    /** Remaining-only path for the contact gate; skips the listing and agreement halves. */
     @Override
     @Transactional(readOnly = true)
-    public OptionalInt contactAllowance(UUID userId) {
+    public OptionalInt contactsRemaining(UUID userId) {
         if (subscriptions.entitlingPlan(userId).map(Plan::isUnlimitedContacts).orElse(false)) {
             return OptionalInt.empty();
         }
-        long granting = referrals.countGrantingFor(userId);
-        return OptionalInt.of(Math.toIntExact(
-                settings.freeContactLimit() + granting * settings.referralContactBonus()));
+        int contactBonus = Math.toIntExact(referrals.countGrantingFor(userId) * settings.referralContactBonus());
+        return OptionalInt.of(standingOf(userId, usage.contactTimes(userId), contactBonus).remaining());
     }
 }

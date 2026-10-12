@@ -217,13 +217,61 @@ public interface PropertyRepository
      * which tallies every row ever posted (docs/system/data-model.md). */
     long countByOwnerIdAndStatusAndArchivedFalse(UUID ownerId, String status);
 
-    /** How many of this owner's listings occupy a freemium slot - deliberately not
-     * {@link #countByOwnerIdAndStatusAndArchivedFalse}; see {@link PropertyStatus#OCCUPIES_LISTING_SLOT}. */
-    @Query("""
-            select count(p) from Property p
-            where p.owner.id = :ownerId and p.archived = false and p.status in :statuses""")
-    long countOccupyingListingSlots(@Param("ownerId") UUID ownerId,
-            @Param("statuses") Collection<String> statuses);
+    /** The listing-pass predicate for a row aliased {@code p}: an unexpired, entitling pass is bound to it. */
+    String ACTIVE_PASS_SQL = """
+            exists (select 1 from subscriptions s join plans pl on pl.id = s.plan_id
+                    where s.property_id = p.id and pl.kind = 'listing-pass'
+                      and s.status in ('active', 'past-due') and s.renews_at > :now)""";
+
+    /** How many of this owner's live listings (see {@link PropertyStatus#OCCUPIES_LISTING_SLOT}) no
+     * active listing pass covers, leaving out {@code excludeId}; the free tier's ceiling counts these. */
+    @Query(nativeQuery = true, value = """
+            select count(*) from properties p
+            where p.owner_id = :ownerId and not p.archived and p.status in (:statuses)
+              and p.id <> :excludeId
+              and not\s""" + ACTIVE_PASS_SQL)
+    long countLiveUncovered(@Param("ownerId") UUID ownerId,
+            @Param("statuses") Collection<String> statuses, @Param("excludeId") UUID excludeId,
+            @Param("now") Instant now);
+
+    default long countLiveUncovered(UUID ownerId, Instant now) {
+        return countLiveUncovered(ownerId, PropertyStatus.OCCUPIES_LISTING_SLOT, new UUID(0, 0), now);
+    }
+
+    /** The ids behind {@link #countLiveUncovered}, oldest listing first. */
+    @Query(nativeQuery = true, value = """
+            select p.id from properties p
+            where p.owner_id = :ownerId and not p.archived and p.status in (:statuses)
+              and not\s""" + ACTIVE_PASS_SQL + """
+
+            order by p.created_at, p.id""")
+    List<UUID> findLiveUncoveredIds(@Param("ownerId") UUID ownerId,
+            @Param("statuses") Collection<String> statuses, @Param("now") Instant now);
+
+    /** A pass covers a listing only while it is live; sold, rented and archived listings forfeit it, and
+     * an order still waiting for payment is cancelled so its checkout cannot complete. */
+    default void endListingPasses(UUID propertyId) {
+        cancelUnpaidPassOrders(propertyId);
+        expireListingPasses(propertyId);
+    }
+
+    @Modifying(flushAutomatically = true)
+    @Query(nativeQuery = true, value = """
+            update subscriptions set status = 'expired', version = version + 1
+            where property_id = :propertyId and status in ('active', 'past-due')
+              and plan_id in (select id from plans where kind = 'listing-pass')""")
+    int expireListingPasses(@Param("propertyId") UUID propertyId);
+
+    @Modifying(flushAutomatically = true)
+    @Query(nativeQuery = true, value = """
+            update subscriptions set status = 'cancelled', idempotency_key = null, version = version + 1
+            where property_id = :propertyId and status = 'pending'
+              and plan_id in (select id from plans where kind = 'listing-pass')""")
+    int cancelUnpaidPassOrders(@Param("propertyId") UUID propertyId);
+
+    @Query(nativeQuery = true, value = """
+            select exists (select 1 from properties p where p.id = :propertyId and\s""" + ACTIVE_PASS_SQL + ")")
+    boolean hasActivePass(@Param("propertyId") UUID propertyId, @Param("now") Instant now);
 
     @Query("select count(p) from Property p where p.owner.id = :ownerId and p.createdAt > :since")
     long countPostedSince(@Param("ownerId") UUID ownerId, @Param("since") java.time.Instant since);

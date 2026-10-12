@@ -7,15 +7,16 @@ public record SubscriptionDto(
         String planId,
         String status,
         String paymentRef,
-        String paymentSessionId) {
+        String paymentSessionId,
+        String propertyId) {
 
     /** The "no subscription" document. See the class Javadoc for why this is not a 404. */
     public static SubscriptionDto none() {
-        return new SubscriptionDto(null, null, null, null, null);
+        return new SubscriptionDto(null, null, null, null, null, null);
     }
 
     /** Same document with the single-use checkout session attached (priced subscribe only). */
     public SubscriptionDto withPaymentSessionId(String sessionId) {
-        return new SubscriptionDto(id, planId, status, paymentRef, sessionId);
+        return new SubscriptionDto(id, planId, status, paymentRef, sessionId, propertyId);
     }
 }

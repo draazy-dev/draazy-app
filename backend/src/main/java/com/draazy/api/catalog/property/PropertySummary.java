@@ -3,6 +3,7 @@ package com.draazy.api.catalog.property;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 /** Card projection for lists: only what the grid, map pins, owner profile and shortlist draw, with no owner
@@ -27,6 +28,7 @@ public record PropertySummary(
         String room,
         List<String> tenants,
         String availableFrom,
+        LocalDate availableOn,
         Boolean pets,
 
         String locality,

@@ -1,16 +1,19 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, signedInAsNew } from '../../../helpers/liveAuth.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { displayDate, istInDays } from '../../../helpers/availability.js';
 import { PHOTO_PNG, uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { LIST_PROPERTY_DRAFT_KEY as DRAFT_KEY } from '../../../helpers/listingForm.helper.js';
 import { approveListing } from '../../../helpers/moderation.js';
 import { fillSociety, pickGoogleSociety } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
 
+// Relative, because the wizard refuses a past date and a rental may not be more than a year out.
+const AVAILABLE_ON = istInDays(90);
 const DETAILS = {
   flatNumber: 'C-901', tower: 'North', society: 'Edit Prefill Homes', street: 'Baner Road',
   landmark: 'Near the public library', ownership: 'Freehold', loanAvailable: false,
-  agreementDuration: '24', lockIn: '0', noticePeriod: '2', availableFrom: '2027-01-20',
+  agreementDuration: '24', lockIn: '0', noticePeriod: '2',
   preferredTenants: ['family', 'bachelors'], petsPolicy: 'no', foodPref: 'veg',
   rentMaintMode: 'extra', possession: 'available', fixtures: [],
 };
@@ -88,6 +91,7 @@ async function seedListing(page, request, { deal = 'rent', legacy = false } = {}
       facing: 'East', overlooking: 'Garden', electricityMeterNo: `00${mobile}`,
       reraId: 'P52100000001', images: [url], description: 'Original owner description.',
       ...(deal === 'buy' ? { possession: 'under-construction' } : {}),
+      ...(legacy ? {} : { availableOn: AVAILABLE_ON }),
       address: legacy ? storedAddress : ADDRESS,
       ...(legacy ? {} : { pincode: '411045', formDetails: DETAILS }),
     },
@@ -180,7 +184,7 @@ async function expectPreserved(request, seeded, description, { rebound = false }
   const saved = await readListing(request, seeded);
   expect(saved.description).toBe(description);
   for (const key of ['address', 'pincode', 'area', 'carpetArea', 'builtUpArea', 'ageYears', 'floor',
-    'deposit', 'maintenance', 'electricityMeterNo', 'reraId', 'formDetails', 'images', 'docsCount',
+    'deposit', 'maintenance', 'electricityMeterNo', 'reraId', 'formDetails', 'availableOn', 'images', 'docsCount',
     'ownershipVerified', 'verified']) {
     // Binding a Google society adds its id and pincode; nothing else already stored may change.
     if (rebound && key === 'formDetails') {
@@ -205,7 +209,7 @@ test('rent reload restores address, terms and zeros; description-only save prese
   await expectAddress(page);
   await nextStep(page, 'Price & terms');
   await expect(page.locator('input[data-err="deposit"]')).toHaveValue('0');
-  await expect(page.locator('[data-err="availableFrom"]')).toHaveText('20/01/2027');
+  await expect(page.locator('[data-err="availableFrom"]')).toHaveText(displayDate(AVAILABLE_ON));
   for (const [label, value] of [[/^Agreement Duration$/, '24 months'], [/^Lock-in Period$/, 'None'], [/^Notice Period$/, '2 months']]) {
     await expect(field(page, label).locator('.dz-dropdown__trigger')).toContainText(value);
   }
@@ -244,7 +248,7 @@ test('sale reload restores Freehold, false loan availability and RERA, and leave
   await nextStep(page, 'Price & terms');
   await expect(page.locator('[data-err="ownership"]')).toContainText('Freehold');
   await expect(page.locator('[data-err="loanAvailable"]').getByRole('button', { name: 'No', exact: true })).toHaveClass(/selected/);
-  await expect(page.locator('[data-err="availableFrom"]')).toHaveText('20/01/2027');
+  await expect(page.locator('[data-err="availableFrom"]')).toHaveText(displayDate(AVAILABLE_ON));
   await expect(page.getByPlaceholder('e.g. P52100012345', { exact: true })).toHaveValue('P52100000001');
   await nextStep(page, 'Photos & description');
   await expectNoDocumentSlots(page);
@@ -547,7 +551,7 @@ test('create through the rental wizard persists exact answers and decimal areas 
   await page.locator('input[data-err="deposit"]').fill('0');
   await page.getByRole('button', { name: 'Charged Extra', exact: true }).click();
   await page.getByPlaceholder('e.g. 2,500', { exact: true }).fill('2500');
-  await pickDate(page, '[data-err="availableFrom"]', details.availableFrom);
+  await pickDate(page, '[data-err="availableFrom"]', AVAILABLE_ON);
   // A fresh form carries the standard terms collapsed, so revealing them is part of the answer.
   await page.getByRole('button', { name: 'Change rental terms', exact: true }).click();
   for (const [label, option] of [[/^Agreement Duration$/, '24 months'], [/^Lock-in Period$/, '6 months'], [/^Notice Period$/, '2 months']]) {
@@ -580,6 +584,7 @@ test('create through the rental wizard persists exact answers and decimal areas 
   expect(response.status(), 'only the wizard may create this listing').toBe(201);
   const body = response.request().postDataJSON();
   expect(body.formDetails).toEqual(details);
+  expect(body.availableOn).toBe(AVAILABLE_ON);
   expect(body.formDetails).not.toHaveProperty('buyerEligibility');
   for (const key of COMMERCIAL_DETAIL_KEYS) expect(body.formDetails).not.toHaveProperty(key);
   const expected = {
@@ -588,7 +593,7 @@ test('create through the rental wizard persists exact answers and decimal areas 
     facing: 'East', overlooking: 'Garden', furnishing: 'semi-furnished', locality: 'Baner',
     price: 31000, deposit: 0, maintenance: 2500, pincode: '411045',
     address: `${details.flatNumber}, ${details.tower}, ${details.society}, ${details.street}`,
-    description, formDetails: details,
+    description, formDetails: details, availableOn: AVAILABLE_ON,
   };
   expect(body).toMatchObject(expected);
   // The first upload is the one whose response shape was asserted, so it must lead the list.
@@ -625,7 +630,7 @@ test('create through the rental wizard persists exact answers and decimal areas 
   await expect(page.locator('input[data-err="monthlyRent"]')).toHaveValue('31,000');
   await expect(page.locator('input[data-err="deposit"]')).toHaveValue('0');
   await expect(page.getByPlaceholder('e.g. 2,500', { exact: true })).toHaveValue('2,500');
-  await expect(page.locator('[data-err="availableFrom"]')).toHaveText('20/01/2027');
+  await expect(page.locator('[data-err="availableFrom"]')).toHaveText(displayDate(AVAILABLE_ON));
   for (const [label, option] of [[/^Agreement Duration$/, '24 months'], [/^Lock-in Period$/, '6 months'], [/^Notice Period$/, '2 months']]) {
     await expect(field(page, label).locator('.dz-dropdown__trigger')).toContainText(option);
   }

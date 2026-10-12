@@ -1,4 +1,6 @@
 import { fmtArea, fmtINR, fmtNum, isSqftUnit } from '../../../lib/format.js';
+import { availabilityLabel } from '../../../lib/availability.js';
+import i18n from '../../../i18n/index.js';
 
 // The four pending buckets the server partitions by `progress`; their labels match the tracker's.
 export const PROGRESS_OPTS = [
@@ -115,7 +117,7 @@ export function detailKvs(l) {
 
   push('Preferred tenants', Array.isArray(l.tenants) ? l.tenants.join(', ') : l.tenants);
   if (l.pets !== null && l.pets !== undefined) kvs.push(['Pets', l.pets ? 'Allowed' : 'Not allowed']);
-  push('Available from', l.availableFrom);
+  push('Available', availabilityLabel(i18n.t.bind(i18n), l) || null);
   push('Agreement duration', l.agreementDuration);
 
   if (isLive) {

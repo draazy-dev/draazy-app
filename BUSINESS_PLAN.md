@@ -88,18 +88,25 @@ NoBroker (~$1B+ valuation) and MagicBricks/Housing.com have huge war chests. You
 
 ## 5. Monetisation — how Draazy makes money
 
-> Keep the **core free** (listings, search, contact within fair limits) to win share aggressively. Monetise the **journey around the transaction**. Mirror NoBroker's proven stack:
+> Strictly broker-free. Keep the **core free and generous**, charge small one-off amounts only where the user is clearly better off, and **never auto-renew anything**. MVP target: ~₹10,000/month to cover infrastructure, run by a team of 2–4 with no assisted (relationship-manager) plans.
 
-| # | Revenue stream | What it is | Margin | When |
-|---|---|---|---|---|
-| 1 | **Seeker/Owner subscription plans** | Priority visibility, more contact unlocks, relationship-manager, "rent faster" boosts | High | Phase 2 |
-| 2 | **Services marketplace** | Packers & movers, painting, cleaning, pest control, deep-clean, interiors — commission/margin | High | Phase 2 |
-| 3 | **Home loans & fintech** | Loan facilitation (bank commission), insurance referral, deposit financing | Very high | Phase 2–3 |
-| 4 | **Rent agreement + tenant verification** | Online draft free → paid registration, e-stamp, police verification, doorstep delivery | High | Phase 1–2 |
-| 5 | **Rent payments** | Pay rent by card/UPI → convenience fee; rewards | Medium | Phase 2 |
-| 6 | **Society SaaS (Draazy Society)** | Recurring per-flat/per-society fee for gate/visitor/maintenance | Recurring, sticky | Phase 2 |
-| 7 | **Builder / new-project listings** | Developer lead-gen for new launches — high ticket | Very high | Phase 3 |
-| 8 | **Featured listings & partner ads** | Boosted placement, financial/home-service partner ads | High | Phase 2 |
+**MVP revenue — the only three paid items (decided 2026-10-11):**
+
+| # | Product | Price | Rule |
+|---|---|---|---|
+| 1 | **Rent agreement** (first or renewal) | ₹499 + government charges | Core driver. Sold to anyone in Pune, not only to deals found on Draazy. |
+| 2 | **Listing pass** | ₹999 | Each extra *live* rent/sell listing beyond the 1 free one; 60 days. |
+| 3 | **Contact pack** | ₹199 | 15 owner contacts, valid 30 days, for buyers and tenants. |
+
+All prices include GST; government charges are stamp duty and registration, passed through at cost.
+
+**Free, on purpose:** 1 live listing at a time, unlimited flatmate posts, 15 owner contacts in the first 30 days, referral rewards, verified badge, 7 days of Featured placement after ownership verification, rent receipts, document vault, renewal reminders.
+
+**Commission-only partners (no price shown to users):** registration lawyer, home-loan agent.
+
+**Owner retention loop:** 60 days before an agreement ends, owner and tenant get a renewal prompt (one tap, prefilled, ₹499) or a "tenant moving out → list it again from the end date" prompt; a shareable "brokerage saved" card follows every registration.
+
+**Later, only once a locality has real liquidity:** services marketplace commissions, Society SaaS, pay-rent and deposit financing. Never: broker plans, broker listings or paid broker leads.
 
 **Unit-economics principle:** A pure listing earns paise; a *move-in* (agreement + verification + movers + loan + rent payments) earns thousands. **Optimise for completed move-ins, not page views.** Your "finalize the deal" flow is the instrumentation point — every finalised deal should trigger a services upsell (you already route to `services.html` on close).
 
@@ -126,7 +133,7 @@ NoBroker (~$1B+ valuation) and MagicBricks/Housing.com have huge war chests. You
 - 🔨 **Rent agreement e-stamp + registration** (paid), doorstep delivery
 - 🔨 **Home-loan & insurance** lead-gen (bank/NBFC partners) — your finances module is the natural home
 - 🔨 **Pay-rent-online** + deposit financing (fintech partner)
-- 🔨 **Subscription plans** (owner boost / seeker priority)
+- ✅ **Pay-per-use** — listing pass and contact pack (no subscriptions, no auto-renewal)
 - 🔨 **Draazy Society** — visitor/gate/maintenance SaaS (the recurring moat)
 - 🔨 **Ratings & reviews** for societies, owners, localities (trust UGC)
 

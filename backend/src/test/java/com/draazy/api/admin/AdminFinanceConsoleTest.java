@@ -56,8 +56,7 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
         return subscribeAt(mobile, displayName, planName, status, null);
     }
 
-    // Passing one that differs is how a test reaches the state a reprice produces — an existing subscription whose
-    // charge no longer matches what the plan costs a new buyer.
+    // A differing amount models a subscription charged at a different price than the plan's current one.
     private String subscribeAt(String mobile, String displayName, String planName, String status,
             Long amount) {
         User u = new User(mobile, Roles.Wire.BUYER);
@@ -181,8 +180,22 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
                             assertThat(((Number) p.get("price")).longValue())
                                     .isEqualTo(OWNER_PRO_PRICE);
                             assertThat(p.get("billingCycle")).isEqualTo("yearly");
+                            assertThat(p).containsEntry("termDays", null);
                         }
                     });
+        }
+
+        @Test
+        void aPassLineCarriesItsTermInDays() throws Exception {
+            String token = admin();
+            subscribe("9877730015", "Pass Member", "Listing Pass", "active");
+
+            List<Map<String, Object>> plans = JsonPath.read(body(Routes.Admin.FINANCE, token), "$.plans");
+
+            assertThat(plans).anySatisfy(p -> {
+                assertThat(p.get("name")).isEqualTo("Listing Pass");
+                assertThat(((Number) p.get("termDays")).intValue()).isEqualTo(60);
+            });
         }
 
         /** The series and the ledger expose the same revenue mix, so all three need the admin guard. */

@@ -2,6 +2,7 @@ package com.draazy.api.catalog.listing;
 
 import com.draazy.api.catalog.locality.LocalityBinding;
 import com.draazy.api.catalog.property.AddressKey;
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.MeterKey;
 import com.draazy.api.catalog.property.PhotoHash;
@@ -13,9 +14,11 @@ import com.draazy.api.catalog.property.PropertySort;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ListingQuotaExhaustedException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.settings.PhotoLimit;
+import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.trust.ListingCaseNotes;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
@@ -57,13 +60,15 @@ public class ListingService {
     private final RateLimitLock locks;
     private final ListingPhotoSources photoSources;
     private final PhotoLimit photoLimit;
+    private final PlatformSettings settings;
 
     public ListingService(PropertyRepository properties, UserRepository users,
             LocalityBinding localities, ListingEditRules editRules, PropertyMapper propertyMapper,
             PropertyLifecycle propertyLifecycle, ListingCaseNotes caseNotes, ListingDuplicateProbe duplicates, AuditService audit,
             ListingQuota quota, RateLimitLock locks, ListingPhotoSources photoSources,
-            PhotoLimit photoLimit) {
+            PhotoLimit photoLimit, PlatformSettings settings) {
         this.properties = properties;
+        this.settings = settings;
         this.users = users;
         this.caseNotes = caseNotes;
         this.duplicates = duplicates;
@@ -113,10 +118,15 @@ public class ListingService {
 
     @Transactional
     public Property resume(AuthPrincipal actor, String idOrSlug) {
-        Property p = resolveOwned(actor.userId(), idOrSlug)
+        Property p = resolveOwnedForWrite(actor.userId(), idOrSlug)
                 .orElseThrow(() -> NotFoundException.of("Listing"));
         if (p.isArchived() || !PropertyStatus.PAUSED.equals(p.getStatus())) {
             throw new ConflictException("Only an owner-paused listing can be resumed");
+        }
+        if (!quota.mayGoLive(p)) {
+            throw new ListingQuotaExhaustedException("You're on the free tier: 1 live listing at a time."
+                    + " Pause another listing or buy a ₹" + settings.listingPass()
+                    + " listing pass for this one.");
         }
         p.resumeByOwner();
         audit.record(actor, "property.ownerResume", "property", p.getId().toString(),
@@ -132,6 +142,7 @@ public class ListingService {
                 .orElseThrow(() -> NotFoundException.of("Listing"));
         if (!p.isArchived()) {
             p.archive("Taken down by the owner");
+            properties.endListingPasses(p.getId());
         }
         return properties.save(p);
     }
@@ -139,21 +150,20 @@ public class ListingService {
     /** Trust-critical fields are server-set, so a listing cannot be born approved or attributed to someone else. */
     @Transactional
     public Property create(UUID userId, ListingCreate in) {
-        requireAllowance(userId);
+        requirePace(userId);
         requirePhotosOnCreate(in.images());
         return createOnBehalf(userId, in, userId);
     }
 
-    /** An owner's own posting, held to the freemium ceiling and daily pace; {@link #createOnBehalf} is not. */
+    /** An owner's own posting, held to the daily pace; {@link #createOnBehalf} is not. */
     @Transactional
     public Property createWithinAllowance(UUID userId, ListingCreate in, String existingLocalitySlug) {
-        requireAllowance(userId);
+        requirePace(userId);
         return createOnBehalf(userId, in, existingLocalitySlug, userId);
     }
 
-    private void requireAllowance(UUID userId) {
+    private void requirePace(UUID userId) {
         locks.holdUntilCommit(RateLimitLock.Limit.LISTING_CREATE, userId.toString());
-        quota.require(userId);
         quota.requirePace(userId);
     }
 
@@ -179,6 +189,7 @@ public class ListingService {
         // PropertyMapper's allowlist decides what the client may say, so ListingCreate's
         // "deliberately absent" set is enforced rather than described.
         propertyMapper.applyTo(in, p);
+        p.setAvailableOn(AvailableOn.resolve(in.availableOn(), in.availableFrom(), false, p.getDeal()));
         ListingEditRules.clearReadyToMoveSaleAvailableDate(p);
         editRules.stampSociety(p, in.societyId(), true);
 

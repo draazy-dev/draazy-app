@@ -1,10 +1,11 @@
 import Icon from '../../../../components/Icon.jsx';
 import PropertyImage from '../../../../components/ui/PropertyImage.jsx';
 import ListingStatusCard, { getOwnerListingStatusMeta } from '../../../../components/listing/ListingStatusCard.jsx';
-import { fmtINR, fmtNum } from '../../../../lib/format.js';
+import { fmtINR, fmtNum, fmtDate } from '../../../../lib/format.js';
 import { onlySeeksOwnershipBadge } from '../../../../lib/recheckFields.js';
 import { computeQualityScore, qualityTips, qualityColor } from '../../../../lib/qualityScore.js';
 import { listingFreshness } from '../../../../lib/freshness.js';
+import { availabilityLabel } from '../../../../lib/availability.js';
 import { canSplitIntoRooms } from '../../../../lib/data/flatSplit.js';
 import { detailPath, roomEditHref } from '../../flatmates/helpers.js';
 import StatChip from './StatChip.jsx';
@@ -18,7 +19,7 @@ export default function ListingCard({
   l, review = null, split = null,
   navigate, openReview,
   onConfirmFresh, onConfirmListing, onReopen, onMarkUnderOffer, onFinalize, onDelete,
-  onSplit, onUnsplit, onPause, onResume, onShare, onOpenTools, onEditGroup, onEditPost, onRenew, t,
+  onSplit, onUnsplit, onPause, onResume, onShare, onOpenTools, onEditGroup, onEditPost, onRenew, quota = null, passPrice = '', t,
 }) {
   const unread = review?.unread || 0;
   const dealStatus = l.dealStatus || 'active';
@@ -54,7 +55,10 @@ export default function ListingCard({
   const isSplit = splitEligible && !!split;
   const splitRooms = isSplit ? split.rooms : 0;
   const movedIn = isSplit ? split.movedIn : 0;
-  // Days remaining on the free first-verify Featured perk, for the badge tooltip/label.
+  const listingId = l.uuid || l.id;
+  const availability = !l.flatmate && !closed && l.deal === 'rent' ? availabilityLabel(t, l) : '';
+  const passTill = !l.flatmate && quota?.passes ? fmtDate(quota.passes[String(listingId)]) : '';
+  const needsPass = !l.flatmate && l.status === 'paused' && !passTill && quota?.full;
   const flatmateKind = l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : null;
   const editHref = `/list-property?edit=${l.id}`;
   const viewHref = flatmateKind ? detailPath(flatmateKind, l.id) : `/property/${l.id}`;
@@ -69,6 +73,7 @@ export default function ListingCard({
 
   let primary = null;
   if (flatmateKind && l.status === 'expired') primary = { label: 'Renew for 30 days', icon: 'refresh-cw', tone: 'emerald', onClick: () => onRenew(flatmateKind, l) };
+  else if (needsPass) primary = { label: t('listingLifecycle.goLive', { price: passPrice }), icon: 'zap', tone: 'teal', to: `/checkout?plan=listing-pass&property=${encodeURIComponent(listingId)}` };
   else if (!l.flatmate && l.status === 'paused') primary = { label: t('listingLifecycle.resume'), icon: 'play-circle', tone: 'emerald', onClick: () => onResume(l) };
   else if (fr && fr.owner.cta === 'confirm') primary = { label: 'Confirm available', icon: 'check-circle', tone: 'emerald', onClick: () => onConfirmFresh(l) };
   else if (fr && fr.owner.cta === 'reactivate') primary = { label: 'Reactivate', icon: 'refresh-cw', tone: 'emerald', onClick: () => onConfirmFresh(l) };
@@ -117,6 +122,7 @@ export default function ListingCard({
           <div className="min-w-0 sm:flex-1">
             <p className="text-white text-sm font-semibold sm:truncate">{l.title}</p>
             {!l.flatmate && specs && <p className="text-gray-500 text-[11px] mt-0.5">{specs}</p>}
+            {availability && <p className="text-gray-500 text-[11px] mt-0.5">{availability}</p>}
             <p className="text-xs mt-0.5">
               {l.locality && <span className="text-gray-500">{l.locality} · </span>}
               <span className="text-white font-semibold">{fmtINR(l.price)}{l.deal === 'rent' ? '/mo' : ''}</span>
@@ -157,6 +163,11 @@ export default function ListingCard({
                 </span>
                 <p className="mt-1 text-xs leading-snug text-amber-100/80">{recheckReason}</p>
               </div>
+            )}
+            {passTill && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 font-semibold inline-flex items-center gap-1">
+                <Icon name="ticket" className="w-3 h-3" /> {t('listingLifecycle.passTill', { date: passTill })}
+              </span>
             )}
             {l.priceReduced && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-semibold inline-flex items-center gap-1">
@@ -214,6 +225,7 @@ export default function ListingCard({
         {/* edit */}
       {/* Action row keeps rental management beside the verification entry point. */}
       <CardActions primary={primary} items={cardActions} />
+      {needsPass && <p className="px-3 pb-3 text-[11px] text-gray-400 sm:px-4">{t('listingLifecycle.orPauseOther')}</p>}
       {!l.flatmate && qScore < 80 && (
         <div className="px-3 pb-3 sm:px-4 sm:pb-4">
           <div className="border-l-2 border-amber-500/40 pl-3">

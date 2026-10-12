@@ -6,6 +6,7 @@ import Icon from '../../../components/Icon.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
 import HScroll from '../../../components/ui/HScroll.jsx';
 import { Card, SectionHead } from './components.jsx';
+import AgreementPerks from '../../../components/dashboard/AgreementPerks.jsx';
 import { fmtINR } from '../../../lib/format.js';
 import {
   toRentalCard, toRentalCards, tenancyStatus,
@@ -250,6 +251,7 @@ export default function MyRentalPanel({ user }) {
               <>
                 <span className="inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 font-semibold border border-emerald-500/20"><Icon name="badge-check" className="w-3.5 h-3.5" /> Registered</span>
                 <p className="text-gray-500 text-xs mt-2">{agreement.startDate || ''}{agreement.endDate ? ' → ' + agreement.endDate : ''}</p>
+                <AgreementPerks ra={agreement} />
               </>
             ) : (
               <p className="text-gray-400 text-xs">No agreement on record. Register a legally-valid e-agreement — Draazy handles e-stamp, biometric & doorstep registration.</p>

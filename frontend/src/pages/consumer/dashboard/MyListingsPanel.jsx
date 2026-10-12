@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useLocation, Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
+import { usePricing } from '../../../context/PricingContext';
 import Select from '../../../components/ui/Select.jsx';
 import Icon from '../../../components/Icon.jsx';
 import { confirmListingFresh, confirmOwnerListing, takeListingDown, pauseListing, resumeListing, myListingCard } from '../../../services/propertyService.js';
@@ -11,12 +12,14 @@ import { getMyRooms, withRooms } from '../../../lib/data/myListings.js';
 import { publishManaged, deleteManaged, ensureManagedForListing } from '../../../services/managedService.js';
 import { listingFreshness } from '../../../lib/freshness.js';
 import { loadListingQuota } from '../../../lib/data/listingQuota.js';
+import { istToday } from '../../../lib/availability.js';
 import { Card, SectionHead } from './components.jsx';
 import AttentionBanner from './myListings/AttentionBanner.jsx';
 import EmptyState from './myListings/EmptyState.jsx';
 import PrivateListingCard from './myListings/PrivateListingCard.jsx';
 import ListingCard from './myListings/ListingCard.jsx';
 import FinalizeDealModal from './myListings/FinalizeDealModal.jsx';
+import RelistModal from './myListings/RelistModal.jsx';
 import VerifyListingsBanner from './myListings/VerifyListingsBanner.jsx';
 import SplitFlatModal from '../flatmates/SplitFlatModal.jsx';
 import { useFlatmateEditing } from './myListings/useFlatmateEditing.jsx';
@@ -24,9 +27,9 @@ import { useFlatmateEditing } from './myListings/useFlatmateEditing.jsx';
 /* Posts, groups, rooms and properties can share an id, so the kind is part of a row's identity. */
 const rowKey = (l) => `${l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : 'property'}:${l.uuid || l.id}`;
 
-export default function MyListingsPanel({ listings, setListings, managed = [], onManagedChanged, user, toast, openReview, reviewsByProp, onChanged }) {
+export default function MyListingsPanel({ listings, listingsLoaded, setListings, managed = [], onManagedChanged, user, toast, openReview, reviewsByProp, onChanged }) {
   const { t } = useTranslation();
-  /* Full My Listings tab with lifecycle actions: Mark Under Offer, Finalize, Reopen, Edit, Delete */
+  const { fee } = usePricing();
   const listingsState = useMemo(() => composeOwnerProperties(listings, managed), [listings, managed]);
   const [showDealModal, setShowDealModal] = useState(null);
   // The rent listing the owner is carving into rooms, if any.
@@ -76,16 +79,18 @@ export default function MyListingsPanel({ listings, setListings, managed = [], o
   const flatmateEditing = useFlatmateEditing({
     user, toast, refresh: () => onChanged?.(),
   });
-  const [quota, setQuota] = useState({ used: 0, allowance: null });
-  // Slots held change only when a posted property is added or taken down, not on every row patch.
+  const [quota, setQuota] = useState({ used: 0, allowance: null, passes: {} });
+  const [resumeBlock, setResumeBlock] = useState(null);
+  const [quotaTick, setQuotaTick] = useState(0);
+  // Slots held change only when a posted property is added, taken down, paused or resumed, not on every row patch.
   const postedCount = listingsState.filter((l) => !l.flatmate && !l.private).length;
   useEffect(() => {
     let live = true;
     loadListingQuota()
       .then((next) => { if (live) setQuota(next); })
-      .catch(() => { if (live) setQuota({ used: 0, allowance: null }); });
+      .catch(() => { if (live) setQuota({ used: 0, allowance: null, passes: {} }); });
     return () => { live = false; };
-  }, [user, postedCount]);
+  }, [user, postedCount, quotaTick]);
   // Categorize each item so the type filter can group properties, flatmate rooms,
   // flatmate requests and flatmate groups — the things a user can post.
 
@@ -162,18 +167,50 @@ export default function MyListingsPanel({ listings, setListings, managed = [], o
     }
     toast(isSale ? `${l.title} finalized as Sold!` : t('dash.tenancy.ownerClosedToast', { title: l.title }), 'success');
     setShowDealModal(null);
+    setQuotaTick((n) => n + 1);
     await reloadRow(l);
   };
 
-  const handleReopen = async (l) => {
+  const handleReopen = async (l, availableOn) => {
     try {
-      await reopenDeal(dealIdOf(l));
+      await reopenDeal(dealIdOf(l), availableOn);
     } catch (err) {
       toast(err?.body?.error || err?.message || 'Could not reopen the listing', 'error');
-      return;
+      return false;
     }
     toast(`${l.title} reopened for listing`, 'success');
+    setQuotaTick((n) => n + 1);
     await reloadRow(l);
+    return true;
+  };
+
+  // `?relist=<id>&from=<date>` comes from the agreement-renewal strip; it is acted on once, then dropped from the URL.
+  const location = useLocation();
+  const relistRef = useRef(null);
+  const [relist, setRelist] = useState(null);
+  const relistId = new URLSearchParams(location.search).get('relist');
+  useEffect(() => {
+    if (!relistId || relistRef.current === relistId || !listingsLoaded) return;
+    relistRef.current = relistId;
+    const params = new URLSearchParams(location.search);
+    const from = params.get('from');
+    params.delete('relist');
+    params.delete('from');
+    const qs = params.toString();
+    navigate(`${location.pathname}${qs ? `?${qs}` : ''}${location.hash}`, { replace: true });
+    const l = listingsState.find((row) => !row.flatmate && !row.private && String(row.uuid || row.id) === relistId);
+    if (!l || l.dealStatus !== 'closed') {
+      toast(t('listingLifecycle.relistUnavailable'), 'error');
+      return;
+    }
+    const today = istToday();
+    setRelist({ listing: l, date: /^\d{4}-\d{2}-\d{2}$/.test(from || '') && from > today ? from : today });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per relist id, when listings have loaded
+  }, [relistId, listingsState, listingsLoaded]);
+
+  const confirmRelist = async (date) => {
+    const { listing } = relist;
+    if (await handleReopen(listing, date)) setRelist(null);
   };
   /* Carve a live rent listing into per-room supply through the seam, so the rooms reach seekers rather than one
      browser's localStorage. */
@@ -237,6 +274,7 @@ export default function MyListingsPanel({ listings, setListings, managed = [], o
     if (!window.confirm(t('listingLifecycle.pauseConfirm', { title: l.title }))) return;
     try {
       patchRow(await pauseListing(l.uuid || l.id));
+      setQuotaTick((n) => n + 1);
       toast(t('listingLifecycle.pauseToast', { title: l.title }), 'info');
     } catch (err) {
       toast(err?.body?.message || err?.message || t('listingLifecycle.pauseError'), 'error');
@@ -254,10 +292,16 @@ export default function MyListingsPanel({ listings, setListings, managed = [], o
   };
 
   const handleResume = async (l) => {
+    setResumeBlock(null);
     try {
       patchRow(await resumeListing(l.uuid || l.id));
       toast(t('listingLifecycle.resumeToast', { title: l.title }), 'success');
+      setQuotaTick((n) => n + 1);
     } catch (err) {
+      if (err?.code === 'listing_quota_exhausted') {
+        setResumeBlock({ id: l.uuid || l.id, message: err.message });
+        return;
+      }
       toast(err?.body?.message || err?.message || t('listingLifecycle.resumeError'), 'error');
     }
   };
@@ -373,10 +417,16 @@ export default function MyListingsPanel({ listings, setListings, managed = [], o
         {quota.allowance != null && (
           <p className="-mt-2 mb-4 flex items-center gap-1.5 text-xs font-medium text-gray-400">
             <Icon name="info" className="w-3.5 h-3.5 flex-shrink-0 text-teal-400" />
-            {quota.used > 0
-              ? t('listingLifecycle.quotaUsed', { used: quota.used, allowance: quota.allowance })
-              : t('listingLifecycle.quotaAvailable', { allowance: quota.allowance })}
+            {t('listingLifecycle.quotaLine', { count: quota.allowance, allowance: quota.allowance, used: quota.used })}
           </p>
+        )}
+        {resumeBlock && (
+          <div role="alert" className="mb-4 flex flex-col gap-2 rounded-xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+            <span>{resumeBlock.message || t('listingLifecycle.resumeError')}</span>
+            <Link to={`/checkout?plan=listing-pass&property=${encodeURIComponent(resumeBlock.id)}`} className="btn-teal inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-xs font-semibold text-white">
+              {t('listingLifecycle.goLive', { price: fee('listingPass') })}
+            </Link>
+          </div>
         )}
         {attentionListings.length > 0 && (
           <AttentionBanner attentionListings={attentionListings} dormantCount={dormantCount} onConfirmAll={handleConfirmAll} />
@@ -406,7 +456,7 @@ export default function MyListingsPanel({ listings, setListings, managed = [], o
                   openReview={openReview}
                   onConfirmFresh={handleConfirmFresh}
                   onConfirmListing={handleConfirmListing}
-                  onReopen={handleReopen}
+                  onReopen={(row) => (row.deal === 'rent' ? setRelist({ listing: row, date: istToday() }) : handleReopen(row))}
                   onMarkUnderOffer={handleMarkUnderOffer}
                   onFinalize={openFinalizeModal}
                   onDelete={handleDelete}
@@ -419,6 +469,8 @@ export default function MyListingsPanel({ listings, setListings, managed = [], o
                   onEditGroup={flatmateEditing.editGroup}
                   onEditPost={flatmateEditing.editPost}
                   onRenew={handleRenew}
+                  quota={quota}
+                  passPrice={fee('listingPass')}
                   t={t}
                 />
               )
@@ -436,6 +488,9 @@ export default function MyListingsPanel({ listings, setListings, managed = [], o
           onFinalize={handleFinalize}
           onClose={() => setShowDealModal(null)}
         />
+      )}
+      {relist && (
+        <RelistModal listing={relist.listing} initialDate={relist.date} onConfirm={confirmRelist} onClose={() => setRelist(null)} />
       )}
       {/* Let this flat room by room */}
 

@@ -64,7 +64,7 @@ class RentAgreementAmendmentTest extends ServiceFixtures {
                         .contentType(MediaType.APPLICATION_JSON).content(TERMS))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String id = field(json, "id");
-        serviceRequests.applyWebhookOutcome(paymentRef(id), true, 0);
+        serviceRequests.applyWebhookOutcome(paymentRef(id), true, null, null);
         return id;
     }
 
@@ -100,6 +100,36 @@ class RentAgreementAmendmentTest extends ServiceFixtures {
         em.flush();
         return jdbc.queryForMap("select title, body, link from notifications where user_id = ? and type = ?",
                 user.getId(), type);
+    }
+
+    @Test
+    @DisplayName("an underpaid amendment is not applied and is flagged to the admins once")
+    void anUnderpaidAmendmentIsNotApplied() throws Exception {
+        User owner = customer("9820008011");
+        User desk = staff("9820008012", Teams.RENTAL);
+        User admin = admin("9820008013");
+        String id = raiseWithTerms(owner);
+        setStatus(desk, id, "assigned", 200);
+        propose(desk, id, "{\"rent\":25000,\"reason\":\"Owner and tenant agreed on the call\"}")
+                .andExpect(status().isCreated());
+        String amendment = openAmendment(id);
+        accept(owner, id, amendment).andExpect(status().isOk());
+        String order = orderOf(amendment);
+
+        deliverSigned(order, true, "1.00", "INR");
+        deliverSigned(order, true, "1.00", "INR");
+
+        read(owner, id).andExpect(jsonPath("$.details.rent").value(20000))
+                .andExpect(jsonPath("$.amendment.checkoutOpen").value(true));
+        assertThat(amendmentRepo.findById(UUID.fromString(amendment)).orElseThrow().getPaidAt()).isNull();
+        assertThat(jdbc.queryForObject("select count(*) from audit_log where action = ? and entity_id = ?",
+                Integer.class, "serviceRequest.amountMismatch", order)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from notifications where user_id = ? and type = ?",
+                Integer.class, admin.getId(), "service.amount-mismatch")).isEqualTo(1);
+        jdbc.update("delete from audit_log where entity_id = ?", order);
+
+        deliverSigned(order, true);
+        read(owner, id).andExpect(jsonPath("$.details.rent").value(25000));
     }
 
     @Test
