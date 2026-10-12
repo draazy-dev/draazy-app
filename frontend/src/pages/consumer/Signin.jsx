@@ -12,6 +12,7 @@ import OtpBoxes from '../../components/auth/OtpBoxes.jsx';
 import AuthShell from '../../components/auth/AuthShell.jsx';
 import MobileAuthIntro from '../../components/auth/MobileAuthIntro.jsx';
 import TurnstileWidget from '../../components/security/TurnstileWidget.jsx';
+import { useTurnstile } from '../../components/security/useTurnstile.js';
 import RotatingNoun from '../../components/RotatingNoun.jsx';
 import { useCity } from '../../context/CityContext.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
@@ -85,12 +86,10 @@ export default function Signin() {
   const [remember, setRemember] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [done, setDone] = useState(false);
-  // A ref, not state: re-rendering the form when Turnstile solves or expires a challenge can
-  // discard a solved one and make the user sit through another.
-  const turnstileRef = useRef(null);
+  const turnstile = useTurnstile();
   /* Only a refusal a fresh code cannot fix blocks the form — a busy limiter or a dropped connection leaves the guess
      intact and must stay retryable. */
-  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstileRef.current }));
+  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstile.spend() }));
   const [verifyError, setVerifyError] = useState(null);
   const otpSpent = verifyError?.terminal === true;
   const otpCanBeRenewed = !otpSpent || verifyError?.resendable === true;
@@ -257,7 +256,7 @@ export default function Signin() {
               /* Renders nothing unless VITE_TURNSTILE_SITE_KEY is set, and the send button is not gated on a token —
                  the server alone decides whether the challenge is required. */
             <>
-              <TurnstileWidget onToken={(tok) => { turnstileRef.current = tok; }} className="flex justify-center" />
+              <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
               <button type="button" onClick={sendOtp} disabled={otp.sending} className="send-otp-btn w-full py-3 rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
                 <Send className="w-4 h-4" /> {otp.sending ? t('auth.sending') : t('auth.sendOtp')}
               </button>

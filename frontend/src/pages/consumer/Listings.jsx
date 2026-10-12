@@ -41,14 +41,16 @@ const MAP_MARKER_CAP = 100;
 const MAP_MAX_AREAS = 5;
 const LAST_LISTINGS_SEARCH_KEY = 'draazy.listings.lastSearch.v1';
 
-/* Localities are created on demand, so there is no list to match typed words against: only the words no other rule
-   claimed are looked up, then the query is parsed again with the hits. */
-async function parseWithLocalities(raw, ctx) {
-  const first = parseSmartQuery(raw, ctx);
-  const hits = first?.q ? await localitiesIn(first.q) : [];
-  if (!hits.length) return first && { ...first, hits, locNames: ctx.locNameBySlug };
+/* Localities are created on demand, so only the words no other rule claimed are looked up; the query is then parsed
+   again against the filters as they are after the lookup, so a change made meanwhile is not undone. */
+async function parseWithLocalities(raw, readCtx) {
+  const first = parseSmartQuery(raw, readCtx());
+  if (!first?.q) return first && { ...first, hits: [], locNames: readCtx().locNameBySlug };
+  const hits = await localitiesIn(first.q);
+  const ctx = readCtx();
   const locNames = { ...ctx.locNameBySlug, ...Object.fromEntries(hits.map((l) => [l.slug, l.name])) };
-  return { ...parseSmartQuery(raw, { ...ctx, localities: [...ctx.localities, ...hits], locNameBySlug: locNames }), hits, locNames };
+  const parsed = parseSmartQuery(raw, { ...ctx, localities: [...ctx.localities, ...hits], locNameBySlug: locNames });
+  return parsed && { ...parsed, hits, locNames };
 }
 const filterSignature = (value) => JSON.stringify(serializeF(value));
 let pendingDrawerBackSnapshot = null;
@@ -290,9 +292,10 @@ export default function Listings() {
 
   // A Places pick resolves to a locality that isn't in the option list yet;
   // register it (slug → name) so its chip and the dropdown summary show a friendly name.
-  const addLocalityOption = useCallback(({ slug, name, lat, lng }) => {
+  const addLocalityOption = useCallback(({ slug, name, lat, lng, archived, liveListings }) => {
     if (!slug) return;
-    setLocalities((prev) => (prev.some((l) => l.slug === slug) ? prev : [...prev, { slug, name: name || slug, lat: lat ?? null, lng: lng ?? null }]));
+    const option = { slug, name: name || slug, lat: lat ?? null, lng: lng ?? null, archived: !!archived, liveListings: liveListings || 0 };
+    setLocalities((prev) => (prev.some((l) => l.slug === slug) ? prev : [...prev, option]));
   }, []);
 
   const locNameBySlug = useMemo(() => Object.fromEntries(localities.map((l) => [l.slug, l.name])), [localities]);
@@ -412,21 +415,26 @@ export default function Listings() {
     [f, locNameBySlug, socNameBySlug, tr, freeText, clearFreeText],
   );
 
+  const parseCtxRef = useRef(null);
+  useEffect(() => { parseCtxRef.current = { current: f, localities, locNameBySlug }; });
+  const smartSeqRef = useRef(0);
+
   const applyParsed = (parsed) => {
-    if (parsed.next.deal !== f.deal) stateDrivenDealRef.current = parsed.next.deal;
+    if (parsed.next.deal !== parseCtxRef.current.current.deal) stateDrivenDealRef.current = parsed.next.deal;
     setF(parsed.next);
     setFreeText(parsed.q);
   };
 
   const parseTyped = async () => {
-    const parsed = await parseWithLocalities(aiQuery, { current: f, localities, locNameBySlug });
+    const parsed = await parseWithLocalities(aiQuery, () => parseCtxRef.current);
     parsed?.hits.filter((l) => parsed.next.localities.has(l.slug)).forEach(addLocalityOption);
     return parsed;
   };
 
   const smartSearch = async () => {
+    const seq = ++smartSeqRef.current;
     const parsed = await parseTyped();
-    if (!parsed) return;
+    if (!parsed || seq !== smartSeqRef.current) return;
     applyParsed(parsed);
     const detail = [...parsed.parts, parsed.q && tr('listings.smartFreeText', { text: parsed.q })]
       .filter(Boolean).join(' · ');

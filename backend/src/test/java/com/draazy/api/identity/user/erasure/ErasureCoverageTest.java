@@ -155,6 +155,10 @@ class ErasureCoverageTest extends AbstractApiTest {
                         + "years in which either party may sue on it, and erasing the tenant would "
                         + "destroy the landlord's proof of the tenancy at the moment a dispute makes "
                         + "it matter. See ErasureRetention#retainedWithReasons, 'rent_agreements'.");
+        map.put("tenancies.tenant_mobile",
+                "The number the owner named when closing the rent deal, which the confirming account "
+                        + "must match. Part of the closed deal's record of who the owner transacted "
+                        + "with. See ErasureRetention#retainedWithReasons, 'closed_deals_and_offers'.");
 
         map.put("managed_property_rent_receipts.landlord_name",
                 "Identifies the payee on a tax document. Income-tax Act 1961 s.10(13A) with Rule 2A; "

@@ -11,10 +11,7 @@ import javax.crypto.SecretKey;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
-/**
- * Issues and parses stateless HS256 access tokens (ADR-008). Access tokens are short-lived (15 min);
- * long-lived sessions ride on rotating refresh tokens (see {@code RefreshTokenService}).
- */
+/** Stateless HS256 access tokens, 15 minutes (ADR-008); long sessions ride on rotating refresh tokens. */
 @Service
 public class JwtService {
 
@@ -44,18 +41,24 @@ public class JwtService {
         return builder.compact();
     }
 
-    /**
-     * Verify signature + expiry and project the claims onto an {@link AuthPrincipal}. Any invalid,
-     * expired or tampered token throws, which the auth filter treats as "no authentication".
-     */
+    /** Throws on an invalid, expired or tampered token, which the auth filter treats as unauthenticated. */
     public AuthPrincipal parse(String token) {
+        return verify(token).principal();
+    }
+
+    /** {@link #parse} plus the token's issue time, which session revocation compares against. */
+    public Verified verify(String token) {
         Claims c = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
-        return new AuthPrincipal(
+        return new Verified(new AuthPrincipal(
                 UUID.fromString(c.getSubject()),
                 c.get("role", String.class),
                 c.get("team", String.class),
                 Boolean.TRUE.equals(c.get("mobileVerified", Boolean.class)),
-                Boolean.TRUE.equals(c.get("verified", Boolean.class)));
+                Boolean.TRUE.equals(c.get("verified", Boolean.class))),
+                c.getIssuedAt() == null ? Instant.EPOCH : c.getIssuedAt().toInstant());
+    }
+
+    public record Verified(AuthPrincipal principal, Instant issuedAt) {
     }
 
     public Duration accessTtl() {

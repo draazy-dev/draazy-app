@@ -1,12 +1,15 @@
 package com.draazy.api.moderation.user;
 
 import com.draazy.api.common.audit.AuditService;
+import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.trust.OwnerBadgeSink;
 import com.draazy.api.identity.auth.RefreshTokenService;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserStatuses;
+import com.draazy.api.identity.verification.IdentityVerificationService;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.Roles;
 import java.util.List;
@@ -27,23 +30,25 @@ public class UserModerationService {
     private final RefreshTokenService sessions;
 
     private final UserTimelineRepository timelines;
-    private final BadgeGrantService badgeGrants;
+    private final OwnerBadgeSink ownerBadges;
+    private final IdentityVerificationService identity;
     private final AdminActionNotifier adminNotifications;
 
     public UserModerationService(BackOfficeUserView view, AuditService audit,
             AdministratorGuard administrators, RefreshTokenService sessions,
-            UserTimelineRepository timelines, BadgeGrantService badgeGrants,
-            AdminActionNotifier adminNotifications) {
+            UserTimelineRepository timelines, OwnerBadgeSink ownerBadges,
+            IdentityVerificationService identity, AdminActionNotifier adminNotifications) {
         this.view = view;
         this.audit = audit;
         this.administrators = administrators;
         this.sessions = sessions;
         this.timelines = timelines;
-        this.badgeGrants = badgeGrants;
+        this.ownerBadges = ownerBadges;
+        this.identity = identity;
         this.adminNotifications = adminNotifications;
     }
 
-    // Suspension takes away sign-in and nothing else.
+    // Ends sign-in; Property#isOwnerSuspended hides an owner's listings until reactivation.
     @Transactional
     public void suspend(AuthPrincipal actor, String id, String reason) {
         User user = view.load(id);
@@ -55,8 +60,8 @@ public class UserModerationService {
         if (UserStatuses.SUSPENDED.equals(user.getStatus())) {
             return;
         }
-        user.setStatus(UserStatuses.SUSPENDED);
         sessions.revokeAllForUser(user.getId());
+        user.setStatus(UserStatuses.SUSPENDED);
         audit.record(actor, "user.suspend", "user", id, "reason", reason, "role", user.getRole());
         adminNotifications.managerAction(actor, "Suspended staff account", user);
     }
@@ -80,10 +85,34 @@ public class UserModerationService {
 
     // Manual badge path exists for people the document flow cannot reach.
     @Transactional
-    public Object setBadge(AuthPrincipal actor, String id, boolean granted, String reason) {
-        return granted
-                ? badgeGrants.request(actor, id, reason)
-                : badgeGrants.withdraw(actor, id, reason);
+    public AdminUserRow setBadge(AuthPrincipal actor, String id, boolean granted, String reason) {
+        User user = view.load(id);
+        String trimmedReason = reason == null ? "" : reason.trim();
+        if (trimmedReason.length() < 10 || trimmedReason.length() > 300) {
+            throw new BadRequestException("reason must be 10 to 300 characters after trimming");
+        }
+        if (actor.userId().equals(user.getId())) {
+            throw new ForbiddenException("You cannot change the Verified badge on your own account");
+        }
+        if (granted && user.isVerified()) {
+            throw new ConflictException("This user is already verified");
+        }
+        if (!granted && identity.isVerified(user.getId())) {
+            throw new ConflictException(
+                    "This badge was earned through identity verification and cannot be withdrawn "
+                            + "here. Revoke it through the identity review record instead.");
+        }
+        if (user.isVerified() != granted) {
+            user.setVerified(granted);
+            if (granted) {
+                ownerBadges.markOwnerVerified(user.getId());
+            } else {
+                ownerBadges.markOwnerUnverified(user.getId());
+            }
+        }
+        audit.record(actor, "user.badge", "user", id,
+                "granted", String.valueOf(granted), "reason", trimmedReason, "role", user.getRole());
+        return view.row(user);
     }
 
     // No self or last-admin guard: a flag takes nothing away.

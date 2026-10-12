@@ -244,8 +244,7 @@ the owner-facing sentence together under a `PESSIMISTIC_WRITE` lock on the listi
   with the checklist snapshot.
 - **On needs info:** listing stays `pending`, owner told the reason; their reply or edit resubmits.
 - **On reject:** final, with a reason code. No owner resubmission.
-- **Two-staff override** (V68 `property_verification_override_requests`, modelled on V60
-  `badge_grant_requests`): approving over a hard signal, or reopening a final reject, needs a maker
+- **Two-staff override** (V68 `property_verification_override_requests`): approving over a hard signal, or reopening a final reject, needs a maker
   (`POST /verification/override-requests {reason}`) and a *different* checker
   (`POST /verification/override-requests/{rid}/approve`). The maker, the owner and `postedByStaff`
   are refused; the checklist is still required; both steps are audited. The staff case file shows

@@ -375,9 +375,8 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.error").value("conflict"));
     }
 
-    // Enforcing future-only would force owners to lie about the slot, which is worse.
     @Test
-    void pastSlot_acceptedAtCreateTime() throws Exception {
+    void pastSlot_refusedAtCreateAndReschedule() throws Exception {
         User owner = user("9820200031", "owner");
         User visitor = user("9820200032", "buyer");
         Property p = listing(owner, "Past slot test");
@@ -386,8 +385,14 @@ class VisitEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + pastSlot() + "\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value(VisitStatuses.SCHEDULED));
+                .andExpect(status().isUnprocessableEntity());
+
+        String visitId = scheduleVisit(visitor, p);
+        mvc.perform(patch(Routes.Visits.SLOT.replace("{id}", visitId))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"slot\":\"" + pastSlot() + "\"}"))
+                .andExpect(status().isUnprocessableEntity());
     }
 
     private String rescheduledSlot() {
@@ -572,6 +577,43 @@ class VisitEndpointsTest extends AbstractApiTest {
             assertThat((String) row.get("body")).contains("The owner");
         });
         assertThat(notificationsFor(owner, "visit.cancelled")).isEmpty();
+    }
+
+    @Test
+    void archivingTheListing_cancelsItsLiveVisitsAndTellsTheVisitor() throws Exception {
+        User owner = user("9820200062", "owner");
+        User visitor = user("9820200063", "buyer");
+        Property p = listing(owner, "Archive cancels visit test");
+        String visitId = scheduleVisit(visitor, p);
+
+        mvc.perform(patch(Routes.Properties.ARCHIVE.replace("{id}", p.getId().toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk());
+
+        assertThat(visitRepo.findById(java.util.UUID.fromString(visitId)).orElseThrow().getStatus())
+                .isEqualTo(VisitStatuses.CANCELLED);
+        assertThat(jdbc.queryForObject(
+                "select count(*) from audit_log where action = 'visit.status' and entity_id = ?", Integer.class, visitId))
+                .isEqualTo(1);
+        assertThat(notificationsFor(visitor, "visit.cancelled")).singleElement().satisfies(row ->
+                assertThat((String) row.get("body")).contains("taken down"));
+    }
+
+    @Test
+    void archivingTheListing_leavesAVisitWhoseSlotHasPassed() throws Exception {
+        User owner = user("9820200900", "owner");
+        User visitor = user("9820200901", "buyer");
+        Property p = listing(owner, "Archive keeps past visit test");
+        String visitId = scheduleVisit(visitor, p);
+        jdbc.update("update visits set slot = now() - interval '1 day' where id = ?::uuid", visitId);
+
+        mvc.perform(patch(Routes.Properties.ARCHIVE.replace("{id}", p.getId().toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk());
+
+        assertThat(visitRepo.findById(java.util.UUID.fromString(visitId)).orElseThrow().getStatus())
+                .isEqualTo(VisitStatuses.SCHEDULED);
+        assertThat(notificationsFor(visitor, "visit.cancelled")).isEmpty();
     }
 
     @Test

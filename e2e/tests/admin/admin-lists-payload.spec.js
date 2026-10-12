@@ -5,7 +5,7 @@ import { API, authHeaders } from '../../helpers/liveAuth.js';
 const MASKED = /^\d{2}X{5}\d{3}$/;
 const USER_ROW_KEYS = new Set([
   'id', 'name', 'mobile', 'role', 'status', 'verified', 'city', 'listingsCount', 'joinedAt',
-  'flagged', 'flagReason', 'badgeSource', 'badgePending',
+  'flagged', 'flagReason', 'badgeSource',
 ]);
 
 function recordGets(page) {
@@ -36,17 +36,16 @@ test('the users directory returns slim rows with a masked mobile, and a page fli
       expect(Object.keys(row).filter((k) => !USER_ROW_KEYS.has(k)), `unexpected keys on ${row.name}`).toEqual([]);
       if (row.mobile) expect(row.mobile).toMatch(MASKED);
     }
-    expect(body.counts).toHaveProperty('badgePending');
+    expect(body.counts).not.toHaveProperty('badgePending');
   });
 
-  await test.step('the page loads without the grants list and counts only once', async () => {
+  await test.step('the page counts only once', async () => {
     await login.asAdmin();
     const gets = recordGets(page);
     await page.goto('/admin/users');
     await expect(page.getByTestId('queue-row').first()).toBeVisible();
     await page.waitForTimeout(500);
 
-    expect(gets.withPath('/api/admin/badge-grants')).toEqual([]);
     const first = gets.withPath('/api/users');
     expect(first).toHaveLength(1);
     expect(first[0]).toContain('counts=true');

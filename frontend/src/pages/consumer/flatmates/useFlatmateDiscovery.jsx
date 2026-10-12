@@ -256,11 +256,12 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
   const seg = segClass;
   // Once a sentence is translated into structured chips the raw sentence must be CLEARED from `q`,
   // or it keeps applying as a substring match and silently zeroes out honest results.
+  const smartSeqRef = useRef(0);
   const smartSearchFlat = async (raw = filters.q) => {
     const rawQuery = String(raw);
     const q = rawQuery.toLowerCase().trim();
     if (!q) return false;
-    urlWriteModeRef.current = 'push';
+    const seq = ++smartSeqRef.current;
     const next = { ...emptyFilters, budget: [...emptyFilters.budget], habits: [], q: rawQuery };
     const parts = [];
 
@@ -278,6 +279,8 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     const loc = (await localitiesIn(q)).map((l) => l.name)
       .filter((name) => q.includes(name.toLowerCase()))
       .sort((a, b) => b.length - a.length)[0];
+    if (seq !== smartSeqRef.current) return false;
+    urlWriteModeRef.current = 'push';
     if (loc) { next.locality = loc; parts.push(loc); }
 
     if (/\b(immediate|now|asap|urgent)\b/.test(q)) { next.moveIn = 'now'; parts.push(t('flatmates.immediate')); }

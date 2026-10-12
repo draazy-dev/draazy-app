@@ -16,10 +16,10 @@ test('smart search turns a sentence into filters and clears the raw query', asyn
 
   // The raw sentence is gone (it's now expressed as structured chips)…
   await expect(page.getByPlaceholder(SEARCH)).toHaveValue('');
-  /* Assert "narrowed but not empty" rather than an exact count, which breaks on every seed change. */
-  const after = await page.locator('.sf-card').count();
-  expect(after).toBeGreaterThan(0);
-  expect(after).toBeLessThan(before);
+  /* "Narrowed but not empty" rather than an exact count, which breaks on every seed change. Polled: a slow runner lets
+     the typing debounce search the raw sentence first, and its empty page shows until the parsed search lands. */
+  await expect.poll(() => page.locator('.sf-card').count(), { timeout: 10000 }).toBeGreaterThan(0);
+  expect(await page.locator('.sf-card').count()).toBeLessThan(before);
 });
 
 test('smart search keeps an unparseable query as a literal text filter', async ({ page }) => {
@@ -67,4 +67,28 @@ test('raising the budget from the empty state recovers matches', async ({ page }
 
   // The list comes back once the budget clears the cheapest match.
   await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 5000 });
+});
+
+test('a slow locality lookup neither searches the raw sentence nor lets an older search win', async ({ page }) => {
+  await page.route('**/api/localities/search**', async (route) => {
+    if (/baner/i.test(route.request().url())) await new Promise((r) => setTimeout(r, 1500));
+    return route.fallback();
+  });
+  const feeds = [];
+  page.on('request', (r) => { if (/\/flatmates\/feed\?/.test(r.url())) feeds.push(new URL(r.url()).searchParams); });
+  await page.goto(`${BASE}/flatmates?view=flatmates`);
+  await page.locator('.sf-card').first().waitFor({ timeout: 10000 });
+
+  const box = page.getByPlaceholder(SEARCH);
+  await box.fill('woman in baner');
+  await box.press('Enter');
+  await page.waitForTimeout(1000);
+  await box.fill('man');
+  await box.press('Enter');
+  await page.waitForTimeout(2000);
+
+  expect(feeds.some((p) => /baner/i.test(p.get('q') || '')), 'the raw sentence reached the server').toBe(false);
+  const last = feeds.at(-1);
+  expect(last.get('gender')).toBe('male');
+  expect(last.get('locality') || '').not.toMatch(/baner/i);
 });

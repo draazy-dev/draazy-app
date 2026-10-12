@@ -19,7 +19,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
@@ -59,12 +58,12 @@ public class AdminSettingsService {
     // An unparseable row is skipped: an admin locked out cannot fix the row that locked them out.
     @Transactional(readOnly = true)
     public SettingsDocument current() {
-        List<Setting> rows = settings.findAll(Sort.by("key"));
+        List<Object[]> rows = settings.storedText();
         Map<String, Object> document = new TreeMap<>();
-        for (Setting row : rows) {
-            JsonNode value = parseOrNull(row.getKey(), row.getValue());
+        for (Object[] row : rows) {
+            JsonNode value = parseOrNull((String) row[0], (String) row[1]);
             if (value != null) {
-                document.put(row.getKey(), objectMapper.convertValue(value, Object.class));
+                document.put((String) row[0], objectMapper.convertValue(value, Object.class));
             }
         }
         return new SettingsDocument(document, etag(rows));
@@ -80,22 +79,23 @@ public class AdminSettingsService {
                 .orElseGet(Map::of);
     }
 
-    // Strong hash of every stored block, taken in the transaction that produced the body it describes.
+    // Strong hash of every stored block as jsonb renders it, so a tag taken after a write matches the next read.
     private String etag() {
-        return etag(settings.findAll(Sort.by("key")));
+        settings.flush();
+        return etag(settings.storedText());
     }
 
-    private static String etag(List<Setting> rows) {
+    private static String etag(List<Object[]> rows) {
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is required of every JRE", impossible);
         }
-        for (Setting row : rows) {
-            digest.update(row.getKey().getBytes(StandardCharsets.UTF_8));
+        for (Object[] row : rows) {
+            digest.update(((String) row[0]).getBytes(StandardCharsets.UTF_8));
             digest.update((byte) 0);
-            digest.update(row.getValue().getBytes(StandardCharsets.UTF_8));
+            digest.update(((String) row[1]).getBytes(StandardCharsets.UTF_8));
             digest.update((byte) 0);
         }
         return "\"" + HexFormat.of().formatHex(digest.digest(), 0, 16) + "\"";

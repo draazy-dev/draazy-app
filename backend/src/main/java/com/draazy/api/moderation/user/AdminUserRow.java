@@ -17,6 +17,5 @@ public record AdminUserRow(
         Instant joinedAt,
         Boolean flagged,
         String flagReason,
-        String badgeSource,
-        boolean badgePending) {
+        String badgeSource) {
 }

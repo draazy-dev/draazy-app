@@ -6,6 +6,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,10 +16,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * Resolves {@code Authorization: Bearer <jwt>} into a Spring Security authentication on every
- * request. Rationale: docs/system/cross-cutting.md#jwt-auth-filter.
- */
+/** Resolves the bearer token on every request. Rationale: docs/system/cross-cutting.md#jwt-auth-filter. */
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private static final String BEARER = "Bearer ";
@@ -40,7 +38,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 AuthPrincipal principal =
-                        current(jwtService.parse(header.substring(BEARER.length())));
+                        current(jwtService.verify(header.substring(BEARER.length())));
                 var authority = new SimpleGrantedAuthority("ROLE_" + principal.role().toUpperCase());
                 var auth = new UsernamePasswordAuthenticationToken(
                         principal, null, List.of(authority));
@@ -55,12 +53,19 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         chain.doFilter(request, response);
     }
 
-    /**
-     * The same principal with the account's current role substituted for the claimed one. No row
-     * means the database has nothing to say and the claim stands; only the role is re-resolved.
-     */
-    private AuthPrincipal current(AuthPrincipal claimed) {
-        String role = roles.roleOf(claimed.userId()).orElse(claimed.role());
+    // The live role replaces the claimed one (no row: the claim stands). A blocked account, or a token issued
+    // in or before the second its sessions were revoked (iat is whole seconds), is refused.
+    private AuthPrincipal current(JwtService.Verified token) {
+        AuthPrincipal claimed = token.principal();
+        var standing = roles.standingOf(claimed.userId());
+        if (standing.isEmpty()) {
+            return claimed;
+        }
+        Instant revoked = standing.get().getSessionsRevokedAt();
+        if (standing.get().isBlocked() || (revoked != null && !token.issuedAt().isAfter(revoked))) {
+            throw new JwtException("Session revoked");
+        }
+        String role = standing.get().getRole();
         if (role.equals(claimed.role())) {
             return claimed;
         }

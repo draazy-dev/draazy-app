@@ -34,6 +34,7 @@ public interface FlatmateRoomRepository extends JpaRepository<FlatmateRoom, UUID
             select r from FlatmateRoom r
             where r.id = :id and r.archived = false
               and r.modStatus in ('live','approved')
+              and not exists (select 1 from User u where u.id = r.hostId and u.status = 'suspended')
             """)
     Optional<FlatmateRoom> findVisible(@Param("id") UUID id);
 

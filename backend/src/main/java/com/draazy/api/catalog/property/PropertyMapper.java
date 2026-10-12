@@ -47,7 +47,7 @@ public interface PropertyMapper {
     PropertyCard toCard(Property property);
 
     @Mapping(target = "coverImage", expression = COVER)
-    @Mapping(target = "available", expression = "java(PropertyStatus.APPROVED.equals(property.getStatus()))")
+    @Mapping(target = "available", expression = "java(property.isPubliclyVisible())")
     SavedCard toSaved(Property property);
 
     @Mapping(target = "coverImage", expression = COVER)

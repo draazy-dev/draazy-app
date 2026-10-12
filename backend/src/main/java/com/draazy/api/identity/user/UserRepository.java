@@ -44,10 +44,13 @@ public interface UserRepository extends JpaRepository<User, UUID>, RoleSource {
     boolean existsOtherLiveWithEmailIgnoreCase(@Param("email") String email,
             @Param("excluding") UUID excluding);
 
-    // Scalar projection because the bearer-token filter needs only the current role.
+    // Scalar projection because the bearer-token filter needs only these columns.
     @Override
-    @Query("select u.role from User u where u.id = :id")
-    Optional<String> roleOf(@Param("id") UUID id);
+    @Query("""
+            select u.role as role, u.sessionsRevokedAt as sessionsRevokedAt,
+                   case when u.archived = true or u.status <> 'active' then true else false end as blocked
+            from User u where u.id = :id""")
+    Optional<RoleSource.Standing> standingOf(@Param("id") UUID id);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""

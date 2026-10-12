@@ -5,9 +5,12 @@ import Icon from '../Icon.jsx';
 import Modal from '../ui/Modal.jsx';
 import DateField from '../ui/DateField.jsx';
 import TimeField from '../ui/TimeField.jsx';
-import { parseWhen, formatWhen } from '../../lib/visitWhen.js';
+import { parseWhen, formatWhen, slotFromParts, todayIso } from '../../lib/visitWhen.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { isVisitHost } from '../../pages/consumer/dashboard/dashboardData.js';
+
+const isPastSlot = (date, time) => new Date(slotFromParts(date, time)) <= new Date();
+
 /* Intl ships month and weekday names for hi and mr, so the calendar chrome reads in the visitor's language without a
    hand-maintained table to drift. */
 
@@ -107,12 +110,15 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
   const openReschedule = (v) => {
     const p = parseWhen(v.when);
     setReschedule(v);
-    setReDate(p.date ? dateKeyOf(p.date) : '');
-    setReTime(p.timeLabel || '10:30 AM');
+    const date = p.date ? dateKeyOf(p.date) : '';
+    const time = p.timeLabel || '10:30 AM';
+    setReDate(date && !isPastSlot(date, time) ? date : '');
+    setReTime(time);
   };
+  const rePast = !!reDate && !!reTime && isPastSlot(reDate, reTime);
   const closeReschedule = () => { setReschedule(null); setReDate(''); setReTime(''); };
   const saveReschedule = async () => {
-    if (!reschedule || !reDate || !reTime) return;
+    if (!reschedule || !reDate || !reTime || isPastSlot(reDate, reTime)) return;
     const id = reschedule.id;
     // Keep the visit's original mode (in-person / video) and fold date + time back
     // into one `when` string that parseWhen can read, so the chosen slot persists.
@@ -280,7 +286,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
       footer={(
         <>
           <button onClick={closeReschedule} className={btnGhost}>{t('visits.cancel')}</button>
-          <button onClick={saveReschedule} disabled={!reDate || !reTime} className={btnConfirm + ' disabled:opacity-40 disabled:cursor-not-allowed'}><Icon name="calendar-check" className="w-3.5 h-3.5" /> {t('visits.saveSlot')}</button>
+          <button onClick={saveReschedule} disabled={!reDate || !reTime || rePast} aria-describedby={rePast ? 're-past-hint' : undefined} className={btnConfirm + ' disabled:opacity-40 disabled:cursor-not-allowed'}><Icon name="calendar-check" className="w-3.5 h-3.5" /> {t('visits.saveSlot')}</button>
         </>
       )}
     >
@@ -291,6 +297,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
           <DateField
             value={reDate}
             onChange={(iso) => setReDate(iso)}
+            min={todayIso()}
             className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white"
             ariaLabel={t('visits.newDate')}
           />
@@ -301,6 +308,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
             className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white"
             ariaLabel={t('visits.newTime')}
           />
+          {rePast ? <p id="re-past-hint" role="alert" className="text-xs text-rose-300">{t('visits.pastSlot')}</p> : null}
           <p className="text-xs text-gray-500">{isVisitHost(reschedule, user?.id) ? t('visits.reconfirmVisitor') : t('visits.reconfirmOwner')}</p>
           {(() => {
             if (!isVisitHost(reschedule, user?.id)) return null;

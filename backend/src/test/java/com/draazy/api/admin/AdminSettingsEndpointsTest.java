@@ -12,6 +12,8 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -22,6 +24,7 @@ import org.springframework.http.MediaType;
 class AdminSettingsEndpointsTest extends AbstractApiTest {
 
     @Autowired UserRepository users;
+    @PersistenceContext EntityManager em;
 
     private String bearer(String mobile, String role) {
         User u = new User(mobile, role);
@@ -274,6 +277,28 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isPreconditionFailed());
 
         assertThat(auditRows()).isEqualTo(before);
+    }
+
+    /** jsonb re-renders what was written, so the tag a save returns must still match on the page's next save. */
+    @Test
+    void theTagASaveReturnsStillMatchesAfterAFreshRead() throws Exception {
+        String token = bearer("9877710030", Roles.Wire.ADMIN);
+        String tag = mvc.perform(put(Routes.Admin.SETTINGS)
+                        .header(HttpHeaders.AUTHORIZATION, token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"geo\":{\"enforceCityLimit\":false}}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getHeader(HttpHeaders.ETAG);
+        em.flush();
+        em.clear();
+
+        assertThat(etag(token)).isEqualTo(tag);
+        mvc.perform(put(Routes.Admin.SETTINGS)
+                        .header(HttpHeaders.AUTHORIZATION, token)
+                        .header(HttpHeaders.IF_MATCH, tag)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"geo\":{\"enforceCityLimit\":true}}"))
+                .andExpect(status().isOk());
     }
 
     private String etag(String token) throws Exception {

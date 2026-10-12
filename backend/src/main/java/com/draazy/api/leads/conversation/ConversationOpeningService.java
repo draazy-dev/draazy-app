@@ -129,6 +129,7 @@ public class ConversationOpeningService {
                 ? null
                 : Ids.parseUuid(body.propertyId()).orElseThrow(ConversationOpeningService::refuse);
         Property listing = propertyId == null ? null : properties.findById(propertyId)
+                .filter(p -> !p.isOwnerSuspended())
                 .orElseThrow(ConversationOpeningService::refuse);
 
         User counterparty = body.counterpartyMobile() == null || body.counterpartyMobile().isBlank()

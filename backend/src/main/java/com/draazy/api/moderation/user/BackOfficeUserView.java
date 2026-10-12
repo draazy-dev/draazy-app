@@ -23,14 +23,11 @@ class BackOfficeUserView {
     private final UserRepository users;
     private final UserMapper mapper;
     private final IdentityVerificationService identity;
-    private final BadgeGrantRequestRepository badgeRequests;
 
-    BackOfficeUserView(UserRepository users, UserMapper mapper, IdentityVerificationService identity,
-            BadgeGrantRequestRepository badgeRequests) {
+    BackOfficeUserView(UserRepository users, UserMapper mapper, IdentityVerificationService identity) {
         this.users = users;
         this.mapper = mapper;
         this.identity = identity;
-        this.badgeRequests = badgeRequests;
     }
 
     /** Resolve an opaque id, or 404. Tolerates a malformed id rather than 500-ing on it. */
@@ -58,13 +55,10 @@ class BackOfficeUserView {
         return rows(List.of(user)).get(0);
     }
 
-    /** One identity query and one pending-grant query for the whole page, not one per row. */
+    /** One identity query for the whole page, not one per row. */
     List<AdminUserRow> rows(List<User> page) {
-        List<UUID> ids = page.stream().map(User::getId).toList();
         Set<UUID> identityBacked = identity.verifiedAmong(
                 page.stream().filter(User::isVerified).map(User::getId).toList());
-        Set<UUID> pending = ids.isEmpty() ? Set.of()
-                : Set.copyOf(badgeRequests.userIdsWithStatus(ids, BadgeGrantStatuses.PENDING));
         return page.stream().map(user -> {
             UserResponse base = mapper.toResponse(user);
             String source = !user.isVerified() ? null
@@ -72,12 +66,8 @@ class BackOfficeUserView {
             return new AdminUserRow(base.id(), base.name(), MobileMask.mask(base.mobile()), base.role(),
                     base.status(), base.verified(), base.city(), base.listingsCount(),
                     base.joinedAt() != null ? base.joinedAt() : base.createdAt(),
-                    user.isFlagged(), user.getFlagReason(), source, pending.contains(user.getId()));
+                    user.isFlagged(), user.getFlagReason(), source);
         }).toList();
-    }
-
-    long pendingBadgeGrants() {
-        return badgeRequests.countByStatus(BadgeGrantStatuses.PENDING);
     }
 
     private String badgeSource(User user) {

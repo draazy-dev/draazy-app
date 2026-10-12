@@ -3,6 +3,7 @@ package com.draazy.api.catalog.society;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.persistence.LikePatterns;
+import com.draazy.api.identity.user.UserStatuses;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
@@ -73,6 +74,7 @@ public final class SocietySpecs {
                         cb.equal(owner.get("id"), society.get("id")),
                         cb.equal(owner.get("mergedInto"), society.get("id"))),
                 cb.equal(listing.get("status"), PropertyStatus.APPROVED),
-                cb.isFalse(listing.get("archived")));
+                cb.isFalse(listing.get("archived")),
+                cb.notEqual(listing.get("owner").get("status"), UserStatuses.SUSPENDED));
     }
 }

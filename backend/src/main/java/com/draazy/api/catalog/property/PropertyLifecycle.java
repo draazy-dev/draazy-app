@@ -88,6 +88,11 @@ public class PropertyLifecycle {
         }
     }
 
+    // Deals listens so visits booked against a withdrawn listing are cancelled with it.
+    public void announceArchived(Property property) {
+        events.publishEvent(new PropertyArchived(property.getId()));
+    }
+
     /** Tells the owner their listing was approved, or that the free tier held it back. */
     public void announceApproval(Property property) {
         UUID ownerId = property.getOwner().getId();

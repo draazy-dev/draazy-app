@@ -540,8 +540,7 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].email").doesNotExist())
                 .andExpect(jsonPath("$.content[0].hideNumber").doesNotExist())
                 .andExpect(jsonPath("$.content[0].permissions").doesNotExist())
-                .andExpect(jsonPath("$.content[0].mobileVerified").doesNotExist())
-                .andExpect(jsonPath("$.content[0].badgePending").value(false));
+                .andExpect(jsonPath("$.content[0].mobileVerified").doesNotExist());
     }
 
     @Test

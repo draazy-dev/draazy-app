@@ -1138,10 +1138,9 @@ public final class DataExportScope {
                                 + "an export that had to get one boolean right to avoid disclosing "
                                 + "staff deliberation is an export one migration away from getting "
                                 + "it wrong."),
-                new Exclusion("staff_invites / badge_grant_requests",
+                new Exclusion("staff_invites",
                         "The paperwork behind a staff account, naming the administrator who "
-                                + "invited it, and badge maker-checker rows naming "
-                                + "the staff who requested or decided a trust signal."),
+                                + "invited it."),
                 new Exclusion("page_view_daily and its path/referrer rollups",
                         "Daily traffic totals. They carry no user id, no session id and no path "
                                 + "attributable to a person — they are what the raw page_views "

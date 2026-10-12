@@ -101,7 +101,7 @@ test.describe('Scheduled visits (live)', () => {
 
     await test.step('confirming one visit moves only that row, and the handoff appears without a reload', async () => {
       await page.getByRole('button', { name: /^Confirm$/ }).first().click();
-      // The count is re-read from the server after the write (useDashboardData#mutateVisit), so this is the server's answer.
+      // Re-read from the server after the write (useDashboardData#mutateVisit), so this is the server's answer.
       await expect(badges(page, 'Confirmed')).toHaveCount(1);
       await expect(badges(page, 'Awaiting confirmation')).toHaveCount(1);
 
@@ -194,5 +194,40 @@ test.describe('Scheduled visits (live)', () => {
     // The row is on screen and fully rendered — and carries no route to the owner's number.
     await expect(page.getByRole('link', { name: /WhatsApp/i })).toHaveCount(0);
     await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+  });
+
+  test('a slot in the past is refused at booking and at reschedule', async () => {
+    const { listingId, visitors } = await scene(['Past Slot Visitor']);
+    const [visitor] = visitors;
+    const past = slotDaysAhead(-1);
+    const booked = await api('POST', '/visits', visitor.headers, { propertyId: listingId, slot: past, mode: 'in-person' });
+    expect(booked.status).toBe(422);
+    const moved = await api('PATCH', `/visits/${visitor.visitId}/slot`, visitor.headers, { slot: past });
+    expect(moved.status).toBe(422);
+  });
+
+  test('taking the listing down cancels its booked visits', async () => {
+    const { owner, listingId, visitors } = await scene(['Archive Visit Visitor']);
+    const [visitor] = visitors;
+    const archived = await api('PATCH', `/properties/${listingId}/archive`, owner.headers, { reason: 'Let out offline' });
+    expect(archived.status).toBe(200);
+    const mine = await api('GET', '/visits?size=50', visitor.headers);
+    expect(mine.status).toBe(200);
+    expect(mine.body.content.find((v) => v.id === visitor.visitId)?.status).toBe('cancelled');
+  });
+
+  test('a suspended owner\'s listing is hidden and takes no visits until reactivated', async () => {
+    const { owner, listingId } = await scene([]);
+    const ownerId = (await api('GET', '/auth/me', owner.headers)).body.id;
+    const admin = await authHeaders(ACTORS.admin);
+    const buyer = await actor('Suspended Owner Buyer');
+    expect((await api('PATCH', `/users/${ownerId}/suspend`, admin, { reason: 'QA check' })).status).toBe(200);
+
+    expect((await api('GET', `/properties/${listingId}`, buyer.headers)).status).toBe(404);
+    const booked = await api('POST', '/visits', buyer.headers, { propertyId: listingId, slot: slotDaysAhead(2), mode: 'in-person' });
+    expect(booked.status).toBe(404);
+
+    expect((await api('PATCH', `/users/${ownerId}/reactivate`, admin)).status).toBe(200);
+    expect((await api('GET', `/properties/${listingId}`, buyer.headers)).status).toBe(200);
   });
 });

@@ -115,8 +115,7 @@ public class UserAdminService {
                 suspended += n;
             }
         }
-        return Map.of("all", all, "active", active, "suspended", suspended, "archived", archived,
-                "badgePending", view.pendingBadgeGrants());
+        return Map.of("all", all, "active", active, "suspended", suspended, "archived", archived);
     }
 
     // Anchored prefix: ?q=% would otherwise be an unanchored scan of every user.
@@ -192,8 +191,8 @@ public class UserAdminService {
             throw new ForbiddenException("You cannot archive your own account");
         }
         administrators.refuseIfLastAdministrator(user);
-        user.archive(reason);
         refreshTokens.revokeAllForUser(user.getId());
+        user.archive(reason);
         audit.record(actor, "user.archive", "user", id, "reason", reason, "role", user.getRole());
         adminNotifications.managerAction(actor, "Archived staff account", user);
     }
@@ -292,8 +291,8 @@ public class UserAdminService {
     @Transactional
     public void resetSecondFactor(AuthPrincipal actor, String id) {
         User target = loadBackOfficeColleague(actor, id, "reset your own authenticator");
-        staffSignIn.resetSecondFactor(target.getId());
         refreshTokens.revokeAllForUser(target.getId());
+        staffSignIn.resetSecondFactor(target.getId());
         audit.record(actor, "user.staff.2fa.reset", "user", id, "role", target.getRole());
         adminNotifications.managerAction(actor, "Reset 2FA", target);
     }

@@ -29,6 +29,7 @@ import org.springframework.web.method.annotation.HandlerMethodValidationExceptio
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import tools.jackson.core.JacksonException;
 
 /** The single translation point from exceptions to the OpenAPI error envelope; no controller builds its own body.
  * Status mapping and non-obvious handlers: docs/system/api-standards.md §4. */
@@ -97,9 +98,29 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException ex) {
         log.debug("Unreadable request body [traceId={}]: {}", traceId(), ex.getMessage());
+        String field = fieldPath(ex);
+        String message = field == null ? ErrorCodes.Messages.MALFORMED_BODY
+                : "Invalid value for field: " + field;
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(new ApiError(ErrorCodes.BAD_REQUEST, ErrorCodes.Messages.MALFORMED_BODY,
-                        400, traceId()));
+                .body(new ApiError(ErrorCodes.BAD_REQUEST, message, 400, traceId()));
+    }
+
+    // Built from property names only: Jackson's own path reference names the Java class.
+    private static String fieldPath(Throwable ex) {
+        for (Throwable t = ex; t != null; t = t.getCause()) {
+            if (t instanceof JacksonException json && !json.getPath().isEmpty()) {
+                StringBuilder path = new StringBuilder();
+                for (JacksonException.Reference ref : json.getPath()) {
+                    if (ref.getPropertyName() != null) {
+                        path.append(path.isEmpty() ? "" : ".").append(ref.getPropertyName());
+                    } else if (ref.getIndex() >= 0) {
+                        path.append('[').append(ref.getIndex()).append(']');
+                    }
+                }
+                return path.isEmpty() || path.length() > 100 ? null : path.toString();
+            }
+        }
+        return null;
     }
 
     /** A missing or untypeable query/path parameter → 400 naming only the parameter: the name is contract,

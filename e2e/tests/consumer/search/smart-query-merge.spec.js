@@ -110,3 +110,25 @@ test('"above N sq ft" sets only the floor of the area range', async ({ page }) =
   await expect(page).toHaveURL(/[?&]area=1200-6000(&|$)/, { timeout: 10000 });
   await expect(page).not.toHaveURL(/[?&]q=/);
 });
+
+test('a slower earlier smart search cannot overwrite the one typed after it', async ({ page }) => {
+  await page.route('**/api/localities/search**', async (route) => {
+    const q = (new URL(route.request().url()).searchParams.get('q') || '').toLowerCase();
+    if (q.includes('baner')) await new Promise((r) => setTimeout(r, 1500));
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(REGISTRY.filter((r) => q.includes(r.name.toLowerCase()))),
+    });
+  });
+  await page.setViewportSize({ width: 1366, height: 900 });
+  await page.goto(`${BASE}/listings?deal=rent`);
+
+  await smartSearch(page, 'baner');
+  await smartSearch(page, 'kharadi');
+
+  await expect(page.locator('.af-chip', { hasText: /Kharadi/i }).first()).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(2000);
+  await expect(page.locator('.af-chip', { hasText: /Baner/i })).toHaveCount(0);
+  await expect(page.locator('.af-chip', { hasText: /Kharadi/i }).first()).toBeVisible();
+});

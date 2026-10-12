@@ -154,6 +154,7 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
   const { t } = useTranslation();
   const [qDraft, setQDraft] = useState(filters.q);
   const [smartClearPending, setSmartClearPending] = useState(false);
+  const [smartParsing, setSmartParsing] = useState(false);
   const qInputRef = useRef(null);
   const sawSmartLoadingRef = useRef(false);
   const SORT_OPTIONS = flatmateSortOptions(t);
@@ -168,11 +169,11 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
   }, [drawer]);
   useEffect(() => { setQDraft(filters.q); }, [filters.q]);
   useEffect(() => {
-    if (smartClearPending) return undefined;
+    if (smartClearPending || smartParsing) return undefined;
     if (qDraft === filters.q) return undefined;
     const timer = window.setTimeout(() => setF({ q: qDraft }), 800);
     return () => window.clearTimeout(timer);
-  }, [filters.q, qDraft, setF, smartClearPending]);
+  }, [filters.q, qDraft, setF, smartClearPending, smartParsing]);
   useEffect(() => {
     if (!smartClearPending) return;
     if (searching) {
@@ -186,9 +187,14 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
   }, [searching, smartClearPending]);
   const submitSmartSearch = async () => {
     const query = qInputRef.current?.value ?? qDraft;
-    if (await smartSearchFlat(query)) {
-      sawSmartLoadingRef.current = false;
-      setSmartClearPending(true);
+    setSmartParsing(true);
+    try {
+      if (await smartSearchFlat(query)) {
+        sawSmartLoadingRef.current = false;
+        setSmartClearPending(true);
+      }
+    } finally {
+      setSmartParsing(false);
     }
   };
   const activeCount = Object.keys(emptyFilters).filter((k) => {

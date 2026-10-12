@@ -565,6 +565,7 @@
     "enterName": "Please enter your name",
     "validMobile": "Enter a valid 10-digit mobile number",
     "visitRequestedToast": "Visit requested — the owner will confirm shortly.",
+    "pastSlot": "Past times can't be booked. Pick a later time or another day.",
     "visitAlreadyBooked": "You already have a visit booked on this property. Manage it from your dashboard.",
     "visitRequestFailed": "Could not request that visit. Please try again.",
     "scheduleVisitSub": "Pick a slot — we'll confirm directly with the owner.",

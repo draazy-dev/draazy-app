@@ -1,6 +1,8 @@
 package com.draazy.api.security;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -22,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 
 @DisplayName("A forged, expired or re-signed access token never authenticates")
 class TokenTamperingTest extends AbstractApiTest {
@@ -49,12 +52,16 @@ class TokenTamperingTest extends AbstractApiTest {
     }
 
     private String signed(SecretKey key, String role, Instant expiry) {
+        return signed(key, role, Instant.now().minusSeconds(120), expiry);
+    }
+
+    private String signed(SecretKey key, String role, Instant issued, Instant expiry) {
         return Jwts.builder()
                 .subject(buyer.getId().toString())
                 .claim("role", role)
                 .claim("mobileVerified", true)
                 .claim("verified", false)
-                .issuedAt(Date.from(Instant.now().minusSeconds(120)))
+                .issuedAt(Date.from(issued))
                 .expiration(Date.from(expiry))
                 .signWith(key)
                 .compact();
@@ -132,5 +139,55 @@ class TokenTamperingTest extends AbstractApiTest {
     void badBearerOnPublicRouteStillServes() throws Exception {
         mvc.perform(get("/properties").header(HttpHeaders.AUTHORIZATION, "Bearer not.a.token"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("a token issued before logout stops working at once; a new sign-in works")
+    void logoutEndsTheAccessToken() throws Exception {
+        String token = validToken();
+        mvc.perform(post(Routes.Auth.LOGOUT).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        assertAnonymous(token);
+        // A token minted in the revocation's own second is refused too, so the fresh sign-in waits it out.
+        Thread.sleep(1_050 - System.currentTimeMillis() % 1_000);
+        mvc.perform(get(PROTECTED).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("a token minted in the same second as the logout is refused")
+    void aTokenFromTheLogoutSecondIsRefused() throws Exception {
+        String token = signed(key(secret), Roles.Wire.BUYER, Instant.now(), Instant.now().plus(Duration.ofMinutes(10)));
+        mvc.perform(post(Routes.Auth.LOGOUT).header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+                .andExpect(status().isNoContent());
+
+        assertAnonymous(token);
+    }
+
+    @Test
+    @DisplayName("a suspended account's token is refused even with no revocation stamp")
+    void aSuspendedAccountIsRefusedWithoutAStamp() throws Exception {
+        String token = validToken();
+        jdbc.update("UPDATE users SET status = 'suspended' WHERE id = ?", buyer.getId());
+
+        assertAnonymous(token);
+    }
+
+    @Test
+    @DisplayName("a token issued before suspension stops working at once")
+    void suspensionEndsTheAccessToken() throws Exception {
+        String token = validToken();
+        User admin = new User("9791110002", Roles.Wire.ADMIN);
+        admin.setMobileVerified(true);
+        users.saveAndFlush(admin);
+
+        mvc.perform(patch(Routes.Users.SUSPEND.replace("{id}", buyer.getId().toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"fraud report\"}"))
+                .andExpect(status().isOk());
+
+        assertAnonymous(token);
     }
 }

@@ -61,8 +61,8 @@
 - **Badge grant is staff-decided, not self-service.** The user (maker) opts in and submits a
   government document plus a live selfie through the consumer badge flow; a reviewer works the ops
   identity queue (`/ops/kyc-review`, and `/admin/kyc-review` for the same screen behind the module
-  guard), or an admin confirms offline docs here and **requests** the badge, which a second admin
-  must approve (§6). A reviewer can never decide their own case (403).
+  guard), or a manager or admin confirms offline docs here and grants the badge in one step with a
+  reason (§6). A reviewer can never decide their own case, and nobody can badge themselves (403).
 - **Review claims are soft assignment.** A reviewer may claim a pending case for 30 minutes; a fresh
   claim blocks another reviewer from claiming or deciding, but stale claims are takeable and
   unclaimed cases can still be decided directly.
@@ -71,7 +71,7 @@
   is enforced as **one document → one badge** via the UNIQUE `identity_hash` (ADR-009b), set at
   approval, inside the opt-in badge flow only.
 - **Both paths write the same `verified` boolean; the origin is derived.** Earned = an
-  `identity_verifications` row in `verified`; hand-granted = an approved `badge_grant_requests` row.
+  `identity_verifications` row in `verified`; hand-granted = `verified` with no such row.
   An earned badge is withdrawn only by **revoking** the identity case (reason required, audited);
   a hand-granted one by the immediate withdraw on this screen. The back-office user payload carries
   the derived `badgeSource` (`identity`/`manual`) so the console disables withdraw on an earned one.
@@ -119,6 +119,8 @@ missed:
 | Restore | `restoreRecord('users', id, 'active')` | `archived=false`, `status='active'`; "Restored" |
 
 - **Suspend** is the ban lever: a suspended account keeps its data but is treated as inactive.
+  Its access tokens stop working at once (`users.sessions_revoked_at`), and an owner's listings
+  are hidden from search and the property page, taking no new visits or contacts, until reactivated.
 - **Archive** is soft-delete (cross-cutting section 4); restore reactivates.
 - A **staff note** on the account is a separate, deliberate act — see 5.6 — because the reason for a
   decision and what the team knows about a person are different records with different lifetimes.
@@ -167,9 +169,9 @@ rather than an absent panel, so "nobody has written one" is distinguishable from
 |---|---|---|---|
 | Earned badge (document + selfie) | the user (submits case) | identity reviewer (`identity:write`) | service 403 when reviewer = subject |
 | QA sample of an earned badge | identity reviewer who approved | second identity reviewer | service 403 + V62 CHECKs: checker ≠ approver, checker ≠ subject |
-| Hand-granted badge | admin A (`PATCH /users/{id}/badge` → 202 pending) | admin B (`/admin/badge-grants/{id}/approve`) | service 403 + V60 CHECKs: maker ≠ subject, checker ≠ maker, checker ≠ subject; one pending per user |
+| Hand-granted badge | - | single manager or admin (`PATCH /users/{id}/badge`), reason 10..300 | service 403 when actor = subject; 409 if already verified; audited `user.badge` |
 | Revoke earned badge | - | single admin, reason 10..300 | protective direction; audited |
-| Withdraw hand-granted badge | - | single admin, reason | protective direction; audited |
+| Withdraw hand-granted badge | - | single manager or admin, reason | protective direction; audited |
 
 Every decision and every staff detail view of a case (it mints signed image URLs) writes an audit
 row. See [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.
@@ -198,7 +200,6 @@ differs from the applicant's entry is a soft stop (409 `identity_number_mismatch
   user.
 - **Identity QA:** `verified + qa_sampled_at → confirmed | revoked`; `confirmed` closes the sample,
   `revoked` runs the earned-badge revoke path with the QA reviewer as revoker.
-- **Badge grant request:** `pending → approved | rejected` (terminal).
 - **`flagged`:** `false <-> true` (advisory marker; does not change access).
 - **Terminal-ish:** `archived` (re-openable by restore, which forces `status='active'`).
 
@@ -260,8 +261,9 @@ Rationale relocated from `UserModerationService` Javadoc.
 - **The manual badge exists because the document-and-selfie flow cannot reach everybody** - a
   company account, or a person an administrator has met and whose documents they have seen. Without
   it those people are permanently unverifiable and the judgement moves off-platform. Because it
-  skips the `identity_hash` dedup, one administrator's word is not enough: the grant is a request a
-  second administrator approves.
+  skips the `identity_hash` dedup, every grant carries a written reason and an audit entry. There is
+  one administrator, so a second-admin approval could never complete; a manager or the admin
+  decides it directly. The old maker-checker table `badge_grant_requests` was dropped in V118.
 - **Withdrawing an earned badge is refused here** - doubt about the verification is an action
   against the verification record (revoke), which keeps the evidence and the reason together.
 - **Badge changes propagate in both directions** to the person's listings, flatmate seeker posts and

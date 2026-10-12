@@ -2,10 +2,12 @@ package com.draazy.api.moderation.user;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.draazy.api.common.access.BackOfficeGrantRepository;
+import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -19,24 +21,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * D200, half 1 — no operation may leave the platform with nobody able to hand back-office access
- * back.
- *
- * <h2>How the lockout is reachable at all</h2>
- *
- * <p>It looks at first as though it cannot be: the caller of every guarded route holds
- * {@code users:write} by definition and self-archive is already 403,
- * so the actor always survives their own request. What breaks that reasoning is that
- * <strong>{@code JwtAuthFilter} is stateless</strong>. Archiving somebody does not revoke the token
- * they are already holding (the same asymmetry D201 records for role changes), so an administrator
- * who has just been archived keeps acting for the remainder of their token's life — and the account
- * they act against is the only one left. Two administrators, two requests, no race required, and
- * afterwards nobody can sign into the back office again.
- *
- * <p>That is the sequence the HTTP test below walks, with a positive control so the guard cannot
- * pass by refusing everything.
- */
+/** No operation may leave the platform with no live administrator. Archiving revokes the archived
+ * account's token (V115), so the floor's remaining job is two administrators archiving each other at once. */
 @DisplayName("D200 — the last-administrator floor")
 class AdministratorGuardTest extends AbstractApiTest {
 
@@ -49,11 +35,7 @@ class AdministratorGuardTest extends AbstractApiTest {
     @Autowired
     AdministratorGuard guard;
 
-    /**
-     * Every test here is a claim about how many administrators the platform has, so none of them may
-     * depend on what happens to be in the database. Demoting rather than deleting keeps every
-     * foreign key intact, and the class-level rollback undoes it.
-     */
+    // Each test counts administrators, so none may depend on the database; demoting keeps foreign keys intact.
     @BeforeEach
     void leaveNoOtherAdministrators() {
         jdbc.update("UPDATE users SET role = 'buyer' WHERE role = 'admin'");
@@ -88,12 +70,8 @@ class AdministratorGuardTest extends AbstractApiTest {
                 + "('user.archive', 'user.permissions.replace')");
     }
 
-    /**
-     * The archive half. The first archive is allowed — one administrator remains, which is the
-     * property the floor protects, not a count of two. The second is refused.
-     */
     @Test
-    @DisplayName("an archived admin cannot use their surviving token to archive the last one")
+    @DisplayName("an archived admin's token is dead, and the floor still refuses the last one")
     void archivingTheLastAdministratorIsRefused() throws Exception {
         User first = admin("9866050001");
         User second = admin("9866050002");
@@ -102,8 +80,10 @@ class AdministratorGuardTest extends AbstractApiTest {
                 .as("archiving a peer is fine while somebody is left")
                 .isEqualTo(200);
         assertThat(archive(second, first))
-                .as("the archived account's token still works; the floor is what stops it")
-                .isEqualTo(409);
+                .as("archiving revoked the archived account's token")
+                .isEqualTo(401);
+        assertThatThrownBy(() -> guard.refuseIfLastAdministrator(users.findById(first.getId()).orElseThrow()))
+                .isInstanceOf(ConflictException.class);
 
         assertThat(users.findById(first.getId()).orElseThrow().isArchived())
                 .as("the refusal changed nothing")

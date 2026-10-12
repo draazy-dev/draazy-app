@@ -143,6 +143,7 @@ public class ListingService {
         if (!p.isArchived()) {
             p.archive("Taken down by the owner");
             properties.endListingPasses(p.getId());
+            propertyLifecycle.announceArchived(p);
         }
         return properties.save(p);
     }

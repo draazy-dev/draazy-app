@@ -548,3 +548,11 @@ test('the resend countdown is the cooldown the server reports, not a constant', 
   await expect(resend).toHaveText(/Resend in 4[567]s/);
   await expect(resend).toBeDisabled();
 });
+
+test('signing out ends the access token at once, not when it expires', async () => {
+  const { accessToken } = await apiLogin(uniqueMobile());
+  const headers = { authorization: 'Bearer ' + accessToken };
+  expect((await fetch(`${API}/auth/me`, { headers })).status).toBe(200);
+  expect((await fetch(`${API}/auth/logout`, { method: 'POST', headers })).status).toBe(204);
+  expect((await fetch(`${API}/auth/me`, { headers })).status).toBe(401);
+});

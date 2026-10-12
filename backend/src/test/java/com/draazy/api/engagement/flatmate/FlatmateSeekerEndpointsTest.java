@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.identity.user.UserStatuses;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import java.util.ArrayList;
@@ -123,6 +124,27 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "Aundh"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
+        }
+
+        @Test
+        @DisplayName("hides a suspended author's post from the feed, the detail and new interest")
+        void suspendedAuthorIsHidden() throws Exception {
+            User author = user("9810000088", "Gauri");
+            User seeker = user("9810000089", "Hema");
+            String id = createPost(author, "Gauri", "Wakad");
+            author.setStatus(UserStatuses.SUSPENDED);
+            users.saveAndFlush(author);
+
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "Wakad"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
+            mvc.perform(get(Routes.Flatmates.POST_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
+                    .andExpect(status().isNotFound());
+            mvc.perform(post(Routes.Flatmates.POST_INTEREST, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(seeker))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"share\":\"solo\"}"))
+                    .andExpect(status().isNotFound());
         }
     }
 

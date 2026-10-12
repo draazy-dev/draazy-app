@@ -6,7 +6,7 @@ audience: staff
 access: staff
 order: 4
 updated: 2026-10-10
-summary: Internal procedure for ownership evidence, ownership badges and manual verified-badge approvals.
+summary: Internal procedure for ownership evidence, ownership badges and manual verified badges.
 tags: [ops, ownership, badges, internal]
 modules: [properties, users]
 ---
@@ -21,20 +21,18 @@ modules: [properties, users]
 - **Badge requests** tab in Properties ? amber from 24 h, rose from 72 h.
 - **Owner is seeking the Verified property badge** banner ? the request waits for your answer.
 - **Current** or **Expired** chip on each evidence row ? only current proof counts.
-- Admins: **Badge approvals** tab count in Users.
 
 **Work on**
 
 - Answer every badge request: **Grant ownership verification**, or **Decline badge request** with a reason.
 - Open every evidence row and compare the dates and address with the listing before you grant.
 - Withdraw a granted badge when its evidence becomes unsafe.
-- Admins: decide **Badge approvals** as the second admin; never your own request.
 
 ## Desks and access
 
 Review ownership evidence inside **Admin → Properties** (`/admin/properties`) in the listing review modal; staff open it under `/staff/properties`. You need the **Property verification** function (`properties:verify`). Use the **Ownership verification** section to read and record evidence, then grant, or withdraw a grant. Decline a badge request from the banner.
 
-Hand-granted verified badges live in **Admin → Users** (`/admin/users`) and are admin-only (admin account with `users:write`): a **Grant Verified badge** row action sends a request, and the **Badge approvals** tab is where a second admin decides it. Hand-grants are audited.
+Hand-granted verified badges live in **Admin → Users** (`/admin/users`). A manager or admin with `users:write` uses **Grant Verified badge** or **Remove Verified badge** with a reason, and it takes effect at once. You cannot badge yourself. Every grant and removal is audited.
 
 ## Ownership request states
 
@@ -80,18 +78,16 @@ Use **Grant ownership verification** when required evidence is valid and matches
 
 Do not use listing approval as a shortcut for ownership proof. A listing can be live without ownership verification.
 
-## Manual verified-badge requests
+## Manual verified badges
 
-Manual user badges use maker-checker control:
+A manager or admin grants or removes a manual badge in one step:
 
 | Rule | Requirement |
 | --- | --- |
-| Request | Reason must be 10 to 300 characters |
-| Pending limit | One pending request per user |
-| Requester | Cannot request a badge for self |
-| Checker | A second admin; cannot be the requester or the subject user |
-| Approve | **Approve** note is optional |
-| Reject | **Reject** reason is required and must be 10 to 300 characters |
+| Who | A manager or admin with `users:write` |
+| Reason | Required, 10 to 300 characters |
+| Self | You cannot badge your own account |
+| Already verified | A second grant is refused |
 
 Use this panel only for hand-granted verified badges. If the badge was earned through KYC, revoke through **Identity review**.
 
@@ -99,7 +95,7 @@ Use this panel only for hand-granted verified badges. If the badge was earned th
 
 - Do not grant ownership from Aadhaar, PAN or a selfie.
 - Do not grant ownership when only supporting evidence is present.
-- Do not decide your own manual badge request.
+- Do not grant a manual badge to your own account.
 - Do not withdraw an identity-earned badge from the user badge panel.
 - Do not delete evidence rows to hide a bad decision; withdraw or decline instead.
 

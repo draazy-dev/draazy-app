@@ -24,16 +24,21 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
     if (f.localities.size === 0) setDraft(new Set(initialDraft));
   }, [f.localities.size, initialDraft]);
 
+  const bySlug = useMemo(() => new Map(localities.filter((l) => !l.archived).map((l) => [l.slug, l])), [localities]);
+  // A stored slug that is retired or failed to load is never drawn, so it must not count as chosen either.
+  const shown = [...draft].filter((slug) => bySlug.has(slug));
   const choices = useMemo(() => {
-    const bySlug = new Map(localities.filter((l) => !l.archived).map((l) => [l.slug, l]));
     const first = [...new Set([...initialDraft, ...draft])];
     const picked = first.map((slug) => bySlug.get(slug)).filter(Boolean);
     const rest = popularAreas(localities, 10).filter((l) => !first.includes(l.slug));
     return [...picked, ...rest].slice(0, 8);
-  }, [localities, initialDraft, draft]);
+  }, [localities, bySlug, initialDraft, draft]);
   const pickArea = (loc) => {
     onAddLocality(loc);
-    setDraft((prev) => (prev.size < maxAreas ? new Set([...prev, loc.slug]) : prev));
+    setDraft((prev) => {
+      const kept = [...prev].filter((slug) => bySlug.has(slug));
+      return kept.length < maxAreas ? new Set([...kept, loc.slug]) : new Set(kept);
+    });
   };
 
   const toggleArea = (slug) => {
@@ -44,14 +49,14 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
   };
   const toggleDraftArea = (slug) => {
     setDraft((prev) => {
-      const next = new Set(prev);
+      const next = new Set([...prev].filter((s) => bySlug.has(s)));
       if (next.has(slug)) next.delete(slug);
       else if (next.size < maxAreas) next.add(slug);
       return next;
     });
   };
   const showMap = () => {
-    if (draft.size) set({ localities: new Set([...draft].slice(0, maxAreas)) });
+    if (shown.length) set({ localities: new Set(shown.slice(0, maxAreas)) });
   };
 
   return (
@@ -128,7 +133,7 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
             <button
               type="button"
               onClick={showMap}
-              disabled={draft.size === 0}
+              disabled={shown.length === 0}
               className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-bold text-slate-950 transition-all disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-500"
             >
               <Icon name="map" className="w-4 h-4" /> {t('listings.showBtn')} {t('listings.mapView')}

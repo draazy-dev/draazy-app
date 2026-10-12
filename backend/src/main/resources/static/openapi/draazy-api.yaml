@@ -16,6 +16,9 @@ info:
       - `docs/system/package-structure.md` — the 11 bounded contexts and their package/schema mapping
       - `docs/flows/**`                 — per-feature behavioural specs
 
+    `x-roles` follows the server's role hierarchy (admin > manager > staff): a route listing `staff`
+    also admits managers and admins.
+
     ### Changelog
     - 1.3.0 — **Flatmates re-modelled around seeker intent.** The flatmates/rooms/groups triple is
       replaced by two feeds, `move-in` and `team-up` (`FlatmateTab`; the old values survive as
@@ -2083,6 +2086,7 @@ paths:
         '200': { description: Rescheduled }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /properties/{id}/status:
     parameters: [ { $ref: '#/components/parameters/PropertyId' } ]
     patch:
@@ -2347,10 +2351,10 @@ paths:
           in: query
           schema: { type: boolean, default: false }
           description: >
-            Adds `counts` (`all`, `active`, `suspended`, `archived`, `badgePending`) to the page: the whole
+            Adds `counts` (`all`, `active`, `suspended`, `archived`) to the page: the whole
             filtered set under `role`, `customers` and `q`, ignoring `status`, `flagged`, `archived` and
-            paging. `all` excludes archived accounts. `badgePending` is the platform-wide count of pending
-            badge-grant requests. The console asks only when the role or search changes, not on a page flip.
+            paging. `all` excludes archived accounts. The console asks only when the role or search
+            changes, not on a page flip.
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
       responses:
@@ -2456,7 +2460,7 @@ paths:
       tags: [Moderation]
       summary: Suspend a user
       description: >-
-        Stops the account obtaining a session and nothing else: it stays in the directory, visibly
+        Stops the account obtaining a session: it stays in the directory, visibly
         marked, where the colleagues investigating it can see it. That is what distinguishes it from
         `archive`, which is the soft delete and hides the account from every read path on the
         platform.
@@ -2468,6 +2472,11 @@ paths:
 
 
         Idempotent: suspending a suspended account is a no-op, not a conflict.
+
+
+        A manager may suspend staff accounts only; suspending a buyer or owner is admin-only (403).
+        While an owner is suspended their listings are hidden from search and the property page, and
+        take no new visits or contact requests; reactivating brings them back.
       operationId: suspendUser
       x-roles: [manager, admin]
       requestBody:
@@ -2518,17 +2527,13 @@ paths:
       description: >-
         The badge is normally earned through the identity-review queue. This route exists for the
         people that funnel cannot reach — a company account, someone whose documents an
-        administrator has checked off-platform.
+        manager or administrator has checked off-platform.
 
 
-        Granting is maker-checker: this call creates a pending `BadgeGrantRequest` and returns 202.
-        A different administrator must approve it through `/admin/badge-grants/{id}/approve`.
-
-
-        Withdrawing a hand-granted badge remains immediate. Withdrawing a badge earned through an
-        approved identity case is refused with 409: act on the case instead, so the record and the
-        badge cannot disagree. If a pending grant exists, withdrawal is refused until the request is
-        rejected.
+        Granting and withdrawing are both immediate, and both are audited with the reason. Nobody
+        can change the badge on their own account. Withdrawing a badge earned through an approved
+        identity case is refused with 409: act on the case instead, so the record and the badge
+        cannot disagree.
 
 
         Approval or withdrawal propagates to every listing the person owns, so the badge on their
@@ -2542,28 +2547,23 @@ paths:
             schema: { $ref: '#/components/schemas/UserBadgeRequest' }
       responses:
         '200':
-          description: Hand-granted badge withdrawn.
+          description: Badge granted or withdrawn; the updated row.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminUserRow' }
-        '202':
-          description: Badge grant request created; a second administrator must approve it.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BadgeGrantRequest' }
         '400':
           description: Reason is shorter than 10 or longer than 300 characters after trimming.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '403':
-          description: The caller tried to request a badge for their own account.
+          description: The caller tried to change the badge on their own account.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: Already verified, duplicate pending request, pending withdrawal conflict, or earned-badge withdrawal.
+          description: Already verified, or an earned-badge withdrawal.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -6143,6 +6143,7 @@ paths:
       tags: [Documents]
       summary: Sign one shared document (share token)
       operationId: getSharedDocumentUrl
+      security: []
       description: >
         Same authorisation as `/documents/shared`: the `X-Share-Token` header is the proof, and
         a missing, unknown, declined or expired token is the same 401. `docId` must be one of the
@@ -10543,98 +10544,6 @@ paths:
               schema: { $ref: '#/components/schemas/MyWork' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
-  /admin/badge-grants:
-    get:
-      tags: [Moderation]
-      summary: List Verified badge grant requests
-      operationId: listBadgeGrantRequests
-      x-roles: [admin]
-      parameters:
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [pending, approved, rejected]
-            default: pending
-        - { $ref: '#/components/parameters/Page' }
-        - { $ref: '#/components/parameters/Size' }
-      responses:
-        '200':
-          description: Badge grant requests, oldest first within status.
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/PageEnvelope'
-                  - type: object
-                    properties:
-                      content:
-                        type: array
-                        items: { $ref: '#/components/schemas/BadgeGrantRequest' }
-        '422': { $ref: '#/components/responses/ValidationError' }
-  /admin/badge-grants/{id}/approve:
-    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
-    post:
-      tags: [Moderation]
-      summary: Approve a Verified badge grant request
-      operationId: approveBadgeGrantRequest
-      x-roles: [admin]
-      requestBody:
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/BadgeGrantApproveRequest' }
-      responses:
-        '200':
-          description: Approved request; the user now holds a hand-granted Verified badge.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BadgeGrantRequest' }
-        '403':
-          description: The caller is the maker or the subject.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: The request is not pending, or the user is already verified.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-  /admin/badge-grants/{id}/reject:
-    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
-    post:
-      tags: [Moderation]
-      summary: Reject a Verified badge grant request
-      operationId: rejectBadgeGrantRequest
-      x-roles: [admin]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/BadgeGrantRejectRequest' }
-      responses:
-        '200':
-          description: Rejected request; the user remains unverified.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/BadgeGrantRequest' }
-        '403':
-          description: The caller is the maker or the subject.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409':
-          description: The request is not pending.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '400':
-          description: Reason is shorter than 10 or longer than 300 characters after trimming.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/Error' }
-        '422': { $ref: '#/components/responses/ValidationError' }
   /admin/content/{type}:
     parameters:
       - { $ref: '#/components/parameters/ContentType' }
@@ -11193,32 +11102,6 @@ components:
           description: >
             Required in both directions. The badge is what buyers use to decide who to trust, so both
             halves of the decision have to be answerable later out of the audit log.
-    BadgeGrantApproveRequest:
-      type: object
-      properties:
-        note: { type: string, maxLength: 300 }
-    BadgeGrantRejectRequest:
-      type: object
-      required: [reason]
-      properties:
-        reason: { type: string, minLength: 10, maxLength: 300 }
-    BadgeGrantRequest:
-      type: object
-      required: [id, userId, requestedBy, reason, status, createdAt]
-      properties:
-        id: { type: string }
-        userId: { type: string }
-        userName: { type: string }
-        userMobile: { type: string, description: Masked; the full number is on the audited user record }
-        requestedBy: { type: string }
-        requestedByName: { type: string }
-        reason: { type: string }
-        status: { type: string, enum: [pending, approved, rejected] }
-        decidedBy: { type: string }
-        decidedByName: { type: string }
-        decidedAt: { type: string, format: date-time }
-        decisionNote: { type: string }
-        createdAt: { type: string, format: date-time }
     UserFlagRequest:
       type: object
       required: [flagged]
@@ -11777,7 +11660,6 @@ components:
         flagged: { type: boolean }
         flagReason: { type: string }
         badgeSource: { type: string, enum: [identity, manual] }
-        badgePending: { type: boolean, description: A hand-grant request for this account awaits a second administrator }
     AdminEnquirySummary:
       type: object
       properties:
@@ -13562,14 +13444,14 @@ components:
       required: [propertyId, slot]
       properties:
         propertyId: { type: string }
-        slot: { type: string, format: date-time }
+        slot: { type: string, format: date-time, description: Must be in the future, or 422. }
         mode: { type: string, enum: [in-person, video], default: in-person }
         note: { type: string }
     VisitSlotUpdate:
       type: object
       required: [slot]
       properties:
-        slot: { type: string, format: date-time }
+        slot: { type: string, format: date-time, description: Must be in the future, or 422. }
     Deal:
       type: object
       description: A closed/closing deal aggregate (owner ↔ counterparty lifecycle).
@@ -15838,8 +15720,8 @@ components:
         Admin moderation state.
 
 
-        `pending` is where every newly written post, room and group starts (D72) — visible to its
-        author, to nobody else. It is not an accusation; it means only that nobody has looked yet.
+        `pending` is where every newly written room and group starts (D72) — visible to its
+        author, to nobody else. A seeker post goes `live` at once and joins the review queue unreviewed. It is not an accusation; it means only that nobody has looked yet.
         The public feeds match on a whitelist (`live`, `approved`), so a state nobody thought about
         stays invisible rather than leaking.
 

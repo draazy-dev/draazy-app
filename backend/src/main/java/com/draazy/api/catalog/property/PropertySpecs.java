@@ -1,6 +1,7 @@
 package com.draazy.api.catalog.property;
 
 import com.draazy.api.common.persistence.LikePatterns;
+import com.draazy.api.identity.user.UserStatuses;
 import jakarta.persistence.criteria.CriteriaBuilder;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.JoinType;
@@ -25,7 +26,7 @@ import org.hibernate.query.criteria.JpaExpression;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
-// Always pins `archived = false AND status = 'approved'`; adminSearch is a separate method, never a flag.
+// Pins archived = false, status 'approved' and an unsuspended owner; adminSearch is separate, never a flag.
 final class PropertySpecs {
 
     private static final char LIKE_ESCAPE = '\\';
@@ -65,6 +66,7 @@ final class PropertySpecs {
 
             where.add(cb.isFalse(root.get("archived")));
             where.add(cb.equal(root.get("status"), PropertyStatus.APPROVED));
+            where.add(cb.notEqual(root.get("owner").get("status"), UserStatuses.SUSPENDED));
 
             // A status param can only narrow within approved (an impossible AND yields an empty page).
             if (filters.status() != null && !PropertyStatus.APPROVED.equals(filters.status())) {

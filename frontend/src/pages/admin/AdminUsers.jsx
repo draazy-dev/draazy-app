@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Archive, BadgeCheck, Ban, Building2, CalendarCheck, CheckCircle2, ConciergeBell, Download, Eye, Flag, Mail, MessageSquareText, RotateCcw, ShieldCheck, ShieldAlert, UserPlus } from 'lucide-react';
 import {
   getUserTimeline,
-  listBadgeGrants,
   listUsers,
   setUserBadge,
   setUserFlag,
@@ -24,7 +23,6 @@ import Modal from '../../components/ui/Modal.jsx';
 import {
   BTN, CHIP, CHIP_TONE, Cell, Chips, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
-import BadgeApprovals from './BadgeApprovals.jsx';
 
 const ROLE_CHIPS = [
   { value: '', label: 'All' },
@@ -37,7 +35,6 @@ const STATUS_TABS = [
   { key: 'suspended', label: 'Suspended', status: 'suspended', note: 'Signed out and refused sign-in until reactivated.' },
   { key: 'archived', label: 'Archived', status: 'archived', note: 'Out of the directory and refused sign-in until restored.' },
 ];
-const BADGES_NOTE = 'Hand-granted Verified badges need a second admin to approve.';
 const PAGE_SIZE = 20;
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 
@@ -70,11 +67,11 @@ export default function AdminUsers() {
   const { user } = useAuth();
   const { optionEnabled } = useAdminFlags();
   const isAdmin = user?.role === 'admin';
-  const canManageBadges = isAdmin && hasPermission(user, 'users:write');
+  const canManageAccounts = isAdmin && hasPermission(user, 'users:write');
+  const canGrantBadge = (isAdmin || user?.role === 'manager') && hasPermission(user, 'users:write');
   const [rows, setRows] = useState(null);
   const [total, setTotal] = useState(0);
-  const [pendingBadgeGrants, setPendingBadgeGrants] = useState(null);
-  const [tab, setTab] = useTabParam([...STATUS_TABS.map((t) => t.key), ...(canManageBadges ? ['badges'] : [])], 'all');
+  const [tab, setTab] = useTabParam(STATUS_TABS.map((t) => t.key), 'all');
   const status = STATUS_TABS.find((t) => t.key === tab)?.status ?? '';
   const [counts, setCounts] = useState({});
   const [role, setRole] = useState('');
@@ -117,23 +114,6 @@ export default function AdminUsers() {
       setCounts(res.counts || {});
     }
   }, [role, status, q, page]);
-
-  const loadGrants = useCallback(async () => {
-    try {
-      const grants = await listBadgeGrants({ status: 'pending', size: 50 });
-      if (alive.current) setPendingBadgeGrants(grants.items || []);
-    } catch (err) {
-      toast(err?.message || 'Could not load badge approvals', 'error');
-      if (alive.current) setPendingBadgeGrants((current) => current || []);
-    }
-  }, [toast]);
-
-  // The pending list is the badges tab's own; the row pill and the tab count ride on the users list.
-  useEffect(() => {
-    if (canManageBadges && tab === 'badges') loadGrants();
-  }, [canManageBadges, tab, loadGrants]);
-
-  const reloadBadges = useCallback(() => Promise.all([load(true), loadGrants()]), [load, loadGrants]);
 
   // Debounced, because `q` changes on every keystroke and each change is a request.
   useEffect(() => {
@@ -193,12 +173,8 @@ export default function AdminUsers() {
       switch (action) {
         case 'verifyGrant':
         case 'verifyRemove': {
-          const result = await setUserBadge(u.id, action === 'verifyGrant', reason);
-          if (result?.pending) {
-            toast('Sent for approval by another admin');
-          } else {
-            toast(action === 'verifyGrant' ? 'Verified badge granted' : 'Verified badge removed');
-          }
+          await setUserBadge(u.id, action === 'verifyGrant', reason);
+          toast(action === 'verifyGrant' ? 'Verified badge granted' : 'Verified badge removed');
           break;
         }
         case 'suspend':
@@ -254,18 +230,16 @@ export default function AdminUsers() {
   const paging = { page, pageCount: Math.max(1, Math.ceil(total / PAGE_SIZE)), total, size: PAGE_SIZE, onPage: (p) => setPageState({ page: p, key: resetKey }) };
 
   const actionButtons = (u) => {
-    const pendingGrant = u.badgePending;
     const earnedBadge = u.verified && u.badgeSource === 'identity';
     const suspended = u.status === 'suspended';
-    const badgeTitle = pendingGrant ? 'Badge approval pending'
-      : earnedBadge ? 'Earned through identity review — revoke it from the KYC review record'
+    const badgeTitle = earnedBadge ? 'Earned through identity review — revoke it from the KYC review record'
         : u.verified ? 'Remove Verified badge' : 'Grant Verified badge';
     return (
       <>
-        {canManageBadges ? (
-          <IconAction label={badgeTitle} icon={ShieldCheck} disabled={!!pendingGrant || earnedBadge} onClick={() => openAction(u, u.verified ? 'verifyRemove' : 'verifyGrant')} />
+        {canGrantBadge ? (
+          <IconAction label={badgeTitle} icon={ShieldCheck} disabled={earnedBadge} onClick={() => openAction(u, u.verified ? 'verifyRemove' : 'verifyGrant')} />
         ) : null}
-        {canManageBadges ? (
+        {canManageAccounts ? (
           <IconAction
             label={u.archived ? 'Restore the account before changing its status' : suspended ? 'Reactivate' : 'Suspend'}
             icon={suspended ? CheckCircle2 : Ban}
@@ -276,7 +250,7 @@ export default function AdminUsers() {
         {isAdmin ? (
           <IconAction label={u.flagged ? `Remove flag${u.flagReason ? ` \u2014 ${u.flagReason}` : ''}` : 'Flag for review'} icon={Flag} onClick={() => openAction(u, u.flagged ? 'flagClear' : 'flagRaise')} />
         ) : null}
-        {!canManageBadges ? null : u.archived
+        {!canManageAccounts ? null : u.archived
           ? <IconAction label="Restore user" icon={RotateCcw} onClick={() => openAction(u, 'restore')} />
           : <IconAction label="Archive user" icon={Archive} onClick={() => openAction(u, 'archive')} />}
       </>
@@ -294,7 +268,6 @@ export default function AdminUsers() {
           <Badge status={u.status} />
           {u.verified ? <span className={classNames(CHIP, CHIP_TONE.teal, 'gap-1')}><BadgeCheck className="h-3 w-3" />Verified</span> : null}
           {u.flagged ? <span className={classNames(CHIP, CHIP_TONE.amber, 'gap-1')}><Flag className="h-3 w-3" />Flagged</span> : null}
-          {u.badgePending ? <span data-testid="admin-user-pending-badge-pill" className={classNames(CHIP, CHIP_TONE.amber)}>Badge pending</span> : null}
         </>
       }
       meta={<><span>{u.mobile}</span><Dot /><span className="capitalize">{u.role}</span>{u.city ? <><Dot /><span>{u.city}</span></> : null}</>}
@@ -320,11 +293,8 @@ export default function AdminUsers() {
 
   if (rows === null) return <Loading />;
 
-  const tabs = [
-    ...STATUS_TABS.map((t) => ({ key: t.key, label: t.label, count: counts[t.key] ?? null })),
-    ...(canManageBadges ? [{ key: 'badges', label: 'Badge approvals', count: counts.badgePending ?? null }] : []),
-  ];
-  const note = tab === 'badges' ? BADGES_NOTE : STATUS_TABS.find((t) => t.key === tab).note;
+  const tabs = STATUS_TABS.map((t) => ({ key: t.key, label: t.label, count: counts[t.key] ?? null }));
+  const note = STATUS_TABS.find((t) => t.key === tab).note;
 
   return (
     <div>
@@ -338,7 +308,7 @@ export default function AdminUsers() {
         idPrefix="users"
         active={tab}
         note={note}
-        toolbar={tab === 'badges' ? null : (
+        toolbar={
           <>
             <SearchBox value={q} onChange={setQ} placeholder="Search name or mobile…" label="Search users" />
             <Chips label="Role" options={ROLE_CHIPS} value={role} onChange={setRole} />
@@ -351,15 +321,11 @@ export default function AdminUsers() {
               <PageNav {...paging} />
             </div>
           </>
-        )}
+        }
       >
-        {tab === 'badges' ? (
-          <BadgeApprovals requests={pendingBadgeGrants || []} currentUser={user} onReload={reloadBadges} />
-        ) : (
-          <RowList isEmpty={!list.length} empty="No users match these filters.">
-            {list.map(userRow)}
-          </RowList>
-        )}
+        <RowList isEmpty={!list.length} empty="No users match these filters.">
+          {list.map(userRow)}
+        </RowList>
       </QueuePanel>
 
       <Modal

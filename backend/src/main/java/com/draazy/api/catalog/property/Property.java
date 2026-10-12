@@ -2,6 +2,7 @@ package com.draazy.api.catalog.property;
 
 import com.draazy.api.common.persistence.SoftDeleteEntity;
 import com.draazy.api.identity.user.User;
+import com.draazy.api.identity.user.UserStatuses;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -498,15 +499,20 @@ public class Property extends SoftDeleteEntity {
         this.city = city;
     }
 
-    /** Public visibility floor: only approved, non-archived rows are shown to anonymous callers. */
+    /** Public visibility floor: only approved, non-archived rows of an unsuspended owner are shown. */
     public boolean isPubliclyVisible() {
-        return !isArchived() && PropertyStatus.APPROVED.equals(status);
+        return !isArchived() && PropertyStatus.APPROVED.equals(status) && !isOwnerSuspended();
+    }
+
+    // Reads the owner: list paths load it through findAllById's entity graph, and search filters it in PropertySpecs.
+    public boolean isOwnerSuspended() {
+        return owner != null && UserStatuses.SUSPENDED.equals(owner.getStatus());
     }
 
     /** Direct-link reachability: approved or terminal (sold/rented) rows open, so a held link shows
-     * the badge rather than a 404. Pending/rejected/flagged/archived stay unreachable. */
+     * the badge rather than a 404. Pending/rejected/flagged/archived and suspended owners stay unreachable. */
     public boolean isDirectlyReachable() {
-        return !isArchived() && PropertyStatus.DIRECTLY_REACHABLE.contains(status);
+        return !isArchived() && PropertyStatus.DIRECTLY_REACHABLE.contains(status) && !isOwnerSuspended();
     }
 
     /** Send an identity-changing edit (or a restore) back to review. Any pending re-check is dropped:

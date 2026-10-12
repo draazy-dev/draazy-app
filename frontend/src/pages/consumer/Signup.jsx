@@ -11,6 +11,7 @@ import OtpBoxes from '../../components/auth/OtpBoxes.jsx';
 import AuthShell from '../../components/auth/AuthShell.jsx';
 import MobileAuthIntro from '../../components/auth/MobileAuthIntro.jsx';
 import TurnstileWidget from '../../components/security/TurnstileWidget.jsx';
+import { useTurnstile } from '../../components/security/useTurnstile.js';
 import RotatingNoun from '../../components/RotatingNoun.jsx';
 import { useCity } from '../../context/CityContext.jsx';
 import { cityHasData } from '../../lib/geoConfig.js';
@@ -83,9 +84,8 @@ export default function Signup() {
      live navbar is still clickable — so the timer has to be cancellable. */
   const redirectTimer = useRef(null);
   useEffect(() => () => clearTimeout(redirectTimer.current), []);
-  // See Signin.jsx: a ref rather than state, because a re-render can throw away a solved challenge.
-  const turnstileRef = useRef(null);
-  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstileRef.current }));
+  const turnstile = useTurnstile();
+  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstile.spend() }));
   const [createError, setCreateError] = useState(null);
   /* True once the refusal is one a fresh code cannot fix. Separate from the message, which is
      cleared on the next keystroke — the whole point is that more typing cannot help. */
@@ -248,7 +248,7 @@ export default function Signup() {
           {!otp.otpSent ? (
             <>
               {/* Inert without VITE_TURNSTILE_SITE_KEY. Not gating the button — see Signin.jsx. */}
-              <TurnstileWidget onToken={(tok) => { turnstileRef.current = tok; }} className="flex justify-center" />
+              <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
               <button type="button" onClick={sendOtp} disabled={otp.sending} className="send-otp-btn w-full py-3 rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
                 <Send className="w-4 h-4" /> {otp.sending ? t('auth.sending') : t('auth.sendOtp')}
               </button>

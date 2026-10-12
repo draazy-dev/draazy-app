@@ -71,19 +71,33 @@ class ErrorEnvelopeWebTest extends AbstractApiTest {
     @ParameterizedTest(name = "{0}")
     @MethodSource("badBodies")
     @DisplayName("a malformed or oversized body is 400 and names no internal type")
-    void malformedBodyIs400WithoutInternals(String label, String body) throws Exception {
+    void malformedBodyIs400WithoutInternals(String label, String body, String message) throws Exception {
         mvc.perform(post("/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value(ErrorCodes.BAD_REQUEST))
-                .andExpect(jsonPath("$.message").value(ErrorCodes.Messages.MALFORMED_BODY));
+                .andExpect(jsonPath("$.message").value(message));
+    }
+
+    @Test
+    void anUntypeableFieldIsNamedButNotItsJavaType() throws Exception {
+        User u = new User("9876500003", "buyer");
+        u.setMobileVerified(true);
+        users.saveAndFlush(u);
+
+        mvc.perform(post("/visits").header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"x\",\"slot\":\"not-a-date\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid value for field: slot"));
     }
 
     static Stream<Arguments> badBodies() {
         String oversized = "9".repeat(JsonBodyLimitsConfig.MAX_JSON_STRING_CHARS + 1);
         return Stream.of(
-                Arguments.of("malformed JSON", "{\"mobile\": "),
-                Arguments.of("oversized JSON string", "{\"mobile\":\"" + oversized + "\"}"));
+                Arguments.of("malformed JSON", "{\"mobile\": ", ErrorCodes.Messages.MALFORMED_BODY),
+                Arguments.of("oversized JSON string", "{\"mobile\":\"" + oversized + "\"}",
+                        "Invalid value for field: mobile"));
     }
 }

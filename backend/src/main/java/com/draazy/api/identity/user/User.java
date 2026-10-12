@@ -97,6 +97,10 @@ public class User extends SoftDeleteEntity implements TokenSubject {
     @Setter
     private Instant lastActive;
 
+    // Written only by RefreshTokenService's native update, so an entity flush can never roll it back.
+    @Column(name = "sessions_revoked_at", insertable = false, updatable = false)
+    private Instant sessionsRevokedAt;
+
     // Internal review marker, deliberately not a status. No setter: the columns move together.
     @Column(name = "flagged", nullable = false)
     private boolean flagged = false;

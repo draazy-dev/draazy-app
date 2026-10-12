@@ -198,30 +198,24 @@ class UserModerationEndpointTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("the list row marks a pending grant, counts it, and carries only the row's columns")
-    void listRowCarriesPendingBadgeGrant() throws Exception {
+    @DisplayName("the list row carries only the row's columns")
+    void listRowCarriesOnlyRowColumns() throws Exception {
         User actor = admin("9877000031");
-        User target = person("9877000032", Roles.Wire.OWNER);
-        mvc.perform(patch(path(Routes.Users.BADGE, target))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
-                .andExpect(status().isAccepted());
-        flushSoRawSqlCanSeeIt();
+        person("9877000032", Roles.Wire.OWNER);
 
         mvc.perform(get(Routes.Users.BASE).param("q", "9877000032").param("counts", "true")
                         .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].badgePending").value(true))
                 .andExpect(jsonPath("$.content[0].mobile").value("98XXXXX032"))
-                .andExpect(jsonPath("$.content[0].verified").value(false))
+                .andExpect(jsonPath("$.content[0].badgePending").doesNotExist())
                 .andExpect(jsonPath("$.content[0].email").doesNotExist())
                 .andExpect(jsonPath("$.content[0].lastActive").doesNotExist())
-                .andExpect(jsonPath("$.counts.badgePending").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
+                .andExpect(jsonPath("$.counts.badgePending").doesNotExist());
     }
+
     @Test
-    @DisplayName("a badge grant creates a pending request, not a badge")
-    void badgeGrantCreatesPendingRequest() throws Exception {
+    @DisplayName("an admin grants the badge in one step, and it is audited")
+    void adminGrantsBadgeInOneStep() throws Exception {
         User actor = admin("9877000001");
         User target = person("9877000006", Roles.Wire.OWNER);
 
@@ -229,24 +223,36 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(actor))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
-                .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.userId").value(target.getId().toString()))
-                .andExpect(jsonPath("$.requestedBy").value(actor.getId().toString()))
-                .andExpect(jsonPath("$.status").value("pending"))
-                .andExpect(jsonPath("$.userMobile").value("98XXXXX006"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true))
+                .andExpect(jsonPath("$.badgeSource").value("manual"));
 
         flushSoRawSqlCanSeeIt();
         em.clear();
-        assertThat(users.findById(target.getId()).orElseThrow().isVerified()).isFalse();
+        assertThat(users.findById(target.getId()).orElseThrow().isVerified()).isTrue();
         assertThat(jdbc.queryForObject("""
-                SELECT count(*) FROM badge_grant_requests
-                WHERE user_id = ? AND requested_by = ? AND status = 'pending'
-                """, Integer.class, target.getId(), actor.getId())).isEqualTo(1);
+                SELECT count(*) FROM audit_log
+                WHERE action = 'user.badge' AND entity_id = ?
+                """, Integer.class, target.getId().toString())).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("a user cannot request their own manual badge")
-    void badgeGrantSelfRequestIsRefused() throws Exception {
+    @DisplayName("a manager grants the badge too")
+    void managerGrantsBadge() throws Exception {
+        User manager = person("9877000029", Roles.Wire.MANAGER);
+        User target = person("9877000030", Roles.Wire.OWNER);
+
+        mvc.perform(patch(path(Routes.Users.BADGE, target))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(manager))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true));
+    }
+
+    @Test
+    @DisplayName("nobody can badge their own account")
+    void badgeSelfGrantIsRefused() throws Exception {
         User actor = admin("9877000024");
 
         mvc.perform(patch(path(Routes.Users.BADGE, actor))
@@ -254,25 +260,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
                 .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("a duplicate pending badge grant is refused")
-    void duplicateBadgeGrantIsRefused() throws Exception {
-        User actor = admin("9877000025");
-        User target = person("9877000026", Roles.Wire.OWNER);
-
-        mvc.perform(patch(path(Routes.Users.BADGE, target))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
-                .andExpect(status().isAccepted());
-
-        mvc.perform(patch(path(Routes.Users.BADGE, target))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"granted\":true,\"reason\":\"fresh documents checked\"}"))
-                .andExpect(status().isConflict());
     }
 
     @Test
@@ -303,150 +290,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message")
                         .value("reason must be 10 to 300 characters after trimming"));
-    }
-
-    @Test
-    @DisplayName("a second administrator can approve a badge request")
-    void badgeGrantApprovalGrantsBadgeAndAudits() throws Exception {
-        User maker = admin("9877000029");
-        User checker = admin("9877000030");
-        User target = person("9877000031", Roles.Wire.OWNER);
-
-        String created = mvc.perform(patch(path(Routes.Users.BADGE, target))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(maker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
-                .andExpect(status().isAccepted())
-                .andReturn().getResponse().getContentAsString();
-        String requestId = jsonField(created, "id");
-
-        mvc.perform(post(Routes.Admin.BADGE_GRANT_APPROVE.replace("{id}", requestId))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"note\":\"looks good\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("approved"))
-                .andExpect(jsonPath("$.decidedBy").value(checker.getId().toString()))
-                .andExpect(jsonPath("$.decisionNote").value("looks good"));
-
-        flushSoRawSqlCanSeeIt();
-        em.clear();
-        assertThat(users.findById(target.getId()).orElseThrow().isVerified()).isTrue();
-        assertThat(jdbc.queryForObject("SELECT status FROM badge_grant_requests WHERE id = ?::uuid",
-                String.class, requestId)).isEqualTo("approved");
-        assertThat(jdbc.queryForObject("""
-                SELECT count(*) FROM audit_log
-                WHERE action = 'user.badge.grant_approved' AND entity_id = ?
-                """, Integer.class, requestId)).isEqualTo(1);
-    }
-
-    @Test
-    @DisplayName("the maker cannot approve their own badge request")
-    void badgeGrantMakerCannotApprove() throws Exception {
-        User maker = admin("9877000032");
-        User target = person("9877000033", Roles.Wire.OWNER);
-        String requestId = createBadgeGrant(maker, target);
-
-        mvc.perform(post(Routes.Admin.BADGE_GRANT_APPROVE.replace("{id}", requestId))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(maker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("the subject cannot approve their own badge request")
-    void badgeGrantSubjectCannotApprove() throws Exception {
-        User maker = admin("9877000034");
-        User target = admin("9877000035");
-        String requestId = createBadgeGrant(maker, target);
-
-        mvc.perform(post(Routes.Admin.BADGE_GRANT_APPROVE.replace("{id}", requestId))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(target))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @DisplayName("rejecting a badge request requires a reason and leaves the user unverified")
-    void badgeGrantRejectRequiresReason() throws Exception {
-        User maker = admin("9877000036");
-        User checker = admin("9877000037");
-        User target = person("9877000038", Roles.Wire.OWNER);
-        String requestId = createBadgeGrant(maker, target);
-
-        mvc.perform(post(Routes.Admin.BADGE_GRANT_REJECT.replace("{id}", requestId))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"\"}"))
-                .andExpect(status().isUnprocessableEntity());
-
-        mvc.perform(post(Routes.Admin.BADGE_GRANT_REJECT.replace("{id}", requestId))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"document mismatch\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("rejected"))
-                .andExpect(jsonPath("$.decisionNote").value("document mismatch"));
-
-        flushSoRawSqlCanSeeIt();
-        em.clear();
-        assertThat(users.findById(target.getId()).orElseThrow().isVerified()).isFalse();
-    }
-
-    @Test
-    @DisplayName("a padded badge grant rejection reason is measured after trimming")
-    void badgeGrantRejectReasonIsTrimValidated() throws Exception {
-        User maker = admin("9877000046");
-        User checker = admin("9877000047");
-        User target = person("9877000048", Roles.Wire.OWNER);
-        String requestId = createBadgeGrant(maker, target);
-
-        mvc.perform(post(Routes.Admin.BADGE_GRANT_REJECT.replace("{id}", requestId))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"          x          \"}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message")
-                        .value("reason must be 10 to 300 characters after trimming"));
-    }
-
-    @Test
-    @DisplayName("a decided badge request cannot be decided again")
-    void badgeGrantNonPendingIsAConflict() throws Exception {
-        User maker = admin("9877000039");
-        User checker = admin("9877000040");
-        User target = person("9877000041", Roles.Wire.OWNER);
-        String requestId = createBadgeGrant(maker, target);
-
-        mvc.perform(post(Routes.Admin.BADGE_GRANT_REJECT.replace("{id}", requestId))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"document mismatch\"}"))
-                .andExpect(status().isOk());
-
-        mvc.perform(post(Routes.Admin.BADGE_GRANT_APPROVE.replace("{id}", requestId))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isConflict());
-    }
-
-    @Test
-    @DisplayName("a pending badge grant must be rejected before withdrawal")
-    void badgeWithdrawalWithPendingRequestIsRefused() throws Exception {
-        User actor = admin("9877000042");
-        User target = person("9877000043", Roles.Wire.OWNER);
-        createBadgeGrant(actor, target);
-
-        mvc.perform(patch(path(Routes.Users.BADGE, target))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"granted\":false,\"reason\":\"documents stale now\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message").value(
-                        "This user has a pending badge grant request. Reject the pending request instead."));
     }
 
     @Test
@@ -830,19 +673,5 @@ class UserModerationEndpointTest extends AbstractApiTest {
             hex.append("%02x".formatted(b));
         }
         return hex.toString();
-    }
-
-    private String createBadgeGrant(User maker, User target) throws Exception {
-        String body = mvc.perform(patch(path(Routes.Users.BADGE, target))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(maker))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
-                .andExpect(status().isAccepted())
-                .andReturn().getResponse().getContentAsString();
-        return jsonField(body, "id");
-    }
-
-    private static String jsonField(String json, String field) {
-        return json.replaceAll("(?s).*\"" + field + "\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 }

@@ -15,6 +15,7 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.identity.user.UserStatuses;
 import com.draazy.api.leads.contact.ContactRequest;
 import com.draazy.api.leads.contact.ContactRequestRepository;
 import com.draazy.api.leads.contact.ContactRequestStatuses;
@@ -368,6 +369,23 @@ class ConversationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the thread itself")
     class Thread {
+
+        @Test
+        @DisplayName("a suspended owner's listing shows as unavailable in the inbox")
+        void suspendedOwnerListingIsUnavailable() throws Exception {
+            User owner = user("9830000149", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000150", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            start(buyer, owner, p, 201);
+            owner.setStatus(UserStatuses.SUSPENDED);
+            users.saveAndFlush(owner);
+
+            mvc.perform(get(Routes.Conversations.BASE).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].propertyAvailable").value(false))
+                    .andExpect(jsonPath("$.content[0].propertyPrice").doesNotExist());
+        }
 
         @Test
         @DisplayName("the inbox omits messages; the detail carries them")

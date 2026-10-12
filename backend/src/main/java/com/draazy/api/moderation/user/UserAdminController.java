@@ -57,13 +57,10 @@ public class UserAdminController {
     private final UserAdminService service;
 
     private final UserModerationService moderation;
-    private final BadgeGrantService badgeGrants;
 
-    public UserAdminController(UserAdminService service, UserModerationService moderation,
-            BadgeGrantService badgeGrants) {
+    public UserAdminController(UserAdminService service, UserModerationService moderation) {
         this.service = service;
         this.moderation = moderation;
-        this.badgeGrants = badgeGrants;
     }
 
     // status and archived are separate because an account can be suspended and archived.
@@ -161,39 +158,10 @@ public class UserAdminController {
     }
 
     @PatchMapping(Routes.Users.BADGE)
-    @PreAuthorize(ADMIN_WRITE)
-    public ResponseEntity<Object> setBadge(@CurrentUser AuthPrincipal principal, @PathVariable String id,
+    @PreAuthorize(TEAM_WRITE)
+    public AdminUserRow setBadge(@CurrentUser AuthPrincipal principal, @PathVariable String id,
             @Valid @RequestBody BadgeRequest body) {
-        Object response = moderation.setBadge(principal, id, body.granted(), body.reason());
-        return body.granted()
-                ? ResponseEntity.accepted().body(response)
-                : ResponseEntity.ok(response);
-    }
-
-    @GetMapping(Routes.Admin.BADGE_GRANTS)
-    @PreAuthorize(ADMIN_WRITE)
-    public PageResponse<BadgeGrantResponse> badgeGrants(
-            @RequestParam(defaultValue = BadgeGrantStatuses.PENDING) String status,
-            @PageableDefault(size = 20) Pageable pageable) {
-        return PageResponse.of(
-                badgeGrants.list(status, Pageables.unsorted(pageable)),
-                dto -> dto);
-    }
-
-    @PostMapping(Routes.Admin.BADGE_GRANT_APPROVE)
-    @PreAuthorize(ADMIN_WRITE)
-    public BadgeGrantResponse approveBadgeGrant(@CurrentUser AuthPrincipal principal,
-            @PathVariable String id,
-            @Valid @RequestBody(required = false) BadgeGrantDecisionRequests.Approve body) {
-        return badgeGrants.approve(principal, id, body == null ? null : body.note());
-    }
-
-    @PostMapping(Routes.Admin.BADGE_GRANT_REJECT)
-    @PreAuthorize(ADMIN_WRITE)
-    public BadgeGrantResponse rejectBadgeGrant(@CurrentUser AuthPrincipal principal,
-            @PathVariable String id,
-            @Valid @RequestBody BadgeGrantDecisionRequests.Reject body) {
-        return badgeGrants.reject(principal, id, body.reason());
+        return moderation.setBadge(principal, id, body.granted(), body.reason());
     }
 
     /** {@code PATCH /users/{id}/flag} (contract {@code setUserFlag}) — admin only. */

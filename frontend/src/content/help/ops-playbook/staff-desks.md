@@ -48,7 +48,6 @@ What you see depends on the **functions** you hold (KYC review, Property verific
 | Flatmates | `/admin/flatmates` | Flatmate posts, badges, edits and group applications | [Flatmate review](/help/a/flatmate-review) |
 | Properties | `/admin/properties` | Listing verification, re-checks, duplicates | [Verification SLAs](/help/a/verification-sla) |
 | Properties → ownership | `/admin/properties` | Ownership evidence and ownership badges | [Ownership and badges](/help/a/ownership-and-badges) |
-| Users → Badge approvals | `/admin/users` | Hand-granted verified-badge requests (admin only) | [Ownership and badges](/help/a/ownership-and-badges) |
 | Reports | `/admin/reports` | Listing, user and flatmate reports; review moderation | [Reports and takedowns](/help/a/reports-and-takedowns) |
 | Societies | `/admin/societies` | Candidates, merges, directory | [Society moderation](/help/a/society-moderation) |
 | Post on Behalf | `/admin/post-on-behalf` | Listings for owners who called or messaged | [Post on behalf](/help/a/post-on-behalf) |

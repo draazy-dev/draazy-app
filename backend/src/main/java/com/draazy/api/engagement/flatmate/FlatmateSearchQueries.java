@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.persistence.LikePatterns;
+import com.draazy.api.identity.user.UserStatuses;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import java.util.HashMap;
@@ -182,9 +183,13 @@ public class FlatmateSearchQueries {
                       end)""".formatted(ROOM_SHARE_MAX);
     }
 
-    private static String publicRows(String alias, Map<String, Object> params) {
+    // A suspended author's posts stay hidden until the account is reactivated.
+    private static String publicRows(String alias, String authorColumn, Map<String, Object> params) {
         params.put("modPublic", FlatmateVocabulary.MOD_PUBLIC);
-        return "where %1$s.archived = false and %1$s.mod_status in (:modPublic)".formatted(alias);
+        params.put("suspended", UserStatuses.SUSPENDED);
+        return ("where %1$s.archived = false and %1$s.mod_status in (:modPublic)"
+                + " and not exists (select 1 from users u where u.id = %1$s.%2$s and u.status = :suspended)")
+                .formatted(alias, authorColumn);
     }
 
     /** The projected column and the {@code verifiedOnly} filter both ask, and must agree. Same rule
@@ -209,7 +214,7 @@ public class FlatmateSearchQueries {
                 from flatmate_rooms r
                 join room_ledger l on l.id = r.id
                 """);
-        sql.append(publicRows("r", params)).append('\n');
+        sql.append(publicRows("r", "host_id", params)).append('\n');
 
         if (f.locality() != null) {
             sql.append(" and lower(r.locality) = lower(:locality)");
@@ -282,7 +287,7 @@ public class FlatmateSearchQueries {
                             else g.policy end as gender
                 from flatmate_groups g
                 """);
-        sql.append(publicRows("g", params)).append('\n');
+        sql.append(publicRows("g", "host_id", params)).append('\n');
         sql.append(housed ? " and g.property_id is not null" : " and g.property_id is null");
 
         if (f.locality() != null) {
@@ -346,7 +351,7 @@ public class FlatmateSearchQueries {
                        p.gender as gender
                 from flatmate_seeker_posts p
                 """);
-        sql.append(publicRows("p", params)).append('\n');
+        sql.append(publicRows("p", "user_id", params)).append('\n');
 
         // A seeker names a shortlist rather than one locality, so this is containment against the
         // jsonb array and its GIN index.

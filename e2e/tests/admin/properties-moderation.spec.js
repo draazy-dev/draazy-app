@@ -1,6 +1,7 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders, apiLogin, uploadedListingPhotos, uniqueMobile, signIn } from '../../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../../helpers/moderation.js';
+import { chooseLocality } from '../../helpers/locality.js';
 
 // Property integration already proves the queue endpoint and featured write path.
 const admin = () => authHeaders('9000000000');
@@ -251,4 +252,29 @@ test('a verifier corrects a pending listing from the review panel and lands back
   const after = await (await fetch(`${API}/me/listings/${id}`, { headers })).json();
   expect(Number(after.price)).toBe(29500);
   expect(after.status).toBe('pending');
+});
+
+test('moving a listing to another locality moves its map pin to that locality', async ({ page, request }) => {
+  const title = `Locality move ${Date.now()}`;
+  const { id, headers } = await freshListing(title);
+  expect((await approveListing(request, id, await admin())).status()).toBe(200);
+  const rows = await (await fetch(`${API}/admin/localities`, { headers: await admin() })).json();
+  const wakad = rows.find((r) => r.slug === 'wakad');
+  expect(wakad?.lat, 'the dev seed pins Wakad').toBeTruthy();
+
+  await signIn(page, ACTORS.admin, { screen: 'staff' });
+  await page.goto('/admin/properties?tab=all');
+  await page.getByPlaceholder('Title, owner, mobile or ID').first().fill(title);
+  const row = page.getByTestId('queue-row').filter({ has: page.getByRole('heading', { name: title }) });
+  await expect(row).toHaveCount(1, { timeout: 20000 });
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: 'Edit listing' });
+  await chooseLocality(page, modal.getByLabel('Locality', { exact: true }), 'Wakad');
+  await modal.getByRole('button', { name: /Save changes/i }).click();
+  await expect(modal).toHaveCount(0);
+
+  const after = await (await fetch(`${API}/me/listings/${id}`, { headers })).json();
+  expect(after.localitySlug).toBe('wakad');
+  expect([Number(after.lat), Number(after.lng)]).toEqual([Number(wakad.lat), Number(wakad.lng)]);
+  expect(after.status).toBe('approved');
 });

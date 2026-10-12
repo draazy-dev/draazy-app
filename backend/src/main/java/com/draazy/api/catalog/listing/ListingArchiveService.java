@@ -38,6 +38,7 @@ public class ListingArchiveService {
         Property p = resolvePermitted(principal, idOrSlug);
         p.archive(reason);
         properties.endListingPasses(p.getId());
+        lifecycle.announceArchived(p);
         return p;
     }
 

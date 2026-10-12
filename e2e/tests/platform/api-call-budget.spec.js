@@ -240,7 +240,7 @@ const DESKS = [
     url: '/admin/users',
     ready: /Users|Customers/,
     once: ['/api/users'],
-    never: ['/api/admin/badge-grants'],
+    never: [],
     check: (gets) => {
       const reads = gets.keys().filter((k) => k.startsWith('/api/users?'));
       expect(reads).toHaveLength(1);

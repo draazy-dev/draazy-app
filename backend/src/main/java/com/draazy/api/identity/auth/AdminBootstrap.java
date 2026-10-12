@@ -99,8 +99,8 @@ public class AdminBootstrap implements ApplicationRunner {
             log.warn("Admin bootstrap recovery skipped: no live administrator matches {}", normalisedEmail);
             return;
         }
-        staffSignIn.resetSecondFactor(admin.getId());
         refreshTokens.revokeAllForUser(admin.getId());
+        staffSignIn.resetSecondFactor(admin.getId());
         String token = invites.reissueToken(admin.getId(), admin.getId(), INVITE_TTL);
         jdbc.update("INSERT INTO admin_bootstrap_runs (nonce) VALUES (?)", recover);
         logInvite(token);

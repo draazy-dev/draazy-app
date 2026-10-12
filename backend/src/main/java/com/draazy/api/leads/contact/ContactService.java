@@ -72,6 +72,9 @@ public class ContactService {
         if (owner != null && owner.getId().equals(viewerId)) {
             return describe(viewerId, property);
         }
+        if (property.isOwnerSuspended()) {
+            throw NotFoundException.of("Property");
+        }
         if (owner != null && owner.isVerifiedContactOnly() && !hasBadge(viewerId)) {
             throw new VerificationRequiredException("This owner only accepts verified contacts");
         }

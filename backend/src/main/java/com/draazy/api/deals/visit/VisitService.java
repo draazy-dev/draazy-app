@@ -52,7 +52,9 @@ public class VisitService {
     @Transactional
     public VisitDto schedule(UUID callerId, VisitCreateRequest body) {
         UUID propertyId = Ids.parseUuid(body.propertyId()).orElse(null);
-        Property property = propertyId == null ? null : properties.findById(propertyId).orElse(null);
+        // Row lock: an archive running alongside either waits for this visit or is seen as archived here.
+        Property property = propertyId == null ? null
+                : properties.findForVerificationDecision(propertyId).orElse(null);
         if (property == null || !property.isPubliclyVisible()) {
             throw NotFoundException.of("Property");
         }
@@ -88,7 +90,7 @@ public class VisitService {
     // Who may do what (the security-critical rule).
     @Transactional
     public void updateStatus(AuthPrincipal caller, UUID visitId, VisitStatusUpdateRequest body) {
-        Visit visit = visits.findById(visitId)
+        Visit visit = visits.lockById(visitId)
                 .orElseThrow(() -> NotFoundException.of("Visit"));
 
         Property property = properties.findById(visit.getPropertyId())
@@ -148,7 +150,7 @@ public class VisitService {
 
     @Transactional
     public void reschedule(UUID callerId, UUID visitId, VisitSlotUpdateRequest body) {
-        Visit visit = visits.findById(visitId)
+        Visit visit = visits.lockById(visitId)
                 .orElseThrow(() -> NotFoundException.of("Visit"));
 
         Property property = properties.findById(visit.getPropertyId())

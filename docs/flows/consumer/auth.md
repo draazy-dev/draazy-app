@@ -214,6 +214,48 @@
 - **Staff sign-in equalises work on an unknown email** with a dummy BCrypt hash, and never reveals which
   half failed; a null hash (a passwordless account) must also 401.
 
+### Backend: refresh rotation, reuse detection and session revocation
+
+*Home of the reasoning behind `RefreshTokenService` and `RefreshTokenRepository`.*
+
+- **Rotation with reuse detection (ADR-008).** Each refresh revokes the presented token and chains a new
+  one via `rotated_from`. Presenting an already-revoked token is a replay, so the whole family is revoked.
+- **`noRollbackFor` the 401 on `rotate`, or the tripwire does nothing.** The theft path revokes then
+  throws; `rotate` joins `AuthService.refresh`'s transaction, so without the rule the throw marks it
+  rollback-only and the revocations never reach the database while the caller still sees 401. Both ends
+  need the rule for the reason on `OtpService#sendLoginCode` (D90). The not-found and expired 401s write
+  nothing.
+- **Grace window.** Two tabs waking together present the same token; one wins and the other replays a
+  token spent milliseconds ago. A token spent within `refreshGrace` is forgiven and served the family's
+  *live head*, re-rotated, rather than a parallel sibling: the winner's raw token cannot be recovered and
+  a sibling would break one-live-token-per-family. A row's `created_at` dates its predecessor's
+  revocation, so no `revoked_at` column is needed. The walk is bounded at `MAX_GRACE_HOPS` (3).
+- **`MAX_CONSECUTIVE_GRACES` (3) is what bounds the window.** A thief who keeps rotating holds it open, so
+  thief and victim could alternate forgiven replays for the whole TTL. Counting *consecutive* graces per
+  chain breaks that: the attack is contested at every step and reaches the limit, while an honest race is
+  followed by a clean rotation that resets the count. Three covers four simultaneous tabs. Both the
+  forgiven and the refused replay log a warning with the user id only.
+- **What the grace window does not fix.** The two tabs also race to write the cookie; if the winner's
+  response lands last the jar holds a token the graced loser already revoked, and the next refresh
+  fifteen minutes later burns the family. Server-side repairs each break a commoner case (a dropped
+  response retried with a spent token) or remove the time bound, so the control is the client's Web Lock
+  in `frontend/src/services/http.js`. A single tab that loses its response and retries outside the window
+  still burns the family.
+- **Per-user advisory lock (`lockFamily`).** Row locks are taken on rows the request chooses, so two
+  concurrent calls for one user could deadlock and Postgres would abort one — a family burn rolled back
+  by the database, which `noRollbackFor` cannot save. One `pg_advisory_xact_lock` taken before any row
+  lock gives every family operation a total order and releases itself at transaction end. The owner is
+  read unlocked first only to choose the lock (`user_id` never changes); every decision uses the locked
+  re-read. The key is folded from the UUID in Java because `hashtext` has no stability promise;
+  collisions only serialise two unrelated families.
+- **Row locks.** `findByTokenHash` is `FOR UPDATE` so two concurrent refreshes of one token cannot both
+  mint a successor. `findByUserId` is locked so a sibling's concurrent rotation cannot commit a token the
+  burn never saw. `findByRotatedFrom` is locked because the grace path is about to rotate the heir.
+- **Logout and suspension end the access token at once.** `revokeAllForUser` also stamps
+  `users.sessions_revoked_at` (whole seconds, matching a JWT `iat`). `JwtAuthFilter` reads it through
+  `RoleSource` with the current role and refuses any access token issued before the stamp, so the
+  15-minute access token stops working on the next request rather than at expiry.
+
 ### Sign in (`Signin.jsx`)
 - **Mobile normalisation:** `useMobileInput` + `MobileField`; a valid number is exactly 10 digits.
 - **No unknown-number handoff.** A branch here once asked `!userExists(mobile)` against the browser

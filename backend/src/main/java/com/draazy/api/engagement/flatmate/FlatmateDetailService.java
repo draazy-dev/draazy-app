@@ -3,6 +3,7 @@ package com.draazy.api.engagement.flatmate;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.identity.user.UserStatuses;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -41,7 +42,7 @@ public class FlatmateDetailService {
     @Transactional(readOnly = true)
     public FlatmateDetailDto group(AuthPrincipal caller, UUID id) {
         FlatmateGroup group = groups.findById(id).filter(g -> !g.isArchived())
-                .filter(g -> g.isVisible() || isHost(caller, g.getHostId()))
+                .filter(g -> isHost(caller, g.getHostId()) || g.isVisible() && hostActive(g.getHostId()))
                 .orElseThrow(() -> NotFoundException.of("Group"));
         String verdict = reviewStatuses.forGroups(List.of(group)).get(group.getId());
         if (isHost(caller, group.getHostId())) {
@@ -62,7 +63,7 @@ public class FlatmateDetailService {
     @Transactional(readOnly = true)
     public FlatmateDetailDto room(AuthPrincipal caller, UUID id) {
         FlatmateRoom room = rooms.findById(id).filter(r -> !r.isArchived())
-                .filter(r -> r.isVisible() || isHost(caller, r.getHostId()))
+                .filter(r -> isHost(caller, r.getHostId()) || r.isVisible() && hostActive(r.getHostId()))
                 .orElseThrow(() -> NotFoundException.of("Room"));
         List<String> photos = List.copyOf(room.getPhotos());
         if (isHost(caller, room.getHostId())) {
@@ -81,7 +82,7 @@ public class FlatmateDetailService {
     @Transactional(readOnly = true)
     public FlatmateDetailDto post(AuthPrincipal caller, UUID id) {
         FlatmateSeekerPost post = posts.findById(id).filter(p -> !p.isArchived())
-                .filter(p -> p.isVisible() || isHost(caller, p.getUserId()))
+                .filter(p -> isHost(caller, p.getUserId()) || p.isVisible() && hostActive(p.getUserId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate post"));
         if (isHost(caller, post.getUserId())) {
             String mobile = users.findById(caller.userId()).map(User::getMobile).orElse(null);
@@ -90,6 +91,10 @@ public class FlatmateDetailService {
         }
         return FlatmateDetailDto.visitor(FlatmateDetailDto.KIND_POST,
                 mapper.toFeedDto(post), List.of());
+    }
+
+    private boolean hostActive(UUID hostId) {
+        return users.findById(hostId).filter(u -> !UserStatuses.SUSPENDED.equals(u.getStatus())).isPresent();
     }
 
     private static boolean isHost(AuthPrincipal caller, UUID hostId) {

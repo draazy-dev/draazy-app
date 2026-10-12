@@ -6,6 +6,7 @@ import Modal from '../ui/Modal.jsx';
 import MobileField from '../MobileField.jsx';
 import OtpBoxes from './OtpBoxes.jsx';
 import TurnstileWidget from '../security/TurnstileWidget.jsx';
+import { useTurnstile } from '../security/useTurnstile.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useMobileInput } from '../../lib/hooks.js';
 import { useOtpFlow } from './useOtpFlow.js';
@@ -21,8 +22,8 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
   const { t } = useTranslation();
   const { login, update } = useAuth();
   const mobile = useMobileInput('');
-  const turnstileRef = useRef(null);
-  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstileRef.current }));
+  const turnstile = useTurnstile();
+  const otp = useOtpFlow((m) => sendOtpSvc({ mobile: m, turnstileToken: turnstile.spend() }));
   const setMobileValue = mobile.setValue;
   const resetOtp = otp.reset;
   const [mobileErr, setMobileErr] = useState(false);
@@ -204,7 +205,7 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
           <p role="alert" id="inline-otp-status" className={status ? 'text-red-400 text-xs text-center' : 'sr-only'}>{status}</p>
           {!otp.otpSent ? (
             <>
-              <TurnstileWidget onToken={(tok) => { turnstileRef.current = tok; }} className="flex justify-center" />
+              <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
               <p className="text-[11px] leading-relaxed text-gray-500">
                 <Trans
                   i18nKey="auth.inlineOtpTerms"

@@ -241,10 +241,12 @@ Grounded in `moderation.verification.PropertyVerificationService` / `ApprovalGat
 | Offer / negotiation | buyer submits an offer | owner responds (accept/counter/decline) | accepted offer feeds finalization | `src/lib/store/deals.js` `addOffer` / `respondOffer` |
 | Society claim | resident claims a society role | admin moderates | claim approved | `src/pages/admin/societies/ClaimsTab.jsx` |
 | Identity badge (earned) | user submits document + selfie | identity reviewer (`identity:write`), never the subject | `users.verified = true`, listings back-filled; revocable with reason | `identity.verification.IdentityReviewService` |
-| Identity badge (hand-granted) | admin A requests (`badge_grant_requests`) | a different admin B, never the subject | `users.verified = true` | `moderation.user` badge-grant service; V60 CHECKs back the service 403s |
 
 In every row the record starts `pending`, is decided by the checker, and only then does the
 side-effect fire. Reject-then-resubmit returns the record to `pending`.
+
+The hand-granted Verified badge is not maker-checker: with one administrator a second approval could
+never complete, so a manager or the admin grants it in one step with a reason, audited as `user.badge`.
 
 > **MUST be server-enforced later.** Today the maker and checker operate on the same editable
 > `localStorage`. The backend must (a) verify the maker's identity, (b) verify the checker is

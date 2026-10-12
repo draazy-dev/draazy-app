@@ -7,6 +7,14 @@ const filters = (page) => page.locator('aside:has(h3:has-text("Filters"))');
 const maxThumb = (page) => filters(page).getByRole('slider', { name: /budget range maximum/i });
 const maxLabel = (page) => filters(page).getByRole('button', { name: /budget range maximum/i });
 
+/** Waits for the page's own first search: networkidle can fire before it is sent and the counter would take it. */
+async function openListings(page, url) {
+  const first = page.waitForResponse((res) => res.request().method() === 'GET' && /\/properties(\?|$)/.test(res.url()));
+  await page.goto(url);
+  await first;
+  await page.waitForLoadState('networkidle').catch(() => {});
+}
+
 /** Count `GET /properties` searches from now on; returns a live counter and a reset. */
 function countSearches(page) {
   const state = { n: 0 };
@@ -18,10 +26,8 @@ function countSearches(page) {
 
 test.describe('Filter sliders fetch once per gesture', () => {
   test('dragging the budget thumb issues one search, on release', async ({ page }) => {
-    await page.goto('/listings?deal=buy');
+    await openListings(page, '/listings?deal=buy');
     await expect(maxThumb(page)).toBeVisible();
-    // Let the page's own first search finish so it can't be miscounted as the drag's.
-    await page.waitForLoadState('networkidle').catch(() => {});
 
     const searches = countSearches(page);
     const before = await maxLabel(page).innerText();
@@ -50,11 +56,10 @@ test.describe('Filter sliders fetch once per gesture', () => {
   test('the near-a-place radius slider also commits on release, and its readouts stay live', async ({ page }) => {
     // A place must be picked before the radius control is rendered at all; the shared deep-link
     // contract seeds one without going through the autocomplete.
-    await page.goto('/listings?deal=buy&near=18.5590,73.7868&nearlabel=Baner&nearr=10&nearmode=km');
+    await openListings(page, '/listings?deal=buy&near=18.5590,73.7868&nearlabel=Baner&nearr=10&nearmode=km');
     const radius = filters(page).getByRole('slider', { name: /search radius/i });
     const readout = filters(page).getByRole('spinbutton', { name: /search radius value/i });
     await expect(radius).toBeVisible();
-    await page.waitForLoadState('networkidle').catch(() => {});
 
     const searches = countSearches(page);
     const box = await radius.boundingBox();
@@ -79,9 +84,8 @@ test.describe('Filter sliders fetch once per gesture', () => {
     await test.step('arrow-key stepping still searches — commit is not pointer-only', async () => {
       /* Commit hangs off the native `change` event, not pointer gestures, so keyboard and AT slider
          adjusts still reach the server — a `pointerup` commit would strand both. */
-      await page.goto('/listings?deal=buy');
+      await openListings(page, '/listings?deal=buy');
       await expect(thumb).toBeVisible();
-      await page.waitForLoadState('networkidle').catch(() => {});
 
       const searches = countSearches(page);
       await thumb.focus();
@@ -91,15 +95,24 @@ test.describe('Filter sliders fetch once per gesture', () => {
     });
 
     await test.step('holding an arrow key crosses the range in one search, not one per step', async () => {
-      /* A range fires `change` on every keyboard step, so auto-repeat is a second route to the
-         request storm. Twelve steps stand in for a held key: only the last may be searched for. */
-      await page.goto('/listings?deal=buy');
+      /* Auto-repeat fires `change` per step; twelve steps 30 ms apart stand in for a held key, run in-page
+         because a loaded runner's per-press round-trip can outlast the 450 ms coalesce window. */
+      await openListings(page, '/listings?deal=buy');
       await expect(thumb).toBeVisible();
-      await page.waitForLoadState('networkidle').catch(() => {});
 
       const searches = countSearches(page);
       await thumb.focus();
-      for (let i = 0; i < 12; i += 1) await thumb.press('ArrowLeft', { delay: 30 });
+      await thumb.evaluate((el) => new Promise((done) => {
+        let left = 12;
+        const step = () => {
+          el.stepDown();
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+          left -= 1;
+          if (left) setTimeout(step, 30); else done();
+        };
+        step();
+      }));
 
       await expect.poll(() => searches.n, { message: 'searches issued across 12 steps' }).toBe(1);
       await page.waitForTimeout(600);
@@ -120,9 +133,8 @@ async function sortBy(page, label) {
 
 test.describe('A search already answered is not asked again', () => {
   test('returning to the previous sort costs no request, and a new one still does', async ({ page }) => {
-    await page.goto('/listings?deal=buy');
+    await openListings(page, '/listings?deal=buy');
     await expect(sortTrigger(page)).toBeVisible();
-    await page.waitForLoadState('networkidle').catch(() => {});
 
     const searches = countSearches(page);
 

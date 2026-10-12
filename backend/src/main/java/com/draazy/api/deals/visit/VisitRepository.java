@@ -1,10 +1,14 @@
 package com.draazy.api.deals.visit;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -36,4 +40,14 @@ public interface VisitRepository extends JpaRepository<Visit, UUID> {
     /** Only {@code completed} counts: a booked visit is an intention, and counting it would let anyone
      * earn a "Visited" badge without attending. */
     boolean existsByVisitorIdAndPropertyIdAndStatus(UUID visitorId, UUID propertyId, String status);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from Visit v where v.id = :id")
+    Optional<Visit> lockById(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select v from Visit v where v.propertyId = :propertyId
+            and v.status in ('scheduled', 'confirmed') and v.slot > :now""")
+    List<Visit> findUpcomingByProperty(@Param("propertyId") UUID propertyId, @Param("now") Instant now);
 }

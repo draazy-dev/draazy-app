@@ -3,6 +3,7 @@ package com.draazy.api.catalog.property;
 import com.draazy.api.catalog.locality.LocalityRepository;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.web.Ids;
+import com.draazy.api.identity.user.UserStatuses;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -98,8 +99,8 @@ public class PropertyService {
 
     @Transactional(readOnly = true)
     public List<Property> featured() {
-        return properties.findByStatusAndArchivedFalseOrderByFeaturedDescCreatedAtDesc(
-                PropertyStatus.APPROVED, PageRequest.of(0, FEATURED_CAP));
+        return properties.findByStatusAndArchivedFalseAndOwner_StatusNotOrderByFeaturedDescCreatedAtDesc(
+                PropertyStatus.APPROVED, UserStatuses.SUSPENDED, PageRequest.of(0, FEATURED_CAP));
     }
 
     /** The publicly live rows among {@code ids} (slugs or UUIDs), in no particular order. */

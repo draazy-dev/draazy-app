@@ -24,6 +24,10 @@ public interface PropertyRepository
     @EntityGraph(attributePaths = "owner")
     Optional<Property> findById(UUID id);
 
+    @Override
+    @EntityGraph(attributePaths = "owner")
+    List<Property> findAllById(Iterable<UUID> ids);
+
     @EntityGraph(attributePaths = "owner")
     Optional<Property> findBySlug(String slug);
 
@@ -136,8 +140,8 @@ public interface PropertyRepository
 
     /** Featured-first live listings for the homepage strip; the {@link Pageable} caps the result
      * because the contract endpoint takes no limit. Summary projection, so no owner graph. */
-    List<Property> findByStatusAndArchivedFalseOrderByFeaturedDescCreatedAtDesc(
-            String status, Pageable limit);
+    List<Property> findByStatusAndArchivedFalseAndOwner_StatusNotOrderByFeaturedDescCreatedAtDesc(
+            String status, String ownerStatus, Pageable limit);
 
     /** Live listings for one society, newest first — the {@code homes} array on the society hub.
      * Summary projection, so no owner graph and no contact data. */
@@ -146,8 +150,8 @@ public interface PropertyRepository
 
     /** The same over a society and everything merged into it: a merge moves nothing, so the survivor's
      * hub finds those listings only by asking for the whole family (docs/flows/consumer/societies.md). */
-    List<Property> findBySocietyIdInAndStatusAndArchivedFalseOrderByCreatedAtDesc(
-            Collection<UUID> societyIds, String status, Pageable limit);
+    List<Property> findBySocietyIdInAndStatusAndArchivedFalseAndOwner_StatusNotOrderByCreatedAtDesc(
+            Collection<UUID> societyIds, String status, String ownerStatus, Pageable limit);
 
     default long countVisibleMatching(PropertySearchQuery filters, ListingFacets facets,
             Instant baseline) {
@@ -183,6 +187,7 @@ public interface PropertyRepository
             from properties p
             where p.status = :status and p.archived = false and p.locality_slug is not null
               and (cast(:slug as text) is null or p.locality_slug = cast(:slug as text))
+              and not exists (select 1 from users u where u.id = p.owner_id and u.status = 'suspended')
             group by p.locality_slug""")
     List<Object[]> liveLocalityStats(@Param("status") String status, @Param("slug") String slug);
 
@@ -190,6 +195,7 @@ public interface PropertyRepository
             select p.societyId, count(p)
             from Property p
             where p.status = :status and p.archived = false and p.societyId in :societyIds
+              and p.owner.status <> 'suspended'
             group by p.societyId""")
     List<Object[]> countLiveBySocietyId(@Param("status") String status,
             @Param("societyIds") Collection<UUID> societyIds);
@@ -202,14 +208,15 @@ public interface PropertyRepository
                    avg(p.price / p.area) filter (where p.deal = 'buy' and p.area > 0),
                    avg(p.price) filter (where p.deal = 'rent')
             from properties p
-            where p.status = :status and p.archived = false and p.society_id in (:societyIds)""")
+            where p.status = :status and p.archived = false and p.society_id in (:societyIds)
+              and not exists (select 1 from users u where u.id = p.owner_id and u.status = 'suspended')""")
     List<Object[]> societyHomeStats(@Param("status") String status,
             @Param("societyIds") Collection<UUID> societyIds);
 
     @Query("""
             select lower(p.city), count(p)
             from Property p
-            where p.status = :status and p.archived = false
+            where p.status = :status and p.archived = false and p.owner.status <> 'suspended'
             group by lower(p.city)""")
     List<Object[]> countLiveByCity(@Param("status") String status);
 
@@ -289,7 +296,8 @@ public interface PropertyRepository
                 count(distinct case when p.ownerVerified = true then p.owner.id end))
             from Property p
             where p.status = :status
-              and p.archived = false""")
+              and p.archived = false
+              and p.owner.status <> 'suspended'""")
     TrustTally tallyTrust(
             @Param("status") String status,
             @Param("now") Instant now);
@@ -301,6 +309,7 @@ public interface PropertyRepository
             from Property p
             where p.status = :status
               and p.archived = false
+              and p.owner.status <> 'suspended'
               and (:unbounded = true
                    or (p.createdAt is not null and p.createdAt > :baseline))
               and (:deal is null or lower(p.deal) = :deal)

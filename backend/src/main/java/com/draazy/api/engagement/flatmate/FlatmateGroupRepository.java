@@ -25,6 +25,7 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
             select g from FlatmateGroup g
             where g.id = :id and g.archived = false
               and g.modStatus in ('live','approved')
+              and not exists (select 1 from User u where u.id = g.hostId and u.status = 'suspended')
             """)
     Optional<FlatmateGroup> lockVisible(@Param("id") UUID id);
 

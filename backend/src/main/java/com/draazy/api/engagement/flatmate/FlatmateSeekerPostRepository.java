@@ -18,6 +18,7 @@ public interface FlatmateSeekerPostRepository extends JpaRepository<FlatmateSeek
             select p from FlatmateSeekerPost p
             where p.id = :id and p.archived = false
               and p.modStatus in ('live','approved')
+              and not exists (select 1 from User u where u.id = p.userId and u.status = 'suspended')
             """)
     Optional<FlatmateSeekerPost> findVisible(@Param("id") UUID id);
 

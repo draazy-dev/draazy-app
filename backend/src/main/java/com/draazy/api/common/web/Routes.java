@@ -1083,12 +1083,6 @@ public final class Routes {
 
         public static final String MY_WORK = "/admin/my-work";
 
-        public static final String BADGE_GRANTS = "/admin/badge-grants";
-
-        public static final String BADGE_GRANT_APPROVE = BADGE_GRANTS + "/{id}/approve";
-
-        public static final String BADGE_GRANT_REJECT = BADGE_GRANTS + "/{id}/reject";
-
         public static final String DASHBOARD = "/admin/dashboard";
 
         public static final String BELL = "/admin/bell";

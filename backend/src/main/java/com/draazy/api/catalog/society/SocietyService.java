@@ -5,6 +5,7 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.RatingLookup;
+import com.draazy.api.identity.user.UserStatuses;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
@@ -130,8 +131,8 @@ public class SocietyService {
         Society society = live(slug);
         List<UUID> family = families(List.of(society.getId())).get(society.getId());
         List<SocietyHome> homes = properties
-                .findBySocietyIdInAndStatusAndArchivedFalseOrderByCreatedAtDesc(
-                        family, PropertyStatus.APPROVED, PageRequest.of(0, HUB_HOMES))
+                .findBySocietyIdInAndStatusAndArchivedFalseAndOwner_StatusNotOrderByCreatedAtDesc(
+                        family, PropertyStatus.APPROVED, UserStatuses.SUSPENDED, PageRequest.of(0, HUB_HOMES))
                 .stream()
                 .map(p -> new SocietyHome(p.getId(), p.getSlug(), p.getTitle(), p.getDeal(), p.getBhk(),
                         p.getPrice(), p.getArea()))

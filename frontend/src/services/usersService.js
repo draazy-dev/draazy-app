@@ -13,9 +13,6 @@ export const getUserTimeline = async (...args) => (await provider()).getUserTime
 /** Withdrawing a badge that was earned through Aadhaar is a 409 the console must show rather than swallow: nothing
  * would restore it, because the verification webhook returns early on an already-verified row. */
 export const setUserBadge = async (...args) => (await provider()).setUserBadge(...args);
-export const listBadgeGrants = async (...args) => (await provider()).listBadgeGrants(...args);
-export const approveBadgeGrant = async (...args) => (await provider()).approveBadgeGrant(...args);
-export const rejectBadgeGrant = async (...args) => (await provider()).rejectBadgeGrant(...args);
 
 /** `'active'` would be ambiguous, because it is the answer to both un-suspending and un-archiving, and the server
  * refuses to guess: reactivating an archived account is a 409 that says to restore it first. */

@@ -18,7 +18,6 @@ modules: [users]
 
 **Monitor**
 
-- **Badge pending** chips on rows. A hand-granted badge is waiting for a second admin.
 - **Flagged** chips and their reason. These are accounts someone raised for review.
 - The **Suspended** tab count when a customer says they cannot sign in.
 - Odd patterns in a lookup: many listings on a brand new account, or the same person under two numbers.
@@ -44,7 +43,6 @@ modules: [users]
 | Part | What it does |
 |---|---|
 | Tabs | **All users**, **Active**, **Suspended**, **Archived**. Counts come from the server. **All users** does not include archived accounts. |
-| **Badge approvals** tab | Administrators only. Hand-granted Verified badges waiting for approval. |
 | Search | Type the start of a name, or a full 10-digit mobile. Email and part of a number are not searched. |
 | Role chips | **All**, **Owners**, **Buyers**. |
 | **Export CSV** | Shown only when that feature is switched on. Exports the first 100 matching rows. Mobile numbers are masked. |
