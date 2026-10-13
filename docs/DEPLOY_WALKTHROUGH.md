@@ -1333,8 +1333,8 @@ points a second hostname at the backend.
   per *recipient*, so walking valid-looking numbers gets a fresh budget for each. On WhatsApp that is
   worse than a bill — sends to non-WhatsApp numbers drag the sending number's quality rating down,
   which cuts the daily messaging limit and takes sign-in itself offline days later.
-- **The eight `@Scheduled` sweeps do not run.** CPU throttling freezes the scheduler thread between
-  requests. Accepted on the sandbox, fatal for production — ADR-011 / ADR-021, and `DEPLOY.md` §7.
+- **Scheduled jobs do not run.** CPU throttling freezes the scheduler thread between requests.
+  Accepted on the sandbox; production needs an always-on host — ADR-021, and `DEPLOY.md` §5.
 - **`INTERNAL_PROXIES=none`.** The origin gate is on, so the `*.run.app` URL refuses direct
   callers, but every anonymous visitor still shares one rate-limit bucket. Widen it only as
   `DEPLOY.md` §4 describes, after confirming a direct non-health request answers 403.

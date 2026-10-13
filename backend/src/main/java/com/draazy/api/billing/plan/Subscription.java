@@ -60,6 +60,10 @@ public class Subscription extends VersionedEntity {
     @Column(name = "refund_amount")
     private Long refundAmount;
 
+    // Read-only here so an entity flush can never overwrite what markRefundTried wrote.
+    @Column(name = "refund_tried_at", insertable = false, updatable = false)
+    private Instant refundTriedAt;
+
     @Column(name = "frozen_at")
     private Instant frozenAt;
 

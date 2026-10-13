@@ -351,7 +351,7 @@ public class IdentityVerificationService {
     }
 
     @Transactional
-    int expireStalePending(Duration ttl) {
+    public int expireStalePending(Duration ttl) {
         Instant now = Instant.now(clock);
         List<IdentityVerification> due = verifications.findStalePendingForUpdate(
                 now.minus(ttl), now.minus(IdentityReviewClaimService.CLAIM_TTL), PageRequest.of(0, STALE_BATCH));

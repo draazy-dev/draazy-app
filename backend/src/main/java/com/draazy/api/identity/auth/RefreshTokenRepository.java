@@ -39,5 +39,7 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<RefreshToken> findByRotatedFrom(UUID predecessorId);
 
-    long deleteByExpiresAtBefore(Instant cutoff);
+    @Modifying
+    @Query(value = "DELETE FROM refresh_tokens WHERE expires_at < :cutoff", nativeQuery = true)
+    int deleteExpiredBefore(@Param("cutoff") Instant cutoff);
 }

@@ -174,8 +174,7 @@ class ListingPasses {
     /** One gateway call and one short transaction per row, so a refused refund leaves the others untouched. */
     int sendDueRefunds() {
         int sent = 0;
-        for (Subscription due : subscriptions
-                .findByRefundDueAtIsNotNullAndRefundRefIsNullOrderByRefundDueAtAsc(Limit.of(MAX_REFUNDS_PER_RUN))) {
+        for (Subscription due : subscriptions.findRefundsDue(Limit.of(MAX_REFUNDS_PER_RUN))) {
             if (settle(due)) {
                 sent++;
             }
@@ -188,6 +187,7 @@ class ListingPasses {
         String refundId = due.gatewayRefundId();
         String ref = send(due, refundId);
         if (ref == null) {
+            transactions.executeWithoutResult(status -> subscriptions.markRefundTried(due.getId(), Instant.now()));
             return false;
         }
         try {

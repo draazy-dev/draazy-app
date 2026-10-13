@@ -51,11 +51,7 @@ public class FlatmateTrustReconciler {
                 .filter(r -> !listingStands(r.getAddressFingerprint())).toList();
         staleRooms.forEach(r -> {
             r.setVerificationTier(fallbackTier(r.isAgreementDeclared()));
-            if (FlatmateVocabulary.MOD_LIVE.equals(r.getModStatus())) {
-                r.setModStatus(FlatmateVocabulary.MOD_PENDING);
-                r.getRecheck().clear();
-                tellHeldForReview(r.getHostId(), FlatmateLinks.of("room", r.getId()));
-            }
+            holdForReview(r, r.getHostId(), FlatmateLinks.of("room", r.getId()));
         });
         rooms.saveAllAndFlush(staleRooms);
 
@@ -63,21 +59,25 @@ public class FlatmateTrustReconciler {
                 .filter(g -> !listingStands(g.getAddressFingerprint())).toList();
         staleGroups.forEach(g -> {
             g.setVerificationTier(fallbackTier(g.isAgreementDeclared()));
-            if (FlatmateVocabulary.MOD_LIVE.equals(g.getModStatus())) {
-                g.setModStatus(FlatmateVocabulary.MOD_PENDING);
-                g.getRecheck().clear();
-                tellHeldForReview(g.getHostId(), FlatmateLinks.of("group", g.getId()));
-            }
+            holdForReview(g, g.getHostId(), FlatmateLinks.of("group", g.getId()));
         });
         groups.saveAllAndFlush(staleGroups);
 
         return staleRooms.size() + staleGroups.size();
     }
 
-    private void tellHeldForReview(UUID hostId, String link) {
-        notifier.notify(hostId, "flatmate.moderated.held", "Your flatmate ad is back in review",
-                "The listing it was linked to is no longer live, so our team will check the ad"
-                        + " before it shows again.", link);
+    // An expired post renews to the status it lapsed from, so a lapsed live one must also come back via review.
+    private void holdForReview(FlatmateSupplyPost post, UUID hostId, String link) {
+        boolean live = FlatmateVocabulary.MOD_LIVE.equals(post.getModStatus());
+        if (live || post.getExpiry().holdForReview()) {
+            if (live) {
+                post.setModStatus(FlatmateVocabulary.MOD_PENDING);
+            }
+            post.getRecheck().clear();
+            notifier.notify(hostId, "flatmate.moderated.held", "Your flatmate ad is back in review",
+                    "The listing it was linked to is no longer live, so our team will check the ad"
+                            + " before it shows again.", link);
+        }
     }
 
     /** {@code deriveTier}'s conditions minus ownership — the fingerprint records the flat, not who

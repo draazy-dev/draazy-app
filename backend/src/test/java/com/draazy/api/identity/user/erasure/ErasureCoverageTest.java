@@ -388,7 +388,7 @@ class ErasureCoverageTest extends AbstractApiTest {
                 "Salted SHA-256 of the address the referee redeemed from (V64), held only to "
                         + "compute the same_ip fraud signal. Not swept on request: the row is "
                         + "reached by mobile rather than by user id, the same reason its two "
-                        + "mobiles are gaps. It expires anyway — ReferralSignalRetentionSweep "
+                        + "mobiles are gaps. It expires anyway — the referral-signal-retention job "
                         + "blanks it after referralSignalRetentionDays (180 by default), so the "
                         + "exposure is bounded "
                         + "without an erasure request. Closing it properly means giving the sweep a "

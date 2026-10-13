@@ -148,7 +148,7 @@ Reason codes: `photos_not_real, duplicate, broker, wrong_details, locality_uncle
 document_unreadable, name_mismatch, other` (CHECK in V67). Each has an owner outreach template
 `reason_<code>`.
 
-Needs-info housekeeping (`NeedsInfoSweep`, hourly): reminders on day 3 and day 7 after
+Needs-info housekeeping (the `needs-info` job, daily at 10:00 IST): reminders on day 3 and day 7 after
 `info_requested_at`, auto-archive (`needs_info_timeout`, soft) on day 14 with no reply or edit (V69, V81).
 
 The four internal notes above go through `saveNoteIfAny` (`components/ui/InternalNote.jsx`), which

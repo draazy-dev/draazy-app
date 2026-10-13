@@ -169,7 +169,7 @@ a committed JWT secret, `trusted-proxies=none`). That is the design, not an inco
 | `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` | schema owner `postgres.<project-ref>`, migration job only; the service reads just the user name, for `DatabasePrivilegeCheck` |
 | `FLYWAY_DB_URL` | session pooler, `:5432` — see §2 |
 | `JWT_SECRET` | HS256, ≥ 32 bytes, generated per environment |
-| `REFERRAL_SIGNAL_SALT` | any long random string; **never** shared with dev. Rotating it is safe — stored digests simply stop matching, and they are discarded after 90 days anyway |
+| `REFERRAL_SIGNAL_SALT` | any long random string; **never** shared with dev. Rotating it is safe — stored digests simply stop matching, and they are discarded after 180 days anyway |
 | `IDENTITY_HASH_SECRET` | any long random string; **never** shared with dev. Keys the one-way digest of verified ID-document numbers used for "one document = one badge". Rotating it makes every existing badge's digest stop matching new submissions, so rotate only with a re-verification plan |
 | `IDENTITY_ENCRYPTION_KEY` / `IDENTITY_ENCRYPTION_KEY_ID` | base64 of 32 random bytes (`openssl rand -base64 32`) and a short id (`[a-z0-9-]`, e.g. `2026a`); **never** shared with dev. AES-256-GCM for PAN/Aadhaar in `service_request_identities` (D283). To rotate, issue a new key and id, and set `IDENTITY_RETIRED_KEYS=oldId:oldKey` so existing rows still decrypt. Losing a key makes its rows unreadable |
 | `STAFF_TOTP_KEY` | base64 of 32 random bytes (`openssl rand -base64 32`); **never** shared with dev. AES-256-GCM for staff and admin authenticator (TOTP) secrets in `staff_credentials`. There is no retired-key list: rotating it makes every enrolled authenticator unreadable, so each account must be reset (admin **Reset 2FA**) and re-enrol |
@@ -299,13 +299,12 @@ notice/consent evidence, not a legal-compliance claim.
 | Case | Rule |
 |---|---|
 | Approved / rejected / revoked | Images purge after `draazy.identity.image-retention-days` from `decidedAt`; default `7` days |
-| Pending too long | `IdentityPendingExpirySweep` rejects pending cases older than `draazy.identity.pending-ttl`; default `P14D`; it purges images immediately and sends the ordinary rejected decision |
+| Pending too long | The `identity-pending-expiry` job (10:00 IST) rejects pending cases older than `draazy.identity.pending-ttl`; default `P14D`; it purges images immediately and sends the ordinary rejected decision |
 | Resubmission / withdrawal / erasure | Existing identity files are queued and purged immediately in the transaction path |
-| Storage delete failure | `identity_storage_deletes` keeps the key; `IdentitySecurityFollowupSweep` retries due deletes in batches of 200 |
+| Storage delete failure | `identity_storage_deletes` keeps the key; the nightly `identity-delete-retry` job tries each due key once, up to 2,000 a night, least-tried first so a stuck key never blocks newer ones |
 
-The sweeps are `@Scheduled` and inherit the Cloud Run CPU-throttling caveat in §7. Sandbox accepts
-that risk; production needs the ADR-011 job runner or always-on CPU before the retention promise is
-operationally reliable.
+These are `JobRunner` jobs (§5) and inherit the Cloud Run CPU-throttling caveat there; an always-on
+host (DigitalOcean, ADR-021) runs them as scheduled.
 
 **WhatsApp identity decision template.**
 
@@ -335,8 +334,8 @@ WhatsApp leg. Vendor failures are logged and swallowed; the decision is already 
 in-app. Meta business verification and approved templates remain the gate before useful WhatsApp
 delivery; see ADR-020 notes in §7.
 
-**WhatsApp waiting-on-you digest template.** Sent by `WaitingDigestSweep` (10:00 IST, daily; it inherits the
-Cloud Run CPU-throttling caveat above) through the same `WhatsAppDecisionMessenger`. Rules are in
+**WhatsApp waiting-on-you digest template.** Sent by the `waiting-digest` job (10:00 IST, daily; it inherits the
+Cloud Run CPU-throttling caveat in §5) through the same `WhatsAppDecisionMessenger`. Rules are in
 [`notifications.md`](./system/notifications.md#waiting-on-you-digest--utility-template).
 
 | Setting | Value |
@@ -345,7 +344,7 @@ Cloud Run CPU-throttling caveat above) through the same `WhatsAppDecisionMesseng
 | Suggested body text | `You have {{1}} waiting for your reply on Draazy. Open the app to respond.` with `{{1}}` = `1 request` / `N requests` |
 | Template name | `WHATSAPP_DIGEST_TEMPLATE_NAME`; blank means no digest is sent |
 | Language | `WHATSAPP_DIGEST_TEMPLATE_LANG`, default `en_US` |
-| Off switch | `draazy.engagement.waiting-digest.enabled=false` |
+| Off switch | `draazy.jobs.waiting-digest.enabled=false` |
 
 **Web push (VAPID).** `WebPushSender` is wired when `PUSH_VAPID_PRIVATE_KEY` is set; without it
 `LoggingPushSender` only logs. Generate a pair once with `npx web-push generate-vapid-keys` (base64url).
@@ -757,20 +756,32 @@ Then set the three variables the script prints on the `sandbox` environment, dis
 deploy, point Pages `API_ORIGIN` at the new `*.run.app` URL, and only then delete the old project —
 `minScale: 1` keeps billing it until you do.
 
-### What the eight `@Scheduled` sweeps do here — nothing
+### Scheduled jobs
 
-Cloud Run allocates CPU **only while a request is in flight**. Between requests the JVM's scheduler
-thread is frozen, so `fixedDelay` timers do not advance; an instance that never accumulates five
-minutes of *CPU* time never reaches its first tick, and every sweep in the codebase uses a five
-minute `initialDelay`. Nothing logs the non-execution.
+`com.draazy.api.jobs.JobRunner` runs every background job in four cron groups, all in IST. Each job
+runs in its own try, so one failure is logged and the rest of the group carries on; the group's
+advisory lock (`JobRunScheduler`) keeps it on one instance.
 
-On the sandbox this is accepted. It cannot ship to production: subscriptions keep entitling after
-they lapse, abandoned checkouts never clear, and `page_views` grows unpruned against a 500 MB
-database. The intended fix is already designed —
-`docs/system/platform-architecture.md` §5.6 specifies Cloud Scheduler calling an OIDC-authenticated
-job runner — and was simply never built; the code reached for `@Scheduled` instead. Always-on CPU
-would also work and costs roughly USD 10–25/month, because it takes the service off the request-billed
-free tier entirely.
+| Group | Cron property (default) | Jobs |
+|---|---|---|
+| Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates` |
+| Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs) |
+| Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
+| Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `waiting-digest` |
+
+Switches: `draazy.jobs.enabled=false` turns off all of them (the test suite does), and
+`draazy.jobs.<name>.enabled=false` (env `DRAAZY_JOBS_<NAME>_ENABLED`) turns off one. Daily jobs that
+read a capped page (200–500 rows) repeat until a page comes back empty, up to ten pages a run.
+
+`spring.task.scheduling.pool.size=2` is a connection budget, not a throughput setting. A group run holds
+one connection for its lock transaction and the work checks out a second. With
+`spring.datasource.hikari.maximum-pool-size=5`, two concurrent runs take four and leave one for HTTP. More
+threads let a long nightly run overlap the 15-minute and hourly ticks and starve requests. Raise both
+together. A run that finds both threads busy starts late; it isn't skipped.
+
+**On Cloud Run they do nothing.** CPU is allocated only while a request is in flight, so the
+scheduler thread is frozen between requests and no cron fires. Nothing logs the non-execution. On
+the sandbox this is accepted; production runs on an always-on host (ADR-021).
 
 ---
 
@@ -855,12 +866,9 @@ free tier entirely.
   budget for each one. On WhatsApp that is worse than a bill — sends to non-WhatsApp numbers drag
   the sending number's quality rating down, which cuts the daily messaging limit and takes sign-in
   itself offline days later.
-- **The eight `@Scheduled` sweeps do not run on Cloud Run.** CPU throttling freezes the scheduler
-  thread between requests, so no timer advances — see §5. Accepted on the sandbox, fatal for
-  production. This is a **drift from ADR-011**, which chose Cloud Scheduler → `/internal/jobs/run`
-  and explicitly deferred native `@Scheduled` until `min-instances=1` *and* ShedLock; the code took
-  the mechanism without either precondition. `platform-architecture.md` §4.3 / ADR-021 costs the
-  alternative that removes the problem instead of working around it.
+- **Scheduled jobs do not run on Cloud Run.** CPU throttling freezes the scheduler thread between
+  requests — see §5. Accepted on the sandbox; production needs an always-on host (ADR-021). Each run
+  takes a Postgres advisory lock per job, so more than one instance is safe and no ShedLock is needed.
 - **Backups.** Supabase's free tier has limited backups and no PITR. A scheduled logical dump to R2
   is the stopgap until Pro is justified.
 - **The anonymous rate limiter is bypassable until §4 is decided.** Not a boot failure and not

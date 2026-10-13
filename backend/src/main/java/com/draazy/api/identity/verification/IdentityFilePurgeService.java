@@ -48,10 +48,15 @@ public class IdentityFilePurgeService {
         afterCommit(() -> keys.forEach(this::deleteStoredFile));
     }
 
+    /** Tries each due row once and returns how many files were really deleted. */
     public int retryQueuedDeletes(Instant now, int batchSize) {
-        List<IdentityStorageDelete> due = deletes.findDue(now, PageRequest.of(0, batchSize));
-        due.forEach(row -> deleteStoredFile(row.getStorageKey()));
-        return due.size();
+        int deleted = 0;
+        for (IdentityStorageDelete row : deletes.findDue(now, PageRequest.of(0, batchSize))) {
+            if (deleteStoredFile(row.getStorageKey())) {
+                deleted++;
+            }
+        }
+        return deleted;
     }
 
     void deleteIfRolledBack(String key) {
@@ -81,14 +86,15 @@ public class IdentityFilePurgeService {
         });
     }
 
-    private void deleteStoredFile(String key) {
-        deleteStoredFile(key, false);
+    private boolean deleteStoredFile(String key) {
+        return deleteStoredFile(key, false);
     }
 
-    private void deleteStoredFile(String key, boolean queueMissing) {
+    private boolean deleteStoredFile(String key, boolean queueMissing) {
         try {
             storage.delete(key);
             transactions.executeWithoutResult(status -> deletes.deleteById(key));
+            return true;
         } catch (RuntimeException e) {
             log.warn("Failed to delete identity verification file {}", key, e);
             transactions.executeWithoutResult(status -> {
@@ -97,6 +103,7 @@ public class IdentityFilePurgeService {
                 }
                 deletes.recordFailure(key, clipped(e));
             });
+            return false;
         }
     }
 

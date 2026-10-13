@@ -53,6 +53,8 @@ class ArchitectureBoundaryTest {
         // The aggregates (/bootstrap, /me/bootstrap, /me/dashboard) read across the platform and nothing reads them,
         // so they rank above every context they compose.
         LAYER.put("bootstrap", 8);
+        // The scheduler calls into every context on a clock and nothing calls it, like the aggregates above.
+        LAYER.put("jobs", 8);
         LAYER.put("deals", 5);
 
         LAYER.put("moderation", 6);

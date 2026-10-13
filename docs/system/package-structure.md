@@ -77,6 +77,7 @@ feature context ──▶ security ──▶ common       feature context ──
 | 3 | `finance`, `services`, `bootstrap` | layers 0–2 |
 | 4 | `deals` | layers 0–3 |
 | 5 | `moderation` | layers 0–4 |
+| top | `jobs` | every context: it schedules their work, and nothing imports it |
 
 Contexts sharing a rank never import one another; only the strict ordering is enforced.
 

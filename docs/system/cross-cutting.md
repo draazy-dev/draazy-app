@@ -493,7 +493,7 @@ frontend no longer derives inbox rows or stores notification state in `localStor
 `GET /notifications/unread-count` returns `{ "count": n }`, using the same unread + deliverable
 filter as the list. Each row carries a stable `id`, `read` flag, timestamp and link; those server
 rows drive both `/notifications` and the header bell. Read rows leave the list after 30 days; all
-notification rows are purged after 90 days by `NotificationRetentionSweep`.
+notification rows are purged after 90 days by the nightly `notification-retention` job.
 
 The bell's count is pushed, not polled: when a row becomes deliverable, or `markRead` changes one,
 `NotificationPublisher` sends an id-free `notification` event on the caller's `/messages/stream`

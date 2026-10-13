@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -49,8 +50,15 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     /** The fast path for the open-unpaid cap; {@code uq_subscriptions_open_unpaid} is what holds it under races. */
     long countByUserIdAndStatus(UUID userId, String status);
 
-    /** Pass payments whose refund the gateway has not yet accepted, oldest first. */
-    List<Subscription> findByRefundDueAtIsNotNullAndRefundRefIsNullOrderByRefundDueAtAsc(Limit batch);
+    /** Pass payments whose refund the gateway has not yet accepted; a refused one waits behind the rest. */
+    @Query("""
+            select s from Subscription s where s.refundDueAt is not null and s.refundRef is null
+            order by s.refundTriedAt asc nulls first, s.refundDueAt asc""")
+    List<Subscription> findRefundsDue(Limit batch);
+
+    @Modifying
+    @Query(value = "UPDATE subscriptions SET refund_tried_at = :at WHERE id = :id", nativeQuery = true)
+    void markRefundTried(@Param("id") UUID id, @Param("at") Instant at);
 
     /** Unpaid checkouts opened before {@code cutoff}, oldest first and batched so one lost race rolls back little. */
     List<Subscription> findByStatusAndCreatedAtBeforeOrderByCreatedAtAsc(String status,

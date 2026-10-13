@@ -116,7 +116,7 @@ on MoA/AoA and authorized capital; keep authorized capital modest, e.g., ₹1–
 - **DPDP Act, 2023** — you're a **Data Fiduciary**: consent notices, purpose limitation, **grievance officer**, breach reporting, retention limits. **Elevated** because verification is **in-house** (ADR-009/009b). Be exact about what is kept, because the answer differs by field:
   - *Never stored* — the document number itself. Only `HMAC(docType:number)` and the last four survive.
   - *Kept indefinitely* — name, date of birth, document type, the masked last four, and `person_key`, a keyed hash over name+DOB. A retention answer that stops at "a hash and the last four" omits two directly identifying fields.
-  - *Purged* — the document and selfie **images**, seven days after a decision (`draazy.identity.image-retention-days`, so an operator can change the number without a code change). **A case that is never decided is never purged**: `findPurgeCandidates` filters on `decidedAt`, so an abandoned queue item keeps its images until someone decides or deletes it. That is the retention gap to close before a DPDP review, not after.
+  - *Purged* — the document and selfie **images**, seven days after a decision (`draazy.identity.image-retention-days`, so an operator can change the number without a code change). A case left undecided is rejected by the daily `identity-pending-expiry` job after `draazy.identity.pending-ttl` (14 days), which purges its images at once.
 - **IT Act + SPDI Rules** — reasonable security practices; publish **Privacy Policy + Terms**.
 
 **E. Not applicable / avoidable**

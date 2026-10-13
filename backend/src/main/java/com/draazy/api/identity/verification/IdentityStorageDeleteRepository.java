@@ -20,7 +20,7 @@ public interface IdentityStorageDeleteRepository extends JpaRepository<IdentityS
     @Query(value = """
             select * from identity_storage_deletes
              where queued_at + ((attempts + 1) * interval '5 minutes') <= :now
-             order by queued_at
+             order by attempts, queued_at
             """, nativeQuery = true)
     List<IdentityStorageDelete> findDue(Instant now, Pageable pageable);
 

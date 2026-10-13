@@ -161,7 +161,7 @@ and reading that file; the constructor check is what states the rule.
   (default 7), whatever happens to the listing meanwhile. Declined, expired and stale-pending requests are
   returned. Asking about a closed listing (paused, rented, sold) is `409 listing_not_live`; an archived, unapproved or
   suspended-owner listing is `404`. An owner approving while theirs is not live gets the same `409 listing_not_live`
-  (decline is always allowed). A daily sweep (`ContactReturnSweep`) marks overdue pending rows `expired` and sends
+  (decline is always allowed). A daily job (`contact-returns`, 10:00 IST) marks overdue pending rows `expired` and sends
   the seeker `contact.returned`; a decline sends the same. The rows stay, so the same listing cannot be
   re-asked to farm returns, and renewing a lapsed request re-checks the allowance. When
   `fees.contactPendingMax` (default 10) requests are open, `POST /contacts/request` is `422 contact_pending_limit`.

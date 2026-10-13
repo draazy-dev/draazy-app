@@ -20,7 +20,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientResponseException;
@@ -39,8 +38,6 @@ public class ProviderCalls {
     private static final Logger log = LoggerFactory.getLogger(ProviderCalls.class);
     private static final int MAX_DETAIL = 200;
     private static final int MAX_PENDING = 1_000;
-    private static final long EVERY_DAY_MS = 24L * 60L * 60L * 1000L;
-    private static final long AFTER_STARTUP_MS = 10L * 60L * 1000L;
     private static final String INSERT = """
             INSERT INTO provider_call (provider, operation, outcome, recipient, recipient_hash,
                                        reference, detail, duration_ms, trace_id)
@@ -122,14 +119,9 @@ public class ProviderCalls {
         }
     }
 
-    @Scheduled(fixedDelay = EVERY_DAY_MS, initialDelay = AFTER_STARTUP_MS)
-    public void purgeExpired() {
-        try {
-            jdbc.update("DELETE FROM provider_call WHERE created_at < now() - make_interval(days => ?)",
-                    (int) RETENTION.toDays());
-        } catch (RuntimeException e) {
-            log.error("provider_call retention sweep failed; will retry on the next tick", e);
-        }
+    public int purgeExpired() {
+        return jdbc.update("DELETE FROM provider_call WHERE created_at < now() - make_interval(days => ?)",
+                (int) RETENTION.toDays());
     }
 
     /** Exact-match search key; null when the value is neither an email nor a 10-digit mobile. */

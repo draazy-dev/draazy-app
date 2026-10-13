@@ -195,7 +195,7 @@ Approvals and the automatic check's rejects are in-app only. Both sends respect 
 
 ### Waiting-on-you digest — `UTILITY` template
 
-One WhatsApp per user per day, sent by `WaitingDigestSweep` at 10:00 IST (`draazy.engagement.waiting-digest.enabled`,
+One WhatsApp per user per day, sent by the `waiting-digest` job at 10:00 IST (`draazy.jobs.waiting-digest.enabled`,
 default on) through `WaitingDigestService`. Template `WHATSAPP_DIGEST_TEMPLATE_NAME` / `WHATSAPP_DIGEST_TEMPLATE_LANG`
 (default `en_US`); blank name = skipped and logged, nothing is sent. Needs Meta approval before it is set. Suggested
 body: `You have {{1}} waiting for your reply on Draazy. Open the app to respond.`, with `{{1}}` = `1 request` or

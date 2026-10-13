@@ -9,9 +9,11 @@ import com.draazy.api.common.payments.AbandonedCheckouts;
 import com.draazy.api.common.trust.Notifier;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -53,8 +55,8 @@ public class SubscriptionSweeper implements AbandonedCheckouts {
     /** Pauses what the free tier has no room for, then expires the lapsed terms. Each pause is its own
      * transaction, listing row before the owner's LISTING_LIVE lock like the go-live paths. */
     public int expireLapsed(Instant now) {
-        List<Subscription> lapsed = subscriptions
-                .findByStatusAndRenewsAtLessThanEqual(SubscriptionStatuses.ACTIVE, now);
+        List<Subscription> lapsed = newestListingFirst(subscriptions
+                .findByStatusAndRenewsAtLessThanEqual(SubscriptionStatuses.ACTIVE, now));
         Map<UUID, String> kinds = plans
                 .findAllById(lapsed.stream().map(Subscription::getPlanId).distinct().toList()).stream()
                 .collect(Collectors.toMap(Plan::getId, Plan::getKind));
@@ -78,6 +80,16 @@ public class SubscriptionSweeper implements AbandonedCheckouts {
             }
         });
         return expire(expirable, now);
+    }
+
+    // Newest listing first, so the oldest is judged last and keeps the free slot, as a plan lapse does.
+    private List<Subscription> newestListingFirst(List<Subscription> lapsed) {
+        Map<UUID, Instant> listedAt = properties.findAllById(lapsed.stream().map(Subscription::getPropertyId)
+                        .filter(Objects::nonNull).distinct().toList()).stream()
+                .collect(Collectors.toMap(Property::getId, Property::getCreatedAt));
+        Comparator<Subscription> byListingAge =
+                Comparator.comparing(s -> listedAt.getOrDefault(s.getPropertyId(), Instant.MIN));
+        return lapsed.stream().sorted(byListingAge.reversed()).toList();
     }
 
     private boolean attempt(UUID ownerId, Runnable enforcement) {

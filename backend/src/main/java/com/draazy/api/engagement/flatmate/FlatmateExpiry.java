@@ -39,6 +39,15 @@ class FlatmateExpiry {
         return FlatmateVocabulary.MOD_EXPIRED;
     }
 
+    /** True when a post that lapsed while live will now renew into review instead. */
+    boolean holdForReview() {
+        if (!FlatmateVocabulary.MOD_LIVE.equals(expiredFrom)) {
+            return false;
+        }
+        expiredFrom = FlatmateVocabulary.MOD_PENDING;
+        return true;
+    }
+
     void markReminded() {
         reminded = true;
     }

@@ -124,7 +124,7 @@ public class RefreshTokenService {
 
     @Transactional
     public long pruneExpired(Instant now) {
-        return repository.deleteByExpiresAtBefore(now);
+        return repository.deleteExpiredBefore(now);
     }
 
     public record Rotation(UUID userId, String refreshToken) {

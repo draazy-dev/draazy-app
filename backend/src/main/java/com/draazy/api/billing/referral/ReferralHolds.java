@@ -24,14 +24,14 @@ public class ReferralHolds {
     }
 
     @Transactional
-    public void release(UUID referralId, Instant now) {
+    public boolean release(UUID referralId, Instant now) {
         if (!settings.referralRewardsEnabled()) {
-            return;
+            return false;
         }
-        referrals.findForDecision(referralId)
+        return referrals.findForDecision(referralId)
                 .filter(r -> ReferralStatuses.HELD.equals(r.getStatus())
                         && r.getHoldUntil() != null && !r.getHoldUntil().isAfter(now))
-                .ifPresent(r -> {
+                .map(r -> {
                     String problem = clawbacks.problem(r, true);
                     if (problem == null) {
                         outcomes.released(r, "Automatic: hold elapsed with no problem found");
@@ -39,6 +39,8 @@ public class ReferralHolds {
                         outcomes.rejected(r, problem, "Automatic: " + problem,
                                 "A referral could not be verified. Contact support if you think this is wrong.");
                     }
-                });
+                    return true;
+                })
+                .orElse(false);
     }
 }

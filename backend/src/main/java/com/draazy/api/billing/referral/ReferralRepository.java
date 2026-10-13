@@ -131,7 +131,7 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             select r.id from Referral r
             where r.status in ('qualified', 'rewarded') and r.grantedAt > :since order by r.grantedAt
             """)
-    List<UUID> grantedSinceIds(@Param("since") Instant since, Pageable limit);
+    List<UUID> grantedSinceIds(@Param("since") Instant since);
 
     // Bulk update so retention never loads unbounded rows; `is not null` stops every tick rewriting null over null.
     @Modifying

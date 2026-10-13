@@ -260,7 +260,7 @@ invalid because which documents expire is a product decision that will change.
 `status` is `pending | needs_info | approved | rejected | flagged | archived` (wire: `in_review`
 for pending). `reason_code` is required for `needs_info` and `rejected` (values in
 `ReviewReasonCodes`, CHECK-backed); `properties.info_requested_at` (V81) starts the 3/7/14-day
-reminder-and-archive clock (`NeedsInfoSweep`). Listing progress is derived from timestamp facts on
+reminder-and-archive clock (the daily `needs-info` job). Listing progress is derived from timestamp facts on
 `properties` (`claim_link_sent_at`, `claim_link_opened_at`, `owner_confirmed_at`,
 `review_started_at`, `info_requested_at`) — see `docs/flows/admin/property-verification.md` §7. A duplicate or hard broker signal is approved only through
 `property_override_requests` (V68): a requester and a different approver, both staff, neither the
@@ -367,8 +367,8 @@ listings posted in the same second each read a world without the other and neith
 which is the precise shape of the abuse the probe exists to catch, since a broker uploading one flat
 twice does it from a script, not by hand a day apart. Hence `findRecentSignalCarrying`.
 
-Its window is deliberately generous relative to the sweep's period, so a listing is re-read a couple
-of times rather than exactly once: a sweep tick that dies mid-run, or a deploy landing between two
+Its 30-minute window is twice the sweep's 15-minute period, so a listing is re-read twice rather
+than exactly once: a sweep tick that dies mid-run, or a deploy landing between two
 ticks, would otherwise leave a permanent hole in coverage at a cost of one indexed range scan. The
 signal predicate is `ListingDuplicateProbe#flag`'s own early-out hoisted into SQL, because most
 listings carry none of the three signals and fetching them only to return immediately would make the
@@ -499,8 +499,7 @@ a bare `? is null` and refuses to prepare the statement; the query already uses 
 the two list facets. Callers must still pass a non-null `baseline`; it is simply not read when
 unbounded. A row with a null `createdAt` is excluded from the bounded reading (it cannot be shown to
 be newer) and counted by the unbounded one (it is still a live listing). Both count rather than load:
-neither caller wants the rows, and the sweep touches every alert on the platform every thirty
-minutes.
+neither caller wants the rows, and the sweep touches every alert on the platform every hour.
 
 ## Audit log policy (`audit_log`)
 
