@@ -27,7 +27,7 @@ const STAYS_LIVE_FORM_TO_WIRE = Object.fromEntries(
 
 const COMMERCIAL_DETAIL_KEYS = new Set([
   'commercialType', 'washrooms', 'shellType', 'powerBackup', 'pantry', 'camCharges', 'suitableFor', 'fixtures',
-  'gstOnRent', 'fitOutMonths', 'escalationPct', 'tenancyStatus', 'inPlaceRent', 'leaseExpiry',
+  'fitOutMonths', 'escalationPct', 'tenancyStatus', 'inPlaceRent', 'leaseExpiry',
   ...COMMERCIAL_SPEC_KEYS,
 ]);
 const RESIDENTIAL_DETAIL_KEYS = new Set([
@@ -214,7 +214,6 @@ export const persistListing = async ({ form, user, editId, editListing, photos }
         pantry: !!form.pantry,
         suitableFor: form.suitableFor || [],
         fixtures: form.fixtures || [],
-        gstOnRent: isRent ? (form.gstOnRent || '') : '',
         fitOutMonths: isRent ? (form.fitOutMonths || '') : '',
         escalationPct: isRent ? (form.escalationPct || '') : '',
         tenancyStatus: isRent ? '' : (form.tenancyStatus || ''),

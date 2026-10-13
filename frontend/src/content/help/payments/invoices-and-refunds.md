@@ -4,9 +4,9 @@ slug: invoices-and-refunds
 category: payments
 audience: everyone
 order: 2
-updated: 2026-10-12
+updated: 2026-10-13
 summary: Where to find your invoices, what is refundable, and how long a refund takes.
-tags: [invoice, refund, gst, billing, receipt]
+tags: [invoice, refund, billing, receipt]
 ---
 
 ## Finding your invoices
@@ -14,7 +14,7 @@ tags: [invoice, refund, gst, billing, receipt]
 Your payment history is under **Dashboard → Plan & Billing**, alongside the plan you are currently on. Each row carries the invoice number, what it was for, the amount and the date — that invoice number is what Support needs if you ever query a charge.
 
 > [!NOTE]
-> Downloadable PDF invoices and adding a GSTIN to an invoice are not live yet. If you need a tax invoice with a GSTIN on it, raise a ticket at [Support](/support) **before** you pay — we cannot re-issue one with a GSTIN added afterwards.
+> Downloadable PDF invoices are not live yet.
 
 ## Payment methods
 
@@ -43,7 +43,7 @@ A contact that an owner declines, or that gets no reply in 7 days, is returned t
 ### Timelines
 
 - We review every request within **2 business days**
-- Approved refunds are processed within **5–7 business days**, to the original payment method, with a GST credit note
+- Approved refunds are processed within **5–7 business days**, to the original payment method, with a credit note
 - Your bank, card issuer or UPI app may take longer to show the credit
 
 ## Requesting a refund

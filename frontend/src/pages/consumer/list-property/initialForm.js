@@ -25,7 +25,6 @@ export const initialForm = {
   camCharges: '',
   suitableFor: [],
   fixtures: [],
-  gstOnRent: '',
   fitOutMonths: '',
   escalationPct: '',
   tenancyStatus: '',

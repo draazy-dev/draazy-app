@@ -233,7 +233,6 @@ export default function Plans() {
         </div>
       </section>
 
-      <p className="text-center text-gray-500 text-sm mb-2">{t('misc1.plansPricesIncludeGst')}</p>
       <p className="text-center text-gray-500 text-sm">{t('misc1.plansFooter1')}<span className="text-gray-300 font-medium">{t('misc1.plansFooterBold')}</span></p>
     </div>
   );

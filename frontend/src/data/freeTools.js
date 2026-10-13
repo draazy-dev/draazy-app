@@ -81,7 +81,7 @@ export const FREE_TOOLS = [
       { q: 'Is it compulsory to register a rent agreement in Maharashtra?', a: 'Yes. Section 55 of the Maharashtra Rent Control Act, 1999 makes registration compulsory for every leave and licence agreement, whatever its term.' },
       { q: 'How is stamp duty on a rent agreement calculated?', a: '0.25% of the rent for the whole term plus 10% a year of the refundable deposit, rounded up to the next ₹100. The calculator above does the sum.' },
       { q: 'Does an 11-month agreement avoid registration?', a: 'No. A shorter term means less stamp duty, but every leave and licence agreement in Maharashtra must be registered, whether it runs 11 months or 60.' },
-      { q: 'Does this work for a shop or office?', a: 'No. It is for homes. Commercial agreements involve GST and TDS and are quoted by Draazy\'s legal desk.' },
+      { q: 'Does this work for a shop or office?', a: 'No. It is for homes. Commercial agreements involve different tax rules and are quoted by Draazy\'s legal desk.' },
     ],
     cta: { text: 'Renting out a flat? List it free on Draazy and let tenants contact you directly.', label: 'List your property', to: '/list-property' },
   },

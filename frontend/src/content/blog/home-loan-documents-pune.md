@@ -2,7 +2,7 @@
 title: Home loan documents checklist for buying a flat in Pune
 description: The identity, income and property documents banks ask for when you buy a flat in Pune, for salaried and self-employed buyers, new or resale.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-13
 author: Draazy Team
 topic: buying
 tags: [home loan, documents, checklist, LTV, resale flat, under construction, Pune]
@@ -45,7 +45,7 @@ If you are applying with a co-borrower, such as your spouse or a parent, they wi
 
 - Income tax returns for the last two to three years, with the computation of income.
 - A balance sheet and profit and loss statement, audited or certified by a chartered accountant.
-- Proof of business, such as GST registration or a Shops and Establishment licence.
+- Proof of business, such as a Shops and Establishment licence.
 - Business and personal bank statements for the last six to twelve months.
 
 ## Property documents: new flat from a builder

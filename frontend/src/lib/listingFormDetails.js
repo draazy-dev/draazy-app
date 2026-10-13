@@ -12,9 +12,9 @@ export const DETAIL_KEYS = new Set([
   // Retired in favour of `naStatus` / `otherRights`; kept so published listings still read back.
   'naSanctioned', 'electricity', 'roadAccess', 'satbara',
   'furniture', 'fixtures', 'suitableFor', 'preferredTenants',
-  'gstOnRent', 'fitOutMonths', 'escalationPct', 'tenancyStatus', 'inPlaceRent', 'leaseExpiry',
+  'fitOutMonths', 'escalationPct', 'tenancyStatus', 'inPlaceRent', 'leaseExpiry',
   'seatCount', 'frontage', 'floorLoad', 'clearHeight', 'sanctionedPower', 'dockCount', 'bestTimeToCall',
-  // No longer asked; kept so listings that stored it still re-save.
+  // Not asked any more; kept so listings that stored it still re-save.
   'listerRelation',
 ]);
 

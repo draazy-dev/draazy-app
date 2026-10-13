@@ -98,7 +98,6 @@ const SITE_FIELDS = [
   ['whatsapp', 'WhatsApp'],
   ['supportHours', 'Support hours'],
   ['address', 'Address'],
-  ['gst', 'GST number'],
 ];
 
 const MOVE_PACK_LABELS = {

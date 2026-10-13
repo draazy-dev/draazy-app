@@ -512,7 +512,6 @@ test('a commercial listing files its type and shell, and asks nothing the owner 
   await page.getByRole('button', { name: /Next/i }).click();
 
   await page.locator('#pob-price').fill('180000');
-  await expect(page.getByText('GST on Rent')).toHaveCount(0);
   // A rental is not asked its tenancy, on screen as well as on the wire.
   await expect(page.getByText('Tenancy Status')).toHaveCount(0);
 
@@ -526,7 +525,5 @@ test('a commercial listing files its type and shell, and asks nothing the owner 
   expect(c.commercialType).toBe('warehouse');
   expect(c.shellType).toBe('bareShell');
   expect(c.floorLoad || '').toBe('');
-  // Escalation is the sale-plausible template most likely to be forwarded.
-  expect(c.gstOnRent || '').toBe('');
   expect(c.tenancyStatus || '').toBe('');
 });

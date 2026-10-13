@@ -18,7 +18,7 @@ export const COMPARE_NOBROKER = {
   accent: 'NoBroker',
   subtitle: 'Plans and fees compared for Pune',
   summary: [
-    'NoBroker lists homes in many cities and sells assisted plans for tenants, buyers, owners and sellers. Its tenant plans start at \u20B91,649 plus 18% GST.',
+    'NoBroker lists homes in many cities and sells assisted plans for tenants, buyers, owners and sellers. Its tenant plans start at \u20B91,649 plus tax.',
     'Draazy focuses on Pune. The first 15 owner contacts and the first listing are free, and paid plans start at \u20B9199.',
     'Which one fits depends on your city and on whether you want a paid plan where a relationship manager works with owners or tenants for you.',
   ],
@@ -34,7 +34,7 @@ export const COMPARE_NOBROKER = {
     {
       label: 'Cost to contact owners',
       nobroker: {
-        text: 'Tenant plans: Freedom \u20B91,649 for 25 owner contacts over 90 days; Relax \u20B93,999 and MoneyBack \u20B95,999 for 50 owner contacts each over 45 days. Buyer plans: Power Plan \u20B91,899 for up to 25 contacts; Property Expert Plan \u20B91,999 for up to 50. Every price is shown plus 18% GST.',
+        text: 'Tenant plans: Freedom \u20B91,649 for 25 owner contacts over 90 days; Relax \u20B93,999 and MoneyBack \u20B95,999 for 50 owner contacts each over 45 days. Buyer plans: Power Plan \u20B91,899 for up to 25 contacts; Property Expert Plan \u20B91,999 for up to 50. Every price is shown before tax.',
         src: ['tenant', 'buyer'],
       },
       draazy: {
@@ -45,7 +45,7 @@ export const COMPARE_NOBROKER = {
     {
       label: 'Owner listing cost',
       nobroker: {
-        text: 'The home page offers \u201CPost Free Property Ad\u201D. Owner plans are Relax \u20B93,399, Super Relax \u20B95,899, MoneyBack \u20B96,999 and Super MoneyBack \u20B910,999, each plus 18% GST, with plan validity listed as 45 days.',
+        text: 'The home page offers \u201CPost Free Property Ad\u201D. Owner plans are Relax \u20B93,399, Super Relax \u20B95,899, MoneyBack \u20B96,999 and Super MoneyBack \u20B910,999, each plus tax, with plan validity listed as 45 days.',
         src: ['home', 'owner'],
       },
       draazy: {
@@ -130,7 +130,7 @@ export const COMPARE_NOBROKER = {
   faq: [
     {
       q: 'Is Draazy cheaper than NoBroker?',
-      a: 'The two publish different plans, so there is no single answer. NoBroker lists \u20B91,649 plus 18% GST for 25 owner contacts over 90 days. Draazy makes the first 15 owner contacts free and sells a 15-contact Contact Pack at \u20B9199. Compare them against the number of owner contacts you expect to need and the city you are searching in.',
+      a: 'The two publish different plans, so there is no single answer. NoBroker lists \u20B91,649 plus tax for 25 owner contacts over 90 days. Draazy makes the first 15 owner contacts free and sells a 15-contact Contact Pack at \u20B9199. Compare them against the number of owner contacts you expect to need and the city you are searching in.',
     },
     {
       q: 'Does Draazy charge brokerage?',

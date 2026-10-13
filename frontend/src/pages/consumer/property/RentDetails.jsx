@@ -71,8 +71,6 @@ export function RentDetails({ p }) {
     .split(',').map((s) => s.trim()).filter(Boolean)
     .map((t) => { const key = t === 'any' ? 'anyone' : t; return ['family', 'bachelors', 'bachelor-male', 'bachelor-female', 'company', 'anyone'].includes(key) ? tr('property.tenant.' + key) : t; });
   const businessList = Array.isArray(p.suitableFor) ? p.suitableFor : [];
-  const gstLabel = p.gstOnRent === 'yes' ? tr('property.gstApplicable')
-    : p.gstOnRent === 'no' ? tr('property.gstNotApplicable') : tr('property.askOwner');
   const petsLabel = p.pets === true ? tr('property.petsAllowed') : p.pets === false ? tr('property.petsNotAllowed') : tr('property.askOwner');
   const foodLabel = p.food === 'veg' ? tr('property.foodVeg') : p.food === 'jain' ? tr('property.foodJain') : p.food === 'any' ? tr('property.foodBoth') : tr('property.askOwner');
   const depMonths = rent ? Math.round(deposit / rent) : 0;
@@ -140,8 +138,7 @@ export function RentDetails({ p }) {
               {!isLand ? tile('sofa', tr('property.furnishingLabel'), furnishing) : null}
             </div>
             {isCommercial ? (
-              <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {tile('receipt-indian-rupee', tr('property.gstOnRent'), gstLabel)}
+              <div className="mt-2.5 grid grid-cols-2 gap-2.5">
                 {tile('calendar-clock', tr('property.fitOutPeriod'), monthsLabel(p.fitOutMonths))}
                 {tile('trending-up', tr('property.escalation'), p.escalationPct ? p.escalationPct + '%' : tr('property.notSpecified'))}
               </div>

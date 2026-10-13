@@ -306,7 +306,7 @@
         "optionalAreaErr": "Enter an area from 1 to 100000, with up to two decimals.",
         "areaPlaceholder": "e.g. 850",
         "smallAreaPlaceholder": "e.g. 40",
-        "commercialNote": "This agreement is for homes only. Renting a shop, office or godown carries GST and different TDS rules —",
+        "commercialNote": "This agreement is for homes only. Renting a shop, office or godown carries different tax rules —",
         "commercialCta": "get a commercial agreement from our legal desk",
         "propTypeErr": "Choose a residential property type. Commercial premises need a commercial agreement."
       },
@@ -1585,7 +1585,7 @@
       }
     },
     "packers": {
-      "badge": "GST-registered moving partners",
+      "badge": "Registered moving partners",
       "titleTop": "Stress-free home shifting",
       "titleAccent": "in & from Pune",
       "subtitle": "Share your moving details and our relocation desk negotiates transparent, all-inclusive rates with trusted movers — then calls you back with the best quote. No haggling, no hidden charges.",
@@ -1642,8 +1642,8 @@
       ],
       "trust": [
         {
-          "t": "GST-registered Partners",
-          "d": "We only recommend GST-registered movers, and we go through every quote with you before you confirm."
+          "t": "Registered Partners",
+          "d": "We only recommend registered movers, and we go through every quote with you before you confirm."
         },
         {
           "t": "Transparent Rates",
@@ -1683,7 +1683,7 @@
         },
         {
           "q": "How are the moving partners verified?",
-          "a": "We only recommend GST-registered moving partners, and we go through every quote with you before you confirm."
+          "a": "We only recommend registered moving partners, and we go through every quote with you before you confirm."
         },
         {
           "q": "Are my belongings insured during the move?",

@@ -1,59 +1,12 @@
-/**
- * Fees Service — the published cost of transacting, one breakdown per deal intent.
- *
- * `GET /fees` (public).
- *
- * ## Why this domain exists
- *
- * The server bills a rent agreement as the admin Fees tab's `rentAgreementPlatform` + its GST + the
- * statutory lines, and serves that same platform fee and GST on the `rent` row here. The
- * rent-agreement wizard must not price itself from the Maharashtra Art. 36A formula
- * and a ₹500/₹1000 registration rule: two pieces of code computing a price from two data sources
- * agree only by coincidence, and a checkout that meets a different number than the
- * sidebar promised is not a rounding bug, it is the customer being quoted one price and charged
- * another.
- *
- * So the sidebar reads *this*, and the figure it shows is the figure the server adds up.
- *
- * ## Shape
- *
- *   { deal, brokerage, platformFee, stampDuty, registration, gst, notes }
- *
- * Every figure is whole rupees, mirroring the contract's `Fees` schema (`Money` is `int64`) — never
- * a float, never a formatted string.
- *
- * **A `null` figure means "not published", not "zero".** `buy.stamp_duty` is null in the live
- * schedule precisely because Maharashtra's duty is a slab on the agreement value, not a flat figure
- * the platform can quote up front; `registration` is a real number because the 1% cap is published.
- * A consumer that meets a null has to decide what to do about it out loud — see the `computed` list
- * the rent-agreement cost estimate carries — rather than silently rendering ₹0 as though the
- * government had waived the duty.
- */
+// `GET /fees` (public): one breakdown per deal intent. Money is whole rupees; `null` means "not published", never zero.
 import { createProvider } from './config.js';
 
 const provider = createProvider('fees');
 
-/**
- * Every published breakdown, one per deal intent.
- *
- * **Public** — this is the zero-brokerage claim in numbers, and it has to render for the signed-out
- * visitor it exists to convince. No token, no short-circuit on a missing session.
- *
- * @returns {Promise<{deal: string, brokerage: number, platformFee: number, stampDuty: (number|null),
- *   registration: (number|null), gst: number, notes: (string|null)}[]>}
- */
+// Public, so it renders for signed-out visitors: no token, no session short-circuit.
 export const listFees = async () => (await provider()).listFees();
 
-/**
- * The breakdown for one deal intent, or `null` when nothing is published for it.
- *
- * Derived here rather than in each provider: the endpoint returns the whole (two-row) table in one
- * response, so a per-deal provider method would be a second request for data the first one already
- * carried. `null` is the honest answer for an unpublished deal — the caller has to render a pending
- * or unavailable state, and a fabricated all-zero row would hand it a confident wrong number.
- *
- * @param {string} deal `rent` | `buy`
- */
+// `null` when nothing is published for the deal, so callers render a pending state instead of a made-up zero row.
 export const getDealFees = async (deal) => {
   const rows = await listFees();
   return (Array.isArray(rows) ? rows : []).find((f) => f.deal === deal) || null;

@@ -5,7 +5,7 @@ category: payments
 audience: owner
 order: 1
 featured: true
-updated: 2026-10-12
+updated: 2026-10-13
 summary: What costs money, what is free, and how listing slots and contact allowances work.
 tags: [plans, pricing, owner, contacts, referral]
 ---
@@ -29,8 +29,6 @@ tags: [plans, pricing, owner, contacts, referral]
 | Listing Pass | ₹999 | One extra live listing for 60 days, tied to that listing |
 | Contact Pack | ₹199 | 15 owner contacts, valid 30 days; packs stack |
 | Rent agreement | ₹499 + government charges | A first agreement or a renewal |
-
-Prices include GST.
 
 ## If you list more than one property
 

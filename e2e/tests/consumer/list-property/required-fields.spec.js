@@ -306,7 +306,6 @@ test('a commercial rental publishes the owner\'s own fit-out, not a tier-keyed g
   await page.locator('input[data-err="monthlyRent"]').fill('180000');
   await page.locator('input[data-err="deposit"]').fill('1080000');
   await pickDate(page, '[data-err="availableFrom"]', istInDays(60));
-  await page.locator('[data-err="gstOnRent"]').getByText('Yes', { exact: true }).click();
   await page.locator('input[data-err="escalationPct"]').fill('5');
   /* Deliberately off the standard terms: a lock-in left at its default is indistinguishable from one the wire
      dropped — both render "None" — so the readback only means something if the fallback could not guess it. */
@@ -330,7 +329,6 @@ test('a commercial rental publishes the owner\'s own fit-out, not a tier-keyed g
     shellType: 'warmShell',
     clearHeight: '32',
     dockCount: '4',
-    gstOnRent: 'yes',
     escalationPct: '5',
   });
 
@@ -391,7 +389,7 @@ test('a commercial sale is priced on its tenancy, and only a let one is asked wh
   const body = await res.json();
   const listed = (Array.isArray(body) ? body : (body.content ?? body.items ?? []))[0];
   const row = await (await fetch(`${API}/me/listings/${listed.id}`, { headers: await authHeaders(mobile) })).json();
-  /* `submit.js` scopes tenancy to the sale and GST to the letting, so each deal writes only its own screen's
+  /* `submit.js` scopes tenancy to the sale and rent terms to the letting, so each deal writes only its own screen's
      keys. An unasserted scoped branch is where the original defect lived. */
   expect(row.commercial).toMatchObject({
     commercialType: 'office',
@@ -400,5 +398,5 @@ test('a commercial sale is priced on its tenancy, and only a let one is asked wh
     inPlaceRent: '320000',
     leaseExpiry: '2029-03-31',
   });
-  expect(row.commercial.gstOnRent).toBe('');
+  expect(row.commercial.fitOutMonths || '').toBe('');
 });

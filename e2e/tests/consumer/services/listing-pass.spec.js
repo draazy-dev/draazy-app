@@ -43,7 +43,6 @@ test.describe('LIVE: the listing pass', () => {
       await expect(page).toHaveURL(/\/checkout\?plan=listing-pass&property=/);
       await expect(page.getByText(parked.title).first()).toBeVisible({ timeout: 20000 });
       await expect(page.getByRole('button', { name: /^Pay ₹999$/ }).first()).toBeVisible();
-      await expect(page.getByText('Prices include GST.')).toBeVisible();
       await page.getByRole('button', { name: /^Pay ₹999$/ }).first().click();
       await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
     });

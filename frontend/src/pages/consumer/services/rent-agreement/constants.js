@@ -68,7 +68,7 @@ export const MAX_DEPOSIT_PAYMENTS = 10;
 export const PAYMENT_REF = /^[A-Za-z0-9]{4,30}$/;
 export const BANKS = ['State Bank of India', 'HDFC Bank', 'ICICI Bank', 'Axis Bank', 'Kotak Mahindra Bank', 'Bank of Maharashtra', 'Bank of Baroda', 'Punjab National Bank', 'Union Bank of India', 'Canara Bank', 'Bank of India', 'IDFC FIRST Bank', 'IndusInd Bank', 'Yes Bank', 'Cosmos Co-operative Bank', 'Saraswat Co-operative Bank'];
 export const TDS_RENT_THRESHOLD = 50000;
-// Commercial leave & licence (GST, TDS 194-I, a different clause set) is quoted by the legal desk.
+// Commercial leave & licence (TDS 194-I, a different clause set) is quoted by the legal desk.
 
 export const COMMERCIAL_ROUTE = '/services/property-legal';
 export const RESIDENTIAL_PROPERTY_TYPES = ['Flat / Apartment', 'Independent House / Bungalow', 'Row House'];

@@ -70,7 +70,6 @@ export const TIER_B_FIELDS = [
   { key: 'parkingSpaces', label: 'Parking spaces' },
   { key: 'powerBackup', label: 'Power backup' },
   { key: 'pantry', label: 'Pantry' },
-  { key: 'gstOnRent', label: 'GST on rent' },
   { key: 'fitOutMonths', label: 'Rent-free / fit-out period' },
   { key: 'escalationPct', label: 'Annual escalation' },
   { key: 'tenancyStatus', label: 'Tenancy status' },

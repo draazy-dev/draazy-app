@@ -2,7 +2,7 @@
 title: "Stamp duty and registration charges in Pune for 2026"
 description: "What it costs to register a flat purchase in Pune in 2026: 7% stamp duty in PMC and PCMC, the women buyers' concession and the ₹30,000 registration fee."
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-13
 author: Draazy Team
 topic: buying
 tags: [stamp duty, registration charges, buying a flat, ready reckoner, Pune, PMC, PCMC]
@@ -19,7 +19,6 @@ Stamp duty on a flat in PMC or PCMC limits is **7%** of its value (5% stamp duty
 | Registration fee | 1% of the value, capped at ₹30,000, so flats worth ₹30 lakh or more pay ₹30,000 |
 | Duty is charged on | The higher of the agreement value and the ready reckoner value |
 | Ready reckoner rates, 2026–27 | Kept unchanged from the previous year (announced 31 March 2026) |
-| GST | 5% on under-construction flats (1% if affordable housing); none on ready flats with an OC or on resale |
 
 Use our [stamp duty calculator for Maharashtra](/tools/stamp-duty-calculator-maharashtra) to work out the figure for your own flat.
 
@@ -70,20 +69,13 @@ Say you buy an ₹80 lakh flat in Wakad, which is within PCMC limits:
 
 Add legal fees and any service charges for document handling to this.
 
-## GST: only on under-construction flats
-
-GST is separate from stamp duty. It applies only to flats that are still under construction:
-
-- **5%** on under-construction flats (1% for flats that qualify as affordable housing).
-- **No GST** on ready-to-move flats that already have an occupancy or completion certificate, or on resale flats. Learn [how to check the OC and CC](/blog/oc-cc-check-pune).
-
 ## How and when you pay
 
 Stamp duty and the registration fee are paid when the sale deed or agreement for sale is registered at the sub-registrar's office. You can pay online through the government's GRAS portal and carry the challan with you. Your bank, builder or lawyer will usually guide you through the appointment.
 
 ## Before you pay a single rupee
 
-Check the project on MahaRERA if it is a new or under-construction flat. Our guide to [checking a project on MahaRERA](/blog/check-maharera-registration) shows you how. For a resale flat, see the [documents to check for a resale flat in Pune](/blog/resale-flat-documents-pune). For legal checks on the title and documents, you can also use [Draazy's property legal service](/services/property-legal).
+Check the project on MahaRERA if it is a new or under-construction flat. Our guide to [checking a project on MahaRERA](/blog/check-maharera-registration) shows you how. For a ready flat, learn [how to check the OC and CC](/blog/oc-cc-check-pune). For a resale flat, see the [documents to check for a resale flat in Pune](/blog/resale-flat-documents-pune). For legal checks on the title and documents, you can also use [Draazy's property legal service](/services/property-legal).
 
 Planning the loan as well? Try our [stamp duty calculator](/tools/stamp-duty-calculator-maharashtra) and [EMI calculator](/emi-calculator), or [browse flats for sale in Pune](/listings?deal=buy) with zero brokerage.
 
@@ -93,4 +85,3 @@ Planning the loan as well? Try our [stamp duty calculator](/tools/stamp-duty-cal
 - [Maharashtra Govt keeps ready reckoner rates unchanged for FY27](https://www.freepressjournal.in/mumbai/maharashtra-govt-keeps-ready-reckoner-rates-unchanged-for-fy27-state-nears-60500-crore-revenue-target), Free Press Journal, 31 March 2026. Accessed October 2026.
 - [Maharashtra govt removes 15 year sale lock-in period for women homebuyers](https://www.businesstoday.in/personal-finance/real-estate/story/maharashtra-govt-removes-15-year-sale-lock-in-period-for-women-homebuyers-383749-2023-06-01), Business Today, 1 June 2023. Accessed October 2026.
 - [Stamp duty and registration charges in Pune](https://www.magicbricks.com/blog/stamp-duty-charges-in-pune/128501.html), MagicBricks, which reproduces the IGR rate table for the 5% stamp duty, 1% LBT, 1% metro cess and the registration fee. Accessed October 2026.
-- [GST Council and CBIC](https://taxinformation.cbic.gov.in), GST rates on under-construction residential flats. Accessed October 2026.

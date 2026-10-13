@@ -353,7 +353,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
   test('a rent increase over a long term is taxed, and the owner says how often it applies', async ({ page }) => {
     await page.route('**/api/fees', (route) => route.fulfill({
       status: 200, contentType: 'application/json',
-      body: JSON.stringify([{ deal: 'rent', brokerage: 0, platformFee: 1999, stampDuty: null, registration: null, gst: 360, notes: null }]),
+      body: JSON.stringify([{ deal: 'rent', brokerage: 0, platformFee: 1999, stampDuty: null, registration: null, notes: null }]),
     }));
     await seedDraft(page, {
       step: 3, prop: PROP, tenantMode: 'fill',
@@ -399,7 +399,7 @@ test.describe('Rent Agreement — what the Sub-Registrar will refuse is refused 
   test('the registration area follows the gram panchayat answer, not the locality', async ({ page }) => {
     await page.route('**/api/fees', (route) => route.fulfill({
       status: 200, contentType: 'application/json',
-      body: JSON.stringify([{ deal: 'rent', brokerage: 0, platformFee: 1999, stampDuty: null, registration: null, gst: 360, notes: null }]),
+      body: JSON.stringify([{ deal: 'rent', brokerage: 0, platformFee: 1999, stampDuty: null, registration: null, notes: null }]),
     }));
     const terms = { startDate: '', months: '11', rent: '20000', deposit: '100000', nrDeposit: '', increment: '5', lockin: '6', notice: '2', dueDay: '5', payMode: 'Bank Transfer / NEFT' };
     const fee = page.locator('div.flex.justify-between', { hasText: 'Registration Fee' }).first();

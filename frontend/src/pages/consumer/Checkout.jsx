@@ -224,7 +224,6 @@ export default function Checkout() {
             <div className="border-t border-white/8 pt-4 space-y-2 text-sm">
               <div className="flex justify-between text-gray-400"><span>{P.nameLabel} <span className="text-gray-600">({P.sub})</span></span><span className="text-gray-200">{inr(P.price)}</span></div>
               <div className="flex justify-between font-bold text-base pt-2 border-t border-white/8 mt-2"><span>{t('misc.coTotal')}</span><span>{inr(P.price)}</span></div>
-              <p className="text-gray-500 text-xs">{t('misc.coPricesIncludeGst')}</p>
               {needsProperty && <RefundGuarantee kind="pass" />}
               {planId === 'contact-pack' && <RefundGuarantee kind="pack" />}
             </div>

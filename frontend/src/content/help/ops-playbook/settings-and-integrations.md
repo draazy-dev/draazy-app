@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 29
-updated: 2026-10-10
+updated: 2026-10-13
 summary: How admins change site settings, fees, maps and flags safely, and how to read provider status and the call log.
 tags: [ops, internal, settings, integrations, flags, fees]
 modules: [settings, integrations]
@@ -45,7 +45,7 @@ A viewer without `settings:write` can open **Settings** but cannot save. The sys
 
 | Tab | What you can change | Button |
 | --- | --- | --- |
-| **General** | Site name, Legal name, Tagline, Support email, Support phone, WhatsApp, Support hours, Address, GST number | **Save details** |
+| **General** | Site name, Legal name, Tagline, Support email, Support phone, WhatsApp, Support hours, Address | **Save details** |
 | **General** | **Max photos per listing** (3 to 20) | **Save photo limit** |
 | **General** | **Max flatmate groups per person** (1 to 10) | **Save group limit** |
 | **Fees** | Listing Pass, Contact Pack, rent agreement fee, free contact limit and a **Referrals** section (rewards, caps, hold and fraud-check windows) | **Save fees** |

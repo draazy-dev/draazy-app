@@ -33,13 +33,7 @@ export function PriceInsights({ p }) {
   const isCommercial = propertyKind(p) === 'commercial';
   const stampDuty = Math.round(p.price * 0.06);
   const registration = Math.min(30000, Math.round(p.price * 0.01));
-  const underConstruction = !isLand && (p.construction === 'new' || p.construction === 'under');
-  const AFFORDABLE_CARPET_SQFT = 969;
-  const affordableArea = p.carpetArea ?? p.area;
-  const isAffordable = p.price <= 4500000 && affordableArea != null && affordableArea <= AFFORDABLE_CARPET_SQFT;
-  const gstRate = isCommercial ? 0.12 : (isAffordable ? 0.01 : 0.05);
-  const gst = underConstruction ? Math.round(p.price * gstRate) : 0;
-  const allIn = p.price + stampDuty + registration + gst;
+  const allIn = p.price + stampDuty + registration;
   const needsTds = p.price > 5000000 && p.landUse !== 'agricultural';
   const stated = (value) => value == null || value === '' ? t('property.notSpecified') : value;
   const monthlyMaintenance = isCommercial
@@ -190,13 +184,10 @@ export function PriceInsights({ p }) {
           </>
         )}
       >
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           {costTile('tag', t('property.basePrice'), fmtINR(p.price), 'price.base')}
           {costTile('scale', t('property.stampDuty'), fmtINR(stampDuty), 'price.stampDuty')}
           {costTile('landmark', t('property.registration'), fmtINR(registration), 'price.registration')}
-          {gst > 0
-            ? costTile('percent', t('property.gstPct', { pct: Math.round(gstRate * 100) }), fmtINR(gst), 'price.gst')
-            : costTile('badge-check', t('property.gst'), isLand ? t('property.gstNotApplicable') : t('property.gstNoneReady', { kind: isCommercial ? t('property.readyProperty') : t('property.readyHome') }), 'price.gst')}
         </div>
         <div className="mt-3 rounded-xl border border-emerald-500/25 p-4 flex flex-wrap items-center justify-between gap-4" style={{ background: 'rgb(var(--dz-c-emerald-500) / .07)' }}>
           <div>
@@ -207,12 +198,12 @@ export function PriceInsights({ p }) {
           <div className="text-right">
             <p className="text-xs text-slate-400">{t('property.overSticker')}</p>
             <p className="text-xl font-extrabold text-brand-teal-3">+{fmtINR(allIn - p.price)}</p>
-            <p className="text-[11px] text-slate-500">{t('property.stampRegLine')}{gst > 0 ? t('property.gstSuffix') : ''}</p>
+            <p className="text-[11px] text-slate-500">{t('property.stampRegLine')}</p>
           </div>
         </div>
         <p className="text-[11px] text-slate-500 mt-3 flex items-start gap-1.5">
           <Icon name="info" className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-          {t('property.disclaimerPre', { kind: isCommercial ? t('property.commercialUnits') : t('property.homesWord') })}{needsTds ? t('property.disclaimerTds') : ''}{t('property.disclaimerRates')}{isCommercial ? '' : t('property.disclaimerWomen')}{t('property.disclaimerPost')}
+          {t('property.disclaimerPre')}{needsTds ? t('property.disclaimerTds') : ''}{t('property.disclaimerRates')}{isCommercial ? '' : t('property.disclaimerWomen')}{t('property.disclaimerPost')}
         </p>
       </MobileCollapse>
     </section>

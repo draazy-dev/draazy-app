@@ -82,7 +82,7 @@ export default function Terms() {
       <h2>7. Payments</h2>
       <ul>
         <li>Listing Passes, Contact Packs and rent agreements are one-off purchases, paid in advance. There are no subscriptions and nothing renews automatically.</li>
-        <li>Prices include GST. Rent agreements cost extra only for government charges (stamp duty and registration).</li>
+        <li>Rent agreements also carry government charges — stamp duty, registration fee and document handling charge. We pay these to the government on behalf of the owner and tenant, in their names, and collect exactly the amount paid; they are not Draazy&apos;s fee.</li>
         <li>A Listing Pass ends early when its listing is rented, sold or archived, with no refund for unused days.</li>
         <li>Refunds, returned contacts and disputes are governed by our <Link to="/refund-policy">Refund Policy</Link>.</li>
       </ul>

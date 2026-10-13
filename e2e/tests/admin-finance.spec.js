@@ -72,7 +72,7 @@ test.describe('admin finance API', () => {
       expect(typeof overview[field], `${field} is a number`).toBe('number');
       expect(overview[field], `${field} is not negative`).toBeGreaterThanOrEqual(0);
     }
-    for (const gone of ['gstCollected', 'pendingSettlement', 'payoutsDue', 'payoutsCompleted',
+    for (const gone of ['pendingSettlement', 'payoutsDue', 'payoutsCompleted',
       'payoutsMeasured']) {
       expect(overview[gone], `${gone} belonged to the withdrawn rent rail`).toBeUndefined();
     }

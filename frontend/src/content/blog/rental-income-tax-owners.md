@@ -2,7 +2,7 @@
 title: "Tax on rental income for Pune owners: 2026-27 guide"
 description: How rent is taxed as income from house property, the 30% standard deduction, municipal tax deduction, home loan interest and TDS on rent above ₹50,000 a month.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-13
 author: Draazy Team
 topic: owners
 tags: [rental income tax, income from house property, standard deduction, TDS on rent, Form 141, owners, Pune]
@@ -82,7 +82,6 @@ Ask your CA how a security deposit is treated in your case. Our guide to [securi
 - Whether the old or the new tax regime suits you better this year.
 - How loan interest is treated against other income.
 - How TDS and rent are treated if you co-own the flat.
-- Whether GST applies in your case, if you rent to a registered business.
 
 ## Renting out your flat
 

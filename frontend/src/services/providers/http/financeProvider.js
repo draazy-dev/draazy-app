@@ -24,7 +24,6 @@ export async function getFinanceOverview() {
     monthRevenue: rupees(res.monthRevenue),
     users: count(res.users),
     payingUsers: count(res.payingUsers),
-    gstCollected: rupees(res.gstCollected),
     pendingSettlement: rupees(res.pendingSettlement),
     plans: Array.isArray(res.plans)
       ? res.plans.map((p) => ({

@@ -19,7 +19,7 @@ const DETAILS = {
 };
 const COMMERCIAL_DETAIL_KEYS = [
   'commercialType', 'washrooms', 'shellType', 'powerBackup', 'pantry', 'camCharges', 'suitableFor',
-  'fixtures', 'gstOnRent', 'fitOutMonths', 'escalationPct', 'tenancyStatus', 'inPlaceRent',
+  'fixtures', 'fitOutMonths', 'escalationPct', 'tenancyStatus', 'inPlaceRent',
   'leaseExpiry', 'seatCount', 'frontage', 'floorLoad', 'clearHeight', 'sanctionedPower', 'dockCount',
 ];
 const ADDRESS = 'C-901, North, Edit Prefill Homes, Baner Road';

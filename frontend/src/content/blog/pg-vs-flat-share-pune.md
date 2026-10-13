@@ -2,7 +2,7 @@
 title: "PG or shared flat in Pune: which suits you better?"
 description: New to Pune for a job or college? Compare a PG with a shared flat on cost, freedom, deposit, paperwork and police verification before you move in.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-13
 author: Draazy Team
 topic: renting
 tags: [PG, paying guest, flatmates, flat share, students, freshers, police verification, Pune]
@@ -17,7 +17,6 @@ Choose a PG if you want to move in quickly with a small deposit and often have m
 | Deposit | Usually smaller | Larger, split between flatmates |
 | Agreement | A written agreement or receipt showing rent, deposit, notice and inclusions | A leave and licence agreement, which must be registered in Maharashtra |
 | Police verification | The PG operator must submit resident details | The owner must submit tenant details |
-| GST on rent | Exempt if ₹20,000 or less per person per month and the stay is at least 90 days (CBIC notification, July 2024) | Not usually charged on a flat rented by an individual as a home |
 | Privacy | Less, with house rules and often shared rooms | More, usually your own room |
 
 ## A PG: easy to start
@@ -59,10 +58,6 @@ Pune City Police and Pimpri Chinchwad Police require owners and PG operators to 
 
 As a tenant, keep a copy of your ID and agreement handy, and make sure your details have been submitted. Our guide to [tenant police verification in Pune](/blog/tenant-police-verification-pune) explains the process.
 
-## Is GST charged on PG rent?
-
-Usually not for long stays. Since July 2024, accommodation costing **₹20,000 or less per person per month** and taken for at least **90 days** in a row has been exempt from GST. Shorter stays or higher rents may attract GST, so ask your PG how it bills.
-
 ## Before you pay anything
 
 1. **Visit in person** and see the exact room you will get.
@@ -76,7 +71,6 @@ On Draazy you contact owners directly, with zero brokerage. [Browse flats for re
 
 ## Sources
 
-- [Notification No. 04/2024-Central Tax (Rate), 12 July 2024](https://taxinformation.cbic.gov.in), Central Board of Indirect Taxes and Customs: GST exemption for accommodation up to ₹20,000 per person per month for at least 90 days. Accessed October 2026.
 - [Police act against 113 landlords, PG operators for failing to submit tenant details](https://www.hindustantimes.com/cities/pune-news/police-act-against-113-landlords-pg-operators-for-failing-to-submit-tenant-details-101786300748974.html), Hindustan Times, 9 August 2026. Accessed October 2026.
 - [Maharashtra Rent Control Act, 1999, section 55](https://www.advocatekhoj.com/library/bareacts/maharashtrarentcontrol/55.php), bare Act text published by Advocatekhoj. Accessed October 2026.
 - [Pune City Police](https://punepolice.gov.in) and [Pimpri Chinchwad Police tenant information](https://pcpc.gov.in/tenant-info). Accessed October 2026.

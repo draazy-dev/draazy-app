@@ -331,23 +331,15 @@ const PricingStep = ({
               </div>
             </div>
 
-            {/* Rent alone does not describe a commercial tenancy: GST is 18% on top of it, the fit-out months are
-               rent the tenant never pays, and the escalation is what they will pay in year four. */}
+            {/* Rent alone does not describe a commercial tenancy: the fit-out months are rent the tenant never
+               pays, and the escalation is what they will pay in year four. */}
             {commercial && (
-              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className={lbl}>{t('listProperty.fields.gstOnRent')}</label>
-                  <div className="flex flex-wrap gap-2.5" data-err="gstOnRent">
-                    {[['yes', t('listProperty.opt.yes')], ['no', t('listProperty.opt.no')]].map(([v, l]) => (
-                      <Pill key={v} selected={form.gstOnRent === v} onClick={() => set('gstOnRent', form.gstOnRent === v ? '' : v)} className="px-5 py-2.5">{l}</Pill>
-                    ))}
-                  </div>
-                </div>
+              <div className="mt-4 grid grid-cols-2 gap-4">
                 <div>
                   <label className={lbl}>{t('listProperty.fields.fitOutPeriod')}</label>
                   <Select value={form.fitOutMonths} onChange={(v) => set('fitOutMonths', v)} placeholder={t('listProperty.ph.select')} options={fitOutOptions} dataErr="fitOutMonths" />
                 </div>
-                <div className="col-span-2 sm:col-span-1">
+                <div>
                   <label className={lbl}>{t('listProperty.fields.escalation')}</label>
                   <div className="relative">
                     <input inputMode="decimal" maxLength={4} value={form.escalationPct} onChange={(e) => set('escalationPct', toDecimal(e.target.value))}

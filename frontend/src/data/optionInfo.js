@@ -36,7 +36,6 @@ export const OPTION_INFO = {
   'price.base': { title: 'Base price', body: 'The quoted sticker price of the property, before stamp duty, registration and any taxes.' },
   'price.stampDuty': { title: 'Stamp duty', body: 'A state government tax on the sale, ~6% in Pune. Paid at registration to make the transfer legally valid.' },
   'price.registration': { title: 'Registration charge', body: 'The fee to record the sale in government records — about 1% of value, capped at \u20B930,000 in Maharashtra.' },
-  'price.gst': { title: 'GST', body: 'Goods & Services Tax applies only to under-construction property (1% affordable / 5% otherwise, 12% commercial). Ready-to-move homes and land are exempt.' },
   'price.emi': { title: 'Estimated EMI', body: 'Indicative monthly home-loan instalment at ~8.5% interest. Adjust the loan amount and tenure to see how it changes.' },
 
   'rent.maintenance': { title: 'Maintenance', body: 'Monthly society charge for upkeep of common areas, security and amenities — sometimes included in rent, sometimes extra.' },

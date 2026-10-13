@@ -1,14 +1,14 @@
 ---
 title: "Packers and movers quotes in Pune: how to compare"
-description: How to compare packers and movers quotes in Pune: the survey, inventory list, transit insurance, GST invoice, what to pay upfront and the red flags to avoid.
+description: How to compare packers and movers quotes in Pune: the survey, inventory list, transit insurance, invoice, what to pay upfront and the red flags to avoid.
 published: 2026-10-09
-updated: 2026-10-09
+updated: 2026-10-13
 author: Draazy Team
 topic: renting
-tags: [packers and movers, moving quotes, transit insurance, GST invoice, moving, Pune]
+tags: [packers and movers, moving quotes, transit insurance, invoice, moving, Pune]
 ---
 
-Get at least three written quotes, each based on a survey of your belongings, not a phone guess. Compare them line by line: inventory, packing material, vehicle, insurance, GST and the payment schedule. The cheapest number is often the one that leaves things out. Never pay the full amount before the goods arrive.
+Get at least three written quotes, each based on a survey of your belongings, not a phone guess. Compare them line by line: inventory, packing material, vehicle, insurance, tax and the payment schedule. The cheapest number is often the one that leaves things out. Never pay the full amount before the goods arrive.
 
 > [!IMPORTANT]
 > This is general guidance. Read the movers' terms before you sign, and keep all papers until your goods are unpacked and checked.
@@ -19,7 +19,7 @@ Get at least three written quotes, each based on a survey of your belongings, no
 |---|---|---|
 | Quotes | Ask for at least three, each in writing | Common consumer practice |
 | Survey | A mover should see your goods, in person or on a video call, before quoting | Common practice |
-| Invoice | Ask for a GST invoice that shows the mover's GSTIN and the rate charged | GST invoicing rules; check on the invoice |
+| Invoice | Ask for a proper invoice with the mover's business name and address | Common practice; check on the invoice |
 | Insurance | Transit insurance is separate from the mover's own liability and should be in writing | Common practice; read the policy |
 | Complaints | National Consumer Helpline, 1915, and consumerhelpline.gov.in | Department of Consumer Affairs, accessed October 2026 |
 
@@ -56,7 +56,7 @@ Compare these lines across all the quotes:
 | Distance and floors | Charges for stairs, long carry or no lift access |
 | Date and timing | Pickup date, delivery window |
 | Insurance | Whether it is included, the amount covered and the policy |
-| Tax | GST rate and whether it is in the total |
+| Tax | Whether tax is included in the total |
 | Extras | Waiting time, parking, society charges, tolls |
 | Payment | Amount upfront and when the balance is due |
 
@@ -73,11 +73,11 @@ Transit insurance covers loss or damage to your goods while they are on the move
 
 For high-value items, consider arranging cover yourself and carrying the most precious things with you.
 
-## What should the GST invoice show?
+## What should the invoice show?
 
-Ask for a proper tax invoice. It should show the mover's business name, address and GSTIN, the services, the GST rate and the amount, and the invoice date. The rate depends on what the service includes, so do not rely on a rate a mover quotes verbally; check it on the invoice.
+Ask for a proper invoice. It should show the mover's business name and address, the services, the amount and the invoice date. Do not rely on a figure a mover quotes verbally; check it on the invoice.
 
-A GST invoice also helps if your employer reimburses relocation costs. If you are a bank employee on transfer, ask your HR team whether your movers must be on the Indian Banks' Association's approved list. Being on any list is not a guarantee of service.
+An invoice also helps if your employer reimburses relocation costs. If you are a bank employee on transfer, ask your HR team whether your movers must be on the Indian Banks' Association's approved list. Being on any list is not a guarantee of service.
 
 ## How much should you pay upfront?
 
@@ -86,7 +86,7 @@ Pay a small booking advance, and pay the balance on delivery, after you have che
 ## What are the red flags?
 
 - **A quote with no survey**, or a price that is far below the others
-- **No company address, GSTIN or landline**, only a mobile number
+- **No company address or landline**, only a mobile number
 - **An unmarked truck**, or a different company's name on the truck
 - **Pressure to pay everything upfront**, or only in cash
 - **No written terms, inventory or insurance details**
@@ -111,5 +111,4 @@ Book movers two to three weeks before. Our [moving checklist for Pune](/blog/mov
 
 - [National Consumer Helpline](https://consumerhelpline.gov.in), Department of Consumer Affairs. Accessed October 2026.
 - [Indian Banks' Association](https://www.iba.org.in), referred to by banks for approved packers and movers on staff transfers; we could not confirm the current list online. Accessed October 2026.
-- [GST portal](https://www.gst.gov.in), for invoice and registration checks. Accessed October 2026.
 - Quote-comparison advice here is general consumer practice, not a legal standard.

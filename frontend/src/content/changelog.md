@@ -135,7 +135,6 @@ What we shipped, newest first.
 **Payments**
 
 - Pay rent by UPI with automatic HRA-compliant receipts.
-- GSTIN can now be added to invoices before checkout.
 
 **Trust**
 

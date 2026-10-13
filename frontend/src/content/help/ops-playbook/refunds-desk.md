@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 14
-updated: 2026-10-12
+updated: 2026-10-13
 summary: How pass and contact-pack refund requests are decided, what the risk signals mean, and what never to promise.
 tags: [ops, refunds, payments, disputes, internal]
 modules: [refunds]
@@ -65,7 +65,7 @@ The limits (reply window, refund windows, guarantee size) are set in **Settings 
 ## Steps: decide a request
 
 1. Open the **Pending** tab and read the row.
-2. To pay it, choose **Approve**. The refund goes to the original payment method in 5–7 business days, with a GST credit note.
+2. To pay it, choose **Approve**. The refund goes to the original payment method in 5–7 business days, with a credit note.
 3. To refuse it, choose **Reject** and write a reason. The customer sees it, so state the policy point plainly.
 4. The row leaves **Pending**. The customer is notified either way.
 

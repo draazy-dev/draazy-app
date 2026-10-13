@@ -474,7 +474,7 @@ export default function useListProperty() {
   const TYPE_SPECIFIC_KEYS = [
     'commercialType',
     'washrooms', 'shellType', 'parkingSpaces', 'powerBackup', 'pantry', 'camCharges', 'suitableFor', 'fixtures',
-    'gstOnRent', 'fitOutMonths', 'escalationPct', 'tenancyStatus', 'inPlaceRent', 'leaseExpiry',
+    'fitOutMonths', 'escalationPct', 'tenancyStatus', 'inPlaceRent', 'leaseExpiry',
     ...COMMERCIAL_SPEC_KEYS,
     'areaUnit', 'plotLength', 'plotWidth', 'openSides', 'roadWidth', 'cornerPlot', 'boundaryWall',
     'plotZone', 'plottedProject', 'naStatus', 'waterSource', 'electricity', 'roadAccess', 'otherRights', 'buyerEligibility',

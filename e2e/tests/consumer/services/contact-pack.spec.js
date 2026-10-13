@@ -54,7 +54,6 @@ test.describe('LIVE: the contact pack', () => {
     await test.step('checkout charges the flat price and opens an unpaid order', async () => {
       await expect(page).toHaveURL(/\/checkout\?plan=contact-pack/);
       await expect(page.getByRole('button', { name: /^Pay ₹199$/ }).first()).toBeVisible({ timeout: 20000 });
-      await expect(page.getByText('Prices include GST.')).toBeVisible();
       await page.getByRole('button', { name: /^Pay ₹199$/ }).first().click();
       await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
       expect((await ask(mobile, next.id)).status, 'an unpaid order opens nothing').toBe(422);

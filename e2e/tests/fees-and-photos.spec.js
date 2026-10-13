@@ -15,7 +15,6 @@ const ADMIN = '9000000000';
 // public projection.
 const rupees = (n) => '₹' + Number(n).toLocaleString('en-IN');
 const adminPrices = async () => (await (await fetch(`${API}/bootstrap`)).json()).pricing;
-const gstOn = (fee, percent) => Math.round((fee * percent) / 100);
 // A fee that disagrees with the admin schedule's ₹499, so it must never appear.
 const STALE_RENT_FEE = '₹1,999';
 
@@ -31,21 +30,16 @@ async function saveFees(fees) {
 const costSidebar = (page) =>
   page.locator('aside, [class*="sticky"]').filter({ hasText: /Draazy Service Fee/i }).first();
 const costRow = (sidebar, label) => sidebar.locator('div.justify-between').filter({ hasText: label }).first();
-// Prices include GST (the schedule's gstPercent is 0), so no GST line is drawn unless an admin sets one.
-const expectGstLine = (sidebar, fee, percent) => (percent > 0
-  ? expect(costRow(sidebar, /^GST/)).toContainText(rupees(gstOn(fee, percent)))
-  : expect(sidebar.locator('div.justify-between').filter({ hasText: /^GST/ })).toHaveCount(0));
 
 test.describe('Fees — the rent-agreement sidebar prices from the admin fee schedule (live)', () => {
-  test('shows the admin service fee with no GST line (the price includes GST), and calls the total an estimate', async ({ page }) => {
-    const { rentAgreementPlatform: fee, gstPercent = 0 } = await adminPrices();
+  test('shows the admin service fee and calls the total an estimate', async ({ page }) => {
+    const { rentAgreementPlatform: fee } = await adminPrices();
     // `GET /fees` is public, so this runs signed out — the state of the visitor it exists to convince.
     await page.goto('/services/rent-agreement');
 
     const sidebar = costSidebar(page);
     await expect(sidebar).toBeVisible({ timeout: 20_000 });
     await expect(costRow(sidebar, /^Draazy Service Fee/)).toContainText(rupees(fee));
-    await expectGstLine(sidebar, fee, gstPercent);
     await expect(sidebar).not.toContainText(STALE_RENT_FEE);
 
     // A failed read must not pass merely by lacking a wrong number.
@@ -58,14 +52,13 @@ test.describe('Fees — the rent-agreement sidebar prices from the admin fee sch
   });
 
   test('a fee repriced in the admin Fees tab is what the wizard quotes', async ({ page }) => {
-    const { rentAgreementPlatform: before, gstPercent = 0 } = await adminPrices();
+    const { rentAgreementPlatform: before } = await adminPrices();
     const repriced = 777;
     await saveFees({ rentAgreementPlatform: repriced });
     try {
       await page.goto('/services/rent-agreement');
       const sidebar = costSidebar(page);
       await expect(costRow(sidebar, /^Draazy Service Fee/)).toContainText(rupees(repriced), { timeout: 20_000 });
-      await expectGstLine(sidebar, repriced, gstPercent);
     } finally {
       await saveFees({ rentAgreementPlatform: before });
     }
@@ -198,16 +191,14 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
     const prices = (await (await fetch(`${API}/bootstrap`)).json()).pricing;
 
     // Keys as a set because a missing fee renders as "₹0", not as missing UI.
-    // `gstPercent` is a leftover that may go; prices include GST either way.
-    expect(Object.keys(prices).filter((key) => key !== 'gstPercent').sort()).toEqual([
-      'contactPack', 'listingPass', 'referral', 'rentAgreementPlatform',
+    expect(Object.keys(prices).sort()).toEqual([
+      'contactPack', 'listingPass', 'referral', 'refunds', 'rentAgreementPlatform',
     ]);
     expect(typeof prices.referral, 'the referral programme rides along as one object').toBe('object');
-    for (const [key, value] of Object.entries(prices).filter(([k]) => k !== 'referral')) {
+    expect(typeof prices.refunds, 'the refund numbers ride along as one object').toBe('object');
+    for (const [key, value] of Object.entries(prices).filter(([k]) => k !== 'referral' && k !== 'refunds')) {
       expect(typeof value, `${key} is a number`).toBe('number');
-      // Every price includes GST, so the schedule's GST is 0.
-      if (key === 'gstPercent') expect(value).toBe(0);
-      else expect(value, `${key} is positive`).toBeGreaterThan(0);
+      expect(value, `${key} is positive`).toBeGreaterThan(0);
     }
 
     // The page, not one node: the figure sits in a translated string in one place and a bare span in another.
@@ -222,7 +213,7 @@ test.describe('Pricing — the product quotes the database, not the bundle (live
       await faq(question).locator('summary').click();
       await expect(faq(question)).toContainText(rupees(fee));
     }
-    await expect(body).not.toContainText(/owner plus|owner pro|seeker plus|\+ ?GST|per year/i);
+    await expect(body).not.toContainText(/owner plus|owner pro|seeker plus|per year/i);
   });
 
   test('a pass repriced in the admin Fees tab is what the plan card and the catalogue quote', async ({ page }) => {

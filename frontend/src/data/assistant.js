@@ -131,7 +131,7 @@ export const KB = [
     id: 'refunds',
     keywords: ['refund', 'refunds', 'money back', 'cancel', 'charged', 'chargeback', 'invoice', 'credit note', 'guarantee'],
     q: 'Can I get a refund?',
-    a: "Sometimes. An unused Contact Pack can be refunded within 7 days, and a Listing Pass whose listing got no enquiries in its first 7 live days is refunded in full. Open Plan & Billing: eligible purchases show a Refund button, and the others show why, with an Ask for a review option. Declined or unanswered contact requests return your contact automatically. We review every request within 2 business days and refund to the original payment method in 5–7 business days, with a GST credit note. The Refund Policy has the live numbers.",
+    a: "Sometimes. An unused Contact Pack can be refunded within 7 days, and a Listing Pass whose listing got no enquiries in its first 7 live days is refunded in full. Open Plan & Billing: eligible purchases show a Refund button, and the others show why, with an Ask for a review option. Declined or unanswered contact requests return your contact automatically. We review every request within 2 business days and refund to the original payment method in 5–7 business days, with a credit note. The Refund Policy has the live numbers.",
     actions: [
       { label: 'Plan & Billing', to: '/dashboard#billing', icon: 'receipt-indian-rupee' },
       { label: 'Refund Policy', to: '/refund-policy', icon: 'file-text' },

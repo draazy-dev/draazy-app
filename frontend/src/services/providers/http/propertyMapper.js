@@ -321,7 +321,7 @@ export function toEditForm(vm = {}) {
     petsPolicy: vm.pets === true ? 'yes' : vm.pets === false ? 'no' : '',
     construction: vm.construction ?? '',
     plotArea: '', floorsInHouse: '', washrooms: '', shellType: '', camCharges: '',
-    gstOnRent: '', fitOutMonths: '', escalationPct: '', tenancyStatus: '', inPlaceRent: '', leaseExpiry: '',
+    fitOutMonths: '', escalationPct: '', tenancyStatus: '', inPlaceRent: '', leaseExpiry: '',
     seatCount: '', frontage: '', floorLoad: '', clearHeight: '', sanctionedPower: '', dockCount: '',
     plotLength: '', plotWidth: '', openSides: '', roadWidth: '', plotZone: '', waterSource: '',
     naStatus: '', otherRights: '', buyerEligibility: '', bestTimeToCall: '',

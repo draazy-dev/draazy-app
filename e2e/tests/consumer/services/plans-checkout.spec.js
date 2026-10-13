@@ -116,7 +116,6 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
 
     const body = page.locator('body');
     await expect(body).not.toContainText(/owner plus|owner pro|seeker plus/i);
-    await expect(body).not.toContainText(/\+ ?GST/i);
 
     await page.goto('/checkout?plan=contact-pack');
     await expect(page).toHaveURL(/\/signin/);
@@ -162,7 +161,7 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     substituted();
   });
 
-  test('checkout shows one flat price with no GST line, for a pack and for a pass', async ({ page }) => {
+  test('checkout shows one flat price, for a pack and for a pass', async ({ page }) => {
     const mobile = await signedInAsNew(page);
     await seedConsent(page);
     const listing = await newListing(mobile, { title: 'Flat price probe' });
@@ -179,8 +178,7 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     // The summary line and the total are the same figure: nothing is added on top at the door.
     const summary = page.locator('div.glass').filter({ hasText: 'Order summary' }).first();
     await expect(summary.getByText(LISTING_PASS, { exact: true })).toHaveCount(2);
-    await expect(page.getByText('Prices include GST.')).toBeVisible();
-    await expect(page.locator('div.max-w-4xl')).not.toContainText(/\+\s*GST|GST\s*[(@:]|18\s*%/);
+    await expect(page.locator('div.max-w-4xl')).not.toContainText(/18\s*%/);
   });
 
   test('a second checkout while an order is still unpaid names that order, instead of inviting a retry that cannot work; a retired or unknown plan goes back to /plans', async ({ page }) => {

@@ -27,7 +27,7 @@ test.describe('LIVE: the Refund Policy page', () => {
     await expect(prose(page)).toContainText(`first ${passGuaranteeDays} live days`);
     await expect(prose(page)).toContainText(`once every ${passGuaranteeEveryMonths} months`);
     await expect(prose(page)).toContainText('you will see a Refund button');
-    await expect(prose(page)).toContainText('GST credit note for every refund');
+    await expect(prose(page)).toContainText('a credit note for every refund');
     await expect(prose(page)).toContainText('nothing renews automatically');
 
     const text = await prose(page).innerText();

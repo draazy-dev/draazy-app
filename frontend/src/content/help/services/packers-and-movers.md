@@ -4,7 +4,7 @@ slug: packers-and-movers
 category: services
 audience: everyone
 order: 2
-updated: 2026-10-10
+updated: 2026-10-13
 summary: Request a callback from the relocation desk, compare mover quotes, and avoid the pricing games the industry is known for.
 tags: [packers, movers, shifting, quote]
 ---
@@ -26,7 +26,6 @@ tags: [packers, movers, shifting, quote]
 - Transport
 - Unpacking and reassembly, if included
 - Transit insurance
-- GST
 - Any lift-unavailability or long-carry surcharge
 
 > [!WARNING]

@@ -66,8 +66,8 @@ export const decide = (refundId, action, reason) =>
  *  money is back; their secret is machine-local. */
 export function seedInvoice(mobile, orderId, number = 'INV-FY2627-900001') {
   sql(
-    'insert into invoices (number, user_id, source_type, source_id, order_ref, amount, taxable_amount, gst_amount, gst_percent, issued_at)'
-    + ` select '${number}', s.user_id, 'subscription', s.id, s.payment_ref, 199, 169, 30, 18, now() from subscriptions s`
+    'insert into invoices (number, user_id, source_type, source_id, order_ref, amount, taxable_amount, issued_at)'
+    + ` select '${number}', s.user_id, 'subscription', s.id, s.payment_ref, 199, 199, now() from subscriptions s`
     + ` join users u on u.id = s.user_id where s.id = '${uuid(orderId)}' and u.mobile = '${digits(mobile)}'`,
   );
   return number;
@@ -75,8 +75,8 @@ export function seedInvoice(mobile, orderId, number = 'INV-FY2627-900001') {
 
 export function seedCreditNote(orderId, number = 'CN-FY2627-900001', invoiceNo = 'INV-FY2627-900001') {
   sql(
-    'insert into credit_notes (number, user_id, source_type, source_id, order_ref, amount, taxable_amount, gst_amount, gst_percent, invoice_no, issued_at)'
-    + ` select '${number}', s.user_id, 'subscription', s.id, s.payment_ref, 199, 169, 30, 18, '${invoiceNo}', now() from subscriptions s`
+    'insert into credit_notes (number, user_id, source_type, source_id, order_ref, amount, taxable_amount, invoice_no, issued_at)'
+    + ` select '${number}', s.user_id, 'subscription', s.id, s.payment_ref, 199, 199, '${invoiceNo}', now() from subscriptions s`
     + ` where s.id = '${uuid(orderId)}'`,
   );
   return number;

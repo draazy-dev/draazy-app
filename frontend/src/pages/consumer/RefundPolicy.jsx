@@ -102,7 +102,7 @@ export default function RefundPolicy() {
       <ul>
         <li>Approved refunds are processed within <strong>5–7 business days</strong>.</li>
         <li>Refunds are credited to the original payment method (UPI, bank account, or card).</li>
-        <li>You receive a GST credit note for every refund.</li>
+        <li>You receive a credit note for every refund.</li>
       </ul>
 
       <h2>8. Non-refundable items</h2>

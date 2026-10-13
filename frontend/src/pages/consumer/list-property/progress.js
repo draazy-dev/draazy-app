@@ -91,7 +91,6 @@ const wholePlaceItems = (form, photos) => {
     isRent && { done: filled(form.deposit) },
     isRent && !land && !commercial && { done: filled(form.rentMaintMode) },
     isRent && !land && !commercial && form.rentMaintMode === 'extra' && { done: filled(form.rentMaintenance) },
-    isRent && commercial && { done: filled(form.gstOnRent) },
     isRent && commercial && { done: filled(form.fitOutMonths) },
     isRent && commercial && { done: filled(form.escalationPct) },
     isRent && { done: filled(form.availableFrom) },
