@@ -176,7 +176,9 @@ advance on any error (scrolling to the first error via `scrollToError`).
   PATCH, moderator PATCH and flatmate room create/edit, for every property type. It is strict: a
   listing stored with more photos must trim before an edit that sends `images`. One picker accepts HEIF/HEIC, JPEG/JPG and PNG; it carries no
   `capture` attribute, so phones offer camera or library in their own sheet. HEIC is converted to JPEG in the browser, so the server receives JPEG or
-  PNG only. A photo under 480 px on its shorter side is refused at its tile with that reason.
+  PNG only. A photo under 480 px on its shorter side is refused at its tile with that reason. A dark
+  or blurry photo still uploads but gets a one-line hint under its tile (`lib/uploads/photoLook.js`,
+  read in the upload worker on a 480 px probe).
   Existing media is not silently deleted on edit. Video uploading is hidden and does not contribute
   to completion.
 - **Gallery.** The cover is the first photo: "Set as cover" jumps a photo to the front, and dragging

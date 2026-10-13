@@ -6,7 +6,7 @@ import { istInDays } from './availability.js';
 import { fillSociety } from './places.js';
 import { pickLocality } from './locality.js';
 
-const png = (width, height, pixelAt) => {
+export const png = (width, height, pixelAt) => {
   const chunk = (type, data) => {
     const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
     const len = Buffer.alloc(4);

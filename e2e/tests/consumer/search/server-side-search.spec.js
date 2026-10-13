@@ -140,7 +140,7 @@ test('the Furnishing chip sends a word the database knows and narrows the grid i
     for (const p of semi.content) expect(p.furnishing).toBe('semi-furnished');
 
     /* And the UI spelling must NOT work, or the assertion above proves only that the server ignores
-       the parameter. `semi` is what the browser used to send. */
+       the parameter. `semi` is the browser's own spelling. */
     const uiWord = await get('deal=rent&types=flat&furnishings=semi&size=1');
     expect(
       uiWord.totalElements,
@@ -166,4 +166,14 @@ test('the Furnishing chip sends a word the database knows and narrows the grid i
     expect(oracle, 'every rent flat is semi-furnished, so "narrows" is unfalsifiable here')
       .toBeLessThan(before);
   });
+});
+
+test('a misspelt place name still finds its listings, and the grid shows the server count', async ({ page }) => {
+  const exact = (await get('q=wagholi&size=1')).totalElements;
+  expect(exact, 'no Wagholi stock - the typo has nothing to find').toBeGreaterThan(0);
+  expect((await get('q=wagholy&size=1')).totalElements).toBeGreaterThanOrEqual(exact);
+
+  await page.goto('/listings?q=wagholy');
+  await expect.poll(async () => settledCount(page), { timeout: 15000 })
+    .toBe((await get('q=wagholy&size=1')).totalElements);
 });

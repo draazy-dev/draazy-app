@@ -1,11 +1,14 @@
+import { useMemo } from 'react';
 import Icon from '../../../components/Icon.jsx';
 import MobileField from '../../../components/MobileField.jsx';
 import NativeSelect from '../../../components/ui/NativeSelect.jsx';
 import { useTranslation } from 'react-i18next';
 import { CATEGORIES, getCatLabel } from '../../../lib/data/support.js';
+import { suggestFaqs } from './suggestFaqs.js';
 
-export default function TicketForm({ form, set, fld, submit }) {
+export default function TicketForm({ form, set, fld, submit, faqs }) {
   const { t } = useTranslation();
+  const suggestions = useMemo(() => suggestFaqs(`${form.subject} ${form.message}`, faqs), [form.subject, form.message, faqs]);
   return (
     <div className="glass-card rounded-2xl p-6 sm:p-7 reveal">
       <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
@@ -47,10 +50,6 @@ export default function TicketForm({ form, set, fld, submit }) {
             ))}
           </NativeSelect>
         </div>
-        {/* A priority picker stood here. Neither `SupportTicket` nor `SupportTicketCreate` carries
-            priority, so it set a value nothing transmits and ops would never have seen an "urgent"
-            ticket as urgent. Removed rather than disabled — a greyed-out control invites "why
-            can't I?", where an absent one asks nothing. */}
         <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-gray-300 mb-2">
             {t('misc.tfSubject')} <span className="text-rose-400">*</span>
@@ -63,6 +62,20 @@ export default function TicketForm({ form, set, fld, submit }) {
             placeholder={t('misc.tfSubjectPlaceholder')}
             className={fld}
           />
+          {suggestions.length > 0 && (
+            <div className="mt-2 rounded-xl border border-teal-400/20 bg-teal-400/5 p-3" data-testid="faq-suggestions">
+              <p className="text-xs font-semibold text-teal-300 mb-1">{t('misc.tfFaqSuggest')}</p>
+              {suggestions.map((f) => (
+                <details key={f.id} className="group">
+                  <summary className="cursor-pointer py-1.5 text-sm text-white list-none flex items-start gap-1.5">
+                    <Icon name="chevron-right" className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400 transition-transform group-open:rotate-90" />
+                    {f.question}
+                  </summary>
+                  <p className="pl-5 pb-2 text-sm text-gray-400 leading-relaxed">{f.answer}</p>
+                </details>
+              ))}
+            </div>
+          )}
         </div>
         <div className="sm:col-span-2">
           <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -76,10 +89,6 @@ export default function TicketForm({ form, set, fld, submit }) {
             className={fld + ' resize-none'}
           />
         </div>
-        {/* An image dropzone stood here. `MessageCreate` is `{ body }`, and the contract states an
-            attachment field would be "accepted and dropped rather than stored as a client-supplied
-            URL nothing can render". Offering an upload that silently discards the file is worse
-            than not offering one. */}
       </div>
 
       <button

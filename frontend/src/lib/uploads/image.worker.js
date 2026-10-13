@@ -1,6 +1,7 @@
 import heicDecoderUrl from 'heic-to/csp?url';
 import { MAX_UPLOAD_BYTES } from './policy.js';
 import { checkImageDimensions, MAX_IMAGE_PIXELS } from './imageDimensions.js';
+import { photoLook } from './photoLook.js';
 
 const MAX_EDGE = 2560;
 /* A scan degraded past reading is worse than one the owner is told to retake, so documents stop at a
@@ -10,6 +11,17 @@ const PHOTO = { minEdge: MIN_PHOTO_EDGE, qualities: [0.92, 0.8, 0.68, 0.56, 0.44
 const DOCUMENT = { minEdge: 1600, qualities: [0.92, 0.82, 0.72, 0.62] };
 
 const release = (canvas) => { canvas.width = 1; canvas.height = 1; };
+
+const LOOK_EDGE = 480;
+
+function readLook(source) {
+  const probe = scaleTo(source, LOOK_EDGE);
+  try {
+    return photoLook(probe.getContext('2d').getImageData(0, 0, probe.width, probe.height).data, probe.width);
+  } finally {
+    release(probe);
+  }
+}
 
 function scaleTo(image, edge) {
   const scale = Math.min(1, edge / Math.max(image.width, image.height));
@@ -61,7 +73,8 @@ self.onmessage = async ({ data: { file, type, document } }) => {
     // Up to 48 MP of decoded pixels: release the bitmap before the first encode, not after the last.
     const source = scaleTo(bitmap, MAX_EDGE);
     bitmap.close(); bitmap = null;
-    self.postMessage({ blob: await compressUnderCap(source, document ? DOCUMENT : PHOTO) });
+    const look = document ? null : readLook(source);
+    self.postMessage({ blob: await compressUnderCap(source, document ? DOCUMENT : PHOTO), look });
   } catch (error) {
     const message = error?.message || '';
     self.postMessage({ error: /48 megapixels|480 px/.test(message) ? message : 'Could not decode this photo. Export a single still image as JPEG or PNG and try again.' });

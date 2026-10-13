@@ -203,15 +203,14 @@ export default function Support() {
           </Link>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-6">
-            {/* Raise a ticket */}
             <TicketForm
               form={form}
               set={set}
               fld={fld}
               submit={submit}
+              faqs={faqs}
             />
 
-            {/* Your tickets */}
             <div className="space-y-6">
               <ContactCard />
               <TicketList tickets={tickets} openThread={openThread} />
@@ -220,7 +219,6 @@ export default function Support() {
         </div>
       </div>
 
-      {/* Thread modal */}
       <TicketThreadModal
         threadOpen={threadOpen}
         closeThread={closeThread}
@@ -231,7 +229,6 @@ export default function Support() {
         fld={fld}
       />
 
-      {/* FAQs */}
       <FaqSection faqs={faqs} openFaq={openFaq} setOpenFaq={setOpenFaq} />
     </div>
   );

@@ -7,11 +7,11 @@ function processInWorker(file, type, document, signal) {
     const worker = type === 'application/pdf'
       ? new Worker(new URL('./pdf.worker.js', import.meta.url), { type: 'module' })
       : new Worker(new URL('./image.worker.js', import.meta.url), { type: 'module' });
-    const finish = (error, result) => {
+    const finish = (error, result, look = null) => {
       clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
       worker.terminate();
-      if (error) reject(error); else resolve(result);
+      if (error) reject(error); else resolve({ file: result, look });
     };
     const abort = () => finish(new DOMException('Upload preparation cancelled.', 'AbortError'));
     const timer = setTimeout(() => finish(new Error('This file took too long to process. Try a smaller original.')), PROCESSING_TIMEOUT_MS);
@@ -24,15 +24,15 @@ function processInWorker(file, type, document, signal) {
         finish(new Error('This file cannot fit under 1 MB at the supported quality. Please choose a smaller original.'));
       } else {
         const name = type === 'application/pdf' ? file.name : file.name.replace(/\.[^.]+$/, '.jpg');
-        finish(null, new File([data.blob], name, { type: data.blob.type, lastModified: file.lastModified }));
+        finish(null, new File([data.blob], name, { type: data.blob.type, lastModified: file.lastModified }), data.look);
       }
     };
     if (signal?.aborted) abort(); else worker.postMessage({ file, type, document });
   });
 }
 
-/** Issuer-original PDFs must never enter a rewriting/compression path. */
-export async function prepareUpload(file, { document = false, originalPdf = false, signal } = {}) {
+/** Issuer-original PDFs must never enter a rewriting/compression path. `withLook` also resolves a dark/blurry hint. */
+export async function prepareUpload(file, { document = false, originalPdf = false, withLook = false, signal } = {}) {
   signal?.throwIfAborted();
   const type = await uploadType(file, document);
   signal?.throwIfAborted();
@@ -42,5 +42,6 @@ export async function prepareUpload(file, { document = false, originalPdf = fals
   if (originalPdf && file.size >= MAX_UPLOAD_BYTES) {
     throw new Error('The original PDF must be under 1 MB. Keep it unchanged; use a current property-tax receipt instead if it is too large.');
   }
-  return processInWorker(file, type, document, signal);
+  const prepared = await processInWorker(file, type, document, signal);
+  return withLook ? prepared : prepared.file;
 }

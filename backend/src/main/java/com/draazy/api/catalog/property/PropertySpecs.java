@@ -3,11 +3,13 @@ package com.draazy.api.catalog.property;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.identity.user.UserStatuses;
 import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
 import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Order;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
+import jakarta.persistence.criteria.Subquery;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -34,6 +36,12 @@ final class PropertySpecs {
     /** A bound on the free-text term, so a pasted paragraph cannot become a predicate per word. */
     private static final int MAX_Q_TOKENS = 6;
     private static final int MAX_LIST_TOKENS = 16;
+
+    // pg_trgm word_similarity; 0.5 still admits two swapped letters in an 8-letter name ("koregoan").
+    private static final double FUZZY_THRESHOLD = 0.5;
+
+    // Letters only and five or more: a short word or a number is matched exactly, so "2bhk" never becomes "3bhk".
+    private static final Pattern FUZZY_WORD = Pattern.compile("\\p{L}{5,}");
     private static final Set<String> FACING = Set.of(
             "east", "west", "north", "south", "north-east", "north-west", "south-east", "south-west");
 
@@ -61,7 +69,7 @@ final class PropertySpecs {
             LocalityPoint localityCenter) {
         return (root, query, cb) -> {
             List<Predicate> where = facets(filters, root, cb, localityCenter);
-            publicTextSearch(filters, root, cb, where);
+            publicTextSearch(filters, root, query, cb, where);
             listingFacets(extra, root, cb, where);
 
             where.add(cb.isFalse(root.get("archived")));
@@ -289,18 +297,11 @@ final class PropertySpecs {
     }
 
     /** Matches only what is printed on the card; a separate method from {@link #adminTextSearch}, never a flag. */
-    private static void publicTextSearch(PropertySearchQuery filters, Root<Property> root,
+    private static void publicTextSearch(PropertySearchQuery filters, Root<Property> root, CriteriaQuery<?> query,
             CriteriaBuilder cb, List<Predicate> where) {
         if (!StringUtils.hasText(filters.q())) {
             return;
         }
-        Expression<String> title = cb.lower(root.get("title"));
-        Expression<String> locality = cb.lower(root.get("locality"));
-
-        // The bound society reaches the row as its slug, so a name matches it word by word or not
-        // at all: the slugs are name-builder-locality and nobody types them in that order.
-        Expression<String> society = cb.lower(root.get("societySlug"));
-        Expression<String> type = cb.lower(root.get("propertyType"));
 
         /** Every word must appear somewhere rather than the whole phrase in one column: smart search
          * sends the words it could not facet, routinely a builder and a project in two columns. */
@@ -309,12 +310,40 @@ final class PropertySpecs {
                 .limit(MAX_Q_TOKENS)
                 .forEach(token -> {
                     String like = "%" + LikePatterns.escape(token) + "%";
-                    where.add(cb.or(
-                            cb.like(title, like, LIKE_ESCAPE),
-                            cb.like(locality, like, LIKE_ESCAPE),
-                            cb.like(society, like, LIKE_ESCAPE),
-                            cb.like(type, like, LIKE_ESCAPE)));
+                    Predicate exact = cb.or(cardText(root, cb).stream()
+                            .map(column -> cb.like(column, like, LIKE_ESCAPE)).toArray(Predicate[]::new));
+                    if (!FUZZY_WORD.matcher(token).matches()) {
+                        where.add(exact);
+                        return;
+                    }
+                    Predicate unmatched = cb.not(cb.exists(liveMatch(query, cb, like)));
+                    where.add(cb.or(exact, cb.and(unmatched, close(token, root, cb))));
                 });
+    }
+
+    /** Title, locality, society slug (a name matches it word by word), type. */
+    private static List<Expression<String>> cardText(Root<Property> root, CriteriaBuilder cb) {
+        return List.of(cb.lower(root.get("title")), cb.lower(root.get("locality")),
+                cb.lower(root.get("societySlug")), cb.lower(root.get("propertyType")));
+    }
+
+    // Uncorrelated, so Postgres runs it once per word. A word that is spelt right somewhere is never fuzzed:
+    // "balewadi" would otherwise also find Kalewadi, at a score no threshold separates from a real typo.
+    private static Subquery<Integer> liveMatch(CriteriaQuery<?> query, CriteriaBuilder cb, String like) {
+        Subquery<Integer> sub = query.subquery(Integer.class);
+        Root<Property> other = sub.from(Property.class);
+        return sub.select(cb.literal(1)).where(
+                cb.isFalse(other.get("archived")),
+                cb.equal(other.get("status"), PropertyStatus.APPROVED),
+                cb.or(cardText(other, cb).stream()
+                        .map(column -> cb.like(column, like, LIKE_ESCAPE)).toArray(Predicate[]::new)));
+    }
+
+    private static Predicate close(String token, Root<Property> root, CriteriaBuilder cb) {
+        return cb.or(cardText(root, cb).subList(0, 3).stream()
+                .map(column -> cb.greaterThanOrEqualTo(
+                        cb.function("word_similarity", Double.class, cb.literal(token), column), FUZZY_THRESHOLD))
+                .toArray(Predicate[]::new));
     }
 
     /** Adds owner name, mobile and the id as text; the id cast must be {@link HibernateCriteriaBuilder#cast}. */

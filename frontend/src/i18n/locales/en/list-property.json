@@ -622,7 +622,11 @@
       "dropped": "Photo moved to position {{to}} of {{count}}.",
       "cancelled": "Reorder cancelled. The photo is back at position {{from}}.",
       "uploading": "Uploading…",
-      "retry": "Retry"
+      "retry": "Retry",
+      "look": {
+        "dark": "Looks dark. A daylight shot gets more views.",
+        "blurry": "Looks blurry. Hold steady and retake?"
+      }
     }
   }
 }

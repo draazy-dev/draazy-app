@@ -160,5 +160,23 @@ test.describe('Consumer support — live API', () => {
       await expect(page.getByText('zero brokerage', { exact: false }).first()).toBeVisible();
     });
   });
+
+  test('typing a subject surfaces matching FAQs under it, and clearing it hides them', async ({ page }) => {
+    await seedConsent(page);
+    await signedInAsNew(page);
+    const faqsRead = page.waitForResponse((r) => new URL(r.url()).pathname.endsWith('/api/faqs') && r.status() === 200);
+    await openSupport(page);
+    await faqsRead;
+
+    const subject = page.getByPlaceholder('Brief summary of your issue');
+    const suggestions = page.getByTestId('faq-suggestions');
+    await subject.fill('Was I charged brokerage');
+    await expect(suggestions).toContainText(ANCHOR_Q);
+    await suggestions.getByText(ANCHOR_Q).click();
+    await expect(suggestions.getByText('zero brokerage', { exact: false }).last()).toBeVisible();
+
+    await subject.fill('');
+    await expect(suggestions).toHaveCount(0);
+  });
 });
 

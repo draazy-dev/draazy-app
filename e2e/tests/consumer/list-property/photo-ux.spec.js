@@ -1,6 +1,6 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { LIST_PROPERTY_DRAFT_KEY } from '../../../helpers/listingForm.helper.js';
-import { PHOTO_PNG, openPhotoStep as openPhotos } from '../../../helpers/listingPhotos.helper.js';
+import { PHOTO_PNG, openPhotoStep as openPhotos, png } from '../../../helpers/listingPhotos.helper.js';
 
 const SMALL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4AWJiYGD4D8IgBpBmYAAAAAD//7vS9wEAAAAGSURBVAMAGDACA6ybwrYAAAAASUVORK5CYII=', 'base64');
 
@@ -110,5 +110,19 @@ test.describe('list property photo UX', () => {
     await expect(photos.locator('.grid img')).toHaveCount(4);
     await expect(photos).toContainText('4 / 4 photos');
     await expect(photos.getByLabel('Add property photos', { exact: true })).toBeDisabled();
+  });
+
+  test('flags a dark or blurry photo without blocking it, and leaves a sharp one alone', async ({ page }) => {
+    await openPhotos(page);
+    const photos = page.locator('[data-err="photos"]');
+    await photos.getByLabel('Add property photos', { exact: true }).setInputFiles([
+      { name: 'dark.png', mimeType: 'image/png', buffer: png(640, 480, (x) => 20 + (x % 2) * 40) },
+      { name: 'flat.png', mimeType: 'image/png', buffer: png(640, 480, () => 150) },
+      { name: 'sharp.png', mimeType: 'image/png', buffer: png(640, 480, (x, y) => ((x >> 1) + (y >> 1)) % 2 ? 230 : 70) },
+    ]);
+    await expect(photos.locator('.grid img')).toHaveCount(3);
+    await expect(photos).toHaveAttribute('aria-busy', 'false');
+    const hints = photos.getByTestId('photo-look');
+    await expect(hints).toHaveText(['Looks dark. A daylight shot gets more views.', 'Looks blurry. Hold steady and retake?']);
   });
 });

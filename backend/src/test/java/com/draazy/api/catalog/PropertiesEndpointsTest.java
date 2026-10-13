@@ -98,6 +98,43 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void textSearchForgivesMisspeltPlaceNames_butNotNumbersOrShortWords() throws Exception {
+        User o = owner("9810000041");
+        save(o, "2BHK near park", "rent", "apartment", new BigDecimal("2"), 25000, "Koregaon Park", "approved", false);
+        save(o, "3BHK tower flat", "rent", "apartment", new BigDecimal("3"), 30000, "Hinjewadi", "approved", false);
+        save(o, "Magarpatta studio", "rent", "Studio", new BigDecimal("1"), 15000, "Hadapsar", "approved", false);
+
+        mvc.perform(get("/properties").param("q", "koregoan"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("2BHK near park"));
+        mvc.perform(get("/properties").param("q", "hinjwadi"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("3BHK tower flat"));
+        mvc.perform(get("/properties").param("q", "magarpata studio"))
+                .andExpect(jsonPath("$.totalElements").value(1));
+        mvc.perform(get("/properties").param("q", "baner"))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/properties").param("q", "4BHK"))
+                .andExpect(jsonPath("$.totalElements").value(0));
+        mvc.perform(get("/properties").param("q", "9810000041"))
+                .andExpect(jsonPath("$.totalElements").value(0));
+    }
+
+    @Test
+    void aCorrectlySpeltPlaceNameIsNotWidenedToLookalikeLocalities() throws Exception {
+        User o = owner("9810000042");
+        save(o, "2BHK by the stadium", "rent", "apartment", new BigDecimal("2"), 25000, "Balewadi", "approved", false);
+        save(o, "1BHK near station", "rent", "apartment", new BigDecimal("1"), 12000, "Kalewadi", "approved", false);
+
+        mvc.perform(get("/properties").param("q", "balewadi"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("2BHK by the stadium"));
+        mvc.perform(get("/properties").param("q", "balewdi"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("2BHK by the stadium"));
+    }
+
+    @Test
     void typesFacetMatchesTheChipTaxonomy_notTheStoredLabel() throws Exception {
         User o = owner("9810000012");
 

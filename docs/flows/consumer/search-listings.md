@@ -282,7 +282,11 @@ search as the words it could not turn into a facet, so it is routinely a builder
 across two columns, and society is on the row only as its `name-builder-locality` slug - nobody
 types it in that order. The term is bounded at 120 characters, words are capped at six and `%`/`_`
 are escaped, so on a route needing no login a pasted paragraph cannot become a predicate per word
-and `?q=%` cannot return the whole catalogue while reading as a narrowing. `adminTextSearch` adds
+and `?q=%` cannot return the whole catalogue while reading as a narrowing. A letter-only word of five
+or more letters that no live listing matches exactly falls back to `pg_trgm` `word_similarity` ≥ 0.5
+over title, locality or society, so "koregoan" finds Koregaon Park while "balewadi" never widens to
+Kalewadi. Numbers, mobiles and shorter words stay exact, which keeps the public search from becoming
+a fuzzy owner lookup. `adminTextSearch` adds
 the owner's name,
 the owner's mobile and the listing id. They are separate methods for the same reason `adminSearch` is
 separate: what a flag would buy an attacker is `?q=98234` against a widened public search answering

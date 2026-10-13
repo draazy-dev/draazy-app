@@ -164,6 +164,9 @@ const PhotoUploader = ({
                     </>
                   )}
                 </div>
+                {p.look && !p.uploading && !p.error && (
+                  <p className="px-2 py-1.5 text-[11px] leading-snug text-amber-200" data-testid="photo-look">{t(`listProperty.photoUx.look.${p.look}`)}</p>
+                )}
                 {p.error && (
                   <div className="p-2 text-xs text-red-200">
                     <p>{p.error}</p>

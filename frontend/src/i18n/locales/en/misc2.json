@@ -26,6 +26,7 @@
     "tfPriority": "Priority",
     "tfSubject": "Subject",
     "tfSubjectPlaceholder": "Brief summary of your issue",
+    "tfFaqSuggest": "These may answer it right away",
     "tfDescribe": "Describe your issue",
     "tfDescribePlaceholder": "Share as much detail as you can so we can help faster.",
     "tfAttach": "Attach screenshots",

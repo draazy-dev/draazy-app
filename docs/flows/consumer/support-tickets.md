@@ -18,7 +18,9 @@
 - **Route:** `/support` (the public Support/Help page). Deep links: `?cat=<category>` preselects the
   category; `?open=SUP-10001` auto-opens an existing ticket thread.
 - **Tiles / triggers:** footer/help links, in-context "contact support" links across the app, and the
-  FAQ section on the same page (self-serve first).
+  FAQ section on the same page (self-serve first). Typing a subject (or description) lists up to three
+  matching FAQs under the subject, openable inline (`support/suggestFaqs.js`, local keyword match over
+  the FAQs the page already loaded; nothing is sent).
 - **Source components:** `src/pages/consumer/Support.jsx` (container),
   `src/pages/consumer/support/{TicketForm,TicketList,TicketThreadModal,Lightbox,ContactCard,FaqSection}.jsx`,
   `src/pages/consumer/support/constants.js` (status chips), and the service module

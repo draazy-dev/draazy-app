@@ -40,7 +40,7 @@ export default function useListingMedia({ setErrors }) {
   const uploadPhotoSlot = async (slot, controller) => {
     setPhotos((prev) => prev.map((photo) => (photo.id === slot.id ? { ...photo, uploading: true, error: '' } : photo)));
     try {
-      const { url } = await uploadPhoto(slot.file, { signal: controller.signal });
+      const { url, look } = await uploadPhoto(slot.file, { signal: controller.signal });
       controller.signal.throwIfAborted();
       setPhotos((prev) => prev.map((photo) => {
         if (photo.id !== slot.id) return photo;
@@ -48,7 +48,7 @@ export default function useListingMedia({ setErrors }) {
           URL.revokeObjectURL(photo.previewUrl);
           previewUrls.current.delete(photo.previewUrl);
         }
-        return { id: photo.id, url, category: photo.category || 'Other' };
+        return { id: photo.id, url, category: photo.category || 'Other', look };
       }));
     } catch (error) {
       if (controller.signal.aborted) return;
