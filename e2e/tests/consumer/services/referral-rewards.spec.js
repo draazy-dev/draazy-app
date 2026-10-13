@@ -2,6 +2,7 @@
  * link are `refer`. Withdrawal of already-earned bonuses is filed in `tasks/DECISIONS-NEEDED.md`. */
 import { expect, test, ACTORS } from '../../../fixtures/live.js';
 import { API, apiLogin, signedInAs, signIn, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { ownersApproveAll } from '../../../helpers/monetisation.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
@@ -33,6 +34,7 @@ async function exhaustedBuyer(page) {
 
   for (const { id } of listings.slice(0, FREE_LIMIT)) {
     expect((await askFor(accessToken, id)).status, 'the free allowance is spendable in full').toBe(200);
+    ownersApproveAll(mobile);
   }
   await signedInAs(page, mobile);
   return { mobile, accessToken, untouched: listings[FREE_LIMIT] };

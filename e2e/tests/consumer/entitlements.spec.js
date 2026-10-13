@@ -2,6 +2,7 @@
    Specs mint their own accounts (uniqueMobile) because spending a quota mutates the account it runs as. */
 import { test, expect } from '../../fixtures/live.js';
 import { API, apiLogin, uniqueMobile } from '../../helpers/liveAuth.js';
+import { ownersApproveAll } from '../../helpers/monetisation.js';
 
 const auth = (token) => ({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' });
 
@@ -79,11 +80,13 @@ test('opening a contact spends exactly one, and re-opening the same one spends n
 });
 
 test('the allowance is a wall, and it is the server that holds it', async () => {
-  const { accessToken } = await apiLogin(uniqueMobile());
+  const mobile = uniqueMobile();
+  const { accessToken } = await apiLogin(mobile);
   const ids = await someListingIds(FREE_LIMIT + 1);
 
   for (const id of ids.slice(0, FREE_LIMIT)) {
     expect((await askFor(accessToken, id)).status, 'the free allowance is spendable in full').toBe(200);
+    ownersApproveAll(mobile);
   }
 
   const spent = await entitlements(accessToken);

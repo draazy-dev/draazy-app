@@ -1,6 +1,6 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { API, apiLogin, signedInAs, uniqueMobile, seedConsent } from '../../../helpers/liveAuth.js';
-import { call, entitlementsOf, openOrder, pendingOrderId, settleOrder, sql, CONTACT_PACK_PLAN } from '../../../helpers/monetisation.js';
+import { call, entitlementsOf, openOrder, ownersApproveAll, pendingOrderId, settleOrder, sql, CONTACT_PACK_PLAN } from '../../../helpers/monetisation.js';
 
 /* A signed payment webhook needs a machine-local secret, so the paid state is reached by settling the order row. */
 
@@ -23,6 +23,7 @@ async function exhaustedBuyer() {
   const listings = await someListings(FREE_CONTACTS + 2);
   for (const { id } of listings.slice(0, FREE_CONTACTS)) {
     expect((await ask(mobile, id)).status, 'the free contacts are spendable in full').toBe(200);
+    ownersApproveAll(mobile);
   }
   return { mobile, next: listings[FREE_CONTACTS], another: listings[FREE_CONTACTS + 1] };
 }

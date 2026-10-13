@@ -307,6 +307,19 @@ takes its contacts back with no grant to reverse. The old module now lives at
   yearly caps reject the overflow; suspension, take-down or revoked verification claws back within 30 days. The ops
   desk is audit plus override (an appeal needs a reason). The listing-slot reward is gone (pay-per-use, Q16b).
 
+### Q17b — Refunds: what comes back, and who decides? *(closed 2026-10-12)*
+
+**Answer:** refund only what was not delivered, decided from server facts; every number is a `settings.fees` key.
+- **Contacts:** a request counts until the owner declines it or it lapses after `contactReplyDays`; then it comes
+  back. Open requests are capped at `contactPendingMax`; paused, let or sold listings take no requests or approvals.
+- **Pack:** full refund within `packRefundDays` if no contact was spent from it. **Pass:** no-enquiry guarantee
+  (≤ `passGuaranteeMaxEnquiries` from start to claim, never paused in the first `passGuaranteeDays`, once per
+  `passGuaranteeEveryMonths` across linked accounts).
+- **Every customer refund is approved by staff** (`refunds` function); the order is frozen while pending.
+  Money taken in error (failed, late, mismatched, closed listing) is refunded automatically.
+- Sequential GST invoices and credit notes per FY; a dispute freezes only that order, never the account; grievance
+  officer in `legal`.
+
 ### Q18 — What should the ops console be allowed to see and act on? *(closed 2026-08-11)*
 
 **Answer: scope by team, with admin-defined per-user permission sets.** The admin creates each ops

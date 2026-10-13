@@ -90,6 +90,14 @@ export function settleOrder(subscriptionId, days) {
   if (!out.includes(subscriptionId)) throw new Error(`could not settle ${subscriptionId}`);
 }
 
+/** Owners answer every request `mobile` has open, so spending the full allowance never meets the pending cap. */
+export function ownersApproveAll(mobile) {
+  sql(
+    "update contact_requests set status = 'approved' where status = 'pending'"
+    + ` and requester_id = (select id from users where mobile = '${String(mobile).replace(/\D/g, '')}')`,
+  );
+}
+
 export async function pendingOrderId(mobile) {
   const me = await call('GET', '/auth/me', mobile);
   const id = sql(`select id from subscriptions where user_id = '${uuid(me.json.id)}' and status = 'pending' order by created_at desc limit 1`).split(/\r?\n/)[0];

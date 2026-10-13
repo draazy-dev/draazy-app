@@ -56,6 +56,13 @@ const WAIVED = new Map([
   ['recent_searches', 'written by `PUT /me/recent-searches` as a signed-in seeker searches; `recent-searches.spec.js` fills its own rail'],
   ['listing_duplicate_dismissals', 'written by `POST /admin/properties/duplicates/dismiss`; `admin/duplicates.spec.js` dismisses clusters it created over the wire'],
   ['tenant_rentals', 'declared by the tenant via `POST /me/rentals`; `tenant-finances.spec.js` adds and removes its own'],
+  ['refund_requests', 'written by `POST /me/payments/{id}/refund`; `consumer/services/refund-request.spec.js` files its own'],
+  ['payment_disputes', 'written by the gateway dispute webhook,   which e2e cannot sign'],
+  ['invoices', 'numbered when a gateway payment settles; the mock order settle in e2e skips the webhook, so refund specs insert their own'],
+  ['invoice_sequences', 'counter row created by the first invoice issued'],
+  ['credit_notes', 'issued from the signed gateway refund webhook; refund specs insert their own'],
+  ['credit_note_sequences', 'counter row created by the first credit note issued'],
+  ['property_live_gaps', 'written when a listing leaves live and comes back; the pass-guarantee specs pause and resume their own'],
 ]);
 
 // Pending tables need read fixtures; populated entries are reported stale.
