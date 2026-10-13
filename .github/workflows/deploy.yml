@@ -252,6 +252,7 @@ jobs:
       - name: Build
         working-directory: frontend
         env:
+          VITE_DEPLOY_ENV: sandbox
           VITE_GOOGLE_MAPS_API_KEY: ${{ secrets.VITE_GOOGLE_MAPS_API_KEY }}
           VITE_GOOGLE_MAPS_MAP_ID: ${{ vars.VITE_GOOGLE_MAPS_MAP_ID }}
           VITE_CASHFREE_MODE: ${{ vars.VITE_CASHFREE_MODE }}

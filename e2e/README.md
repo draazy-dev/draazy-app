@@ -14,12 +14,11 @@ npm run test:nobackend            # safe, fast, no server needed — start here
 "Two configs" below before you run it, because it resets a database.
 
 `playwright.config.js` starts the frontend dev server for you (`npm --prefix ../frontend run dev`
-on **port 5173**). To point at a different instance (e.g. a deployed preview) and skip the
-auto-start:
+on **port 5173**). Another local instance can be targeted with `BASE_URL=http://localhost:<port>`.
 
-```bash
-BASE_URL=https://preview.example.com npm run test:nobackend
-```
+e2e is local-only: both configs throw at load when `CI` is set or `BASE_URL` is not
+`localhost`/`127.0.0.1`/`::1`, because the suite resets a database and has no business near shared
+environments or CI runners.
 
 ## Fast runs: `run-fast.ps1`
 

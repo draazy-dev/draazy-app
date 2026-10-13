@@ -182,7 +182,9 @@ does not have any, so it gets a second file.
 cd backend; .\run-e2e-backend.ps1        # :8081, plus the lane scripts for parallel suites
 ```
 
-A delta on `local` for the Playwright suite. What it changes and why:
+A delta on `local` for the Playwright suite, and **only ever on a developer machine**. The backend
+refuses to boot `e2e` without `local` or alongside `prod`/`sandbox`, and both Playwright configs
+refuse `CI` and any non-localhost `BASE_URL`. What it changes and why:
 
 - **Its own database** (`draazy_e2e`). The suite creates and deletes freely; pointing it at `draazy`
   would destroy the demo data, and pointing it at `draazy_test` would fight the Java suite's exact

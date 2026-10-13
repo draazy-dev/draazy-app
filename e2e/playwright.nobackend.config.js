@@ -3,14 +3,15 @@ import { NO_BACKEND } from './no-backend-specs.js';
 
 const NB_PORT = process.env.NB_PORT;
 const BASE_URL = NB_PORT ? `http://localhost:${NB_PORT}` : process.env.BASE_URL || 'http://localhost:5173';
-const CI = !!process.env.CI;
+if (process.env.CI || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(BASE_URL).hostname)) {
+  throw new Error('e2e runs only on developer machines: it refuses CI and any BASE_URL that is not localhost.');
+}
 
 export default defineConfig({
   testDir: './tests',
-  forbidOnly: CI,
   timeout: 30_000,
   expect: { timeout: 7_500 },
-  retries: CI ? 2 : 1,
+  retries: 1,
   // Cap workers: too many browsers against one Vite server look like product bugs.
   workers: 4,
   fullyParallel: true,
@@ -32,7 +33,7 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      // Named explicitly rather than by exclusion: a spec that belongs to neither config runs nowhere and reports nothing.
+      // Named explicitly, not by exclusion: a spec in neither config runs nowhere and reports nothing.
       testMatch: NO_BACKEND,
     },
   ],
@@ -42,7 +43,7 @@ export default defineConfig({
         command: `npm --prefix ../frontend run dev${NB_PORT ? ` -- --port ${NB_PORT} --strictPort` : ''}`,
         url: BASE_URL,
         timeout: 120_000,
-        reuseExistingServer: !CI && !NB_PORT,
+        reuseExistingServer: !NB_PORT,
         env: NB_PORT ? { VITE_PROXY_TARGET: 'http://127.0.0.1:9' } : undefined,
         stdout: 'ignore',
         stderr: 'pipe',

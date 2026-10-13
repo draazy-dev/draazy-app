@@ -12,6 +12,7 @@ const WAIVED = new Map([
   ['refresh_tokens', 'issued at login, by the same flow every spec starts with'],
   ['push_subscriptions', 'written by the push opt-in flow; a seeded endpoint would fake browser registration'],
   ['provider_call', 'written by every OTP, email and payment call the specs make'],
+  ['error_event', 'written by the error appender and POST /api/client-errors; a seeded row would fake a captured failure'],
   ['audit_log', 'written BY the admin actions the ops specs assert on'],
   ['transactions', 'written by the payment flows; a seeded row would fake the thing under test'],
   ['outbound_message', 'the send queue - filled when a notification actually fires'],

@@ -113,6 +113,7 @@ const AdminSettings = lazy(() => import('./pages/admin/AdminSettings.jsx'));
 const AdminIntegrations = lazy(() => import('./pages/admin/AdminIntegrations.jsx'));
 const AdminErasureRequests = lazy(() => import('./pages/admin/AdminErasureRequests.jsx'));
 const AdminHelpFeedback = lazy(() => import('./pages/admin/AdminHelpFeedback.jsx'));
+const AdminErrorLog = lazy(() => import('./pages/admin/AdminErrorLog.jsx'));
 const AdminPostOnBehalf = lazyPage(() => import('./pages/admin/AdminPostOnBehalf.jsx'), 'list-property');
 const AdminStaffActivity = lazy(() => import('./pages/admin/AdminStaffActivity.jsx'));
 const AdminSocieties = lazy(() => import('./pages/admin/AdminSocieties.jsx'));
@@ -241,6 +242,7 @@ const BACK_OFFICE_ROUTES = [{
     { path: 'integrations', element: <ModuleRoute moduleKey="integrations"><AdminIntegrations /></ModuleRoute> },
     { path: 'erasure-requests', element: <ModuleRoute moduleKey="erasure"><AdminErasureRequests /></ModuleRoute> },
     { path: 'help-feedback', element: <ModuleRoute moduleKey="helpFeedback"><AdminHelpFeedback /></ModuleRoute> },
+    { path: 'error-log', element: <ModuleRoute moduleKey="errorLog"><AdminErrorLog /></ModuleRoute> },
     { path: 'post-on-behalf', element: <ModuleRoute moduleKey="postOnBehalf"><AdminPostOnBehalf /></ModuleRoute> },
     { path: 'staff-activity', element: <ModuleRoute moduleKey="staffActivity"><AdminStaffActivity /></ModuleRoute> },
     { path: '*', element: <PortalHome /> },

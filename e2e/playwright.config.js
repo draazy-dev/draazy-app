@@ -10,6 +10,9 @@ if (prefixed.length) throw new Error(`Drop the "live-" prefix from: ${prefixed.j
 
 // **It resets a database**: prefer the `run-live-*.ps1` lanes, which pin port, database and app URL together.
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5173';
+if (process.env.CI || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(BASE_URL).hostname)) {
+  throw new Error('e2e runs only on developer machines: it refuses CI and any BASE_URL that is not localhost.');
+}
 const API_PORT = process.env.API_PORT || '8081';
 // run-fast.ps1 doubles this for parallel shards, where every backend shares the same CPU.
 const TIMEOUT_SCALE = Math.max(1, Number(process.env.E2E_TIMEOUT_SCALE) || 1);

@@ -1,7 +1,7 @@
 import { appendFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import helpContentPlugin from './scripts/vite-plugin-help-content.mjs';
@@ -149,7 +149,11 @@ function pwaPlugin() {
   });
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  // Unset VITE_DEPLOY_ENV in a production build counts as prod, so the safe default strips console output.
+  esbuild: mode === 'production' && loadEnv(mode, __dirname, 'VITE_').VITE_DEPLOY_ENV !== 'sandbox'
+    ? { drop: ['console', 'debugger'] }
+    : {},
   // spaFallbackPlugin reads files the blog, locality and route-head plugins write, so it runs after them.
   plugins: [react(), phosphorWeightsPlugin(), helpContentPlugin({ root: __dirname }), blogPlugin({ root: __dirname }), localityGuidesPlugin({ root: __dirname }), contentIndexPlugin({ root: __dirname }), routeHeadsPlugin(), spaFallbackPlugin({ root: __dirname }), pwaPlugin(), apiBaseHtmlPlugin(), devInlineScriptHashesPlugin(), noindexOffProductionPlugin()],
   build: {
@@ -210,4 +214,4 @@ export default defineConfig({
       ],
     },
   },
-});
+}));

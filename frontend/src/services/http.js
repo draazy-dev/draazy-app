@@ -73,6 +73,13 @@ export function observeBuildStamp(fn) {
   buildStampObserver = fn;
 }
 
+let lastBuild = null;
+let failedTraceId = null;
+/** Build id of the last response that carried one, for crash reports. */
+export const lastBuildStamp = () => lastBuild;
+/** Trace id of the last 5xx response, so a crash report can be matched to a server log line. */
+export const lastFailedTraceId = () => failedTraceId;
+
 // Opts: `method`, `body`, `query`, `headers`, `auth`, `withStatus`, `signal`. Their exact
 // semantics, and what `withStatus` is for: docs/system/frontend-data-seam.md
 export async function request(path, opts = {}) {
@@ -291,6 +298,7 @@ async function send(path, { method = 'GET', body, query, headers: extra, signal 
     // Read from every answer, statuses included: a deploy that moved the contract shows up as a 4xx,
     // so the response most in need of explaining is the one watching only successes would skip.
     buildStampObserver?.(res.headers.get(BUILD_HEADER));
+    lastBuild = res.headers.get(BUILD_HEADER) ?? lastBuild;
     return res;
   } catch (cause) {
     // An abort is the caller's own decision: neither an error to normalise nor evidence about the
@@ -383,13 +391,15 @@ function buildQuery(query) {
 async function toResult(res, withStatus = false) {
   const payload = await parseBody(res);
   if (res.ok) return withStatus ? { data: payload, status: res.status, etag: res.headers.get('ETag') } : payload;
+  const traceId = payload?.traceId || res.headers.get(TRACE_HEADER);
+  if (res.status >= 500 && traceId) failedTraceId = traceId;
   throw new ApiError({
     code: payload?.error,
     message: payload?.message,
     status: res.status,
     // Prefer the body's traceId, but fall back to the header: 502s and other proxy-level failures
     // never reach our exception handler and so carry no envelope at all.
-    traceId: payload?.traceId || res.headers.get(TRACE_HEADER),
+    traceId,
     fields: payload?.fields,
     attemptsRemaining: payload?.attemptsRemaining,
     // From the envelope, not the `Retry-After` header beside it: the API exposes no CORS response

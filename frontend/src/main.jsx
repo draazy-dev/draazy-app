@@ -14,6 +14,7 @@ import { NotificationProvider } from './context/NotificationContext.jsx';
 import { ConversationProvider } from './context/ConversationContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
 import { installMapsLoader } from './lib/mapsConfig.js';
+import { installGlobalErrorHandlers } from './lib/errorReporter.js';
 import { initPmf } from './lib/pmf.js';
 import { initProductAnalytics } from './lib/productAnalytics.js';
 import { loadGeoPolicy } from './lib/geoConfig.js';
@@ -39,6 +40,7 @@ import './styles/theme.css';
 // Boot the temporary PMF-test overlay (GA4). No-op unless VITE_PMF_MODE=on.
 initPmf();
 initProductAnalytics();
+installGlobalErrorHandlers();
 installMapsLoader();
 
 // "auto" restoration lands this SPA part-scrolled once async content and reveals run. Scoped to

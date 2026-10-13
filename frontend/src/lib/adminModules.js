@@ -2,7 +2,7 @@
 import {
   BarChart3, BookOpen, Building2, Calculator, FileSignature, FileText, Gauge, Gift, Landmark, LayoutDashboard, LifeBuoy,
   MessageSquare, Paintbrush, Scale, Settings, Truck, Users, Flag, IndianRupee, UserPlus,
-  MapPin, Plug, UsersRound, Eraser, ThumbsUp, Undo2,
+  MapPin, Plug, UsersRound, Eraser, ThumbsUp, Undo2, Bug,
 } from 'lucide-react';
 
 // `value` is the server's desk slug (`desk:<value>` function); Home Loans has tickets, not service requests.
@@ -54,6 +54,7 @@ export const ADMIN_MODULES = [
   { key: 'integrations', label: 'Integrations', path: '/admin/integrations', icon: Plug, adminOnly: true, atom: 'settings:read' },
   { key: 'erasure', label: 'Erasure requests', path: '/admin/erasure-requests', icon: Eraser, adminOnly: true, atom: 'settings:read' },
   { key: 'helpFeedback', label: 'Help feedback', path: '/admin/help-feedback', icon: ThumbsUp, adminOnly: true, atom: 'settings:read' },
+  { key: 'errorLog', label: 'Error log', path: '/admin/error-log', icon: Bug, role: 'admin', atom: 'audit:read' },
 ];
 
 export const MODULE_BY_KEY = Object.fromEntries(ADMIN_MODULES.map((m) => [m.key, m]));
@@ -70,6 +71,8 @@ export function canAccessModule(user, key) {
   const mod = MODULE_BY_KEY[key];
   if (!mod) return false;
   if (mod.base) return true;
+  // `audit:read` is also held by managers, so a module that is for administrators only names its role.
+  if (mod.role && user?.role !== mod.role) return false;
   // Only staff are scoped to desks; the server lets admin and manager work every desk.
   if (mod.desk && user?.role === 'staff' && !(Array.isArray(user?.desks) && user.desks.includes(mod.desk))) return false;
   return [].concat(mod.atom).some((atom) => hasPermission(user, atom));

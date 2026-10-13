@@ -23,6 +23,7 @@ Things code can't close: secrets, deploy steps, real-device checks, human fact-c
 - [ ] WhatsApp daily digest template: submit to Meta as `UTILITY` (body in `docs/DEPLOY.md` §3), then set `WHATSAPP_DIGEST_TEMPLATE_NAME` — until approved no digest is sent
 - [ ] Once WhatsApp OTP delivery is live (MindFort: owner consent accepts `000000`): remove `draazy.otp.sandbox-code=000000` from `application-sandbox.properties` and its pin in `SandboxProfileContractTest`
 - [ ] Rotate `backend/.env.local` secrets if in doubt (surfaced 2026-08-09)
+- [ ] DigitalOcean: add the alert policies and the one free Uptime check from `docs/DEPLOY.md` §8; leave log forwarding off
 - [ ] Optional: `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY` for graphify community labels
 
 ## Real phones

@@ -14,6 +14,7 @@
 
 ## Tests: what green does not prove
 
+- **`mvnw test -Dtest=A+B` runs zero tests and reports BUILD SUCCESS** (surefire 3.5). Separate classes with commas, and check "Tests run:" is non-zero.
 - **A green build does not prove a new prop is passed.** When adding a prop, grep every `<Component` call site; Vite builds clean and crashes at runtime.
 - **A spec never executed is a claim, not coverage.** The first full run found six broken specs, none a product bug.
 - **A run longer than the token TTL is a different experiment**: a session replayed past 15 min presents a rotated refresh token and reuse detection revokes the family.
@@ -84,6 +85,8 @@
 
 ## Backend — Spring, JPA, Postgres
 
+- **Spring 6.2+ hands a `TaskScheduler` an OutcomeTrackingRunnable, not a `ScheduledMethodRunnable`**; test scheduler wrappers through a real `@Scheduled` bean.
+- **A session advisory lock leaks behind a transaction pooler (Supavisor :6543)**; hold `pg_try_advisory_xact_lock` in an open transaction.
 - **`@Transactional` goes on the outermost reachable method**; self-invoked/`private` helpers never cross the proxy.
 - **`:param is null` in JPQL fails on Postgres**: use `cast(:from as LocalDate) is null`.
 - **A multi-column `@Query` returning `Object[]` silently nests**: use a projection interface with `as` aliases.

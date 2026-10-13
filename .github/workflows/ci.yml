@@ -60,55 +60,6 @@ jobs:
         working-directory: frontend
         run: npm run check:size
 
-  e2e:
-    name: Playwright (no-backend)
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    # No `needs: checks`. The suites test different things, and making e2e wait
-    # on lint just delays the slowest signal for the sake of tidiness.
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: |
-            frontend/package-lock.json
-            e2e/package-lock.json
-
-      # The Playwright config starts the dev server with `npm --prefix ../frontend run dev`,
-      # so frontend deps are required even though the specs live in e2e/.
-      - name: Install frontend dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Install e2e dependencies
-        working-directory: e2e
-        run: npm ci
-
-      # Chromium only: the one project this config defines is Desktop Chrome, so
-      # downloading Firefox and WebKit would add minutes for browsers nothing uses.
-      - name: Install Playwright browser
-        working-directory: e2e
-        run: npx playwright install --with-deps chromium
-
-      - name: Run no-backend specs
-        working-directory: e2e
-        run: npm run test:nobackend
-
-      # `always()`, not `failure()`: the HTML report is the artifact you want when
-      # a run is flaky-but-green just as much as when it is red.
-      - name: Upload report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report-nobackend
-          path: |
-            e2e/playwright-report/
-            e2e/test-results/
-          retention-days: 7
-
   lighthouse:
     name: Lighthouse (mobile, record-only)
     runs-on: ubuntu-latest
