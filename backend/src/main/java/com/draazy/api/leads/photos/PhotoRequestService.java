@@ -2,7 +2,6 @@ package com.draazy.api.leads.photos;
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.Notifier;
@@ -32,16 +31,14 @@ public class PhotoRequestService {
     private final UserRepository users;
     private final PhotoRequestMapper mapper;
     private final Notifier notifier;
-    private final AuditService audit;
 
     public PhotoRequestService(PhotoRequestRepository photoRequests, PropertyRepository properties,
-            UserRepository users, PhotoRequestMapper mapper, Notifier notifier, AuditService audit) {
+            UserRepository users, PhotoRequestMapper mapper, Notifier notifier) {
         this.photoRequests = photoRequests;
         this.properties = properties;
         this.users = users;
         this.mapper = mapper;
         this.notifier = notifier;
-        this.audit = audit;
     }
 
     @Transactional
@@ -102,8 +99,6 @@ public class PhotoRequestService {
         }
         row.decide(decision, Instant.now());
         PhotoRequestResponse answer = project(photoRequests.save(row), property);
-        audit.record(owner, "photo.request." + decision, "photoRequest",
-                row.getId().toString(), "fromStatus", before, "toStatus", decision);
         announce(row.getRequesterId(), decision, answer);
         return answer;
     }

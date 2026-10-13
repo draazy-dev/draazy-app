@@ -57,8 +57,9 @@ public final class ErasureRetention {
                         + "identified by their staff id -- the subject appears as an entity id, not "
                         + "as a name or a number. Erasing it would remove the proof that moderation "
                         + "and erasure themselves were carried out properly, including the proof of "
-                        + "this erasure. It is also the only table on the platform that is "
-                        + "append-only by design.");
+                        + "this erasure. Kept 365 days, then purged: security and accountability "
+                        + "log retention (CERT-In 180 days, DPDP Rule 6 one year). Within that "
+                        + "window it is append-only by design.");
 
         reasons.put("abuse_reports",
                 "Safety record. A report *about* the subject is another user's statement and the "

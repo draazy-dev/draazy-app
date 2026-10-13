@@ -109,8 +109,6 @@ class ListingPasses {
                 .ifPresent(p -> {
                     locks.holdUntilCommit(RateLimitLock.Limit.LISTING_LIVE, pass.getUserId().toString());
                     p.resumeByOwner();
-                    audit.record(pass.getUserId(), "owner", "property.ownerResume", "property",
-                            p.getId().toString());
                     duplicates.flag(p);
                 });
     }

@@ -98,7 +98,7 @@ public class GlobalExceptionHandler {
      * deserialisation layer's shape. Detail is logged at debug. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiError> handleUnreadableBody(HttpMessageNotReadableException ex) {
-        log.debug("Unreadable request body [traceId={}]: {}", traceId(), ex.getMessage());
+        log.debug("Unreadable request body: {}", ex.getMessage());
         String field = fieldPath(ex);
         String message = field == null ? ErrorCodes.Messages.MALFORMED_BODY
                 : "Invalid value for field: " + field;
@@ -157,7 +157,7 @@ public class GlobalExceptionHandler {
      * as the vault's own {@link UnsupportedMediaTypeException}, raised after sniffing. */
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ApiError> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
-        log.debug("Unsupported content type [traceId={}]: {}", traceId(), ex.getContentType());
+        log.debug("Unsupported content type: {}", ex.getContentType());
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .body(new ApiError(ErrorCodes.UNSUPPORTED_MEDIA_TYPE,
                         ErrorCodes.Messages.UNSUPPORTED_CONTENT_TYPE, 415, traceId()));
@@ -167,7 +167,7 @@ public class GlobalExceptionHandler {
      * a mistyped URL is not an operational event. */
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiError> handleNoRoute(NoResourceFoundException ex) {
-        log.debug("No route for [traceId={}]: {} {}", traceId(), ex.getHttpMethod(), ex.getResourcePath());
+        log.debug("No route for {} {}", ex.getHttpMethod(), ex.getResourcePath());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ApiError(ErrorCodes.NOT_FOUND, "That route does not exist", 404, traceId()));
     }
@@ -205,12 +205,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> handleDataIntegrity(DataIntegrityViolationException ex) {
         if (NestedExceptionUtils.getMostSpecificCause(ex) instanceof SQLException sql
                 && UNSTORABLE_CHARACTER.equals(sql.getSQLState())) {
-            log.debug("Unstorable character in input [traceId={}]", traceId());
+            log.debug("Unstorable character in input");
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(new ApiError(ErrorCodes.BAD_REQUEST, "The request contains an invalid character",
                             400, traceId()));
         }
-        log.warn("Database rejected a write [traceId={}]", traceId(), ex);
+        log.warn("Database rejected a write", ex);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError(ErrorCodes.CONFLICT,
                         "That request conflicts with existing data", 409, traceId()));
@@ -220,7 +220,7 @@ public class GlobalExceptionHandler {
      * {@code info} because a lost race is concurrency working, not a defect. */
     @ExceptionHandler(OptimisticLockingFailureException.class)
     public ResponseEntity<ApiError> handleOptimisticLock(OptimisticLockingFailureException ex) {
-        log.info("Concurrent update rejected [traceId={}]: {}", traceId(), ex.getMessage());
+        log.info("Concurrent update rejected: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(new ApiError(ErrorCodes.CONFLICT,
                         "Someone else changed this while you were editing it. Reload and try again.",
@@ -230,13 +230,13 @@ public class GlobalExceptionHandler {
     /** The client (usually an SSE tab) hung up; there is nobody left to send an error body to. */
     @ExceptionHandler(AsyncRequestNotUsableException.class)
     public void handleClientGone(AsyncRequestNotUsableException ex) {
-        log.debug("Client disconnected [traceId={}]: {}", traceId(), ex.getMessage());
+        log.debug("Client disconnected: {}", ex.getMessage());
     }
 
     /** Last resort: never leak internals — log the cause, return a generic 500. */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUncaught(Exception ex) {
-        log.error("Unhandled exception [traceId={}]", traceId(), ex);
+        log.error("Unhandled exception", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(new ApiError(ErrorCodes.INTERNAL, "Something went wrong", 500, traceId()));
     }

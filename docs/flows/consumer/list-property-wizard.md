@@ -631,7 +631,7 @@ back.
 
 `POST /me/listings/{id}/pause` moves a live `approved` listing to `paused`; anything else is a 409.
 `POST /me/listings/{id}/resume` returns an owner-paused listing to `approved` without a new
-moderation decision. Both are audited (`property.ownerPause`, `property.ownerResume`).
+moderation decision. Neither writes an audit row: they are the owner's own action on their own listing.
 
 - A paused listing is excluded from search and every public discovery surface, but its direct link
   still resolves, so a buyer holding the URL is not sent to a dead page.

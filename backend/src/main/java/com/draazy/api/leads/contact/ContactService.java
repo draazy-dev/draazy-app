@@ -3,7 +3,6 @@ package com.draazy.api.leads.contact;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.catalog.property.PropertyRepository;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ContactPendingLimitException;
 import com.draazy.api.common.error.ErrorCodes;
@@ -45,7 +44,6 @@ public class ContactService {
     private final Notifier notifier;
     private final VerifiedTenantLookup verifiedTenants;
     private final ContactAllowanceLookup allowances;
-    private final AuditService audit;
     private final RateLimitLock locks;
     private final ReferralTriggers referralTriggers;
     private final ContactReplyWindow window;
@@ -54,8 +52,7 @@ public class ContactService {
 
     public ContactService(ContactRequestRepository contactRequests, PropertyRepository properties,
             UserRepository users, ContactMapper contactMapper, Notifier notifier,
-            VerifiedTenantLookup verifiedTenants, ContactAllowanceLookup allowances,
-            AuditService audit, RateLimitLock locks, ReferralTriggers referralTriggers,
+            VerifiedTenantLookup verifiedTenants, ContactAllowanceLookup allowances, RateLimitLock locks, ReferralTriggers referralTriggers,
             ContactReplyWindow window, ContactReturns returnedContact, PlatformSettings settings) {
         this.contactRequests = contactRequests;
         this.properties = properties;
@@ -64,7 +61,6 @@ public class ContactService {
         this.notifier = notifier;
         this.verifiedTenants = verifiedTenants;
         this.allowances = allowances;
-        this.audit = audit;
         this.locks = locks;
         this.referralTriggers = referralTriggers;
         this.window = window;
@@ -197,8 +193,6 @@ public class ContactService {
             }
             throw new ConflictException("This contact request has already been answered");
         }
-        audit.record(owner, "contact.request." + body.status(), "contactRequest",
-                row.getId().toString(), "fromStatus", before, "toStatus", body.status());
 
         if (ContactRequestStatuses.APPROVED.equals(body.status())) {
             notifier.notify(

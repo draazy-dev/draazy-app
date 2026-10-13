@@ -1,7 +1,6 @@
 package com.draazy.api.documents.agreement;
 
 import com.draazy.api.common.PlatformTime;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.trust.Notifier;
@@ -35,15 +34,13 @@ public class RentAgreementRenewalSweeper {
     private final RentAgreementRepository agreements;
     private final UserRepository users;
     private final Notifier notifier;
-    private final AuditService audit;
     private final PlatformSettings settings;
 
     public RentAgreementRenewalSweeper(RentAgreementRepository agreements, UserRepository users,
-            Notifier notifier, AuditService audit, PlatformSettings settings) {
+            Notifier notifier, PlatformSettings settings) {
         this.agreements = agreements;
         this.users = users;
         this.notifier = notifier;
-        this.audit = audit;
         this.settings = settings;
     }
 
@@ -83,7 +80,5 @@ public class RentAgreementRenewalSweeper {
 
         group.forEach(row -> row.markRenewalReminded(now));
         agreements.saveAllAndFlush(group);
-        audit.record("system", "admin", "rentAgreement.renewalReminder", "rentAgreement",
-                first.getId().toString());
     }
 }

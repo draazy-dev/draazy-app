@@ -298,9 +298,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                             .content("{\"status\":\"declined\"}"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("declined"));
-            assertThat(jdbc.queryForObject(
-                    "select count(*) from audit_log where actor = ? and action = ?", Long.class,
-                    owner.getId().toString(), "flatmate.groupApplication.declined")).isEqualTo(1L);
             assertThat(jdbc.queryForList(
                     "select type from notifications where user_id = ?", String.class, host.getId()))
                     .containsExactly("flatmate.groupApplication.declined");
@@ -380,9 +377,6 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                     String.class, hostB.getId())).containsExactly("flatmate.groupApplication.declined");
             assertThat(jdbc.queryForList("select type from notifications where user_id = ?",
                     String.class, hostA.getId())).containsExactly("flatmate.groupApplication.accepted");
-            assertThat(jdbc.queryForObject(
-                    "select count(*) from audit_log where actor = ? and action = ?", Long.class,
-                    owner.getId().toString(), "flatmate.groupApplication.declined")).isEqualTo(2L);
         }
 
         @Test

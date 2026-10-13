@@ -7,7 +7,6 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.catalog.society.Society;
 import com.draazy.api.catalog.society.SocietyRepository;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
@@ -40,18 +39,15 @@ public class FlatSplitService {
     private final FlatmateGuardrails guardrails;
     private final FlatmateMapper mapper;
     private final UserRepository users;
-    private final AuditService audit;
     private final SocietyRepository societies;
 
     public FlatSplitService(PropertyRepository properties, FlatmateRoomRepository rooms,
-            FlatmateGuardrails guardrails, FlatmateMapper mapper, UserRepository users,
-            AuditService audit, SocietyRepository societies) {
+            FlatmateGuardrails guardrails, FlatmateMapper mapper, UserRepository users, SocietyRepository societies) {
         this.properties = properties;
         this.rooms = rooms;
         this.guardrails = guardrails;
         this.mapper = mapper;
         this.users = users;
-        this.audit = audit;
         this.societies = societies;
     }
 
@@ -102,8 +98,6 @@ public class FlatSplitService {
                     0, owner.getName(), owner.getMobile(), null)));
         }
 
-        audit.record(caller, "property.split", "property", propertyId.toString(),
-                "rooms", String.valueOf(created.size()));
 
         return new FlatSplitResult(created.size(), tier, !approved, eligibility.flagForReview(),
                 created);
@@ -144,8 +138,6 @@ public class FlatSplitService {
             room.archive("split withdrawn by the owner");
             rooms.saveAndFlush(room);
         });
-        audit.record(caller, "property.unsplit", "property", propertyId.toString(),
-                "rooms", String.valueOf(siblings.size()));
     }
 
     private FlatmateRoom buildRoom(AuthPrincipal caller, Property parent,

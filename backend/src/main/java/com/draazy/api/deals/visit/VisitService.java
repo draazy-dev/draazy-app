@@ -2,7 +2,6 @@ package com.draazy.api.deals.visit;
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
@@ -36,15 +35,13 @@ public class VisitService {
     private final PropertyRepository properties;
     private final UserRepository users;
     private final Notifier notifier;
-    private final AuditService audit;
 
     public VisitService(VisitRepository visits, PropertyRepository properties,
-                        UserRepository users, Notifier notifier, AuditService audit) {
+                        UserRepository users, Notifier notifier) {
         this.visits = visits;
         this.properties = properties;
         this.users = users;
         this.notifier = notifier;
-        this.audit = audit;
     }
 
     // The caller must be either the visitor or the listing owner.
@@ -121,8 +118,6 @@ public class VisitService {
 
         visit.setStatus(body.status());
         visits.saveAndFlush(visit);
-        audit.record(caller, "visit.status", "visit", visit.getId().toString(),
-                "fromStatus", before, "toStatus", body.status());
 
         if (VisitStatuses.CONFIRMED.equals(body.status())
                 && !visit.getVisitorId().equals(caller.userId())) {

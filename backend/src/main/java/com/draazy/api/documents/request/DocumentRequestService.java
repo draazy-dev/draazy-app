@@ -149,10 +149,9 @@ public class DocumentRequestService {
             }
             throw new ConflictException("This document request has already been answered");
         }
-        audit.record(owner, "document.request." + body.status(), "documentRequest",
-                row.getId().toString(), "fromStatus", before, "toStatus", body.status());
-
         if (DocumentRequestStatuses.GRANTED.equals(body.status())) {
+            audit.record(owner, "document.request.granted", "documentRequest",
+                    row.getId().toString(), "fromStatus", before, "toStatus", body.status());
             notifier.notify(row.getRequesterId(), "document.granted",
                     "Property documents unlocked",
                     "The owner approved your request \u2014 open your documents to view them. "

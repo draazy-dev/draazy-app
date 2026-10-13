@@ -128,6 +128,7 @@ public class SecurityConfig {
 
                         .requestMatchers(HttpMethod.POST, Routes.DemandSignals.BASE).permitAll()
                         .requestMatchers(HttpMethod.POST, Routes.PageViews.BASE).permitAll()
+                        .requestMatchers(HttpMethod.POST, Routes.ClientErrors.BASE).permitAll()
 
                         .requestMatchers(HttpMethod.POST, Routes.HelpFeedback.BASE).permitAll()
 

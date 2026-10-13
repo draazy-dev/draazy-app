@@ -1,6 +1,5 @@
 package com.draazy.api.engagement.flatmate;
 
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.RateLimitLock;
@@ -23,18 +22,15 @@ public class FlatmateMembershipService {
     private final RateLimitLock locks;
     private final UserRepository users;
     private final Notifier notifier;
-    private final AuditService audit;
 
     FlatmateMembershipService(FlatmateGroupRepository groups, FlatmateRequestRepository requests,
-            PlatformSettings settings, RateLimitLock locks, UserRepository users, Notifier notifier,
-            AuditService audit) {
+            PlatformSettings settings, RateLimitLock locks, UserRepository users, Notifier notifier) {
         this.groups = groups;
         this.requests = requests;
         this.settings = settings;
         this.locks = locks;
         this.users = users;
         this.notifier = notifier;
-        this.audit = audit;
     }
 
     void requireRoomToAsk(UUID userId) {
@@ -78,8 +74,6 @@ public class FlatmateMembershipService {
                 (name == null ? "A member" : name) + " left " + group.getTitle(),
                 "A seat is open again.",
                 FlatmateLinks.of("group", groupId));
-        audit.record(caller, "flatmate.group.leave", "flatmategroup", groupId.toString(),
-                "host", group.getHostId().toString());
     }
 
     @Transactional
@@ -108,8 +102,6 @@ public class FlatmateMembershipService {
                     "The host removed you from this group.",
                     FlatmateLinks.of("group", groupId));
         }
-        audit.record(caller, "flatmate.group.remove_member", "flatmategroup", groupId.toString(),
-                "member", memberId.toString());
     }
 
     /** A deleted group has no page to open, so the asks pointing at it go too — they would otherwise

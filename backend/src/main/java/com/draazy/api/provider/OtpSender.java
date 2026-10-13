@@ -1,5 +1,6 @@
 package com.draazy.api.provider;
 
+import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.security.LocalOnly;
 import com.draazy.api.security.LocalProfileGuard;
 import java.util.List;
@@ -83,7 +84,7 @@ class SandboxOtpSender implements OtpSender {
 
     @Override
     public void send(String mobile, String code) {
-        log.warn("[SANDBOX OTP] mobile={} - not sent; the code is draazy.otp.sandbox-code", mobile);
+        log.warn("[SANDBOX OTP] mobile={} - not sent; the code is draazy.otp.sandbox-code", MobileMask.mask(mobile));
         calls.record(ProviderCalls.WHATSAPP, OPERATION, ProviderCalls.Outcome.SKIPPED, mobile, null, "sandbox", null);
     }
 

@@ -50,7 +50,7 @@ class DashboardDecisionAuditHardeningTest extends AbstractApiTest {
     }
 
     @Test
-    void contactDecisionsAuditOnceAndSameDecisionRepeatsAreNoOps() throws Exception {
+    void contactDecisionsWriteNoAuditRowAndSameDecisionRepeatsAreNoOps() throws Exception {
         User owner = user("9822400001", Roles.Wire.OWNER);
         User otherOwner = user("9822400002", Roles.Wire.OWNER);
         User buyer = user("9822400003", Roles.Wire.BUYER);
@@ -67,7 +67,7 @@ class DashboardDecisionAuditHardeningTest extends AbstractApiTest {
         mvc.perform(contactDecision(owner, reqId, ContactRequestStatuses.DECLINED))
                 .andExpect(status().isConflict());
 
-        assertThat(auditRows("contact.request.approved", reqId)).isEqualTo(1);
+        assertThat(auditRows("contact.request.approved", reqId)).isZero();
         assertThat(notificationRows(buyer, "contact.approved")).isEqualTo(1);
     }
 
@@ -116,7 +116,7 @@ class DashboardDecisionAuditHardeningTest extends AbstractApiTest {
     }
 
     @Test
-    void photoDecisionsAuditOnceAndSameDecisionRepeatsAreNoOps() throws Exception {
+    void photoDecisionsWriteNoAuditRowAndSameDecisionRepeatsAreNoOps() throws Exception {
         User owner = user("9822400030", Roles.Wire.OWNER);
         User otherOwner = user("9822400031", Roles.Wire.OWNER);
         User buyer = user("9822400032", Roles.Wire.BUYER);
@@ -135,12 +135,12 @@ class DashboardDecisionAuditHardeningTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value(PhotoRequestStatuses.RESOLVED));
 
-        assertThat(auditRows("photo.request.resolved", reqId)).isEqualTo(1);
+        assertThat(auditRows("photo.request.resolved", reqId)).isZero();
         assertThat(notificationRows(buyer, "photo.added")).isEqualTo(1);
     }
 
     @Test
-    void visitDecisionsAuditOnceAndSameStatusRepeatsAreNoOps() throws Exception {
+    void visitDecisionsWriteNoAuditRowAndSameStatusRepeatsAreNoOps() throws Exception {
         User owner = user("9822400040", Roles.Wire.OWNER);
         User visitor = user("9822400041", Roles.Wire.BUYER);
         User stranger = user("9822400042", Roles.Wire.BUYER);
@@ -156,12 +156,12 @@ class DashboardDecisionAuditHardeningTest extends AbstractApiTest {
         mvc.perform(visitDecision(owner, visitId, VisitStatuses.SCHEDULED))
                 .andExpect(status().isConflict());
 
-        assertThat(auditRows("visit.status", visitId)).isEqualTo(1);
+        assertThat(auditRows("visit.status", visitId)).isZero();
         assertThat(notificationRows(visitor, "visit.confirmed")).isEqualTo(1);
     }
 
     @Test
-    void flatmateInterestDecisionsAuditOnceAndSameDecisionRepeatsAreNoOps() throws Exception {
+    void flatmateInterestDecisionsWriteNoAuditRowAndSameDecisionRepeatsAreNoOps() throws Exception {
         User host = user("9822400050", Roles.Wire.BUYER);
         User requester = user("9822400051", Roles.Wire.BUYER);
         User stranger = user("9822400052", Roles.Wire.BUYER);
@@ -180,7 +180,7 @@ class DashboardDecisionAuditHardeningTest extends AbstractApiTest {
         mvc.perform(flatmateDecision(host, requestId, "declined"))
                 .andExpect(status().isConflict());
 
-        assertThat(auditRows("flatmate.request.accepted", requestId)).isEqualTo(1);
+        assertThat(auditRows("flatmate.request.accepted", requestId)).isZero();
         assertThat(notificationRows(requester, "flatmate.request.accepted")).isEqualTo(1);
     }
 

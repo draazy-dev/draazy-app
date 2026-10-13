@@ -3,7 +3,6 @@ package com.draazy.api.engagement.flatmate;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
@@ -31,19 +30,17 @@ public class FlatmateApplicationService {
     private final PropertyRepository properties;
     private final GroupApplicationHydrator hydrator;
     private final Notifier notifier;
-    private final AuditService audit;
     private final RateLimitLock locks;
 
     public FlatmateApplicationService(FlatmateGroupApplicationRepository applications,
             FlatmateGroupRepository groups, PropertyRepository properties,
-            GroupApplicationHydrator hydrator, Notifier notifier, AuditService audit,
+            GroupApplicationHydrator hydrator, Notifier notifier,
             RateLimitLock locks) {
         this.applications = applications;
         this.groups = groups;
         this.properties = properties;
         this.hydrator = hydrator;
         this.notifier = notifier;
-        this.audit = audit;
         this.locks = locks;
     }
 
@@ -106,8 +103,6 @@ public class FlatmateApplicationService {
                     group.getTitle() + " would like to rent " + listing.getTitle() + ".",
                     "/dashboard");
         }
-        audit.record(caller, "flatmate.groupApplication.create", "flatmateGroupApplication",
-                saved.getId().toString(), "listingId", listingId.toString());
 
         return hydrator.hydrateOne(saved);
     }
@@ -167,23 +162,19 @@ public class FlatmateApplicationService {
                 .orElseThrow(() -> NotFoundException.of("Group application"));
 
         notifyVerdict(listing, decided, verdict);
-        audit.record(caller, "flatmate.groupApplication." + verdict, "flatmateGroupApplication",
-                decided.getId().toString(), "status", verdict);
 
         if (accepting) {
-            declineOtherPending(caller, listing, decided.getId());
+            declineOtherPending(listing, decided.getId());
         }
         return hydrator.hydrateOne(decided);
     }
 
-    private void declineOtherPending(AuthPrincipal caller, Property listing, UUID acceptedId) {
+    private void declineOtherPending(Property listing, UUID acceptedId) {
         for (FlatmateGroupApplication other : applications.findByListingIdAndStatus(
                 listing.getId(), FlatmateVocabulary.STATUS_PENDING)) {
             if (!other.getId().equals(acceptedId) && applications.updateDecisionIfPending(other.getId(),
                     FlatmateVocabulary.STATUS_PENDING, "declined", Instant.now()) == 1) {
                 notifyVerdict(listing, other, "declined");
-                audit.record(caller, "flatmate.groupApplication.declined", "flatmateGroupApplication",
-                        other.getId().toString(), "status", "declined");
             }
         }
     }

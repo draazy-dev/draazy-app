@@ -15,7 +15,7 @@ import java.util.TreeMap;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Reads only the daily rollup, never {@code page_views}: raw views are kept 90 days but the picker offers 180,
+/** Reads only the daily rollup, never {@code page_views}: raw views are kept 30 days but the picker offers 180,
  * so a raw read would silently return half a window. Windows are cut on the Indian calendar like the rollup. */
 @Service
 public class AdminPageViewAnalyticsService {

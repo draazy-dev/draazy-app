@@ -12,7 +12,6 @@ import com.draazy.api.catalog.property.PropertyMapper;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertySort;
 import com.draazy.api.catalog.property.PropertyStatus;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ListingQuotaExhaustedException;
 import com.draazy.api.common.error.NotFoundException;
@@ -55,7 +54,6 @@ public class ListingService {
     private final PropertyLifecycle propertyLifecycle;
     private final ListingCaseNotes caseNotes;
     private final ListingDuplicateProbe duplicates;
-    private final AuditService audit;
     private final ListingQuota quota;
     private final RateLimitLock locks;
     private final ListingPhotoSources photoSources;
@@ -64,7 +62,7 @@ public class ListingService {
 
     public ListingService(PropertyRepository properties, UserRepository users,
             LocalityBinding localities, ListingEditRules editRules, PropertyMapper propertyMapper,
-            PropertyLifecycle propertyLifecycle, ListingCaseNotes caseNotes, ListingDuplicateProbe duplicates, AuditService audit,
+            PropertyLifecycle propertyLifecycle, ListingCaseNotes caseNotes, ListingDuplicateProbe duplicates,
             ListingQuota quota, RateLimitLock locks, ListingPhotoSources photoSources,
             PhotoLimit photoLimit, PlatformSettings settings) {
         this.properties = properties;
@@ -76,7 +74,6 @@ public class ListingService {
         this.editRules = editRules;
         this.propertyMapper = propertyMapper;
         this.propertyLifecycle = propertyLifecycle;
-        this.audit = audit;
         this.quota = quota;
         this.locks = locks;
         this.photoSources = photoSources;
@@ -111,8 +108,6 @@ public class ListingService {
             throw new ConflictException("Only a live approved listing can be paused");
         }
         p.pauseByOwner();
-        audit.record(actor, "property.ownerPause", "property", p.getId().toString(),
-                "owner", actor.userId().toString());
         return properties.save(p);
     }
 
@@ -129,8 +124,6 @@ public class ListingService {
                     + " listing pass for this one.");
         }
         p.resumeByOwner();
-        audit.record(actor, "property.ownerResume", "property", p.getId().toString(),
-                "owner", actor.userId().toString());
         duplicates.flag(p);
         return properties.save(p);
     }

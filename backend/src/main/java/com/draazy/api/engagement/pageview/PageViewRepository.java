@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PageViewRepository extends JpaRepository<PageView, UUID> {
 
-    /** Deletes everything before {@code cutoff} (ninety-day retention); uses {@code page_views_occurred_idx}. */
+    /** Deletes everything before {@code cutoff} (thirty-day retention); uses {@code page_views_occurred_idx}. */
     @Modifying
     @Query("delete from PageView p where p.occurredAt < :cutoff")
     int deleteOlderThan(@Param("cutoff") Instant cutoff);

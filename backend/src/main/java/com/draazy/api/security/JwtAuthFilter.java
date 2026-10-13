@@ -1,5 +1,6 @@
 package com.draazy.api.security;
 
+import com.draazy.api.common.web.RequestCorrelation;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -10,6 +11,7 @@ import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -43,6 +45,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 var auth = new UsernamePasswordAuthenticationToken(
                         principal, null, List.of(authority));
                 SecurityContextHolder.getContext().setAuthentication(auth);
+                MDC.put(RequestCorrelation.USER_ID_MDC, principal.userId().toString());
+                MDC.put(RequestCorrelation.USER_ROLE_MDC, principal.role());
             } catch (JwtException | IllegalArgumentException ex) {
                 // ponytail: an unparseable token means "anonymous"; downstream authz decides. Not an
                 // error path (probing/expired tokens are routine) so log at DEBUG, never WARN/ERROR.

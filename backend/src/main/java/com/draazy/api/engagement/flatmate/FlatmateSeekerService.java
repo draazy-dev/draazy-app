@@ -2,7 +2,6 @@ package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.catalog.locality.LocalityBinding;
 import com.draazy.api.common.PlatformTime;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
@@ -60,7 +59,6 @@ public class FlatmateSeekerService {
     private final FlatmateMapper mapper;
     private final UserRepository users;
     private final Notifier notifier;
-    private final AuditService audit;
 
     private final RateLimitLock locks;
     private final FlatmateEditRules editRules;
@@ -70,7 +68,7 @@ public class FlatmateSeekerService {
     public FlatmateSeekerService(FlatmateSeekerPostRepository posts,
             FlatmateRequestRepository requests, FlatmateRequestHydrator hydrator,
             FlatmateMapper mapper, UserRepository users,
-            Notifier notifier, AuditService audit, RateLimitLock locks,
+            Notifier notifier, RateLimitLock locks,
             FlatmateEditRules editRules, FlatmateAcceptance acceptance, LocalityBinding localities) {
         this.posts = posts;
         this.requests = requests;
@@ -78,7 +76,6 @@ public class FlatmateSeekerService {
         this.mapper = mapper;
         this.users = users;
         this.notifier = notifier;
-        this.audit = audit;
         this.locks = locks;
         this.editRules = editRules;
         this.acceptance = acceptance;
@@ -211,8 +208,6 @@ public class FlatmateSeekerService {
         User requester = users.findById(caller.userId())
                 .orElseThrow(() -> NotFoundException.of("User"));
         notify(hostId, post, requester);
-        audit.record(caller, "flatmate.interest", "flatmateSeekerPost", post.getId().toString(),
-                "host", hostId.toString());
     }
 
     /** A 0..1 resource in a page envelope. Why not the feed narrowed:
@@ -277,8 +272,6 @@ public class FlatmateSeekerService {
         request.decide(verdict);
         requests.saveAndFlush(request);
 
-        audit.record(caller, "flatmate.request." + verdict, "flatmateRequest",
-                request.getId().toString(), "fromStatus", before, "toStatus", verdict);
         notifyDecision(request, verdict);
         return hydrator.hydrateOne(request).forHost();
     }

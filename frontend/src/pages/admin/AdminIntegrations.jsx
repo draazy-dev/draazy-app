@@ -149,7 +149,7 @@ export default function AdminIntegrations() {
 
   return (
     <div>
-      <PageHeader title="Integrations" subtitle="Email, WhatsApp and payment calls, kept for 90 days." />
+      <PageHeader title="Integrations" subtitle="Email, WhatsApp and payment calls, kept for 30 days." />
 
       {failedParts.length ? (
         <div role="alert" className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">

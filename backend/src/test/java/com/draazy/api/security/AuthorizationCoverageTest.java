@@ -73,6 +73,7 @@ class AuthorizationCoverageTest extends AbstractApiTest {
             "GET /flatmates/feed", "GET /flatmates/groups/{id}", "GET /flatmates/posts/{id}", "GET /flatmates/rooms/{id}",
             "GET /documents/shared/url",
             "POST /cities/waitlist", "POST /service-waitlist", "POST /demand-signals", "POST /page-views",
+            "POST /client-errors",
             "POST /help/feedback",
             // Signature-verified in the handler, and always 200 so Cashfree does not retry a refusal.
             "POST /webhooks/cashfree/payment");

@@ -105,7 +105,7 @@ public class ConversationOpeningService {
                 ordered ? me : them, ordered ? them : me, null);
         Conversation conversation = existing.orElseGet(() ->
                 conversations.saveAndFlush(new Conversation(me, them, null, null)));
-        if (existing.isEmpty()) {
+        if (existing.isEmpty() && Roles.isBackOffice(caller.role())) {
             audit.record(caller, "conversation.started", "conversation",
                     conversation.getId().toString(), "counterparty", them.toString());
         }
@@ -162,7 +162,7 @@ public class ConversationOpeningService {
         Conversation conversation = existing.orElseGet(() ->
                 conversations.saveAndFlush(new Conversation(me, them, propertyId, null)));
         thread.send(conversation, caller, body.body());
-        if (existing.isEmpty()) {
+        if (existing.isEmpty() && Roles.isBackOffice(caller.role())) {
             audit.record(caller, "conversation.started", "conversation",
                     conversation.getId().toString(),
                     "counterparty", them.toString(),

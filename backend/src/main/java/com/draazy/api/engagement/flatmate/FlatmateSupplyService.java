@@ -6,7 +6,6 @@ import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.catalog.society.SocietyReference;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
@@ -67,7 +66,6 @@ public class FlatmateSupplyService {
     private final SocietyReference societyReference;
     private final UserRepository users;
     private final Notifier notifier;
-    private final AuditService audit;
 
     private final RateLimitLock locks;
 
@@ -86,7 +84,7 @@ public class FlatmateSupplyService {
             FlatmateOwnerConsentService consentService,
             FlatmatePublication publication,
             FlatmateMapper mapper, PropertyRepository properties, UserRepository users,
-            Notifier notifier, AuditService audit,
+            Notifier notifier,
             RateLimitLock locks, FlatmateRoomCards cards, SocietyReference societyReference,
             FlatmateReviewStatuses reviewStatuses, FlatmateEditRules editRules,
             OwnedDocumentLookup ownedDocuments, FlatmateMembershipService membership,
@@ -101,7 +99,6 @@ public class FlatmateSupplyService {
         this.properties = properties;
         this.users = users;
         this.notifier = notifier;
-        this.audit = audit;
         this.locks = locks;
         this.cards = cards;
         this.societyReference = societyReference;
@@ -656,8 +653,6 @@ public class FlatmateSupplyService {
                 (requesterName == null ? "Someone" : requesterName) + " is interested in " + targetLabel,
                 "Open your request inbox to review their interest.",
                 FlatmateLinks.of(kind, targetId));
-        audit.record(caller, "flatmate." + kind + ".interest", "flatmate" + kind,
-                targetId.toString(), "host", hostId.toString());
         return saved;
     }
 

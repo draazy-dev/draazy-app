@@ -4,6 +4,7 @@ import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.validation.Formats;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.provider.EmailSender;
 import com.draazy.api.security.Roles;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.FlushModeType;
@@ -96,7 +97,7 @@ public class AdminBootstrap implements ApplicationRunner {
         String normalisedEmail = normaliseEmail(email);
         User admin = adminToRecover(normalisedEmail);
         if (admin == null) {
-            log.warn("Admin bootstrap recovery skipped: no live administrator matches {}", normalisedEmail);
+            log.warn("Admin bootstrap recovery skipped: no live administrator matches {}", EmailSender.maskAddress(normalisedEmail));
             return;
         }
         refreshTokens.revokeAllForUser(admin.getId());

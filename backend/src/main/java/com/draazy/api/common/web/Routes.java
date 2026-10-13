@@ -1075,6 +1075,13 @@ public final class Routes {
 
         public static final String AUDIT_LOG = "/admin/audit-log";
 
+        /** Admin — captured errors, newest first; the resolve action is audited. */
+        public static final String ERROR_LOG = "/admin/error-log";
+
+        public static final String ERROR_LOG_BY_ID = ERROR_LOG + "/{id}";
+
+        public static final String ERROR_LOG_RESOLVE = ERROR_LOG_BY_ID + "/resolve";
+
         public static final String STAFF_ACTIVITY = "/admin/staff-activity";
 
         public static final String STAFF_ACTIVITY_SUMMARY = STAFF_ACTIVITY + "/summary";
@@ -1165,6 +1172,15 @@ public final class Routes {
         /** POST is public and capped per IP by {@code WriteRateLimitFilter}; the client batches so
          * that a beacon cannot spend a visitor's whole write budget. */
         public static final String BASE = "/page-views";
+    }
+
+    public static final class ClientErrors {
+
+        private ClientErrors() {
+        }
+
+        /** POST is public and capped per caller by {@code WriteRateLimitFilter}. There is no GET. */
+        public static final String BASE = "/client-errors";
     }
 
     public static final class HelpFeedback {

@@ -383,7 +383,7 @@ The boot fails if the flag is on and the key or from-address is blank. Send fail
 call, and every Cashfree webhook, writes one `provider_call` row (`provider/ProviderCalls.java`):
 outcome, masked recipient, order id or subject, an error code and the latency. Message bodies, OTPs,
 links and keys are never stored. The page shows 24h/7d health per provider and a log searchable by
-full email, mobile or order id. Rows are written off the request thread and purged after 90 days;
+full email, mobile or order id. Rows are written off the request thread and purged after 30 days;
 nothing to configure. Delivery and bounce receipts still live in each vendor's console.
 
 **Server-chosen selfie pose.** `POST /me/verification/identity/challenge` issues a signed 15-minute
@@ -510,7 +510,7 @@ Six settings in it encode consequences that are invisible from the console:
 
 | Setting | Value | Why not the default |
 |---|---|---|
-| `autoscaling.knative.dev/minScale` | `1` | The only setting here that costs money whether or not anyone uses the service: one instance held warm is ~₹1,300/month at `1Gi` (₹42/day on the Sep 2026 bill), billed at the *idle* rate because `cpu-throttling` stays on. Bought to remove the JVM boot plus Spring context refresh from the first request after an idle period, and from every redeploy cutover. The trap is reading it as "the backend is now running": CPU is still throttled to ~0 between requests, so the `@Scheduled` sweeps remain frozen. It satisfies one of ADR-011 Option C's two preconditions; ShedLock and `cpu-throttling: 'false'` are the other half, and that half is the 6× bill. |
+| `autoscaling.knative.dev/minScale` | `1` | The only setting here that costs money whether or not anyone uses the service: one instance held warm is ~₹1,300/month at `1Gi` (₹42/day on the Sep 2026 bill), billed at the *idle* rate because `cpu-throttling` stays on. Bought to remove the JVM boot plus Spring context refresh from the first request after an idle period, and from every redeploy cutover. The trap is reading it as "the backend is now running": CPU is still throttled to ~0 between requests, so the `@Scheduled` sweeps remain frozen. It satisfies one of ADR-011 Option C's two preconditions; the advisory-lock job runs (no ShedLock needed) and `cpu-throttling: 'false'` are the other half, and that half is the 6× bill. |
 | `autoscaling.knative.dev/maxScale` | `4` | Each instance opens up to 5 Postgres connections (`spring.datasource.hikari.maximum-pool-size`), so the ceiling multiplies straight into Supabase's budget: 4 × 5 = 20, which the free-tier pooler absorbs. At the default of 100 the same arithmetic gives 500 and the database refuses connections under a spike — arriving as scattered 500s on unrelated endpoints, never as anything naming the pool. It is also the runaway-cost stop: a crawler cannot cost more than four instances' compute. |
 | `containerConcurrency` | `40` | Tomcat accepts 200 by default and then parks 195 of them on Hikari until its 30-second connection timeout expires, which surfaces as slow 500s rather than honest backpressure. Forty keeps the queue short enough that Cloud Run scales out instead. |
 | `timeoutSeconds` | `3600` | The Cloud Run maximum. The messages SSE stream (`MessageEventHub`) is a single long request, so any shorter timeout cuts it mid-stream and reconnects every client on that period (it did at `120`); the hub's own 5-minute stream timeout and 25-second heartbeat bound it instead. The other slow request is a 13 MB multipart upload (`spring.servlet.multipart.max-request-size`) over a slow mobile uplink. A hung ordinary request now holds its thread for longer than the old `120`. |
@@ -871,3 +871,46 @@ free tier entirely.
   means baking the Supabase CA into the image and adding `sslrootcert`; `FLYWAY_DB_URL` needs the
   same, in the URL itself, because Flyway builds its own DataSource and the Hikari property does not
   reach it.
+
+---
+
+## 8. Logs, errors and alerts on DigitalOcean — $0
+
+Nothing here costs money; non-critical logs are not worth paying to keep.
+
+| Signal | Where it lives | Retention |
+|---|---|---|
+| Runtime logs (ECS JSON on stdout, every line carries `traceId`) | App Platform → Runtime Logs, `doctl apps logs <app> --type run --follow` | live only — DO keeps none |
+| Build / deploy logs | App Platform → Activity | 90 days (DO) |
+| Every backend `ERROR` and every sandbox/prod UI crash, deduplicated, PII-scrubbed | `error_event` → Admin ▸ Error log | 30 days after first seen |
+| Outbound provider calls (ZeptoMail, WhatsApp, Cashfree), with `trace_id` | `provider_call` → Admin ▸ Settings call log | 30 days |
+| Critical/high privileged actions | `audit_log` → Admin ▸ Audit trail | 365 days (CERT-In 180 d, DPDP Rule 6 one year) |
+
+**Finding a bug.** A user quotes the reference on the error screen, or an API error body carries
+`traceId`. Search it in Admin ▸ Error log; the same id is on the runtime-log lines and on
+`provider_call.trace_id`. Scheduled-job errors carry `job-<Class.method>-<id>`.
+
+**Do not enable log forwarding.** OpenSearch and Datadog are paid; Better Stack's free plan keeps
+3 days, which adds nothing the error table does not already hold for 30.
+
+**Free alert policies** — add to the app spec (`alerts` at app level, the rest under the service):
+
+```yaml
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+services:
+  - name: api
+    alerts:
+      - { rule: RESTART_COUNT, operator: GREATER_THAN, value: 2, window: TEN_MINUTES }
+      - { rule: MEM_UTILIZATION, operator: GREATER_THAN, value: 85, window: FIVE_MINUTES }
+      - { rule: CPU_UTILIZATION, operator: GREATER_THAN, value: 85, window: TEN_MINUTES }
+    health_check:
+      http_path: /api/actuator/health/liveness
+```
+
+**One free Uptime check** (DO credits one per month): HTTPS `GET https://draazy.com/api/actuator/health`,
+alerts on downtime and SSL expiry to the owner's email. A second check is $1/month — not needed.
+
+**Scaling out is safe for the jobs.** Every cron-scheduled run takes a Postgres advisory lock keyed
+on the job name and skips if another instance holds it, so two instances never run the same job group.

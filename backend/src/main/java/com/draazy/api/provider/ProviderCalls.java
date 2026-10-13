@@ -1,6 +1,7 @@
 package com.draazy.api.provider;
 
 import com.draazy.api.common.trust.MobileMask;
+import com.draazy.api.common.web.RequestCorrelation;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -16,6 +17,7 @@ import java.util.function.Supplier;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -32,7 +34,7 @@ public class ProviderCalls {
     public static final String WHATSAPP = "whatsapp";
     public static final String CASHFREE = "cashfree";
 
-    public static final Duration RETENTION = Duration.ofDays(90);
+    public static final Duration RETENTION = Duration.ofDays(30);
 
     private static final Logger log = LoggerFactory.getLogger(ProviderCalls.class);
     private static final int MAX_DETAIL = 200;
@@ -41,8 +43,8 @@ public class ProviderCalls {
     private static final long AFTER_STARTUP_MS = 10L * 60L * 1000L;
     private static final String INSERT = """
             INSERT INTO provider_call (provider, operation, outcome, recipient, recipient_hash,
-                                       reference, detail, duration_ms)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)""";
+                                       reference, detail, duration_ms, trace_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""";
 
     public enum Outcome {
         OK, FAILED, SKIPPED;
@@ -104,7 +106,7 @@ public class ProviderCalls {
     public void record(String provider, String operation, Outcome outcome, String recipient,
             String reference, String detail, Integer durationMs) {
         Object[] row = {provider, operation, outcome.wire(), mask(recipient), hashRecipient(recipient),
-                reference, truncate(detail), durationMs};
+                reference, truncate(detail), durationMs, MDC.get(RequestCorrelation.TRACE_ID_MDC)};
         try {
             writer.execute(() -> write(provider, operation, row));
         } catch (RuntimeException e) {

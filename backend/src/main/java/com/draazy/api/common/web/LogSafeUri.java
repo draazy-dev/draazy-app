@@ -3,30 +3,8 @@ package com.draazy.api.common.web;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * Makes a request URI safe to write to a log by masking the query parameters that are credentials.
- *
- * <p><strong>Why this exists (tech-debt D42).</strong> {@code GET /documents/shared?token=…} carries
- * a bearer credential in the query string: whoever holds that string can read someone's title deeds
- * without an account. A URL is the single most-copied part of a request — access logs, proxy logs,
- * browser history, bookmarks, {@code Referer} on any outbound link, and whatever the recipient
- * pastes into a chat window. Nothing in this application logs a request URI today, and the container
- * access log is pinned to a query-string-free pattern in {@code application.properties} for exactly
- * this reason. This class is the one call any future request-logging code must go through, so that
- * "remember to exclude {@code token}" is a compile-time affordance rather than a comment someone has
- * to find.
- *
- * <p><strong>Deliberately a denylist, not an allowlist.</strong> An allowlist over query parameter
- * names would have to be edited every time a filter facet is added, and the failure mode of
- * forgetting is a broken log line rather than a leaked secret. The denylist's failure mode is the
- * reverse, which is why {@link #SENSITIVE} names the credential-shaped parameters the contract
- * actually has rather than trying to be clever.
- *
- * <p><strong>Scope.</strong> Redaction is a log-hygiene measure, not an authorisation boundary. It
- * matches on the raw, still-encoded parameter name, so a caller who writes {@code %74oken=…} keeps
- * their own value in the log; that is a caller harming only themselves and is not worth decoding
- * the query string for.
- */
+// /documents/shared?token=… is a bearer credential, and URLs are the most-copied part of a request. Log hygiene
+// only, not authz: a denylist of credential names, matched on the raw name so %74oken only leaks the caller's own.
 public final class LogSafeUri {
 
     private LogSafeUri() {
@@ -35,24 +13,13 @@ public final class LogSafeUri {
     /** What a masked value is replaced with. Constant so tests and greps agree on one spelling. */
     public static final String REDACTED = "REDACTED";
 
-    /**
-     * Query parameter names whose value is a credential. Lower-case; matching is case-insensitive.
-     *
-     * <p>{@code token} is the share token behind {@code GET /documents/shared}. The rest are the
-     * shapes that arrive with any OAuth-style or signed-URL integration, listed now because the
-     * cost is a string and the cost of noticing later is an incident.
-     */
+    // Lower-case; matched case-insensitively. Beyond the share token, these are the OAuth and signed-URL
+    // shapes, listed up front because a string is cheap and noticing later is an incident.
     static final Set<String> SENSITIVE = Set.of(
             "token", "access_token", "refresh_token", "id_token", "code", "signature", "sig",
             "secret", "password", "otp", "api_key", "apikey");
 
-    /**
-     * Returns {@code uri} with the value of every sensitive query parameter replaced by
-     * {@link #REDACTED}. The path, the parameter names and every other value are left exactly as
-     * they were, so the line stays useful for debugging.
-     *
-     * @param uri a request URI, with or without a query string; {@code null} passes through
-     */
+    /** Masks only sensitive values; path, names and other values stay, so the line remains debuggable. */
     public static String redact(String uri) {
         if (uri == null) {
             return null;

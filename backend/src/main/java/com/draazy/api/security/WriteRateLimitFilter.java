@@ -176,7 +176,7 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
     }
 
     /** The smallest unit one party controls: the IPv4 address, or the /64 for IPv6 (assigned to a host whole). */
-    static String anonymousKey(String address) {
+    public static String anonymousKey(String address) {
         if (address == null || address.indexOf(':') < 0 || !isNumericIpv6(address)) {
             return address == null ? "unknown" : address;
         }

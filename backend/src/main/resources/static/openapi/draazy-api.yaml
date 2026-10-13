@@ -1185,6 +1185,27 @@ paths:
         '202':
           description: Accepted for recording. No body.
         '422': { $ref: '#/components/responses/ValidationError' }
+  /client-errors:
+    post:
+      tags: [Engagement]
+      summary: Report a browser-side crash
+      security: []
+      operationId: recordClientError
+      description: >
+        The crash screen's report. Unauthenticated, and it accepts a token if one is present so the
+        row can carry the user's role. Always 204 for a valid body: whether the error was new,
+        merged into an existing one or dropped by the daily cap of new distinct errors is not
+        revealed. Rate-limited per caller like every write.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientErrorReport' }
+      responses:
+        '204': { description: Recorded or deliberately ignored. No body. }
+        '413': { description: Body larger than 16 KB }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /help/feedback:
     post:
       tags: [Engagement]
@@ -10257,7 +10278,7 @@ paths:
       operationId: adminIntegrationCalls
       description: >
         Every outbound call to a third party and every inbound payment webhook, newest first, kept
-        for 90 days. Never carries a message body, OTP, link or key; recipients are masked.
+        for 30 days. Never carries a message body, OTP, link or key; recipients are masked.
       x-roles: [admin]
       parameters:
         - name: provider
@@ -10641,6 +10662,65 @@ paths:
                       content:
                         type: array
                         items: { $ref: '#/components/schemas/AuditEntry' }
+  /admin/error-log:
+    get:
+      tags: [Admin & Analytics]
+      summary: Captured errors, newest first
+      operationId: adminErrorLog
+      # Admin-only, like the audit log: stacks and request paths are operational detail.
+      x-roles: [admin]
+      parameters:
+        - { name: source, in: query, schema: { type: string, enum: [api, job, web] } }
+        - { name: status, in: query, schema: { type: string, enum: [open, resolved, all], default: open } }
+        # Matches message, error type, path, last trace id and fingerprint anywhere, and the client crash
+        # reference from its start; `%` and `_` are escaped.
+        - { name: q, in: query, schema: { type: string } }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+      responses:
+        '200':
+          description: One row per distinct error, with an occurrence count
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/ErrorEventSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/error-log/{id}:
+    get:
+      tags: [Admin & Analytics]
+      summary: One captured error with its stack and context
+      operationId: adminErrorLogDetail
+      x-roles: [admin]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200':
+          description: The error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEventDetail' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/error-log/{id}/resolve:
+    post:
+      tags: [Admin & Analytics]
+      summary: Mark a captured error resolved
+      operationId: adminErrorLogResolve
+      # A server error happening again reopens the row; a browser report does not.
+      x-roles: [admin]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '204': { description: Resolved. No body. }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /admin/staff-activity:
     get:
       tags: [Admin & Analytics]
@@ -18407,6 +18487,59 @@ components:
         checker: { type: [string, 'null'], description: Approver in maker-checker flows. }
         at: { type: string, format: date-time }
         metadata: { type: object, additionalProperties: true }
+    ClientErrorReport:
+      type: object
+      required: [reference, kind, path]
+      description: >
+        A browser-side failure. Every string is scrubbed (emails, numbers, tokens, query strings) and
+        truncated server-side; the whole body may not exceed 16 KB.
+      properties:
+        reference: { type: string, format: uuid, description: The id the crash screen showed the user. }
+        kind: { type: string, enum: [render, error, unhandledrejection] }
+        scope: { type: string, maxLength: 100 }
+        path: { type: string, pattern: '^/', description: 'Route the user was on; the query string is dropped.' }
+        name: { type: string, maxLength: 100, example: TypeError }
+        message: { type: string, maxLength: 1000 }
+        stack: { type: string, maxLength: 8000 }
+        componentStack: { type: string, maxLength: 2000 }
+        build: { type: string, maxLength: 64 }
+        lastTraceId: { type: string, maxLength: 128, description: The traceId of the last API response the page saw. }
+        context:
+          type: object
+          properties:
+            viewport: { type: string, example: 390x844 }
+            online: { type: boolean }
+            userAgent: { type: string, description: Browser family only. }
+            deployEnv: { type: string }
+    ErrorEventSummary:
+      type: object
+      required: [id, source, occurrences, firstSeen, lastSeen]
+      properties:
+        id: { type: string, format: uuid }
+        source: { type: string, enum: [api, job, web] }
+        errorType: { type: [string, 'null'] }
+        message: { type: [string, 'null'] }
+        path: { type: [string, 'null'] }
+        occurrences: { type: integer }
+        firstSeen: { type: string, format: date-time }
+        lastSeen: { type: string, format: date-time }
+        lastTraceId: { type: [string, 'null'] }
+        resolvedAt: { type: [string, 'null'], format: date-time }
+    ErrorEventDetail:
+      allOf:
+        - $ref: '#/components/schemas/ErrorEventSummary'
+        - type: object
+          properties:
+            fingerprint: { type: string }
+            level: { type: string }
+            stack: { type: [string, 'null'] }
+            httpMethod: { type: [string, 'null'] }
+            httpStatus: { type: [integer, 'null'] }
+            build: { type: [string, 'null'] }
+            userRole: { type: [string, 'null'] }
+            lastUserId: { type: [string, 'null'], format: uuid }
+            context: { type: object, additionalProperties: true }
+            resolvedBy: { type: [string, 'null'], format: uuid }
     StaffActivityEntry:
       type: object
       # AuditEntry with the actor resolved to a person. `metadata` is filled for admins only, the same

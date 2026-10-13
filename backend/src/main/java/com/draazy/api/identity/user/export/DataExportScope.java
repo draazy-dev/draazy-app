@@ -435,7 +435,7 @@ public final class DataExportScope {
                 Map.of()));
 
         out.add(new Dataset("listings", "page_views",
-                "Pages you viewed while signed in, for the ninety days we keep them. This is usually "
+                "Pages you viewed while signed in, for the thirty days we keep them. This is usually "
                         + "the largest dataset here and the most likely to be truncated.",
                 """
                 select session_id, path, referrer_host, device, occurred_at

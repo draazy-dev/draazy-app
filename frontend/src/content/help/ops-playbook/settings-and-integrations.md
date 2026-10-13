@@ -77,7 +77,7 @@ Three cards: **Email** (Zoho ZeptoMail), **WhatsApp** (Meta Cloud API) and **Pay
 - **Last success**, **Last failure** and the failure detail.
 - An **Open** link (for example **Open Cashfree**) to the provider's own console.
 
-The call log keeps 90 days. It has the search box "Full email, mobile or order id" (people are stored masked, so use the full value), **Provider** chips, **Outcome** chips (**All**, **Failed**, **OK**, **Not sent**) and 20 rows per page. Operations are Email, Login OTP, KYC decision, Payment order, Refund and Payment webhook. **Not sent** means the call was skipped, for example in **Mock**.
+The call log keeps 30 days. It has the search box "Full email, mobile or order id" (people are stored masked, so use the full value), **Provider** chips, **Outcome** chips (**All**, **Failed**, **OK**, **Not sent**) and 20 rows per page. Operations are Email, Login OTP, KYC decision, Payment order, Refund and Payment webhook. **Not sent** means the call was skipped, for example in **Mock**.
 
 ## Steps: change a setting
 

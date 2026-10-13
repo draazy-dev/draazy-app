@@ -502,6 +502,33 @@ be newer) and counted by the unbounded one (it is still a live listing). Both co
 neither caller wants the rows, and the sweep touches every alert on the platform every thirty
 minutes.
 
+## Audit log policy (`audit_log`)
+
+Only critical or high-value activity is written, and rows are kept 365 days.
+
+- **Audited:** every action by staff, manager, admin or `system` (staff activity, team performance,
+  SLA, the admin funnel and the user timeline read these); money, refunds and payments; consent and
+  approvals (draft approvals, declarations, owner and tenant consent, `property.owner.confirmed`,
+  `document.request.granted`); identity and KYC, including withdrawals and disputes; erasure and
+  export; access to sensitive documents; security events; and any action application code reads
+  (`service-request.party-declined`, `property.status`, `ticket.update`, `AuditService.recordOnce` keys).
+- **Deliberately not audited:** a consumer acting on their own data. Conversation, contact, photo and
+  document-decline requests and answers, flatmate interest, requests, group leave, removal and group
+  applications, owner pause and resume, flat split and unsplit, and a consumer's visit status change.
+  Their own tables and notifications are the record.
+- A new consumer-only action must justify itself against the audited list before it calls `AuditService`.
+
+## Log table retention
+
+Log-shaped tables are purged nightly by the job runner; the `error_event` and `audit_log` sweeps delete in 5,000-row batches.
+
+| Table | Kept | Sweep |
+|---|---|---|
+| `provider_call` | 30 days | `ProviderCalls.purgeExpired` |
+| `page_views` | 30 days (daily rollups are kept forever; the rollup only recomputes the last two days) | `PageViewRetention` |
+| `error_event` | 30 days since `first_seen` | `ErrorEventRetention` |
+| `audit_log` | 365 days (CERT-In 180 days, DPDP Rule 6 one year); rows code reads as state are kept: `property.status`, `property.verification.decision`, `service-request.party-declined`, `serviceRequest.amountMismatch` | `AuditLogRetention` |
+
 ## Identity root notes (`users`)
 
 *Home of the reasoning behind the `User` entity.*
