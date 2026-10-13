@@ -2,7 +2,7 @@
 
 > The monetisation and growth surface: pay-per-use products (listing pass, contact pack), the rent
 > agreement fee, checkout, the per-user billing view, and a two-track referral program with
-> non-monetary rewards. Nothing auto-renews and every price includes GST (Q16b).
+> non-monetary rewards. Nothing auto-renews (Q16b).
 > **Status:** re-synced to Q16b (pay-per-use MVP) - **Primary role(s):** owner + seeker (buyer/tenant)
 
 ---
@@ -63,7 +63,7 @@ they lapse but never sold.
   rewards, `featuredDays` (7) of Featured after ownership verification.
 
 ### Platform fees (`settings.fees`)
-- Keys: `listingPass`, `contactPack`, `rentAgreementPlatform`, `gstPercent` (0: prices include GST),
+- Keys: `listingPass`, `contactPack`, `rentAgreementPlatform`,
   `freeContactLimit`, `featuredDays`, and the referral numbers `referralContactBonus`,
   `referralSeekerBonusContacts`, `referralOwnerFeaturedDays`, `referralOwnerRewardAgreements`,
   `referralQualifyPerMonth`, `referralQualifyPerYear`, `referralHoldDays`, `referralClawbackDays`,
@@ -100,7 +100,7 @@ they lapse but never sold.
 - `POST /me/subscription {planId, propertyId?, paymentMethod}` with an Idempotency-Key unique to the
   checkout screen: a double tap returns the same order, a second pack is a new purchase. A pending
   order opens Cashfree; only the signed webhook activates it. One open unpaid order per user (409).
-- The page shows the flat price (GST included) and, once paid, the expiry date. Nothing auto-renews.
+- The page shows the flat price and, once paid, the expiry date. Nothing auto-renews.
 
 ### The Cashfree webhook signature (`WebhookSignature`)
 
@@ -170,7 +170,7 @@ and reading that file; the constructor check is what states the rule.
   refund_rejected|disputed, creditNoteNo?, propertyId?, serviceRequestId?, refund{eligible, reason, from, until,
   amount}}`. `refund` is computed for passes and packs only. Reasons: `pack_unused`, `pass_no_enquiries`,
   `not_eligible_used`, `window_closed`, `window_not_open`, `guarantee_used_recently`, `already_requested`,
-  `listing_paused`. `invoiceNo` is the order's GST tax invoice number, or null when none was issued. `X-Device-Id` (at most 64 chars) is salt-hashed like the referral code.
+  `listing_paused`. `invoiceNo` is the order's invoice number, or null when none was issued. `X-Device-Id` (at most 64 chars) is salt-hashed like the referral code.
 - **Customer refund request.** `POST /me/payments/{id}/refund {reason?}` with an `Idempotency-Key`. Eligibility:
   - *Pack:* within `fees.packRefundDays` (default 7, 0 = off) of payment and no contact allocated from it.
   - *Pass guarantee:* its listing got at most `fees.passGuaranteeMaxEnquiries` (default 0) contact requests in the
@@ -191,14 +191,15 @@ and reading that file; the constructor check is what states the rule.
   and are audited `refund.*`. The request row is locked, so concurrent decisions leave one (the other gets 409).
 - **Automatic system refunds stay automatic** (failed, late or mismatched payment; a pass for a closed listing).
   They also notify `refunds` holders with `refund.auto` and show on the desk as `auto`.
-- **GST credit note** `CN-FY2627-000001` (FY April-March, IST, one sequence per FY) is issued when a refund is
-  confirmed successful by the gateway for an invoiced order (an automatic refund of a payment that never activated gets none): subscription refunds, rent-agreement refunds, automatic refunds. Amounts are
-  GST-inclusive and split with `gstPercent` (18% when unset); a rent-agreement note taxes only the platform fee,
-  the pass-through part is untaxed. A note never credits more taxable value than its invoice carried, less what earlier
+- **Credit note** `CN-FY2627-000001` (FY April-March, IST, one sequence per FY) is issued when a refund is
+  confirmed successful by the gateway for an invoiced order (an automatic refund of a payment that never activated gets none): subscription refunds, rent-agreement refunds, automatic refunds. A
+  rent-agreement note records only the platform fee as Draazy's (`taxable_amount`), not the pass-through part.
+  A note never credits more fee than its invoice carried, less what earlier
   notes on that invoice already credited, and cites the invoice number.
-- **GST tax invoice** `INV-FY2627-000001` (same FY and per-FY sequence pattern) is issued once when a gateway
+- **Invoice** `INV-FY2627-000001` (same FY and per-FY sequence pattern) is issued once when a gateway
   payment succeeds: listing passes, contact packs, rent-agreement checkouts and amendment top-ups. A replayed
-  webhook issues nothing new. Only the platform fee carries GST on a rent agreement; amendment top-ups carry none.
+  webhook issues nothing new. Only the platform fee is Draazy's own (`taxable_amount`) on a rent agreement; stamp duty, registration
+  and DHC are pass-through, and amendment top-ups carry none.
   A payment that is refunded automatically without ever activating the order (failed, late) gets no invoice.
   Orders paid before invoicing were numbered in `paid_at` order by the migration. No PDF is generated.
 - **Disputes.** The signed Cashfree webhook also takes `DISPUTE_CREATED`, `DISPUTE_UPDATED`, `DISPUTE_CLOSED`

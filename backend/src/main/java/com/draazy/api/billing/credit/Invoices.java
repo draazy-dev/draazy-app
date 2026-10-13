@@ -6,7 +6,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Issues the GST tax invoice when a payment succeeds. One per source, numbered per financial year. */
+/** Issues the invoice when a payment succeeds. One per source, numbered per financial year. */
 @Service
 public class Invoices {
 
@@ -24,11 +24,11 @@ public class Invoices {
         this.documents = documents;
     }
 
-    /** {@code taxableInclusive} is the part of {@code amount} that carries GST; the rest is pass-through.
+    /** {@code taxable} is the part of {@code amount} that is Draazy's own fee; the rest is pass-through.
      * Returns the existing invoice when this source already has one, so a replayed callback issues nothing new. */
     @Transactional
     public Optional<Invoice> issue(UUID userId, String sourceType, UUID sourceId, String orderRef, long amount,
-            long taxableInclusive, Instant now) {
+            long taxable, Instant now) {
         if (amount <= 0 || userId == null) {
             return Optional.empty();
         }
@@ -37,8 +37,8 @@ public class Invoices {
         if (existing.isPresent()) {
             return existing;
         }
-        GstSplit split = documents.split(amount, taxableInclusive);
         String number = documents.nextInvoiceNumber(now);
-        return Optional.of(invoices.save(new Invoice(number, userId, sourceType, sourceId, orderRef, amount, split, now)));
+        return Optional.of(invoices.save(new Invoice(number, userId, sourceType, sourceId, orderRef, amount,
+                documents.taxablePart(amount, taxable), now)));
     }
 }

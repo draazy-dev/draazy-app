@@ -293,7 +293,7 @@ that list has to be a real disclosure, because the subject reads it.
 
 Nothing in the schema marks a column as personal, so the set is derived from column names, and the
 derivation is deliberately **conservative — it must over-match, never under-match**. A false positive
-(`cities.name`, `platform_fees.gst`, `plans.contact_limit`) costs one line in the test's `RETAINED`
+(`cities.name`, `localities.lat`, `plans.contact_limit`) costs one line in the test's `RETAINED`
 map saying why it is not personal, written once, by someone who had to look. A false negative costs a
 column of live personal data that erasure silently misses and no test ever mentions again. So the
 vocabulary is matched as a bare substring: `name` matches `tenant_name`, `society_name` and

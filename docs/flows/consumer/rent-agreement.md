@@ -183,7 +183,7 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
   The listing's carpet area wins over its built-up one and sets the basis to match; a listing
   measured in another unit leaves the area to type, and the basis and unit only move with the area.
   There is no Residential/Commercial toggle:
-  a commercial licence differs on GST, TDS (194-I, not 194-IB) and clause set, so commercial premises
+  a commercial licence differs on TDS (194-I, not 194-IB) and clause set, so commercial premises
   are sent to `/services/property-legal` instead of being drafted on residential terms.
 - **Step 1 Owner:** the primary licensor — name, mother's name, DOB (which derives age),
   optional alias, gender, PAN, Aadhaar, mobile, email, address —
@@ -249,8 +249,7 @@ stamp   = max(100, ceil(0.0025 * taxable / 100) * 100) // 0.25%, up to the next 
 reg     = isGramPanchayat(prop.locality) ? 500 : 1000 // registration fee
 dhc     = 300                                        // document handling charge
 service = feeRow.platformFee                         // getDealFees('rent').platformFee
-gst     = feeRow.gst                                 // GST on the service fee only
-total   = stamp + reg + dhc + service + gst
+total   = stamp + reg + dhc + service
 ```
 - The registration area is not the customer's choice (D-h). The fee halves for a Gram Panchayat
   area, so a toggle invited a false "rural". On create, `RegistrationArea` resolves
@@ -268,7 +267,7 @@ total   = stamp + reg + dhc + service + gst
 - The FAQ states the same rule in words: stamp duty = 0.25% of (rent for the full period, including
   agreed increases, + non-refundable deposit + 10% of the refundable deposit per year of term);
   rounded up to the next ₹100, minimum ₹100); registration Rs 1,000 urban / Rs 500 rural; DHC ₹300. `service` is admin-controlled and is the only Draazy
-  revenue line here; `gst` is charged on it and not on the government levies, which pass through.
+  revenue line here; the government levies pass through.
 - The increment and its interval live only in `_state.terms` (`increment`, `incrementEvery`); the
   server refuses an interval other than 11 or 12 and an increment with more than two decimals.
 - The admin **ticket value** uses `cost.total`.

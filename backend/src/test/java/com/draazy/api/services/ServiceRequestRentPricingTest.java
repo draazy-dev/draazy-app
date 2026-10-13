@@ -17,7 +17,6 @@ import org.springframework.http.MediaType;
 @DisplayName("Rent agreement pricing — the statutory charges are computed, not published")
 class ServiceRequestRentPricingTest extends ServiceFixtures {
 
-    // The seeded admin fee: ₹499, GST included.
     private static final int PLATFORM_HALF = 499;
 
     @Test
@@ -28,7 +27,6 @@ class ServiceRequestRentPricingTest extends ServiceFixtures {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].deal").value("rent"))
                 .andExpect(jsonPath("$[0].platformFee").value(499))
-                .andExpect(jsonPath("$[0].gst").value(0))
                 .andExpect(jsonPath("$[0].stampDuty").doesNotExist())
                 .andExpect(jsonPath("$[0].registration").doesNotExist());
     }

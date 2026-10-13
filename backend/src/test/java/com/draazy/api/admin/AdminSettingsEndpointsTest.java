@@ -64,13 +64,13 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
     @Test
     void changingOneFeeKeepsTheRest() throws Exception {
         String token = bearer("9877710003", Roles.Wire.ADMIN);
-        save(token, "{\"fees\":{\"gstPercent\":18,\"listingPass\":299,\"rentAgreementPlatform\":499}}");
+        save(token, "{\"fees\":{\"contactPack\":249,\"listingPass\":299,\"rentAgreementPlatform\":499}}");
         save(token, "{\"fees\":{\"rentAgreementPlatform\":999}}");
 
         mvc.perform(get(Routes.Admin.SETTINGS).header(HttpHeaders.AUTHORIZATION, token))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fees.rentAgreementPlatform").value(999))
-                .andExpect(jsonPath("$.fees.gstPercent").value(18))
+                .andExpect(jsonPath("$.fees.contactPack").value(249))
                 .andExpect(jsonPath("$.fees.listingPass").value(299));
     }
 

@@ -16,6 +16,6 @@ public interface CreditNoteRepository extends JpaRepository<CreditNote, UUID> {
 
     List<CreditNote> findByUserIdOrderByIssuedAtDesc(UUID userId);
 
-    @Query("select coalesce(sum(c.taxableAmount + c.gstAmount), 0) from CreditNote c where c.invoiceNo = :invoiceNo")
-    long creditedTaxableInclusive(@Param("invoiceNo") String invoiceNo);
+    @Query("select coalesce(sum(c.taxableAmount), 0) from CreditNote c where c.invoiceNo = :invoiceNo")
+    long creditedTaxable(@Param("invoiceNo") String invoiceNo);
 }

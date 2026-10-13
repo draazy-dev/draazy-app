@@ -42,7 +42,7 @@
   `financeService` (`getTenant`/`getDues`) keyed to the owner's properties. **There is no owner-side
   view of `tenant_rentals` at all** — an owner who wants to know what their tenant believes the rent
   to be has to ask them.
-- **Platform:** earns nothing here. There is no fee, no GST and no revenue ledger on this flow.
+- **Platform:** earns nothing here. There is no fee and no revenue ledger on this flow.
 - **Guards:** `/pay-rent` is a `ProtectedRoute`; the tenancy write is cross-actor and server-authorized
   ([`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 1).
 
@@ -62,8 +62,8 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
 - **Tenant profile** - `tenant_profiles` (occupation/income/occupants/prior landlord/about). Read
   and written through `GET|PUT /me/tenant-profile`; the score is computed server-side from these
   fields (section 5.5).
-- **Fees config** - `getFees()` -> `gstPercent` (18). There is no rent-payment percentage: the key
-  `fees.rentPayPercent` was deleted with the rail.
+- **Fees config** - there is no rent-payment percentage: the key `fees.rentPayPercent` was deleted
+  with the rail.
 
 ## 5. Business rules & logic  *(the meat)*
 

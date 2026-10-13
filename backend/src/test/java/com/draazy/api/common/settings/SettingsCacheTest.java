@@ -27,12 +27,12 @@ class SettingsCacheTest {
 
     @Test
     void aRepeatReadIsAnsweredFromMemoryIncludingAMissingRow() {
-        stored("fees", "{\"gstPercent\":18}");
+        stored("fees", "{\"listingPass\":999}");
         when(repository.findById("geo")).thenReturn(Optional.empty());
         SettingsCache cache = new SettingsCache(repository, Duration.ofSeconds(30));
 
-        assertThat(cache.value("fees")).contains("{\"gstPercent\":18}");
-        assertThat(cache.value("fees")).contains("{\"gstPercent\":18}");
+        assertThat(cache.value("fees")).contains("{\"listingPass\":999}");
+        assertThat(cache.value("fees")).contains("{\"listingPass\":999}");
         assertThat(cache.value("geo")).isEmpty();
         assertThat(cache.value("geo")).isEmpty();
 

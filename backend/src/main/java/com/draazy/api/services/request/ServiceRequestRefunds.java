@@ -156,7 +156,7 @@ public class ServiceRequestRefunds {
             return true;
         }
         if (GATEWAY_SETTLED.equals(providerStatus)) {
-            // Only the platform fee carries GST; stamp duty and registration are passed through untaxed.
+            // Only the platform fee is Draazy's; stamp duty and registration are passed through.
             creditNotes.issue(request.getRequesterId(), CreditNotes.SERVICE_REQUEST_REFUND, refund.getId(),
                     refund.getOrderId(), refund.getAmount(), Instant.now());
             return true;

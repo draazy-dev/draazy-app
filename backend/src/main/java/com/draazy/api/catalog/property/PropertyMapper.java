@@ -241,7 +241,6 @@ public interface PropertyMapper {
                 formDetailBoolean(property, "pantry"),
                 formDetailStrings(property, "suitableFor"),
                 formDetailStrings(property, "fixtures"),
-                formDetailText(property, "gstOnRent"),
                 formDetailText(property, "fitOutMonths"),
                 formDetailText(property, "escalationPct"),
                 formDetailText(property, "tenancyStatus"),

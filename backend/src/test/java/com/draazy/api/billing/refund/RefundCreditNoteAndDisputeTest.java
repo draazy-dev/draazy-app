@@ -23,7 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-@DisplayName("A confirmed refund earns a GST credit note; a dispute freezes only its own order")
+@DisplayName("A confirmed refund earns a credit note; a dispute freezes only its own order")
 class RefundCreditNoteAndDisputeTest extends RefundTestBase {
 
     private static final String LISTING_PASS = "b1000000-0000-4000-8000-000000000005";
@@ -80,13 +80,12 @@ class RefundCreditNoteAndDisputeTest extends RefundTestBase {
         webhook(paid);
 
         em.flush();
-        var invoices = jdbc.queryForList("select number, amount, taxable_amount, gst_amount from invoices where order_ref = ?",
+        var invoices = jdbc.queryForList("select number, amount, taxable_amount from invoices where order_ref = ?",
                 orderId);
         assertThat(invoices).hasSize(1);
         assertThat((String) invoices.get(0).get("number")).matches("INV-FY\\d{4}-\\d{6}");
         assertThat(((Number) invoices.get(0).get("amount")).longValue()).isEqualTo(999);
-        assertThat(((Number) invoices.get(0).get("taxable_amount")).longValue()
-                + ((Number) invoices.get(0).get("gst_amount")).longValue()).isEqualTo(999);
+        assertThat(((Number) invoices.get(0).get("taxable_amount")).longValue()).isEqualTo(999);
         UUID id = jdbc.queryForObject("select id from subscriptions where payment_ref = ?", UUID.class, orderId);
         assertThat((java.util.List<String>) paymentField(owner, id, "invoiceNo")).containsExactly((String) invoices.get(0).get("number"));
     }
@@ -134,11 +133,9 @@ class RefundCreditNoteAndDisputeTest extends RefundTestBase {
         assertThat(number).matches("CN-FY\\d{4}-\\d{6}");
         assertThat(jdbc.queryForObject("select count(*) from credit_notes where order_ref = ?", Long.class,
                 ref(approved))).isEqualTo(1);
-        var note = jdbc.queryForMap("select amount, taxable_amount, gst_amount from credit_notes where number = ?", number);
+        var note = jdbc.queryForMap("select amount, taxable_amount from credit_notes where number = ?", number);
         assertThat(((Number) note.get("amount")).longValue()).isEqualTo(approved.getAmount());
-        assertThat(((Number) note.get("taxable_amount")).longValue() + ((Number) note.get("gst_amount")).longValue())
-                .isEqualTo(approved.getAmount());
-        assertThat(((Number) note.get("gst_amount")).longValue()).isEqualTo(30);
+        assertThat(((Number) note.get("taxable_amount")).longValue()).isEqualTo(approved.getAmount());
         paymentsStatusIs(buyer, approved, "refunded", number);
     }
 

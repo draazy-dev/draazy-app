@@ -1,7 +1,5 @@
 package com.draazy.api.common.settings;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -22,11 +20,6 @@ public class PlatformSettings {
 
     /** The seeded key holding the feature-toggle block, the same one {@code GET /bootstrap} publishes. */
     static final String FLAGS_KEY = "flags";
-
-    /** Every Draazy price already includes GST, so nothing is added on top unless an admin sets a rate. */
-    private static final BigDecimal DEFAULT_GST_PERCENT = BigDecimal.ZERO;
-
-    private static final BigDecimal MAX_PERCENT = new BigDecimal("100");
 
     /** Owner contacts a caller with no subscription may open, before any referral bonus. */
     private static final long DEFAULT_FREE_CONTACT_LIMIT = 15L;
@@ -104,16 +97,6 @@ public class PlatformSettings {
         this.settings = settings;
         this.cache = cache;
         this.objectMapper = objectMapper;
-    }
-
-    public BigDecimal gstPercent() {
-        return percent(FEES_KEY, "gstPercent", DEFAULT_GST_PERCENT);
-    }
-
-    /** GST on a whole-rupee amount at the configured rate, rounded half-up to whole rupees. */
-    public long gstOn(long rupees) {
-        return BigDecimal.valueOf(rupees).multiply(gstPercent())
-                .divide(MAX_PERCENT, 0, RoundingMode.HALF_UP).longValueExact();
     }
 
     public long listingPass() {
@@ -296,29 +279,6 @@ public class PlatformSettings {
             if (parsed < min || parsed > max) {
                 log.warn("settings.{}.{} is {}, outside [{},{}]; using default {}",
                         key, field, parsed, min, max, fallback);
-                return fallback;
-            }
-            return parsed;
-        } catch (RuntimeException malformed) {
-            log.warn("settings.{}.{} could not be read; using default {}", key, field, fallback,
-                    malformed);
-            return fallback;
-        }
-    }
-
-    private BigDecimal percent(String key, String field, BigDecimal fallback) {
-        try {
-            JsonNode value = cache.value(key)
-                    .map(objectMapper::readTree)
-                    .map(node -> node.get(field))
-                    .orElse(null);
-            if (value == null || !value.isNumber()) {
-                return fallback;
-            }
-            BigDecimal parsed = value.decimalValue();
-            if (parsed.signum() < 0 || parsed.compareTo(MAX_PERCENT) > 0) {
-                log.warn("settings.{}.{} is {}, outside [0,100]; using default {}",
-                        key, field, parsed, fallback);
                 return fallback;
             }
             return parsed;

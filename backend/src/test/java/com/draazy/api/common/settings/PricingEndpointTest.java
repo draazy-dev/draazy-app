@@ -33,8 +33,7 @@ class PricingEndpointTest extends AbstractApiTest {
     void anonymousCallersGetThePriceList() throws Exception {
         mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.pricing.listingPass").value(999))
-                .andExpect(jsonPath("$.pricing.gstPercent").value(0));
+                .andExpect(jsonPath("$.pricing.listingPass").value(999));
     }
 
     /** Checked per key with {@code exists()}: defaults equal the seed row, so a value check proves no read. */
@@ -45,7 +44,6 @@ class PricingEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.pricing.listingPass").exists())
                 .andExpect(jsonPath("$.pricing.contactPack").exists())
                 .andExpect(jsonPath("$.pricing.rentAgreementPlatform").exists())
-                .andExpect(jsonPath("$.pricing.gstPercent").exists())
                 .andExpect(jsonPath("$.pricing.ownerProYearly").doesNotExist());
     }
 

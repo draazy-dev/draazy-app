@@ -31,7 +31,7 @@ public @interface ListingFormDetails {
                 "floorsInHouse", "washrooms",
                 "shellType", "camCharges", "plotLength", "plotWidth", "openSides", "roadWidth",
                 "plotZone", "waterSource", "naStatus", "otherRights", "buyerEligibility",
-                "gstOnRent", "fitOutMonths", "escalationPct", "tenancyStatus", "inPlaceRent", "leaseExpiry",
+                "fitOutMonths", "escalationPct", "tenancyStatus", "inPlaceRent", "leaseExpiry",
                 "seatCount", "frontage", "floorLoad", "clearHeight", "sanctionedPower", "dockCount",
                 "bestTimeToCall", "plottedProject", "listerRelation");
 
@@ -62,7 +62,6 @@ public @interface ListingFormDetails {
                         "industrial", "coworking")),
                 Map.entry("shellType", Set.of("", "bareShell", "warmShell", "furnished")),
                 Map.entry("washrooms", Set.of("", "0", "1", "2", "3", "4+")),
-                Map.entry("gstOnRent", Set.of("", "yes", "no")),
                 Map.entry("fitOutMonths", Set.of("", "0", "1", "2", "3", "6")),
                 Map.entry("tenancyStatus", Set.of("", "vacant", "leased")),
                 Map.entry("bestTimeToCall", Set.of("", "anytime", "morning", "afternoon", "evening")),

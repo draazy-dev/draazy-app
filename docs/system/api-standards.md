@@ -220,15 +220,14 @@ vault's byte-sniffing check *and* Spring refusing a `Content-Type` the endpoint 
 ### 4.4 Platform settings accessors always answer
 
 `common.settings.PlatformSettings` gives each settings value a named accessor with its fallback and
-bounds beside it, instead of `settings.get("fees").get("gstPercent")`. Every accessor has a
+bounds beside it, instead of `settings.get("fees").get("listingPass")`. Every accessor has a
 defaulted, in-range answer, because this class sits in the path of taking money and the alternative
 to a default is a 500 on the pay button because somebody mistyped a config value in the back office.
 
 - **Price fallbacks must match what a healthy install answers** and what `GET /bootstrap` (`pricing`) publishes. A
   default that differed would let a broken config row quietly *change* the price rather than merely
   fail to be read.
-- **Every ceiling catches a typo, not an attack.** `MAX_PERCENT = 100` stops a fat-fingered `200`
-  billing a member twice what they were quoted. `MAX_PRICE = 100000` catches a trailing zero — a lakh
+- **Every ceiling catches a typo, not an attack.** `MAX_PRICE = 100000` catches a trailing zero — a lakh
   is two orders of magnitude past anything sold to an individual. `MAX_CONTACT_GRANT = 1000` matters
   most on the referral bonus, where a mistyped extra zero is not one wrong grant but an unbounded
   one, multiplied by however many referrals somebody can generate; past a thousand the number means
@@ -241,9 +240,8 @@ to a default is a 500 on the pay button because somebody mistyped a config value
   fraud desk — so setting it too low costs review time, not honest referrers their reward. It is
   configuration rather than a constant because a fraud threshold has to be movable on the day it is
   wrong: a deployment change, not a release.
-- **Prices are whole rupees** because they are catalogue prices an operator types into a box, not
-  amounts computed from a percentage; `gstPercent` is the one percentage and is `BigDecimal` for that
-  reason. Named one accessor at a time rather than returned as a map, which would put the field names
+- **Prices are whole rupees** because they are catalogue prices an operator types into a box.
+  Named one accessor at a time rather than returned as a map, which would put the field names
   back in the caller's string literals.
 - **`rentAgreementPlatform` is the platform's share only.** Stamp duty and registration are the
   state's, computed per agreement and collected on top, which is why `platform_fees` carries them.

@@ -19,8 +19,7 @@ public final class ErasureRetention {
         reasons.put("payments_and_invoices",
                 "Books of account. Income-tax Act 1961 s.44AA with Rule 6F requires books and "
                         + "vouchers to be kept for six years from the end of the relevant assessment "
-                        + "year; CGST Act 2017 s.36 requires seventy-two months from the due date of "
-                        + "the annual return; Companies Act 2013 s.128(5) requires eight years. A "
+                        + "year; Companies Act 2013 s.128(5) requires eight years. A "
                         + "receipt with the payer erased is not a book of account, it is an "
                         + "unattributed credit -- so the identifying fields are the part the statute "
                         + "is actually asking for.");

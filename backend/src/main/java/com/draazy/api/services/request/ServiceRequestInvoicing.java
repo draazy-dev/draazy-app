@@ -5,7 +5,7 @@ import com.draazy.api.common.settings.PlatformSettings;
 import java.time.Instant;
 import org.springframework.stereotype.Component;
 
-/** Issues the tax invoice when a rent-agreement checkout or an amendment top-up is paid. */
+/** Issues the invoice when a rent-agreement checkout or an amendment top-up is paid. */
 @Component
 class ServiceRequestInvoicing {
 
@@ -17,11 +17,10 @@ class ServiceRequestInvoicing {
         this.settings = settings;
     }
 
-    // Only the platform fee carries GST; stamp duty and registration are passed through untaxed.
+    // Only the platform fee is Draazy's; stamp duty and registration are passed through.
     void checkoutPaid(ServiceRequest request) {
-        long platformFee = settings.rentAgreementPlatform();
         invoices.issue(request.getRequesterId(), Invoices.SERVICE_REQUEST, request.getId(), request.getPaymentRef(),
-                request.getAmount() == null ? 0 : request.getAmount(), platformFee + settings.gstOn(platformFee),
+                request.getAmount() == null ? 0 : request.getAmount(), settings.rentAgreementPlatform(),
                 Instant.now());
     }
 

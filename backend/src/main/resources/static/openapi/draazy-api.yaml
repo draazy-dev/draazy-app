@@ -12620,10 +12620,6 @@ components:
                   type: array
                   description: Fit-out items present, as the owner selected them.
                   items: { type: string }
-                gstOnRent:
-                  type: string
-                  enum: ['', 'yes', 'no']
-                  description: Whether GST applies on the rent. Rent listings only.
                 fitOutMonths:
                   type: string
                   description: Rent-free / fit-out period in months. Rent listings only.
@@ -13327,7 +13323,6 @@ components:
         platformFee: { $ref: '#/components/schemas/Money' }
         stampDuty: { $ref: '#/components/schemas/Money', description: 'Omitted when the duty is not a flat published figure and is computed per transaction instead — which is both deals: leave-and-licence duty is 0.25% of a consideration built from the rent, term and deposit, and sale duty is 5-7% of the higher of agreement value and ready reckoner rate. **Absent is not zero.** A client that renders a missing value as ₹0 is telling the customer the state waived a charge it did not.'}
         registration: { $ref: '#/components/schemas/Money', description: 'Omitted when the fee depends on the registering body (rent: ₹1,000 municipal / ₹500 rural). Present for `buy`, where it is 1% capped at ₹30,000. Absent is not zero.'}
-        gst: { $ref: '#/components/schemas/Money' }
         notes: { type: string }
     ListingFormDetails:
       type: object
@@ -13406,9 +13401,6 @@ components:
         powerBackup: { type: boolean }
         pantry: { type: boolean }
         camCharges: { type: string, maxLength: 80, description: 'Common-area maintenance, rupees per sq.ft per month. The only maintenance a commercial listing states.' }
-        gstOnRent:
-          type: string
-          enum: ['', yes, 'no']
         fitOutMonths:
           type: string
           enum: ['', '0', '1', '2', '3', '6']
@@ -15684,7 +15676,7 @@ components:
           minimum: 0
           description: >-
             Credits spendable at `POST /service-requests/{id}/checkout`, which waives only Draazy's
-            service fee and its GST. Never negative, even after a referral clawback.
+            service fee. Never negative, even after a referral clawback.
     ReferralSummary:
       type: object
       description: >-
@@ -17069,29 +17061,27 @@ components:
         transaction costs and is mostly the state's money.
 
 
-        Four named fields rather than an open map, and the reason is the document they come out of:
+        Named fields rather than an open map, and the reason is the document they come out of:
         the same settings block also holds the free contact allowance and the referral fraud
         thresholds (velocity, retention). A projection of the block would publish them. This shape
         cannot, and neither can it publish the next key ops adds.
 
 
-        Prices are **whole rupees** — there are no paise anywhere on this platform. The one
-        percentage is a decimal because it is multiplied by an amount rather than typed as one.
+        Prices are **whole rupees** — there are no paise anywhere on this platform.
       required:
         - listingPass
         - contactPack
         - rentAgreementPlatform
-        - gstPercent
       properties:
         listingPass:
           type: integer
           minimum: 0
-          description: Price of one listing pass, GST included — an extra live listing for 60 days.
+          description: Price of one listing pass — an extra live listing for 60 days.
           example: 999
         contactPack:
           type: integer
           minimum: 0
-          description: Price of one contact pack, GST included — 15 owner contacts for 30 days.
+          description: Price of one contact pack — 15 owner contacts for 30 days.
           example: 199
         rentAgreementPlatform:
           type: integer
@@ -17100,14 +17090,6 @@ components:
             The platform's share of a rent agreement. Stamp duty and registration are the state's,
             are computed per agreement from its own terms, and are quoted on `/fees` instead.
           example: 499
-        gstPercent:
-          type: number
-          minimum: 0
-          maximum: 100
-          description: >
-            GST charged on top of the platform's fees. Every price already includes GST, so this
-            is 0 unless an admin sets a rate.
-          example: 0
         refunds:
           type: object
           description: The refund and contact-return numbers the plans page quotes (admin settings under `fees`).
@@ -17144,11 +17126,11 @@ components:
         id: { type: string, description: The order id; pass it to the refund route. }
         kind: { type: string, enum: [listing_pass, contact_pack, rent_agreement, ra_amendment] }
         label: { type: string }
-        amount: { type: integer, description: Whole rupees, GST included. }
+        amount: { type: integer, description: Whole rupees, the full amount paid. }
         paidAt: { type: string, format: date-time }
-        invoiceNo: { type: [string, 'null'], description: 'GST tax invoice number, e.g. INV-FY2627-000001; null when none was issued.' }
+        invoiceNo: { type: [string, 'null'], description: 'Invoice number, e.g. INV-FY2627-000001; null when none was issued.' }
         status: { type: string, enum: [paid, refund_pending, refunded, refund_rejected, disputed] }
-        creditNoteNo: { type: [string, 'null'], description: 'GST credit note number, e.g. CN-FY2627-000001.' }
+        creditNoteNo: { type: [string, 'null'], description: 'Credit note number, e.g. CN-FY2627-000001.' }
         propertyId: { type: [string, 'null'] }
         serviceRequestId: { type: [string, 'null'] }
         refund:
@@ -18383,7 +18365,6 @@ components:
             listingPass: { type: integer }
             contactPack: { type: integer }
             rentAgreementPlatform: { type: integer }
-            gstPercent: { type: number, example: 0 }
             contactReplyDays: { type: integer, minimum: 1, maximum: 30, example: 7 }
             contactPendingMax: { type: integer, minimum: 1, maximum: 100, example: 10 }
             packRefundDays: { type: integer, minimum: 0, maximum: 30, example: 7, description: '0 switches the pack refund off.' }

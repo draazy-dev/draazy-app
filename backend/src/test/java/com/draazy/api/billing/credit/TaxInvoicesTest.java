@@ -13,7 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-@DisplayName("Tax invoices: one per payment, numbered per financial year; credit notes never out-tax them")
+@DisplayName("Invoices: one per payment, numbered per financial year; credit notes never credit more fee than was invoiced")
 class TaxInvoicesTest extends AbstractApiTest {
 
     private static final Instant FY4041_START = Instant.parse("2040-04-01T00:00:00Z");
@@ -34,7 +34,7 @@ class TaxInvoicesTest extends AbstractApiTest {
 
     private Map<String, Object> invoice(UUID sourceId) {
         em.flush();
-        return jdbc.queryForMap("select number, amount, taxable_amount, gst_amount, order_ref from invoices where source_id = ?",
+        return jdbc.queryForMap("select number, amount, taxable_amount, order_ref from invoices where source_id = ?",
                 sourceId);
     }
 
@@ -77,7 +77,7 @@ class TaxInvoicesTest extends AbstractApiTest {
     }
 
     @Test
-    void theGstSplitIsTakenFromTheTaxablePartOnly() {
+    void onlyThePlatformFeeIsCountedAsTaxable() {
         User u = customer();
         UUID source = UUID.randomUUID();
         invoices.issue(u.getId(), Invoices.SERVICE_REQUEST, source, "ra1", 5000, 499, FY4041_START);
@@ -85,19 +85,17 @@ class TaxInvoicesTest extends AbstractApiTest {
         Map<String, Object> row = invoice(source);
 
         assertThat(n(row, "amount")).isEqualTo(5000);
-        assertThat(n(row, "taxable_amount") + n(row, "gst_amount")).isEqualTo(499);
-        assertThat(n(row, "gst_amount")).isEqualTo(76);
+        assertThat(n(row, "taxable_amount")).isEqualTo(499);
     }
 
     @Test
-    void anAmendmentTopUpCarriesNoGst() {
+    void anAmendmentTopUpCarriesNoPlatformFee() {
         User u = customer();
         UUID source = UUID.randomUUID();
         invoices.issue(u.getId(), Invoices.SERVICE_REQUEST_AMENDMENT, source, "am1", 800, 0, FY4041_START);
 
         Map<String, Object> row = invoice(source);
 
-        assertThat(n(row, "gst_amount")).isZero();
         assertThat(n(row, "taxable_amount")).isZero();
     }
 
@@ -121,7 +119,7 @@ class TaxInvoicesTest extends AbstractApiTest {
     }
 
     @Test
-    void anOrderThatCarriedNoPlatformFeeCreditsNoGst() {
+    void anOrderThatCarriedNoPlatformFeeCreditsNoFee() {
         User u = customer();
         invoices.issue(u.getId(), Invoices.SERVICE_REQUEST, UUID.randomUUID(), "ra3", 2000, 0, FY4041_START);
 
@@ -143,8 +141,6 @@ class TaxInvoicesTest extends AbstractApiTest {
 
     private long taxed(CreditNote note) {
         em.flush();
-        Map<String, Object> row = jdbc.queryForMap("select taxable_amount, gst_amount from credit_notes where id = ?",
-                note.getId());
-        return n(row, "taxable_amount") + n(row, "gst_amount");
+        return jdbc.queryForObject("select taxable_amount from credit_notes where id = ?", Long.class, note.getId());
     }
 }

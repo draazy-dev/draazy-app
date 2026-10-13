@@ -40,6 +40,7 @@
 ## Shipped
 Newest first, one line per slice; the commit (or the uncommitted tree) is the record.
 
+- 2026-10-13 GST removed entirely (billing + property-market copy): V125 drops `invoices/credit_notes.gst_amount/gst_percent` (folded into `taxable_amount` = Draazy's fee), `platform_fees.gst`, `fees.gstPercent`, `site.gst`, `form_details.gstOnRent`; `GstSplit` deleted; frontend/e2e/help/blog/docs cleaned (business-planning docs kept). Backend billing suites green except the stale `buy` fee row in shared `draazy_test`; targeted e2e 147/147.
 - 2026-10-13 L01 logging overhaul (see `docs/DEPLOY.md` §8, `docs/system/data-model.md` retention + audit policy):
   - **e2e:** local-only, enforced by the backend guard and both Playwright configs; the CI e2e job is removed.
   - **Tracing:** traceId in every log line; MDC carries user, role, method and path; one request-outcome line per request; per-package log levels.

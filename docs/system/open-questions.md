@@ -241,8 +241,7 @@ Q10's "50 hand-recruited owners" and Q11's flatmates gate remain the two numbers
 **Follow-on (Q16b) — the MVP price list *(decided 2026-10-11)*.** Subscriptions are retired; nothing
 auto-renews. The only paid items are the rent agreement (₹499 + government charges, first or
 renewal), a listing pass (₹999, each extra *live* rent/sell listing beyond 1 free, 60 days) and a
-contact pack (₹199, 15 contacts for 30 days, after 15 free in the first 30 days). All prices include
-GST. Flatmate posts
+contact pack (₹199, 15 contacts for 30 days, after 15 free in the first 30 days). Flatmate posts
 are free and unlimited; the 3-active-post cap on non-owner hosts stays as an anti-broker guard. Over
 the free tier a listing is never refused: it waits paused until the owner buys a pass or pauses
 another. Featured is a 7-day reward for ownership verification, not a paid boost. Lawyer and loan
@@ -317,7 +316,7 @@ takes its contacts back with no grant to reverse. The old module now lives at
   `passGuaranteeEveryMonths` across linked accounts).
 - **Every customer refund is approved by staff** (`refunds` function); the order is frozen while pending.
   Money taken in error (failed, late, mismatched, closed listing) is refunded automatically.
-- Sequential GST invoices and credit notes per FY; a dispute freezes only that order, never the account; grievance
+- Sequential invoices and credit notes per FY; a dispute freezes only that order, never the account; grievance
   officer in `legal`.
 
 ### Q18 — What should the ops console be allowed to see and act on? *(closed 2026-08-11)*

@@ -47,12 +47,12 @@
 ## 5. Business rules & logic  *(the meat)*
 
 ### 5.1 General (site) settings
-`SITE_FIELDS` = name, legalName, tagline, supportEmail, supportPhone, whatsapp, supportHours, address, gst.
+`SITE_FIELDS` = name, legalName, tagline, supportEmail, supportPhone, whatsapp, supportHours, address.
 `saveSite()` -> `updateSettings({ site })` + audit "Updated branding / contact / legal details". Free-text; no validation today.
 
 ### 5.2 Fees + Move-in Pack
 - Fees are the flat `settings.fees` map (seed: `ownerPlanYearly 999`, `ownerProYearly 2499`,
-  `rentAgreementPlatform 500`, `seekerPlusTopup 199`, `gstPercent 18`).
+  `rentAgreementPlatform 500`, `seekerPlusTopup 199`).
   `setFee(k, v) = Number(v) || 0`; keys containing "percent" render a `%` suffix (else a rupee prefix). Labels are humanized.
   `saveFees()` -> `updateSettings({ fees })` + audit "Updated platform charges & fee schedule". These feed Finance math.
 - **Move-in Pack** (`settings.movePack`): `{ enabled, items:{ movers, clean, agreement, paint, verify, internet } }`.

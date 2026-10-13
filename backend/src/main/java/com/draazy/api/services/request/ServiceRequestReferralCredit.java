@@ -3,7 +3,7 @@ package com.draazy.api.services.request;
 import com.draazy.api.billing.entitlement.EntitlementService;
 import org.springframework.stereotype.Service;
 
-// Spends one referral-earned free agreement: Draazy's own fee and its GST go, statutory charges stay.
+// Spends one referral-earned free agreement: Draazy's own fee goes, statutory charges stay.
 @Service
 class ServiceRequestReferralCredit {
 

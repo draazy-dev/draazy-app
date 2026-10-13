@@ -1,13 +1,12 @@
 -- Repeatable reference/config seed; keep statements idempotent and never add user data. A statutory
 -- charge is seeded only where it is a flat published figure, so a percentage stays NULL.
-INSERT INTO platform_fees (deal, brokerage, platform_fee, stamp_duty, registration, gst, notes) VALUES
-    ('rent', 0, 499, NULL,  NULL,  0, 'Zero brokerage; flat Rs 499 platform fee, GST included. Maharashtra stamp duty (0.25% of rent for the term + non-refundable deposit + 10% of the refundable deposit per year, rounded up to the next Rs 100, minimum Rs 100), registration (Rs 1,000 municipal / Rs 500 rural) and the Rs 300 document handling charge are statutory, computed per agreement from your terms, and     collected on top.')
+INSERT INTO platform_fees (deal, brokerage, platform_fee, stamp_duty, registration, notes) VALUES
+    ('rent', 0, 499, NULL,  NULL,  'Zero brokerage; flat Rs 499 platform fee. Maharashtra stamp duty (0.25% of rent for the term + non-refundable deposit + 10% of the refundable deposit per year, rounded up to the next Rs 100, minimum Rs 100), registration (Rs 1,000 municipal / Rs 500 rural) and the Rs 300 document handling charge are statutory, computed per agreement from your terms, and     collected on top.')
     ON CONFLICT (deal) DO UPDATE SET
     brokerage    = EXCLUDED.brokerage,
     platform_fee = EXCLUDED.platform_fee,
     stamp_duty   = EXCLUDED.stamp_duty,
     registration = EXCLUDED.registration,
-    gst          = EXCLUDED.gst,
     notes        = EXCLUDED.notes;
 
 -- Admin settings seed: a re-run only adds missing keys (`||` keeps stored values), so repricing survives.
@@ -16,7 +15,6 @@ INSERT INTO settings (key, value) VALUES
         "listingPass": 999,
         "contactPack": 199,
         "rentAgreementPlatform": 499,
-        "gstPercent": 0,
         "freeContactLimit": 15,
         "featuredDays": 7,
         "referralContactBonus": 15,

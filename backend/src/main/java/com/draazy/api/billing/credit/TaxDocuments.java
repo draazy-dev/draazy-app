@@ -1,16 +1,14 @@
 package com.draazy.api.billing.credit;
 
-import com.draazy.api.common.settings.PlatformSettings;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** What invoices and credit notes share: the financial-year number series and the GST split. */
+/** What invoices and credit notes share: the financial-year number series and the fee/pass-through split. */
 @Component
 class TaxDocuments {
 
@@ -22,15 +20,10 @@ class TaxDocuments {
 
     private static final ZoneId INDIA = ZoneId.of("Asia/Kolkata");
 
-    // The platform's configured rate is 0 while prices are quoted GST-inclusive; the tax inside them is 18%.
-    private static final BigDecimal STATUTORY_PERCENT = new BigDecimal("18");
-
     private final EntityManager entityManager;
-    private final PlatformSettings settings;
 
-    TaxDocuments(EntityManager entityManager, PlatformSettings settings) {
+    TaxDocuments(EntityManager entityManager) {
         this.entityManager = entityManager;
-        this.settings = settings;
     }
 
     /** April to March in India, as the two-digit years it spans: 2627 for 1 April 2026 to 31 March 2027. */
@@ -62,8 +55,7 @@ class TaxDocuments {
                 .getSingleResult();
     }
 
-    GstSplit split(long amount, long taxableInclusive) {
-        BigDecimal percent = settings.gstPercent().signum() > 0 ? settings.gstPercent() : STATUTORY_PERCENT;
-        return GstSplit.ofInclusive(Math.min(amount, Math.max(0, taxableInclusive)), percent);
+    long taxablePart(long amount, long taxable) {
+        return Math.min(amount, Math.max(0, taxable));
     }
 }

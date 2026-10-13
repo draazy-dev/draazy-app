@@ -176,7 +176,6 @@ public record PropertyResponse(
             Boolean pantry,
             List<String> suitableFor,
             List<String> fixtures,
-            String gstOnRent,
             String fitOutMonths,
             String escalationPct,
             String tenancyStatus,

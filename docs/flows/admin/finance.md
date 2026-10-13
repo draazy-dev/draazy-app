@@ -1,7 +1,7 @@
 # Flow: Admin Finance
 
 > The platform-economics console: revenue by month, subscription MRR, services,
-> a transaction ledger, GST accounting and the plan book.
+> a transaction ledger and the plan book.
 > **Status:** documented from React source - **Primary role(s):** admin (with the Finance module)
 
 ---
@@ -9,7 +9,7 @@
 ## 1. Purpose & user problem
 - **Persona:** a finance / growth lead who owns the platform P&L.
 - **Job-to-be-done:** "Show me what Draazy earned this month, where it came from
-  (subscriptions vs services), what GST we collected,
+  (subscriptions vs services),
   and let me drill into individual transactions."
 - **Why it matters:** this is the money view of the marketplace. It rolls up the
   monetisation from every other flow (owner/seeker plans and service tickets) into
@@ -40,7 +40,7 @@
 - Guards are UX-only (mock RBAC) - see [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 1.
 
 ## 4. Entities touched
-- [`settings.fees`](../../system/data-model.md) - **read** (fee schedule + `gstPercent`).
+- [`settings.fees`](../../system/data-model.md) - **read** (fee schedule).
 - [`analytics.revenue`](../../system/data-model.md) - **read** (per-month subscriptions/services series; services is zero until measured).
 - `users` - **read** for ARPU/ARPPU; paying users are active subscribers only.
 - Nothing is written here - Finance is entirely read/aggregate today (no audit rows, no mutations).
@@ -64,8 +64,7 @@
 
 ### 5.3 Fee schedule inputs (`settings.fees`)
 Seed values (`src/data/settings.json`): `ownerPlanYearly: 999`, `ownerProYearly: 2499`,
-`rentAgreementPlatform: 500`, `seekerPlusTopup: 199`, `gstPercent: 18`.
-- `gstRate = (fees.gstPercent || 18) / 100`.
+`rentAgreementPlatform: 500`, `seekerPlusTopup: 199`.
 - `ownerPlan = fees.ownerPlanMonthly || round(fees.ownerPlanYearly / 12 || 500)`
   (with the seed, `ownerPlanMonthly` is absent so `ownerPlan = round(999/12) = 83`).
 - `seekerPlan = fees.seekerPlanMonthly || 299` (seed has no monthly, so `299`).
@@ -78,14 +77,13 @@ The subscription line is split into owner vs seeker by a **fixed 55/45 heuristic
 - The Subscriptions panel renders each row as `count active . fmtINR(price)/mo` and `count * price`,
   and shows `MRR total = month.subscriptions`.
 
-### 5.5 Commission, GST, net position
+### 5.5 Commission, net position
 - `partnerPayout = round(month.services * 0.65)` (partners keep 65% of services revenue).
 - `commission    = month.services - partnerPayout` (platform keeps the remaining 35%).
 - `netRetained   = monthTotal - partnerPayout`.
-- `gstAmount     = round(monthTotal * gstRate)`.
 - **Net position panel:** revenue in, refunds out. "Partner payouts (65%)" and "Platform
-  commission (35%)" were a split of a figure that was itself fabricated, and the payouts,
-  GST-held-on-rent and unsettled-gateway-fee rows were all facts about the tenant-to-owner rent
+  commission (35%)" were a split of a figure that was itself fabricated, and the payouts
+  and unsettled-gateway-fee rows were all facts about the tenant-to-owner rent
   rail. That rail was withdrawn, so those rows are **gone** rather than pinned at a zero an
   operator would read as a quiet month. Refunds keep the marker that says no refund path exists.
 
@@ -121,10 +119,10 @@ A server ledger built from subscription payments, newest-first (sorted by `date`
 - The 55/45 owner/seeker subscription split, the 65/35 partner/commission split, the 0.5%
   sale-facilitation rate and the deterministic revenue fallback are **client-side heuristics**
   that must be replaced by real ledger/subscription accounting on the server.
-- The transaction ledger must stay backed by real subscription payment rows with gateway status,
-  GST and refund records, not by unrelated product collections.
-- GST and net-retained are computed in the browser from `monthTotal` and must be
-  authoritative server figures.
+- The transaction ledger must stay backed by real subscription payment rows with gateway status
+  and refund records, not by unrelated product collections.
+- Net-retained is computed in the browser from `monthTotal` and must be an
+  authoritative server figure.
 
 ### 5.11 Disclosed figures: what is measured and what is a structural zero (D63, D65)
 
@@ -140,7 +138,7 @@ identical to an operator:
 There used to be a third: `payoutsCompleted` / **Partner payouts**. Both the figure and its
 disclosure are gone. `payout_accounts` stored *where* a remittance to an owner would go and nothing
 ever wrote one; the rail that would have was withdrawn in V127, taking `payoutsMeasured`,
-`payoutsCompleted`, `payoutsDue`, `gstCollected` and `pendingSettlement` with it, along with the
+`payoutsCompleted`, `payoutsDue` and `pendingSettlement` with it, along with the
 `rent` band in the revenue series. A disclosure explaining why a figure is zero is only worth
 carrying while the figure has a reason to be on the screen at all.
 
@@ -200,7 +198,7 @@ at which point the server property becomes the single source of truth for both h
   disputes the order, is 409. Both notify the customer (`refund.decided`) and are audited `refund.approved` / `refund.rejected`.
 - New requests, automatic refunds and disputes notify holders of `refunds` (`refund.requested`, `refund.auto`,
   `refund.dispute`), linking to `/admin/refunds`.
-- A GST credit note (`CN-FY2627-000001`) is issued when a refund is confirmed paid; it cites the original tax invoice (`INV-FY2627-000001`, issued when the payment succeeded),
+- A credit note (`CN-FY2627-000001`) is issued when a refund is confirmed paid; it cites the original invoice (`INV-FY2627-000001`, issued when the payment succeeded),
   and `/me/payments` shows both numbers. An order that was never invoiced (a failed, late or mismatched payment refunded automatically) gets no credit note.
 
 ## 6. Maker-checker / approval

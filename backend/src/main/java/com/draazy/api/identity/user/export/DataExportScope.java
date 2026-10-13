@@ -363,10 +363,9 @@ public final class DataExportScope {
                         + "A digest is not something you could read or use.")));
 
         out.add(new Dataset("listings", "invoices",
-                "GST tax invoices issued to you when a payment of yours succeeded.",
+                "Invoices issued to you when a payment of yours succeeded.",
                 """
-                select number, source_type, order_ref, amount, taxable_amount, gst_amount,
-                       gst_percent, issued_at
+                select number, source_type, order_ref, amount, taxable_amount, issued_at
                   from invoices
                  where user_id = :subjectId
                  order by issued_at desc
@@ -374,10 +373,9 @@ public final class DataExportScope {
                 Map.of()));
 
         out.add(new Dataset("listings", "credit_notes",
-                "GST credit notes issued to you when a refund went through.",
+                "Credit notes issued to you when a refund went through.",
                 """
-                select number, invoice_no, source_type, order_ref, amount, taxable_amount, gst_amount,
-                       gst_percent, issued_at
+                select number, invoice_no, source_type, order_ref, amount, taxable_amount, issued_at
                   from credit_notes
                  where user_id = :subjectId
                  order by issued_at desc

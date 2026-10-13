@@ -59,8 +59,7 @@ public class ServiceRequestPricing {
     }
 
     private long rentAgreementPrice(Map<String, Object> details) {
-        long platformFee = settings.rentAgreementPlatform();
-        return platformFee + settings.gstOn(platformFee) + statutory(details);
+        return settings.rentAgreementPlatform() + statutory(details);
     }
 
     long statutory(Map<String, Object> details) {

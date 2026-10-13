@@ -420,7 +420,7 @@ INSERT INTO public.faqs (id, question, answer, category) VALUES
    'Payments'),
   ('fa900001-0000-4000-8000-00000000f006',
    'Do you offer rent agreements?',
-   'Yes — drafting, stamp duty and e-registration with a doorstep biometric visit. Our platform fee is ₹499, GST included, and government stamp duty and registration charges are added, worked out from your rent, deposit and term. You fill the details online and our team prepares the draft.',
+   'Yes — drafting, stamp duty and e-registration with a doorstep biometric visit. Our platform fee is ₹499, and government stamp duty and registration charges are added, worked out from your rent, deposit and term. You fill the details online and our team prepares the draft.',
    'Services'),
   ('fa900001-0000-4000-8000-00000000f007',
    'Which areas of Pune do you cover?',

@@ -18,7 +18,6 @@ public class PricingController {
                 settings.listingPass(),
                 settings.contactPack(),
                 settings.rentAgreementPlatform(),
-                settings.gstPercent(),
                 new PricingResponse.Referral(
                         settings.referralContactBonus(),
                         settings.referralSeekerBonusContacts(),

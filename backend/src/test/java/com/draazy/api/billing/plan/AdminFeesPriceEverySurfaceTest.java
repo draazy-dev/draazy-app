@@ -108,13 +108,12 @@ class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
     }
 
     @Test
-    void theRentAgreementFeeAndItsGstFollowTheAdminFee() throws Exception {
-        saveFees("{\"rentAgreementPlatform\":750,\"gstPercent\":18}").andExpect(status().isOk());
+    void theRentAgreementFeeFollowsTheAdminFee() throws Exception {
+        saveFees("{\"rentAgreementPlatform\":750}").andExpect(status().isOk());
 
         mvc.perform(get(Routes.Fees.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.deal=='rent')].platformFee").value(hasItem(750)))
-                .andExpect(jsonPath("$[?(@.deal=='rent')].gst").value(hasItem(135)));
+                .andExpect(jsonPath("$[?(@.deal=='rent')].platformFee").value(hasItem(750)));
     }
 
     @Test
@@ -124,8 +123,7 @@ class AdminFeesPriceEverySurfaceTest extends AbstractApiTest {
                 .andExpect(jsonPath(planPrice(CONTACT_PACK)).value(hasItem(199)));
         mvc.perform(get(Routes.Fees.BASE))
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[?(@.deal=='rent')].platformFee").value(hasItem(499)))
-                .andExpect(jsonPath("$[?(@.deal=='rent')].gst").value(hasItem(0)));
+                .andExpect(jsonPath("$[?(@.deal=='rent')].platformFee").value(hasItem(499)));
     }
 
     // Stored but unreadable, it would sit in the admin panel while the site charged the default.

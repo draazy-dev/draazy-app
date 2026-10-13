@@ -155,21 +155,6 @@ class ErasureCoverageTest extends AbstractApiTest {
                         + "years in which either party may sue on it, and erasing the tenant would "
                         + "destroy the landlord's proof of the tenancy at the moment a dispute makes "
                         + "it matter. See ErasureRetention#retainedWithReasons, 'rent_agreements'.");
-        map.put("credit_notes.gst_amount",
-                "The tax on a refund, on a GST credit note. Books of account under CGST Act 2017 s.34 and s.36, not personal data about anyone but the "
-                        + "payer. See ErasureRetention#retainedWithReasons, 'payments_and_invoices'.");
-        map.put("credit_notes.gst_percent",
-                "The GST rate applied on a credit note, a figure about the tax and not about a person. CGST Act 2017 "
-                        + "s.34 and s.36 require the note and its tax split to be kept for seventy-two months. "
-                        + "See ErasureRetention#retainedWithReasons, 'payments_and_invoices'.");
-        map.put("invoices.gst_amount",
-                "The tax on a payment, on a GST tax invoice. Books of account under CGST Act 2017 s.31, s.34 and s.36, "
-                        + "not personal data about anyone but the payer. See ErasureRetention#retainedWithReasons, "
-                        + "'payments_and_invoices'.");
-        map.put("invoices.gst_percent",
-                "The GST rate applied on a tax invoice, a figure about the tax and not about a person. CGST Act 2017 "
-                        + "s.31 and s.36 require the invoice and its tax split to be kept for seventy-two months. "
-                        + "See ErasureRetention#retainedWithReasons, 'payments_and_invoices'.");
         map.put("tenancies.tenant_mobile",
                 "The number the owner named when closing the rent deal, which the confirming account "
                         + "must match. Part of the closed deal's record of who the owner transacted "
@@ -221,9 +206,6 @@ class ErasureCoverageTest extends AbstractApiTest {
                 "Whether a plan lifts the contact ceiling entirely (V91). Matched on 'contact'; it "
                         + "is a flag on a catalogue row, identical for every subscriber to that "
                         + "plan, and says nothing about any of them.");
-        map.put("platform_fees.gst",
-                "A tax rate on the platform's own fee schedule. Matched on 'gst'; it is a rate, not "
-                        + "a GSTIN.");
 
         map.put("properties.address",
                 "The address of a listing, which is the listing's whole point. Listings are retained "
