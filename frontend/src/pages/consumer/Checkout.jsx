@@ -10,6 +10,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { usePricing } from '../../context/PricingContext.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { fmtDate } from '../../lib/format.js';
+import RefundGuarantee from '../../components/billing/RefundGuarantee.jsx';
 
 const DAY_MS = 86_400_000;
 const POLL_MS = 3_000;
@@ -224,6 +225,8 @@ export default function Checkout() {
               <div className="flex justify-between text-gray-400"><span>{P.nameLabel} <span className="text-gray-600">({P.sub})</span></span><span className="text-gray-200">{inr(P.price)}</span></div>
               <div className="flex justify-between font-bold text-base pt-2 border-t border-white/8 mt-2"><span>{t('misc.coTotal')}</span><span>{inr(P.price)}</span></div>
               <p className="text-gray-500 text-xs">{t('misc.coPricesIncludeGst')}</p>
+              {needsProperty && <RefundGuarantee kind="pass" />}
+              {planId === 'contact-pack' && <RefundGuarantee kind="pack" />}
             </div>
           </div>
 

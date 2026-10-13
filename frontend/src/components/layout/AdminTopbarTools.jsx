@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, Bell, Building2, User, Wrench, ShieldCheck, LayoutDashboard, BarChart3, MessageSquare, FileText, Flag, LifeBuoy, Users, Settings, IndianRupee, Gift, Compass, BookOpen } from 'lucide-react';
+import { Search, Bell, Building2, User, Wrench, ShieldCheck, LayoutDashboard, BarChart3, MessageSquare, FileText, Flag, LifeBuoy, Users, Settings, IndianRupee, Gift, Compass, BookOpen, Undo2 } from 'lucide-react';
 import { lookupForModeration } from '../../services/propertyService.js';
 import { listUsers } from '../../services/usersService.js';
 import { adminBell } from '../../services/analyticsService.js';
@@ -49,6 +49,7 @@ const NAV_INDEX_FULL = [
   { label: 'Settings', keywords: 'settings configuration preferences site general email notifications sms seo', path: '/admin/settings', icon: Settings, flag: null },
   { label: 'Integrations', keywords: 'integrations email whatsapp otp payments cashfree zoho webhook delivery failures providers', path: '/admin/integrations', icon: Settings, flag: null },
   { label: 'Referrals', keywords: 'referrals ops refer bonus', path: '/admin/referrals', icon: Gift, flag: null },
+  { label: 'Refunds', keywords: 'refunds refund money back credit note dispute chargeback pass pack', path: '/admin/refunds', icon: Undo2, flag: null },
   { label: 'Runbooks', keywords: 'help runbook runbooks docs documentation guide guides knowledge base handbook playbook ops internal how to checklist', path: '/admin/runbooks', icon: BookOpen, flag: null },
 ];
 

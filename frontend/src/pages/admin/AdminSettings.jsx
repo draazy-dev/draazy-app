@@ -73,6 +73,17 @@ const REFERRAL_FIELDS = [
   ['referralSignalRetentionDays', 'Keep device and network signals (days)', 30, 180, 'Then the fraud signals are erased.'],
   ['referralNewReferrerDays', 'New referrer account (days)', 0, 90, 'A referrer account younger than this counts as a risk signal.'],
 ];
+const REFUND_FIELDS = [
+  ['contactReplyDays', 'Owner reply window (days)', 1, 30, 'An unanswered contact request returns the contact after this.'],
+  ['contactPendingMax', 'Open contact requests per seeker', 1, 100, 'More are refused until an owner replies.'],
+  ['packRefundDays', 'Contact pack refund window (days)', 0, 30, 'Unused packs are refundable this long. 0 turns it off.'],
+  ['passGuaranteeDays', 'Listing pass guarantee (days)', 0, 30, 'No enquiries in this many live days earns a refund. 0 turns it off.'],
+  ['passGuaranteeMaxEnquiries', 'Guarantee: max enquiries', 0, 50, 'Enquiries allowed while the guarantee still applies.'],
+  ['passGuaranteeEveryMonths', 'Guarantee: once every (months)', 1, 36, 'How often one owner can use the guarantee.'],
+];
+const GRIEVANCE_NAME_MAX = 80;
+const GRIEVANCE_EMAIL_MAX = 120;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const saveError = (err) => (err?.status === 412
   ? 'Someone else changed these settings — reload to see their changes.'
@@ -239,6 +250,7 @@ export default function AdminSettings() {
   const saveSite = () => persist({ site: settings.site }, 'Site details saved');
   const feeFields = FEE_FIELDS.filter(([k]) => k in settings.fees);
   const referralFields = REFERRAL_FIELDS.filter(([k]) => k in settings.fees);
+  const refundFields = REFUND_FIELDS.filter(([k]) => k in settings.fees);
   const saveFeeGroup = (scope, fields, okMessage) => {
     if (!requireFilled(scope, fields.map(([k]) => settings.fees[k]))) return false;
     const outOfRange = fields.some(([k, , min, max]) => min != null && !(Number.isInteger(settings.fees[k]) && settings.fees[k] >= min && settings.fees[k] <= max));
@@ -248,6 +260,17 @@ export default function AdminSettings() {
   };
   const saveFees = () => saveFeeGroup('fees', feeFields, 'Fee schedule saved');
   const saveReferrals = () => saveFeeGroup('referrals', referralFields, 'Referral settings saved');
+  const saveRefunds = () => saveFeeGroup('refunds', refundFields, 'Refund settings saved');
+
+  const officer = settings.legal?.grievanceOfficer ?? { name: '', email: '' };
+  const setOfficer = (k, v) => setSettings((s) => ({ ...s, legal: { ...s.legal, grievanceOfficer: { ...officer, [k]: v } } }));
+  const saveOfficer = () => {
+    const name = String(officer.name ?? '').trim();
+    const email = String(officer.email ?? '').trim();
+    const invalid = !name || name.length > GRIEVANCE_NAME_MAX || email.length > GRIEVANCE_EMAIL_MAX || !EMAIL_RE.test(email);
+    setFormError((e) => ({ ...e, officer: invalid ? `Enter a name (1–${GRIEVANCE_NAME_MAX} characters) and a valid email (up to ${GRIEVANCE_EMAIL_MAX}).` : '' }));
+    return !invalid && persist({ legal: { grievanceOfficer: { name, email } } }, 'Grievance officer saved');
+  };
 
   const maxPhotos = settings.listings?.maxPhotos ?? DEFAULT_MAX_PHOTOS;
   const setMaxPhotos = (v) => setSettings((s) => ({ ...s, listings: { ...s.listings, maxPhotos: v === '' ? '' : Number(v) } }));
@@ -366,6 +389,24 @@ export default function AdminSettings() {
             </button>
           </div>
           <div className="dz-card p-5">
+            <h3 className="text-sm font-semibold text-white">Grievance officer</h3>
+            <p className="mt-0.5 text-xs text-gray-500">Shown on the Refund Policy page.</p>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-400">Name</span>
+                <input value={officer.name ?? ''} maxLength={GRIEVANCE_NAME_MAX} required onChange={(e) => setOfficer('name', e.target.value)} className="dz-input" />
+              </label>
+              <label className="text-sm">
+                <span className="mb-1 block text-gray-400">Email</span>
+                <input type="email" value={officer.email ?? ''} maxLength={GRIEVANCE_EMAIL_MAX} onChange={(e) => setOfficer('email', e.target.value)} className="dz-input" />
+              </label>
+            </div>
+            <button onClick={saveOfficer} className="dz-btn dz-btn-primary mt-5">
+              <Save className="h-4 w-4" /> Save officer
+            </button>
+            {formError.officer ? <p role="alert" className="mt-3 text-xs text-rose-300">{formError.officer}</p> : null}
+          </div>
+          <div className="dz-card p-5">
             <div className="flex items-center justify-between gap-4 text-sm">
               <div>
                 <label htmlFor="settings-max-photos" className="block text-gray-300">Max photos per listing</label>
@@ -437,6 +478,27 @@ export default function AdminSettings() {
                 <Save className="h-4 w-4" /> Save referrals
               </button>
               {formError.referrals ? <p role="alert" className="mt-3 text-xs text-rose-300">{formError.referrals}</p> : null}
+            </div>
+          )}
+
+          {refundFields.length > 0 && (
+            <div className="dz-card p-5">
+              <h3 className="text-sm font-semibold text-white">Refunds</h3>
+              <div className="mt-3 space-y-3">
+                {refundFields.map(([k, label, min, max, help]) => (
+                  <label key={k} className="flex items-center justify-between gap-4 text-sm">
+                    <span>
+                      <span className="block text-gray-300">{label}</span>
+                      <span className="block text-xs text-gray-500">{help}</span>
+                    </span>
+                    <input type="number" min={min} max={max} step="1" value={settings.fees[k]} onChange={(e) => setFee(k, e.target.value)} className="dz-input w-28 shrink-0 text-right" />
+                  </label>
+                ))}
+              </div>
+              <button onClick={saveRefunds} className="dz-btn dz-btn-primary mt-5">
+                <Save className="h-4 w-4" /> Save refunds
+              </button>
+              {formError.refunds ? <p role="alert" className="mt-3 text-xs text-rose-300">{formError.refunds}</p> : null}
             </div>
           )}
 

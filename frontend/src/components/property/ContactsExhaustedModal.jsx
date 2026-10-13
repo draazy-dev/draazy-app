@@ -13,7 +13,7 @@ import useModalDialog from '../../hooks/useModalDialog.js';
 export default function ContactsExhaustedModal({ onClose }) {
   const { t } = useTranslation();
   const { pathname, search } = useLocation();
-  const { fee, referral } = usePricing();
+  const { fee, referral, refunds } = usePricing();
   const { flagEnabled } = useAppFlags();
   const canRefer = flagEnabled('referralRewards');
   const [counts, setCounts] = useState(null);
@@ -76,6 +76,7 @@ export default function ContactsExhaustedModal({ onClose }) {
             {t('property.contactsExhausted.planCta', { price: fee('contactPack') })} <Icon name="arrow-right" className="w-4 h-4" />
           </span>
         </Link>
+        <p className="mt-3 text-center text-[11px] text-slate-500">{t('misc1.contactComesBack', { days: refunds.contactReplyDays })}</p>
       </div>
     </div>
   );

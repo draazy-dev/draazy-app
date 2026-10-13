@@ -91,7 +91,7 @@ There are no invoices, payouts or reconciliation tools on this page.
 
 - Do not quote **Revenue** as net of refunds or including services.
 - Do not share the CSV files outside Draazy.
-- Do not promise a customer a refund. **Finance** cannot issue one.
+- Do not promise a customer a refund. **Finance** cannot issue one; refunds are decided on the [Refunds desk](/help/a/refunds-desk).
 - Do not treat an empty ledger or an endless loading state as zero revenue. Reload, then report it.
 
 ## Related
@@ -100,3 +100,4 @@ There are no invoices, payouts or reconciliation tools on this page.
 - [Analytics review](/help/a/analytics-review)
 - [Drafting desk](/help/a/drafting-desk)
 - [Referral fraud](/help/a/referral-fraud)
+- [Refunds desk](/help/a/refunds-desk)

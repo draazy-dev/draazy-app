@@ -11,12 +11,12 @@ import { useAuth } from '../../context/AuthContext.jsx';
 const rupees = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 
 const seekerPlans = (t, fee, n) => [
-  { id: 'seeker-free', free: true, name: t('misc1.plansSeekerFreeName'), price: '₹0', sub: t('misc1.plansSeekerFreeSub'), tag: t('misc1.plansSeekerFreeTag'), feats: [t('misc1.plansSeekerFreeFeat1'), t('misc1.plansSeekerFreeFeat2'), t('misc1.plansSeekerFreeFeat3'), t('misc1.plansSeekerFreeFeat4')], cta: t('misc1.plansSeekerFreeCta'), href: '/listings' },
-  { id: 'contact-pack', name: t('misc1.plansContactPackName'), price: fee('contactPack'), sub: t('misc1.plansContactPackSub', { count: n.contacts, days: n.packDays }), tag: t('misc1.plansContactPackTag'), feats: [t('misc1.plansContactPackFeat1', { count: n.contacts }), t('misc1.plansContactPackFeat2', { days: n.packDays }), t('misc1.plansContactPackFeat3'), t('misc1.plansContactPackFeat4')], cta: t('misc1.plansContactPackCta'), href: '/checkout?plan=contact-pack', pop: true, badge: t('misc1.plansContactPackBadge') },
+  { id: 'seeker-free', free: true, name: t('misc1.plansSeekerFreeName'), price: '₹0', sub: t('misc1.plansSeekerFreeSub'), tag: t('misc1.plansSeekerFreeTag'), feats: [t('misc1.plansSeekerFreeFeat1'), t('misc1.plansSeekerFreeFeat2'), t('misc1.plansSeekerFreeFeat3'), t('misc1.plansSeekerFreeFeat4'), t('misc1.contactComesBack', { days: n.contactReplyDays })], cta: t('misc1.plansSeekerFreeCta'), href: '/listings' },
+  { id: 'contact-pack', name: t('misc1.plansContactPackName'), price: fee('contactPack'), sub: t('misc1.plansContactPackSub', { count: n.contacts, days: n.packDays }), tag: t('misc1.plansContactPackTag'), feats: [t('misc1.plansContactPackFeat1', { count: n.contacts }), t('misc1.plansContactPackFeat2', { days: n.packDays }), t('misc1.plansContactPackFeat3'), t('misc1.plansContactPackFeat4'), n.packRefundDays > 0 && t('misc1.refundGuaranteePack', { days: n.packRefundDays })].filter(Boolean), cta: t('misc1.plansContactPackCta'), href: '/checkout?plan=contact-pack', pop: true, badge: t('misc1.plansContactPackBadge') },
 ];
 const ownerPlans = (t, fee, n) => [
   { id: 'owner-free', free: true, name: t('misc1.plansOwnerFreeName'), price: '₹0', sub: t('misc1.plansOwnerFreeSub'), tag: t('misc1.plansOwnerFreeTag'), feats: [t('misc1.plansOwnerFreeFeat1'), t('misc1.plansOwnerFreeFeat2'), t('misc1.plansOwnerFreeFeat3'), t('misc1.plansOwnerFreeFeat4', { days: n.featuredDays }), t('misc1.plansOwnerFreeFeat5')], cta: t('misc1.plansOwnerFreeCta'), href: '/list-property' },
-  { id: 'listing-pass', name: t('misc1.plansListingPassName'), price: fee('listingPass'), sub: t('misc1.plansListingPassSub', { days: n.passDays }), tag: t('misc1.plansListingPassTag'), feats: [t('misc1.plansListingPassFeat1', { days: n.passDays }), t('misc1.plansListingPassFeat2'), t('misc1.plansListingPassFeat3'), t('misc1.plansListingPassFeat4')], cta: t('misc1.plansListingPassCta'), href: '/dashboard#properties', pop: true },
+  { id: 'listing-pass', name: t('misc1.plansListingPassName'), price: fee('listingPass'), sub: t('misc1.plansListingPassSub', { days: n.passDays }), tag: t('misc1.plansListingPassTag'), feats: [t('misc1.plansListingPassFeat1', { days: n.passDays }), t('misc1.plansListingPassFeat2'), t('misc1.plansListingPassFeat3'), t('misc1.plansListingPassFeat4'), n.passGuaranteeDays > 0 && t('misc1.refundGuaranteePass', { days: n.passGuaranteeDays })].filter(Boolean), cta: t('misc1.plansListingPassCta'), href: '/dashboard#properties', pop: true },
 ];
 /** `price` resolves a plan slug to the card's price so FAQ prose can't quote a different number. */
 const plansFaqs = (t, rentFee, price, n) => [
@@ -119,7 +119,7 @@ export default function Plans() {
   const { t } = useTranslation();
   const { hasEverListed } = useAuth();
   // Fallback price list from `GET /bootstrap`; a compiled-in constant would quote a price nobody could change.
-  const { fee, referral } = usePricing();
+  const { fee, referral, refunds, loaded } = usePricing();
   // The live catalogue, keyed by slug. Empty until it resolves and after a failure; both cases
   // fall through to `fee()` below.
   const [catalogue, setCatalogue] = useState({});
@@ -145,6 +145,9 @@ export default function Plans() {
     packDays: catalogue['contact-pack']?.termDays ?? 30,
     passDays: catalogue['listing-pass']?.termDays ?? 60,
     featuredDays: referral.featuredDays,
+    contactReplyDays: refunds.contactReplyDays,
+    packRefundDays: loaded ? refunds.packRefundDays : 0,
+    passGuaranteeDays: loaded ? refunds.passGuaranteeDays : 0,
   };
   const SEEKER = seekerPlans(t, fee, n).map(priced);
   const OWNER = ownerPlans(t, fee, n).map(priced);

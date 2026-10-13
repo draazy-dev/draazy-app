@@ -17,6 +17,8 @@ export const TYPE_META = {
   document: { icon: 'folder-check', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'document updates' },
   service: { icon: 'file-signature', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'service updates' },
   referral: { icon: 'gift', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'referral updates' },
+  refund: { icon: 'undo-2', iconCls: 'text-amber-400', bgCls: 'bg-amber-400/15', plural: 'refund updates' },
+  contactReturned: { icon: 'rotate-ccw', iconCls: 'text-emerald-400', bgCls: 'bg-emerald-400/15', plural: 'returned contacts' },
   system: { icon: 'info', iconCls: 'text-gray-400', bgCls: 'bg-white/10', plural: 'updates' },
 };
 

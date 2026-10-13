@@ -27,9 +27,18 @@ export const PRICING_DEFAULTS = Object.freeze({
     contactBonus: 15, seekerBonusContacts: 5, ownerFeaturedDays: 14, ownerRewardAgreements: 1,
     featuredDays: 7, qualifyPerMonth: 10, qualifyPerYear: 50, holdDays: 7, clawbackDays: 30, signupWindowHours: 24,
   }),
+  refunds: Object.freeze({
+    packRefundDays: 7, passGuaranteeDays: 7, passGuaranteeMaxEnquiries: 0, passGuaranteeEveryMonths: 12, contactReplyDays: 7,
+  }),
 });
 
 /** The `pricing` section of `GET /bootstrap`. */
 export const getPricing = async () => (await provider()).getPricing();
+
+/** Named on the Refund Policy; `email` falls back to support until an admin sets an officer. */
+export const GRIEVANCE_OFFICER_DEFAULT = Object.freeze({ name: '', email: 'support@draazy.com' });
+
+/** The `legal` section of `GET /bootstrap`. */
+export const getGrievanceOfficer = async () => (await provider()).getGrievanceOfficer();
 
 export const getListingPolicy = async () => (await provider()).getListingPolicy();

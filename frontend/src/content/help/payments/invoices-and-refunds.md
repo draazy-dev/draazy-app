@@ -4,7 +4,7 @@ slug: invoices-and-refunds
 category: payments
 audience: everyone
 order: 2
-updated: 2026-10-10
+updated: 2026-10-12
 summary: Where to find your invoices, what is refundable, and how long a refund takes.
 tags: [invoice, refund, gst, billing, receipt]
 ---
@@ -29,23 +29,30 @@ The binding terms are in the [Refund Policy](/refund-policy). In summary:
 
 | Situation | Refundable |
 | --- | --- |
-| Listing Pass or Contact Pack cancelled within 7 days, unused | Full |
-| Pass or pack after 7 days, or used | Not refundable |
-| Service request cancelled before a partner is assigned | Full |
+| Contact Pack, none of its contacts used, within 7 days of buying | Full |
+| Listing Pass whose listing got no enquiries in its first 7 live days (once every 12 months) | Full |
+| Pack with a contact used, or pass that got enquiries | Not refundable |
 | Rent agreement, before the stamp duty is paid on GRAS | Refundable up to what you paid |
 | Rent agreement, after the stamp duty is paid | Government charges are spent; only eligible service-fee or overpayment refunds can come back |
-| Other services cancelled after a partner starts | 75% if under 25% done, 50% if 25–50% done, none beyond that |
-| Duplicate or failed-but-charged payment | Full |
+| Duplicate or failed-but-charged payment | Refunded automatically |
+
+The windows above are the current settings; the [Refund Policy](/refund-policy) always shows the live numbers.
+
+A contact that an owner declines, or that gets no reply in 7 days, is returned to your allowance automatically — that is not a refund, so you do not need to ask.
 
 ### Timelines
 
 - We review every request within **2 business days**
-- Approved refunds are processed within **5–7 business days**
+- Approved refunds are processed within **5–7 business days**, to the original payment method, with a GST credit note
 - Your bank, card issuer or UPI app may take longer to show the credit
 
 ## Requesting a refund
 
-Raise a ticket at [Support](/support), category **Payment**, with the invoice number. Attach a screenshot if the charge does not appear in your billing history.
+Open **Dashboard → Plan & Billing**. If a pass or pack qualifies, its row shows **Refund · until {date}**. Tap it, add a reason if you like, and confirm. While we review, the pack's contacts are frozen or the pass's listing is paused; if the request is declined they resume.
+
+If a row does not qualify, it says why. Think it should? Tap **Ask for a review** — it opens a [Support](/support) ticket with the invoice number filled in. Attach a screenshot if the charge does not appear in your billing history.
+
+A chargeback with your bank pauses only that purchase, never your account — but contacting us first is usually faster.
 
 ## A charge you do not recognise
 

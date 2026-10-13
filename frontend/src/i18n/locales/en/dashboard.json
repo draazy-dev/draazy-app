@@ -136,11 +136,37 @@
     "billingPassTitled": "Listing pass · {{title}} · till {{date}}",
     "billingPack": "Contact pack · till {{date}}",
     "billingHistory": "Payment history",
-    "billingColInvoice": "Invoice",
-    "billingColItem": "Item",
-    "billingColAmount": "Amount",
-    "billingColDate": "Date",
-    "billingColStatus": "Status"
+    "billingEmpty": "No payments yet.",
+    "billingLoadError": "Couldn’t load your payments — please try again",
+    "billingCreditNote": "Credit note {{no}}",
+    "billingRefundUntil": "Refund · until {{date}}",
+    "billingAskReview": "Ask for a review",
+    "billingViewCase": "View case",
+    "billingStatus": {
+      "paid": "Paid",
+      "refund_pending": "Refund pending",
+      "refunded": "Refunded",
+      "refund_rejected": "Refund declined",
+      "disputed": "Disputed"
+    },
+    "billingWhyNot": {
+      "not_eligible_used": "Already used, so it can’t be refunded.",
+      "window_closed": "The refund window has closed.",
+      "guarantee_used_recently": "You’ve used this guarantee recently.",
+      "already_requested": "A refund was already requested.",
+      "window_not_open": "You can ask from {{date}}.",
+      "listing_paused": "The listing was paused during the guarantee window.",
+      "window_not_open_soon": "The refund window hasn’t opened yet."
+    },
+    "refundTitle": "Request a refund",
+    "refundBack": "{{amount}} goes back to your original payment method.",
+    "refundFreezePack": "Your pack’s contacts are frozen until we decide.",
+    "refundFreezePass": "Your listing is paused until we decide.",
+    "refundReasonLabel": "Reason (optional)",
+    "refundConfirm": "Confirm refund",
+    "refundSent": "Request sent — reviewed within 2 business days.",
+    "refundFailed": "Couldn’t send the request — please try again",
+    "refundNotEligible": "This purchase can’t be refunded any more."
   },
   "visits": {
     "stScheduled": "Awaiting confirmation",

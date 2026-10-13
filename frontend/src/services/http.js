@@ -10,15 +10,15 @@ const TRACE_HEADER = 'X-Trace-Id';
 /** Opaque id of the build that answered. Set by the backend's `BuildStampFilter`. */
 const BUILD_HEADER = 'X-Draazy-Build';
 const REFRESH_PATH = '/auth/refresh';
-// Sign-in, refresh and referral calls only: the id is a fraud signal, so the rest of the API never sees it.
-const DEVICE_ID_PATH = /^\/(auth\/|referrals\/|me\/referrals)/;
+// Sign-in, refresh, referral and refund calls only: the id is a fraud signal, so the rest of the API never sees it.
+const DEVICE_ID_PATH = /^\/(auth\/|referrals\/|me\/referrals|me\/payments)/;
 /** Name of the cross-tab Web Lock that serialises token refreshes. */
 const REFRESH_LOCK = 'draazy:auth-refresh';
 
 // Branch on `code`, the backend's stable machine-readable string — never on `message`, which is
 // human-facing and may be reworded at any time.
 export class ApiError extends Error {
-  constructor({ code, message, status, traceId, fields, attemptsRemaining, retryAfterSeconds }) {
+  constructor({ code, message, status, traceId, fields, attemptsRemaining, retryAfterSeconds, reason }) {
     super(message || code || `HTTP ${status}`);
     this.name = 'ApiError';
     this.code = code || null;
@@ -32,6 +32,8 @@ export class ApiError extends Error {
     /** The *remaining* wait a rate-limited response reports; `null` on every other status. */
     this.retryAfterSeconds =
       Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0 ? retryAfterSeconds : null;
+    /** The sub-code a 422 adds beside `code`, e.g. why a refund is not eligible. */
+    this.reason = typeof reason === 'string' ? reason : null;
   }
 
   /** True when the failure was a validation rejection, so a form can map `fields` onto inputs. */
@@ -393,6 +395,7 @@ async function toResult(res, withStatus = false) {
     // From the envelope, not the `Retry-After` header beside it: the API exposes no CORS response
     // headers, so a browser on another origin can read the body and nothing else.
     retryAfterSeconds: payload?.retryAfterSeconds,
+    reason: payload?.reason,
   });
 }
 

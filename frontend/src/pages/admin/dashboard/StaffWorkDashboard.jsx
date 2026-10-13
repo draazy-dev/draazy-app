@@ -24,6 +24,7 @@ const FUNCTIONS = {
   societies: { label: 'Societies', path: '/admin/societies' },
   reports: { label: 'Reports', path: '/admin/reports' },
   analytics: { label: 'Analytics', path: '/admin/analytics' },
+  refunds: { label: 'Refunds', path: '/admin/refunds' },
 };
 
 function describe(fn) {

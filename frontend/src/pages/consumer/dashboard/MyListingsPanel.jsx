@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { usePricing } from '../../../context/PricingContext';
 import Select from '../../../components/ui/Select.jsx';
 import Icon from '../../../components/Icon.jsx';
+import RefundGuarantee from '../../../components/billing/RefundGuarantee.jsx';
 import { confirmListingFresh, confirmOwnerListing, takeListingDown, pauseListing, resumeListing, myListingCard } from '../../../services/propertyService.js';
 import { deleteGroup, deletePost, deleteRoom, renewFlatmate, splitProperty, unsplitProperty } from '../../../services/flatmateService.js';
 import { closeDeal, reopenDeal, reserveDeal } from '../../../services/dealService.js';
@@ -425,7 +426,10 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
         )}
         {resumeBlock && (
           <div role="alert" className="mb-4 flex flex-col gap-2 rounded-xl border border-amber-400/30 bg-amber-400/5 p-3 text-xs text-amber-100 sm:flex-row sm:items-center sm:justify-between">
-            <span>{resumeBlock.message || t('listingLifecycle.resumeError')}</span>
+            <div className="space-y-1">
+              <span>{resumeBlock.message || t('listingLifecycle.resumeError')}</span>
+              <RefundGuarantee kind="pass" className="text-xs text-emerald-300" />
+            </div>
             <Link to={`/checkout?plan=listing-pass&property=${encodeURIComponent(resumeBlock.id)}`} className="btn-teal inline-flex min-h-[44px] items-center justify-center rounded-lg px-4 py-2 text-xs font-semibold text-white">
               {t('listingLifecycle.goLive', { price: fee('listingPass') })}
             </Link>

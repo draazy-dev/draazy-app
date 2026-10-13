@@ -152,7 +152,8 @@ export function useDashboardData({ user, toast, ownsProperty }) {
       try {
         await respondToContactRequest(reqId, decision);
       } catch (e) {
-        toast(e?.message || 'That did not go through. Please try again.', 'error');
+        const notLive = e?.code === 'listing_not_live';
+        toast(notLive ? 'Make the listing live to share your number.' : e?.message || 'That did not go through. Please try again.', 'error');
         await refreshContactReqs();
         return false;
       }

@@ -33,7 +33,7 @@ modules: [dashboard]
 
 Staff, managers and admins share one back office. Managers and admins open it at `/admin`; staff open the same pages under `/staff/…`. Old `/ops/…` bookmarks redirect to the matching `/admin/…` page.
 
-What you see depends on the **functions** you hold (KYC review, Property verification, Listing moderation, Post on behalf, Flatmates, Support, Reports, Referrals, Societies, Content, Analytics, and one per service desk). A staff member with no function sees the dashboard only. Admins see everything; managers also see every service desk. If a desk you need is missing, ask your manager or an admin to grant the function in **Team & Access** (`/admin/team`, manager and admin only) — do not borrow a colleague's login. New staff activate from an invite link at `/staff-invite`.
+What you see depends on the **functions** you hold (KYC review, Property verification, Listing moderation, Post on behalf, Flatmates, Support, Reports, Referrals, Refunds, Societies, Content, Analytics, and one per service desk). A staff member with no function sees the dashboard only. Admins see everything; managers also see every service desk. If a desk you need is missing, ask your manager or an admin to grant the function in **Team & Access** (`/admin/team`, manager and admin only) — do not borrow a colleague's login. New staff activate from an invite link at `/staff-invite`.
 
 ## Desks
 
@@ -45,6 +45,7 @@ What you see depends on the **functions** you hold (KYC review, Property verific
 | Rent Agreement | `/admin/rent-agreement` | Rent-agreement drafting, registration, refunds | [Drafting desk and service queues](/help/a/drafting-desk) |
 | Other service desks | `/admin/legal`, `/admin/interior`, `/admin/packers`, `/admin/valuation` | Legal, interior, packers and valuation requests | [Service queues](/help/a/service-queues) |
 | Referrals | `/admin/referrals` | Referral reward review and clawbacks | [Referral fraud review](/help/a/referral-fraud) |
+| Refunds | `/admin/refunds` | Pass and contact-pack refund requests, automatic refunds, disputes | [Refunds desk](/help/a/refunds-desk) |
 | Flatmates | `/admin/flatmates` | Flatmate posts, badges, edits and group applications | [Flatmate review](/help/a/flatmate-review) |
 | Properties | `/admin/properties` | Listing verification, re-checks, duplicates | [Verification SLAs](/help/a/verification-sla) |
 | Properties → ownership | `/admin/properties` | Ownership evidence and ownership badges | [Ownership and badges](/help/a/ownership-and-badges) |

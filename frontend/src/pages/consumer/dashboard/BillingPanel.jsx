@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { fmtDate, fmtINR } from '../../../lib/format.js';
+import { fmtDate } from '../../../lib/format.js';
 import { getEntitlements } from '../../../services/entitlementService.js';
 import { usePricing } from '../../../context/PricingContext';
-import { BILLING_HISTORY } from './constants.js';
 import { Card, SectionHead } from './components.jsx';
+import PaymentHistory from './PaymentHistory.jsx';
 
 export default function BillingPanel({ isOwner, listings = [] }) {
   const { t } = useTranslation();
@@ -45,42 +45,7 @@ export default function BillingPanel({ isOwner, listings = [] }) {
       </Card>
       <Card className="p-6">
         <SectionHead icon="history" title={t('dash.billingHistory')} />
-        {/* Desktop: the full table. Mobile (< sm): stacked cards so five columns
-            don't get squished into ~390px. Same data, one source, no h-scroll. */}
-        <div className="hidden sm:block overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead><tr className="text-left text-gray-500">
-              <th className="py-2 pr-4 font-medium">{t('dash.billingColInvoice')}</th><th className="py-2 pr-4 font-medium">{t('dash.billingColItem')}</th><th className="py-2 pr-4 font-medium">{t('dash.billingColAmount')}</th><th className="py-2 pr-4 font-medium">{t('dash.billingColDate')}</th><th className="py-2 font-medium">{t('dash.billingColStatus')}</th>
-            </tr></thead>
-            <tbody>
-              {BILLING_HISTORY.map((b) => (
-                <tr key={b.id} className="border-t border-white/5">
-                  <td className="py-3 pr-4 font-mono text-xs text-gray-400">{b.id}</td>
-                  <td className="py-3 pr-4 text-white">{b.plan}</td>
-                  <td className="py-3 pr-4 font-semibold">{fmtINR(b.amount)}</td>
-                  <td className="py-3 pr-4 text-gray-400">{b.at}</td>
-                  <td className="py-3"><span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-semibold">{b.status}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="sm:hidden space-y-2.5">
-          {BILLING_HISTORY.map((b) => (
-            <div key={b.id} className="rounded-xl bg-white/[0.03] p-3.5">
-              <div className="flex items-start justify-between gap-3">
-                <p className="text-white text-sm font-semibold leading-snug min-w-0">{b.plan}</p>
-                <span className="text-white text-sm font-bold whitespace-nowrap flex-shrink-0">{fmtINR(b.amount)}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 mt-2">
-                <p className="text-gray-500 text-xs truncate">
-                  <span className="font-mono">{b.id}</span> · {b.at}
-                </p>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-semibold flex-shrink-0">{b.status}</span>
-              </div>
-            </div>
-          ))}
-        </div>
+        <PaymentHistory />
       </Card>
     </div>
   );

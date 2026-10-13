@@ -25,6 +25,7 @@ export default function Support() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [params] = useSearchParams();
+  const invoice = (params.get('invoice') || '').replace(/[^\w-]/g, '').slice(0, 40);
 
   /* No priority or image-attachment control: neither is on the wire, and unknown properties are ignored rather
      than rejected, so sending one would appear to work while ops never sees it. */
@@ -36,7 +37,7 @@ export default function Support() {
     name: user?.name || '',
     mobile: user?.mobile || '',
     category: params.get('cat') || 'payment',
-    subject: '',
+    subject: invoice ? tr('misc.supportRefundSubject', { invoice }) : '',
     message: '',
   });
 

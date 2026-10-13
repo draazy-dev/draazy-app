@@ -67,7 +67,7 @@ export const KB = [
     id: 'contact-gate',
     keywords: ['contact', 'owner', 'call', 'number', 'phone', 'details', 'request', 'reveal', 'reach', 'message', 'connect', 'masked', 'limit'],
     q: 'How do I contact an owner?',
-    a: "Open a property and tap Contact Owner (or Request number) — you only need to be signed in with your mobile number. That sends the owner a contact request; your number stays private. Once they accept, you can chat in Messages and you see their number, unless the owner keeps it private. A request with no answer lapses after 30 days. A free account includes 15 owner contacts, usable within 30 days of your first (asking again on the same home is free); referring friends or a Contact Pack gets you more. A few owners only accept people with the Verified badge.",
+    a: "Open a property and tap Contact Owner (or Request number) — you only need to be signed in with your mobile number. That sends the owner a contact request; your number stays private. Once they accept, you can chat in Messages and you see their number, unless the owner keeps it private. A request with no answer lapses after 7 days, and a declined or lapsed request returns your contact. A free account includes 15 owner contacts, usable within 30 days of your first (tapping again while your request is open is free; a fresh request after one lapses uses a contact); referring friends or a Contact Pack gets you more. A few owners only accept people with the Verified badge.",
     actions: [
       { label: 'Browse listings', to: '/listings', icon: 'search' },
       { label: 'My messages', to: '/messages', icon: 'message-circle' },
@@ -126,6 +126,16 @@ export const KB = [
     q: 'What costs money on Draazy?',
     a: "Only three things: a Contact Pack (15 owner contacts for 30 days), a Listing Pass for each extra live listing beyond your one free listing (60 days), and a rent agreement. None renews by itself. Everything else, including enquiries, the verified badge and flatmate posts, is free. Compare current prices on the Plans page.",
     actions: [{ label: 'View Plans', to: '/plans', icon: 'badge-check' }],
+  },
+  {
+    id: 'refunds',
+    keywords: ['refund', 'refunds', 'money back', 'cancel', 'charged', 'chargeback', 'invoice', 'credit note', 'guarantee'],
+    q: 'Can I get a refund?',
+    a: "Sometimes. An unused Contact Pack can be refunded within 7 days, and a Listing Pass whose listing got no enquiries in its first 7 live days is refunded in full. Open Plan & Billing: eligible purchases show a Refund button, and the others show why, with an Ask for a review option. Declined or unanswered contact requests return your contact automatically. We review every request within 2 business days and refund to the original payment method in 5–7 business days, with a GST credit note. The Refund Policy has the live numbers.",
+    actions: [
+      { label: 'Plan & Billing', to: '/dashboard#billing', icon: 'receipt-indian-rupee' },
+      { label: 'Refund Policy', to: '/refund-policy', icon: 'file-text' },
+    ],
   },
   {
     id: 'emi',

@@ -17,6 +17,8 @@ const TYPE_PREFIXES = [
   ['flatmate.agreement', 'service'],
   // Catch-all for future flatmate types; more specific rules above win.
   ['flatmate', 'share'],
+  // A declined or lapsed request hands the contact back; it is not an owner's answer to chase.
+  ['contact.returned', 'contactReturned'],
   // The owner answered a contact request the user made — an outcome on their own enquiry.
   ['contact', 'enquiry'],
   /** Not `document` — that member means paperwork access, and photos are neither. This mapping is load-bearing rather
@@ -38,11 +40,12 @@ const TYPE_PREFIXES = [
   ['service', 'service'],
   ['tenancy', 'service'],
   ['referral', 'referral'],
+  ['refund', 'refund'],
 ];
 
 /** UI types that already mean what they say — passed through untouched. */
 const PASSTHROUGH = new Set([
-  'match', 'enquiry', 'price', 'visit', 'share', 'document', 'service', 'referral', 'system',
+  'match', 'enquiry', 'price', 'visit', 'share', 'document', 'service', 'referral', 'refund', 'contactReturned', 'system',
 ]);
 
 const warned = new Set();

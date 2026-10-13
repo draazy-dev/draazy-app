@@ -66,6 +66,8 @@ export function ContactBox({ p, isIn, toast }) {
       // Free contacts spent. This arrives as a refusal from the server rather than being decided
       // here, so the modal opens on the same press that was refused — one round trip, not zero.
       else if (err?.code === 'contact_quota_exhausted') setQuotaOpen(true);
+      else if (err?.code === 'contact_pending_limit') toast(t('property.contactPendingLimit'), 'info');
+      else if (err?.code === 'listing_not_live') toast(t('property.listingNotLive'), 'info');
       else if (err?.status === 401) sendToSignIn('contact', back);
       else toast(t('property.contactUnavailable'), 'error');
     } finally {
@@ -113,10 +115,15 @@ export function ContactBox({ p, isIn, toast }) {
             </span>
           ) : status === 'declined' ? (
             <span className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-400 font-medium px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
-              <Icon name="x-circle" className="w-3.5 h-3.5" /> {t('property.ownerDeclined')}
+              <Icon name="rotate-ccw" className="w-3.5 h-3.5" /> {t('property.contactReturned')}
             </span>
           ) : (
             <>
+              {status === 'expired' && (
+                <span className="mt-2 inline-flex items-center gap-1.5 text-xs text-slate-400 font-medium px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                  <Icon name="rotate-ccw" className="w-3.5 h-3.5" /> {t('property.contactReturned')}
+                </span>
+              )}
               <p className="text-[11px] text-slate-500 mt-0.5">{t('property.hiddenPrivacy')}</p>
               <Button onClick={request} disabled={busy} variant="primary" size="sm" fullWidth icon="lock-keyhole" className="mt-2">{t('property.requestNumber')}</Button>
               {isIn && Number.isFinite(left) && (

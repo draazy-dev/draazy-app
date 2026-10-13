@@ -5,7 +5,7 @@ category: payments
 audience: owner
 order: 1
 featured: true
-updated: 2026-10-10
+updated: 2026-10-12
 summary: What costs money, what is free, and how listing slots and contact allowances work.
 tags: [plans, pricing, owner, contacts, referral]
 ---
@@ -47,6 +47,14 @@ Referring a friend who is looking for a home adds owner contacts for free, and r
 ## Billing
 
 Passes and packs are prepaid for the term and never renew. Every payment is under **Dashboard → Plan & Billing**.
+
+## Money-back protection
+
+- **Listing Pass:** no enquiries in the first 7 live days? Full refund, once every 12 months.
+- **Contact Pack:** unused? Refund within 7 days.
+- **Contacts:** if an owner declines or does not reply in 7 days, the contact comes back to you automatically.
+
+Ask for a refund from **Plan & Billing**; the windows shown there are the live ones. See [Invoices, refunds and receipts](/help/a/invoices-and-refunds).
 
 ## Related
 

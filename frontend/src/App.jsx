@@ -121,6 +121,7 @@ const AdminLocalities = lazy(() => import('./pages/admin/AdminLocalities.jsx'));
 const AdminTeam = lazyPage(() => import('./pages/admin/AdminTeam.jsx'), 'team');
 
 const OpsReferrals = lazy(() => import('./pages/ops/OpsReferrals.jsx'));
+const OpsRefunds = lazy(() => import('./pages/ops/OpsRefunds.jsx'));
 const OpsFlatmateReview = lazy(() => import('./pages/ops/OpsFlatmateReview.jsx'));
 const OpsIdentityReview = lazy(() => import('./pages/ops/OpsIdentityReview.jsx'));
 const OpsSupportQueue = lazy(() => import('./pages/ops/OpsSupportQueue.jsx'));
@@ -228,6 +229,7 @@ const BACK_OFFICE_ROUTES = [{
     { path: 'support', element: <ModuleRoute moduleKey="support"><FlagRoute flag="support"><OpsSupportQueue /></FlagRoute></ModuleRoute> },
     { path: 'enquiries', element: <ModuleRoute moduleKey="enquiries"><AdminEnquiries /></ModuleRoute> },
     { path: 'referrals', element: <ModuleRoute moduleKey="referrals"><OpsReferrals /></ModuleRoute> },
+    { path: 'refunds', element: <ModuleRoute moduleKey="refunds"><OpsRefunds /></ModuleRoute> },
     { path: 'finance', element: <ModuleRoute moduleKey="finance"><FlagRoute flag="finance"><AdminFinance /></FlagRoute></ModuleRoute> },
     { path: 'content', element: <ModuleRoute moduleKey="content"><AdminContent /></ModuleRoute> },
     { path: 'reports', element: <ModuleRoute moduleKey="reports"><FlagRoute flag="reports"><AdminReports /></FlagRoute></ModuleRoute> },

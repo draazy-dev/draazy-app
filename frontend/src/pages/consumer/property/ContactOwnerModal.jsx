@@ -78,6 +78,10 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
         setQuotaOpen(true);
         return;
       }
+      if (err?.code === 'contact_pending_limit') {
+        toast(t('property.contactPendingLimit'), 'info');
+        return;
+      }
       if (err?.status === 401) {
         /* `back` is the listing as it was when the request left: `signInPath` otherwise reads `window.location` at
            call time and would return them to wherever they navigated meanwhile. */
@@ -104,6 +108,14 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
     }
     if (err?.code === 'contact_quota_exhausted') {
       setQuotaOpen(true);
+      return true;
+    }
+    if (err?.code === 'contact_pending_limit') {
+      toast(t('property.contactPendingLimit'), 'info');
+      return true;
+    }
+    if (err?.code === 'listing_not_live') {
+      toast(t('property.listingNotLive'), 'info');
       return true;
     }
     if (err?.status === 401) {
@@ -226,7 +238,12 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
                   )}
                   {status === 'declined' && (
                     <span className="inline-flex items-center gap-1.5 text-xs text-slate-400 font-medium px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
-                      <Icon name="x-circle" className="w-3.5 h-3.5" /> {t('property.ownerDeclined')}
+                      <Icon name="rotate-ccw" className="w-3.5 h-3.5" /> {t('property.contactReturned')}
+                    </span>
+                  )}
+                  {status === 'expired' && (
+                    <span className="mb-2 flex w-fit items-center gap-1.5 text-xs text-slate-400 font-medium px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                      <Icon name="rotate-ccw" className="w-3.5 h-3.5" /> {t('property.contactReturned')}
                     </span>
                   )}
                   {status !== 'pending' && status !== 'declined' && (

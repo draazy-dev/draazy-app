@@ -53,7 +53,11 @@ export function PricingProvider({ children }) {
     [prices],
   );
 
-  const value = useMemo(() => ({ fee, prices, referral: prices.referral, activate }), [fee, prices, activate]);
+  const loaded = prices !== PRICING_DEFAULTS;
+  const value = useMemo(
+    () => ({ fee, prices, referral: prices.referral, refunds: prices.refunds, loaded, activate }),
+    [fee, prices, loaded, activate],
+  );
 
   return (
     <PricingContext.Provider value={value}>

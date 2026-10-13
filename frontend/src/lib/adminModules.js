@@ -2,7 +2,7 @@
 import {
   BarChart3, BookOpen, Building2, Calculator, FileSignature, FileText, Gauge, Gift, Landmark, LayoutDashboard, LifeBuoy,
   MessageSquare, Paintbrush, Scale, Settings, Truck, Users, Flag, IndianRupee, UserPlus,
-  MapPin, Plug, UsersRound, Eraser, ThumbsUp,
+  MapPin, Plug, UsersRound, Eraser, ThumbsUp, Undo2,
 } from 'lucide-react';
 
 // `value` is the server's desk slug (`desk:<value>` function); Home Loans has tickets, not service requests.
@@ -42,6 +42,7 @@ export const ADMIN_MODULES = [
   { key: 'support', label: 'Support queue', path: '/admin/support', icon: LifeBuoy, flagKey: 'support', atom: 'tickets:read', writeAtom: 'tickets:write' },
   { key: 'enquiries', label: 'Enquiries', path: '/admin/enquiries', icon: MessageSquare, atom: 'enquiries:read' },
   { key: 'referrals', label: 'Referrals', path: '/admin/referrals', icon: Gift, atom: 'referrals:read', writeAtom: 'referrals:write' },
+  { key: 'refunds', label: 'Refunds', path: '/admin/refunds', icon: Undo2, atom: 'refunds:read', writeAtom: 'refunds:write' },
   { key: 'finance', label: 'Finance', path: '/admin/finance', icon: IndianRupee, flagKey: 'finance', adminOnly: true, atom: 'finance:read' },
   { key: 'content', label: 'Content', path: '/admin/content', icon: FileText, atom: 'content:read', writeAtom: 'content:write' },
   { key: 'reports', label: 'Reports', path: '/admin/reports', icon: Flag, flagKey: 'reports', atom: ['reports:read', 'reviews:read'], writeAtom: 'reports:write' },

@@ -83,8 +83,8 @@ export default function Terms() {
       <ul>
         <li>Listing Passes, Contact Packs and rent agreements are one-off purchases, paid in advance. There are no subscriptions and nothing renews automatically.</li>
         <li>Prices include GST. Rent agreements cost extra only for government charges (stamp duty and registration).</li>
-        <li>A Listing Pass ends early when its listing is rented, sold or archived; unused days are not refunded.</li>
-        <li>Refunds are governed by our <Link to="/refund-policy">Refund Policy</Link>.</li>
+        <li>A Listing Pass ends early when its listing is rented, sold or archived, with no refund for unused days.</li>
+        <li>Refunds, returned contacts and disputes are governed by our <Link to="/refund-policy">Refund Policy</Link>.</li>
       </ul>
 
       <h2>8. Limitation of liability</h2>

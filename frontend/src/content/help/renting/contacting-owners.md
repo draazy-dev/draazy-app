@@ -4,7 +4,7 @@ slug: contacting-owners
 category: renting
 audience: tenant
 order: 1
-updated: 2026-10-10
+updated: 2026-10-12
 summary: How owner approval, masked contact details, contact allowance and in-app chat work.
 tags: [enquiry, contact, owner, messaging, quota]
 ---
@@ -13,15 +13,17 @@ tags: [enquiry, contact, owner, messaging, quota]
 
 Open a listing and tap **Contact Owner** (or **Request number** next to the masked number). You need to be signed in with a verified mobile number — that is the only requirement, and it is the same floor everywhere on Draazy.
 
-Tapping does not hand you a phone number. Sending an enquiry, starting a chat or tapping **Request number** all send the owner a **contact request**, and their number stays partly masked (`+91 98xxx xxxx02`) until they say yes. A request sits in one of three states:
+Tapping does not hand you a phone number. Sending an enquiry, starting a chat or tapping **Request number** all send the owner a **contact request**, and their number stays partly masked (`+91 98xxx xxxx02`) until they say yes. A request sits in one of these states:
 
 | State | What you see |
 | --- | --- |
 | Pending | Request sent. The owner has not answered yet. |
 | Approved | The contact path opens. You can message in-app, and any phone action shown for that owner appears only after approval. Some owners keep their number hidden even after approving — you then see "Approved — listing contact prefers in-app chat" and talk in the app. |
-| Declined | The owner passed. This is final for that listing. |
+| Contact returned | The owner declined, or did not reply in 7 days. The contact goes back to your allowance — nothing is used. |
 
-Tapping again on the same listing does not send a second request — it shows you where the first one stands. A pending request lapses after 30 days; ask again then, and it does not use another contact.
+Tapping again on the same listing does not send a second request — it shows you where the first one stands. If the owner does not reply within 7 days the request lapses and your contact comes back; you can ask again then, and the new request uses a contact like any other.
+
+Too many requests waiting at once? Draazy limits how many unanswered requests you can have open. You will see a message, and can send more once owners reply or requests lapse.
 
 The owner's number is never shown before approval. For many listings the safe next step is in-app chat rather than taking the conversation off-platform.
 
@@ -45,7 +47,7 @@ Owner contacts are counted per account, not per day:
 | Contact Pack | 15 more, valid 30 days; packs stack |
 | Referral reward | Extra contacts for each qualified referral (see [Refer](/refer)) |
 
-One listing costs one contact however many times you open it, and whether the owner approves or declines does not change the number — you are charged for asking, once, per property.
+A contact is used when you ask, and comes back if the owner declines or does not reply in 7 days. An approved request keeps it used. One listing costs one contact however many times you open it.
 
 The listing shows "N owner contacts left" beside **Request number**, and the same line shows when your free contacts expire. When the allowance runs out the app says so and offers a referral link (while referral rewards are on) or a [Contact Pack](/plans).
 
@@ -70,7 +72,7 @@ A workable template:
 - Check the listing's freshness badge; an unconfirmed listing may already be rented.
 - Use [Report this listing](/help/a/report-a-listing) if it is clearly gone, so other tenants do not waste time on it.
 
-A declined request cannot be re-sent. That is deliberate: it stops a refusal being worn down by repetition.
+A declined request cannot be re-sent. That is deliberate: it stops a refusal being worn down by repetition. Your contact is returned, so you lose nothing by moving on.
 
 ## Staying safe
 

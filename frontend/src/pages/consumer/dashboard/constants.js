@@ -90,9 +90,3 @@ export const VISIT_STATUS_CLS = {
   'no-show': 'bg-rose-500/15 text-rose-300',
   rescheduled: 'bg-indigo-500/15 text-indigo-300',
 };
-
-export const BILLING_HISTORY = [
-  { id: 'INV-2041', plan: 'Listing Pass · 60 days', amount: 999, at: '2026-01-14', status: 'Paid' },
-  { id: 'INV-1980', plan: 'Contact Pack · 15 contacts', amount: 199, at: '2025-11-02', status: 'Paid' },
-  { id: 'INV-1899', plan: 'Rent agreement', amount: 499, at: '2025-09-21', status: 'Paid' },
-];

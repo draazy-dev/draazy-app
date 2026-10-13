@@ -1,6 +1,6 @@
 import { get, put } from '../../http.js';
 import { bootstrapSection } from './bootstrap.js';
-import { PRICING_DEFAULTS } from '../../settingsService.js';
+import { GRIEVANCE_OFFICER_DEFAULT, PRICING_DEFAULTS } from '../../settingsService.js';
 import { DEFAULT_MAX_PHOTOS, MAX_PHOTOS_CEILING } from '../../../lib/uploads/policy.js';
 
 /** The `ETag` of the last document read or written, sent back as `If-Match` so a stale save answers 412. */
@@ -73,7 +73,17 @@ export async function getPricing() {
   for (const key of Object.keys(PRICING_DEFAULTS.referral)) {
     if (Number.isFinite(raw.referral?.[key])) out.referral[key] = raw.referral[key];
   }
+  out.refunds = { ...PRICING_DEFAULTS.refunds };
+  for (const key of Object.keys(PRICING_DEFAULTS.refunds)) {
+    if (Number.isFinite(raw.refunds?.[key])) out.refunds[key] = raw.refunds[key];
+  }
   return out;
+}
+
+export async function getGrievanceOfficer() {
+  const officer = (await bootstrapSection('legal'))?.grievanceOfficer;
+  const text = (v) => (typeof v === 'string' ? v.trim() : '');
+  return { name: text(officer?.name), email: text(officer?.email) || GRIEVANCE_OFFICER_DEFAULT.email };
 }
 
 /** The `listingPolicy` section of `GET /bootstrap` (`common/settings/ListingPolicyController.java`). */
