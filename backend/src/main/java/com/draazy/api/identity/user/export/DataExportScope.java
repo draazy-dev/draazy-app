@@ -349,6 +349,51 @@ public final class DataExportScope {
                 withheld("idempotency_key", "A client-supplied token that stops a double tap "
                         + "charging you twice. Internal plumbing, not information about you.")));
 
+        out.add(new Dataset("listings", "refund_requests",
+                "Refunds you asked for on a listing pass or contact pack, and what staff decided.",
+                """
+                select id, subscription_id, kind, status, basis, amount, customer_reason,
+                       decided_at, decision_reason, created_at
+                  from refund_requests
+                 where user_id = :subjectId
+                 order by created_at desc
+                """,
+                withheld("device_id_hash / instrument_hash", "Salted digests of your browser and payment "
+                        + "instrument, kept only to stop one refund being claimed from two accounts. "
+                        + "A digest is not something you could read or use.")));
+
+        out.add(new Dataset("listings", "invoices",
+                "GST tax invoices issued to you when a payment of yours succeeded.",
+                """
+                select number, source_type, order_ref, amount, taxable_amount, gst_amount,
+                       gst_percent, issued_at
+                  from invoices
+                 where user_id = :subjectId
+                 order by issued_at desc
+                """,
+                Map.of()));
+
+        out.add(new Dataset("listings", "credit_notes",
+                "GST credit notes issued to you when a refund went through.",
+                """
+                select number, invoice_no, source_type, order_ref, amount, taxable_amount, gst_amount,
+                       gst_percent, issued_at
+                  from credit_notes
+                 where user_id = :subjectId
+                 order by issued_at desc
+                """,
+                Map.of()));
+
+        out.add(new Dataset("listings", "payment_disputes",
+                "Chargebacks your bank raised against a payment of yours.",
+                """
+                select dispute_ref, order_ref, status, provider_status, amount, reason,
+                       opened_at, closed_at
+                  from payment_disputes
+                 where user_id = :subjectId
+                 order by opened_at desc
+                """,
+                Map.of()));
         out.add(new Dataset("listings", "saved_properties",
                 "Listings you shortlisted.",
                 """

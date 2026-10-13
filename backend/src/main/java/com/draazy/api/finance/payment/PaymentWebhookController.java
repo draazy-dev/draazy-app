@@ -1,6 +1,7 @@
 package com.draazy.api.finance.payment;
 
 import com.draazy.api.billing.BillingPayments;
+import com.draazy.api.billing.refund.PaymentDisputes;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.provider.PaymentGateway;
 import com.draazy.api.provider.ProviderCalls;
@@ -38,6 +39,8 @@ public class PaymentWebhookController {
     private static final String REFUND_EVENT = "REFUND_STATUS_WEBHOOK";
 
     private static final String PASS_REFUND_PREFIX = "lp_";
+
+    private static final String DISPUTE_EVENT_PREFIX = "DISPUTE_";
 
     private final BillingPayments billingPayments;
     private final ServiceRequestService serviceRequests;
@@ -77,8 +80,13 @@ public class PaymentWebhookController {
         }
         try {
             JsonNode root = objectMapper.readTree(rawBody);
-            if (REFUND_EVENT.equals(root.path("type").asString(null))) {
+            String eventType = root.path("type").asString(null);
+            if (REFUND_EVENT.equals(eventType)) {
                 settleRefund(root.path("data").path("refund"));
+                return;
+            }
+            if (eventType != null && eventType.startsWith(DISPUTE_EVENT_PREFIX)) {
+                settleDispute(eventType, root.path("data"));
                 return;
             }
             JsonNode data = root.path("data");
@@ -87,6 +95,9 @@ public class PaymentWebhookController {
             String orderId = data.path("order").path("order_id").asString(null);
             String providerStatus = payment.path("payment_status").asString(null);
             boolean paid = PROVIDER_SUCCESS.equals(providerStatus);
+            if (paid) {
+                recordInstrument(orderId, payment.path("payment_method"));
+            }
 
             String paymentTime = payment.path("payment_time").asString(null);
             Instant settledAt = settlementInstant(paymentTime);
@@ -142,6 +153,42 @@ public class PaymentWebhookController {
         calls.record(ProviderCalls.CASHFREE, PaymentGateway.WEBHOOK,
                 ok ? ProviderCalls.Outcome.OK : ProviderCalls.Outcome.FAILED,
                 null, refund.path("order_id").asString(null), "refund " + status, null);
+    }
+
+    // Disputes freeze one order and tell the refunds desk; an unknown DISPUTE_* type still freezes on first sight.
+    private void settleDispute(String eventType, JsonNode data) {
+        JsonNode dispute = data.path("dispute");
+        String orderId = data.path("order_details").path("order_id").asString(null);
+        if (orderId == null) {
+            orderId = data.path("order").path("order_id").asString(null);
+        }
+        BigDecimal amount = exactAmount(dispute.path("dispute_amount").asString(null));
+        String finalOrderId = orderId;
+        Settlement outcome = settle("dispute", () -> {
+            billingPayments.applyDispute(new PaymentDisputes.Event(eventType,
+                    dispute.path("dispute_id").asString(null), finalOrderId,
+                    dispute.path("dispute_status").asString(null), amount == null ? null : amount.longValue(),
+                    dispute.path("reason_description").asString(null)));
+            return true;
+        });
+        calls.record(ProviderCalls.CASHFREE, PaymentGateway.WEBHOOK,
+                outcome == Settlement.CLAIMED ? ProviderCalls.Outcome.OK : ProviderCalls.Outcome.FAILED,
+                null, orderId, eventType, null);
+    }
+
+    // The card or UPI id behind a payment, so accounts paying from the same instrument can be linked.
+    private void recordInstrument(String orderId, JsonNode method) {
+        String card = method.path("card").path("card_number").asString(null);
+        String upi = method.path("upi").path("upi_id").asString(null);
+        String fingerprint = card != null ? "card:" + card : upi != null ? "upi:" + upi : null;
+        if (orderId == null || fingerprint == null) {
+            return;
+        }
+        try {
+            billingPayments.recordInstrument(orderId, fingerprint);
+        } catch (Exception failed) {
+            log.warn("Could not record the payment instrument for order {}", orderId, failed);
+        }
     }
 
     // Only HMAC-authenticated stale callbacks cost money, so only they log as errors.

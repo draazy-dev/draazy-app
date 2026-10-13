@@ -1,5 +1,6 @@
 package com.draazy.api.billing.entitlement;
 
+import com.draazy.api.billing.plan.ContactPackTerm;
 import com.draazy.api.billing.plan.Plan;
 import com.draazy.api.billing.plan.SubscriptionService;
 import com.draazy.api.billing.referral.ReferralRepository;
@@ -10,6 +11,7 @@ import com.draazy.api.common.trust.ContactUsageLookup;
 import com.draazy.api.common.trust.ListingAllowanceLookup;
 import com.draazy.api.common.trust.ListingSlotLookup;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -70,6 +72,19 @@ public class EntitlementService implements ContactAllowanceLookup, ListingAllowa
                 freeListingSlots(plan), slots.listingSlotsHeld(userId), passes);
 
         return new EntitlementsDto(contacts, listings, agreementsOf(userId));
+    }
+
+    /** Contacts the history replays onto this pack, for the refund rule; the pack is replayed even while frozen. */
+    @Transactional(readOnly = true)
+    public int contactsSpentFromPack(UUID userId, ContactPackTerm pack, Instant asOf) {
+        List<ContactPackTerm> terms = new ArrayList<>(subscriptions.contactPacks(userId));
+        if (terms.stream().noneMatch(t -> pack.subscriptionId().equals(t.subscriptionId()))) {
+            terms.add(pack);
+        }
+        List<Instant> before = usage.contactTimes(userId).stream().filter(at -> at.isBefore(asOf)).toList();
+        return ContactAllocator.spentFromPacks(before,
+                Math.toIntExact(settings.freeContactLimit()) + friendBonus(userId), terms,
+                referralContacts(userId)).getOrDefault(pack.subscriptionId(), 0);
     }
 
     private ContactAllocator.Standing standingOf(UUID userId, List<Instant> contacted, int contactBonus,

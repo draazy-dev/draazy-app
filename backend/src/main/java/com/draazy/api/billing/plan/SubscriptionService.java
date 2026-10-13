@@ -1,5 +1,6 @@
 package com.draazy.api.billing.plan;
 
+import com.draazy.api.billing.credit.Invoices;
 import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ErrorCodes;
@@ -52,12 +53,13 @@ public class SubscriptionService {
     private final UserRepository users;
     private final PlatformSettings platformSettings;
     private final ListingPasses passes;
+    private final Invoices invoices;
 
     private final TransactionTemplate transactions;
 
     public SubscriptionService(PlanRepository plans, SubscriptionRepository subscriptions,
             PlanMapper mapper, PaymentGateway gateway, UserRepository users,
-            PlatformSettings platformSettings, ListingPasses passes,
+            PlatformSettings platformSettings, ListingPasses passes, Invoices invoices,
             PlatformTransactionManager transactionManager) {
         this.plans = plans;
         this.subscriptions = subscriptions;
@@ -66,6 +68,7 @@ public class SubscriptionService {
         this.users = users;
         this.platformSettings = platformSettings;
         this.passes = passes;
+        this.invoices = invoices;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -268,6 +271,8 @@ public class SubscriptionService {
         if (subscription.getPropertyId() != null) {
             passes.resumeIfPaused(subscription);
         }
+        invoices.issue(subscription.getUserId(), Invoices.SUBSCRIPTION, subscription.getId(),
+                subscription.getPaymentRef(), subscription.getAmount(), subscription.getAmount(), paidAt);
         log.info("Subscription {} activated by provider callback", subscription.getId());
         return true;
     }

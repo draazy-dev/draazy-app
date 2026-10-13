@@ -56,6 +56,22 @@ class ContactAllocatorTest {
     }
 
     @Test
+    @DisplayName("a frozen pack keeps the contacts it already served but supplies no more")
+    void aFrozenPackKeepsItsHistoryAndLendsNothing() {
+        var frozen = new ContactPackTerm(null, day(0), day(30), 15, day(5));
+        var live = new ContactPackTerm(day(0), day(60), 15);
+
+        var beforeFreeze = ContactAllocator.allocate(contactsOn(3, 1), 0, List.of(frozen, live), 0, day(6));
+        assertThat(beforeFreeze.remaining()).isEqualTo(15);
+
+        var afterFreeze = ContactAllocator.allocate(
+                java.util.stream.Stream.concat(contactsOn(3, 1).stream(), contactsOn(2, 7).stream()).toList(),
+                0, List.of(frozen, live), 0, day(8));
+        assertThat(afterFreeze.remaining()).isEqualTo(13);
+        assertThat(afterFreeze.packExpiresAt()).isEqualTo(day(60));
+    }
+
+    @Test
     @DisplayName("a pack's leftovers vanish when it lapses, and later packs are untouched")
     void anExpiredPackLeavesNothing() {
         var old = new ContactPackTerm(day(0), day(30), 15);

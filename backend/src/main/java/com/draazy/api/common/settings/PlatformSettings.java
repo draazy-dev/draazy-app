@@ -52,7 +52,18 @@ public class PlatformSettings {
             Map.entry("referralVelocityPerDay", new Bound(5, 1, 1_000)),
             Map.entry("referralSignupWindowHours", new Bound(24, 1, 720)),
             Map.entry("referralSignalRetentionDays", new Bound(180, 30, 180)),
-            Map.entry("referralNewReferrerDays", new Bound(7, 0, 90)));
+            Map.entry("referralNewReferrerDays", new Bound(7, 0, 90)),
+            Map.entry("contactReplyDays", new Bound(7, 1, 30)),
+            Map.entry("contactPendingMax", new Bound(10, 1, 100)),
+            Map.entry("packRefundDays", new Bound(7, 0, 30)),
+            Map.entry("passGuaranteeDays", new Bound(7, 0, 30)),
+            Map.entry("passGuaranteeMaxEnquiries", new Bound(0, 0, 50)),
+            Map.entry("passGuaranteeEveryMonths", new Bound(12, 1, 36)));
+
+    public static final String LEGAL_KEY = "legal";
+
+    public record GrievanceOfficer(String name, String email) {
+    }
 
     // The product prices, in whole rupees.
     // Defaults match a healthy install so broken rows fail instead of changing prices.
@@ -173,6 +184,44 @@ public class PlatformSettings {
 
     public long referralNewReferrerDays() {
         return fee("referralNewReferrerDays");
+    }
+
+    public long contactReplyDays() {
+        return fee("contactReplyDays");
+    }
+
+    public long contactPendingMax() {
+        return fee("contactPendingMax");
+    }
+
+    public long packRefundDays() {
+        return fee("packRefundDays");
+    }
+
+    public long passGuaranteeDays() {
+        return fee("passGuaranteeDays");
+    }
+
+    public long passGuaranteeMaxEnquiries() {
+        return fee("passGuaranteeMaxEnquiries");
+    }
+
+    public long passGuaranteeEveryMonths() {
+        return fee("passGuaranteeEveryMonths");
+    }
+
+    public GrievanceOfficer grievanceOfficer() {
+        try {
+            JsonNode officer = cache.value(LEGAL_KEY).map(objectMapper::readTree)
+                    .map(node -> node.get("grievanceOfficer")).orElse(null);
+            if (officer == null || !officer.isObject()) {
+                return new GrievanceOfficer(null, null);
+            }
+            return new GrievanceOfficer(officer.path("name").asString(null), officer.path("email").asString(null));
+        } catch (RuntimeException malformed) {
+            log.warn("settings.legal could not be read; no grievance officer published", malformed);
+            return new GrievanceOfficer(null, null);
+        }
     }
 
     public boolean referralRewardsEnabled() {

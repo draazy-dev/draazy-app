@@ -36,6 +36,10 @@ public class ContactRequest extends AuditedEntity {
     @Column(name = "first_requested_at", nullable = false, insertable = false, updatable = false)
     private Instant firstRequestedAt;
 
+    /** When the asker first enquired on the listing; written once by the database and never moved. */
+    @Column(name = "enquired_at", nullable = false, insertable = false, updatable = false)
+    private Instant enquiredAt;
+
     protected ContactRequest() {
         // JPA
     }

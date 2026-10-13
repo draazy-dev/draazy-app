@@ -30,9 +30,19 @@ INSERT INTO settings (key, value) VALUES
         "referralVelocityPerDay": 5,
         "referralSignupWindowHours": 24,
         "referralSignalRetentionDays": 180,
-        "referralNewReferrerDays": 7
+        "referralNewReferrerDays": 7,
+        "contactReplyDays": 7,
+        "contactPendingMax": 10,
+        "packRefundDays": 7,
+        "passGuaranteeDays": 7,
+        "passGuaranteeMaxEnquiries": 0,
+        "passGuaranteeEveryMonths": 12
     }'::jsonb)
 ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value || settings.value;
+
+INSERT INTO settings (key, value) VALUES
+    ('legal', '{ "grievanceOfficer": { "name": "Grievance Officer", "email": "grievance@draazy.com" } }'::jsonb)
+ON CONFLICT (key) DO NOTHING;
 
 INSERT INTO settings (key, value) VALUES
     ('site', '{ "brand": "Draazy", "supportEmail": "support@draazy.com", "city": "Pune" }'::jsonb)

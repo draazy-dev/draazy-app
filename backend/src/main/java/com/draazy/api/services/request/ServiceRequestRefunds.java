@@ -1,5 +1,6 @@
 package com.draazy.api.services.request;
 
+import com.draazy.api.billing.credit.CreditNotes;
 import com.draazy.api.catalog.fee.LeaveAndLicenceCharges;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
@@ -35,6 +36,8 @@ public class ServiceRequestRefunds {
 
     private static final Set<String> GATEWAY_REFUSED = Set.of("CANCELLED", "FAILED");
 
+    private static final String GATEWAY_SETTLED = "SUCCESS";
+
     private static final Pattern GATEWAY_REFUND_ID = Pattern.compile("rf_([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})");
 
     private final ServiceRequestService requests;
@@ -46,11 +49,12 @@ public class ServiceRequestRefunds {
     private final PaymentGateway gateway;
     private final AuditService audit;
     private final Notifier notifier;
+    private final CreditNotes creditNotes;
 
     public ServiceRequestRefunds(ServiceRequestService requests, ServiceRequestRepository requestRows,
             ServiceRequestRefundRepository refunds, ServiceRequestAmendmentRepository amendments,
             ServiceRequestEventRepository events, ServiceRequestRegistrationRepository registrations,
-            PaymentGateway gateway, AuditService audit, Notifier notifier) {
+            PaymentGateway gateway, AuditService audit, Notifier notifier, CreditNotes creditNotes) {
         this.requests = requests;
         this.requestRows = requestRows;
         this.refunds = refunds;
@@ -60,6 +64,7 @@ public class ServiceRequestRefunds {
         this.gateway = gateway;
         this.audit = audit;
         this.notifier = notifier;
+        this.creditNotes = creditNotes;
     }
 
     public record RefundSummaryDto(long paid, long refunded, long refundableBeforeDuty,
@@ -147,7 +152,16 @@ public class ServiceRequestRefunds {
             return false;
         }
         ServiceRequest request = locked(refund.getServiceRequestId());
-        if (!ServiceRequestRefund.APPROVED.equals(refund.getStatus()) || !GATEWAY_REFUSED.contains(providerStatus)) {
+        if (!ServiceRequestRefund.APPROVED.equals(refund.getStatus())) {
+            return true;
+        }
+        if (GATEWAY_SETTLED.equals(providerStatus)) {
+            // Only the platform fee carries GST; stamp duty and registration are passed through untaxed.
+            creditNotes.issue(request.getRequesterId(), CreditNotes.SERVICE_REQUEST_REFUND, refund.getId(),
+                    refund.getOrderId(), refund.getAmount(), Instant.now());
+            return true;
+        }
+        if (!GATEWAY_REFUSED.contains(providerStatus)) {
             return true;
         }
         refund.markFailed();

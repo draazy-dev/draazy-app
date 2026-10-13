@@ -70,6 +70,12 @@ public final class ErrorCodes {
 
     public static final String CONTACT_QUOTA_EXHAUSTED = "contact_quota_exhausted";
 
+    public static final String CONTACT_PENDING_LIMIT = "contact_pending_limit";
+
+    public static final String LISTING_NOT_LIVE = "listing_not_live";
+
+    public static final String REFUND_NOT_ELIGIBLE = "refund_not_eligible";
+
     public static final String LISTING_QUOTA_EXHAUSTED = "listing_quota_exhausted";
 
     public static final String ALREADY_REVIEWED = "already_reviewed";

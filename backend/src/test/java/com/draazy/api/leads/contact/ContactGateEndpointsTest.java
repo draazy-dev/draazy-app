@@ -205,7 +205,7 @@ class ContactGateEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void decliningAContactRequest_notifiesNobody() throws Exception {
+    void decliningAContactRequest_tellsTheSeekerTheirContactIsBack() throws Exception {
         User owner = user("9820000202", "owner");
         User buyer = user("9820000203", "buyer");
         Property p = listing(owner, "Silent decline");
@@ -217,7 +217,10 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                         .content("{\"status\":\"declined\"}"))
                 .andExpect(status().isOk());
 
-        assertThat(notificationsFor(buyer)).isEmpty();
+        assertThat(notificationsFor(buyer)).singleElement().satisfies(row -> {
+            assertThat(row.get("type")).isEqualTo("contact.returned");
+            assertThat(row.get("link")).isEqualTo("/property/" + p.getId());
+        });
     }
 
     private List<Map<String, Object>> notificationsFor(User user) {
@@ -260,7 +263,7 @@ class ContactGateEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void anExpiredPendingRequest_readsAsNone_andAskingAgainRenewsTheSameRow() throws Exception {
+    void anExpiredPendingRequest_readsAsExpired_andAskingAgainRenewsTheSameRow() throws Exception {
         User owner = user("9820000096", "owner");
         User buyer = user("9820000097", "buyer");
         Property p = listing(owner, "Renewable");
@@ -271,7 +274,7 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 mvc.perform(get(Routes.Contacts.STATUS).param("propertyId", p.getId().toString())
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value(ContactStatuses.NONE));
+                .andExpect(jsonPath("$.status").value(ContactStatuses.EXPIRED));
 
         mvc.perform(post(Routes.Contacts.REQUEST).header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -287,7 +290,7 @@ class ContactGateEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void renewingTheEarliestRequest_neitherReopensTheFreeWindowNorChargesAPack() throws Exception {
+    void renewingALapsedRequest_isANewSpendThatStartsTheWindowAgain() throws Exception {
         User owner = user("9820000098", "owner");
         User buyer = user("9820000099", "buyer");
         Property p = listing(owner, "Renewed late");
@@ -305,11 +308,11 @@ class ContactGateEndpointsTest extends AbstractApiTest {
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.contacts.remaining").value(15))
+                .andExpect(jsonPath("$.contacts.remaining").value(29))
                 .andExpect(jsonPath("$.contacts.used").value(1));
         assertThat(contactRequests.findByPropertyIdInOrderByCreatedAtDesc(List.of(p.getId()),
                 Pageable.unpaged())).allSatisfy(row ->
-                assertThat(row.getFirstRequestedAt()).isBefore(Instant.now().minus(30, ChronoUnit.DAYS)));
+                assertThat(row.getFirstRequestedAt()).isAfter(Instant.now().minus(1, ChronoUnit.HOURS)));
     }
 
     @Test

@@ -54,6 +54,9 @@ final class TeamPerformanceAuditFunctions {
         if (starts(action, "referral.")) {
             return BackOfficeFunctions.REFERRALS;
         }
+        if (starts(action, "refund.")) {
+            return BackOfficeFunctions.REFUNDS;
+        }
         if (starts(action, "report.")) {
             return BackOfficeFunctions.REPORTS;
         }

@@ -29,10 +29,12 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
     /** Every contact pack the caller ever paid for, expired ones included: past contacts were
      * spent against them. */
     @Query("""
-            select new com.draazy.api.billing.plan.ContactPackTerm(s.startedAt, s.renewsAt, p.contactLimit)
+            select new com.draazy.api.billing.plan.ContactPackTerm(s.id, s.startedAt, s.renewsAt, p.contactLimit,
+                                                                   s.frozenAt)
             from Subscription s join Plan p on p.id = s.planId
             where s.userId = :userId and p.kind = 'contact-pack' and p.contactLimit is not null
-              and s.status in ('active', 'past-due', 'expired') and s.renewsAt is not null""")
+              and s.status in ('active', 'past-due', 'expired', 'refund-review', 'disputed')
+              and s.renewsAt is not null""")
     List<ContactPackTerm> findContactPackTerms(@Param("userId") UUID userId);
 
     /** The payment webhook's key. Unique in the DB (V23). */

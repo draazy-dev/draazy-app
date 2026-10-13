@@ -76,6 +76,7 @@ class ContactQuotaRaceTest extends AbstractCommittedApiTest {
             contactRequests.saveAndFlush(new ContactRequest(listing(filler, "Filler " + i).getId(),
                     buyer.getId(), null));
         }
+        jdbc.update("update contact_requests set status = 'approved' where requester_id = ?", buyer.getId());
         mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(jsonPath("$.contacts.remaining").value(1));
 

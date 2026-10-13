@@ -1,13 +1,17 @@
 package com.draazy.api.leads.contact;
 
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ContactPendingLimitException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ContactQuotaExhaustedException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.VerificationRequiredException;
 import com.draazy.api.common.persistence.RateLimitLock;
+import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.trust.ContactAllowanceLookup;
 import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.Notifier;
@@ -44,11 +48,15 @@ public class ContactService {
     private final AuditService audit;
     private final RateLimitLock locks;
     private final ReferralTriggers referralTriggers;
+    private final ContactReplyWindow window;
+    private final ContactReturns returnedContact;
+    private final PlatformSettings settings;
 
     public ContactService(ContactRequestRepository contactRequests, PropertyRepository properties,
             UserRepository users, ContactMapper contactMapper, Notifier notifier,
             VerifiedTenantLookup verifiedTenants, ContactAllowanceLookup allowances,
-            AuditService audit, RateLimitLock locks, ReferralTriggers referralTriggers) {
+            AuditService audit, RateLimitLock locks, ReferralTriggers referralTriggers,
+            ContactReplyWindow window, ContactReturns returnedContact, PlatformSettings settings) {
         this.contactRequests = contactRequests;
         this.properties = properties;
         this.users = users;
@@ -59,6 +67,9 @@ public class ContactService {
         this.audit = audit;
         this.locks = locks;
         this.referralTriggers = referralTriggers;
+        this.window = window;
+        this.returnedContact = returnedContact;
+        this.settings = settings;
     }
 
     @Transactional(readOnly = true)
@@ -75,8 +86,8 @@ public class ContactService {
         if (owner != null && owner.getId().equals(viewerId)) {
             return describe(viewerId, property);
         }
-        if (property.isOwnerSuspended()) {
-            throw NotFoundException.of("Property");
+        if (!property.isPubliclyVisible()) {
+            throw closedListing(property);
         }
         if (owner != null && owner.isVerifiedContactOnly() && !hasBadge(viewerId)) {
             throw new VerificationRequiredException("This owner only accepts verified contacts");
@@ -87,16 +98,17 @@ public class ContactService {
         locks.holdUntilCommit(RateLimitLock.Limit.CONTACT_REQUEST, viewerId.toString());
         Optional<ContactRequest> existing =
                 contactRequests.findByRequesterIdAndPropertyId(viewerId, property.getId());
+        Instant now = Instant.now();
         if (existing.isEmpty()) {
-            requireContactAllowance(viewerId);
+            requireRoomForAnotherRequest(viewerId, now);
             contactRequests.saveAndFlush(new ContactRequest(property.getId(), viewerId, body.message()));
             announceToOwner(owner, viewerId, property);
-        } else if (ContactRequestStatuses.isExpiredPending(existing.get().getStatus(),
-                existing.get().getCreatedAt(), Instant.now())) {
+        } else if (window.lapsed(existing.get().getStatus(), existing.get().getCreatedAt(), now)) {
 
-            // The same row is renewed rather than a second one inserted: the allowance counts rows,
-            // and asking the same owner again is not a new contact.
-            if (contactRequests.renewIfPending(existing.get().getId(), body.message(), Instant.now()) > 0) {
+            // A lapsed request does not count, so asking again is a new spend and is checked as one.
+            requireRoomForAnotherRequest(viewerId, now);
+            if (contactRequests.renewIfLapsed(existing.get().getId(), body.message(), now,
+                    window.cutoff(now)) > 0) {
                 announceToOwner(owner, viewerId, property);
             }
         }
@@ -117,7 +129,12 @@ public class ContactService {
                 "/dashboard#leads");
     }
 
-    private void requireContactAllowance(UUID viewerId) {
+    private void requireRoomForAnotherRequest(UUID viewerId, Instant now) {
+        long open = contactRequests.countOpenPending(viewerId, window.cutoff(now));
+        if (open >= settings.contactPendingMax()) {
+            throw new ContactPendingLimitException("You already have " + open + " requests waiting for a reply."
+                    + " Wait for a reply, or for one to lapse, before asking another owner.");
+        }
         OptionalInt remaining = allowances.contactsRemaining(viewerId);
         if (remaining.isPresent() && remaining.getAsInt() <= 0) {
             throw new ContactQuotaExhaustedException(
@@ -159,8 +176,11 @@ public class ContactService {
                 .orElseThrow(() -> NotFoundException.of("Contact request"));
 
         String before = row.getStatus();
-        if (ContactRequestStatuses.isExpiredPending(before, row.getCreatedAt(), Instant.now())) {
+        if (window.lapsed(before, row.getCreatedAt(), Instant.now())) {
             throw new ConflictException("This contact request has expired");
+        }
+        if (ContactRequestStatuses.APPROVED.equals(body.status()) && !listingIsLive(row.getPropertyId())) {
+            throw new ConflictException(ErrorCodes.LISTING_NOT_LIVE, "This listing is not live, so its contact cannot be shared");
         }
         if (body.status().equals(before)) {
             return;
@@ -189,7 +209,22 @@ public class ContactService {
                     "/property/" + row.getPropertyId());
             referralTriggers.contactAccepted(
                     row.getRequesterId(), owner.userId(), row.getPropertyId(), Instant.now());
+        } else {
+            returnedContact.notifySeeker(row, "declined");
         }
+    }
+
+    // A listing a visitor can still open (paused, rented, sold) is closed; anything else is not visible to the caller.
+    private static RuntimeException closedListing(Property property) {
+        boolean reachable = !property.isArchived() && !property.isOwnerSuspended()
+                && PropertyStatus.DIRECTLY_REACHABLE.contains(property.getStatus());
+        return reachable
+                ? new ConflictException(ErrorCodes.LISTING_NOT_LIVE, "This listing is not live right now")
+                : NotFoundException.of("Property");
+    }
+
+    private boolean listingIsLive(UUID propertyId) {
+        return properties.findById(propertyId).map(Property::isPubliclyVisible).orElse(false);
     }
 
     // An owner is never blocked from their own contact by their own opt-in.
@@ -201,9 +236,8 @@ public class ContactService {
             return new ContactStatusResponse(ContactStatuses.OWNER, verifiedContactOnly, false, false);
         }
         String status = contactRequests.findByRequesterIdAndPropertyId(viewerId, property.getId())
-                .map(row -> ContactRequestStatuses.isExpiredPending(
-                        row.getStatus(), row.getCreatedAt(), Instant.now())
-                        ? ContactStatuses.NONE : row.getStatus())
+                .map(row -> window.lapsed(row.getStatus(), row.getCreatedAt(), Instant.now())
+                        ? ContactStatuses.EXPIRED : row.getStatus())
                 .orElse(ContactStatuses.NONE);
         return new ContactStatusResponse(
                 status, verifiedContactOnly, verifiedContactOnly && !hasBadge(viewerId),
@@ -220,9 +254,9 @@ public class ContactService {
                 ? ContactVisibility.REVEALED : ContactVisibility.MASKED;
     }
 
-    private static ContactRequestResponse withDerivedStatus(
+    private ContactRequestResponse withDerivedStatus(
             ContactRequestResponse response, ContactRequest row, Instant now) {
-        if (!ContactRequestStatuses.isExpiredPending(row.getStatus(), row.getCreatedAt(), now)) {
+        if (!window.lapsed(row.getStatus(), row.getCreatedAt(), now)) {
             return response;
         }
         return new ContactRequestResponse(response.id(), response.propertyId(), response.requester(),

@@ -182,6 +182,12 @@ class RentAgreementAmendmentTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.amount").value(after));
         deliverSigned(secondOrder, true);
         read(owner, id).andExpect(jsonPath("$.amount").value(after));
+        var topUp = jdbc.queryForList("select number, amount, gst_amount from invoices"
+                + " where source_type = 'service_request_amendment' and source_id = ?", UUID.fromString(amendment));
+        assertThat(topUp).hasSize(1);
+        assertThat((String) topUp.get(0).get("number")).matches("INV-FY\\d{4}-\\d{6}");
+        assertThat(((Number) topUp.get(0).get("amount")).longValue()).isEqualTo(after - paid);
+        assertThat(((Number) topUp.get(0).get("gst_amount")).longValue()).isZero();
         shareDraft(desk, id, 200);
         propose(desk, id, "{\"rent\":27000,\"reason\":\"After the draft\"}").andExpect(status().isConflict());
     }

@@ -29,6 +29,12 @@ public class PricingController {
                         settings.referralQualifyPerYear(),
                         settings.referralHoldDays(),
                         settings.referralClawbackDays(),
-                        settings.referralSignupWindowHours()));
+                        settings.referralSignupWindowHours()),
+                new PricingResponse.Refunds(
+                        settings.packRefundDays(),
+                        settings.passGuaranteeDays(),
+                        settings.passGuaranteeMaxEnquiries(),
+                        settings.passGuaranteeEveryMonths(),
+                        settings.contactReplyDays()));
     }
 }

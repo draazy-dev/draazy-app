@@ -97,6 +97,10 @@ public final class ErasureRetention {
                         + " redeemed from, used only to detect referral fraud; those are cleared"
                         + " automatically after the retention window the platform sets (180 days by default),"
                         + " whether or not erasure is ever requested.",
+                "refund_requests.device_id_hash / instrument_hash and subscriptions.payment_instrument_hash — salted"
+                        + " digests of the browser and payment instrument behind a refund, kept so a refund that is only"
+                        + " allowed once a year cannot be repeated from a second account. A digest, not an identifier;"
+                        + " the rows are reached by user id only after pseudonymisation.",
                 "referral_codes — the referrer's half of the same salted fraud digests, refreshed"
                         + " whenever they open the referral screen. Cleared automatically after the same"
                         + " window. The code itself stays: it is not personal data, and it is what"

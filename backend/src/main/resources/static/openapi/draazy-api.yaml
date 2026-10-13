@@ -4829,7 +4829,9 @@ paths:
         `403 verification_required` **only** when the target owner has opted into
         "verified contact only" and the caller has no Verified badge (L2). Returns
         `422 contact_quota_exhausted` when the caller has used every owner contact their free
-        allowance, contact packs and referrals allow — see `GET /me/entitlements`.
+        allowance, contact packs and referrals allow — see `GET /me/entitlements`. Returns `409 listing_not_live`
+        when the listing is paused, rented or sold, and `404` when it is archived, not approved or its owner is suspended. A request counts against the allowance from the moment it is made until
+        the owner declines it or it lapses after `contactReplyDays`, whatever happens to the listing meanwhile.
       requestBody:
         required: true
         content:
@@ -4854,6 +4856,13 @@ paths:
           links:
             checkStatus: { $ref: '#/components/links/CheckContactStatus' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The listing is closed (paused, rented or sold) - `listing_not_live`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: listing_not_live, message: This listing is not live right now, status: 409 }
         '403':
           description: Owner accepts verified contacts only — earn the Verified badge to proceed.
           content:
@@ -4863,7 +4872,7 @@ paths:
         # 422, not 403 (a 403 invites a login, and signing in again conjures no contacts) and not
         # 429 (that promises the request works if you wait; this quota is a lifetime total).
         '422':
-          description: No owner contacts left — subscribe or refer a friend to earn more.
+          description: No owner contacts left (`contact_quota_exhausted`), or `contactPendingMax` requests still wait for a reply (`contact_pending_limit`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -4898,6 +4907,9 @@ paths:
       tags: [Leads & Contact]
       summary: Approve / decline contact request
       operationId: respondContactRequest
+      description: >-
+        A decline is always allowed; approving needs the listing to be publicly live, else `409 listing_not_live`.
+        `409` also covers an expired or already answered request.
       requestBody:
         required: true
         content:
@@ -4906,6 +4918,12 @@ paths:
       responses:
         '200': { description: Updated }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Expired or already answered, or approving while the listing is not live (`listing_not_live`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: listing_not_live, message: This listing is not live so its contact cannot be shared, status: 409 }
   /properties/{id}/photo-requests:
     parameters:
       - name: id
@@ -7773,6 +7791,158 @@ paths:
       # and referrals. Separate from /me/subscription, whose pending purchase confers nothing.
       responses:
         '200': { description: Entitlements, content: { application/json: { schema: { $ref: '#/components/schemas/Entitlements' } } } }
+  /me/payments:
+    get:
+      tags: [Billing & Growth]
+      summary: My paid orders, newest first
+      operationId: listMyPayments
+      description: >-
+        Listing passes, contact packs, rent agreements and agreement amendments the caller has paid,
+        with their refund state. `refund` is set for passes and packs only; rent-agreement refunds
+        follow their own flow. Send `X-Device-Id`; only a salted hash is stored.
+      parameters:
+        - { $ref: '#/components/parameters/DeviceId' }
+      responses:
+        '200':
+          description: Payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/MyPayment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/payments/{id}/refund:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Billing & Growth]
+      summary: Ask for a refund on a listing pass or contact pack
+      operationId: requestPaymentRefund
+      description: >-
+        Re-checks eligibility. A pack is refundable within `packRefundDays` of payment while none of its
+        contacts is used. A pass is refundable when its listing got at most `passGuaranteeMaxEnquiries`
+        contact requests in its first `passGuaranteeDays` days, claimed from the end of that window until
+        seven days after, once per `passGuaranteeEveryMonths` across accounts that share a user, device
+        or payment instrument. Every refund is staff-approved: the order is frozen (a pack's contacts
+        cannot be used, a pass stops covering its listing) until a decision. A repeat with the same
+        `Idempotency-Key` returns the same state.
+      parameters:
+        - { $ref: '#/components/parameters/IdempotencyKey' }
+        - { $ref: '#/components/parameters/DeviceId' }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 500 }
+      responses:
+        '200':
+          description: Refund requested; the order is now `refund_pending`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MyPayment' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422':
+          description: Not eligible. `reason` is one of the codes on `MyPayment.refund.reason`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: refund_not_eligible, message: Some of this pack's contacts are already used., status: 422, reason: not_eligible_used }
+  /admin/refunds:
+    get:
+      tags: [Billing & Growth]
+      summary: Refunds desk - customer requests, automatic system refunds and gateway disputes
+      operationId: listRefunds
+      description: >-
+        Needs the `refunds` back-office function (admins always). `status` defaults to `pending_review`;
+        `auto` lists the system's own refunds (failed, late or mismatched payment, pass for a closed
+        listing) and `disputed` the open gateway disputes. An unknown status is a 400.
+      x-roles: [staff, admin]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [pending_review, approved, rejected, auto, disputed], default: pending_review } }
+        - name: counts
+          in: query
+          schema: { type: boolean, default: false }
+          description: 'Add the tab totals (`pending_review`, `approved`, `rejected`, `auto`, `disputed`).'
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+      responses:
+        '200':
+          description: Refund rows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/RefundDeskRow' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/refunds/{id}/approve:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Billing & Growth]
+      summary: Approve a refund request
+      operationId: approveRefund
+      description: >-
+        Re-checks the facts as of the request, then queues the refund through the gateway; the order's
+        entitlement is revoked for good. Locks the request, so concurrent decisions leave one.
+        `409` when already decided or the gateway has an open dispute on the order; `422 refund_not_eligible`
+        when the facts no longer hold, counting every enquiry up to now and any pause during the guarantee window.
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: Approved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RefundDeskRow' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422':
+          description: The facts no longer qualify.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: refund_not_eligible, message: Some of this pack's contacts are already used., status: 422, reason: not_eligible_used }
+  /admin/refunds/{id}/reject:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Billing & Growth]
+      summary: Reject a refund request and restore the entitlement
+      operationId: rejectRefund
+      description: >-
+        The term is pushed out by the time the order spent frozen; if it would still have ended, the order
+        expires instead. `409` when already decided or the gateway has an open dispute on the order.
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, minLength: 1 }
+      responses:
+        '200':
+          description: Rejected
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RefundDeskRow' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /me/referrals:
     get:
       tags: [Billing & Growth]
@@ -10901,6 +11071,7 @@ components:
         message: { type: string, description: Human-readable detail. }
         status: { type: integer, description: HTTP status., example: 404 }
         traceId: { type: string, description: Correlation id for observability. }
+        reason: { type: string, description: 'Present only on 422 refund_not_eligible: the policy reason code.' }
         attemptsRemaining:
           type: integer
           minimum: 0
@@ -14210,7 +14381,7 @@ components:
       type: object
       description: Whether the caller may see a listing's contact, under the badge-not-gate model (ADR-019).
       properties:
-        status: { type: string, enum: [owner, approved, pending, declined, none], description: 'Gate state for this caller vs this listing: owner (viewer owns it), approved, pending, declined, or none (no request yet).' }
+        status: { type: string, enum: [owner, approved, pending, declined, expired, none], description: 'Gate state for this caller vs this listing: owner (viewer owns it), approved, pending, declined, expired (owner did not reply in time; the contact came back and asking again spends one), or none (no request yet).' }
         verifiedContactOnly: { type: boolean, description: True when the owner accepts verified contacts only — caller needs the L2 badge (ADR-019). }
         verificationRequired: { type: boolean, description: True when this specific request is blocked pending the caller's Verified badge. }
         ownerHidesNumber: { type: boolean, description: 'True when the owner has opted to stay masked even after approving. The client should offer chat instead of a call; approval still stands (D5).' }
@@ -14229,7 +14400,7 @@ components:
         status:
           type: string
           enum: [pending, approved, declined, expired]
-          description: expired is derived on read for a request left pending more than 30 days; it cannot be answered.
+          description: expired is set once a request is left pending longer than `contactReplyDays`; it cannot be answered and the contact is returned.
         contact:
           type: [object, 'null']
           description: Present only after the gate is passed & owner grants.
@@ -16857,6 +17028,15 @@ components:
             GST charged on top of the platform's fees. Every price already includes GST, so this
             is 0 unless an admin sets a rate.
           example: 0
+        refunds:
+          type: object
+          description: The refund and contact-return numbers the plans page quotes (admin settings under `fees`).
+          properties:
+            packRefundDays: { type: integer }
+            passGuaranteeDays: { type: integer }
+            passGuaranteeMaxEnquiries: { type: integer }
+            passGuaranteeEveryMonths: { type: integer }
+            contactReplyDays: { type: integer }
         referral:
           type: object
           description: >-
@@ -16877,6 +17057,67 @@ components:
             holdDays: { type: integer, description: How long a medium-risk referral is held before it is re-checked. }
             clawbackDays: { type: integer, description: Days after a grant during which a problem takes the reward back. }
             signupWindowHours: { type: integer, description: A code can be redeemed only this long after the account was created. }
+    MyPayment:
+      type: object
+      required: [id, kind, label, amount, status]
+      properties:
+        id: { type: string, description: The order id; pass it to the refund route. }
+        kind: { type: string, enum: [listing_pass, contact_pack, rent_agreement, ra_amendment] }
+        label: { type: string }
+        amount: { type: integer, description: Whole rupees, GST included. }
+        paidAt: { type: string, format: date-time }
+        invoiceNo: { type: [string, 'null'], description: 'GST tax invoice number, e.g. INV-FY2627-000001; null when none was issued.' }
+        status: { type: string, enum: [paid, refund_pending, refunded, refund_rejected, disputed] }
+        creditNoteNo: { type: [string, 'null'], description: 'GST credit note number, e.g. CN-FY2627-000001.' }
+        propertyId: { type: [string, 'null'] }
+        serviceRequestId: { type: [string, 'null'] }
+        refund:
+          type: [object, 'null']
+          description: Passes and packs only.
+          properties:
+            eligible: { type: boolean }
+            reason:
+              type: string
+              enum: [pack_unused, pass_no_enquiries, not_eligible_used, window_closed, window_not_open, guarantee_used_recently, already_requested, listing_paused]
+            from: { type: [string, 'null'], format: date-time, description: When a not-yet-open claim window opens. }
+            until: { type: [string, 'null'], format: date-time, description: When an open claim window closes. }
+            amount: { type: integer }
+    RefundDeskRow:
+      type: object
+      properties:
+        id: { type: string, description: 'The request id; the order id for `auto`, the dispute id for `disputed`.' }
+        status: { type: string, enum: [pending_review, approved, rejected, auto, disputed] }
+        kind: { type: string, enum: [listing_pass, contact_pack] }
+        label: { type: string }
+        customerId: { type: string }
+        customerName: { type: string }
+        orderRef: { type: string }
+        amount: { type: integer }
+        basis: { type: string }
+        customerReason: { type: [string, 'null'] }
+        requestedAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        decisionReason: { type: [string, 'null'] }
+        propertyId: { type: [string, 'null'] }
+        creditNoteNo: { type: [string, 'null'] }
+        signals:
+          type: [object, 'null']
+          description: Computed only for `pending_review` rows; null on every other tab.
+          properties:
+            refunds12m: { type: integer }
+            linkedAccounts: { type: integer }
+            contactsUsed: { type: integer }
+            enquiries: { type: integer }
+            pausedDuringWindow: { type: boolean, description: The listing was not publicly live at some point in the guarantee window. }
+    LegalNotices:
+      type: object
+      description: The notices the footer and refund copy publish; the `legal` admin setting.
+      properties:
+        grievanceOfficer:
+          type: object
+          properties:
+            name: { type: string, maxLength: 80 }
+            email: { type: string, format: email, maxLength: 120 }
     SocietyAdminEdit:
       type: object
       description: >
@@ -16962,6 +17203,7 @@ components:
           items: { $ref: '#/components/schemas/Plan' }
         counts: { $ref: '#/components/schemas/PropertyCounts' }
         trustStats: { $ref: '#/components/schemas/TrustStats' }
+        legal: { $ref: '#/components/schemas/LegalNotices' }
     MeBootstrap:
       type: object
       required: [me]
@@ -18062,7 +18304,15 @@ components:
             contactPack: { type: integer }
             rentAgreementPlatform: { type: integer }
             gstPercent: { type: number, example: 0 }
+            contactReplyDays: { type: integer, minimum: 1, maximum: 30, example: 7 }
+            contactPendingMax: { type: integer, minimum: 1, maximum: 100, example: 10 }
+            packRefundDays: { type: integer, minimum: 0, maximum: 30, example: 7, description: '0 switches the pack refund off.' }
+            passGuaranteeDays: { type: integer, minimum: 0, maximum: 30, example: 7, description: '0 switches the pass guarantee off.' }
+            passGuaranteeMaxEnquiries: { type: integer, minimum: 0, maximum: 50, example: 0 }
+            passGuaranteeEveryMonths: { type: integer, minimum: 1, maximum: 36, example: 12 }
           additionalProperties: true
+        legal:
+          $ref: '#/components/schemas/LegalNotices'
         movePack:
           type: object
           additionalProperties: true

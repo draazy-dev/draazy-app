@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -17,12 +18,34 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
 
     Optional<ContactRequest> findByRequesterIdAndPropertyId(UUID requesterId, UUID propertyId);
 
-    // The contact quota is derived from these instants; read under RateLimitLock.Limit.CONTACT_REQUEST.
-    // first_requested_at, not created_at: a renewal moves created_at and must not restart or recharge a window.
+    // A request counts while it has revealed the number or may still do so: approved, or pending inside the reply
+    // window, whatever happens to the listing. Read under RateLimitLock.Limit.CONTACT_REQUEST.
+    String COUNTS_TOWARDS_QUOTA = """
+            (cr.status = 'approved' or (cr.status = 'pending' and cr.createdAt >= :replyCutoff))""";
+
+    // first_requested_at, not created_at: a renewal after a return restarts it, nothing else moves it.
     @Query("""
             select cr.firstRequestedAt from ContactRequest cr
-            where cr.requesterId = :requesterId order by cr.firstRequestedAt""")
-    List<Instant> findFirstRequestedAtByRequesterId(@Param("requesterId") UUID requesterId);
+            where cr.requesterId = :requesterId and\s""" + COUNTS_TOWARDS_QUOTA + """
+             order by cr.firstRequestedAt""")
+    List<Instant> findCountedFirstRequestedAt(@Param("requesterId") UUID requesterId,
+            @Param("replyCutoff") Instant replyCutoff);
+
+    @Query("""
+            select count(cr) from ContactRequest cr
+            where cr.propertyId = :propertyId and cr.enquiredAt >= :from and cr.enquiredAt < :to""")
+    long countEnquiredBetween(@Param("propertyId") UUID propertyId, @Param("from") Instant from,
+            @Param("to") Instant to);
+
+    @Query("""
+            select count(cr) from ContactRequest cr
+            where cr.requesterId = :requesterId and cr.status = 'pending' and\s""" + COUNTS_TOWARDS_QUOTA)
+    long countOpenPending(@Param("requesterId") UUID requesterId, @Param("replyCutoff") Instant replyCutoff);
+
+    @Query("""
+            select cr from ContactRequest cr
+            where cr.status = 'pending' and cr.createdAt < :replyCutoff order by cr.createdAt""")
+    List<ContactRequest> findOverduePending(@Param("replyCutoff") Instant replyCutoff, Limit limit);
 
     // The mapper asks this on every detail render, so an existence check is enough.
     boolean existsByRequesterIdAndPropertyIdAndStatus(UUID requesterId, UUID propertyId, String status);
@@ -81,15 +104,16 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
                               @Param("fromStatus") String fromStatus,
                               @Param("toStatus") String toStatus);
 
+    // Native: first_requested_at is database-written, so the entity maps it read-only.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
-    @Query("""
-            update ContactRequest cr
-               set cr.createdAt = :now, cr.message = :message
-             where cr.id = :id
-               and cr.status = 'pending'
-            """)
-    int renewIfPending(@Param("id") UUID id, @Param("message") String message,
-                       @Param("now") Instant now);
+    @Query(value = """
+            update contact_requests
+               set status = 'pending', created_at = :now, first_requested_at = :now, message = :message
+             where id = :id
+               and (status = 'expired' or (status = 'pending' and created_at < :replyCutoff))
+            """, nativeQuery = true)
+    int renewIfLapsed(@Param("id") UUID id, @Param("message") String message, @Param("now") Instant now,
+                      @Param("replyCutoff") Instant replyCutoff);
 
     @Query("""
             select count(cr) > 0 from ContactRequest cr

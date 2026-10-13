@@ -79,6 +79,7 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         for (int i = 0; i < count; i++) {
             User owner = user(String.valueOf(firstOwnerMobile + i), "owner");
             assertThat(ask(buyer, listing(owner, "Flat " + i))).isEqualTo(200);
+            jdbc.update("update contact_requests set status = 'approved' where requester_id = ?", buyer.getId());
         }
     }
 

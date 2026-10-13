@@ -4,6 +4,7 @@ import com.draazy.api.common.persistence.VersionedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.AccessLevel;
@@ -58,6 +59,13 @@ public class Subscription extends VersionedEntity {
 
     @Column(name = "refund_amount")
     private Long refundAmount;
+
+    @Column(name = "frozen_at")
+    private Instant frozenAt;
+
+    /** Salted digest of the card or UPI id the gateway reported; only equality across accounts is ever asked. */
+    @Column(name = "payment_instrument_hash")
+    private String paymentInstrumentHash;
 
     protected Subscription() {
         // JPA
@@ -161,6 +169,78 @@ public class Subscription extends VersionedEntity {
         return SubscriptionStatuses.ACTIVE.equals(status)
                 && renewsAt != null
                 && !renewsAt.isAfter(now);
+    }
+
+    public void recordInstrument(String hash) {
+        if (hash != null && paymentInstrumentHash == null) {
+            this.paymentInstrumentHash = hash;
+        }
+    }
+
+    /** Active to refund-review; false for any other status, so only a benefit that is live can be frozen. */
+    public boolean freezeForRefund(Instant now) {
+        if (!moveStatus(SubscriptionStatuses.ACTIVE, SubscriptionStatuses.REFUND_REVIEW)) {
+            return false;
+        }
+        this.frozenAt = now;
+        return true;
+    }
+
+    /** Back to active with the term pushed out by the time it was frozen; it expires if that still leaves it ended. */
+    public boolean restoreAfterRefundRejected(Instant now) {
+        return moveStatus(SubscriptionStatuses.REFUND_REVIEW, SubscriptionStatuses.ACTIVE) && thaw(now);
+    }
+
+    /** Ends the benefit for good and queues the money; the sweep sends it through the gateway. */
+    public boolean approveRefund(Instant now, long refundAmount) {
+        if (!moveStatus(SubscriptionStatuses.REFUND_REVIEW, SubscriptionStatuses.REFUNDED)) {
+            return false;
+        }
+        markRefundDue(now, refundAmount);
+        return true;
+    }
+
+    /** The status the dispute froze, or null when this order was not entitling (nothing to freeze). */
+    public String freezeForDispute(Instant now) {
+        String before = status;
+        if (!SubscriptionStatuses.isEntitling(before) || !moveStatus(before, SubscriptionStatuses.DISPUTED)) {
+            return null;
+        }
+        this.frozenAt = now;
+        return before;
+    }
+
+    public boolean restoreAfterDisputeWon(String frozenFrom, Instant now) {
+        return frozenFrom != null && moveStatus(SubscriptionStatuses.DISPUTED, frozenFrom) && thaw(now);
+    }
+
+    /** A lost or accepted dispute ends the benefit from any status that still held it. */
+    public boolean revokeAfterDisputeLost() {
+        boolean held = SubscriptionStatuses.isEntitling(status) || SubscriptionStatuses.DISPUTED.equals(status)
+                || SubscriptionStatuses.REFUND_REVIEW.equals(status);
+        if (!held) {
+            return false;
+        }
+        this.status = SubscriptionStatuses.CANCELLED;
+        this.frozenAt = null;
+        return true;
+    }
+
+    private boolean thaw(Instant now) {
+        if (frozenAt != null && renewsAt != null && now.isAfter(frozenAt)) {
+            this.renewsAt = renewsAt.plus(Duration.between(frozenAt, now));
+        }
+        this.frozenAt = null;
+        expire(now);
+        return true;
+    }
+
+    private boolean moveStatus(String from, String to) {
+        if (!from.equals(status)) {
+            return false;
+        }
+        this.status = to;
+        return true;
     }
 
     /** Only active rows expire; a cancelled row already says why it ended. */

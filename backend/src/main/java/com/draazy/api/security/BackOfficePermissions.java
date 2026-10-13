@@ -66,6 +66,10 @@ public final class BackOfficePermissions {
 
     public static final String REFERRALS_WRITE = "referrals:write";
 
+    public static final String REFUNDS_READ = "refunds:read";
+
+    public static final String REFUNDS_WRITE = "refunds:write";
+
     public static final String REVIEWS_READ = "reviews:read";
 
     public static final String REVIEWS_WRITE = "reviews:write";
@@ -139,6 +143,8 @@ public final class BackOfficePermissions {
             ops("flatmates", WRITE),
             ops("referrals", READ),
             ops("referrals", WRITE),
+            ops("refunds", READ),
+            ops("refunds", WRITE),
             ops("reviews", READ),
             ops("reviews", WRITE),
             ops("localities", READ),
@@ -247,6 +253,10 @@ public final class BackOfficePermissions {
     public static final String REQUIRE_REFERRALS_READ = CALL + REFERRALS_READ + "')";
 
     public static final String REQUIRE_REFERRALS_WRITE = CALL + REFERRALS_WRITE + "')";
+
+    public static final String REQUIRE_REFUNDS_READ = CALL + REFUNDS_READ + "')";
+
+    public static final String REQUIRE_REFUNDS_WRITE = CALL + REFUNDS_WRITE + "')";
 
     public static final String REQUIRE_REVIEWS_READ = CALL + REVIEWS_READ + "')";
 

@@ -176,6 +176,8 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
     long countByRequesterIdAndTypeAndStatus(UUID requesterId, String type,
             ServiceRequestStatus status);
 
+    List<ServiceRequest> findByRequesterIdAndTypeAndPaymentRefNotNull(UUID requesterId, String type);
+
     // Awaiting-payment with stale update means no settled money arrived yet.
     @Query("""
             select r from ServiceRequest r

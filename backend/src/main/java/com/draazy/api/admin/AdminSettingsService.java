@@ -41,6 +41,13 @@ public class AdminSettingsService {
 
     private static final String ADMIN_FLAGS_KEY = "adminFlags";
 
+    private static final int MAX_OFFICER_NAME = 80;
+
+    private static final int MAX_OFFICER_EMAIL = 120;
+
+    private static final java.util.regex.Pattern OFFICER_EMAIL =
+            java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
     private final SettingRepository settings;
     private final SettingsCache cache;
     private final ObjectMapper objectMapper;
@@ -148,6 +155,28 @@ public class AdminSettingsService {
         }
         PlatformSettings.FEE_BOUNDS.forEach((field, bound) -> rejectOutOfRange(
                 patch, PlatformSettings.FEES_KEY, field, (int) bound.min(), (int) bound.max()));
+        rejectBadGrievanceOfficer(patch);
+    }
+
+    private static void rejectBadGrievanceOfficer(Map<String, Object> patch) {
+        if (!(patch.get(PlatformSettings.LEGAL_KEY) instanceof Map<?, ?> legal)
+                || !(legal.get("grievanceOfficer") instanceof Map<?, ?> officer)) {
+            return;
+        }
+        if (officer.get("name") instanceof String name && (name.isBlank() || name.length() > MAX_OFFICER_NAME)) {
+            throw new ValidationException("'legal.grievanceOfficer.name' must be 1 to " + MAX_OFFICER_NAME
+                    + " characters. Nothing was saved.");
+        }
+        if (officer.get("email") instanceof String email
+                && (email.length() > MAX_OFFICER_EMAIL || !OFFICER_EMAIL.matcher(email).matches())) {
+            throw new ValidationException("'legal.grievanceOfficer.email' must be an email address of at most "
+                    + MAX_OFFICER_EMAIL + " characters. Nothing was saved.");
+        }
+        if ((officer.containsKey("name") && !(officer.get("name") instanceof String))
+                || (officer.containsKey("email") && !(officer.get("email") instanceof String))) {
+            throw new ValidationException("'legal.grievanceOfficer' name and email must be text."
+                    + " Nothing was saved.");
+        }
     }
 
     private static void rejectOutOfRange(Map<String, Object> patch, String key, String field,

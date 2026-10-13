@@ -155,6 +155,62 @@ and reading that file; the constructor check is what states the rule.
   ("1 live listing free · Rs 999 pass for each extra" / "15 free owner contacts in your first 30
   days"). Payment history is still the static `BILLING_HISTORY` seed. "Change plan ->" links to `/plans`.
 
+### Refunds, contact returns and credit notes
+- **Contact returns (no money moves).** The contact quota counts only requests that revealed or may still
+  reveal the number: approved rows always, pending ones while they are younger than `fees.contactReplyDays`
+  (default 7), whatever happens to the listing meanwhile. Declined, expired and stale-pending requests are
+  returned. Asking about a closed listing (paused, rented, sold) is `409 listing_not_live`; an archived, unapproved or
+  suspended-owner listing is `404`. An owner approving while theirs is not live gets the same `409 listing_not_live`
+  (decline is always allowed). A daily sweep (`ContactReturnSweep`) marks overdue pending rows `expired` and sends
+  the seeker `contact.returned`; a decline sends the same. The rows stay, so the same listing cannot be
+  re-asked to farm returns, and renewing a lapsed request re-checks the allowance. When
+  `fees.contactPendingMax` (default 10) requests are open, `POST /contacts/request` is `422 contact_pending_limit`.
+- **`GET /me/payments`** lists the caller's paid orders, newest first: `{id, kind: listing_pass|contact_pack|
+  rent_agreement|ra_amendment, label, amount, paidAt, invoiceNo, status: paid|refund_pending|refunded|
+  refund_rejected|disputed, creditNoteNo?, propertyId?, serviceRequestId?, refund{eligible, reason, from, until,
+  amount}}`. `refund` is computed for passes and packs only. Reasons: `pack_unused`, `pass_no_enquiries`,
+  `not_eligible_used`, `window_closed`, `window_not_open`, `guarantee_used_recently`, `already_requested`,
+  `listing_paused`. `invoiceNo` is the order's GST tax invoice number, or null when none was issued. `X-Device-Id` (at most 64 chars) is salt-hashed like the referral code.
+- **Customer refund request.** `POST /me/payments/{id}/refund {reason?}` with an `Idempotency-Key`. Eligibility:
+  - *Pack:* within `fees.packRefundDays` (default 7, 0 = off) of payment and no contact allocated from it.
+  - *Pass guarantee:* its listing got at most `fees.passGuaranteeMaxEnquiries` (default 0) contact requests in the
+    first `fees.passGuaranteeDays` (default 7, 0 = off) days of the pass; claimable from the end of that window
+    until 7 days after; once per `fees.passGuaranteeEveryMonths` (default 12) per owner, linking accounts by user
+    id, device-id hash and payment-instrument hash. Enquiries count from the pass start up to the claim (and again
+    at approval), not only inside the window, and the listing must have been publicly live for the whole window:
+    a pause in it (recorded by a trigger in `property_live_gaps`) gives `listing_paused`.
+  - Not eligible: `422 refund_not_eligible` with a top-level `reason`.
+  - Eligible: a `pending_review` request is created and the order is frozen. A frozen pack's contacts cannot be
+    used; a frozen pass stops covering its listing (it falls back to paused under the soft gate). Staff holding the
+    `refunds` back-office function (and admins) get `refund.requested`.
+- **Staff decision.** Every customer refund needs it. Approve re-checks the facts as of the request, then
+  `markRefundDue(amount)`; the existing sweep, gateway and webhook path pays it and the entitlement is revoked for
+  good. Reject needs a `reason` and restores the entitlement, with the term pushed out by the time the order
+  was frozen (it expires instead if it would still have ended, and a pass's listing goes live again only if the
+  listing quota allows). Both are `409` while a gateway dispute is open on the order. Both notify the customer with `refund.decided`
+  and are audited `refund.*`. The request row is locked, so concurrent decisions leave one (the other gets 409).
+- **Automatic system refunds stay automatic** (failed, late or mismatched payment; a pass for a closed listing).
+  They also notify `refunds` holders with `refund.auto` and show on the desk as `auto`.
+- **GST credit note** `CN-FY2627-000001` (FY April-March, IST, one sequence per FY) is issued when a refund is
+  confirmed successful by the gateway for an invoiced order (an automatic refund of a payment that never activated gets none): subscription refunds, rent-agreement refunds, automatic refunds. Amounts are
+  GST-inclusive and split with `gstPercent` (18% when unset); a rent-agreement note taxes only the platform fee,
+  the pass-through part is untaxed. A note never credits more taxable value than its invoice carried, less what earlier
+  notes on that invoice already credited, and cites the invoice number.
+- **GST tax invoice** `INV-FY2627-000001` (same FY and per-FY sequence pattern) is issued once when a gateway
+  payment succeeds: listing passes, contact packs, rent-agreement checkouts and amendment top-ups. A replayed
+  webhook issues nothing new. Only the platform fee carries GST on a rent agreement; amendment top-ups carry none.
+  A payment that is refunded automatically without ever activating the order (failed, late) gets no invoice.
+  Orders paid before invoicing were numbered in `paid_at` order by the migration. No PDF is generated.
+- **Disputes.** The signed Cashfree webhook also takes `DISPUTE_CREATED`, `DISPUTE_UPDATED`, `DISPUTE_CLOSED`
+  (unknown types are tolerated) into `payment_disputes`. A dispute freezes only its own order and notifies `refunds`
+  holders with `refund.dispute`; closing it won restores the entitlement (term extended as above), lost or accepted
+  revokes it from whatever status the order was in. A pack frozen by a dispute or review keeps the contacts it
+  already served but lends no more. The account
+  is never suspended. `/me/payments` shows `disputed`.
+- **Settings.** `fees`: `contactReplyDays` 1..30, `contactPendingMax` 1..100, `packRefundDays` 0..30,
+  `passGuaranteeDays` 0..30, `passGuaranteeMaxEnquiries` 0..50, `passGuaranteeEveryMonths` 1..36; `legal.grievanceOfficer`
+  `{name <= 80, email <= 120}`. `GET /bootstrap` carries `pricing.refunds` and `legal`.
+
 ### Rent-agreement retention (`AgreementPerks.jsx`, `RentAgreementRenewalSweeper`)
 - A daily 09:00 IST sweep notifies the owner (once per agreement) and each tenant whose mobile
   matches, 60 days before a registered/active agreement ends (`rent_agreements.renewal_reminded_at`

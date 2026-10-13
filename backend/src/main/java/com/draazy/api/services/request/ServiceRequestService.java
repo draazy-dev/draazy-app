@@ -81,6 +81,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
     private final AccountPermissions accountPermissions;
     private final RentAgreementOwnerSide ownerSide;
     private final ServiceRequestAmountGuard amountGuard;
+    private final ServiceRequestInvoicing invoicing;
 
     private final TransactionTemplate transactions;
 
@@ -102,6 +103,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
             AccountPermissions accountPermissions,
             RentAgreementOwnerSide ownerSide,
             ServiceRequestAmountGuard amountGuard,
+            ServiceRequestInvoicing invoicing,
             PlatformTransactionManager transactionManager) {
         this.requests = requests;
         this.events = events;
@@ -121,6 +123,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
         this.accountPermissions = accountPermissions;
         this.ownerSide = ownerSide;
         this.amountGuard = amountGuard;
+        this.invoicing = invoicing;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -303,6 +306,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
         if (paid) {
             transition(request, ServiceRequestStatus.NEW);
             record(request, "payment.received", null);
+            invoicing.checkoutPaid(request);
         } else {
             transition(request, ServiceRequestStatus.CANCELLED);
             record(request, "payment.failed", null);

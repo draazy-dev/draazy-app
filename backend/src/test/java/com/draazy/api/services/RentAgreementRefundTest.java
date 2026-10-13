@@ -233,4 +233,68 @@ class RentAgreementRefundTest extends ServiceFixtures {
         String unpaid = raiseUnpaid(owner, listing(owner));
         ask(admin("9820009034"), unpaid, 100, false, null).andExpect(status().isConflict());
     }
-}
+
+    @Test
+    @DisplayName("a paid checkout is invoiced once, with GST on the platform fee only, and the credit note cites it")
+    void aPaidCheckoutIsInvoicedAndItsCreditNoteCitesTheInvoice() throws Exception {
+        User owner = customer("9820009071");
+        User maker = staff("9820009072", Teams.RENTAL);
+        User checker = staff("9820009073", Teams.RENTAL);
+        String id = raiseWithTerms(owner);
+        serviceRequests.applyWebhookOutcome(paymentRef(id), true, null, null);
+        em.flush();
+
+        var invoices = jdbc.queryForList("select number, amount, taxable_amount, gst_amount from invoices"
+                + " where source_type = 'service_request' and source_id = ?", UUID.fromString(id));
+        assertThat(invoices).hasSize(1);
+        String number = (String) invoices.get(0).get("number");
+        assertThat(number).matches("INV-FY\\d{4}-\\d{6}");
+        assertThat(((Number) invoices.get(0).get("amount")).longValue()).isEqualTo(paid(id));
+        long taxed = ((Number) invoices.get(0).get("taxable_amount")).longValue()
+                + ((Number) invoices.get(0).get("gst_amount")).longValue();
+        assertThat(taxed).isPositive().isLessThan(paid(id));
+
+        setStatus(maker, id, "assigned", 200);
+        String merchantId = "rf_" + approvedRefund(maker, checker, id, 500).replace("-", "");
+        deliverRefundSigned(merchantId, "SUCCESS");
+        em.flush();
+        assertThat(jdbc.queryForObject("select invoice_no from credit_notes where user_id = ?", String.class, owner.getId()))
+                .isEqualTo(number);
+        em.clear();
+        mvc.perform(get(Routes.Refunds.MY_PAYMENTS).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$[0].invoiceNo").value(number));
+    }
+
+    @Test
+    @DisplayName("a confirmed refund is a credit note taxed on the platform fee only, and shows in /me/payments")
+    void aConfirmedRefundIssuesACreditNote() throws Exception {
+        User owner = customer("9820009061");
+        User maker = staff("9820009062", Teams.RENTAL);
+        User checker = staff("9820009063", Teams.RENTAL);
+        String id = raiseWithTerms(owner);
+        setStatus(maker, id, "assigned", 200);
+        String merchantId = "rf_" + approvedRefund(maker, checker, id, 500).replace("-", "");
+        em.flush();
+        em.clear();
+        mvc.perform(get(Routes.Refunds.MY_PAYMENTS).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$[0].kind").value("rent_agreement"))
+                .andExpect(jsonPath("$[0].serviceRequestId").value(id))
+                .andExpect(jsonPath("$[0].status").value("refund_pending"))
+                .andExpect(jsonPath("$[0].creditNoteNo").doesNotExist());
+
+        deliverRefundSigned(merchantId, "SUCCESS");
+        deliverRefundSigned(merchantId, "SUCCESS");
+        em.flush();
+
+        var notes = jdbc.queryForList("select number, amount, taxable_amount, gst_amount from credit_notes"
+                + " where source_type = 'service_request_refund' and user_id = ?", owner.getId());
+        assertThat(notes).hasSize(1);
+        long gst = ((Number) notes.get(0).get("gst_amount")).longValue();
+        assertThat(((Number) notes.get(0).get("amount")).longValue()).isEqualTo(500);
+        assertThat(((Number) notes.get(0).get("taxable_amount")).longValue() + gst).isPositive().isLessThanOrEqualTo(500);
+        assertThat(gst).isPositive().isLessThanOrEqualTo(500 * 18 / 118);
+        em.clear();
+        mvc.perform(get(Routes.Refunds.MY_PAYMENTS).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$[0].status").value("refunded"))
+                .andExpect(jsonPath("$[0].creditNoteNo").value(notes.get(0).get("number")));
+    }}

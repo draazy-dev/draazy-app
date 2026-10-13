@@ -26,6 +26,7 @@ public final class BackOfficeFunctions {
     public static final String SOCIETIES = "societies";
     public static final String REPORTS = "reports";
     public static final String REFERRALS = "referrals";
+    public static final String REFUNDS = "refunds";
 
     public static String desk(String desk) {
         return "desk:" + desk;
@@ -79,6 +80,9 @@ public final class BackOfficeFunctions {
             new Function(REFERRALS, "Referrals", "Trust & safety", List.of(
                     BackOfficePermissions.REFERRALS_READ,
                     BackOfficePermissions.REFERRALS_WRITE), null),
+            new Function(REFUNDS, "Refunds", "Trust & safety", List.of(
+                    BackOfficePermissions.REFUNDS_READ,
+                    BackOfficePermissions.REFUNDS_WRITE), null),
             new Function(CONTENT, "Content", "Content", List.of(
                     BackOfficePermissions.CONTENT_READ,
                     BackOfficePermissions.CONTENT_WRITE), null),

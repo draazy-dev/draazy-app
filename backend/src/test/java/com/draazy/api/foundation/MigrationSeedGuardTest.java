@@ -28,10 +28,12 @@ class MigrationSeedGuardTest {
             "V71", "Re-seeds open review cases with the four-fact checklist the approval gate now requires;"
                     + " a reset DB has no open cases to re-seed.",
             "V90", "Converts stored per-account atom documents to function documents; a reset DB has no"
-                    + " stored documents, and accounts without one fall back to the role default.");
+                    + " stored documents, and accounts without one fall back to the role default.",
+            "V120", "Issues tax invoices for orders paid before invoice numbering existed; a reset DB has no paid"
+                    + " orders, and the invoice sequence restarts with it.");
 
     // Tables whose rows a versioned migration once seeded, and which the repeatable seed now owns alone.
-    // Keyed by table rather than by version because there is no longer a version to point at.
+    // Keyed by table because the seed owns these rows with no version to point at.
     private static final Map<String, String> RE_HOMED_INTO_REFERENCE_SEED = Map.of(
             "message_template",
             "V78 created this table and seeded its ten WhatsApp templates in the same file, so the live "

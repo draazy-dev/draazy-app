@@ -12,9 +12,11 @@ import org.springframework.stereotype.Component;
 class PendingLeadCounter implements PendingLeadLookup {
 
     private final ContactRequestRepository requests;
+    private final ContactReplyWindow window;
 
-    PendingLeadCounter(ContactRequestRepository requests) {
+    PendingLeadCounter(ContactRequestRepository requests, ContactReplyWindow window) {
         this.requests = requests;
+        this.window = window;
     }
 
     @Override
@@ -23,7 +25,7 @@ class PendingLeadCounter implements PendingLeadLookup {
         if (propertyIds.isEmpty()) {
             return counts;
         }
-        Instant liveSince = Instant.now().minus(ContactRequestStatuses.PENDING_TTL);
+        Instant liveSince = window.cutoff(Instant.now());
         for (Object[] row : requests.countPendingByProperty(propertyIds, ContactRequestStatuses.PENDING, liveSince)) {
             counts.put((UUID) row[0], ((Number) row[1]).intValue());
         }

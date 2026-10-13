@@ -49,6 +49,17 @@ public class ReferralSignals {
         return stored != null && stored.equals(observed);
     }
 
+    /** The salted digest of an {@code X-Device-Id} value; null when absent or over 64 characters. */
+    public String deviceIdHash(String header) {
+        return hash(deviceId(header));
+    }
+
+    /** The salted digest of a payment instrument (a card fingerprint or UPI id); null when absent. */
+    public String instrumentHash(String instrument) {
+        String trimmed = blankToNull(instrument);
+        return trimmed == null ? null : hash("instrument" + SEPARATOR + trimmed.toLowerCase(java.util.Locale.ROOT));
+    }
+
     /** {@code deviceHash} digests the User-Agent; {@code deviceIdHash} the first-party device id. */
     public record Signals(String ipHash, String deviceHash, String deviceIdHash) {
 

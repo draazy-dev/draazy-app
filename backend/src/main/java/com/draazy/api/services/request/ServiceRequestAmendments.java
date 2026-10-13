@@ -51,13 +51,15 @@ public class ServiceRequestAmendments {
     private final AuditService audit;
     private final Notifier notifier;
     private final ServiceRequestAmountGuard amountGuard;
+    private final ServiceRequestInvoicing invoicing;
     private final TransactionTemplate transactions;
 
     public ServiceRequestAmendments(ServiceRequestService requests, ServiceRequestRepository requestRows,
             ServiceRequestAmendmentRepository amendments, ServiceRequestRefundRepository refunds,
             ServiceRequestPartyRepository parties, ServiceRequestPricing pricing,
             ServiceRequestMapper mapper, PaymentGateway gateway, UserRepository users, AuditService audit,
-            Notifier notifier, ServiceRequestAmountGuard amountGuard, PlatformTransactionManager transactionManager) {
+            Notifier notifier, ServiceRequestAmountGuard amountGuard, ServiceRequestInvoicing invoicing,
+            PlatformTransactionManager transactionManager) {
         this.requests = requests;
         this.requestRows = requestRows;
         this.amendments = amendments;
@@ -70,6 +72,7 @@ public class ServiceRequestAmendments {
         this.audit = audit;
         this.notifier = notifier;
         this.amountGuard = amountGuard;
+        this.invoicing = invoicing;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -240,6 +243,7 @@ public class ServiceRequestAmendments {
         }
         if (firstPayment) {
             amendment.markPaid(Instant.now());
+            invoicing.amendmentPaid(request, amendment);
         }
         if (!amendment.open() || !AMENDABLE.contains(request.getStatus())) {
             if (firstPayment && !ServiceRequestAmendment.APPLIED.equals(amendment.getStatus())) {

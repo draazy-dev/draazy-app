@@ -189,10 +189,24 @@ claim about a figure, made by a typo. **When the admin http provider lands, thes
 be fed from the endpoint's `refundsMeasured` / `serviceOrdersCounted` fields**,
 at which point the server property becomes the single source of truth for both halves.
 
+### 5.12 Refunds desk (`/admin/refunds`)
+- Back-office function `refunds` (group "Trust & safety"; `refunds:read` lists, `refunds:write` decides; admins
+  always). `GET /admin/refunds?status=pending_review|approved|rejected|auto|disputed&counts=true` is paged in the
+  house envelope. Rows: `{id, status, kind, label, customerId, customerName, orderRef, amount, basis, customerReason,
+  requestedAt, decidedAt, decisionReason, propertyId, creditNoteNo, signals{refunds12m, linkedAccounts, contactsUsed,
+  enquiries, pausedDuringWindow}}`. `signals` is computed only for `pending_review` rows and is null on every other tab. `auto` rows are the system's own refunds (id = order id) and `disputed` rows the gateway disputes.
+- `POST /admin/refunds/{id}/approve` re-checks the facts, then queues the refund; `POST .../reject {reason}`
+  (required, else 422) restores the entitlement. A second decision, or approving or rejecting while the gateway
+  disputes the order, is 409. Both notify the customer (`refund.decided`) and are audited `refund.approved` / `refund.rejected`.
+- New requests, automatic refunds and disputes notify holders of `refunds` (`refund.requested`, `refund.auto`,
+  `refund.dispute`), linking to `/admin/refunds`.
+- A GST credit note (`CN-FY2627-000001`) is issued when a refund is confirmed paid; it cites the original tax invoice (`INV-FY2627-000001`, issued when the payment succeeded),
+  and `/me/payments` shows both numbers. An order that was never invoiced (a failed, late or mismatched payment refunded automatically) gets no credit note.
+
 ## 6. Maker-checker / approval
 - **Applicable: no.** Finance is a read-only reporting surface today - no proposal/approval
-  states, no mutations, no audit writes. Refunds are only *displayed*, not initiated
-  here. A real backend would introduce maker-checker on refunds (see
+  states, no mutations, no audit writes. The one exception is the refunds desk (5.12): a customer
+  asks, staff approve or reject, and both are audited. Refunds are not initiated from the finance tiles. A real backend would introduce maker-checker on refunds (see
   [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2).
 
 ## 7. State machine

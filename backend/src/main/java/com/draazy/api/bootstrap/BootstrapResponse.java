@@ -5,6 +5,7 @@ import com.draazy.api.catalog.city.CityResponse;
 import com.draazy.api.catalog.property.PropertyCountsResponse;
 import com.draazy.api.catalog.property.TrustStatsResponse;
 import com.draazy.api.common.settings.GeoPolicyResponse;
+import com.draazy.api.common.settings.LegalResponse;
 import com.draazy.api.common.settings.ListingPolicyResponse;
 import com.draazy.api.common.settings.MovePackResponse;
 import com.draazy.api.common.settings.PricingResponse;
@@ -20,5 +21,6 @@ public record BootstrapResponse(
         MovePackResponse movePack,
         List<PlanDto> plans,
         PropertyCountsResponse counts,
-        TrustStatsResponse trustStats) {
+        TrustStatsResponse trustStats,
+        LegalResponse legal) {
 }

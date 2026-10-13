@@ -1,5 +1,7 @@
 package com.draazy.api.billing.plan;
 
+import com.draazy.api.billing.credit.CreditNotes;
+import com.draazy.api.billing.refund.RefundStaffAlerts;
 import com.draazy.api.catalog.listing.ListingDuplicateProbe;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -59,12 +61,16 @@ class ListingPasses {
     private final Notifier notifier;
     private final TransactionTemplate transactions;
     private final EntityManager entityManager;
+    private final CreditNotes creditNotes;
+    private final RefundStaffAlerts staffAlerts;
 
     ListingPasses(PropertyRepository properties, SubscriptionRepository subscriptions,
             ListingDuplicateProbe duplicates, AuditService audit, RateLimitLock locks,
             PaymentGateway gateway, Notifier notifier, PlatformTransactionManager transactionManager,
-            EntityManager entityManager) {
+            EntityManager entityManager, CreditNotes creditNotes, RefundStaffAlerts staffAlerts) {
         this.entityManager = entityManager;
+        this.creditNotes = creditNotes;
+        this.staffAlerts = staffAlerts;
         this.properties = properties;
         this.subscriptions = subscriptions;
         this.duplicates = duplicates;
@@ -133,6 +139,7 @@ class ListingPasses {
                     Notifier.rupees(pass.getAmount()) + " will be refunded",
                     "That listing is no longer live, so the pass was not activated and your payment goes back"
                             + " to the account you paid from.", "/dashboard");
+            alertStaff(pass, pass.refundable(), "its listing is no longer live");
         }
     }
 
@@ -156,8 +163,14 @@ class ListingPasses {
             notifier.notify(order.getUserId(), "subscription.refund", Notifier.rupees(back) + " will be refunded",
                     "The payment did not match the price of what you ordered, so nothing was activated and your"
                             + " payment goes back to the account you paid from.", "/dashboard");
+            alertStaff(order, back, "the payment did not match the order");
         }
         return true;
+    }
+
+    private void alertStaff(Subscription order, long amount, String why) {
+        staffAlerts.notifyHolders("refund.auto", "Automatic refund queued",
+                Notifier.rupees(amount) + " is going back on order " + order.getPaymentRef() + ": " + why + ".");
     }
 
     /** One gateway call and one short transaction per row, so a refused refund leaves the others untouched. */
@@ -240,8 +253,12 @@ class ListingPasses {
         if (!refundId.equals(pass.gatewayRefundId())) {
             return true;
         }
-        if (REFUND_SUCCESS.equals(status) && pass.getRefundRef() == null) {
-            recordRefunded(pass, gatewayRef == null || gatewayRef.isBlank() ? refundId : gatewayRef);
+        if (REFUND_SUCCESS.equals(status)) {
+            if (pass.getRefundRef() == null) {
+                recordRefunded(pass, gatewayRef == null || gatewayRef.isBlank() ? refundId : gatewayRef);
+            }
+            creditNotes.issue(pass.getUserId(), CreditNotes.SUBSCRIPTION, pass.getId(), pass.getPaymentRef(),
+                    pass.refundable(), Instant.now());
         } else if (REFUND_REFUSED.contains(status) && pass.getRefundDueAt() != null) {
             pass.refundFailed();
             audit.record("system", "admin", "subscription.passRefundFailed", "subscription",

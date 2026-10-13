@@ -23,6 +23,15 @@ public final class SubscriptionStatuses {
     /** Term elapsed without renewal. Written by the sweep; also decided live on every read. */
     public static final String EXPIRED = "expired";
 
+    /** Paid, but a refund request is waiting for staff: entitles nothing until it is decided. */
+    public static final String REFUND_REVIEW = "refund-review";
+
+    /** A staff-approved refund was issued; the benefit is gone for good. */
+    public static final String REFUNDED = "refunded";
+
+    /** The card network is disputing the payment: entitles nothing until the dispute closes. */
+    public static final String DISPUTED = "disputed";
+
     /** The states that actually entitle a user to the plan's benefits. */
     public static final Set<String> ENTITLED = Set.of(ACTIVE, PAST_DUE);
 

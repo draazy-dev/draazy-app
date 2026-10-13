@@ -40,6 +40,16 @@ public interface PropertyRepository
     @EntityGraph(attributePaths = "owner")
     Optional<Property> findBySlugAndOwner_Id(String slug, UUID ownerId);
 
+    /** Whether the listing was out of the live state at any point before {@code to}: a gap that opened at or after
+     * {@code from}, or that was still open at {@code graceEnd}. */
+    @Query(value = """
+            select exists (select 1 from property_live_gaps g
+                           where g.property_id = :propertyId and g.left_live_at < :to
+                             and (g.left_live_at >= :from or g.returned_live_at is null
+                                  or g.returned_live_at > :graceEnd))""", nativeQuery = true)
+    boolean wasNotLiveBetween(@Param("propertyId") UUID propertyId, @Param("from") Instant from,
+            @Param("graceEnd") Instant graceEnd, @Param("to") Instant to);
+
     /** Load a listing for an ops write against its verification state under a row lock (check-then-act).
      * Lock order: {@code properties} then {@code referrals}, never the reverse. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -1177,6 +1177,25 @@ public final class Routes {
         public static final String BASE = "/help/feedback";
     }
 
+    public static final class Refunds {
+
+        private Refunds() {
+        }
+
+        /** Authenticated — the caller's paid and refunded orders, each with its refund eligibility. */
+        public static final String MY_PAYMENTS = "/me/payments";
+
+        /** Authenticated — ask for a refund of one paid order; staff decide it. */
+        public static final String MY_REFUND = MY_PAYMENTS + "/{id}/refund";
+
+        /** Staff/admin with the refunds function — the desk, one status at a time. */
+        public static final String DESK = "/admin/refunds";
+
+        public static final String APPROVE = DESK + "/{id}/approve";
+
+        public static final String REJECT = DESK + "/{id}/reject";
+    }
+
     /** POST is public and rate-limited per mobile; GET is staff/admin and paged. */
     public static final class Webhooks {
 

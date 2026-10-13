@@ -6,6 +6,7 @@ import com.draazy.api.catalog.property.ListingCounts;
 import com.draazy.api.catalog.property.PropertyCountsService;
 import com.draazy.api.common.settings.AppFlagsController;
 import com.draazy.api.common.settings.GeoPolicyController;
+import com.draazy.api.common.settings.LegalController;
 import com.draazy.api.common.settings.ListingPolicyController;
 import com.draazy.api.common.settings.MovePackController;
 import com.draazy.api.common.settings.PricingController;
@@ -26,11 +27,12 @@ public class BootstrapController {
     private final SubscriptionService plans;
     private final PropertyCountsService counts;
     private final ListingCounts listingCounts;
+    private final LegalController legal;
 
     public BootstrapController(AppFlagsController flags, GeoPolicyController geo, CityService cities,
             PricingController pricing, ListingPolicyController listingPolicy,
             MovePackController movePack, SubscriptionService plans, PropertyCountsService counts,
-            ListingCounts listingCounts) {
+            ListingCounts listingCounts, LegalController legal) {
         this.flags = flags;
         this.geo = geo;
         this.cities = cities;
@@ -40,12 +42,13 @@ public class BootstrapController {
         this.plans = plans;
         this.counts = counts;
         this.listingCounts = listingCounts;
+        this.legal = legal;
     }
 
     @GetMapping(Routes.Bootstrap.BASE)
     public BootstrapResponse bootstrap() {
         return new BootstrapResponse(flags.flags(), geo.geo(), cities.list(), pricing.pricing(),
                 listingPolicy.listingPolicy(), movePack.movePack(), plans.listPlans(), counts.counts(),
-                listingCounts.trustStats());
+                listingCounts.trustStats(), legal.legal());
     }
 }

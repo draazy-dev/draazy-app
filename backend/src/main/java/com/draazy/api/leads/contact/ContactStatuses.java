@@ -15,6 +15,9 @@ public final class ContactStatuses {
     /** The owner declined. Terminal — contact stays masked and re-requesting does not reset it. */
     public static final String DECLINED = "declined";
 
+    /** The owner never answered within the reply window; the contact came back and asking again is a new spend. */
+    public static final String EXPIRED = "expired";
+
     public static final String NONE = "none";
 
     // Approval unlocks chat, not digits, so `approved` is not a reveal state.

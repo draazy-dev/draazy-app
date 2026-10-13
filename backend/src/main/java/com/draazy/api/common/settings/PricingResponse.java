@@ -9,7 +9,17 @@ public record PricingResponse(
         long contactPack,
         long rentAgreementPlatform,
         BigDecimal gstPercent,
-        Referral referral) {
+        Referral referral,
+        Refunds refunds) {
+
+    /** What the plans page and the refund copy quote; each is an admin setting under {@code fees}. */
+    public record Refunds(
+            long packRefundDays,
+            long passGuaranteeDays,
+            long passGuaranteeMaxEnquiries,
+            long passGuaranteeEveryMonths,
+            long contactReplyDays) {
+    }
 
     /** The numbers the referral and Refer screens quote; each is an admin setting under {@code fees}. */
     public record Referral(
