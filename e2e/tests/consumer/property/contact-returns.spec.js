@@ -1,4 +1,4 @@
-﻿import { test, expect } from '../../../fixtures/live.js';
+import { test, expect } from '../../../fixtures/live.js';
 import { signedInAs, seedConsent } from '../../../helpers/liveAuth.js';
 import { call, entitlementsOf, sql } from '../../../helpers/monetisation.js';
 import { liveListing, member } from '../../../helpers/referral.js';
