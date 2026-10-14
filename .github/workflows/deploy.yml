@@ -283,7 +283,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: frontend-build
-    if: !cancelled() && needs.frontend-build.result == 'success'
+    if: >-
+      !cancelled() &&
+      needs['frontend-build'].result == 'success'
     environment: sandbox-web
     permissions:
       contents: read
