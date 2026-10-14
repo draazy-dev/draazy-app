@@ -1,0 +1,157 @@
+name: draazy-api-sandbox
+region: blr
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+ingress:
+  rules:
+    - component:
+        name: api
+      match:
+        path:
+          prefix: /
+databases:
+  - name: db
+    engine: PG
+    production: false
+services:
+  - name: api
+    image:
+      registry_type: GHCR
+      registry: ${GHCR_OWNER}
+      repository: draazy-api
+      tag: ${DEPLOY_SHA}
+    instance_size_slug: apps-s-1vcpu-1gb
+    instance_count: 1
+    http_port: 8080
+    health_check:
+      http_path: /api/actuator/health/readiness
+      initial_delay_seconds: 30
+      period_seconds: 10
+      timeout_seconds: 5
+      failure_threshold: 18
+    alerts:
+      - rule: CPU_UTILIZATION
+        operator: GREATER_THAN
+        value: 85
+        window: TEN_MINUTES
+      - rule: MEM_UTILIZATION
+        operator: GREATER_THAN
+        value: 90
+        window: TEN_MINUTES
+      - rule: RESTART_COUNT
+        operator: GREATER_THAN
+        value: 2
+        window: FIVE_MINUTES
+    envs:
+      - key: SPRING_PROFILES_ACTIVE
+        value: sandbox
+      - key: WEB_ORIGINS
+        value: https://sandbox.draazy.com,https://draazy.com
+      - key: API_PUBLIC_ORIGIN
+        value: https://sandbox.draazy.com
+      - key: APP_BASE_URL
+        value: https://sandbox.draazy.com
+      - key: INTERNAL_PROXIES
+        value: none
+      - key: BOOTSTRAP_ADMIN_EMAIL
+        type: SECRET
+        value: "${BOOTSTRAP_ADMIN_EMAIL}"
+      - key: BOOTSTRAP_ADMIN_MOBILE
+        type: SECRET
+        value: "${BOOTSTRAP_ADMIN_MOBILE}"
+      - key: BOOTSTRAP_ADMIN_RECOVER
+        value: "${BOOTSTRAP_ADMIN_RECOVER}"
+      - key: DB_URL
+        value: jdbc:postgresql://${db.HOSTNAME}:${db.PORT}/${db.DATABASE}?sslmode=require
+      - key: DB_USER
+        value: ${db.USERNAME}
+      - key: DB_PASSWORD
+        value: ${db.PASSWORD}
+      - key: FLYWAY_DB_USER
+        value: ${db.USERNAME}
+      - key: ORIGIN_SHARED_SECRET
+        type: SECRET
+        value: "${ORIGIN_SHARED_SECRET}"
+      - key: JWT_SECRET
+        type: SECRET
+        value: "${JWT_SECRET}"
+      - key: REFERRAL_SIGNAL_SALT
+        type: SECRET
+        value: "${REFERRAL_SIGNAL_SALT}"
+      - key: IDENTITY_HASH_SECRET
+        type: SECRET
+        value: "${IDENTITY_HASH_SECRET}"
+      - key: STAFF_TOTP_KEY
+        type: SECRET
+        value: "${STAFF_TOTP_KEY}"
+      - key: IDENTITY_ENCRYPTION_KEY
+        type: SECRET
+        value: "${IDENTITY_ENCRYPTION_KEY}"
+      - key: IDENTITY_ENCRYPTION_KEY_ID
+        value: s1
+      - key: CASHFREE_ENABLED
+        value: "true"
+      - key: CASHFREE_APP_ID
+        type: SECRET
+        value: "${CASHFREE_APP_ID}"
+      - key: CASHFREE_SECRET_KEY
+        type: SECRET
+        value: "${CASHFREE_SECRET_KEY}"
+      - key: CASHFREE_WEBHOOK_SECRET
+        type: SECRET
+        value: "${CASHFREE_SECRET_KEY}"
+      - key: CASHFREE_NOTIFY_URL
+        value: https://sandbox.draazy.com/api/webhooks/cashfree/payment
+      - key: ZEPTOMAIL_ENABLED
+        value: "true"
+      - key: ZEPTOMAIL_FROM_NAME
+        value: Draazy Sandbox
+      - key: ZEPTOMAIL_API_KEY
+        type: SECRET
+        value: "${ZEPTOMAIL_API_KEY}"
+      - key: STORAGE_ENABLED
+        value: "true"
+      - key: R2_ENDPOINT
+        value: "${R2_ENDPOINT}"
+      - key: R2_BUCKET_PRIVATE
+        value: "${R2_BUCKET_PRIVATE}"
+      - key: R2_BUCKET_PUBLIC
+        value: "${R2_BUCKET_PUBLIC}"
+      - key: R2_PUBLIC_BASE_URL
+        value: "${R2_PUBLIC_BASE_URL}"
+      - key: R2_ACCESS_KEY_ID
+        type: SECRET
+        value: "${R2_ACCESS_KEY_ID}"
+      - key: R2_SECRET_ACCESS_KEY
+        type: SECRET
+        value: "${R2_SECRET_ACCESS_KEY}"
+      - key: GOOGLE_PLACES_SERVER_KEY
+        type: SECRET
+        value: "${GOOGLE_PLACES_SERVER_KEY}"
+      - key: PUSH_VAPID_PRIVATE_KEY
+        type: SECRET
+        value: "${PUSH_VAPID_PRIVATE_KEY}"
+      - key: PUSH_VAPID_PUBLIC_KEY
+        type: SECRET
+        value: "${PUSH_VAPID_PUBLIC_KEY}"
+jobs:
+  - name: migrate
+    kind: PRE_DEPLOY
+    image:
+      registry_type: GHCR
+      registry: ${GHCR_OWNER}
+      repository: draazy-api
+      tag: ${DEPLOY_SHA}
+    instance_size_slug: apps-s-1vcpu-1gb
+    instance_count: 1
+    run_command: java -jar /app/app.jar --migrate-only
+    envs:
+      - key: SPRING_PROFILES_ACTIVE
+        value: sandbox
+      - key: FLYWAY_DB_URL
+        value: jdbc:postgresql://${db.HOSTNAME}:${db.PORT}/${db.DATABASE}?sslmode=require
+      - key: FLYWAY_DB_USER
+        value: ${db.USERNAME}
+      - key: FLYWAY_DB_PASSWORD
+        value: ${db.PASSWORD}

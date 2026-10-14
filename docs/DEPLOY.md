@@ -1,8 +1,8 @@
 # Deploying Draazy
 
-The local counterpart is [`LOCAL_DEV.md`](./LOCAL_DEV.md). The *shape* of the deployment — Cloud Run
-in `asia-south1`, Supabase Postgres in Mumbai, Cloudflare R2 — is decided in
-[`system/platform-architecture.md`](./system/platform-architecture.md) §6 and ADR-007/ADR-013. This
+The local counterpart is [`LOCAL_DEV.md`](./LOCAL_DEV.md). The *shape* of the deployment — DigitalOcean
+App Platform in `blr`, dev Postgres, Cloudflare R2 — is decided in
+[`system/platform-architecture.md`](./system/platform-architecture.md) §6 and ADR-007/ADR-013/ADR-021. This
 file is the runbook: what to set, in what order, and which mistakes are silent.
 
 > **Source of truth for the variable list is `ProdProfileContractTest`**, not this page. That test
@@ -55,7 +55,7 @@ one rewrite per `App.jsx` route to the shell (prerendered pages rewrite to thems
 real 404. A `/*` rewrite cannot be used: Pages ignores `/* /index.html`, and any other `/*` target
 would be matched before the asset lookup and serve `/assets/*.js` as HTML. The `/api` prefix is forwarded verbatim because
 the backend runs with `server.servlet.context-path=/api`. The Function's own configuration is a
-single Pages environment variable, `API_ORIGIN` (scheme + host of the Cloud Run service, no path);
+single Pages environment variable, `API_ORIGIN` (scheme + host of the backend service e.g. DigitalOcean default ingress, no path);
 unset, it answers 502 rather than falling through — a fall-through would return the HTML shell with
 a 200, which `http.js` reads as success and renders as an affirmative "no results" on every
 catalogue.

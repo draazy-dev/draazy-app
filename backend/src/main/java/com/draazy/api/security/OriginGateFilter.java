@@ -74,7 +74,7 @@ public class OriginGateFilter extends OncePerRequestFilter {
     }
 
     // The edge proxy writes the visitor's address as the first X-Forwarded-For hop;
-    // Cloud Run's front end may append more.
+    // the origin front end may append more.
     private static HttpServletRequest edgeAddressed(HttpServletRequest request) {
         String forwarded = request.getHeader(WriteRateLimitFilter.FORWARDED_FOR);
         String client = forwarded == null ? "" : forwarded.split(",", 2)[0].trim();

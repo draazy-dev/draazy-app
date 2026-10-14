@@ -115,8 +115,8 @@ Four, none of which can be created from a terminal:
 ### 0.4 The repository, and where commands run
 
 ```bash
-git clone https://github.com/yatishpatil101/Learning.git
-cd Learning
+git clone https://github.com/draazy-dev/draazy-app.git
+cd draazy-app
 git checkout feature/backend-integration
 ```
 
@@ -843,7 +843,7 @@ copy.
 
 ```bash
 # macOS
-gh api --method PUT repos/yatishpatil101/Learning/environments/sandbox
+gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox
 
 gh secret   set GCP_SA_KEY            --env sandbox < key.json
 gh variable set GCP_PROJECT_ID        --env sandbox --body "$PROJECT_ID"
@@ -856,7 +856,7 @@ rm -P key.json          # macOS has no `shred`; -P overwrites before unlinking
 
 ```powershell
 # Windows
-gh api --method PUT repos/yatishpatil101/Learning/environments/sandbox
+gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox
 
 gh secret   set GCP_SA_KEY            --env sandbox --body (Get-Content key.json -Raw)
 gh variable set GCP_PROJECT_ID        --env sandbox --body $PROJECT_ID

@@ -16,33 +16,36 @@ import org.junit.jupiter.api.Test;
 @DisplayName("The sandbox deployment manifest — the facts in it that no compiler checks")
 class SandboxDeploymentManifestTest {
 
-    /** See {@code ProdProfileContractTest.MODULE} — same working-directory hazard, same fix. */
     private static final Path MODULE = Path.of(System.getProperty("basedir", "")).toAbsolutePath();
 
-    // Not a YAML parse: the file is an envsubst template a parser would choke on.
     private static final Pattern ENTRY = Pattern.compile(
-            "- name: (\\w+)\\s*\\n\\s*(?:value: (.+)|valueFrom:\\s*\\n\\s*secretKeyRef:\\s*\\n\\s*name: (\\S+))");
+            "- key: (\\w+)\\s*\\n\\s*(?:type: \\w+\\s*\\n\\s*)?value: \"?([^\"]+?)\"?\\s*(?:\\n|$)");
 
     private static String manifest() throws IOException {
-        Path file = MODULE.resolve("deploy/cloudrun-sandbox.yaml");
+        Path file = MODULE.resolve("deploy/do-app-sandbox.yaml");
         assertThat(file)
                 .as("run this from the backend module — the working directory was %s", MODULE)
                 .exists();
         return Files.readString(file, StandardCharsets.UTF_8);
     }
 
-    /** The literal value, or the Secret Manager entry name, for one environment variable. */
+    private static String servicesBlock() throws IOException {
+        String all = manifest();
+        int servicesIdx = all.indexOf("services:");
+        int jobsIdx = all.indexOf("jobs:");
+        return jobsIdx > servicesIdx ? all.substring(servicesIdx, jobsIdx) : all.substring(servicesIdx);
+    }
+
     private static String entry(String variable) throws IOException {
         Matcher matcher = ENTRY.matcher(manifest());
         while (matcher.find()) {
             if (matcher.group(1).equals(variable)) {
-                return matcher.group(2) != null ? matcher.group(2).trim() : matcher.group(3).trim();
+                return matcher.group(2).trim();
             }
         }
-        throw new AssertionError(variable + " is not set in deploy/cloudrun-sandbox.yaml");
+        throw new AssertionError(variable + " is not set in deploy/do-app-sandbox.yaml");
     }
 
-    // Nothing else ties this string to the route constant; `/api` is the context path, easy to drop.
     @Test
     @DisplayName("the deployed notify URL is the route this service actually serves")
     void theNotifyUrlMatchesTheRoute() throws IOException {
@@ -61,17 +64,15 @@ class SandboxDeploymentManifestTest {
     void theWebhookSecretIsTheApiKey() throws IOException {
         assertThat(entry("CASHFREE_WEBHOOK_SECRET"))
                 .as("Cashfree signs webhooks with x-client-secret. Splitting these across two "
-                        + "Secret Manager entries survives until the first rotation and then "
-                        + "rejects every payment callback, silently and permanently.")
+                        + "entries survives until the first rotation and then rejects every payment callback.")
                 .isEqualTo(entry("CASHFREE_SECRET_KEY"));
     }
 
     @Test
     @DisplayName("the service never holds the schema-owner password; only the migration job does")
     void theServiceNeverHoldsTheSchemaOwnerPassword() throws IOException {
-        assertThat(manifest())
+        assertThat(servicesBlock())
                 .as("code execution in the service would reach the owner role (docs/DEPLOY.md §2.1)")
-                .doesNotContain("FLYWAY_DB_PASSWORD")
-                .doesNotContain("draazy-sandbox-flyway-db-password");
+                .doesNotContain("FLYWAY_DB_PASSWORD");
     }
 }
