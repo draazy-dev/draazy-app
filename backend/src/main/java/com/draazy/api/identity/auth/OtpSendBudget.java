@@ -26,6 +26,12 @@ public class OtpSendBudget {
      * low enough that a victim's phone cannot be used as a doorbell. Only local dev loosens it. */
     static final int MAX_SENDS_PER_WINDOW = 5;
 
+    static final Duration SEND_DAY = Duration.ofDays(1);
+
+    /** Secure default for codes per mobile per {@link #SEND_DAY}, so the hourly budget cannot be
+     * spent again every hour. */
+    static final int MAX_SENDS_PER_DAY = 10;
+
     /** Secure default for codes across <em>every</em> recipient per {@link #SEND_WINDOW} — a spend
      * ceiling for the attacker who rotates the number. Rationale: docs/flows/consumer/auth.md */
     static final int MAX_PLATFORM_SENDS_PER_WINDOW = 500;
@@ -53,6 +59,7 @@ public class OtpSendBudget {
     private final Duration sendCooldown;
     /** Enforced per-mobile ceiling; {@link #MAX_SENDS_PER_WINDOW} unless overridden for local dev. */
     private final int maxSendsPerWindow;
+    private final int maxSendsPerDay;
     /** Enforced platform-wide ceiling; {@link #MAX_PLATFORM_SENDS_PER_WINDOW} unless overridden. */
     private final int maxPlatformSendsPerWindow;
     /** Enforced per-purpose share; {@link #MAX_PURPOSE_SENDS_PER_WINDOW} unless overridden. */
@@ -63,6 +70,7 @@ public class OtpSendBudget {
     public OtpSendBudget(OtpCodeRepository repository, RateLimitLock locks,
             @Value("${draazy.otp.send-cooldown-seconds:60}") long sendCooldownSeconds,
             @Value("${draazy.otp.max-sends-per-window:5}") int maxSendsPerWindow,
+            @Value("${draazy.otp.max-sends-per-day:10}") int maxSendsPerDay,
             @Value("${draazy.otp.max-platform-sends-per-window:500}") int maxPlatformSendsPerWindow,
             @Value("${draazy.otp.max-purpose-sends-per-window:100}") int maxPurposeSendsPerWindow,
             @Value("${draazy.otp.max-caller-sends-per-window:5}") int maxCallerSendsPerWindow) {
@@ -70,6 +78,7 @@ public class OtpSendBudget {
         this.locks = locks;
         this.sendCooldown = Duration.ofSeconds(sendCooldownSeconds);
         this.maxSendsPerWindow = maxSendsPerWindow;
+        this.maxSendsPerDay = maxSendsPerDay;
         this.maxPlatformSendsPerWindow = maxPlatformSendsPerWindow;
         this.maxPurposeSendsPerWindow = maxPurposeSendsPerWindow;
         this.maxCallerSendsPerWindow = maxCallerSendsPerWindow;
@@ -97,22 +106,35 @@ public class OtpSendBudget {
         enforcePurposeBudget(family, requestedBy);
         enforceCallerBudget(requestedBy, family);
         List<Instant> recent = repository.findRecentSendTimesForRecipient(
-                mobile, family, PageRequest.of(0, maxSendsPerWindow));
+                mobile, family, PageRequest.of(0, Math.max(maxSendsPerWindow, maxSendsPerDay)));
         if (recent.isEmpty()) {
             return;
         }
         Instant now = Instant.now();
         Instant readyAt = recent.get(0).plus(sendCooldown);
+        // Newest first here, so row N-1 is the oldest send still inside a budget of N.
+        Instant capFreesAt = now;
+        if (recent.size() >= maxSendsPerWindow) {
+            capFreesAt = latest(capFreesAt, recent.get(maxSendsPerWindow - 1).plus(SEND_WINDOW));
+        }
+        if (recent.size() >= maxSendsPerDay) {
+            capFreesAt = latest(capFreesAt, recent.get(maxSendsPerDay - 1).plus(SEND_DAY));
+        }
+        // The latest reopening, or a client obeying Retry-After walks into the next limit's 429.
+        if (now.isBefore(capFreesAt)) {
+            throw new RateLimitedException(
+                    "Too many login codes requested for this number — try again later",
+                    secondsUntil(now, latest(capFreesAt, readyAt)));
+        }
         if (now.isBefore(readyAt)) {
             throw new RateLimitedException(
                     "A code was just sent — wait a moment before requesting another",
                     secondsUntil(now, readyAt));
         }
-        if (recent.size() >= maxSendsPerWindow) {
-            // Newest first here, so the page's last row is the oldest send still inside the budget.
-            refuseUntilWindowFrees(now, recent.get(recent.size() - 1),
-                    "Too many login codes requested for this number — try again later");
-        }
+    }
+
+    private static Instant latest(Instant a, Instant b) {
+        return a.isAfter(b) ? a : b;
     }
 
     /** Throw {@link RateLimitedException} once the platform has spent its share for this window.

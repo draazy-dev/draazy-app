@@ -5,6 +5,8 @@ import { useCity } from '../context/CityContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import MobileField from './MobileField.jsx';
+import TurnstileWidget from './security/TurnstileWidget.jsx';
+import { useTurnstile } from './security/useTurnstile.js';
 import useScrollLock from '../hooks/useScrollLock.js';
 
 /* The +91 prefix only comes off a number longer than ten digits: a real mobile can begin 91. */
@@ -98,6 +100,7 @@ function CityModal({ modal, user, onClose, onSubmit }) {
   const [form, setForm] = useState({ city: '', mobile: digits(user?.mobile), email: user?.email || '' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const turnstile = useTurnstile();
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   /* Every way out is sealed while the POST is in flight: `onSubmit` closes over `CityChrome`,
@@ -127,7 +130,7 @@ function CityModal({ modal, user, onClose, onSubmit }) {
     setBusy(true);
     try {
       await onSubmit(
-        { city: target, mobile: mob, email },
+        { city: target, mobile: mob, email, turnstileToken: turnstile.spend() },
         isWaitlist ? `You're on the ${target} waitlist 🎉` : `Thanks! We've noted your request for ${target}`,
       );
     } catch {
@@ -172,6 +175,7 @@ function CityModal({ modal, user, onClose, onSubmit }) {
               <input value={form.email} onChange={(e) => set('email', e.target.value)} className={fld + ' mt-1.5'} placeholder="you@example.com" />
             </label>
           ) : null}
+          <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="mt-2 flex justify-center" />
           {/* `role="alert"` because this message arrives *after* an await, with focus parked on a
              button that has gone quiet, so it would otherwise never be announced. */}
           {err ? <p role="alert" className="mt-1 text-xs text-rose-300">{err}</p> : null}

@@ -62,6 +62,22 @@
 - [ ] **MT-18** Interactions (rows 243, 255-258): hover states on desktop, drag-to-reorder photos (mouse and touch), drag-and-drop upload, swipe-to-delete with undo, accordions/tooltips/copy/share with tap, mouse and keyboard.
 - [ ] **MT-19** Product decision before testing (row 84): visit no-show has no status in the product; decide whether it is needed (payment disputes are in SB-03).
 
+### wa.me click-to-chat (manual on another system: phone with WhatsApp installed + desktop with WhatsApp Web/desktop app and one without)
+- [ ] **WA-01** Support: `/contact` WhatsApp button prefills "Hi Draazy, I need help with a property enquiry." and the `/support` contact card opens with no text; both open `wa.me/918728872895` and the chat shows the Draazy business profile (needs 87288 72895 set up on the WhatsApp Business app first).
+- [ ] **WA-02** Property page contact modal and owner card (`ContactOwnerModal.jsx`, `OwnerCard.jsx`): WhatsApp opens the owner's number only after the contact gate; a masked/locked number shows no WhatsApp link.
+- [ ] **WA-03** Owner profile (`Owner.jsx`, 3 buttons: header, desktop side card, phone bottom bar): prefilled "Hi {first name}, I saw your profile on Draazy…" with the right name.
+- [ ] **WA-04** Dashboard visits, owner → visitor (`VisitsTab.jsx`): confirmed, cancelled/no-show, pending and reschedule texts name the right listing, date and time.
+- [ ] **WA-05** Chat thread header and dashboard contact buttons: WhatsApp shows only when the number is unlocked (`canCall`); opens the other party with no text.
+- [ ] **WA-06** Rent agreement co-fill invite: "Send on WhatsApp" opens the invitee's number with the invite link and sign-up link; both links open and work for the invitee.
+- [ ] **WA-07** Shares with no recipient (property share, Refer & earn, Reels): WhatsApp opens the contact picker with the text; the link and referral code in it resolve.
+- [ ] **WA-08** Staff outreach (send from the support number on WhatsApp Web): Post on Behalf → *Send claim link on WhatsApp* (`wa-onboard`) → *I've sent it* moves the listing to `link_sent`; Property review templates panel + *Mark sent* in the Communication log; Needs Follow-up `wa-gentle` / `wa-stale` / `wa-dormant`. All placeholders filled (₹ with Indian grouping, claim link opens `/signin?claim=`), only `{market_rate}` may stay in braces.
+- [ ] **WA-09** Edge cases: Hindi/Marathi UI texts, emoji, ₹ and line breaks arrive intact; a stored mobile with spaces or `+91` still opens the right number; desktop without WhatsApp shows the wa.me landing page, not a broken link.
+
+### OTP abuse limits (sandbox, once the Turnstile keys are set) — PENDING VERIFICATION, no e2e: the local bundle has no site key
+- [ ] **OA-01** Sign-in, city waitlist and Services "notify me" each show the Turnstile widget and submit successfully.
+- [ ] **OA-02** With the widget blocked (devtools → block `challenges.cloudflare.com`), each of the three is refused with "could not be verified as human".
+- [ ] **OA-03** An 11th code to one mobile within 24 h is refused with "try again later" (10/day cap).
+
 ### Sandbox only (owner runs these; local mocks cannot prove them)
 - [ ] **SB-01** Cashfree: every plan checkout and rent payment - success, failure, user cancels, timeout, double-click Pay, browser closed mid-payment; the user gets exactly what was paid. Includes rent agreement payment for owner and tenant (manual sheet 24, 25, 32, 41).
 - [ ] **SB-02** Cashfree webhooks: signature check, the same webhook replayed grants nothing twice, webhook arriving before the redirect, an underpaid webhook is refused and marked for refund (QA-06).

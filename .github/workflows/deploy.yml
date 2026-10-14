@@ -81,6 +81,17 @@ jobs:
               ;;
           esac
 
+      # Here, not in the frontend job: by then the backend is live and enforcing, and a bundle without the
+      # widget could not sign in. Both halves need it, so it gates either target.
+      - name: Require the Turnstile site key
+        env:
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+        run: |
+          if [ -z "${VITE_TURNSTILE_SITE_KEY}" ]; then
+            echo "::error::VITE_TURNSTILE_SITE_KEY is empty. Sandbox enforces Turnstile, so sign-in and both waitlists would be refused. Set it as a repository variable." >&2
+            exit 1
+          fi
+
   backend:
     name: Build image and deploy to DigitalOcean
     runs-on: ubuntu-latest
@@ -137,6 +148,8 @@ jobs:
           CASHFREE_APP_ID: ${{ secrets.SANDBOX_CASHFREE_APP_ID }}
           CASHFREE_SECRET_KEY: ${{ secrets.SANDBOX_CASHFREE_SECRET_KEY }}
           ZEPTOMAIL_API_KEY: ${{ secrets.SANDBOX_ZEPTOMAIL_API_KEY }}
+          WHATSAPP_ACCESS_TOKEN: ${{ secrets.SANDBOX_WHATSAPP_ACCESS_TOKEN }}
+          TURNSTILE_SECRET_KEY: ${{ secrets.SANDBOX_TURNSTILE_SECRET_KEY }}
           R2_ENDPOINT: ${{ vars.SANDBOX_R2_ENDPOINT }}
           R2_BUCKET_PRIVATE: ${{ vars.SANDBOX_R2_BUCKET_PRIVATE }}
           R2_BUCKET_PUBLIC: ${{ vars.SANDBOX_R2_BUCKET_PUBLIC }}
@@ -150,6 +163,7 @@ jobs:
           set -euo pipefail
           required="GHCR_OWNER DEPLOY_SHA ORIGIN_SHARED_SECRET JWT_SECRET REFERRAL_SIGNAL_SALT IDENTITY_HASH_SECRET
             STAFF_TOTP_KEY IDENTITY_ENCRYPTION_KEY CASHFREE_APP_ID CASHFREE_SECRET_KEY ZEPTOMAIL_API_KEY
+            WHATSAPP_ACCESS_TOKEN TURNSTILE_SECRET_KEY
             R2_ENDPOINT R2_BUCKET_PRIVATE R2_BUCKET_PUBLIC R2_PUBLIC_BASE_URL R2_ACCESS_KEY_ID
             R2_SECRET_ACCESS_KEY GOOGLE_PLACES_SERVER_KEY PUSH_VAPID_PRIVATE_KEY PUSH_VAPID_PUBLIC_KEY"
           for name in $required; do
@@ -239,6 +253,7 @@ jobs:
           VITE_PMF_MODE: ${{ vars.VITE_PMF_MODE }}
           VITE_GA_ID: ${{ secrets.VITE_GA_ID }}
           VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
+          VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
         run: |
           set -euo pipefail
 

@@ -101,6 +101,13 @@
   second slot against any single number, and the per-IP `WriteRateLimitFilter` is defeated by the same
   rotation. That one is a spend ceiling rather than a correctness limit, and is meant to be raised as
   the platform grows — what it buys is a bounded bill in the worst case.
+- **A daily cap per mobile and an hourly cap per address.** `MAX_SENDS_PER_DAY` (10) stops the hourly
+  five being spent again every hour against one victim. `OtpSendIpBudget` (20 send *attempts* an hour
+    per IPv4 address or IPv6 /64, refusals included) stops one machine draining the platform ceiling by rotating numbers,
+  which would otherwise lock every honest sign-in out. It is loose because Indian carriers share one
+  IPv4 address across many subscribers, and it is counted only after the Turnstile check passes, so a
+  bot without a token spends nothing honest callers behind the same address rely on. In memory, like
+  `WriteRateLimitFilter`: a restart refunds it, and the database-backed limits still hold.
 - **The budget is the `otp_codes` rows, not a counter.** One row per send, so the rate limiter needs no
   counter table and stays correct across restarts and nodes. `OtpCodeRepository#findByMobileAndPurpose…`
   deliberately ignores `consumed` and `expiresAt` — it counts *sends*, and filtering them out would let
@@ -143,8 +150,8 @@
   copies of a rate limiter is one copy that gets forgotten when the rule changes.
 - **Two predictable-code keys, both fenced at boot.** `draazy.otp.fixed-code` is the e2e affordance (so
   a browser suite can type the code rather than scrape a shared log, which cannot tell two concurrent
-  logins apart); `draazy.otp.sandbox-code` is sandbox's stand-in for a delivery channel it does not
-  have. Only the choice of digits is weakened — still hashed, single-use, TTL'd, budgeted and
+  logins apart); `draazy.otp.sandbox-code` is a sandbox-only break-glass, pinned empty now that
+  sandbox delivers real codes over WhatsApp. Only the choice of digits is weakened — still hashed, single-use, TTL'd, budgeted and
   attempt-capped, and verification is never special-cased. Two keys rather than an exemption, because an
   exemption is invisible in the prod properties file and no environment variable that means something in
   prod can set the sandbox one. `rejectFixedCodeInProduction` and `rejectSandboxCodeOutsideSandbox` kill
@@ -153,8 +160,8 @@
   unrecognised profile lands on the safe side and a superset activation such as `prod,sandbox` fails
   too. The runtime guards are not redundant with the properties pins: a classpath config-data file is
   the *lowest*-precedence source Spring consults, so `DRAAZY_OTP_FIXED_CODE` exported into a
-  deployment's environment silently outranks both pins and only the boot check is left. The sandbox cost is real and accepted: a committed `000000` and
-  login that resolves a user by mobile — the guard keeps the blast radius to that one environment, and
+  deployment's environment silently outranks both pins and only the boot check is left. Should the
+  sandbox break-glass ever be set, the guard keeps the blast radius to that one environment, and
   back-office accounts are out of it entirely because `/auth/login` refuses them (§ Staff login).
 - **`AuthResponse` carries several shapes in one record** because the contract models login as a single
   dual-mode operation: the send step returns `{otpSent, resendAfterSeconds}` and no tokens, the staff

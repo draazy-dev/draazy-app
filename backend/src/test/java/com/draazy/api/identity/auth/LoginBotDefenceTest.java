@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.security.BotDefence;
+import com.draazy.api.security.InMemoryWriteRateLimitStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -32,7 +33,8 @@ class LoginBotDefenceTest {
                 public boolean verify(String token, String remoteIp) {
                     return GOOD.equals(token);
                 }
-            });
+            },
+            new OtpSendIpBudget(InMemoryWriteRateLimitStore::new, 100));
 
     @Test
     @DisplayName("refuses the send step without a token, before an SMS is spent")

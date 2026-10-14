@@ -208,23 +208,25 @@ creator, who shares it privately; manager-created staff invites also notify the 
 deploy, because Spring does not complain about an absent profile — a deploy that forgot it would
 boot on the developer defaults and report itself healthy.
 
-### 3.1 The sandbox login code — a stand-in for OTP delivery
+### 3.1 Sandbox OTP — real WhatsApp codes
 
-Sandbox cannot send an OTP. WhatsApp is off while ADR-020 waits on Meta business verification, so
-`SandboxOtpSender` accepts the send and drops it, and before this existed the shared environment
-could not be signed into at all. `draazy.otp.sandbox-code` pins every code to one value so it can be
-typed into the six-box OTP field like any other. It is **`000000`, hardcoded** in
-`application-sandbox.properties` — the same code the e2e profile uses. Nothing to provision.
+Sandbox sends real, random OTPs through WhatsApp exactly like prod: `do-app-sandbox.yaml` sets
+`WHATSAPP_ENABLED=true`, the business number's `WHATSAPP_PHONE_NUMBER_ID` and the approved
+`draazy_login_otp` / `draazy_identity_decision` templates, and the deploy workflow passes the
+System User token from the GitHub `sandbox` environment secret **`SANDBOX_WHATSAPP_ACCESS_TOKEN`**
+(the deploy fails fast while it is empty). Every send is billed to the Meta prepaid balance and only
+reaches mobiles registered on WhatsApp, so seeded demo mobiles cannot sign in — use your own number.
 
-**Understand what this opens before you put anything real in that environment.** Any consumer
-account in the sandbox can be signed into by anyone who knows its mobile. The back office is not
-covered by it: staff and admin accounts sign in only with email, password and an authenticator code
-(`POST /auth/staff-login`), and `/auth/login` refuses them even after a correct code. Use the
-single-admin bootstrap below for the first back-office login.
+`draazy.otp.sandbox-code` is pinned empty, as in prod. It remains a break-glass only: exporting
+`DRAAZY_OTP_SANDBOX_CODE` on the sandbox app pins every code to that value for anyone who knows a
+mobile, so set it only for a disposable database and remove it afterwards.
 
-That trade is acceptable for disposable demo inventory and is deliberate, not a gap to be reported.
-It stops being acceptable the moment the sandbox database holds anything you would not publish; at
-that point make the code a generated per-deploy secret in Secret Manager.
+Sandbox also enforces Turnstile on the code send and both waitlists (`TURNSTILE_ENABLED=true`). Create a
+widget in Cloudflare → Turnstile for the sandbox hostname, then add its secret key as the `sandbox`
+environment secret **`SANDBOX_TURNSTILE_SECRET_KEY`** and its site key as the repository variable
+**`VITE_TURNSTILE_SITE_KEY`**. The deploy stops before anything ships while either is empty, because the
+API would refuse every sign-in from a bundle without the widget. Sign in once by hand after the first
+rollout: the health check cannot catch a mismatched key pair or a widget missing the sandbox hostname.
 
 It is a key of its own rather than a reuse of `DRAAZY_OTP_FIXED_CODE` on purpose. That one is refused
 on *every* deployment profile by `OtpService.rejectFixedCodeInProduction`, and sandbox counts as one,
@@ -488,7 +490,7 @@ the `draazy.com` zone, free plan:
 - **Managed WAF ruleset** (free tier) — on.
 - **One rate-limiting rule** — e.g. `/api/auth/*` POST, per IP, to back up the OTP counters.
 - **Custom WAF rules** (5 on the free plan) — e.g. block `/api/docs*` and `/api/swagger-ui*` on sandbox.
-- **Turnstile** is already wired (`TurnstileBotDefence`).
+- **Turnstile** is wired (`TurnstileBotDefence`) and on in sandbox (§3.1).
 - **Bot Fight Mode: leave off.** On the free plan it cannot be skipped per path, so it can challenge
   the Cashfree webhook at `/api/webhooks/cashfree/payment` and payments stop confirming without an error.
 
@@ -857,7 +859,7 @@ the sandbox this is accepted; production runs on an always-on host (ADR-021).
 
 - **Nobody can log in on `prod` until WhatsApp is configured.** `UnconfiguredOtpSender` — selected on
   every profile except `local` and `sandbox` while `draazy.providers.whatsapp.enabled` is false —
-  throws on every send. (`sandbox` is the exception: it uses a hardcoded login code, §3.1.) Set
+  throws on every send. (Sandbox already sends through WhatsApp, §3.1.) Set
   the flag plus the `WHATSAPP_*` credentials (ADR-020: `WHATSAPP_PHONE_NUMBER_ID`,
   `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_OTP_TEMPLATE_NAME`, `WHATSAPP_OTP_TEMPLATE_LANG`) before the
   first useful deploy. The token must be a **System User** token; the one the App Dashboard offers

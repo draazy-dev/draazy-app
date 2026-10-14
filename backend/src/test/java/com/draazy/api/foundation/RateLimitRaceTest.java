@@ -86,7 +86,7 @@ class RateLimitRaceTest {
     void otpSendsCannotOverspendTheWindowBudget() {
 
         OtpService tightBudget = new OtpService(otpCodes, otpSender,
-                new OtpSendBudget(otpCodes, locks, 0, 2, 500, 500, 500),
+                new OtpSendBudget(otpCodes, locks, 0, 2, 500, 500, 500, 500),
                 environment, "", "", 3);
 
         tx.executeWithoutResult(status ->
@@ -118,7 +118,7 @@ class RateLimitRaceTest {
         UUID caller = jdbc.queryForObject(
                 "insert into users (mobile) values (?) returning id", UUID.class, CALLER_MOBILE);
         OtpService wideBudget = new OtpService(otpCodes, otpSender,
-                new OtpSendBudget(otpCodes, locks, 0, 500, 500, 500, 500),
+                new OtpSendBudget(otpCodes, locks, 0, 500, 500, 500, 500, 500),
                 environment, "", "", 3);
 
         List<Throwable> outcomes = Races.run(3, index ->

@@ -293,6 +293,47 @@ class AuthEndpointsTest extends AbstractApiTest {
                 .andExpect(header().exists(HttpHeaders.RETRY_AFTER));
     }
 
+    /** Each send is aged past the hourly window, so only the daily cap can refuse the last one. */
+    @Test
+    void sendsBeyondTheDailyBudgetAre429EvenWhenEveryHourIsUnderItsCap() throws Exception {
+        String mobile = "9876500711";
+        for (int i = 0; i < OtpSendBudget.MAX_SENDS_PER_DAY; i++) {
+            sendOtp(mobile);
+            ageOut(mobile, OtpSendBudget.SEND_WINDOW.toSeconds() + 1);
+        }
+
+        MvcResult res = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mobile\":\"" + mobile + "\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error").value("rate_limited"))
+                .andReturn();
+
+        assertThat(Integer.parseInt(res.getResponse().getHeader(HttpHeaders.RETRY_AFTER)))
+                .as("waits for the oldest send to leave the day, not the hour")
+                .isGreaterThan((int) OtpSendBudget.SEND_WINDOW.toSeconds());
+    }
+
+    /** Both caps bind here; answering with the hourly wait would earn a second 429 when it elapsed. */
+    @Test
+    void retryAfterNamesTheLaterReopeningWhenTheHourlyAndDailyCapsBothBind() throws Exception {
+        String mobile = "9876500712";
+        for (int i = 0; i < OtpSendBudget.MAX_SENDS_PER_DAY; i++) {
+            sendOtp(mobile);
+            ageOutCooldown(mobile);
+            if (i == OtpSendBudget.MAX_SENDS_PER_WINDOW - 1) {
+                ageOut(mobile, OtpSendBudget.SEND_WINDOW.toSeconds() + 1);
+            }
+        }
+
+        MvcResult res = mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mobile\":\"" + mobile + "\"}"))
+                .andExpect(status().isTooManyRequests())
+                .andReturn();
+
+        assertThat(Integer.parseInt(res.getResponse().getHeader(HttpHeaders.RETRY_AFTER)))
+                .isGreaterThan((int) OtpSendBudget.SEND_WINDOW.toSeconds());
+    }
+
     /** Counting sends globally rather than per mobile would turn the limiter into a platform-wide DoS tool;
      * per mobile also stops POST /auth/login ringing any phone the caller names. */
     @Test
@@ -320,12 +361,16 @@ class AuthEndpointsTest extends AbstractApiTest {
 
     /** Shift this number's existing codes back past the cooldown, leaving them inside the window. */
     private void ageOutCooldown(String mobile) {
+        ageOut(mobile, OtpSendBudget.SEND_COOLDOWN.toSeconds() + 1);
+    }
+
+    private void ageOut(String mobile, long seconds) {
         // Without the flush the pending JPA write means the UPDATE matches nothing; without the
         // clear the next repository read is served a stale entity carrying the old created_at.
         em.flush();
         jdbc.update("update otp_codes set created_at = created_at - (?::text || ' seconds')::interval"
                         + " where mobile = ?",
-                OtpSendBudget.SEND_COOLDOWN.toSeconds() + 1, mobile);
+                seconds, mobile);
         em.clear();
     }
 

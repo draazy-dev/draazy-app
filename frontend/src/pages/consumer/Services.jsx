@@ -11,6 +11,8 @@ import { createTicket, joinServiceWaitlist } from '../../services/ticketService.
 import { getMovePack } from '../../services/settingsService.js';
 import MobileField from '../../components/MobileField.jsx';
 import FieldError from '../../components/ui/FieldError.jsx';
+import TurnstileWidget from '../../components/security/TurnstileWidget.jsx';
+import { useTurnstile } from '../../components/security/useTurnstile.js';
 import HScroll from '../../components/ui/HScroll.jsx';
 import { isValidMobile } from '../../lib/hooks.js';
 import { srcSetFor, CARD_SIZES } from '../../lib/imgSrcSet.js';
@@ -132,6 +134,7 @@ export default function Services() {
   const [notify, setNotify] = useState({ name: '', mobile: '' });
   const [notifyErr, setNotifyErr] = useState('');
   const [notified, setNotified] = useState(false);
+  const turnstile = useTurnstile();
   useEffect(() => {
     if (isIn) setNotify((n) => ({ name: n.name || user?.name || '', mobile: n.mobile || user?.mobile || '' }));
   }, [isIn, user]);
@@ -234,7 +237,12 @@ export default function Services() {
     if (!isValidMobile(mob)) { setNotifyErr(tr('services.hub.notifyMobileErr')); return; }
     setNotifyErr('');
     try {
-      await joinServiceWaitlist({ service: 'move-in-pack', name: notify.name?.trim() || user?.name || '', mobile: mob });
+      await joinServiceWaitlist({
+        service: 'move-in-pack',
+        name: notify.name?.trim() || user?.name || '',
+        mobile: mob,
+        turnstileToken: turnstile.spend(),
+      });
     } catch {
       setNotifyErr(tr('services.hub.notifyFailed'));
       return;
@@ -428,6 +436,7 @@ export default function Services() {
                       <input value={notify.name} onChange={(e) => setNotify((n) => ({ ...n, name: e.target.value }))} placeholder={tr('services.hub.notifyNamePlaceholder')} className="field w-full px-3.5 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500" />
                       <MobileField value={notify.mobile} onChange={(v) => { setNotify((n) => ({ ...n, mobile: v })); if (notifyErr) setNotifyErr(''); }} error={!!notifyErr} />
                       <FieldError show={!!notifyErr}>{notifyErr}</FieldError>
+                      <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
                       <button type="submit" className="btn-teal w-full py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name="bell" className="w-4 h-4" /> {tr('services.hub.notifyBtn')}</button>
                     </form>
                     <p className="text-gray-500 text-[11px] mt-2 text-center">{tr('services.hub.notifyFinePrint')}</p>

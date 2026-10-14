@@ -29,25 +29,31 @@ public class AuthController {
     private final RefreshCookie refreshCookie;
     private final RefreshOriginGate refreshOrigins;
     private final BotDefence botDefence;
+    private final OtpSendIpBudget otpIpBudget;
 
     public AuthController(AuthService authService, StaffSignInService staffSignIn,
             StaffInviteService staffInvites, RefreshCookie refreshCookie,
-            RefreshOriginGate refreshOrigins, BotDefence botDefence) {
+            RefreshOriginGate refreshOrigins, BotDefence botDefence, OtpSendIpBudget otpIpBudget) {
         this.authService = authService;
         this.staffSignIn = staffSignIn;
         this.staffInvites = staffInvites;
         this.refreshCookie = refreshCookie;
         this.refreshOrigins = refreshOrigins;
         this.botDefence = botDefence;
+        this.otpIpBudget = otpIpBudget;
     }
 
     /** {@code POST /auth/login} — dual-mode: {mobile} sends an OTP; {mobile,otp} verifies + issues tokens. */
     @PostMapping(Routes.Auth.LOGIN)
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
             HttpServletRequest http) {
-        // Only the send step spends an SMS; verify is held by the per-code guess cap instead.
-        if (!request.hasOtp() && !BotDefenceFilter.verified(botDefence, http)) {
-            throw new ForbiddenException(BotDefenceFilter.REFUSAL);
+        // Only the send step spends a message; verify is held by the per-code guess cap instead.
+        if (!request.hasOtp()) {
+            if (!BotDefenceFilter.verified(botDefence, http)) {
+                throw new ForbiddenException(BotDefenceFilter.REFUSAL);
+            }
+            // After the challenge, so a bot without a token spends nothing a shared address relies on.
+            otpIpBudget.enforce(http);
         }
         return withRefreshCookie(authService.login(request), request.rememberDevice());
     }

@@ -15,58 +15,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.support.PropertiesLoaderUtils;
 
-/**
- * {@code application-sandbox.properties} is a near-copy of the prod file, and this test is the price
- * of that.
- *
- * <p><strong>Why the duplication exists.</strong> Sandbox used to be activated as {@code
- * prod,sandbox} — a delta that inherited every hardening line from prod and added {@code db/seed}
- * back. That guaranteed the two could never diverge, but it did so by running the profile named
- * {@code prod} against a database full of fabricated listings, which is a confusing thing to have to
- * explain to anyone reading a deployment. The profiles were separated so each environment names
- * exactly one profile and owns its own file.
- *
- * <p><strong>What separation costs.</strong> Inheritance was doing real work: it made drift
- * impossible. Copying the file trades that guarantee for a maintenance hazard whose failure mode is
- * silent and one-directional — someone hardens prod, forgets sandbox, and sandbox quietly stops
- * being a faithful rehearsal of production. Nothing breaks, no test fails, and the environment whose
- * entire purpose is to catch production problems before production does becomes slightly less like
- * production with every such change. By the time it matters, the two files have drifted in a dozen
- * places and nobody knows which differences were deliberate.
- *
- * <p><strong>So this test restores the guarantee as an assertion.</strong> The two files must be
- * byte-for-byte identical in their effective properties except for the keys in {@link
- * #INTENTIONAL_DIVERGENCE}. Adding a line to prod fails this test until the author has either copied
- * it to sandbox or written down, here, why sandbox is different. That is the same protection
- * inheritance gave, except it now also catches the reverse case — a setting loosened in sandbox and
- * never noticed — which the delta arrangement could not see at all.
- *
- * <p>Sibling of {@link ProdProfileContractTest}, which covers the values themselves. This one only
- * covers the <em>relationship</em> between the two files; it deliberately asserts nothing about
- * whether a given value is correct, because duplicating those assertions here would mean two places
- * to update and a second chance to get it wrong.
- */
+// Sandbox copies prod rather than inheriting it, so parity is asserted here; values live in ProdProfileContractTest.
 @DisplayName("The sandbox profile — a standalone copy that must not drift from prod")
 class SandboxProfileContractTest {
 
-    /**
-     * The keys sandbox is allowed to differ on, and the reason for each. Every entry is a deliberate
-     * decision that someone has to defend; the empty case is the healthy one.
-     */
     private static final Set<String> INTENTIONAL_DIVERGENCE = Set.of(
-            // The entire point of the environment. Prod is migration-only; sandbox adds
-            // classpath:db/seed so the shared environment has demo inventory to look at. This is the
-            // difference that makes a seeded database unpromotable to production.
-            "spring.flyway.locations",
-
-            // Sandbox cannot deliver an OTP -- WhatsApp is off and SandboxOtpSender drops the send --
-            // so it pins every code to a committed 000000 to stay signable-into from a browser, and
-            // prod pins the same key empty. It is a key of its own rather than draazy.otp.fixed-code,
-            // which stays pinned empty here so that OtpService.rejectFixedCodeInProduction keeps
-            // refusing a code on every deployment profile. See application-sandbox.properties for
-            // what this buys: the seeded admin and staff mobiles are in the repo and there is no
-            // network control in front of the service, so the sandbox back office is open by design.
-            "draazy.otp.sandbox-code");
+            // Sandbox adds classpath:db/seed for demo inventory, which makes its database unpromotable.
+            "spring.flyway.locations");
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}]+)}");
 
@@ -89,12 +44,7 @@ class SandboxProfileContractTest {
         return mainResource("application-sandbox.properties");
     }
 
-    /**
-     * The load-bearing assertion. Not "sandbox contains the important keys" — that phrasing needs a
-     * list of what counts as important, and the whole failure mode here is someone adding a setting
-     * nobody thought to add to such a list. Comparing the complete maps means the test knows about
-     * new keys without being told.
-     */
+    // Compares the complete maps so a new key is caught without anyone listing it as important.
     @Test
     @DisplayName("sandbox and prod agree on every key except the declared divergences")
     void sandboxDoesNotDriftFromProd() throws IOException {
@@ -131,12 +81,7 @@ class SandboxProfileContractTest {
                 .isEmpty();
     }
 
-    /**
-     * Sandbox holds real credentials for a real Supabase project and a real Cashfree account, so the
-     * fail-loudly-on-a-missing-secret property has to survive the copy. A {@code ${DB_PASSWORD:}}
-     * that picked up a default during the split would boot happily against whatever the base file
-     * points at, which is a developer's local Postgres.
-     */
+    // A defaulted secret like ${DB_PASSWORD:} would boot sandbox against the base file's local Postgres.
     @Test
     @DisplayName("every secret is still an ${ENV} lookup with no fallback")
     void noSecretAcquiredADefaultDuringTheSplit() throws IOException {
@@ -164,13 +109,6 @@ class SandboxProfileContractTest {
         assertThat(sandbox().getProperty("spring.flyway.locations")).doesNotContain("seed-staff");
     }
 
-    /**
-     * The variables an operator has to provision before the first sandbox deploy. That this is
-     * exactly prod's set is not a coincidence worth asserting for its own sake — it falls out of the
-     * parity test above — but naming it here means the deploy checklist is greppable from the sandbox
-     * side too, rather than only from a test named after prod. The login code is deliberately absent:
-     * it is hardcoded rather than provisioned, so it is not on anyone's checklist.
-     */
     @Test
     @DisplayName("the deploy checklist is exactly the same as prod's")
     void sandboxNeedsTheSameVariablesAsProd() throws IOException {

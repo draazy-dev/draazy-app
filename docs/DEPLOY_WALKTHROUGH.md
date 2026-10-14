@@ -1315,20 +1315,16 @@ target. If the session dies, the cookie is being withheld silently and the serve
 indistinguishable from a visitor who was never signed in — go back to §1.1 and check that nothing
 points a second hostname at the backend.
 
-> Step 1 used to be impossible, so this section was unreachable. Sign-in now works with the hardcoded
-> sandbox login code — `000000`, see DEPLOY.md §3.1 — and nothing needs provisioning first.
+> Step 1 used to be impossible, so this section was unreachable. Sign-in now sends a real WhatsApp
+> code — see DEPLOY.md §3.1 for the one secret it needs.
 
 ---
 
 ## Known blockers
 
-- **Sign-in works here only through a shared code.** `UnconfiguredOtpSender` is selected on every
-  profile except `local` and `sandbox` while `draazy.providers.whatsapp.enabled` is false, and throws
-  on every send. Sandbox steps around it with a hardcoded `000000` — one constant that signs in as
-  any seeded account, including `admin`, with no network control in front of it (`ingress: all` is
-  required here). The back office is therefore open to anyone who finds the URL; keep the data
-  disposable and read DEPLOY.md §3.1. Real OTP delivery still needs Meta **business verification** —
-  weeks (ADR-020).
+- **Sign-in needs WhatsApp.** `UnconfiguredOtpSender` is selected on every profile except `local`
+  and `sandbox` while `draazy.providers.whatsapp.enabled` is false, and throws on every send. Sandbox
+  sends real codes through the business number (DEPLOY.md §3.1), billed to the Meta prepaid balance.
   **Before turning the flag on, set a spend cap on the Meta billing account:** `OtpService` throttles
   per *recipient*, so walking valid-looking numbers gets a fresh budget for each. On WhatsApp that is
   worse than a bill — sends to non-WhatsApp numbers drag the sending number's quality rating down,

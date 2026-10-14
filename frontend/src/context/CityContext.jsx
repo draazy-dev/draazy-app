@@ -82,6 +82,7 @@ export function CityProvider({ children }) {
       city: cityName,
       mobile: String(o.mobile || '').trim(),
       email: String(o.email || '').trim(),
+      turnstileToken: o.turnstileToken,
     });
   }, []);
 

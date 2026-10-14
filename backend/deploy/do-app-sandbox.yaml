@@ -111,6 +111,22 @@ services:
       - key: ZEPTOMAIL_API_KEY
         type: SECRET
         value: "${ZEPTOMAIL_API_KEY}"
+      - key: WHATSAPP_ENABLED
+        value: "true"
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        value: "1366478296549636"
+      - key: WHATSAPP_ACCESS_TOKEN
+        type: SECRET
+        value: "${WHATSAPP_ACCESS_TOKEN}"
+      - key: WHATSAPP_OTP_TEMPLATE_NAME
+        value: draazy_login_otp
+      - key: WHATSAPP_IDENTITY_TEMPLATE_NAME
+        value: draazy_identity_decision
+      - key: TURNSTILE_ENABLED
+        value: "true"
+      - key: TURNSTILE_SECRET_KEY
+        type: SECRET
+        value: "${TURNSTILE_SECRET_KEY}"
       - key: STORAGE_ENABLED
         value: "true"
       - key: R2_ENDPOINT

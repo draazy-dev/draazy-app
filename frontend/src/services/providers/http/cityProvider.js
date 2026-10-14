@@ -16,10 +16,13 @@ export async function updateCity(slug, body) {
 
 /** `auth: false`: the contract marks the route `security: []`, so visitors in unserved cities can still ask.
  * `name` is dropped on purpose: the request has no such field and a waitlist has no use for it. */
-export async function joinCityWaitlist({ city, mobile, email }) {
+export async function joinCityWaitlist({ city, mobile, email, turnstileToken }) {
   const body = { city, mobile };
   if (email) body.email = email;
-  await post('/cities/waitlist', body, { auth: false });
+  await post('/cities/waitlist', body, {
+    auth: false,
+    headers: turnstileToken ? { 'CF-Turnstile-Response': turnstileToken } : undefined,
+  });
 }
 
 /** Authenticated unlike the write above: anyone may ask, only staff may read. Counts only, never contacts:

@@ -52,6 +52,8 @@ export async function createTicket(data) {
 
 /** Unauthenticated and bodyless: a 409 on a repeat would reveal whether a number is listed, so it answers 201.
  * Not routed through `toCreate`: desk and priority are server-derived, so no anonymous caller picks the desk. */
-export async function joinServiceWaitlist({ service, name, mobile }) {
-  await post('/service-waitlist', { service, name: name || undefined, mobile });
+export async function joinServiceWaitlist({ service, name, mobile, turnstileToken }) {
+  await post('/service-waitlist', { service, name: name || undefined, mobile }, {
+    headers: turnstileToken ? { 'CF-Turnstile-Response': turnstileToken } : undefined,
+  });
 }

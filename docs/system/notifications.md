@@ -168,7 +168,7 @@ Business-initiated template messages from the Draazy number. Both templates must
 |---|---|
 | Template | `WHATSAPP_OTP_TEMPLATE_NAME` / `WHATSAPP_OTP_TEMPLATE_LANG` (default `en_US`); boot fails if unset while WhatsApp is enabled |
 | Parameters | `{{1}}` = the 6-digit code; the same code fills the copy-code URL button |
-| Sender | `WhatsAppOtpSender` (local profile logs `[MOCK OTP]`; sandbox uses `draazy.otp.sandbox-code`) |
+| Sender | `WhatsAppOtpSender` on sandbox and prod (local profile logs `[MOCK OTP]`) |
 
 The same template carries every code purpose:
 
