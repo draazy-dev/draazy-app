@@ -13,6 +13,7 @@ ingress:
 databases:
   - name: db
     engine: PG
+    version: "17"
     production: false
 services:
   - name: api
@@ -21,7 +22,7 @@ services:
       registry: ${GHCR_OWNER}
       repository: draazy-api
       tag: ${DEPLOY_SHA}
-    instance_size_slug: apps-s-1vcpu-1gb
+    instance_size_slug: basic-xs
     instance_count: 1
     http_port: 8080
     health_check:
@@ -143,7 +144,7 @@ jobs:
       registry: ${GHCR_OWNER}
       repository: draazy-api
       tag: ${DEPLOY_SHA}
-    instance_size_slug: apps-s-1vcpu-1gb
+    instance_size_slug: basic-xs
     instance_count: 1
     run_command: java -jar /app/app.jar --migrate-only
     envs:
