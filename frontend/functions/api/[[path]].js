@@ -103,7 +103,7 @@ export async function onRequest({ request, env, waitUntil }) {
     headers.set('X-Forwarded-For', clientIp);
     headers.set('X-Proxy-Auth', originSecret);
     headers.set('X-Forwarded-Proto', 'https');
-    /** Sent for future absolute URL builders; otherwise redirects expose the raw `*.run.app` host. */
+    /** Sent for future absolute URL builders; otherwise redirects expose the origin host. */
     headers.set('X-Forwarded-Host', incoming.host);
     // `fetch` derives Host from the target URL; carrying the page's Host through would make the
     // backend answer for an origin it is not serving.

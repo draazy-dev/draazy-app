@@ -291,7 +291,7 @@ services:
       registry: ${GHCR_OWNER}
       repository: draazy-api
       tag: ${DEPLOY_SHA}
-    instance_size_slug: apps-s-1vcpu-1gb
+    instance_size_slug: apps-s-1vcpu-1gb-fixed
     instance_count: 1
     http_port: 8080
     health_check:
@@ -413,7 +413,7 @@ jobs:
       registry: ${GHCR_OWNER}
       repository: draazy-api
       tag: ${DEPLOY_SHA}
-    instance_size_slug: apps-s-1vcpu-1gb
+    instance_size_slug: apps-s-1vcpu-1gb-fixed
     instance_count: 1
     # Full command on purpose: DO may replace the ENTRYPOINT or append to it; --migrate-only works either way.
     run_command: java -jar /app/app.jar --migrate-only

@@ -218,7 +218,7 @@ is the only time persistent users are intentionally cleared.
 SPRING_PROFILES_ACTIVE=sandbox
 ```
 
-The shared test environment on Cloud Run, at `sandbox.draazy.com`. Production configuration —
+The shared test environment on DigitalOcean App Platform, at `sandbox.draazy.com`. Production configuration —
 env-only secrets, `Secure` cookies, real TLS, real rate limits — with demo inventory so there is
 something to look at. It reaches its own Supabase project through its own
 `draazy-sandbox-*` secrets, and its own Cashfree account; nothing about the values is shared with

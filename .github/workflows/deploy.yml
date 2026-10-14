@@ -28,10 +28,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  REGION: asia-south1
-  SERVICE: draazy-api-sandbox
-  AR_REPOSITORY: draazy
-
   CF_PAGES_PROJECT: draazy
   CF_PRODUCTION_BRANCH: main
 
@@ -54,7 +50,6 @@ jobs:
       backend: ${{ steps.decide.outputs.backend }}
       frontend: ${{ steps.decide.outputs.frontend }}
     steps:
-      # The only thing between a stray click and a live `gcloud run services replace`.
       - name: Confirm target
         if: inputs.confirm != 'sandbox'
         run: |
@@ -87,131 +82,116 @@ jobs:
           esac
 
   backend:
-    name: Build image and replace Cloud Run service
+    name: Build image and deploy to DigitalOcean
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     needs: gate
     if: needs.gate.outputs.backend == 'true'
-    # The environment name is part of the GCP trust condition, case included.
     environment: sandbox
-    # The only job that needs to mint GCP credentials.
     permissions:
       contents: read
-      id-token: write
+      packages: write
 
     steps:
-      # Explicit ref keeps all checkouts pinned to DEPLOY_SHA if the branch moves.
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.DEPLOY_SHA }}
-          # checkout leaves GITHUB_TOKEN in .git/config as an http extraheader.
           persist-credentials: false
 
-      # WIF stores no GCP credential; the provider's GCP-side attribute condition is the guard.
-      - id: auth
-        name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v3
+      - id: owner
+        env:
+          OWNER: ${{ github.repository_owner }}
+        run: echo "lower=${OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
         with:
-          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
-          service_account: ${{ vars.GCP_DEPLOYER_SA }}
-
-      - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v3
-
-      - name: Configure Docker for Artifact Registry
-        run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: docker/setup-buildx-action@v4
 
-      # Commit SHA tags make rollback a known redeploy, never a mutable `latest`.
       - name: Build and push image
         uses: docker/build-push-action@v7
         with:
           context: backend
           file: backend/Dockerfile
           push: true
-          tags: ${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/api:${{ env.DEPLOY_SHA }}
+          tags: ghcr.io/${{ steps.owner.outputs.lower }}/draazy-api:${{ env.DEPLOY_SHA }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Render service definition
+      - name: Render app spec
         env:
-          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
-          IMAGE: ${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ env.AR_REPOSITORY }}/api:${{ env.DEPLOY_SHA }}
-          DB_URL: ${{ secrets.SANDBOX_DB_URL }}
-          FLYWAY_DB_URL: ${{ secrets.SANDBOX_FLYWAY_DB_URL }}
-          DB_USER: ${{ secrets.SANDBOX_DB_USER }}
-          FLYWAY_DB_USER: ${{ secrets.SANDBOX_FLYWAY_DB_USER }}
-          # Must be in envsubst: literal "${R2_ENDPOINT}" is non-blank and bypasses
-          # R2FileStorage's boot refusal.
+          GHCR_OWNER: ${{ steps.owner.outputs.lower }}
+          BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.SANDBOX_BOOTSTRAP_ADMIN_EMAIL }}
+          BOOTSTRAP_ADMIN_MOBILE: ${{ secrets.SANDBOX_BOOTSTRAP_ADMIN_MOBILE }}
+          BOOTSTRAP_ADMIN_RECOVER: ${{ vars.SANDBOX_BOOTSTRAP_ADMIN_RECOVER }}
+          ORIGIN_SHARED_SECRET: ${{ secrets.SANDBOX_ORIGIN_SHARED_SECRET }}
+          JWT_SECRET: ${{ secrets.SANDBOX_JWT_SECRET }}
+          REFERRAL_SIGNAL_SALT: ${{ secrets.SANDBOX_REFERRAL_SIGNAL_SALT }}
+          IDENTITY_HASH_SECRET: ${{ secrets.SANDBOX_IDENTITY_HASH_SECRET }}
+          STAFF_TOTP_KEY: ${{ secrets.SANDBOX_STAFF_TOTP_KEY }}
+          IDENTITY_ENCRYPTION_KEY: ${{ secrets.SANDBOX_IDENTITY_ENCRYPTION_KEY }}
+          CASHFREE_APP_ID: ${{ secrets.SANDBOX_CASHFREE_APP_ID }}
+          CASHFREE_SECRET_KEY: ${{ secrets.SANDBOX_CASHFREE_SECRET_KEY }}
+          ZEPTOMAIL_API_KEY: ${{ secrets.SANDBOX_ZEPTOMAIL_API_KEY }}
           R2_ENDPOINT: ${{ vars.SANDBOX_R2_ENDPOINT }}
           R2_BUCKET_PRIVATE: ${{ vars.SANDBOX_R2_BUCKET_PRIVATE }}
           R2_BUCKET_PUBLIC: ${{ vars.SANDBOX_R2_BUCKET_PUBLIC }}
           R2_PUBLIC_BASE_URL: ${{ vars.SANDBOX_R2_PUBLIC_BASE_URL }}
-          # Optional: blank leaves the admin bootstrap off — docs/DEPLOY.md §3. Secrets, not vars,
-          # because run logs on a public repo print vars in clear.
-          BOOTSTRAP_ADMIN_EMAIL: ${{ secrets.SANDBOX_BOOTSTRAP_ADMIN_EMAIL }}
-          BOOTSTRAP_ADMIN_MOBILE: ${{ secrets.SANDBOX_BOOTSTRAP_ADMIN_MOBILE }}
-          BOOTSTRAP_ADMIN_RECOVER: ${{ vars.SANDBOX_BOOTSTRAP_ADMIN_RECOVER }}
+          R2_ACCESS_KEY_ID: ${{ secrets.SANDBOX_R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.SANDBOX_R2_SECRET_ACCESS_KEY }}
+          GOOGLE_PLACES_SERVER_KEY: ${{ secrets.SANDBOX_GOOGLE_PLACES_SERVER_KEY }}
+          PUSH_VAPID_PRIVATE_KEY: ${{ secrets.SANDBOX_PUSH_VAPID_PRIVATE_KEY }}
+          PUSH_VAPID_PUBLIC_KEY: ${{ secrets.SANDBOX_PUSH_VAPID_PUBLIC_KEY }}
         run: |
           set -euo pipefail
-          for required in GCP_PROJECT_ID DB_URL FLYWAY_DB_URL DB_USER FLYWAY_DB_USER \
-                          R2_ENDPOINT R2_BUCKET_PRIVATE R2_BUCKET_PUBLIC R2_PUBLIC_BASE_URL; do
-            if [ -z "${!required}" ]; then
-              echo "::error::$required is empty. Cloud Run would start a container that fails on the first query, or refuses to boot at all." >&2
-              exit 1
-            fi
+          required="GHCR_OWNER DEPLOY_SHA ORIGIN_SHARED_SECRET JWT_SECRET REFERRAL_SIGNAL_SALT IDENTITY_HASH_SECRET
+            STAFF_TOTP_KEY IDENTITY_ENCRYPTION_KEY CASHFREE_APP_ID CASHFREE_SECRET_KEY ZEPTOMAIL_API_KEY
+            R2_ENDPOINT R2_BUCKET_PRIVATE R2_BUCKET_PUBLIC R2_PUBLIC_BASE_URL R2_ACCESS_KEY_ID
+            R2_SECRET_ACCESS_KEY GOOGLE_PLACES_SERVER_KEY PUSH_VAPID_PRIVATE_KEY PUSH_VAPID_PUBLIC_KEY"
+          for name in $required; do
+            [ -n "${!name}" ] || { echo "::error::$name is empty." >&2; exit 1; }
           done
-          envsubst '${GCP_PROJECT_ID} ${IMAGE} ${DB_URL} ${FLYWAY_DB_URL} ${DB_USER} ${FLYWAY_DB_USER} ${R2_ENDPOINT} ${R2_BUCKET_PRIVATE} ${R2_BUCKET_PUBLIC} ${R2_PUBLIC_BASE_URL} ${BOOTSTRAP_ADMIN_EMAIL} ${BOOTSTRAP_ADMIN_MOBILE} ${BOOTSTRAP_ADMIN_RECOVER}' \
-            < backend/deploy/cloudrun-sandbox.yaml > "${RUNNER_TEMP}/service.yaml"
-          envsubst '${GCP_PROJECT_ID} ${IMAGE} ${FLYWAY_DB_URL} ${FLYWAY_DB_USER}' \
-            < backend/deploy/cloudrun-migrate-sandbox.yaml > "${RUNNER_TEMP}/migrate.yaml"
+          vars=$(printf '${%s} ' $required BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_MOBILE BOOTSTRAP_ADMIN_RECOVER)
+          envsubst "$vars" < backend/deploy/do-app-sandbox.yaml > "$RUNNER_TEMP/app.yaml"
 
-      # Runs while the old revision still serves, so every migration must stay compatible with it.
-      - name: Migrate the database
+      - uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - id: deploy
+        name: Create or update the app
         run: |
           set -euo pipefail
-          gcloud run jobs replace "${RUNNER_TEMP}/migrate.yaml" --region "$REGION" --quiet
-          gcloud run jobs execute draazy-migrate-sandbox --region "$REGION" --wait --quiet
+          id=$(doctl apps list --output json | jq -r '.[] | select(.spec.name=="draazy-api-sandbox") | .id')
+          if [ -z "$id" ]; then
+            doctl apps create --spec "$RUNNER_TEMP/app.yaml" --wait --output json > "$RUNNER_TEMP/app.json"
+            id=$(jq -r '.[0].id' "$RUNNER_TEMP/app.json")
+          else
+            doctl apps update "$id" --spec "$RUNNER_TEMP/app.yaml" --wait --output json > "$RUNNER_TEMP/app.json"
+          fi
+          phase=$(doctl apps list-deployments "$id" --output json | jq -r '.[0].phase')
+          [ "$phase" = "ACTIVE" ] || { echo "::error::Latest deployment is $phase, not ACTIVE." >&2; exit 1; }
+          echo "url=$(doctl apps get "$id" --output json | jq -r '.[0].default_ingress')" >> "$GITHUB_OUTPUT"
 
-      # `replace`, not `deploy`: removed repo settings must not linger on the service.
-      - name: Deploy to Cloud Run
-        run: gcloud run services replace "${RUNNER_TEMP}/service.yaml" --region "$REGION" --quiet
-
-      # `services replace` leaves IAM untouched; a new service would make Cloudflare 403.
-      - name: Allow public invocation
-        run: |
-          gcloud run services add-iam-policy-binding "$SERVICE" \
-            --region "$REGION" \
-            --member allUsers \
-            --role roles/run.invoker \
-            --quiet
-
-      # Checks external reachability through the IAM binding, which the startup probe cannot; gates the frontend.
       - name: Smoke test
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
         run: |
           set -euo pipefail
-          url=$(gcloud run services describe "$SERVICE" --region "$REGION" --format 'value(status.url)')
-          attempt=1
-          max=12
-          while : ; do
-            if curl -fsS --max-time 15 "$url/api/actuator/health"; then
-              echo
-              break
-            fi
-            if [ "$attempt" -ge "$max" ]; then
-              echo "::error::Cloud Run health check failed after ${max} attempts." >&2
-              exit 1
-            fi
-            echo "Waiting for Cloud Run routing mesh to warm up (attempt ${attempt}/${max})..."
-            attempt=$((attempt + 1))
+          for attempt in $(seq 1 12); do
+            curl -fsS --max-time 15 "$URL/api/actuator/health" && exit 0
             sleep 5
           done
+          echo "::error::Health check failed on $URL" >&2
+          exit 1
 
-      # Self-hosted runners can keep RUNNER_TEMP after the job.
-      - name: Remove rendered service definition
+      - name: Remove rendered spec
         if: always()
-        run: rm -f "${RUNNER_TEMP}/service.yaml" "${RUNNER_TEMP}/migrate.yaml"
+        run: rm -f "$RUNNER_TEMP/app.yaml" "$RUNNER_TEMP/app.json"
 
   # Keep the deploy token away from repository code; dependency scripts can alter
   # the workspace that a later `npx` resolves from.
@@ -302,9 +282,10 @@ jobs:
     name: Publish to Cloudflare Pages
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Plain `needs:` already means "only if that succeeded"; the skip is handled earlier.
     needs: frontend-build
-    # Backend and frontend environments stay separate because GCP trusts only `sandbox`.
+    if: >-
+      !cancelled() &&
+      needs['frontend-build'].result == 'success'
     environment: sandbox-web
     permissions:
       contents: read
@@ -423,7 +404,7 @@ jobs:
             fi
 
             if [ "$attempt" -ge "$max" ]; then
-              echo "::error::${SITE_URL} did not answer correctly after ${max} attempts. Check that the Pages Function shipped (frontend/functions/) and that API_ORIGIN is set on the Pages project to the current Cloud Run URL." >&2
+              echo "::error::${SITE_URL} did not answer correctly after ${max} attempts. Check that the Pages Function shipped (frontend/functions/) and that API_ORIGIN is set on the Pages project to the current backend URL." >&2
               exit 1
             fi
 
