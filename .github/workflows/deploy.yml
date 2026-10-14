@@ -360,9 +360,12 @@ jobs:
             fi
 
             # A 404 probe cannot tell a missing listing from an unreachable API; this page's own title can.
-            if [ "$ok" = true ] && ! curl -sS --max-time 30 "${SITE_URL}/rent/pune" | grep -q '<title[^>]*>Flats and homes for rent in Pune'; then
-              echo "::warning::/rent/pune fell back to the bare shell, so the edge cannot read the API (API_ORIGIN, ORIGIN_SHARED_SECRET, /api prefix)."
-              ok=false
+            if [ "$ok" = true ]; then
+              rent_html=$(curl -sS --max-time 30 "${SITE_URL}/rent/pune") || rent_html=
+              if ! grep -q '<title[^>]*>Flats and homes for rent in Pune' <<<"$rent_html"; then
+                echo "::warning::/rent/pune fell back to the bare shell, so the edge cannot read the API (API_ORIGIN, ORIGIN_SHARED_SECRET, /api prefix)."
+                ok=false
+              fi
             fi
 
             if [ "$ok" = true ] && ! curl -sS --max-time 30 -o /dev/null -D - "${SITE_URL}/" | grep -qi '^x-robots-tag: *noindex'; then

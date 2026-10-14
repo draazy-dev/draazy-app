@@ -1,4 +1,4 @@
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
@@ -71,7 +71,9 @@ function noindexOffProductionPlugin() {
     writeBundle() {
       if (new URL(process.env.SITE_URL || 'https://draazy.com').host === 'draazy.com') return;
       writeFileSync(join(outDir, 'robots.txt'), 'User-agent: Googlebot\nUser-agent: Bingbot\nDisallow:\n\nUser-agent: *\nDisallow: /\n');
-      appendFileSync(join(outDir, '_headers'), '\n/*\n  X-Robots-Tag: noindex\n');
+      const headersPath = join(outDir, '_headers');
+      const content = readFileSync(headersPath, 'utf8');
+      writeFileSync(headersPath, content.replace(/^(\/\*[\r\n]+)/m, '$1  X-Robots-Tag: noindex\n'));
     },
   };
 }
