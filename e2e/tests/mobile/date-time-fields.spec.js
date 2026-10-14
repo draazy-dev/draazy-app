@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/live.js';
+import { openRescheduleDialog } from '../../helpers/visits.js';
 
 /* Below 640px the pickers dock as bottom sheets; the CSS (`.dz-cal`, 639.98px) and `place()` must share the
    breakpoint. Use `getBoundingClientRect()`: `boundingBox()` is document-relative, wrong for fixed elements. */
@@ -63,19 +64,22 @@ test.describe('Mobile date & time pickers', () => {
     });
   });
 
-  test('the schedule-visit date and time pickers dock rather than floating over their own sheet', async ({ page, login }) => {
-    await login.asBuyer();
-    await page.goto('/schedule-visit');
+  test('the reschedule date and time pickers dock rather than floating over their own sheet', async ({ page }) => {
     const viewport = page.viewportSize();
 
     await test.step('the date picker docks', async () => {
-      const cal = await openSheet(page);
+      const dialog = await openRescheduleDialog(page);
+      await dialog.locator('.dz-datefield').first().click();
+      const cal = page.locator('.dz-cal');
+      await expect(cal).toBeVisible();
+      await expectDockedToBottom(page, cal);
       expect((await rect(cal)).width).toBeGreaterThanOrEqual(viewport.width - 2);
     });
 
     await test.step('the time picker docks too — both dialogs share the breakpoint', async () => {
-      await page.goto('/schedule-visit');
-      const time = page.locator('.dz-datefield').last();
+      await page.reload();
+      await page.getByRole('button', { name: /^Reschedule$/ }).first().click();
+      const time = page.getByRole('dialog').locator('.dz-datefield').last();
       await expect(time).toBeVisible({ timeout: 20_000 });
       await time.click();
 

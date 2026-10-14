@@ -47,7 +47,7 @@ export async function scheduleVisit(req = {}) {
   return toViewModel(await post('/visits', {
     propertyId: req.propertyId,
     slot,
-    mode: req.mode || 'in-person',
+    mode: 'in-person',
     note: req.note || undefined,
   }));
 }

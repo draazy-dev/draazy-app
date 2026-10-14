@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import ContactsExhaustedModal from '../../../components/property/ContactsExhaustedModal.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
-import { slotFromParts, todayIso, VISIT_SLOTS } from '../../../lib/visitWhen.js';
+import TimeField from '../../../components/ui/TimeField.jsx';
+import { slotFromParts, todayIso } from '../../../lib/visitWhen.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import useScrollLock from '../../../hooks/useScrollLock.js';
@@ -19,23 +21,17 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
   const { t } = useTranslation();
   const { isIn: authIn, loading: authLoading } = useAuth();
   const sendToSignIn = useSignInGate();
-  const [mode, setMode] = useState('in-person');
   const [visitDate, setVisitDate] = useState(nextDayIso());
   const [visitTime, setVisitTime] = useState('10:30 AM');
   const [msg, setMsg] = useState('');
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [quotaOpen, setQuotaOpen] = useState(false);
   const signedIn = isIn ?? authIn;
   const returnPath = p?.id ? `/property/${encodeURIComponent(String(p.id))}?visit=1` : undefined;
   const gated = useRef(false);
-  const isPastOn = (date, slot) => new Date(slotFromParts(date, slot)) <= new Date();
-  const isPast = (slot) => isPastOn(visitDate, slot);
-  const anyPast = VISIT_SLOTS.some(isPast);
-  const pickDate = (date) => {
-    setVisitDate(date);
-    if (isPastOn(date, visitTime)) setVisitTime(VISIT_SLOTS.find((s) => !isPastOn(date, s)) || '');
-  };
+  const past = new Date(slotFromParts(visitDate, visitTime)) <= new Date();
 
   useScrollLock();
   useEffect(() => {
@@ -52,7 +48,7 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
 
   const submit = async () => {
     if (busy) return;
-    if (!visitTime || isPast(visitTime)) {
+    if (past) {
       setError(t('property.pastSlot'));
       return;
     }
@@ -65,16 +61,15 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
     let keepMounted = true;
     try {
       await scheduleVisit({
-        propertyId: p?.id || '',
+        propertyId: p?.uuid || p?.id || '',
         listing: p?.title || [p?.bhk, p?.type, p?.locality].filter(Boolean).join(' ') || t('property.typeFallback'),
         ownerMobile: p?.ownerMobile || '',
         dateIso: visitDate,
         time: visitTime,
-        mode,
         note: msg.trim(),
       });
       setDone(true);
-      track('visit_requested', { id: p?.id, mode });
+      track('visit_requested', { id: p?.id });
       toast(t('property.visitRequestedToast'), 'success');
     } catch (e) {
       if (e?.status === 401) {
@@ -84,15 +79,22 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
         }
         return;
       }
-      const message = e?.code === 'visit_exists' ? t('property.visitAlreadyBooked') : t('property.visitRequestFailed');
+      if (e?.code === 'contact_quota_exhausted') {
+        setQuotaOpen(true);
+        return;
+      }
+      const expected = e?.code === 'contact_pending_limit' || e?.status === 409;
+      const message = e?.code === 'contact_pending_limit' ? t('property.contactPendingLimit')
+        : e?.status === 409 ? t('property.visitAlreadyBooked') : t('property.visitRequestFailed');
       setError(message);
-      toast(message, e?.code === 'visit_exists' ? 'info' : 'error');
+      toast(message, expected ? 'info' : 'error');
     } finally {
       if (keepMounted) setBusy(false);
     }
   };
 
   if (!authLoading && !signedIn) return null;
+  if (quotaOpen) return <ContactsExhaustedModal onClose={onClose} />;
 
   return (
     <div className="dz-modal-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
@@ -115,39 +117,13 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
           <>
             <div className="space-y-4 mb-4">
               <div>
-                <p className="text-sm font-medium text-gray-300 mb-3">{t('property.visitType')}</p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button type="button" onClick={() => setMode('in-person')} className={'pick rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left' + (mode === 'in-person' ? ' sel' : '')}>
-                    <div className="w-10 h-10 rounded-xl bg-teal-400/15 flex items-center justify-center shrink-0"><Icon name="map-pin" className="w-5 h-5 text-teal-400" /></div>
-                    <div className="min-w-0"><p className="text-white text-sm font-semibold leading-tight">{t('property.inPerson')}</p><p className="text-gray-500 text-xs mt-0.5 sm:mt-0">{t('property.visitSite')}</p></div>
-                  </button>
-                  <button type="button" onClick={() => setMode('video')} className={'pick rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-center gap-2 sm:gap-3 text-center sm:text-left' + (mode === 'video' ? ' sel' : '')}>
-                    <div className="w-10 h-10 rounded-xl bg-teal-400/15 flex items-center justify-center shrink-0"><Icon name="video" className="w-5 h-5 text-teal-400" /></div>
-                    <div className="min-w-0"><p className="text-white text-sm font-semibold leading-tight">{t('property.videoTour')}</p><p className="text-gray-500 text-xs mt-0.5 sm:mt-0">{t('property.liveWalkthrough')}</p></div>
-                  </button>
-                </div>
-              </div>
-              <div>
                 <p className="text-sm font-medium text-gray-300 mb-3">{t('property.selectDate')}</p>
-                <DateField value={visitDate} onChange={pickDate} min={todayIso()} ariaLabel={t('property.selectDate')} className="field w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm" />
+                <DateField value={visitDate} onChange={setVisitDate} min={todayIso()} ariaLabel={t('property.selectDate')} className="field w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm" />
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-300 mb-3">{t('property.selectTimeSlot')}</p>
-                <div role="group" aria-label={t('property.selectTimeSlot')} aria-describedby={anyPast ? 'visit-past-hint' : undefined} className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {VISIT_SLOTS.map((slot) => (
-                    <button
-                      key={slot}
-                      type="button"
-                      aria-pressed={visitTime === slot}
-                      disabled={isPast(slot)}
-                      onClick={() => setVisitTime(slot)}
-                      className={'min-h-[44px] rounded-xl border px-3 text-sm font-semibold transition-smooth disabled:opacity-40 disabled:cursor-not-allowed ' + (visitTime === slot ? 'border-teal-400/70 bg-teal-400/15 text-teal-100' : 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10')}
-                    >
-                      {slot}
-                    </button>
-                  ))}
-                </div>
-                {anyPast ? <p id="visit-past-hint" className="mt-2 text-xs text-slate-400">{t('property.pastSlot')}</p> : null}
+                <TimeField value={visitTime} onChange={setVisitTime} invalid={past} ariaLabel={t('property.selectTimeSlot')} className="field w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm" />
+                {past ? <p id="visit-past-hint" role="alert" className="mt-2 text-xs text-rose-300">{t('property.pastSlot')}</p> : null}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">{t('property.message')} <span className="text-gray-500 font-normal">{t('property.optional')}</span></label>
@@ -155,7 +131,7 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
               </div>
             </div>
             {error ? <p className="mb-3 rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p> : null}
-            <button type="button" onClick={submit} disabled={busy || !visitTime || isPast(visitTime)} aria-describedby={anyPast ? 'visit-past-hint' : undefined} className="btn-teal w-full min-h-[44px] flex items-center justify-center gap-2 px-4 disabled:opacity-60"><Icon name="calendar-check" className="w-4 h-4" /> {t('property.confirmVisit')}</button>
+            <button type="button" onClick={submit} disabled={busy || past} aria-describedby={past ? 'visit-past-hint' : undefined} className="btn-teal w-full min-h-[44px] flex items-center justify-center gap-2 px-4 disabled:opacity-60"><Icon name="calendar-check" className="w-4 h-4" /> {t('property.confirmVisit')}</button>
           </>
         )}
       </div>

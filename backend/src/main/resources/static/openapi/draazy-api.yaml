@@ -2039,6 +2039,10 @@ paths:
       tags: [Listings]
       summary: Schedule visit
       operationId: scheduleVisit
+      description: >
+        In person only. A visit spends one owner contact from the same allowance as `POST /contacts/request`,
+        unless the caller already has a counted contact request or visit on this listing; booking your own
+        listing is free. Cancelling before the owner first confirms gives it back; after that it stays spent.
       requestBody:
         required: true
         content:
@@ -2051,7 +2055,14 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Visit' }
         '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/ValidationError' }
+        '422':
+          description: >
+            Invalid body (`validation_failed`), no owner contacts left (`contact_quota_exhausted`), or
+            `contactPendingMax` contacts and visits still wait for an owner's reply (`contact_pending_limit`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ValidationProblem' }
+              example: { error: contact_quota_exhausted, message: You have used all your owner contacts. Buy a contact pack, or refer a friend to earn more., status: 422 }
   /me/visit-requests:
     get:
       tags: [Listings]
@@ -4853,6 +4864,7 @@ paths:
         allowance, contact packs and referrals allow — see `GET /me/entitlements`. Returns `409 listing_not_live`
         when the listing is paused, rented or sold, and `404` when it is archived, not approved or its owner is suspended. A request counts against the allowance from the moment it is made until
         the owner declines it or it lapses after `contactReplyDays`, whatever happens to the listing meanwhile.
+        A visit booked on the same listing (`POST /visits`) shares that one contact.
       requestBody:
         required: true
         content:
@@ -13069,7 +13081,7 @@ components:
         visitorName: { type: string, nullable: true }
         visitorMobile: { type: string, nullable: true }
         slot: { type: string, format: date-time }
-        mode: { type: string, enum: [in-person, video] }
+        mode: { type: string, enum: [in-person] }
         status: { type: string, enum: [scheduled, confirmed, completed, cancelled] }
         createdAt: { type: string, format: date-time }
     OpsDeal:
@@ -13710,7 +13722,7 @@ components:
         propertyId: { type: string }
         visitor: { $ref: '#/components/schemas/Party' }
         slot: { type: string, format: date-time }
-        mode: { type: string, enum: [in-person, video] }
+        mode: { type: string, enum: [in-person] }
         status: { type: string, enum: [scheduled, confirmed, completed, cancelled, no-show] }
         createdAt: { type: string, format: date-time }
     VisitCreate:
@@ -13719,7 +13731,7 @@ components:
       properties:
         propertyId: { type: string }
         slot: { type: string, format: date-time, description: Must be in the future, or 422. }
-        mode: { type: string, enum: [in-person, video], default: in-person }
+        mode: { type: string, enum: [in-person], default: in-person }
         note: { type: string }
     VisitSlotUpdate:
       type: object

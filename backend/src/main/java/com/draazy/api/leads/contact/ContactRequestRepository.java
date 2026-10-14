@@ -18,29 +18,28 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
 
     Optional<ContactRequest> findByRequesterIdAndPropertyId(UUID requesterId, UUID propertyId);
 
-    // A request counts while it has revealed the number or may still do so: approved, or pending inside the reply
-    // window, whatever happens to the listing. Read under RateLimitLock.Limit.CONTACT_REQUEST.
-    String COUNTS_TOWARDS_QUOTA = """
-            (cr.status = 'approved' or (cr.status = 'pending' and cr.createdAt >= :replyCutoff))""";
-
-    // first_requested_at, not created_at: a renewal after a return restarts it, nothing else moves it.
+    // Counts while it has revealed the number or may still: approved, or pending inside the reply window. A projection,
+    // since first_requested_at is database-written and a just-saved entity holds null. Read under CONTACT_REQUEST lock.
     @Query("""
-            select cr.firstRequestedAt from ContactRequest cr
-            where cr.requesterId = :requesterId and\s""" + COUNTS_TOWARDS_QUOTA + """
-             order by cr.firstRequestedAt""")
-    List<Instant> findCountedFirstRequestedAt(@Param("requesterId") UUID requesterId,
+            select cr.propertyId as propertyId, cr.firstRequestedAt as firstRequestedAt, cr.status as status
+            from ContactRequest cr where cr.requesterId = :requesterId
+            and (cr.status = 'approved' or (cr.status = 'pending' and cr.createdAt >= :replyCutoff))""")
+    List<CountedRequest> findCountedForQuota(@Param("requesterId") UUID requesterId,
             @Param("replyCutoff") Instant replyCutoff);
+
+    interface CountedRequest {
+        UUID getPropertyId();
+
+        Instant getFirstRequestedAt();
+
+        String getStatus();
+    }
 
     @Query("""
             select count(cr) from ContactRequest cr
             where cr.propertyId = :propertyId and cr.enquiredAt >= :from and cr.enquiredAt < :to""")
     long countEnquiredBetween(@Param("propertyId") UUID propertyId, @Param("from") Instant from,
             @Param("to") Instant to);
-
-    @Query("""
-            select count(cr) from ContactRequest cr
-            where cr.requesterId = :requesterId and cr.status = 'pending' and\s""" + COUNTS_TOWARDS_QUOTA)
-    long countOpenPending(@Param("requesterId") UUID requesterId, @Param("replyCutoff") Instant replyCutoff);
 
     @Query("""
             select cr from ContactRequest cr

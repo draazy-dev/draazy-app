@@ -87,9 +87,9 @@ export const KB = [
   },
   {
     id: 'schedule-visit',
-    keywords: ['visit', 'visits', 'schedule', 'tour', 'see', 'inspection', 'viewing', 'appointment', 'book', 'site', 'video'],
+    keywords: ['visit', 'visits', 'schedule', 'tour', 'see', 'inspection', 'viewing', 'appointment', 'book', 'site'],
     q: 'How do I schedule a property visit?',
-    a: "On a property page, tap Schedule a Visit, choose In-person or Video tour, pick a date and time and tap Confirm Visit. The owner confirms or suggests another slot, and you'll get a notification. Your visits are in your Dashboard under Visits, where you can cancel if plans change. Once the owner marks a visit completed, you can leave a “Visited” review.",
+    a: "On a property page, tap Schedule a Visit, pick a date and time and tap Confirm Visit. Visits are in person only. A visit uses one owner contact, free if you've already contacted that owner about the listing; cancelling before the owner confirms gives it back. The owner confirms or suggests another slot, and you'll get a notification. Your visits are in your Dashboard under Visits, where you can cancel if plans change. Once the owner marks a visit completed, you can leave a “Visited” review.",
     actions: [
       { label: 'My visits', to: '/dashboard#visits', icon: 'calendar-check' },
       { label: 'Browse listings', to: '/listings', icon: 'search' },

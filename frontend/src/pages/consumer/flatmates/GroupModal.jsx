@@ -90,9 +90,9 @@ export default function GroupModal({ setGroupOpen, submitGroup, grpFormRef, grpD
               ) : (myListings && myListings.length) ? (
                 <div>
                   <label className="block text-[11px] font-medium text-gray-400 mb-1.5">{tr('flatmates.attachVerifiedProperty')}</label>
-                  <NativeSelect title={tr('flatmates.attachVerifiedProperty')} value={grp.propertyId} onChange={(e) => { const l = myListings.find((x) => x.id === e.target.value); if (l) onAttachProperty(l); else setGrp((g) => ({ ...g, propertyId: '' })); }} className="field w-full rounded-full px-4 py-2 text-sm">
+                  <NativeSelect title={tr('flatmates.attachVerifiedProperty')} value={grp.propertyId} onChange={(e) => { const l = myListings.find((x) => (x.uuid || x.id) === e.target.value); if (l) onAttachProperty(l); else setGrp((g) => ({ ...g, propertyId: '' })); }} className="field w-full rounded-full px-4 py-2 text-sm">
                     <option value="">{tr('flatmates.selectVerifiedListing')}</option>
-                    {myListings.map((l) => <option key={l.id} value={l.id}>{l.title || l.society || l.locality || tr('flatmates.listingFallback', { id: l.id })}</option>)}
+                    {myListings.map((l) => <option key={l.id} value={l.uuid || l.id}>{l.title || l.society || l.locality || tr('flatmates.listingFallback', { id: l.id })}</option>)}
                   </NativeSelect>
                   <p className="text-[11px] text-gray-500 mt-1.5">{tr('flatmates.ownerAttachHelpPre')} <span className="text-emerald-300 font-semibold">{tr('flatmates.ownerVerifiedBadge')}</span> {tr('flatmates.ownerAttachHelpSuf')}</p>
                 </div>

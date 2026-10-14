@@ -75,7 +75,7 @@ const REFERRAL_FIELDS = [
 ];
 const REFUND_FIELDS = [
   ['contactReplyDays', 'Owner reply window (days)', 1, 30, 'An unanswered contact request returns the contact after this.'],
-  ['contactPendingMax', 'Open contact requests per seeker', 1, 100, 'More are refused until an owner replies.'],
+  ['contactPendingMax', 'Open contacts and visits per seeker', 1, 100, 'More are refused until an owner replies.'],
   ['packRefundDays', 'Contact pack refund window (days)', 0, 30, 'Unused packs are refundable this long. 0 turns it off.'],
   ['passGuaranteeDays', 'Listing pass guarantee (days)', 0, 30, 'No enquiries in this many live days earns a refund. 0 turns it off.'],
   ['passGuaranteeMaxEnquiries', 'Guarantee: max enquiries', 0, 50, 'Enquiries allowed while the guarantee still applies.'],

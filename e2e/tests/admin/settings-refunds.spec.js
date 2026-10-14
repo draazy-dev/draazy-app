@@ -12,7 +12,7 @@ const FEE_BOUNDS = {
 };
 const LABELS = {
   contactReplyDays: /^Owner reply window/,
-  contactPendingMax: /^Open contact requests per seeker/,
+  contactPendingMax: /^Open contacts and visits per seeker/,
   packRefundDays: /^Contact pack refund window/,
   passGuaranteeDays: /^Listing pass guarantee/,
   passGuaranteeMaxEnquiries: /^Guarantee: max enquiries/,

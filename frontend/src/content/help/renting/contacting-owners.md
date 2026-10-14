@@ -23,7 +23,7 @@ Tapping does not hand you a phone number. Sending an enquiry, starting a chat or
 
 Tapping again on the same listing does not send a second request — it shows you where the first one stands. If the owner does not reply within 7 days the request lapses and your contact comes back; you can ask again then, and the new request uses a contact like any other.
 
-Too many requests waiting at once? Draazy limits how many unanswered requests you can have open. You will see a message, and can send more once owners reply or requests lapse.
+Too many requests waiting at once? Draazy limits how many unanswered requests and visits you can have open. You will see a message, and can send more once owners reply or requests lapse.
 
 The owner's number is never shown before approval. For many listings the safe next step is in-app chat rather than taking the conversation off-platform.
 
@@ -47,7 +47,7 @@ Owner contacts are counted per account, not per day:
 | Contact Pack | 15 more, valid 30 days; packs stack |
 | Referral reward | Extra contacts for each qualified referral (see [Refer](/refer)) |
 
-A contact is used when you ask, and comes back if the owner declines or does not reply in 7 days. An approved request keeps it used. One listing costs one contact however many times you open it.
+A contact is used when you ask, and comes back if the owner declines or does not reply in 7 days. An approved request keeps it used. One listing costs one contact however many times you open it, and booking a visit there uses that same contact rather than a second one. A visit on a listing you have not contacted uses one.
 
 The listing shows "N owner contacts left" beside **Request number**, and the same line shows when your free contacts expire. When the allowance runs out the app says so and offers a referral link (while referral rewards are on) or a [Contact Pack](/plans).
 

@@ -50,4 +50,11 @@ public interface VisitRepository extends JpaRepository<Visit, UUID> {
             select v from Visit v where v.propertyId = :propertyId
             and v.status in ('scheduled', 'confirmed') and v.slot > :now""")
     List<Visit> findUpcomingByProperty(@Param("propertyId") UUID propertyId, @Param("now") Instant now);
+
+    // No reply window: a visit lapsing then revived by a reschedule would reach the owner again unchecked.
+    @Query("""
+            select v from Visit v where v.visitorId = :visitorId
+            and v.propertyId not in (select p.id from Property p where p.owner.id = :visitorId)
+            and (v.status <> 'cancelled' or v.confirmedAt is not null)""")
+    List<Visit> findCountedForQuota(@Param("visitorId") UUID visitorId);
 }

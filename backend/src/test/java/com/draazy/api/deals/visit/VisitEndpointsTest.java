@@ -83,11 +83,18 @@ class VisitEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot()
-                                + "\",\"mode\":\"video\",\"note\":\"Morning preferred\"}"))
+                                + "\",\"mode\":\"video\"}"))
+                .andExpect(status().isUnprocessableEntity());
+
+        mvc.perform(post(Routes.Visits.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot()
+                                + "\",\"mode\":\"in-person\",\"note\":\"Morning preferred\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.propertyId").value(p.getId().toString()))
                 .andExpect(jsonPath("$.status").value(VisitStatuses.SCHEDULED))
-                .andExpect(jsonPath("$.mode").value("video"))
+                .andExpect(jsonPath("$.mode").value("in-person"))
                 .andExpect(jsonPath("$.visitor.role").value("buyer"))
                 .andExpect(jsonPath("$.visitor.id").value(visitor.getId().toString()));
     }

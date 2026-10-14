@@ -81,6 +81,26 @@ test.describe('LIVE: group-form prefill', () => {
 
     expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
   });
+  test('an attached listing is sent as its UUID, not its URL slug', async ({ page }) => {
+    const { accessToken } = await apiLogin(ACTORS.owner);
+    const listing = (await myListings(accessToken)).find((row) => row.status === 'approved' && row.deal === 'rent' && row.slug);
+    expect(listing, 'the seeded owner needs an approved rent listing with a slug').toBeTruthy();
+    await signedInAs(page, ACTORS.owner);
+    await openGroupModal(page);
+    await page.getByRole('button', { name: /Flat owner/i }).click();
+    await attachProperty(page, listing.title);
+
+    // Stubbed so the run leaves no group behind; only the body the form sends matters.
+    let sent;
+    await page.route('**/api/flatmates/groups', (route) => {
+      sent = route.request().postDataJSON();
+      return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"stubbed"}' });
+    });
+    await page.getByPlaceholder('Your name').fill('Zztest Host');
+    await page.getByRole('button', { name: 'Create group' }).click();
+    await expect.poll(() => sent?.propertyId).toBe(listing.id);
+  });
+
   test('a sitting tenant prefills from their real tenancy, and the owner-consent step becomes one tap', async ({ page }) => {
     const errors = trackErrors(page);
     const { accessToken } = await apiLogin(ACTORS.tenant);

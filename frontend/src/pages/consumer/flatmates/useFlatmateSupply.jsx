@@ -249,7 +249,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
       return {
         ...g,
         hunting: false,
-        propertyId: listing.id,
+        propertyId: listing.uuid || listing.id,
         title,
         locality,
         ...(live && locality !== g.locality ? { localitySlug: live.slug } : {}),

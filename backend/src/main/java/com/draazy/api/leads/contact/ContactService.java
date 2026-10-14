@@ -49,11 +49,13 @@ public class ContactService {
     private final ContactReplyWindow window;
     private final ContactReturns returnedContact;
     private final PlatformSettings settings;
+    private final ContactUsageService usage;
 
     public ContactService(ContactRequestRepository contactRequests, PropertyRepository properties,
             UserRepository users, ContactMapper contactMapper, Notifier notifier,
             VerifiedTenantLookup verifiedTenants, ContactAllowanceLookup allowances, RateLimitLock locks, ReferralTriggers referralTriggers,
-            ContactReplyWindow window, ContactReturns returnedContact, PlatformSettings settings) {
+            ContactReplyWindow window, ContactReturns returnedContact, PlatformSettings settings,
+            ContactUsageService usage) {
         this.contactRequests = contactRequests;
         this.properties = properties;
         this.users = users;
@@ -66,6 +68,7 @@ public class ContactService {
         this.window = window;
         this.returnedContact = returnedContact;
         this.settings = settings;
+        this.usage = usage;
     }
 
     @Transactional(readOnly = true)
@@ -96,13 +99,13 @@ public class ContactService {
                 contactRequests.findByRequesterIdAndPropertyId(viewerId, property.getId());
         Instant now = Instant.now();
         if (existing.isEmpty()) {
-            requireRoomForAnotherRequest(viewerId, now);
+            requireRoomForAnotherRequest(viewerId, property.getId(), now);
             contactRequests.saveAndFlush(new ContactRequest(property.getId(), viewerId, body.message()));
             announceToOwner(owner, viewerId, property);
         } else if (window.lapsed(existing.get().getStatus(), existing.get().getCreatedAt(), now)) {
 
             // A lapsed request does not count, so asking again is a new spend and is checked as one.
-            requireRoomForAnotherRequest(viewerId, now);
+            requireRoomForAnotherRequest(viewerId, property.getId(), now);
             if (contactRequests.renewIfLapsed(existing.get().getId(), body.message(), now,
                     window.cutoff(now)) > 0) {
                 announceToOwner(owner, viewerId, property);
@@ -125,11 +128,23 @@ public class ContactService {
                 "/dashboard#leads");
     }
 
-    private void requireRoomForAnotherRequest(UUID viewerId, Instant now) {
-        long open = contactRequests.countOpenPending(viewerId, window.cutoff(now));
+    // A visit reaches the owner just as a contact request does, so it spends from the same allowance.
+    @Transactional
+    public void requireRoomForVisit(UUID viewerId, UUID propertyId) {
+        locks.holdUntilCommit(RateLimitLock.Limit.CONTACT_REQUEST, viewerId.toString());
+        requireRoomForAnotherRequest(viewerId, propertyId, Instant.now());
+    }
+
+    // A listing already reached by a request or a visit costs nothing more.
+    private void requireRoomForAnotherRequest(UUID viewerId, UUID propertyId, Instant now) {
+        ContactUsageService.Uses uses = usage.uses(viewerId, window.cutoff(now));
+        if (uses.spentAt().containsKey(propertyId)) {
+            return;
+        }
+        int open = uses.awaitingReply().size();
         if (open >= settings.contactPendingMax()) {
-            throw new ContactPendingLimitException("You already have " + open + " requests waiting for a reply."
-                    + " Wait for a reply, or for one to lapse, before asking another owner.");
+            throw new ContactPendingLimitException("You already have " + open + " requests waiting for an owner's reply."
+                    + " Wait for a reply or for a request to lapse, or cancel a visit you no longer need.");
         }
         OptionalInt remaining = allowances.contactsRemaining(viewerId);
         if (remaining.isPresent() && remaining.getAsInt() <= 0) {

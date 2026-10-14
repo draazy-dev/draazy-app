@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/live.js';
+import { openRescheduleDialog } from '../../helpers/visits.js';
 
 /* DateField/TimeField render on ~20 surfaces, so these check the computed box on more than one route:
    a class-name assertion would pass even where the field rendered as a plain block. */
@@ -10,13 +11,6 @@ const ROUTES = [
     open: async (page, login) => {
       await login.asTenant();
       await page.goto('/tenant-profile');
-    },
-  },
-  {
-    name: '/schedule-visit',
-    open: async (page, login) => {
-      await login.asBuyer();
-      await page.goto('/schedule-visit');
     },
   },
   {
@@ -71,15 +65,14 @@ test.describe('Date & time pickers', () => {
     await expect(field.locator('.dz-datefield__text')).toHaveText(`${d}/${m}/${y}`);
   });
 
-  test('the time picker is the app dialog, not the OS control', async ({ page, login }) => {
-    await login.asBuyer();
-    await page.goto('/schedule-visit');
+  test('the time picker is the app dialog, not the OS control', async ({ page }) => {
+    const dialog = await openRescheduleDialog(page);
 
     // No native date/time inputs anywhere — the slot rules live in the custom
     // dialogs, and a native control would silently bypass them.
     await expect(page.locator('input[type="time"], input[type="date"]')).toHaveCount(0);
 
-    const time = page.locator('.dz-datefield').last();
+    const time = dialog.locator('.dz-datefield').last();
     await expect(time).toBeVisible({ timeout: 20_000 });
     await time.click();
 

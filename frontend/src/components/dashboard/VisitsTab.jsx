@@ -120,7 +120,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
   const saveReschedule = async () => {
     if (!reschedule || !reDate || !reTime || isPastSlot(reDate, reTime)) return;
     const id = reschedule.id;
-    // Keep the visit's original mode (in-person / video) and fold date + time back
+    // Keep the visit's mode and fold date + time back
     // into one `when` string that parseWhen can read, so the chosen slot persists.
     const mode = parseWhen(reschedule.when).mode || 'in-person';
     const ok = await onUpdate?.(id, { when: formatWhen(reDate, reTime, mode), status: 'scheduled' });
@@ -201,7 +201,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
             <span>·</span>
             <span className={tag ? 'text-teal-300 font-semibold' : ''}>{tag || dateStr}</span>
             {p.timeLabel && <><span>·</span><span>{p.timeLabel}</span></>}
-            {p.mode && hostedByMe && <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-gray-400 capitalize"><Icon name={p.mode === 'video' ? 'video' : 'map-pin'} className="w-3 h-3" /> {p.mode}</span>}
           </p>
         {/* Action buttons meet the 44px tap-target minimum on phones (the same standard as CallBtn/WhatsAppBtn) then
            relax to their compact size from `sm` up, so the desktop row stays exactly as before. */}

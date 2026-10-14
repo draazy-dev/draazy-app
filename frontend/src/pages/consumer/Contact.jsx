@@ -8,6 +8,7 @@ import PropertyImage from '../../components/ui/PropertyImage.jsx';
 import MobileField from '../../components/MobileField.jsx';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { useFieldErrors } from '../../lib/hooks.js';
 import { maskPhone } from '../../lib/contact.js';
 import { getProperty } from '../../services/propertyService.js';
@@ -75,7 +76,8 @@ export default function Contact() {
     .join('')
     .slice(0, 2)
     .toUpperCase();
-  const [form, setForm] = useState({ name: '', phone: '', email: '', subject: presel, msg: preMsg });
+  const { user } = useAuth();
+  const [form, setForm] = useState({ name: user?.name || '', phone: user?.mobile || '', email: user?.email || '', subject: presel, msg: preMsg });
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));

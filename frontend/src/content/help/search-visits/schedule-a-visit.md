@@ -5,18 +5,18 @@ category: search-visits
 audience: tenant
 order: 4
 featured: true
-updated: 2026-10-10
-summary: How to book an in-person or video visit, what to check when you are there, and what to do if the owner does not turn up.
-tags: [visit, viewing, checklist, video]
+updated: 2026-10-13
+summary: How to book a site visit, what to check when you are there, and what to do if the owner does not turn up.
+tags: [visit, viewing, checklist]
 ---
 
 ## Booking
 
-From any property page, tap **Schedule a Visit**. Pick **In-person** or **Video tour**, choose a date and one of the day's slots — 9:00 AM through 7:00 PM — add an optional note, and tap **Confirm Visit**. You need to be signed in. Dates are forward-only; you cannot book yesterday.
+From any property page, tap **Schedule a Visit**. Visits are in person only. Choose a date and a time, add an optional note, and tap **Confirm Visit**. You need to be signed in, and the owner sees the name on your profile. Dates are forward-only; you cannot book yesterday.
 
 The owner is notified and has to confirm the slot. Until they do, your visit reads **Awaiting confirmation**. Track everything under **Dashboard → Visits**.
 
-There is no limit on how many visits you can hold, but you can only have **one live request per property**. If you already have one, manage or move that visit from your dashboard instead of sending a duplicate.
+A visit uses one owner contact from the same allowance as a contact request. It is free if you have already contacted that owner about the listing, or already booked a visit there. Cancelling before the owner confirms gives the contact back; once they confirm, it stays used, as an approved contact request does. A visit the owner has not answered keeps holding a contact until you cancel it. You can only have **one live request per property**; if you already have one, manage or move that visit from your dashboard instead of sending a duplicate.
 
 If either side reschedules, the visit goes back to awaiting confirmation so both sides re-agree on the new slot. Cancel anything you no longer want; owners see your history.
 

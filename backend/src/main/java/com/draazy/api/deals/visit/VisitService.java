@@ -10,6 +10,7 @@ import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.leads.contact.ContactService;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.List;
 import java.util.Map;
@@ -35,13 +36,15 @@ public class VisitService {
     private final PropertyRepository properties;
     private final UserRepository users;
     private final Notifier notifier;
+    private final ContactService contacts;
 
     public VisitService(VisitRepository visits, PropertyRepository properties,
-                        UserRepository users, Notifier notifier) {
+                        UserRepository users, Notifier notifier, ContactService contacts) {
         this.visits = visits;
         this.properties = properties;
         this.users = users;
         this.notifier = notifier;
+        this.contacts = contacts;
     }
 
     // The caller must be either the visitor or the listing owner.
@@ -60,6 +63,10 @@ public class VisitService {
         if (visits.findLiveByVisitorAndProperty(callerId, propertyId).isPresent()) {
             throw new ConflictException("You already have a live visit on this property");
         }
+        UUID ownerId = property.getOwner().getId();
+        if (!ownerId.equals(callerId)) {
+            contacts.requireRoomForVisit(callerId, propertyId);
+        }
 
         Visit visit;
         try {
@@ -72,7 +79,6 @@ public class VisitService {
         }
 
         User visitor = users.findById(callerId).orElse(null);
-        UUID ownerId = property.getOwner().getId();
         if (!ownerId.equals(callerId)) {
             notifier.notify(ownerId, "visit.requested",
                     "New visit request",

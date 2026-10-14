@@ -1,4 +1,5 @@
 import { test, expect, MOBILE } from '../../../fixtures/live.js';
+import { API, authHeaders, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 
 /* `/contact` without a property must not fetch or render an owner; otherwise it bypasses the
    enquiry gate and leaks a personal number on a support page. */
@@ -26,4 +27,14 @@ test('the generic support page shows no owner card and leaks no owner number', a
   expect(body.match(new RegExp(MOBILE.source, 'g')) ?? [], 'a mobile number appeared on the generic support page').toEqual([]);
 
   expect(consoleErrors).toEqual([]);
+});
+
+test('a signed-in user finds the enquiry form prefilled with their profile name', async ({ page }) => {
+  const mobile = uniqueMobile();
+  const name = 'Zztest Kavya Rao';
+  const res = await fetch(`${API}/auth/me`, { method: 'PATCH', headers: await authHeaders(mobile), body: JSON.stringify({ name }) });
+  expect(res.status).toBe(200);
+  await signedInAs(page, mobile);
+  await page.goto('/contact');
+  await expect(page.locator('#ct-name')).toHaveValue(name);
 });
