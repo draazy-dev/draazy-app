@@ -64,12 +64,11 @@ so a parallel session skips it. `tasks/todo.md` `## In flight` holds one index l
   The document routes stay crawlable too, so their 0.4 `noindex` header is seen (a blocked URL can still
   be indexed bare).
   *Done when* the built robots.txt carries them and the sitemap line.
-- [x] **0.3 Only draazy.com is indexable** (S4). Build reads `SITE_URL` (deploy.yml already sets it to
-  `https://sandbox.draazy.com`); any other host gets `X-Robots-Tag: noindex` on `/*` in `_headers` and a
-  `robots.txt` (no sitemap line) that lets only Googlebot and Bingbot crawl, so they see the `noindex` and
-  drop any sandbox page indexed earlier; every other bot gets `Disallow: /`. ⚠️ The production deploy must set
-  `SITE_URL=https://draazy.com` (or leave it unset), or production ships noindexed.
-  *Done when* a build with `SITE_URL=https://sandbox.draazy.com` emits both, a default build emits neither.
+- [x] **0.3 Only draazy.com is indexable** (S4). Host rules at the end of `public/_headers` send
+  `X-Robots-Tag: noindex` on `sandbox.draazy.com` and `draazy.pages.dev`; `headersFor` does the same for
+  Functions. One deployment serves every host, so nothing depends on the build's `SITE_URL`, and every host
+  shares the production `robots.txt` (crawlable, so the noindex is seen). The deploy smoke test asserts the
+  sandbox noindex.
 - [x] **0.4 `X-Robots-Tag: noindex` on pages reachable by link** (S7) in `_headers`: `/shared-documents`,
   `/view-documents/*`, `/flatmates/:kind/:id` (individual flatmate posts, privacy; `_headers` allows one
   splat per rule, so placeholders). The other 0.2 routes are
@@ -348,3 +347,15 @@ Function responses, HEAD, the `/404` asset fetch, and both sitemaps against the 
   groups (wrong link, no price); `TrustPage` takes its key from the route (case-insensitive match crashed).
   Service pages gained BreadcrumbList JSON-LD. PENDING SANDBOX: landing/flatmate Functions, 301s,
   `landing.xml`, headers.
+- 2026-10-10 — Sandbox check. Pass: 117 prerendered pages (title, canonical, description ≤160, og:image,
+  JSON-LD, byline on 31 posts), OG cards, CSV, llms.txt, sandbox robots + noindex, real 404s. Two bugs
+  found and fixed (needs redeploy): edge `apiGet` dropped the backend's `/api` context path, so every edge
+  page 404'd and the three dynamic sitemaps 503'd. Verified fixed by running the handlers against the live
+  API: 60/7/6 sitemap URLs, the 301, and correct heads. The appended noindex `/*` block replaced the
+  security `/*` rule (Pages keys `_headers` rules by path), so static pages had no CSP or HSTS; noindex is
+  now inserted into the existing block. The deploy smoke test now probes `properties.xml` and the CSP.
+- 2026-10-12 — Content-first launch (user decision): `draazy.com` serves the sandbox deployment and
+  indexes the content pages now. Noindex moved from a build-time plugin to host rules in `_headers`. The
+  `INDEX_LISTINGS` Pages env var (off) keeps property, society, landing and flatmate pages noindexed and the
+  three dynamic sitemaps empty until real listings exist. `WEB_ORIGINS` gains `https://draazy.com`. The smoke
+  test probes `/rent/pune`'s title (edge API reads) and the sandbox noindex. User steps: USER-CHECKLIST "Content-first launch".

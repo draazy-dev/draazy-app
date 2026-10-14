@@ -14,12 +14,30 @@ from this file. Plan: [../seo-aio-geo-plan.md](../seo-aio-geo-plan.md).
      `chatgpt\.com|chat\.openai\.com|perplexity\.ai|copilot\.microsoft\.com|gemini\.google\.com|claude\.ai`.
   3. Breakdown by `Referring domain`. Weekly. Save as "AI referrals" on a dashboard named "SEO & AI".
 
+## Content-first launch (draazy.com indexes the content pages before the full launch)
+
+Do these in order, after committing and deploying both halves (`target: both`: the backend carries the
+new `WEB_ORIGINS`).
+
+- [ ] **Remove the 302.** Cloudflare → zone `draazy.com` → Rules: delete the redirect to the sandbox
+  (Redirect Rules, or a Page Rule if it was made there).
+- [ ] **Attach the domain.** Workers & Pages → project `draazy` → Custom domains → Set up a domain →
+  `draazy.com`. Then add a Redirect Rule: `www.draazy.com/*` → `https://draazy.com/${1}`, 301.
+- [ ] **Leave `INDEX_LISTINGS` unset** on the Pages project for now. At the real launch, set it to `true`
+  (Settings → Variables, Production) and redeploy: listing, society, rent/buy and flatmate pages and the
+  three dynamic sitemaps open up.
+- [ ] **R2 CORS:** add `https://draazy.com` to the bucket's `AllowedOrigins`, or photo uploads fail there.
+- [ ] **Google Maps key:** Google Cloud → APIs & Services → Credentials → the browser key → Website
+  restrictions → add `https://draazy.com/*`, or maps break there.
+- [ ] **Tell me.** I check `draazy.com` live: indexable content pages, noindexed listings, empty dynamic
+  sitemaps, sign-in, and the sandbox still noindexed.
+- [ ] Then do **Google Search Console**, **Bing Webmaster Tools** and **Crawler Hints** under "Launch day"
+  below. They apply now; submit only `sitemap.xml` until `INDEX_LISTINGS` is on.
+
 ## When the sandbox is deployed
 
-- [ ] **Tell me.** I check the edge pages myself with curl: a property and a society page, the 301 from a
-  bare id, the three sitemaps (`properties`, `societies`, `landing`), `/rent/baner`, `/buy/pune`,
-  `/rent/baner/2-bhk`, `/flatmates/baner`, `/flatmates/women-only-pune`, the security headers, the sandbox
-  `X-Robots-Tag: noindex`, and a real 404.
+- [ ] **Redeploy** the `/api` and `_headers` fixes (sandbox check 2026-10-10), then tell me; I re-probe the
+  edge pages, sitemaps and the static-page CSP live. Everything else on the sandbox already passed.
 - [ ] **Click through the new pages on your phone** (all UI you approved): `/about`,
   `/how-verification-works`, `/tools` and the four tools, `/compare/nobroker`, the home hero chips and the
   new guide/post strips under the FAQ, a property page (breadcrumb + "Know <Locality>" card), and a blog
@@ -44,8 +62,8 @@ from this file. Plan: [../seo-aio-geo-plan.md](../seo-aio-geo-plan.md).
   4. Check: `curl -A "OAI-SearchBot" -I https://draazy.com/blog` returns 200, not 403.
 - [ ] **Google Search Console** (0.12).
   1. Add property → **Domain** → `draazy.com` → copy the TXT record → Cloudflare DNS → add TXT → Verify.
-  2. Sitemaps → submit `sitemap.xml`, `sitemaps/properties.xml`, `sitemaps/societies.xml`,
-     `sitemaps/landing.xml`.
+  2. Sitemaps → submit `sitemap.xml`. Add `sitemaps/properties.xml`, `sitemaps/societies.xml` and
+     `sitemaps/landing.xml` once `INDEX_LISTINGS` is on.
   3. URL inspection → Request indexing for `/`, `/blog`, `/locality`, one guide, one blog post.
 - [ ] **Bing Webmaster Tools** (0.12). Sign in → Import from Google Search Console (copies the site and
   sitemaps). Bing feeds Copilot and ChatGPT search, so do not skip it.

@@ -74,7 +74,7 @@ assert.equal(propertySitemapRow({ ...P, dealStatus: 'closed' }), null);
 assert.ok(sitemapXml([[PATH, '2026-10-01'], ['/society/a&b', null]]).includes(`<url><loc>https://draazy.com${PATH}</loc><lastmod>2026-10-01</lastmod></url>\n  <url><loc>https://draazy.com/society/a&amp;b</loc></url>`));
 
 // Handler flow: API 404 → real 404, API down → bare shell 200, both with the security headers.
-const env = { API_ORIGIN: 'https://api.example.com', ORIGIN_SHARED_SECRET: 's', ASSETS: { fetch: async () => new Response(SHELL) } };
+const env = { API_ORIGIN: 'https://api.example.com', ORIGIN_SHARED_SECRET: 's', INDEX_LISTINGS: 'true', ASSETS: { fetch: async () => new Response(SHELL) } };
 const request = new Request(`https://draazy.com${PATH}`, { headers: { 'CF-Connecting-IP': '1.2.3.4' } });
 const realFetch = globalThis.fetch;
 const run = async (answer) => {
@@ -87,7 +87,7 @@ try {
   const gone = await run(() => new Response('{}', { status: 404 }));
   assert.equal(gone.res.status, 404);
   assert.ok(gone.html.includes('noindex'));
-  assert.equal(gone.seen.url, `https://api.example.com/properties/${ID}`);
+  assert.equal(gone.seen.url, `https://api.example.com/api/properties/${ID}`);
   assert.equal(gone.seen.init.headers['X-Proxy-Auth'], 's');
   assert.equal(gone.seen.init.headers['X-Forwarded-For'], '1.2.3.4');
   assert.equal(gone.res.headers.get('Content-Security-Policy'), SECURITY_HEADERS['Content-Security-Policy']);
@@ -101,6 +101,9 @@ try {
   assert.equal(ok.res.headers.get('X-Robots-Tag'), null, 'production is indexable');
   const sandbox = await edgePage({ request: new Request(`https://sandbox.draazy.com${PATH}`), env, apiPath: '/x', render: (shell, p, url) => propertyPage(shell, p, { pathname: url.pathname }) });
   assert.equal(sandbox.headers.get('X-Robots-Tag'), 'noindex', 'other hosts never get indexed');
+  globalThis.fetch = async () => Response.json(P);
+  const held = await edgePage({ request, env: { ...env, INDEX_LISTINGS: undefined }, apiPath: '/x', render: (shell, p, url) => propertyPage(shell, p, { pathname: url.pathname }) });
+  assert.equal(held.headers.get('X-Robots-Tag'), 'noindex', 'listings stay out of the index until INDEX_LISTINGS=true');
 } finally {
   globalThis.fetch = realFetch;
 }

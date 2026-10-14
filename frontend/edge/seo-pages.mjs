@@ -200,7 +200,7 @@ export const societySitemapRow = (r) => (r.slug ? [`/society/${r.slug}`, null] :
 
 const ORIGIN = /^https:\/\/[A-Za-z0-9.-]+(?::\d+)?$/;
 
-/** Anonymous API read through the origin gate, as functions/api/[[path]].js does. `{ status: 0 }` means unusable. */
+/** Anonymous `GET /api${path}` through the origin gate, like functions/api/[[path]].js. `{ status: 0 }` = unusable. */
 export async function apiGet(env, request, path) {
   const origin = (env.API_ORIGIN || '').trim().replace(/\/+$/, '');
   const secret = (env.ORIGIN_SHARED_SECRET || '').trim();
@@ -209,7 +209,8 @@ export async function apiGet(env, request, path) {
   const ip = request.headers.get('CF-Connecting-IP');
   if (ip) headers['X-Forwarded-For'] = ip;
   try {
-    const res = await fetch(`${origin}${path}`, { headers, redirect: 'manual', signal: AbortSignal.timeout(5000) });
+    // The backend's servlet context path is /api (application.properties).
+    const res = await fetch(`${origin}/api${path}`, { headers, redirect: 'manual', signal: AbortSignal.timeout(5000) });
     return { status: res.status, data: res.ok ? await res.json() : null };
   } catch {
     return { status: 0 };
@@ -219,11 +220,14 @@ export async function apiGet(env, request, path) {
 /** The SPA shell, the same file `_redirects` serves for these routes. */
 export const fetchShell = async (env, request) => (await env.ASSETS.fetch(new URL('/404', request.url))).text();
 
-/* vite.config.js noindexes non-production builds through `_headers`, which Functions never get, so the
-   same rule is applied here by host. */
+/* public/_headers noindexes the non-production hosts, which Functions never get, so the same rule is
+   applied here by host. */
 export const headersFor = (request) => (new URL(request.url).host === new URL(SITE).host
   ? SECURITY_HEADERS
   : { ...SECURITY_HEADERS, 'X-Robots-Tag': 'noindex' });
+
+/** Listing-backed pages stay out of the index until the Pages env var `INDEX_LISTINGS` is `true` (real listings). */
+export const listingsIndexable = (env) => env.INDEX_LISTINGS === 'true';
 
 export function htmlResponse({ status, html, location }, headers = SECURITY_HEADERS) {
   if (location) return new Response(null, { status, headers: { Location: location, ...headers } });
@@ -236,7 +240,7 @@ export function htmlResponse({ status, html, location }, headers = SECURITY_HEAD
 /** Shared by the property and society handlers: render from the API, or fall back to the bare shell. */
 export async function edgePage({ request, env, apiPath, render }) {
   const [shell, api] = await Promise.all([fetchShell(env, request), apiGet(env, request, apiPath)]);
-  const headers = headersFor(request);
+  const headers = listingsIndexable(env) ? headersFor(request) : { ...SECURITY_HEADERS, 'X-Robots-Tag': 'noindex' };
   if (api.status === 404) return htmlResponse(notFoundPage(shell), headers);
   // Origin down or misconfigured: the app still works from the bare shell, so never fail the page.
   if (api.status !== 200 || !api.data) return htmlResponse({ status: 200, html: shell }, headers);

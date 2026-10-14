@@ -101,7 +101,7 @@ jobs:
 
     steps:
       # Explicit ref keeps all checkouts pinned to DEPLOY_SHA if the branch moves.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.DEPLOY_SHA }}
           # checkout leaves GITHUB_TOKEN in .git/config as an http extraheader.
@@ -110,22 +110,22 @@ jobs:
       # WIF stores no GCP credential; the provider's GCP-side attribute condition is the guard.
       - id: auth
         name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
           service_account: ${{ vars.GCP_DEPLOYER_SA }}
 
       - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
 
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker "${REGION}-docker.pkg.dev" --quiet
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       # Commit SHA tags make rollback a known redeploy, never a mutable `latest`.
       - name: Build and push image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: backend
           file: backend/Dockerfile
@@ -231,15 +231,15 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ env.DEPLOY_SHA }}
           persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # A different major here would mean the artifact that ships was produced by a toolchain nothing tested.
-          node-version: '22'
+          node-version: '26'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -286,7 +286,7 @@ jobs:
       # Wrangler needs dist/ and functions/ side by side to publish the site and /api proxy,
       # with edge/, src/ and scripts/ for SSR/SEO Pages Functions to resolve their imports.
       - name: Upload the built site
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: site-${{ env.DEPLOY_SHA }}
           path: |
@@ -312,7 +312,7 @@ jobs:
     steps:
       # No checkout: repository dependencies cannot redirect the `npx wrangler` resolution.
       - name: Download the built site
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: site-${{ env.DEPLOY_SHA }}
           path: ${{ runner.temp }}/site
@@ -361,6 +361,17 @@ jobs:
                   ok=false
                 fi
               done
+            fi
+
+            # A 404 probe cannot tell a missing listing from an unreachable API; this page's own title can.
+            if [ "$ok" = true ] && ! curl -sS --max-time 30 "${SITE_URL}/rent/pune" | grep -q '<title[^>]*>Flats and homes for rent in Pune'; then
+              echo "::warning::/rent/pune fell back to the bare shell, so the edge cannot read the API (API_ORIGIN, ORIGIN_SHARED_SECRET, /api prefix)."
+              ok=false
+            fi
+
+            if [ "$ok" = true ] && ! curl -sS --max-time 30 -o /dev/null -D - "${SITE_URL}/" | grep -qi '^x-robots-tag: *noindex'; then
+              echo "::warning::${SITE_URL}/ is indexable. Only draazy.com may be; check the host rules at the end of public/_headers."
+              ok=false
             fi
 
             # `/` gets dist/_headers; Function pages get SECURITY_HEADERS from edge/seo-pages.mjs, so both are probed.

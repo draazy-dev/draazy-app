@@ -25,7 +25,7 @@ Two arrangements satisfy that:
 
 | Shape | `WEB_ORIGINS` | `API_PUBLIC_ORIGIN` |
 |---|---|---|
-| **Path proxy** (chosen) — one origin, `/api/*` proxied to the backend | `https://sandbox.draazy.com` | `https://sandbox.draazy.com` |
+| **Path proxy** (chosen) — one origin, `/api/*` proxied to the backend | `https://sandbox.draazy.com,https://draazy.com` (both hosts serve the same Pages deployment) | `https://sandbox.draazy.com` |
 | Sibling subdomains — cross-origin but same-site | `https://www.draazy.com` | `https://api.draazy.com` |
 
 A UI served from its own registrable domain — `*.netlify.app`, `*.pages.dev`, `*.vercel.app`, all

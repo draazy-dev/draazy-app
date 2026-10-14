@@ -26,6 +26,7 @@
 - **Grep the application log after a green run**: sweeps, schedulers and listeners fail silently.
 - **Prove a regression test fails on old code** (`git show HEAD:<path>`, or `if (false)` the guard); a test passing via a side effect of the fix is not a regression test.
 - **Before editing a red assertion, say whether the test or the product is wrong**; one in five was a real regression.
+- **A checklist row is Pass only if a check did what the row says**: a count of green mobile specs that never opened the admin drawer is not "menus work on a phone". Drive each layout shell by hand.
 - **A gate that now refuses what it allowed has callers the old looseness served** (`PATCH /status → approved` re-listing a fallen-through sale got 409); enumerate them first.
 
 ## Assertions that assert nothing

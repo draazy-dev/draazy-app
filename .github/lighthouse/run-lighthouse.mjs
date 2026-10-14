@@ -1,69 +1,26 @@
-/* Mobile Lighthouse run — record-only.
- *
- * Closes D138: CI measured lint, i18n, help content, build and the bundle budget,
- * but nothing measured what a phone actually experiences. `check:size` counts the
- * bytes on the critical path, which is a good proxy and a real gate — but it cannot
- * see a slow font swap, a layout shift, or main-thread work after the bytes land.
- * This measures the outcome those bytes are a proxy for.
- *
- * DELIBERATELY RECORD-ONLY. There are no budgets here and no assertion step, and
- * that is a decision rather than an omission — see the long comment in
- * .github/workflows/lighthouse.yml before adding one. In short: a single Lighthouse
- * run on a shared CI runner has enough variance that a threshold tight enough to
- * catch a real regression is also loose enough to block an innocent PR, and a gate
- * people learn to re-run is worse than no gate. The first job of this job is to
- * produce the baseline that would make a threshold defensible.
- *
- * Because the numbers are advisory, the run reports the things that explain a shift
- * as loudly as it reports the metrics: Lighthouse version, Chrome version, the
- * runner's CPU benchmark index, and the emulated form factor. When a number moves,
- * the first question is "did the app change or did the machine?", and this answers
- * it without a rerun.
- */
+// Record-only on purpose: one run on a shared runner varies more than a real regression (see lighthouse.yml).
+// It prints Lighthouse/Chrome versions and the CPU benchmark so a shift can be blamed on the app or the machine.
 
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-// Pinned, not a range. Lighthouse re-weights its performance score between minor
-// versions (and moves audits between majors), so an unpinned runner would silently
-// redefine the baseline it is here to establish — a score drop would be
-// indistinguishable from a regression. Bumping this is a deliberate act that should
-// come with the note that the numbers before and after are not comparable.
-// Requires Node >= 22.19, which the workflow's NODE_VERSION ('22', resolved by
-// setup-node to the latest 22.x) satisfies.
+// Pinned: Lighthouse re-weights its score between versions, so a bump makes before/after incomparable.
+// Requires Node >= 22.19, which the workflow's NODE_VERSION satisfies.
 const LIGHTHOUSE_VERSION = '13.4.1';
 
 const ORIGIN = process.env.LH_ORIGIN || 'http://127.0.0.1:4173';
 const OUT_DIR = resolve(process.env.LH_OUT_DIR || '.lighthouse');
 
-/* Three routes, not twenty. This runs on every CI job, and each route costs roughly
- * half a minute of wall clock, so the list has to earn its length. These are the
- * three shapes of page the product actually lives or dies on:
- *
- *   /              the landing page — the only route most first-time visitors see,
- *                  and the one every ad and search result lands on.
- *   /listings      the search results grid — the heaviest consumer surface, many
- *                  cards and many images, so it is where LCP and CLS go wrong first.
- *   /property/:id  a detail page — a different render shape again (gallery, map,
- *                  contact gate) and the page a lead converts on.
- *
- * P5000 is the first record in frontend/src/data/properties.json and is the same id
- * the mobile e2e suite navigates to, so it is as load-bearing as any other fixture
- * here. The app defaults to VITE_API_MODE=mock, so a plain production build serves
- * this page from bundled data with no backend running.
- */
+// Landing, results grid and detail page: the three shapes the product lives on, ~30 s each.
+// P5000 is served from bundled mock data (VITE_API_MODE=mock) and is the same id the mobile e2e suite uses.
 const ROUTES = [
   { slug: 'home', path: '/' },
   { slug: 'listings', path: '/listings' },
   { slug: 'property-detail', path: '/property/P5000' },
 ];
 
-/* The audits worth putting in front of someone who has not opened the report.
- * Read defensively by id: Lighthouse removes and renames audits across majors (TTI
- * is already gone), and a missing audit should show as "n/a" in the table rather
- * than crash a job whose entire purpose is to leave a record behind.
- */
+// Read by id defensively: Lighthouse renames/removes audits across majors, and a gap must print "n/a", not crash.
 const METRICS = [
   { id: 'first-contentful-paint', label: 'FCP' },
   { id: 'largest-contentful-paint', label: 'LCP' },
@@ -73,30 +30,17 @@ const METRICS = [
 ];
 
 function runLighthouse(url, jsonPath) {
-  // `npx --yes` rather than a devDependency: adding lighthouse to
-  // frontend/package.json without regenerating package-lock.json would break the
-  // `npm ci` that the checks and e2e jobs open with, and regenerating the lockfile
-  // is a much larger change than this item asked for.
+  // `npx --yes`, not a devDependency: adding one means regenerating the lockfile every `npm ci` job relies on.
   const args = [
     '--yes',
     `lighthouse@${LIGHTHOUSE_VERSION}`,
     url,
-    // Mobile is Lighthouse's default form factor (Moto G Power screen emulation,
-    // simulated slow 4G, 4x CPU slowdown) and the project's performance targets are
-    // mobile targets, so the default is the right one. It is not left implicit: the
-    // form factor actually used is read back out of the report below and printed, so
-    // a future default change shows up in the summary instead of quietly making the
-    // whole record measure the wrong device.
+    // Mobile is the default form factor; the one actually used is read back from the report and printed.
     '--only-categories=performance',
     '--output=json',
     `--output-path=${jsonPath}`,
-    // Headless is spelled explicitly and not left to chrome-launcher's default,
-    // which launches a headful browser and would fail immediately on a runner with
-    // no display. Plain `--headless` rather than `--headless=new`: Chrome 132 made
-    // it mean new headless anyway, and the bare flag is the spelling that has been
-    // valid across every Chrome the runner image is likely to carry.
-    // --no-sandbox / --disable-dev-shm-usage are not needed on a GitHub-hosted VM
-    // but are what makes this survive a container-based self-hosted runner.
+    // chrome-launcher defaults to headful, which fails on a display-less runner.
+    // --no-sandbox / --disable-dev-shm-usage let it survive a container-based self-hosted runner.
     '--chrome-flags=--headless --no-sandbox --disable-dev-shm-usage',
   ];
 
@@ -170,9 +114,7 @@ for (const route of ROUTES) {
     ),
   });
 
-  // One reading per route per run, and the environment that produced it. The CPU
-  // benchmark index is the single biggest source of run-to-run drift on shared
-  // runners; without it a 10-point score swing looks like a code change.
+  // The CPU benchmark index is the biggest run-to-run drift on shared runners; without it a swing looks like code.
   record.benchmarkIndex = lhr.environment?.benchmarkIndex ?? null;
   record.formFactor = lhr.configSettings?.formFactor ?? 'unknown';
 }
@@ -207,11 +149,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 }
 console.log(`\n${summary}`);
 
-/* Exit code. A bad *number* never fails this job — that is the whole design. But a
- * run where Lighthouse produced nothing at all is not a slow app, it is a broken
- * job, and exiting 0 on that would leave an empty summary that reads like a pass.
- * So: green if at least one route reported, red only if none did.
- */
+// A bad number never fails the job, but no route reporting at all is a broken job, not a slow app.
 const anyOk = record.routes.some((r) => r.ok);
 if (!anyOk) {
   console.error('\nEvery Lighthouse run failed — the job is broken, not the app.');

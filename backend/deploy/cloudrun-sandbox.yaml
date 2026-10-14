@@ -67,10 +67,10 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: sandbox
 
-            # The SPA origin, not the *.run.app URL: /api is same-origin behind the Pages Function,
-            # which is what lets the session cookie keep its __Host- prefix (docs/DEPLOY.md §1).
+            # The SPA origins (sandbox and draazy.com share one Pages deployment), not the *.run.app URL:
+            # /api is same-origin behind the Pages Function, so the cookie keeps __Host- (docs/DEPLOY.md §1).
             - name: WEB_ORIGINS
-              value: https://sandbox.draazy.com
+              value: https://sandbox.draazy.com,https://draazy.com
             - name: API_PUBLIC_ORIGIN
               value: https://sandbox.draazy.com
             # Base of links read off-site (staff invites, outreach); defaults to draazy.com.

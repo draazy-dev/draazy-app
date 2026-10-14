@@ -97,3 +97,9 @@
   X-Robots-Tag: noindex, nofollow
 /flatmates/:kind/:id
   X-Robots-Tag: noindex
+
+# Only draazy.com is indexed; the other hosts serve the same deployment. Crawlable, so the noindex is seen.
+https://sandbox.draazy.com/*
+  X-Robots-Tag: noindex
+https://draazy.pages.dev/*
+  X-Robots-Tag: noindex

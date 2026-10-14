@@ -1,4 +1,4 @@
-import { apiGet, headersFor, propertySitemapRow, sitemapXml, societySitemapRow } from '../../edge/seo-pages.mjs';
+import { apiGet, headersFor, listingsIndexable, propertySitemapRow, sitemapXml, societySitemapRow } from '../../edge/seo-pages.mjs';
 import { landingSitemapRows } from '../../edge/landing-pages.mjs';
 
 const SOURCES = {
@@ -31,7 +31,8 @@ export async function onRequestGet({ request, env, params, waitUntil }) {
   const hit = cache && await cache.match(key);
   if (hit) return hit;
 
-  const rows = await (source.rows ? source.rows(env, request) : pagedRows(source, env, request));
+  const rows = !listingsIndexable(env) ? []
+    : await (source.rows ? source.rows(env, request) : pagedRows(source, env, request));
   // A partial sitemap would tell crawlers the missing URLs are gone; a 503 asks them to come back.
   if (!rows) return new Response('Sitemap unavailable', { status: 503, headers: { 'Retry-After': '3600', ...headers } });
 
