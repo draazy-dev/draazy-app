@@ -8,6 +8,7 @@ import { safeInAppPath } from '../../lib/authIntent.js';
 import { healStaleShell } from '../../lib/seamErrors.js';
 import { staffAuthError } from '../../lib/staffAuthError.js';
 import StaffShell, { StaffField, STAFF_SUBMIT } from '../../components/auth/StaffShell.jsx';
+import OtpBoxes from '../../components/auth/OtpBoxes.jsx';
 import { portalBase } from '../../lib/adminModules.js';
 
 /* Password, then an authenticator code; a first sign-in sets the authenticator up and shows the
@@ -23,6 +24,7 @@ export default function StaffLogin() {
   const [enrolment, setEnrolment] = useState(null);
   const [qr, setQr] = useState('');
   const [code, setCode] = useState('');
+  const [byRecoveryCode, setByRecoveryCode] = useState(false);
   const [recovery, setRecovery] = useState(null);
   const [copied, setCopied] = useState('');
   const [error, setError] = useState(null);
@@ -87,9 +89,11 @@ export default function StaffLogin() {
     });
   };
 
+  const recoveryEntry = byRecoveryCode && step === 'totp';
+
   const submitCode = (e) => {
     e.preventDefault();
-    if (!code.trim()) {
+    if (recoveryEntry ? !code.trim() : code.length !== 6) {
       setError('Enter the 6-digit code from your authenticator app.');
       return;
     }
@@ -162,20 +166,35 @@ export default function StaffLogin() {
             <code id="staff-totp-secret" className="max-w-full break-all rounded-lg bg-white/[.05] px-3 py-2 text-center font-mono text-xs tracking-wider text-teal-100 select-all">{enrolment?.secret}</code>
           </div>
         )}
-        <StaffField
-          id="staff-code"
-          label={enrolling ? '6-digit code from the app' : 'Code'}
-          autoComplete="one-time-code"
-          autoFocus={!enrolling}
-          inputMode={enrolling ? 'numeric' : 'text'}
-          autoCapitalize="off"
-          enterKeyHint="done"
-          maxLength={32}
-          placeholder={enrolling ? '000000' : '000000 or recovery code'}
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
-          className="text-center font-mono text-lg tracking-[0.3em] placeholder:tracking-normal placeholder:text-sm placeholder:font-sans"
-        />
+        {recoveryEntry ? (
+          <StaffField
+            id="staff-code"
+            label="Recovery code"
+            autoComplete="off"
+            autoFocus
+            autoCapitalize="off"
+            enterKeyHint="done"
+            maxLength={32}
+            placeholder="One of your saved recovery codes"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            className="text-center font-mono tracking-wider placeholder:tracking-normal placeholder:font-sans"
+          />
+        ) : (
+          <div>
+            <p className="text-center text-sm font-medium text-gray-300 mb-3">{enrolling ? '6-digit code from the app' : 'Enter the 6-digit code'}</p>
+            <OtpBoxes id="staff-code" value={code} onChange={(v) => { setCode(v); setError(null); }} error={!!error} autoFocus={!enrolling} />
+          </div>
+        )}
+        {!enrolling && (
+          <button
+            type="button"
+            onClick={() => { setByRecoveryCode(!byRecoveryCode); setCode(''); setError(null); }}
+            className="block mx-auto text-sm text-teal-400 hover:text-teal-300 font-semibold transition-colors"
+          >
+            {recoveryEntry ? 'Use the 6-digit code instead' : 'Use a recovery code instead'}
+          </button>
+        )}
         {errorLine}
         <button type="submit" disabled={busy} className={STAFF_SUBMIT}>
           {busy ? checking : <>{enrolling ? 'Confirm & sign in' : 'Sign in'} <ArrowRight className="w-4 h-4" /></>}

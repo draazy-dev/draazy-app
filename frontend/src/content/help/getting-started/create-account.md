@@ -37,10 +37,6 @@ Sign-in uses the same OTP flow - there is no password to forget. Keep **Remember
 
 Your number is your login, so it cannot be changed from the app. If you need to move an account to a new number, raise a support ticket; support will tell you what proof is needed.
 
-## Staff and internal accounts
-
-Draazy employees sign in through the staff sign-in page with an internal account. Consumer sign-up does not grant staff access, and staff accounts cannot be created from the public site.
-
 ## Related
 
 - [Managing your profile](/help/a/manage-profile)

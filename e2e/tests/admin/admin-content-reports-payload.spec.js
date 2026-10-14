@@ -42,8 +42,8 @@ test('the society queue pages on the server with slim rows, and the directory re
   await test.step('the candidate tab reads one small page, scans only what is shown, and never the public list', async () => {
     await login.asAdmin();
     const gets = recordGets(page);
-    await page.goto('/admin/societies');
-    await expect(page.getByRole('tab', { name: /candidates/i })).toBeVisible();
+    await page.goto('/admin/places?tab=duplicates');
+    await expect(page.getByRole('tab', { name: /duplicates/i })).toBeVisible();
     await page.waitForTimeout(1500);
 
     const reads = gets.withPath('/api/admin/society-candidates');
@@ -56,9 +56,9 @@ test('the society queue pages on the server with slim rows, and the directory re
     expect(consoleErrors).toHaveLength(0);
   });
 
-  await test.step('the directory tab uses /admin/societies, not the public list', async () => {
+  await test.step('the details tab uses /admin/societies, not the public list', async () => {
     const gets = recordGets(page);
-    await page.goto('/admin/societies?tab=directory');
+    await page.goto('/admin/places?tab=societies');
     await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20000 });
     expect(gets.withPath('/api/admin/societies').length).toBeGreaterThan(0);
     expect(gets.withPath('/api/societies')).toEqual([]);
@@ -72,7 +72,7 @@ test('the localities console reads the slim admin list', async ({ page, login, c
 
   await login.asAdmin();
   const gets = recordGets(page);
-  await page.goto('/admin/localities');
+  await page.goto('/admin/places?tab=areas');
   await expect(page.getByRole('table').locator('tbody tr').first()).toBeVisible();
   await expect.poll(() => gets.withPath('/api/admin/localities').length).toBe(1);
   expect(gets.withPath('/api/localities')).toEqual([]);

@@ -50,7 +50,6 @@
   "chrome": {
     "maintenanceTitle": "We’ll be right back",
     "maintenanceBody": "Draazy is undergoing scheduled maintenance. Please check back shortly — your saved data is safe.",
-    "staffSignIn": "Staff & Admin sign in →",
     "postPropertyFree": "Post property — Free"
   },
   "install": {

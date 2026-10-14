@@ -9,8 +9,8 @@ const ALL_TABS = [
   'Dashboard', 'KYC Review', 'Analytics', 'Post on Behalf', 'Team Activity',
   'Properties', 'Users', 'Rent Agreement', 'Property & Legal', 'Home Loans', 'Interior & Renovation',
   'Packers & Movers', 'Property Valuation', 'Support queue', 'Enquiries',
-  'Referrals', 'Finance', 'Content', 'Reports', 'Flatmates', 'Societies', 'Localities',
-  'Team & Access', 'Settings', 'Integrations',
+  'Referrals', 'Finance', 'Content', 'Reports', 'Flatmates',
+  'Team & Access', 'Places', 'Settings', 'Integrations',
 ];
 
 test('an administrator sees every module in the console', async ({ page, login, consoleErrors }) => {

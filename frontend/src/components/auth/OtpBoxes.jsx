@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-/* 6-box OTP input (ports the .otp-box flow from signin/signup.html): auto-advance, backspace to previous,
-   paste-to-fill. */
 
-export default function OtpBoxes({ value = '', onChange, error }) {
+export default function OtpBoxes({ value = '', onChange, error, id, autoFocus = true }) {
   const { t } = useTranslation();
   const refs = useRef([]);
 
   useEffect(() => {
-    refs.current[0]?.focus();
-  }, []);
+    if (autoFocus) refs.current[0]?.focus();
+  }, [autoFocus]);
 
   const setChar = (idx, ch) => {
     const arr = value.split('');
@@ -18,9 +16,8 @@ export default function OtpBoxes({ value = '', onChange, error }) {
     onChange(next);
     if (ch && idx < 5) refs.current[idx + 1]?.focus();
   };
-  // Handle single-key typing plus multi-digit input (iOS/Android SMS autofill
-  // dumps the whole code into one box, and some IMEs deliver several digits).
 
+  // iOS/Android SMS autofill dumps the whole code into one box, and some IMEs deliver several digits.
   const onInput = (idx, raw) => {
     const digits = raw.replace(/\D/g, '');
     if (digits.length >= 6) {
@@ -67,6 +64,7 @@ export default function OtpBoxes({ value = '', onChange, error }) {
         return (
           <input
             key={i}
+            id={i === 0 ? id : undefined}
             ref={(el) => (refs.current[i] = el)}
             type="text"
             inputMode="numeric"

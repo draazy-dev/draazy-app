@@ -186,7 +186,7 @@ test('the palette finds a posted listing and a registered person, and the bell c
     await openAdmin(page);
     await search(page, token);
 
-    // Prefix, because that is what `GET /users` matches â€” see the header. A term from the middle of
+    // Prefix, because that is what `GET /users` matches — see the header. A term from the middle of
     // the name would find this account in a mock build and nothing at all here.
     await expect(chip(page, 'People')).toHaveText('People (1)');
     await expect(palette(page).getByRole('button', { name: new RegExp(name) })).toHaveCount(1);

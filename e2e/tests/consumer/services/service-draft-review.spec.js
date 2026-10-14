@@ -104,6 +104,9 @@ test.describe('Service draft review — the customer is the checker', () => {
     // The status chip proves the hyphenated wire status survived `serviceRequestMapper.js` —
     // an unmapped one renders as the raw key and the Approve button never appears at all.
     await expect(mine.getByText('Draft ready for your review')).toBeVisible();
+    await expect(mine.getByRole('progressbar', { name: 'Request progress' }))
+      .toHaveAttribute('aria-valuetext', 'Step 3 of 5 · Draft & approval');
+    await expect(mine.getByText('Next: Registration')).toBeVisible();
 
     const approve = mine.getByRole('button', { name: /^Approve$/ });
     await expect(approve, 'a draft nobody opened cannot be approved blind').toBeDisabled();

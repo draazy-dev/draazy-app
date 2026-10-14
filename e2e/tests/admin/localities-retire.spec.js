@@ -1,4 +1,4 @@
-// LIVE: `/admin/localities` — retiring an area closes it to new listings; restoring reopens it.
+// LIVE: Places → Areas — retiring an area closes it to new listings; restoring reopens it.
 import { expect, test, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
 import { appReady } from '../../helpers/app.js';
@@ -13,7 +13,7 @@ test.describe('LIVE: retire and restore a locality', () => {
     const target = (await list()).find((l) => !l.archived && l.liveListings === 0) ?? (await list()).find((l) => !l.archived);
     expect(target, 'the directory needs an active area').toBeTruthy();
     await login.asAdmin();
-    await page.goto('/admin/localities');
+    await page.goto('/admin/places?tab=areas');
     await appReady(page);
     await page.getByLabel('Search localities').fill(target.slug);
     const row = bodyRows(page).filter({ has: page.getByText(target.slug, { exact: true }) });

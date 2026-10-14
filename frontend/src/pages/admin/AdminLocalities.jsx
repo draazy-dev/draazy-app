@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { fmtNum } from '../../lib/format.js';
-import { canWriteModule } from '../../lib/adminModules.js';
+import { hasPermission } from '../../lib/adminModules.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { listAdminLocalities, restoreLocality, retireLocality } from '../../services/localityService.js';
-import PageHeader from '../../components/ui/PageHeader.jsx';
 import Table from '../../components/ui/Table.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Loading from '../../components/ui/Loading.jsx';
@@ -26,7 +25,7 @@ const consequence = (l) => (l.archived
 export default function AdminLocalities() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const canWrite = canWriteModule(user, 'localities');
+  const canWrite = hasPermission(user, 'localities:write');
   const [directory, setDirectory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState('');
@@ -103,8 +102,6 @@ export default function AdminLocalities() {
 
   return (
     <div>
-      <PageHeader title="Localities" subtitle="Every area buyers can search, and how many live listings each has." />
-
       <QueuePanel
         note={NOTE}
         toolbar={(

@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from 'react-router';
+import { Outlet, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Navbar from './Navbar.jsx';
 import BottomNav from './BottomNav.jsx';
@@ -24,8 +24,7 @@ function MaintenanceOverlay() {
       <div style={{ maxWidth: 440 }}>
         <div className="text-5xl mb-2">🛠️</div>
         <h1 className="text-2xl font-extrabold mb-2.5 gradient-text">{t('chrome.maintenanceTitle')}</h1>
-        <p className="text-gray-400 leading-relaxed mb-5">{t('chrome.maintenanceBody')}</p>
-        <Link to="/staff-login" className="text-teal-300 text-sm font-semibold hover:text-teal-200">{t('chrome.staffSignIn')}</Link>
+        <p className="text-gray-400 leading-relaxed">{t('chrome.maintenanceBody')}</p>
       </div>
     </div>
   );
@@ -39,7 +38,9 @@ function ConsumerLayoutContent() {
   // The banner rides along rather than being left behind the early return: maintenance and a dead
   // uplink look identical, and it sits above the overlay because the overlay tops everything else.
   const isInternal = isInternalUser(user);
-  if (flags.maintenanceMode === true && !isInternal) {
+  // Staff reach their sign-in by direct URL only, so it must stay open while consumers are locked out.
+  const staffDoor = /^\/staff-(login|invite)/.test(pathname);
+  if (flags.maintenanceMode === true && !isInternal && !staffDoor) {
     return (
       <>
         <ConnectivityBanner zClass="z-[100000]" />

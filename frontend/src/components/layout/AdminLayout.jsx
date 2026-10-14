@@ -54,7 +54,7 @@ function AdminLayoutInner() {
       <ConnectivityBanner />
       <aside
         className={
-          'fixed inset-y-0 left-0 z-50 w-64 transform border-r border-white/10 bg-ink-2 transition-transform lg:static lg:translate-x-0 ' +
+          'fixed inset-y-0 left-0 z-50 flex w-64 transform flex-col border-r border-white/10 bg-ink-2 transition-transform lg:sticky lg:top-0 lg:h-[100dvh] lg:shrink-0 lg:translate-x-0 ' +
           (open ? 'translate-x-0' : '-translate-x-full')
         }
       >
@@ -74,7 +74,7 @@ function AdminLayoutInner() {
             <X className="h-5 w-5" />
           </button>
         </div>
-        <nav className="space-y-1 px-3 py-2">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pt-2 pb-[calc(0.5rem+var(--dz-safe-b))]">
           {nav.map(([to, label, Icon, end]) => (
             <NavLink
               key={to}
@@ -147,7 +147,6 @@ function AdminLayoutInner() {
               <span className="hidden sm:inline">{t('help.runbooks')}</span>
             </a>
 
-            {/* User profile + logout */}
             <div>
               <div className="flex items-center gap-2.5">
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-teal/15 text-xs font-bold text-brand-teal">

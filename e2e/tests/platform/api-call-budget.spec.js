@@ -281,9 +281,9 @@ const DESKS = [
     check: () => {},
   },
   {
-    name: 'societies reads one summary and the open tab only',
-    url: '/admin/societies',
-    ready: /Candidates/,
+    name: 'places reads one summary and the open tab only',
+    url: '/admin/places?tab=duplicates',
+    ready: /Duplicates/,
     once: ['/api/admin/societies/summary', '/api/admin/society-candidates', '/api/admin/society-merges'],
     never: [
       '/api/admin/society-claims', '/api/admin/society-residents', '/api/admin/society-proposals', '/api/societies',

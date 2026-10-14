@@ -5,9 +5,9 @@ import { test, expect } from '../../fixtures/live.js';
 const ROUTES = [
   { path: '/admin/content', heading: { name: 'Content' } },
   { path: '/admin/enquiries', heading: { name: 'Enquiries & Deals' } },
-  { path: '/admin/societies?tab=directory', heading: { name: 'Societies', exact: true } },
+  { path: '/admin/places?tab=societies', heading: { name: 'Places', exact: true } },
   { path: '/admin/settings', heading: { name: 'Settings' } },
-  { path: '/admin/localities', heading: null },
+  { path: '/admin/places?tab=areas', heading: null },
   { path: '/admin/properties', heading: null },
   { path: '/ops', heading: { name: 'My Dashboard' } },
   { path: '/ops/rent-agreement', heading: { name: 'Rent Agreement' } },

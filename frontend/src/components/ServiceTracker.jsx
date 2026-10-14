@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from './Icon.jsx';
-import HScroll from './ui/HScroll.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { STEPS, stepStates, statusMeta, isActive, progressPct } from '../lib/serviceRequestStatus.js';
@@ -10,6 +9,7 @@ import {
   getServiceRequestDocumentUrl,
 } from '../services/serviceRequestService.js';
 import { openDocFrom } from '../lib/openDoc.js';
+import { timeAgo } from '../lib/format.js';
 import useScrollLock from '../hooks/useScrollLock.js';
 import RejectedPapers from './RejectedPapers.jsx';
 import RevisedTerms from './RevisedTerms.jsx';
@@ -18,47 +18,33 @@ import IdentityRefill, { needsIdentityRefill } from './IdentityRefill.jsx';
 const openRequestFile = (requestId, docId) => openDocFrom(() => getServiceRequestDocumentUrl(requestId, docId));
 
 const REUPLOADABLE = new Set(['docs_review', 'draft_shared', 'changes_requested', 'approved']);
+const rank = (r) => (r.status === 'cancelled' ? 2 : isActive(r.status) ? 0 : 1);
 const hasForeignTenant = (request) => {
   const tenants = request.details?._state?.tenants;
   return Array.isArray(tenants) && tenants.some((tenant) => tenant?.residency === 'foreign');
 };
 
-function ProgressBar({ status }) {
+const SEGMENT = { done: 'bg-emerald-500', active: 'bg-teal-500', todo: 'bg-white/15' };
+
+// Segments, not labelled chips: five labels cannot share a 360px row without scrolling the current step away.
+function Progress({ status }) {
   const pct = progressPct(status);
   if (pct == null) return null;
-  const done = pct >= 100;
+  const states = stepStates(status);
+  const current = states.indexOf('active');
+  const caption = pct >= 100 ? 'All steps complete'
+    : current < 0 ? 'Not started yet'
+    : `Step ${current + 1} of ${STEPS.length} · ${STEPS[current]}`;
   return (
-    <div className="mb-3">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] text-gray-400 font-medium">Progress</span>
-        <span className={'text-[11px] font-semibold ' + (done ? 'text-emerald-300' : 'text-teal-300')}>{pct}% complete</span>
+    <div className="mb-4">
+      <div className="flex gap-1" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-valuetext={caption} aria-label="Request progress">
+        {states.map((st, i) => <span key={STEPS[i]} className={'h-1.5 flex-1 rounded-full ' + SEGMENT[st]} />)}
       </div>
-      <div className="h-2 rounded-full bg-white/15 overflow-hidden ring-1 ring-inset ring-white/5" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Request progress">
-        <div className="h-full rounded-full transition-[width] duration-500" style={{ width: (pct > 0 ? Math.max(pct, 4) : 0) + '%', background: done ? 'linear-gradient(to right,rgb(var(--dz-c-emerald-500)),rgb(var(--dz-c-emerald-400)))' : 'var(--brand-gradient)' }} />
+      <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
+        <span className="font-semibold text-gray-200">{caption}</span>
+        {current >= 0 && current < STEPS.length - 1 ? <span className="text-gray-500 truncate">Next: {STEPS[current + 1]}</span> : null}
       </div>
     </div>
-  );
-}
-
-function Stepper({ status }) {
-  const states = stepStates(status);
-  return (
-    <HScroll wrapClassName="mb-4" className="flex items-center gap-1 pb-1" fadeColor="rgb(var(--dz-c-ink-card))">
-      {STEPS.map((lab, i) => {
-        const st = states[i];
-        const dot = st === 'done' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-          : st === 'active' ? 'bg-teal-500/20 text-teal-300 border-teal-500/30'
-          : 'bg-white/5 text-gray-500 border-white/10';
-        return (
-          <div key={lab} className="flex items-center gap-1 flex-shrink-0">
-            <div className={'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium ' + dot}>
-              <Icon name={st === 'done' ? 'check' : st === 'active' ? 'loader' : 'circle'} className="w-3 h-3" /> {lab}
-            </div>
-            {i < STEPS.length - 1 ? <div className={'w-4 h-px ' + (st === 'done' ? 'bg-emerald-500/40' : 'bg-white/10')} /> : null}
-          </div>
-        );
-      })}
-    </HScroll>
   );
 }
 
@@ -114,8 +100,8 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
   const [changeReq, setChangeReq] = useState(null);
   const [changeNote, setChangeNote] = useState('');
   const [otpDraft, setOtpDraft] = useState({});
+  const [showCancelled, setShowCancelled] = useState(false);
   const refresh = () => setTick((t) => t + 1);
-  // Lock scroll + close on Escape while the "Request changes" modal is open.
 
   useScrollLock(Boolean(changeReq));
   useEffect(() => {
@@ -133,7 +119,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
     (async () => {
       try {
         const requests = await listServiceRequests(typeFilter);
-        if (alive) setRequests([...requests].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));
+        if (alive) setRequests([...requests].sort((a, b) => (rank(a) - rank(b)) || ((b.updatedAt || 0) - (a.updatedAt || 0))));
       } catch (error) {
         if (alive) console.warn('[service-tracker] requests failed', error);
       }
@@ -206,6 +192,9 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
 
   if (!isIn) return null;
 
+  const cancelledCount = requests.filter((r) => r.status === 'cancelled').length;
+  const shown = showCancelled ? requests : requests.filter((r) => r.status !== 'cancelled');
+
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pt">
       <div className="glass-card rounded-2xl p-5 sm:p-6">
@@ -214,7 +203,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
         </div>
         <p className="text-gray-400 text-sm mb-4">Track progress, review the draft we prepare, and approve it so we can register it with the government.</p>
 
-        {requests.length === 0 ? (
+        {shown.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/15 p-6 text-center">
             <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-3"><Icon name="file-clock" className="w-6 h-6 text-gray-500" /></div>
             <p className="text-white text-sm font-semibold">No active request yet</p>
@@ -222,24 +211,22 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
           </div>
         ) : (
           <div className="space-y-4">
-            {requests.map((r) => {
+            {shown.map((r) => {
               const m = statusMeta(r.status);
               const unreadStaff = (r.messages || []).filter((x) => x.from === 'staff' && !x.read).length;
               return (
-                <div key={r.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
-                    <div className="min-w-0">
-                      <p className="text-white font-semibold text-sm">{r.service}</p>
-                      <p className="text-gray-500 text-xs truncate">{r.details?.property || r.details?.from || 'Request'} · {r.id.slice(0, 10)}</p>
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg font-semibold" style={{ background: m.bg, color: m.color }}><Icon name={m.icon} className="w-3 h-3" /> {m.label}</span>
+                <div key={r.id} className="rounded-xl border border-white/10 border-l-4 bg-white/[0.03] p-4" style={{ borderLeftColor: m.color }}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold" style={{ background: m.bg, color: m.color }}><Icon name={m.icon} className="w-3.5 h-3.5 flex-shrink-0" /> {m.label}</span>
+                    {r.updatedAt ? <span className="text-[11px] text-gray-500 flex-shrink-0 mt-1">{timeAgo(r.updatedAt)}</span> : null}
                   </div>
+                  <p className="text-white font-semibold text-sm line-clamp-2">{r.details?.property || r.details?.from || r.service}</p>
+                  <p className="text-gray-500 text-xs mt-0.5 mb-3">{r.service} · Ref {r.id.slice(0, 10)}</p>
+                  <Progress status={r.status} />
 
                   {r.type === 'rental' && REUPLOADABLE.has(r.status) ? <RejectedPapers requestId={r.id} onUploaded={refresh} /> : null}
                   {r.type === 'rental' && r.amendment ? <RevisedTerms request={r} onChanged={refresh} /> : null}
                   {r.type === 'rental' && isActive(r.status) && needsIdentityRefill(r) ? <IdentityRefill request={r} viewerMobile={mobile} onSaved={refresh} /> : null}
-                  <ProgressBar status={r.status} />
-                  <Stepper status={r.status} />
                   {r.status === 'draft_shared' && r.draftApproval ? (
                     <div className="mb-3 rounded-xl border border-white/8 bg-white/[0.03] p-3">
                       <p className="text-xs font-semibold text-gray-200">
@@ -314,6 +301,12 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
             })}
           </div>
         )}
+        {cancelledCount ? (
+          <button type="button" onClick={() => setShowCancelled((v) => !v)} aria-expanded={showCancelled} className="mt-3 w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white cursor-pointer">
+            <Icon name="chevron-down" className={'w-4 h-4 transition-transform ' + (showCancelled ? 'rotate-180' : '')} />
+            {showCancelled ? 'Hide cancelled requests' : `Show ${cancelledCount} cancelled request${cancelledCount === 1 ? '' : 's'}`}
+          </button>
+        ) : null}
       </div>
 
       {changeReq ? (

@@ -1,4 +1,4 @@
-// LIVE: `/admin/localities` — the directory the curator reads, not the endpoint behind it.
+// LIVE: Places → Areas — the directory the curator reads, not the endpoint behind it.
 import { expect, test, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
 
@@ -9,10 +9,10 @@ const chip = (page, name) => page.getByRole('group', { name: 'Status' }).getByRo
 async function openDirectory(page) {
   const [res] = await Promise.all([
     page.waitForResponse((r) => /\/api\/admin\/localities(\?|$)/.test(r.url()) && r.request().method() === 'GET'),
-    page.goto('/admin/localities'),
+    page.goto('/admin/places?tab=areas'),
   ]);
   expect(res.status()).toBe(200);
-  await expect(page.getByRole('heading', { name: 'Localities' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Places', exact: true })).toBeVisible();
   await expect(bodyRows(page).first()).toBeVisible();
 }
 

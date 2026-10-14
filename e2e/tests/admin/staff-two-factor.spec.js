@@ -135,3 +135,76 @@ test('staff sign-in refusals say what to do next', async ({ page }) => {
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(error).toHaveText('Something went wrong on our side. Try again in a minute.');
 });
+
+test('the code step uses the six OTP boxes, with a recovery code one tap away', async ({ page, consoleErrors }) => {
+  const sent = [];
+  await page.route('**/api/auth/staff-login', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ mfa: 'totp', challenge: 'c' }) }));
+  await page.route('**/api/auth/staff-login/verify', (route) => {
+    sent.push(route.request().postDataJSON().code);
+    return route.fulfill({ status: 401, contentType: 'application/json', body: JSON.stringify({ error: 'staff_code_invalid', status: 401 }) });
+  });
+  await page.goto('/staff-login');
+  await page.locator('#staff-email').fill('someone@draazy.test');
+  await page.locator('#staff-password').fill('any-password');
+  await page.getByRole('button', { name: 'Continue' }).click();
+
+  const boxes = page.locator('.otp-box');
+  await expect(boxes).toHaveCount(6);
+  await expect(boxes.first()).toBeFocused();
+  await page.keyboard.type('12');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.locator('#staff-login-error')).toHaveText('Enter the 6-digit code from your authenticator app.');
+  await boxes.first().fill('123456');
+  await expect(page.locator('.otp-box.filled')).toHaveCount(6);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.locator('#staff-login-error')).toContainText("That code didn't work");
+
+  await page.getByRole('button', { name: 'Use a recovery code instead' }).click();
+  await expect(boxes).toHaveCount(0);
+  await page.getByLabel('Recovery code').fill('abcd-efgh');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect.poll(() => sent).toEqual(['123456', 'abcd-efgh']);
+  await page.getByRole('button', { name: 'Use the 6-digit code instead' }).click();
+  await expect(boxes).toHaveCount(6);
+  expect(consoleErrors.filter((e) => !/401/.test(String(e)))).toHaveLength(0);
+});
+
+/* The hero panel is a dark island: in light theme its headline must stay white and its gradient text
+   solid, not outlined by the light theme's hairline text stroke. */
+for (const path of ['/signin', '/staff-login']) {
+  test(`the ${path} hero stays readable in light theme`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.addInitScript(() => localStorage.setItem('dzAppPrefs', JSON.stringify({ theme: 'light' })));
+    await page.goto(path);
+    await expect(page.locator('html')).toHaveClass(/\blight\b/);
+    const hero = page.locator('.auth-left');
+    await expect(hero.locator('h1')).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(hero.locator('.gradient-text').first()).toHaveCSS('-webkit-text-stroke-width', '0px');
+  });
+}
+
+test('the signin stat labels stay readable in light theme', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.addInitScript(() => localStorage.setItem('dzAppPrefs', JSON.stringify({ theme: 'light' })));
+  await page.goto('/signin');
+  await expect(page.locator('.auth-left .stat-card p').nth(1)).toHaveCSS('color', 'rgb(209, 213, 219)');
+});
+
+/* Staff sign-in is reached by direct URL only: no public page links to it, and its hero does not
+   describe how the back office authenticates. */
+test('public pages never point at the staff sign-in', async ({ page }) => {
+  await page.goto('/');
+  const footer = page.locator('footer');
+  await expect(footer.getByRole('link', { name: 'Privacy policy' })).toBeVisible();
+  await expect(page.locator('a[href^="/staff"]')).toHaveCount(0);
+  await expect(footer).not.toContainText(/staff/i);
+
+  await page.goto('/help/a/create-account');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect(page.locator('main')).not.toContainText(/staff sign-in/i);
+
+  await page.goto('/staff-login');
+  const hero = page.locator('.auth-left');
+  await expect(hero.locator('h1')).toBeVisible();
+  await expect(hero).not.toContainText(/Two-step|Authenticator|Audit-logged|Role-scoped/);
+});

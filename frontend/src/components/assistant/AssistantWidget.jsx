@@ -220,7 +220,8 @@ export default function AssistantWidget() {
     || /^\/flatmates\/(room|group|post)\//.test(pathname)
     || pathname === '/society'
     || pathname.startsWith('/society/')
-    || pathname === '/contact';
+    || pathname === '/contact'
+    || pathname === '/services/rent-agreement';
   const cityBar = !isLive(city);
   const wizardBar = pathname.startsWith('/list-property');
   let anchorClass = 'bottom-[calc(var(--dz-bottom-inset)+1.5rem)]';

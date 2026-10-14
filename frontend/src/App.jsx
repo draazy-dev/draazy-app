@@ -116,8 +116,7 @@ const AdminHelpFeedback = lazy(() => import('./pages/admin/AdminHelpFeedback.jsx
 const AdminErrorLog = lazy(() => import('./pages/admin/AdminErrorLog.jsx'));
 const AdminPostOnBehalf = lazyPage(() => import('./pages/admin/AdminPostOnBehalf.jsx'), 'list-property');
 const AdminStaffActivity = lazy(() => import('./pages/admin/AdminStaffActivity.jsx'));
-const AdminSocieties = lazy(() => import('./pages/admin/AdminSocieties.jsx'));
-const AdminLocalities = lazy(() => import('./pages/admin/AdminLocalities.jsx'));
+const AdminPlaces = lazy(() => import('./pages/admin/AdminPlaces.jsx'));
 /* The manager warning owns the only translated string on this page; the rest is still English. */
 const AdminTeam = lazyPage(() => import('./pages/admin/AdminTeam.jsx'), 'team');
 
@@ -235,8 +234,9 @@ const BACK_OFFICE_ROUTES = [{
     { path: 'content', element: <ModuleRoute moduleKey="content"><AdminContent /></ModuleRoute> },
     { path: 'reports', element: <ModuleRoute moduleKey="reports"><FlagRoute flag="reports"><AdminReports /></FlagRoute></ModuleRoute> },
     { path: 'flatmates', element: <ModuleRoute moduleKey="flatmates"><FlagRoute flag="flatmates"><OpsFlatmateReview /></FlagRoute></ModuleRoute> },
-    { path: 'societies', element: <ModuleRoute moduleKey="societies"><AdminSocieties /></ModuleRoute> },
-    { path: 'localities', element: <ModuleRoute moduleKey="localities"><AdminLocalities /></ModuleRoute> },
+    { path: 'places', element: <ModuleRoute moduleKey="places"><AdminPlaces /></ModuleRoute> },
+    { path: 'societies', element: <Navigate to="/admin/places?tab=duplicates" replace /> },
+    { path: 'localities', element: <Navigate to="/admin/places?tab=areas" replace /> },
     { path: 'team', element: <ModuleRoute moduleKey="team"><AdminTeam /></ModuleRoute> },
     { path: 'settings', element: <ModuleRoute moduleKey="settings"><AdminSettings /></ModuleRoute> },
     { path: 'integrations', element: <ModuleRoute moduleKey="integrations"><AdminIntegrations /></ModuleRoute> },

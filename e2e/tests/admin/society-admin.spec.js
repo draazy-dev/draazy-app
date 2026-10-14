@@ -6,10 +6,10 @@ import { API, authHeaders, uniqueMobile } from '../../helpers/liveAuth.js';
 /** A note no other run — or other test in this file — could have written. */
 const uniqueNote = (label) => `${label} ${Date.now()}-${Math.floor(Math.random() * 1e4)}`;
 
-/** Open the Directory tab and wait for its table, not its heading. */
+/** Open the Society details tab and wait for its table, not its heading. */
 async function openDirectory(page) {
-  await page.goto('/admin/societies?tab=directory');
-  await expect(page.getByRole('heading', { name: 'Societies', exact: true })).toBeVisible({ timeout: 20000 });
+  await page.goto('/admin/places?tab=societies');
+  await expect(page.getByRole('heading', { name: 'Places', exact: true })).toBeVisible({ timeout: 20000 });
   // Rows are in the DOM twice — `Table` renders an `sm:hidden` stacked card per row before the
   // `hidden sm:block` table. Scope to the table or every count is doubled.
   await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20000 });

@@ -17,18 +17,18 @@ async function catalogue(params = {}) {
   return res.json();
 }
 
-/** Open the Directory tab and wait for its table. The tab is a URL parameter (`useTabParam`). */
+/** Open the Society details tab and wait for its table. The tab is a URL parameter (`useTabParam`). */
 async function openDirectory(page) {
-  await page.goto('/admin/societies?tab=directory');
-  await expect(page.getByRole('heading', { name: 'Societies', exact: true })).toBeVisible({ timeout: 20000 });
+  await page.goto('/admin/places?tab=societies');
+  await expect(page.getByRole('heading', { name: 'Places', exact: true })).toBeVisible({ timeout: 20000 });
   /* Rows are in the DOM twice — `Table` renders an `sm:hidden` stacked card per row before the
      `hidden sm:block` table — so every locator here is scoped to the table or it counts double. */
   await expect(page.locator('table tbody tr').first()).toBeVisible({ timeout: 20000 });
 }
 
 const rows = (page) => page.locator('table tbody tr');
-/** The Directory tab's count pill, so `20` cannot be satisfied by a `20` elsewhere on the page. */
-const dirCount = (page) => page.getByTestId('tab-count-directory');
+/** The Society details tab's count pill, so `20` cannot be satisfied by a `20` elsewhere on the page. */
+const dirCount = (page) => page.getByTestId('tab-count-societies');
 const range = (page) => page.getByTestId('queue-range').first();
 
 // ─── The desk itself ───
@@ -48,9 +48,9 @@ test('the desk counts the whole catalogue, not the page it is showing', async ({
   await expect(dirCount(page)).not.toHaveText(String(PAGE_SIZE));
   await expect(rows(page)).toHaveCount(PAGE_SIZE);
 
-  // Exactly two tabs — Candidates and Directory. Values belong to the queues, and to the specs that own those queues.
-  await expect(page.getByRole('tab')).toHaveText([/^Candidates/, /^Directory/]);
-  for (const [key, label] of [['candidates', 'Candidates'], ['directory', 'Directory']]) {
+  // Exactly three tabs. Values belong to the queues, and to the specs that own those queues.
+  await expect(page.getByRole('tab')).toHaveText([/^Areas/, /^Duplicates/, /^Society details/]);
+  for (const [key, label] of [['duplicates', 'Duplicates'], ['societies', 'Society details']]) {
     await expect(page.getByRole('tab', { name: new RegExp(`^${label}`) })).toBeVisible();
     await expect(page.getByTestId(`tab-count-${key}`)).toHaveText(/^\d[\d,]*$/);
   }

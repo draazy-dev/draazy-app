@@ -44,8 +44,7 @@ const NAV_INDEX_FULL = [
   { label: 'Reports', keywords: 'reports flagged abuse spam moderation', path: '/admin/reports', icon: Flag, flag: 'reports' },
   { label: 'Support', keywords: 'support help tickets complaints issues', path: '/admin/support', icon: LifeBuoy, flag: 'support' },
   { label: 'Flatmates', keywords: 'flatmates roommate matching seekers moderation', path: '/admin/flatmates', icon: Users, flag: 'flatmates' },
-  { label: 'Societies', keywords: 'societies society merge duplicate buildings', path: '/admin/societies', icon: Building2, flag: null },
-  { label: 'Localities', keywords: 'localities locality area neighbourhood neighborhood registry community pune', path: '/admin/localities', icon: Compass, flag: null },
+  { label: 'Places', keywords: 'places societies society localities locality area neighbourhood neighborhood merge duplicate buildings pune', path: '/admin/places', icon: Compass, flag: null },
   { label: 'Settings', keywords: 'settings configuration preferences site general email notifications sms seo', path: '/admin/settings', icon: Settings, flag: null },
   { label: 'Integrations', keywords: 'integrations email whatsapp otp payments cashfree zoho webhook delivery failures providers', path: '/admin/integrations', icon: Settings, flag: null },
   { label: 'Referrals', keywords: 'referrals ops refer bonus', path: '/admin/referrals', icon: Gift, flag: null },
@@ -93,10 +92,9 @@ const FEATURES_INDEX = [
   { label: 'Flatmate Moderation', keywords: 'seekers rooms groups flatmate share roommate posts publish', path: '/admin/flatmates', parent: 'Flatmates', flag: 'flatmates' },
   { label: 'Group Applications', keywords: 'applications join group flatmate', path: '/admin/flatmates', parent: 'Flatmates', flag: 'flatmates' },
 
-  { label: 'Society Candidates', keywords: 'society candidates merge duplicate minted community', path: '/admin/societies?tab=candidates', parent: 'Societies', flag: null },
-  { label: 'Society Directory', keywords: 'society directory catalogue edit overlay maintenance', path: '/admin/societies?tab=directory', parent: 'Societies', flag: null },
-
-  { label: 'Locality Directory', keywords: 'locality directory registry community areas retired active', path: '/admin/localities', parent: 'Localities', flag: null },
+  { label: 'Areas', keywords: 'areas localities locality retire restore registry community', path: '/admin/places?tab=areas', parent: 'Places', flag: null },
+  { label: 'Duplicate Societies', keywords: 'society candidates merge duplicate minted community', path: '/admin/places?tab=duplicates', parent: 'Places', flag: null },
+  { label: 'Society Details', keywords: 'society directory catalogue edit registration conveyance maintenance', path: '/admin/places?tab=societies', parent: 'Places', flag: null },
   /* Three Dashboard entries stood here — Smart Alerts, SLA Health and Daily Scorecard. */
 
   { label: 'Team Performance', keywords: 'staff kpi performance metrics summary leaderboard turnaround', path: '/admin/staff-activity?tab=performance', parent: 'Team Activity', flag: null },

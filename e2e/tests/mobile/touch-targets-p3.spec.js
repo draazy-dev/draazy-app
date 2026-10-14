@@ -103,6 +103,42 @@ test.describe('Admin shell on a field phone', () => {
     }
   });
 
+  test('the drawer nav scrolls so its last module is reachable', async ({ page, login }) => {
+    await consent(page);
+    await login.asAdmin();
+    await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+
+    const nav = page.locator('aside nav');
+    const last = nav.getByRole('link').last();
+    await last.scrollIntoViewIfNeeded();
+
+    const box = await last.boundingBox();
+    const vh = page.viewportSize().height;
+    expect(box.y + box.height, 'last drawer link must sit inside the viewport').toBeLessThanOrEqual(vh);
+    const href = await last.getAttribute('href');
+    await last.click();
+    await expect(page).toHaveURL(new RegExp(`${href}$`));
+  });
+
+  test('on desktop the side rail stays put and scrolls on its own', async ({ page, login }) => {
+    await page.setViewportSize({ width: 1280, height: 700 });
+    await consent(page);
+    await login.asAdmin();
+    await page.goto('/admin/analytics');
+
+    const rail = page.locator('aside');
+    const nav = rail.locator('nav');
+    await expect(nav.getByRole('link').first()).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 2000));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    expect((await rail.boundingBox()).y, 'rail must not scroll away with the page').toBe(0);
+
+    const last = nav.getByRole('link').last();
+    await last.scrollIntoViewIfNeeded();
+    const box = await last.boundingBox();
+    expect(box.y + box.height, 'last rail link reachable').toBeLessThanOrEqual(700);
+  });
+
   test('no dashboard card overflows the viewport', async ({ page, login }) => {
     await consent(page);
     await login.asAdmin();

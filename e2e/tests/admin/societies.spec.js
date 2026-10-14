@@ -1,13 +1,13 @@
-/** Society ops console (candidates and merges) against the live API; each test mints its own candidates over `POST /societies`
- * because the tab lists only the 20 newest, and nothing here seeds storage. */
+/* Places › Duplicates against the live API. Each test mints its own candidates over `POST /societies`:
+   the tab lists only the 20 newest, and nothing here seeds storage. */
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile } from '../../helpers/liveAuth.js';
 
 
-/** Opens a console tab by URL param (`useTabParam`) and waits for its heading; navigating, not clicking, names the tab on failure. */
+// Navigating by URL param, not clicking, names the tab on failure.
 async function openTab(page, tab, search) {
-  await page.goto(`/admin/societies?tab=${tab}`);
-  await expect(page.getByRole('heading', { name: 'Societies', exact: true })).toBeVisible({ timeout: 20000 });
+  await page.goto(`/admin/places?tab=${tab}`);
+  await expect(page.getByRole('heading', { name: 'Places', exact: true })).toBeVisible({ timeout: 20000 });
   // The queue pages client-side at ten, and every spec that mints makes it longer.
   if (search) await page.getByPlaceholder('Society or locality').fill(search);
 }
@@ -34,13 +34,13 @@ async function mintSociety(name, { mobile, apart = false, mintOrigin }) {
 /** A name no other run will collide with — the same trick as `uniqueMobile`, for societies. */
 const uniqueName = (label) => `${label} ${String(Date.now()).slice(-7)}`;
 
-test('the desk is exactly Candidates and Directory, loads from the server, and has no console errors', async ({ page, login, consoleErrors }) => {
+test('Places is exactly Areas, Duplicates and Society details, loads from the server, and has no console errors', async ({ page, login, consoleErrors }) => {
   const name = uniqueName('Deskcheck Towers');
   await mintSociety(name, { mobile: uniqueMobile() });
   await login.asAdmin();
-  await openTab(page, 'candidates', name);
+  await openTab(page, 'duplicates', name);
 
-  await expect(page.getByRole('tab')).toHaveText([/^Candidates/, /^Directory/]);
+  await expect(page.getByRole('tab')).toHaveText([/^Areas/, /^Duplicates/, /^Society details/]);
   for (const gone of ['Claims', 'Residents', 'Moderation']) {
     await expect(page.getByRole('tab', { name: new RegExp(`^${gone}`) })).toHaveCount(0);
   }
@@ -55,7 +55,7 @@ test('the desk is exactly Candidates and Directory, loads from the server, and h
   expect(consoleErrors).toHaveLength(0);
 });
 
-test('the retired society desk routes are gone: a removed tab falls back to Candidates, and the verify and claims APIs answer no more', async ({ page, login }) => {
+test('the retired society desk routes are gone: a removed tab falls back to the first tab, and the verify and claims APIs answer no more', async ({ page, login }) => {
   const slug = await mintSociety(uniqueName('Noverify Towers'), { mobile: uniqueMobile() });
   const headers = await authHeaders(ACTORS.admin);
 
@@ -73,14 +73,36 @@ test('the retired society desk routes are gone: a removed tab falls back to Cand
 
   await login.asAdmin();
   await openTab(page, 'claims');
-  await expect(page.getByRole('tab', { name: /^Candidates/ })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tab', { name: /^Areas/ })).toHaveAttribute('aria-selected', 'true');
+});
+
+test('the old Societies and Localities links land on their Places tab', async ({ page, login }) => {
+  await login.asAdmin();
+  for (const [from, tab] of [['/admin/societies', 'duplicates'], ['/admin/localities', 'areas']]) {
+    await page.goto(from);
+    await expect(page).toHaveURL(new RegExp(`/admin/places\\?tab=${tab}$`));
+    await expect(page.getByRole('tab', { selected: true })).toHaveAttribute('data-tab', tab);
+  }
+  await expect(page.locator('aside nav').getByRole('link', { name: 'Places', exact: true })).toBeVisible();
+  for (const gone of ['Societies', 'Localities']) {
+    await expect(page.locator('aside nav').getByRole('link', { name: gone, exact: true })).toHaveCount(0);
+  }
+});
+
+test('a staffer with only the Localities function sees Places with the Areas tab alone', async ({ page, login }) => {
+  await login.scopeStaff('rental', ['localities']);
+  await login.asStaff('rental');
+  await page.goto('/staff/places?tab=duplicates');
+  await expect(page.getByRole('heading', { name: 'Places', exact: true })).toBeVisible({ timeout: 20000 });
+  await expect(page.getByRole('tab')).toHaveText([/^Areas/]);
+  await expect(page.getByRole('table').locator('tbody tr').first()).toBeVisible();
 });
 
 test('a candidate row offers Merge and no Verify', async ({ page, login }) => {
   const name = uniqueName('Mergeonly Court');
   await mintSociety(name, { mobile: uniqueMobile() });
   await login.asAdmin();
-  await openTab(page, 'candidates', name);
+  await openTab(page, 'duplicates', name);
 
   const row = named(page, name);
   await expect(row).toHaveCount(1);
@@ -95,7 +117,7 @@ test('a candidate row names where it came from: a listing, or searcher demand', 
   await mintSociety(fromDemand, { mobile: uniqueMobile(), mintOrigin: 'demand' });
   await login.asAdmin();
 
-  await openTab(page, 'candidates', fromListing);
+  await openTab(page, 'duplicates', fromListing);
   await expect(named(page, fromListing)).toContainText('From a listing');
   await expect(named(page, fromListing)).not.toContainText('Searcher demand');
 
@@ -105,12 +127,12 @@ test('a candidate row names where it came from: a listing, or searcher demand', 
 });
 
 test('merging a duplicate takes it off the queue without deleting it, and undoes cleanly', async ({ page, login }) => {
-  /* The duplicate is minted here and the survivor is a catalogue society, as an operator merging a typo into a real building would. */
+  // The survivor is a catalogue society, as when an operator merges a typo into a real building.
   const dupe = uniqueName('Mergetest Blue Ridge Tower');
   const dupeSlug = await mintSociety(dupe, { mobile: uniqueMobile() });
 
   await login.asAdmin();
-  await openTab(page, 'candidates', dupe);
+  await openTab(page, 'duplicates', dupe);
 
   await named(page, dupe).getByRole('button', { name: 'Merge' }).click();
   const dialog = page.getByRole('dialog', { name: 'Merge society' });
@@ -139,7 +161,8 @@ test('merging a duplicate takes it off the queue without deleting it, and undoes
 
 test('the duplicate column finds a second copy the bundled catalogue never held, and says so when nothing resembles a society', async ({ page, login }) => {
   await test.step('the duplicate column finds a second copy the bundled catalogue never held', async () => {
-    /* A typo pair: neither name is a substring of the other and both share the run stamp, so locators never match the wrong row or a previous run. */
+    /* A typo pair: neither name contains the other and both share the run stamp,
+       so locators never match the wrong row or a previous run. */
     const stamp = String(Date.now()).slice(-7);
     const original = `Quollhaven Ridge ${stamp}`;
     const typo = `Quollhaven Rydge ${stamp}`;
@@ -147,12 +170,12 @@ test('the duplicate column finds a second copy the bundled catalogue never held,
     await mintSociety(typo, { mobile: uniqueMobile() });
 
     await login.asAdmin();
-    await openTab(page, 'candidates', typo);
+    await openTab(page, 'duplicates', typo);
 
     const row = named(page, typo);
     await expect(row).toHaveCount(1);
-    /* The hint is fetched, so the column has a "Checking…" state; wait for the chip, since `not.toContainText('No obvious match')`
-       would pass immediately against a column that has not started. */
+    /* The hint is fetched, so wait for the chip: `not.toContainText('No obvious match')`
+       would pass at once against a column that has not started. */
     await expect(row.getByText(original)).toBeVisible({ timeout: 20000 });
     await expect(row).not.toContainText('No obvious match');
 
@@ -164,13 +187,12 @@ test('the duplicate column finds a second copy the bundled catalogue never held,
     await expect(dialog).toContainText(typo);
   });
   await test.step('a society that resembles nothing says so, rather than saying nothing', async () => {
-    /* "Checking…" must settle into "No obvious match"; one that never settles is what a failed fetch leaves if the page does not record it. */
     // Locality and pin add to a name score, so anything minted beside it would be offered as a duplicate.
     const name = `Ynthracite Bqorvald ${String(Date.now()).slice(-7)}`;
     await mintSociety(name, { mobile: uniqueMobile(), apart: true });
 
     await login.asAdmin();
-    await openTab(page, 'candidates', name);
+    await openTab(page, 'duplicates', name);
 
     const row = named(page, name);
     await expect(row).toHaveCount(1);
@@ -191,14 +213,14 @@ test('the duplicate column finds a second copy the bundled catalogue never held,
 });
 
 test('a duplicate check that fails says so, instead of saying "No obvious match"', async ({ page, login }) => {
-  /* A request that did not answer must not record `[]` and render "nothing like this", the case where the operator most needs to look twice. */
+  // An unanswered request must not render "nothing like this", where the operator most needs to look twice.
   const name = `Failcheck Manor ${String(Date.now()).slice(-7)}`;
   await mintSociety(name, { mobile: uniqueMobile() });
 
   await page.route('**/admin/society-candidates/*/duplicates*', (route) => route.abort('failed'));
 
   await login.asAdmin();
-  await openTab(page, 'candidates', name);
+  await openTab(page, 'duplicates', name);
 
   const row = named(page, name);
   await expect(row).toHaveCount(1);

@@ -104,7 +104,6 @@ export default function Footer() {
                 ['Terms of service', '/terms'],
                 ['Refund policy', '/refund-policy'],
                 ['Disclaimer', '/disclaimer'],
-                ['Staff & admin', '/staff-login'],
               ].map(([label, href]) => (
                 <li key={label}>
                   <Link to={href} className="text-sm text-gray-500 hover:text-white transition-colors">{label}</Link>

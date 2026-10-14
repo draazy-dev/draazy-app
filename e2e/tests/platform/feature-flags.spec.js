@@ -241,9 +241,14 @@ test('maintenanceMode flag blocks consumer pages and writes, and leaves the back
 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: /right back/ })).toBeVisible();
+  await expect(page.locator('a[href^="/staff"]')).toHaveCount(0);
   const write = await fetch(`${API}/me/saved/${BUY}`, { method: 'PUT', headers: buyer });
   expect(write.status).toBe(503);
   expect((await write.json()).error).toBe('maintenance_mode');
+  // Nothing public links to staff sign-in, so it must stay open by direct URL.
+  await page.goto('/staff-login');
+  await expect(page.locator('#staff-email')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /right back/ })).toHaveCount(0);
 
   await flags.disable('maintenanceMode');
   await page.goto('/');

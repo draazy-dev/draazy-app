@@ -5,10 +5,10 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 23
-updated: 2026-10-10
-summary: How to read the Localities directory, retire or restore an area, and who to tell about duplicates or missing pins.
+updated: 2026-10-12
+summary: How to read the Areas tab of Places, retire or restore an area, and who to tell about duplicates or missing pins.
 tags: [ops, internal, localities, directory]
-modules: [localities]
+modules: [places]
 ---
 
 > [!IMPORTANT]
@@ -34,16 +34,16 @@ modules: [localities]
 
 ## Desk and access
 
-- Route: `/admin/localities`. Staff open `/staff/localities`.
-- Permission: `localities:read` to see the page, `localities:write` to retire or restore (both are in the **Localities** function). Managers and admins can open it too. Without `localities:write` the page shows no action button.
+- Route: **Places → Areas** (`/admin/places?tab=areas`). Staff open `/staff/places?tab=areas`. The old `/admin/localities` link redirects there.
+- Permission: `localities:read` to see the tab, `localities:write` to retire or restore (both are in the **Localities** function). Managers and admins can open it too. Without `localities:write` the tab shows no action button.
 - You can **retire** and **restore** an area. There is no add, rename or merge button.
 - To rename or merge one, tell engineering. Give the name, the slug and what is wrong.
 
 ## What is on the page
 
-Header: **Localities**, "Every area buyers can search, and how many live listings each has."
+Open **Places** and pick the **Areas** tab. Places also holds the society tabs, shown only if you have the **Societies** function.
 
-The note on the page says: areas appear when someone picks them from Google Maps suggestions. Retiring an area stops new listings there; its existing listings and page stay. Restore reopens it.
+The note on the tab says: areas appear when someone picks them from Google Maps suggestions. Retiring an area stops new listings there; its existing listings and page stay. Restore reopens it.
 
 | Part | What it does |
 |---|---|
@@ -76,7 +76,7 @@ If two areas get the same name, the second slug gets a number, like `kothrud-2`.
 
 ## Check an area
 
-1. Open Localities and search for the name or slug.
+1. Open **Places → Areas** and search for the name or slug.
 2. Look for the same area under other spellings.
 3. Check **Live listings**. Zero means nothing is live there now.
 4. Check **Pin**. A dash means the map cannot place the area properly.

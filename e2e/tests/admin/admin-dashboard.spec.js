@@ -150,7 +150,7 @@ test.describe('/admin dashboard — the scorecard is the server\'s', () => {
     await login.asStaff('rental');
     await page.goto('/staff');
     const queues = page.getByTestId('my-queues');
-    for (const [label, path] of [['Societies', '/staff/societies'], ['Reports', '/staff/reports']]) {
+    for (const [label, path] of [['Societies', '/staff/places?tab=duplicates'], ['Reports', '/staff/reports']]) {
       await expect(queues.getByRole('link', { name: new RegExp(label) })).toHaveAttribute('href', path);
     }
     await expect(queues.getByText('Referrals')).toHaveCount(0);

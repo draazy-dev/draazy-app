@@ -434,6 +434,7 @@ body {
 /* Dark ink on a light page reads thinner than light ink on dark. A hairline stroke in the text's own
    colour thickens glyphs without changing their metrics, so nothing re-wraps the way a weight bump would. */
 html.light body { -webkit-text-stroke-width: 0.25px; }
+html.light .theme-dark { -webkit-text-stroke-width: 0; }
 html.light svg.lucide[stroke-width="2"] { stroke-width: 2.5; }
 
 /* The app ships its own reduce-motion switch and does not seed it from the OS, so honouring

@@ -10,25 +10,37 @@ import {
   getSocietyAdminView, editSociety, listSocietyDirectory,
 } from '../../services/societyService.js';
 import { ApiError, NetworkError } from '../../services/http.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { hasPermission } from '../../lib/adminModules.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import { titleCase, DUPES_FAILED } from './societies/helpers.jsx';
 import CandidatesTab from './societies/CandidatesTab.jsx';
 import DirectoryTab from './societies/DirectoryTab.jsx';
+import AdminLocalities from './AdminLocalities.jsx';
 
 // 20, matching `GET /admin/societies`'s own `@PageableDefault`.
 const DIR_PAGE_SIZE = 20;
 const CAND_PAGE_SIZE = 10;
 
 const NOTES = {
-  candidates: 'Auto-minted societies (from listings & searcher demand). Merge duplicates into the canonical society — listings & followers redirect.',
-  directory: 'Every society. Edits are stored as an overlay on the catalogue.',
+  duplicates: 'Societies added from Google Maps picks. Merge a duplicate into the real one — its listings and followers move across.',
+  societies: 'Details Google does not have: registration, conveyance and maintenance. Shown on the society page and price insights.',
 };
 
-export default function AdminSocieties() {
+const TABS = [
+  { key: 'areas', label: 'Areas', atom: 'localities:read' },
+  { key: 'duplicates', label: 'Duplicates', atom: 'societies:read' },
+  { key: 'societies', label: 'Society details', atom: 'societies:read' },
+];
+
+export default function AdminPlaces() {
   const { toast } = useToast();
-  const [tab, setTab] = useTabParam(['candidates', 'directory'], 'candidates');
+  const { user } = useAuth();
+  const allowed = TABS.filter((t) => hasPermission(user, t.atom));
+  const canSocieties = hasPermission(user, 'societies:read');
+  const [tab, setTab] = useTabParam(allowed.map((t) => t.key));
   const [candidates, setCandidates] = useState({ items: [], total: 0 });
   const [merges, setMerges] = useState([]);
   const [counts, setCounts] = useState(null);
@@ -59,6 +71,7 @@ export default function AdminSocieties() {
 
   // Tab badges: on arrival and after a decision, not on every tab or page change.
   useEffect(() => {
+    if (!canSocieties) return undefined;
     let alive = true;
     getSocietiesSummary()
       .then((c) => { if (alive) setCounts(c); })
@@ -68,10 +81,10 @@ export default function AdminSocieties() {
         if (alive) setCounts(null);
       });
     return () => { alive = false; };
-  }, [bump]);
+  }, [bump, canSocieties]);
 
   useEffect(() => {
-    if (tab !== 'candidates') return undefined;
+    if (tab !== 'duplicates') return undefined;
     let alive = true;
     const broke = [];
     safe(listSocietyCandidates({ q: candSearch, page: candPage, size: CAND_PAGE_SIZE }), 'society candidates', { items: [], total: 0 }, broke)
@@ -86,7 +99,7 @@ export default function AdminSocieties() {
   }, [tab, bump, candSearch, candPage]); // eslint-disable-line react-hooks/exhaustive-deps -- `safe` is redeclared every render and closes over nothing stateful.
 
   useEffect(() => {
-    if (tab !== 'candidates') return undefined;
+    if (tab !== 'duplicates') return undefined;
     let alive = true;
     const broke = [];
     safe(listSocietyMerges(), 'merges', [], broke).then((rows) => {
@@ -108,7 +121,7 @@ export default function AdminSocieties() {
   }, [dirQuery]);
 
   useEffect(() => {
-    if (tab !== 'directory') return undefined;
+    if (tab !== 'societies') return undefined;
     let alive = true;
     setDir((d) => ({ ...d, status: 'loading' }));
     listSocietyDirectory({ q: dirSearch, page: dirPage, size: DIR_PAGE_SIZE })
@@ -130,7 +143,7 @@ export default function AdminSocieties() {
   }, [bump]);
 
   useEffect(() => {
-    if (tab !== 'candidates') return undefined;
+    if (tab !== 'duplicates') return undefined;
     const gen = dupesGen.current;
     const queue = candidates.items.map((c) => c.slug).filter((s) => s && !dupesAsked.current.has(s));
     queue.forEach((s) => dupesAsked.current.add(s));
@@ -233,16 +246,17 @@ export default function AdminSocieties() {
     toast('Society details saved', 'success');
   };
 
-  const tabs = [
-    { key: 'candidates', label: 'Candidates', count: counts?.candidates ?? null },
-    { key: 'directory', label: 'Directory', count: dir.status === 'ready' ? dir.total : null },
-  ];
+  const counted = {
+    duplicates: counts?.candidates ?? null,
+    societies: dir.status === 'ready' ? dir.total : null,
+  };
+  const tabs = allowed.map((t) => ({ ...t, count: counted[t.key] ?? null }));
 
   const inp = 'w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white outline-none focus:border-teal-400/50';
 
   return (
     <div>
-      <PageHeader title="Societies" subtitle="Merge duplicate societies & edit society profiles." />
+      <PageHeader title="Places" subtitle="Areas and societies buyers search by — fix what Google Maps got wrong." />
 
       {queueErrors.length ? (
         <div role="alert" className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">
@@ -253,11 +267,13 @@ export default function AdminSocieties() {
         </div>
       ) : null}
 
-      <QueueTabs label="Society queues" active={tab} onChange={setTab} tabs={tabs} />
+      <QueueTabs label="Places" active={tab} onChange={setTab} tabs={tabs} />
 
-      {tab === 'candidates' ? (
+      {tab === 'areas' ? <AdminLocalities /> : null}
+
+      {tab === 'duplicates' ? (
         <CandidatesTab
-          note={NOTES.candidates}
+          note={NOTES.duplicates}
           candidates={candidateRows}
           total={candidates.total}
           query={candQuery}
@@ -272,9 +288,9 @@ export default function AdminSocieties() {
           deciding={deciding}
         />
       ) : null}
-      {tab === 'directory' ? (
+      {tab === 'societies' ? (
         <DirectoryTab
-          note={NOTES.directory}
+          note={NOTES.societies}
           state={dir}
           query={dirQuery}
           onQuery={setDirQuery}

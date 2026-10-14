@@ -5,10 +5,10 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 6
-updated: 2026-10-10
-summary: Internal procedure for society candidates, duplicate merges and directory edits.
+updated: 2026-10-12
+summary: Internal procedure for duplicate society merges and society detail edits.
 tags: [ops, societies, moderation, internal]
-modules: [societies]
+modules: [places]
 ---
 
 > [!IMPORTANT]
@@ -18,19 +18,19 @@ modules: [societies]
 
 **Monitor**
 
-- **Candidates** tab count ? new societies waiting for a check.
-- **Similar to** column ? **Could not check** means search by hand before merging.
-- **Merged duplicates** list at the bottom of Candidates ? recent merges you may need to undo.
+- **Duplicates** tab count — new societies waiting for a check.
+- **Similar to** column — **Could not check** means search by hand before merging.
+- **Merged duplicates** list at the bottom of Duplicates — recent merges you may need to undo.
 
 **Work on**
 
-- Go through **Candidates** and **Merge** only true duplicates of an existing society.
+- Go through **Duplicates** and **Merge** only true duplicates of an existing society.
 - **Undo** a merge that was wrong.
-- In **Directory**, fix a profile only when its details are wrong.
+- In **Society details**, fix a profile only when its details are wrong.
 
 ## Desk and access
 
-Use **Admin → Societies** (`/admin/societies`). You need the **Societies** function (`societies:read` to view, `societies:write` for merges and directory edits); staff open it under `/staff/societies`.
+Use **Places** (`/admin/places`), tabs **Duplicates** and **Society details**. You need the **Societies** function (`societies:read` to view, `societies:write` for merges and detail edits); staff open it under `/staff/places`. The old `/admin/societies` link redirects there.
 
 A society is identified by its Google Maps place. Owners and seekers can only pick a society from Google Maps suggestions, so every society row maps to one real place.
 
@@ -38,8 +38,8 @@ A society is identified by its Google Maps place. Owners and seekers can only pi
 
 | Tab | Use it for | Primary actions |
 | --- | --- | --- |
-| **Candidates** | Societies added from listings and demand, with duplicate hints | **Merge**, **Undo** |
-| **Directory** | Search and edit canonical society profiles | Edit profile fields |
+| **Duplicates** | Societies added from Google Maps picks, with duplicate hints | **Merge**, **Undo** |
+| **Society details** | Search and edit registration, conveyance and maintenance — data Google does not have | Edit profile fields |
 
 If a tab shows empty because loading failed, reload before deciding that the queue is clear.
 
@@ -52,7 +52,7 @@ Use **Undo** only when the merged-away society should exist again. Duplicate hin
 ## Never do in society moderation
 
 - Do not merge a candidate just because names are similar.
-- Do not use Directory edits to hide a moderation problem.
+- Do not use Society details edits to hide a moderation problem.
 
 ## Related
 

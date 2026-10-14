@@ -5,7 +5,7 @@ category: services
 audience: everyone
 order: 1
 featured: true
-updated: 2026-10-10
+updated: 2026-10-13
 summary: Co-fill, drafting, Article 36A charges, draft approval, registration and refunds for a rent agreement.
 tags: [rent agreement, e-stamp, service, legal, co-fill]
 ---
@@ -21,7 +21,7 @@ tags: [rent agreement, e-stamp, service, legal, co-fill]
 - Draft review, amendments and approval before registration
 - Registered copy upload and tracking after the Sub-Registrar step
 
-The Draazy service fee is shown in the cost breakdown before you pay, with Article 36A stamp duty, registration fee, the document handling charge and any other statutory charges itemised separately. Stamp duty is rounded up to the next ₹100.
+The Draazy service fee is shown in the cost breakdown before you pay, with Article 36A stamp duty, registration fee, the document handling charge and any other statutory charges itemised separately. We pay the government charges on your behalf, in the parties' names, at exactly what you paid us for them — they are not part of our fee. Stamp duty is rounded up to the next ₹100.
 
 ## The process
 
