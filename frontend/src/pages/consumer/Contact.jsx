@@ -8,14 +8,16 @@ import PropertyImage from '../../components/ui/PropertyImage.jsx';
 import MobileField from '../../components/MobileField.jsx';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
 import { useToast } from '../../context/ToastContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 import { useFieldErrors } from '../../lib/hooks.js';
 import { maskPhone } from '../../lib/contact.js';
 import { getProperty } from '../../services/propertyService.js';
 import { fmtINR } from '../../lib/format.js';
+import { SUPPORT_PHONE, SUPPORT_TEL, SUPPORT_WHATSAPP } from '../../lib/supportContact.js';
 
 const SUBJECTS = ['Buying this property', 'Renting this property', 'Site visit', 'Home Loan Assistance', 'General enquiry'];
-const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^91/, '');
-const WA_SUPPORT = `https://wa.me/919876543210?text=${encodeURIComponent('Hi Draazy, I need help with a property enquiry.')}`;
+const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
+const WA_SUPPORT = `${SUPPORT_WHATSAPP}?text=${encodeURIComponent('Hi Draazy, I need help with a property enquiry.')}`;
 
 function titleOf(p) {
   if (!p) return '';
@@ -30,9 +32,9 @@ export default function Contact() {
   const [params] = useSearchParams();
   const subj = params.get('subject');
   const ref = params.get('ref');
-
   // `?ref=<id>` names the listing the enquiry is about, so look it up to label the form and prefill
   // it. `refListing` is null on the first pass, which downstream copes with — `?ref=` is optional.
+
   const [refListing, setRefListing] = useState(null);
   useEffect(() => {
     if (!ref) { setRefListing(null); return undefined; }
@@ -58,9 +60,9 @@ export default function Contact() {
           : ''
       }${refListing.id ? ` (Ref: ${refListing.id})` : ''}.`
     : '';
-
   // Direct-contact owner is only meaningful when an actual listing is referenced.
   // Otherwise this is a general support page and we must not invent a phantom owner.
+
   const owner = refListing
     ? {
         name: refListing.owner || 'Owner',
@@ -74,17 +76,16 @@ export default function Contact() {
     .join('')
     .slice(0, 2)
     .toUpperCase();
-
-
-  const [form, setForm] = useState({ name: '', phone: '', email: '', subject: presel, msg: preMsg });
+  const { user } = useAuth();
+  const [form, setForm] = useState({ name: user?.name || '', phone: user?.mobile || '', email: user?.email || '', subject: presel, msg: preMsg });
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
   const formRef = useRef(null);
   const err = useFieldErrors(formRef);
+  /* The lookup lands after the user may already be typing, so the prefill only writes a field it would not be
+     overwriting, and keys on the derived strings rather than on `refListing`. */
 
-  /* The lookup lands after the user may already be typing, so the prefill only writes a field it
-     would not be overwriting, and keys on the derived strings rather than on `refListing`. */
   useEffect(() => {
     setForm((prev) => {
       const next = { ...prev };
@@ -130,7 +131,6 @@ export default function Contact() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-            {/* Enquiry form */}
             <div className="glass-card rounded-2xl p-6 sm:p-8 reveal order-2 lg:order-1" ref={formRef}>
               <h2 className="text-lg font-bold text-white mb-5">{t('misc1.contactSendEnquiry')}</h2>
               {refListing ? (
@@ -174,9 +174,9 @@ export default function Contact() {
                   <textarea id="ct-msg" value={form.msg} onChange={(e) => { set('msg', e.target.value); err.clear('msg'); }} rows={4} placeholder={t('misc1.contactMsgPlaceholder')} className={fld + ' resize-none' + err.cx('msg')} data-err="msg" />
                   <FieldError show={err.has('msg')}>{err.msg('msg')}</FieldError>
                 </div>
+              {/* The tap target is the label, not the box: a single line of text-xs is an ~18px hit area on a consent
+                 control. */}
               </div>
-              {/* The tap target is the label, not the box: a single line of text-xs is an ~18px hit
-                  area on a consent control. Reset above sm, where a mouse needs no 44px floor. */}
               <label className="tap-target sm:min-h-0 sm:min-w-0 flex items-center gap-2.5 mt-4 cursor-pointer">
                 <input type="checkbox" defaultChecked className="accent-teal-500 w-4 h-4" />
                 <span className="text-xs text-gray-400">{t('misc1.contactConsent')}</span>
@@ -187,9 +187,9 @@ export default function Contact() {
                 <button onClick={send} disabled={sending} className="btn-teal w-full mt-5 py-3.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60">{sending ? <><Icon name="loader-2" className="w-4 h-4 animate-spin" /> {t('misc1.contactSending')}</> : <><Icon name="send" className="w-4 h-4" /> {t('misc1.contactSendBtn')}</>}</button>
               )}
             </div>
+            {/* On mobile the rail sits above the form so the fast paths are the first thing a thumb reaches; desktop
+               keeps it on the right. */}
 
-            {/* On mobile the rail sits above the form so the fast paths are the first thing a thumb
-                reaches; desktop keeps it on the right. */}
             <div className="space-y-4 reveal order-1 lg:order-2">
               {owner ? (
                 <div className="glass-card rounded-2xl p-6">
@@ -224,20 +224,20 @@ export default function Contact() {
                   <span className="text-xs text-teal-300 font-medium">{t('misc1.contactResponseTime')}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 lg:grid-cols-1 lg:gap-2.5">
-                  <a href="tel:18002000000" className="flex flex-col lg:flex-row items-center gap-1.5 lg:gap-3 min-h-[44px] py-3 px-2 lg:px-4 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm hover:bg-white/10 transition-all">
+                  <a href={SUPPORT_TEL} className="flex flex-col lg:flex-row items-center gap-1.5 lg:gap-3 min-h-[44px] py-3 px-2 lg:px-4 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm hover:bg-white/10 transition-all">
                     <Icon name="headset" className="w-4 h-4 text-teal-400 shrink-0" />
                     <span className="font-semibold text-xs lg:hidden">{t('misc1.contactCall')}</span>
-                    <span className="font-semibold hidden lg:inline">1800 200 0000</span>
+                    <span className="font-semibold hidden lg:inline">{SUPPORT_PHONE}</span>
                   </a>
                   <a href={WA_SUPPORT} target="_blank" rel="noopener noreferrer" className="flex flex-col lg:flex-row items-center gap-1.5 lg:gap-3 min-h-[44px] py-3 px-2 lg:px-4 rounded-xl border border-emerald-500/20 text-emerald-300 text-sm hover:bg-emerald-500/10 transition-all">
                     <Icon name="message-circle" className="w-4 h-4 shrink-0" />
                     <span className="font-semibold text-xs lg:hidden">{t('misc1.contactWhatsappShort')}</span>
                     <span className="font-semibold hidden lg:inline">{t('misc1.contactWhatsapp')}</span>
                   </a>
-                  <a href="mailto:hello@draazy.com" className="flex flex-col lg:flex-row items-center gap-1.5 lg:gap-3 min-h-[44px] py-3 px-2 lg:px-4 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm hover:bg-white/10 transition-all">
+                  <a href="mailto:support@draazy.com" className="flex flex-col lg:flex-row items-center gap-1.5 lg:gap-3 min-h-[44px] py-3 px-2 lg:px-4 rounded-xl bg-white/5 border border-white/10 text-gray-200 text-sm hover:bg-white/10 transition-all">
                     <Icon name="mail" className="w-4 h-4 text-teal-400 shrink-0" />
                     <span className="font-semibold text-xs lg:hidden">{t('misc1.contactEmailShort')}</span>
-                    <span className="truncate hidden lg:inline">hello@draazy.com</span>
+                    <span className="truncate hidden lg:inline">support@draazy.com</span>
                   </a>
                 </div>
                 <p className="mt-3 text-[11px] text-gray-500 flex items-center gap-1.5"><Icon name="shield-check" className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> {t('misc1.contactNoSpam')}</p>
@@ -246,12 +246,11 @@ export default function Contact() {
           </div>
         </div>
       </div>
+      {/* Sticky mobile quick-contact bar — Draazy support (not the gated owner number). */}
 
-      {/* Sticky mobile quick-contact bar — Draazy support (not the gated owner number).
-          Hidden on lg where the rail is already visible. The Draaz FAB lifts above it. */}
       <div className="dz-sticky-cta lg:hidden" role="navigation" aria-label="Quick contact support">
-        <a href="tel:18002000000" className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4 focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f0d1a]"><Icon name="phone" className="w-4 h-4" /> {t('misc1.contactCall')}</a>
-        <a href={WA_SUPPORT} target="_blank" rel="noopener noreferrer" className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold py-3 px-4 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0f0d1a]"><Icon name="message-circle" className="w-4 h-4" /> {t('misc1.contactWhatsappShort')}</a>
+        <a href={SUPPORT_TEL} className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4 focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"><Icon name="phone" className="w-4 h-4" /> {t('misc1.contactCall')}</a>
+        <a href={WA_SUPPORT} target="_blank" rel="noopener noreferrer" className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold py-3 px-4 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"><Icon name="message-circle" className="w-4 h-4" /> {t('misc1.contactWhatsappShort')}</a>
       </div>
     </div>
   );

@@ -1,0 +1,178 @@
+import { test, expect } from '@playwright/test';
+
+/* Home's mobile "3-second rule": a first-time visitor must see real inventory without scrolling. The desktop half
+   is in desktop-noleak-guardrails.spec.js; mobile projects run with hasTouch. */
+
+const consent = { necessary: true, functional: true, analytics: true, marketing: true, version: 1, ts: Date.now() };
+
+// Home is lazy-routed, so goto can return before the hero paints; wait for the rail for stable layout reads.
+async function gotoHome(page) {
+  await page.goto('/');
+  await page.locator('section.hero-bg').waitFor({ state: 'attached' });
+  await page.locator('.property-card').first().waitFor();
+}
+
+test.beforeEach(async ({ page }) => {
+  // A partial consent object is rejected by CookieConsent and the bar stays
+  // mounted at z-1400, silently intercepting taps on anything bottom-anchored.
+  await page.addInitScript((c) => {
+    localStorage.setItem('dz_cookie_consent_v1', JSON.stringify(c));
+  }, consent);
+});
+
+test.describe('Home mobile — featured first', () => {
+  test('a real property card, the proof chips and a compact hero are inside the fold', async ({ page }) => {
+    test.slow();
+    await gotoHome(page);
+    const vh = page.viewportSize().height;
+
+    await test.step('a real property card is visible without scrolling', async () => {
+      const card = page.locator('.property-card').first();
+      await expect(card).toBeVisible();
+
+      const box = await card.boundingBox();
+      expect(box.y, `first card top ${Math.round(box.y)} must be inside the ${vh}px fold`).toBeLessThan(vh);
+      // Not just the top edge peeking — enough card to read as a property.
+      expect(box.y + 120, 'at least 120px of the card should be on screen').toBeLessThan(vh);
+    });
+
+    await test.step('the first featured image is not lazy', async () => {
+      // Above the fold, loading="lazy" defers the one image the first impression rests on.
+      const img = page.locator('.property-card img').first();
+      await expect(img).toBeVisible();
+      await expect(img).toHaveAttribute('loading', 'eager');
+    });
+
+    await test.step('the hero no longer reserves a full viewport', async () => {
+      const h = await page.locator('section.hero-bg').evaluate((el) => el.getBoundingClientRect().height);
+      expect(h, 'min-h-[100dvh] must be lg-only').toBeLessThan(vh);
+    });
+
+    await test.step('the four proof chips lead the hero, in at most two rows', async () => {
+      // They replace the marketing sentence on mobile. Two rows is the budget — a third
+      // row pushes Featured out of the fold, which the first step guards.
+      const chips = page.locator('.hero-trust:visible > *');
+      await expect(chips).toHaveCount(4);
+      await expect(page.locator('p.hero-sub')).toBeHidden();
+
+      const rows = await page.locator('.hero-trust:visible').evaluate((el) => {
+        const tops = [...el.children].map((c) => Math.round(c.getBoundingClientRect().top));
+        return new Set(tops).size;
+      });
+      expect(rows, 'the four chips must fit in two rows').toBeLessThanOrEqual(2);
+
+      // Pills that each size to their own label are what made this block read as scattered.
+      const widths = await page.locator('.hero-trust:visible').evaluate((el) =>
+        [...el.children].map((c) => Math.round(c.getBoundingClientRect().width)));
+      expect(new Set(widths).size, `cells must be uniform, got ${widths}`).toBe(1);
+
+      // A wrapped label reintroduces the ragged look at 360px. Measured on the label, not
+      // the row: the icon disc is taller than one line of text.
+      const wrapped = await page.locator('.hero-trust:visible').evaluate((el) =>
+        [...el.children].map((c) => {
+          const label = c.lastElementChild;
+          return Math.round(label.getBoundingClientRect().height / parseFloat(getComputedStyle(label).lineHeight));
+        }));
+      expect(Math.max(...wrapped), `every claim must be one line, got ${wrapped}`).toBe(1);
+
+      const box = await page.locator('.hero-trust:visible').boundingBox();
+      expect(box.y + box.height, 'all four chips belong inside the fold').toBeLessThan(vh);
+    });
+  });
+
+  test('section order, single exposed copy, shared spacing, rail caption and no leaked i18n keys', async ({ page }) => {
+    test.slow();
+    await gotoHome(page);
+
+    await test.step('Featured sits above Browse-by-type, which sits above the headline stats', async () => {
+      const y = await page.evaluate(() => {
+        const top = (sel) => {
+          const el = [...document.querySelectorAll(sel)].find((e) => e.getBoundingClientRect().height > 0);
+          return el ? Math.round(el.getBoundingClientRect().top + window.scrollY) : null;
+        };
+        return { featured: top('.property-card'), category: top('.cat-card'), trust: top('.hero-trust'), stats: top('.hero-stats') };
+      });
+      expect(y.featured).not.toBeNull();
+      expect(y.trust, 'the proof chips lead the page').toBeLessThan(y.featured);
+      expect(y.category, 'Browse by type belongs below Featured').toBeGreaterThan(y.featured);
+      expect(y.stats, 'the headline stats belong below both').toBeGreaterThan(y.category);
+    });
+
+    await test.step('exactly one copy of the trust chips and stats is exposed', async () => {
+      // The hero and the mobile proof strip render the same component; both being
+      // visible would duplicate them in the accessibility tree.
+      await expect(page.locator('.hero-trust:visible')).toHaveCount(1);
+      await expect(page.locator('.hero-stats:visible')).toHaveCount(1);
+    });
+
+    await test.step('the vertical rhythm is standardised, not four different gaps', async () => {
+      const r = await page.evaluate(() => {
+        const cs = getComputedStyle(document.documentElement);
+        const heads = [...document.querySelectorAll('.section-head')]
+          .filter((e) => e.getBoundingClientRect().height > 0)
+          .map((e) => Math.round(parseFloat(getComputedStyle(e).marginBottom)));
+        return {
+          gap: cs.getPropertyValue('--section-gap').trim(),
+          headGap: cs.getPropertyValue('--section-head-gap').trim(),
+          heads,
+        };
+      });
+      expect(r.gap).toBe('1.75rem');
+      expect(r.headGap).toBe('1.25rem');
+      expect(r.heads.length, 'the home sections opt into the shared header gap').toBeGreaterThanOrEqual(4);
+      expect(new Set(r.heads).size, `every section header shares one gap, got ${r.heads}`).toBe(1);
+      expect(r.heads[0]).toBe(20);
+    });
+
+    await test.step('the verified-homes proof captions the rail, not the heading', async () => {
+      // Inventory proof belongs against the stock it describes; under the heading it read as a
+      // second subtitle and pushed the first card down.
+      await page.waitForTimeout(1200); // let the list-reveal transform settle
+      const r = await page.evaluate(() => {
+        const rect = (el) => el.getBoundingClientRect();
+        const h2 = [...document.querySelectorAll('h2')].find((e) => /featured/i.test(e.textContent));
+        const proof = [...document.querySelectorAll('p')]
+          .find((e) => /shield-check|verified/i.test(e.className + e.textContent) && rect(e).height > 0 && e.querySelector('svg'));
+        const card = document.querySelector('.property-card');
+        return {
+          found: !!proof,
+          headingToProof: Math.round(rect(proof).top - rect(h2).bottom),
+          proofToCard: Math.round(rect(card).top - rect(proof).bottom),
+        };
+      });
+      expect(r.found, 'the verified-homes line is rendered on mobile').toBe(true);
+      expect(r.headingToProof, 'heading sits close above the proof line').toBeLessThanOrEqual(12);
+      expect(r.proofToCard, 'the proof line captions the first tile').toBeLessThanOrEqual(12);
+      expect(r.proofToCard).toBeGreaterThan(0);
+    });
+
+    await test.step('no unresolved i18n keys are rendered as copy', async () => {
+      // i18next renders a missing key as the key itself, so a rename that moves the JSX but not
+      // the JSON ships silently. `npm run check:i18n` is the static half; this catches interpolated keys.
+      const leaked = await page.evaluate(() => {
+        const out = [];
+        const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+        for (let n = w.nextNode(); n; n = w.nextNode()) {
+          const s = n.nodeValue.trim();
+          if (/^[a-z][\w]*(\.[\w]+){2,}$/.test(s)) out.push(s);
+        }
+        return out;
+      });
+      expect(leaked, `unresolved i18n keys on screen: ${leaked}`).toEqual([]);
+    });
+  });
+
+  test('on the light theme the hero is light with the morning-mist glow', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('dzAppPrefs', JSON.stringify({ theme: 'light' })));
+    await gotoHome(page);
+    const hero = page.locator('section.hero-bg');
+    await expect(hero).not.toHaveClass(/theme-dark/);
+    await expect(hero.locator('.hero-mist')).toBeVisible();
+    // The dark island's headline is white; on the light hero it must be dark ink.
+    await expect(hero.locator('h1')).toHaveCSS('color', 'rgb(15, 23, 42)');
+    await expect(hero.locator('.hero-city')).toHaveCSS('color', 'rgb(194, 65, 12)');
+    await expect(hero.locator('.hero-noun [aria-hidden]').first()).toHaveCSS('color', 'rgb(15, 118, 110)');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(hero.locator('.hero-mist')).toHaveCSS('animation-name', 'none');
+  });
+});

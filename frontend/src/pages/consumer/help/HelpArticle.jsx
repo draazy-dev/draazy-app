@@ -7,35 +7,23 @@ import ArticleProse from '../../../components/help/ArticleProse.jsx';
 import ArticleToc from '../../../components/help/ArticleToc.jsx';
 import ArticleFeedback from '../../../components/help/ArticleFeedback.jsx';
 import { Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
-import { articleNeighbours, markViewed } from '../../../lib/help.js';
-import { useHelpTree, useHelpLang, useHelpPath } from '../../../lib/useHelp.js';
-import { useHelpSeo } from '../../../lib/useHelpSeo.js';
-import { useAuth } from '../../../context/AuthContext.jsx';
+import { markViewed } from '../../../lib/help.js';
+import { useHelpTree, useArticleNeighbours } from '../../../lib/useHelp.js';
 
 export default function HelpArticle() {
   const { slug } = useParams();
   const { t } = useTranslation();
-  const { user } = useAuth();
-  const lang = useHelpLang();
-  const hp = useHelpPath();
-  const { sections, categories, articles } = useHelpTree();
+  const { sections, categories, articles, pending } = useHelpTree();
 
   const article = articles.find((a) => a.slug === slug) || null;
   const category = article ? categories.find((c) => c.id === article.category) : null;
   const section = category ? sections.find((s) => s.id === category.section) : null;
-  const { prev, next } = articleNeighbours(article, user, lang);
-
-  // An untranslated article serves identical English at all three URLs, so the
-  // alternates would be a duplicate-content signal rather than a translation
-  // one. Only publish them once the article actually exists in this language.
-  useHelpSeo(`/help/a/${slug}`, lang, {
-    index: article ? article.access !== 'staff' : false,
-  });
+  const { prev, next } = useArticleNeighbours(article);
 
   useEffect(() => { if (article) markViewed(article.slug); }, [article]);
-
   // Deep links to a heading arrive before the prose has painted, so the browser's
   // native hash scroll lands nowhere. Re-run it once the article is on screen.
+
   useEffect(() => {
     if (!article || !window.location.hash) return undefined;
     const id = window.location.hash.slice(1);
@@ -44,13 +32,14 @@ export default function HelpArticle() {
   }, [article]);
 
   if (!article) {
+    if (pending) return <HelpLayout />;
     return (
-      <HelpLayout title={t('help.articleNotFound')}>
+      <HelpLayout title={t('help.articleNotFound')} noindex>
         <EmptyState icon="file-text" title={t('help.articleNotFound')}>
           <Trans
             i18nKey="help.articleNotFoundBody"
             components={{
-              1: <Link to={hp('/help')} className="text-teal-400 hover:underline" />,
+              1: <Link to="/help" className="text-teal-400 hover:underline" />,
               3: <Link to="/support" className="text-teal-400 hover:underline" />,
             }}
           />
@@ -60,14 +49,19 @@ export default function HelpArticle() {
   }
 
   return (
-    <HelpLayout title={article.title}>
+    <HelpLayout
+      title={article.title}
+      description={article.summary}
+      path={`/help/a/${article.slug}`}
+      noindex={article.access === 'staff'}
+    >
       <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_13rem] xl:gap-10">
         <article className="min-w-0 max-w-3xl">
           <Breadcrumbs
             trail={[
-              [t('help.centre'), hp('/help')],
+              [t('help.centre'), '/help'],
               [section?.title || t('help.topics'), null],
-              [category?.title || '', category ? hp(`/help/c/${category.id}`) : null],
+              [category?.title || '', category ? `/help/c/${category.id}` : null],
               [article.title, null],
             ]}
           />
@@ -91,31 +85,14 @@ export default function HelpArticle() {
               )}
             </div>
           </header>
-
-          {/* Falling back to English is better than hiding the article, but the
-              reader has to be told, or a page that suddenly switches language
-              reads as a bug rather than a gap in our content. */}
-          {!article.translated && (
-            <div
-              lang="en"
-              className="mb-7 flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5"
-            >
-              <Icon name="info" className="mt-0.5 w-4 h-4 shrink-0 text-teal-400" />
-              <div>
-                <p className="text-sm font-semibold text-white">{t('help.notTranslatedTitle')}</p>
-                <p className="mt-1 text-xs leading-relaxed text-gray-500">{t('help.notTranslatedBody')}</p>
-              </div>
-            </div>
-          )}
+          {/* A page that silently switches language reads as a bug rather than a gap in our content, so the fallback
+             to English has to be announced. */}
 
           <ArticleToc headings={article.headings} variant="inline" />
 
-          {/* `lang` marks the body's actual language for screen readers and for
-              the browser's hyphenation and font selection, which matters when the
-              body is English inside an otherwise-Marathi page. */}
-          <div lang={article.lang}>
-            <ArticleProse html={article.html} />
-          </div>
+          {/* `lang` drives screen readers, hyphenation and font selection when the body is English inside an
+             otherwise-Marathi page. */}
+          <ArticleProse html={article.html} />
 
           {article.tags.length > 0 && (
             <div className="mt-10 flex flex-wrap items-center gap-2">
@@ -123,7 +100,7 @@ export default function HelpArticle() {
               {article.tags.map((tag) => (
                 <Link
                   key={tag}
-                  to={hp(`/help/search?q=${encodeURIComponent(tag)}`)}
+                  to={`/help/search?q=${encodeURIComponent(tag)}`}
                   className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-gray-500 transition-colors hover:border-teal-400/40 hover:text-teal-300"
                 >
                   {tag}
@@ -132,13 +109,13 @@ export default function HelpArticle() {
             </div>
           )}
 
-          <ArticleFeedback slug={article.slug} title={article.title} />
+          <ArticleFeedback key={article.slug} slug={article.slug} title={article.title} />
 
           {(prev || next) && (
             <nav aria-label={t('help.moreIn', { section: category?.title || '' })} className="mt-8 grid gap-3 sm:grid-cols-2">
               {prev ? (
                 <Link
-                  to={hp(`/help/a/${prev.slug}`)}
+                  to={`/help/a/${prev.slug}`}
                   className="group rounded-xl border border-white/10 bg-white/[0.03] p-4 transition-colors hover:border-teal-400/40"
                 >
                   <span className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-widest text-gray-500">
@@ -150,7 +127,7 @@ export default function HelpArticle() {
 
               {next && (
                 <Link
-                  to={hp(`/help/a/${next.slug}`)}
+                  to={`/help/a/${next.slug}`}
                   className="group rounded-xl border border-white/10 bg-white/[0.03] p-4 text-right transition-colors hover:border-teal-400/40 sm:col-start-2"
                 >
                   <span className="flex items-center justify-end gap-1 text-[11px] font-semibold uppercase tracking-widest text-gray-500">

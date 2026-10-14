@@ -1,15 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/* 6-box OTP input (ports the .otp-box flow from signin/signup.html):
-   auto-advance, backspace to previous, paste-to-fill. Controlled via `value`. */
-export default function OtpBoxes({ value = '', onChange, error }) {
+export default function OtpBoxes({ value = '', onChange, error, id, autoFocus = true }) {
   const { t } = useTranslation();
   const refs = useRef([]);
 
   useEffect(() => {
-    refs.current[0]?.focus();
-  }, []);
+    if (autoFocus) refs.current[0]?.focus();
+  }, [autoFocus]);
 
   const setChar = (idx, ch) => {
     const arr = value.split('');
@@ -19,10 +17,18 @@ export default function OtpBoxes({ value = '', onChange, error }) {
     if (ch && idx < 5) refs.current[idx + 1]?.focus();
   };
 
-  // Handle single-key typing plus multi-digit input (iOS/Android SMS autofill
-  // dumps the whole code into one box, and some IMEs deliver several digits).
+  // iOS/Android SMS autofill dumps the whole code into one box, and some IMEs deliver several digits.
   const onInput = (idx, raw) => {
     const digits = raw.replace(/\D/g, '');
+    if (digits.length >= 6) {
+      onChange(digits.slice(-6));
+      refs.current[5]?.focus();
+      return;
+    }
+    if (digits.length === 2 && value[idx]) {
+      setChar(idx, digits[0] === value[idx] ? digits[1] : digits[0]);
+      return;
+    }
     if (digits.length > 1) {
       const next = (value.slice(0, idx) + digits).slice(0, 6);
       onChange(next);
@@ -58,17 +64,18 @@ export default function OtpBoxes({ value = '', onChange, error }) {
         return (
           <input
             key={i}
+            id={i === 0 ? id : undefined}
             ref={(el) => (refs.current[i] = el)}
             type="text"
             inputMode="numeric"
             autoComplete={i === 0 ? 'one-time-code' : 'off'}
-            maxLength={1}
+            maxLength={i === 0 ? 6 : 1}
             value={ch}
             onChange={(e) => onInput(i, e.target.value)}
             onKeyDown={(e) => onKeyDown(i, e)}
             onPaste={onPaste}
             className={cls}
-              aria-label={t('auth2.otpDigit', { n: i + 1 })}
+            aria-label={t('auth2.otpDigit', { n: i + 1 })}
           />
         );
       })}

@@ -1,0 +1,76 @@
+import { test, expect } from '@playwright/test';
+import { API, apiLogin, signedInAsNew, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { ACTORS } from '../../../fixtures/live.js';
+import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { withSocietyId } from '../../../helpers/liveSociety.js';
+/* The fixture omits `propertyId` and declares no agreement, so the server derives the identity
+   floor; owner tier is covered by `trust-badges.spec.js`. */
+
+const BASE = process.env.BASE_URL || 'http://localhost:5173';
+const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
+const track = flatmateCleanup(test);
+
+async function publish(roomId) {
+  const { accessToken } = await apiLogin(ACTORS.admin);
+  const response = await fetch(`${API}/admin/flatmates/${roomId}/moderation`, {
+    method: 'PATCH',
+    headers: auth(accessToken),
+    body: JSON.stringify({ modStatus: 'live', note: 'e2e room seat fixture' }),
+  });
+  expect(response.status).toBeLessThan(300);
+}
+
+async function myRoom(token, roomId) {
+  const response = await fetch(`${API}/flatmates/rooms/${roomId}`, { headers: auth(token) });
+  expect(response.status).toBe(200);
+  const { item: room } = await response.json();
+  expect(room, 'the host should still own the room').toBeTruthy();
+  return room;
+}
+
+test('the host closes and reopens a real standalone room seat from its detail page', async ({ page }) => {
+  const mobile = await signedInAsNew(page);
+  const { accessToken } = await apiLogin(mobile);
+  const society = `Live room seats ${Date.now().toString(36)}`;
+  const created = await fetch(`${API}/flatmates/rooms`, {
+    method: 'POST',
+    headers: auth(accessToken),
+    body: JSON.stringify({
+      bhk: '2',
+      roomType: 'Private room',
+      attachedBath: 'attached',
+      furnishing: 'semi',
+      locality: 'Baner',
+      ...(await withSocietyId(accessToken, { society })),
+      rentShare: 15000,
+      deposit: 30000,
+      availableFrom: '2026-12-01',
+      lookingFor: 'any',
+      foodPref: 'any',
+      hostRole: 'tenant',
+      photos: await uploadedListingPhotos(accessToken),
+      ...(await tenantRoomAgreement(accessToken)),
+    }),
+  });
+  const room = await created.json();
+  expect(created.status, JSON.stringify(room)).toBe(201);
+  track('rooms', room.id, accessToken);
+  await publish(room.id);
+
+  await page.goto(`${BASE}/flatmates`);
+  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20_000 });
+  await page.getByTestId('my-posts-strip').locator(`a[href="/flatmates/room/${room.id}"]`).click({ timeout: 15_000 });
+
+  const panel = page.getByTestId('flatmate-owner-panel');
+  await expect(panel).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/1 seat open/i).first()).toBeVisible();
+  await panel.locator('.seat-close-btn').click();
+  await expect(page.getByText(/^Filled$/)).toBeVisible({ timeout: 10_000 });
+  expect((await myRoom(accessToken, room.id)).seatsOpen).toBe(0);
+
+  await expect(panel.locator('.seat-reopen-btn')).toBeEnabled();
+  await panel.locator('.seat-reopen-btn').click();
+  await expect(page.getByText(/1 seat open/i)).toBeVisible({ timeout: 10_000 });
+  expect((await myRoom(accessToken, room.id)).seatsOpen).toBe(1);
+});

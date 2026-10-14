@@ -1,8 +1,4 @@
-/* Shared HRA rent-receipt PDF engine (prototype). ESM port of rent-receipt.js.
-   Generates the legal-format HRA rent receipt used on the Pay Rent flow and the
-   owner dashboard bulk generator. Uses jsPDF. */
-
-import { jsPDF } from 'jspdf';
+/* HRA rent-receipt PDF engine for the Pay Rent flow and the owner bulk generator; jsPDF loads on first use. */
 
 const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -77,8 +73,9 @@ export function monthMeta(ym) {
 }
 
 /* Generate + save a single-month receipt PDF. Returns filename. */
-export function generateSingle(d, filename) {
+export async function generateSingle(d, filename) {
   const meta = monthMeta(d.month);
+  const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   drawReceipt(doc, 15, 20, 180, 124, {
     no: d.no || 1, tenant: d.tenant || '—', landlord: d.landlord || '—', address: d.address || '—',

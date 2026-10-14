@@ -1,102 +1,87 @@
 package com.draazy.api.catalog.listing;
 
-import com.draazy.api.catalog.locality.LocalityResolver;
+import com.draazy.api.catalog.locality.LocalityBinding;
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyPossession;
+import com.draazy.api.catalog.society.Society;
 import com.draazy.api.catalog.society.SocietyRepository;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.error.ValidationException;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Path;
+import jakarta.validation.metadata.ConstraintDescriptor;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
-/**
- * Which edits to a listing earn a moderator's attention, and which kind.
- *
- * <p>Extracted from {@code ListingService} when that class reached the 450-line ceiling
- * {@code ServiceSizeGuardTest} enforces. The split is along a real seam rather than a convenient
- * one: everything here <em>decides</em> and nothing here <em>acts</em>. {@link #apply} mutates the
- * listing with the caller's values and returns what that cost, and the two callers then do opposite
- * things with the answer — {@code ListingService.update} reverts or queues a re-check,
- * {@code updateAsModerator} deliberately does neither. Keeping the decision in one place and the
- * two reactions in the caller is what stops the moderator path drifting into the owner rule.
- *
- * <p><strong>What counts as a foundation field, and why that set.</strong> It is exactly the set a
- * buyer can <em>search on</em>: {@code price}, {@code bhk}, {@code propertyType}, {@code locality},
- * {@code deal}, {@code furnishing} and {@code possession} — one per facet accepted by
- * {@code GET /properties}. Re-moderation exists to stop bait-and-switch, and bait-and-switch is
- * specifically the act of being approved into one set of search results and then editing your way
- * into a different, more valuable one. Any facet an owner can change without review is a hole of
- * exactly that shape, so deriving the rule from the facet list rather than curating it by hand is
- * what keeps the two in step: a new facet that is not also a foundation field is a new hole, and
- * {@code ListingFoundationTest} fails until someone has decided which it is.
- *
- * <p>{@code furnishing} and {@code possession} were missing from this set until the API polish pass.
- * Both are live filters, so an approved unfurnished flat could be relabelled "furnished", and an
- * under-construction listing relabelled "ready to move", with no moderator ever seeing it.
- *
- * <p><strong>What re-review costs, and why it is not one price (Q14).</strong> Every foundation edit
- * is re-checked; the split is only over whether the listing keeps earning while it waits.
- *
- * <ul>
- *   <li><strong>Off search</strong> — {@code locality}, {@code propertyType}, {@code bhk},
- *       {@code deal}. These change <em>what the listing fundamentally is</em>, so a stale index
- *       entry would actively mislead searchers: a 2BHK appearing under 3BHK, or a rental under
- *       sale, is a wrong answer, not a slightly stale one.</li>
- *   <li><strong>Stays live</strong> — {@code price}, {@code furnishing}, {@code possession}. These
- *       change <em>an attribute of a listing that is still the same property</em>, so the worst
- *       case is a briefly out-of-date number on a listing that is still genuinely what it claims to
- *       be. The same moderator work item is raised without touching {@code status}.</li>
- * </ul>
- *
- * <p>Fraud risk is handled by the re-check either way; the difference is only whether the listing
- * earns while it waits. Price is the most-edited field on any marketplace and the one an owner is
- * most often asked to move — a rule that takes the listing dark for a day every time it moves
- * teaches owners not to move it, which is the opposite of what a marketplace wants.
- */
 @Component
 public class ListingEditRules {
 
-    private final LocalityResolver localities;
+    private final LocalityBinding localities;
     private final SocietyRepository societies;
 
-    public ListingEditRules(LocalityResolver localities, SocietyRepository societies) {
+    public ListingEditRules(LocalityBinding localities, SocietyRepository societies) {
         this.localities = localities;
         this.societies = societies;
     }
 
-    /**
-     * Apply a PATCH body to a listing and report what re-review it earned. The caller decides what
-     * to do about it — {@code ListingService.update} acts, {@code updateAsModerator} deliberately
-     * does not.
-     *
-     * <p><strong>This method is the one place either foundation set is written down.</strong> There
-     * is no constant to fall out of step with it: which set a field belongs to <em>is</em> which
-     * flag its block sets, so a field cannot be in both and cannot be silently in neither. The two
-     * blocks are kept first, contiguous and in that order; {@code ListingFoundationTest} asserts
-     * both sets behaviourally through the real endpoint, and
-     * {@code frontend/scripts/check-listing-foundation.mjs} parses them straight back out of this
-     * source and fails if a field has moved between them. That script reads this file <em>by
-     * path</em> and matches this signature as a literal, so moving either is a two-file change.
-     *
-     * <p>The only thing distinguishing a foundation block from an ordinary one is the flag it sets,
-     * so interleaving them is how {@code furnishing} ended up in the wrong set the first time.
-     *
-     * <p>Only non-null fields are applied, so absent and "set to null" are the same request. That is
-     * the documented PATCH semantic for this contract; a client that needs to clear a field sends
-     * the empty value the field's type allows.
-     */
+    private static void clearStaleAddressParts(Property property, ListingUpdate update) {
+        if (update.formDetails() != null || property.getFormDetails() == null) return;
+        Set<String> addressParts = Set.of("flatNumber", "tower", "society", "street", "landmark");
+        property.setFormDetails(property.getFormDetails().entrySet().stream()
+                .filter(entry -> !addressParts.contains(entry.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
+
+    static void clearReadyToMoveSaleAvailableDate(Property property) {
+        if (!DealIntent.BUY.equals(property.getDeal())
+                || !PropertyPossession.READY_TO_MOVE.equals(property.getPossession())) {
+            return;
+        }
+        property.setAvailableOn(null);
+        if (property.getFormDetails() == null || !property.getFormDetails().containsKey("availableFrom")) {
+            return;
+        }
+        property.setFormDetails(property.getFormDetails().entrySet().stream()
+                .filter(entry -> !"availableFrom".equals(entry.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
+
+    /** Did this PATCH relabel the commercial subtype? Absent formDetails is "unchanged", not "cleared". */
+    private static boolean commercialTypeChanged(Property property, ListingUpdate update) {
+        if (update.formDetails() == null) return false;
+        Object incoming = update.formDetails().get("commercialType");
+        Object stored = property.getFormDetails() == null
+                ? null
+                : property.getFormDetails().get("commercialType");
+
+        /** Symmetric with the write, which replaces the map rather than merging: a PATCH that merely
+         * omits the key deletes an approved subtype, which is the same moderation event as relabelling. */
+        return !Objects.equals(incoming, stored);
+    }
+
+    /** Apply a PATCH body and report the re-review it earned; only non-null fields are applied.
+     * The two foundation blocks are kept first and contiguous — see the class Javadoc's rationale. */
     EditImpact apply(Property p, ListingUpdate in) {
+        validateSanityPatch(p, in);
         boolean remoderationRequired = false;
         boolean recheckOnly = false;
         List<String> rechecked = new ArrayList<>();
-        boolean localityChanged = false;
 
-        // ── Foundation, OFF SEARCH ────────────────────────────────────────────────────────────
-        // These change what the listing fundamentally *is*, so a stale index entry is a wrong
-        // answer rather than a late one: a 2BHK under 3BHK, or a rental under sale.
+        // ── Foundation, OFF SEARCH: these change what the listing fundamentally *is*, so a stale
+        // index entry is a wrong answer rather than a late one. ───────────────────────────────
         if (in.bhk() != null && !numericEquals(in.bhk(), p.getBhk())) {
             p.setBhk(in.bhk());
             remoderationRequired = true;
@@ -105,22 +90,40 @@ public class ListingEditRules {
             p.setPropertyType(in.propertyType());
             remoderationRequired = true;
         }
-        if (in.locality() != null && !in.locality().equals(p.getLocality())) {
-            p.setLocality(in.locality());
+
+        if (commercialTypeChanged(p, in)) {
             remoderationRequired = true;
-            localityChanged = true;
+        }
+
+        // Same argument for zoning: an agricultural plot approved against a 7/12 extract must not be
+        // relabelled residential and go on answering a filter it was never checked for.
+        if (Boolean.TRUE.equals(in.clearLandUse())) {
+            if (p.getLandUse() != null) {
+                p.setLandUse(null);
+                remoderationRequired = true;
+            }
+        } else if (in.landUse() != null && !in.landUse().equals(p.getLandUse())) {
+            p.setLandUse(in.landUse());
+            remoderationRequired = true;
+        }
+        boolean pickedLocality = in.localitySlug() != null && !in.localitySlug().equals(p.getLocalitySlug());
+        if (in.locality() != null && !in.locality().equals(p.getLocality()) || pickedLocality) {
+            LocalityBinding.Bound bound = localities.require(in.localitySlug(),
+                    in.locality() != null ? in.locality() : p.getLocality(), p.getLocalitySlug());
+            p.setLocality(bound.name());
+            p.setLocalitySlug(bound.slug());
+            remoderationRequired = true;
         }
         if (in.deal() != null && !in.deal().equals(p.getDeal())) {
             p.setDeal(in.deal());
-            // A deal flip changes the meaning of price — keep priceUnit consistent.
+
+            // Rent and sale require different evidence; publication approval must not reuse the old verdict.
+            p.revokeOwnershipVerification();
+
             p.setPriceUnit(DealIntent.priceUnitFor(in.deal()));
             remoderationRequired = true;
         }
 
-        // ── Foundation, STAYS LIVE ────────────────────────────────────────────────────────────
-        // Still re-checked, still searchable: these change an attribute of a listing that is still
-        // the same property, so the worst case is a briefly out-of-date value on a listing that is
-        // genuinely what it claims to be (Q14).
         if (in.price() != null && !in.price().equals(p.getPrice())) {
             p.setPrice(in.price());
             recheckOnly = true;
@@ -136,26 +139,109 @@ public class ListingEditRules {
             recheckOnly = true;
             rechecked.add("possession");
         }
-        // D219. The one field here a buyer cannot filter on, and it is in this set for a different
-        // reason: `address` is what AddressKey derives the duplicate signal from, so an edit to it is
-        // how a listing moves onto an address somebody else already holds. The probe already
-        // notices and files a note — but only when the collision exists, and a moderator reading
-        // "possible duplicate" has no way to tell an honest correction from an owner who typed their
-        // way onto a neighbour's flat. The re-check names the field and is raised either way.
+
+        // `address` is what AddressKey derives the duplicate signal from, so an edit to it is how a
+        // listing moves onto an address somebody else already holds. Re-check either way.
         if (in.address() != null && !in.address().equals(p.getAddress())) {
+
+            // A legacy/staff correction must not leave components that restore the old address.
+            clearStaleAddressParts(p, in);
             p.setAddress(in.address());
+            p.revokeOwnershipVerification();
             recheckOnly = true;
             rechecked.add("address");
         }
+        UUID wantedSociety = in.societyId() == null ? p.getSocietyId() : societyOf(in.societyId());
+        if (in.societyId() != null && !Objects.equals(wantedSociety, p.getSocietyId())) {
+            stampSociety(p, wantedSociety, true);
+            p.setSocietyId(wantedSociety);
+            p.revokeOwnershipVerification();
+            recheckOnly = true;
+            rechecked.add("societyId");
+        }
+        if (in.electricityMeterNo() != null && !Objects.equals(in.electricityMeterNo(), p.getElectricityMeterNo())) {
+            p.setElectricityMeterNo(in.electricityMeterNo());
+            p.revokeOwnershipVerification();
+            recheckOnly = true;
+            rechecked.add("electricityMeterNo");
+        }
+        if (in.carpetArea() != null && materialCarpetAreaChange(p.getCarpetArea(), in.carpetArea())) {
+            recheckOnly = true;
+            rechecked.add("carpetArea");
+        }
+        if (locationMovedMoreThan500m(p, in)) {
+            recheckOnly = true;
+            rechecked.add("location");
+        }
 
-        // Non-foundation fields: applied without triggering re-moderation.
+        /** Photos, prose and amenities are the evidence a reviewer approved against, so swapping them re-sells
+         * that approval. Stays-live because it is the same flat, and going dark would cost a day per photo. */
+        if (in.images() != null && !in.images().equals(p.getImages())) {
+            p.setImages(List.copyOf(in.images()));
+            recheckOnly = true;
+            rechecked.add("images");
+        }
+        if (in.description() != null && !in.description().equals(p.getDescription())) {
+            p.setDescription(in.description());
+            recheckOnly = true;
+            rechecked.add("description");
+        }
+        if (in.amenities() != null && !in.amenities().equals(p.getAmenities())) {
+            p.setAmenities(List.copyOf(in.amenities()));
+            recheckOnly = true;
+            rechecked.add("amenities");
+        }
+        if (in.reraId() != null && !in.reraId().equals(p.getReraId())) {
+            recheckOnly = true;
+            rechecked.add("reraId");
+        }
+        if (plottedProjectChanged(p, in)) {
+            recheckOnly = true;
+            rechecked.add("plottedProject");
+        }
+
+        if (in.formDetails() != null) p.setFormDetails(Map.copyOf(in.formDetails()));
+        if (in.pincode() != null) p.setPincode(in.pincode());
+        if (in.carpetArea() != null) p.setCarpetArea(in.carpetArea());
+        if (in.builtUpArea() != null) p.setBuiltUpArea(in.builtUpArea());
+        if (in.superBuiltUpArea() != null) p.setSuperBuiltUpArea(in.superBuiltUpArea());
+
+        /** Non-foundation only because the membership rule holds: a PATCH carrying `floorPlan` alone has
+         * no `images` key, so without it an approved listing could render an unreviewed image. */
+        if (in.floorPlan() != null) {
+            String plan = in.floorPlan().isBlank() ? null : in.floorPlan();
+            if (plan != null && (p.getImages() == null || !p.getImages().contains(plan))) {
+                throw new ValidationException("A floor plan must be one of the listing's photos.");
+            }
+            p.setFloorPlan(plan);
+        }
+        if (in.video() != null) {
+            String video = in.video().isBlank() ? null : in.video();
+            if (!Objects.equals(video, p.getVideo())) {
+                recheckOnly = true;
+                rechecked.add("video");
+            }
+            p.setVideo(video);
+        }
+
+        // Blank is how an owner withdraws a move-in claim.
+        if (AvailableOn.isStated(in.availableOn(), in.availableFrom())) {
+            p.setAvailableOn(AvailableOn.resolve(in.availableOn(), in.availableFrom(), true, p.getDeal()));
+        }
+        if (Boolean.TRUE.equals(in.clearPets())) {
+            p.setPets(null);
+        } else if (in.pets() != null) {
+            p.setPets(in.pets());
+        }
         if (in.title() != null) {
             p.setTitle(in.title());
         }
         if (in.deposit() != null) {
             p.setDeposit(in.deposit());
         }
-        if (in.maintenance() != null) {
+        if (Boolean.TRUE.equals(in.clearMaintenance())) {
+            p.setMaintenance(null);
+        } else if (in.maintenance() != null) {
             p.setMaintenance(in.maintenance());
         }
         if (in.negotiable() != null) {
@@ -179,21 +265,15 @@ public class ListingEditRules {
         if (in.reraId() != null) {
             p.setReraId(in.reraId());
         }
-        if (in.amenities() != null) {
-            p.setAmenities(in.amenities());
-        }
-        if (in.images() != null) {
-            p.setImages(in.images());
-        }
-        if (in.description() != null) {
-            p.setDescription(in.description());
+        if (in.tenants() != null) {
+            p.setTenants(List.copyOf(in.tenants()));
         }
         if (in.floor() != null) {
             p.setFloor(in.floor());
         }
-        // The V114 detail answers. Plain non-foundation applies: none of these is a thing the
-        // moderator approved, so correcting a bathroom count or a facing must not knock an approved
-        // listing back to pending, and none of them appears in the tier sets above.
+
+        // Plain non-foundation applies: correcting a bathroom count or a facing is not something the
+        // moderator approved, so it must not knock an approved listing back to pending.
         if (in.bathrooms() != null) {
             p.setBathrooms(in.bathrooms());
         }
@@ -206,64 +286,244 @@ public class ListingEditRules {
         if (in.facing() != null) {
             p.setFacing(in.facing());
         }
+        if (in.overlooking() != null) {
+            p.setOverlooking(in.overlooking());
+        }
         if (in.totalFloors() != null) {
             p.setTotalFloors(in.totalFloors());
         }
         if (in.ageYears() != null) {
             p.setAgeYears(in.ageYears());
         }
-        if (in.societyId() != null) {
-            p.setSocietySlug(requireSociety(in.societyId()));
-            p.setSocietyId(in.societyId());
+        if (wantedSociety != null && Objects.equals(wantedSociety, p.getSocietyId())) {
+            stampSociety(p, wantedSociety, false);
         }
-        if (in.electricityMeterNo() != null) {
+        if (in.electricityMeterNo() != null && Objects.equals(in.electricityMeterNo(), p.getElectricityMeterNo())) {
             p.setElectricityMeterNo(in.electricityMeterNo());
         }
 
-        // Re-bind the curated slug only when the display locality actually changed — deliberately not
-        // on a lat/lng-only edit. Coordinates are non-foundation (no re-moderation), so re-resolving
-        // on them would let an owner silently move an approved listing into a different market's
-        // search results. Run last so the resolver's geo fallback sees this request's coordinates.
-        if (localityChanged) {
-            p.setLocalitySlug(localities.resolve(p.getLocality(), p.getLat(), p.getLng()));
-        }
+        clearReadyToMoveSaleAvailableDate(p);
 
         return new EditImpact(remoderationRequired, recheckOnly && !remoderationRequired, rechecked);
     }
 
-    /**
-     * Refuse a society id that names nothing, on both the create and the update path.
-     *
-     * <p>Not a duplicate of {@code properties_society_id_fkey}, which does already stop the write —
-     * but stops it as a constraint violation surfacing at flush, which is a {@code 409} on a request
-     * that is not a conflict with anything. An owner who sends a stale id gets a 404 naming what was
-     * not found, and the error shape stops depending on which of two writes reaches the database
-     * first.
-     *
-     * <p>Existence is also all that can be checked here today, and it is worth being clear that it is
-     * the weaker half of the problem. The FK already rules out ids that name nothing; what neither it
-     * nor this can rule out is an owner naming a society that <em>does</em> exist and has nothing to
-     * do with them, which puts their listing on that society's hub and into its count. Closing that
-     * needs a claim linking an owner to a society — the same missing claim that took the society arm
-     * out of the duplicate probe (see {@code PropertyRepository#findDuplicateCandidates}). When it
-     * exists, it goes here.
-     * <p>Returns the society's slug rather than nothing, because {@code Property.societySlug} is a
-     * {@code @Formula} and a formula is only evaluated by a SELECT. A listing that has just been
-     * inserted or updated is still the managed instance the writer built, so its derived slug is
-     * null until some later request loads the row afresh — and that instance is exactly what the
-     * create and update responses are mapped from. Handing the slug back here lets the writer stamp
-     * it, so the response to the write says the same thing as the next read of it.
-     */
-    String requireSociety(UUID societyId) {
-        if (societyId == null) {
-            return null;
+    private void validateSanityPatch(Property p, ListingUpdate in) {
+        Set<ConstraintViolation<?>> violations = new LinkedHashSet<>();
+        String deal = in.deal() == null ? p.getDeal() : in.deal();
+        String propertyType = in.propertyType() == null ? p.getPropertyType() : in.propertyType();
+        Long price = in.price() == null ? p.getPrice() : in.price();
+        BigDecimal carpet = in.carpetArea() == null ? p.getCarpetArea() : in.carpetArea();
+        BigDecimal builtUp = in.builtUpArea() == null ? p.getBuiltUpArea() : in.builtUpArea();
+        BigDecimal superBuiltUp = in.superBuiltUpArea() == null ? p.getSuperBuiltUpArea() : in.superBuiltUpArea();
+        String reraId = in.reraId() == null ? p.getReraId() : in.reraId();
+        Object plottedProject = in.formDetails() != null && in.formDetails().containsKey("plottedProject")
+                ? in.formDetails().get("plottedProject")
+                : p.getFormDetails() == null ? null : p.getFormDetails().get("plottedProject");
+
+        if (in.price() != null || in.deal() != null) {
+            if (DealIntent.BUY.equals(deal) && price != null && price < 100_000L) {
+                violations.add(violation("price", "must be at least Rs. 1,00,000 for a sale listing"));
+            }
+            if (DealIntent.RENT.equals(deal) && price != null && price < 1_000L) {
+                violations.add(violation("price", "must be at least Rs. 1,000 per month"));
+            }
+            if (DealIntent.RENT.equals(deal) && p.getDeposit() != null && p.getPrice() != null
+                    && p.getDeposit() <= p.getPrice() * 24L && price != null
+                    && p.getDeposit() > price * 24L) {
+                violations.add(violation("deposit", "cannot exceed 24 months of rent"));
+            }
         }
-        return societies.findById(societyId)
-                .orElseThrow(() -> NotFoundException.of("Society"))
-                .getSlug();
+        if (in.deposit() != null && DealIntent.RENT.equals(deal) && price != null && in.deposit() > price * 24L) {
+            violations.add(violation("deposit", "cannot exceed 24 months of rent"));
+        }
+        if (isResidential(propertyType)) {
+            if (in.carpetArea() != null || in.propertyType() != null) {
+                if (outside(carpet, new BigDecimal("100"), new BigDecimal("20000"))) {
+                    violations.add(violation("carpetArea",
+                            "must be between 100 and 20,000 sq.ft for a residential listing"));
+                }
+                if (exceeds(carpet, builtUp)) {
+                    violations.add(violation("builtUpArea", "must be at least the carpet area"));
+                }
+                BigDecimal superFloor = builtUp == null ? carpet : builtUp;
+                if (exceeds(superFloor, superBuiltUp)) {
+                    violations.add(violation("superBuiltUpArea",
+                            builtUp == null ? "must be at least the carpet area" : "must be at least the built-up area"));
+                }
+            } else if (in.builtUpArea() != null) {
+                if (exceeds(carpet, builtUp)) {
+                    violations.add(violation("builtUpArea", "must be at least the carpet area"));
+                }
+                if (exceeds(builtUp, superBuiltUp)) {
+                    violations.add(violation("superBuiltUpArea", "must be at least the built-up area"));
+                }
+            } else if (in.superBuiltUpArea() != null) {
+                BigDecimal superFloor = builtUp == null ? carpet : builtUp;
+                if (exceeds(superFloor, superBuiltUp)) {
+                    violations.add(violation("superBuiltUpArea",
+                            builtUp == null ? "must be at least the carpet area" : "must be at least the built-up area"));
+                }
+            }
+        }
+        if (!violations.isEmpty()) {
+            throw new ConstraintViolationException(violations);
+        }
     }
 
-    /** {@code true} when two nullable numerics are equal by value (BigDecimal scale-insensitive). */
+    private static boolean plottedProjectChanged(Property property, ListingUpdate update) {
+        if (update.formDetails() == null || !update.formDetails().containsKey("plottedProject")) {
+            return false;
+        }
+        Object stored = property.getFormDetails() == null ? null : property.getFormDetails().get("plottedProject");
+        return !Objects.equals(update.formDetails().get("plottedProject"), stored);
+    }
+
+    private static boolean materialCarpetAreaChange(BigDecimal current, BigDecimal incoming) {
+        if (current == null || current.signum() == 0 || numericEquals(current, incoming)) {
+            return false;
+        }
+        BigDecimal delta = incoming.subtract(current).abs();
+        return delta.multiply(new BigDecimal("5")).compareTo(current.abs()) >= 0;
+    }
+
+    private static boolean locationMovedMoreThan500m(Property p, ListingUpdate in) {
+        if (in.lat() == null && in.lng() == null) {
+            return false;
+        }
+        Double oldLat = p.getLat();
+        Double oldLng = p.getLng();
+        Double newLat = in.lat() == null ? oldLat : in.lat();
+        Double newLng = in.lng() == null ? oldLng : in.lng();
+        if (oldLat == null || oldLng == null || newLat == null || newLng == null) {
+            return false;
+        }
+        double earthMetres = 6_371_000d;
+        double dLat = Math.toRadians(newLat - oldLat);
+        double dLng = Math.toRadians(newLng - oldLng);
+        double lat1 = Math.toRadians(oldLat);
+        double lat2 = Math.toRadians(newLat);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return earthMetres * c > 500d;
+    }
+
+    private static boolean outside(BigDecimal value, BigDecimal min, BigDecimal max) {
+        return value != null && (value.compareTo(min) < 0 || value.compareTo(max) > 0);
+    }
+
+    private static boolean exceeds(BigDecimal smaller, BigDecimal larger) {
+        return smaller != null && larger != null && smaller.compareTo(larger) > 0;
+    }
+
+    private static boolean isResidential(String propertyType) {
+        if (propertyType == null) {
+            return false;
+        }
+        String label = propertyType.toLowerCase(java.util.Locale.ROOT);
+        return label.contains("flat")
+                || label.contains("apartment")
+                || label.contains("studio")
+                || label.contains("penthouse")
+                || label.contains("independent house")
+                || label.contains("row house")
+                || label.contains("villa");
+    }
+
+    private static ConstraintViolation<?> violation(String field, String message) {
+        return new SimpleViolation(field, message);
+    }
+
+    private record SimplePath(String field) implements Path {
+        @Override
+        public Iterator<Node> iterator() {
+            return Collections.emptyIterator();
+        }
+
+        @Override
+        public String toString() {
+            return field;
+        }
+    }
+
+    private record SimpleViolation(String field, String message) implements ConstraintViolation<Object> {
+        @Override
+        public String getMessage() {
+            return message;
+        }
+
+        @Override
+        public String getMessageTemplate() {
+            return message;
+        }
+
+        @Override
+        public Object getRootBean() {
+            return null;
+        }
+
+        @Override
+        public Class<Object> getRootBeanClass() {
+            return Object.class;
+        }
+
+        @Override
+        public Object getLeafBean() {
+            return null;
+        }
+
+        @Override
+        public Object[] getExecutableParameters() {
+            return null;
+        }
+
+        @Override
+        public Object getExecutableReturnValue() {
+            return null;
+        }
+
+        @Override
+        public Path getPropertyPath() {
+            return new SimplePath(field);
+        }
+
+        @Override
+        public Object getInvalidValue() {
+            return null;
+        }
+
+        @Override
+        public ConstraintDescriptor<?> getConstraintDescriptor() {
+            return null;
+        }
+
+        @Override
+        public <U> U unwrap(Class<U> type) {
+            throw new jakarta.validation.ValidationException("No unwrap target for " + type.getName());
+        }
+    }
+
+    /** The PATCH {@code societyId}: blank clears the binding, which is {@code null}. */
+    private static UUID societyOf(String societyId) {
+        return societyId.isBlank() ? null : UUID.fromString(societyId);
+    }
+
+    /** A stale society id is a {@code 404}, not an FK {@code 409}; an archived society is refused only for a
+     * new binding. Stamps the slug and name formulas so the response carries them. */
+    void stampSociety(Property p, UUID societyId, boolean newBinding) {
+        if (societyId == null) {
+            p.setSocietySlug(null);
+            p.setSocietyName(null);
+            return;
+        }
+        Society society = societies.findById(societyId).orElseThrow(() -> NotFoundException.of("Society"));
+        if (newBinding && society.getArchivedAt() != null) {
+            throw NotFoundException.of("Society");
+        }
+        p.setSocietySlug(society.getSlug());
+        p.setSocietyName(society.getName());
+    }
+
     private static boolean numericEquals(BigDecimal a, BigDecimal b) {
         if (a == null || b == null) {
             return Objects.equals(a, b);

@@ -3,8 +3,10 @@ package com.draazy.api.moderation.verification;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.security.AuthPrincipal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
@@ -12,10 +14,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Browsing verification case files, as opposed to working one — a use-case split under
- * package-structure.md §4.1. Neither route re-checks a role; see the flow doc for why.
- */
+// Browsing case files, not working one; role checks happen at the controller boundary.
 @Service
 public class PropertyReviewQueue {
 
@@ -27,59 +26,69 @@ public class PropertyReviewQueue {
         this.properties = properties;
     }
 
-    /**
-     * {@code GET /admin/property-reviews} — paged verification case queue for staff/admin. The unread
-     * count is the owner's unanswered messages, not the reader's own inbox: the queue is shared.
-     */
+    // Owner messages the desk has not read; the queue is shared, not per-reader.
     @Transactional(readOnly = true)
-    public Page<PropertyReviewSummary> listCases(Pageable pageable) {
-        Page<PropertyReview> page = reviews.findAllForDesk(pageable);
-        Map<UUID, UUID> ownerByProperty = ownersOf(page.getContent());
-        return page.map(review -> toSummary(review, ownerByProperty.get(review.getPropertyId()), true));
+    public Page<PropertyReviewSummary> awaitingReplies(Pageable pageable) {
+        Page<PropertyReview> page = reviews.findAllAwaitingStaff(pageable);
+        Map<UUID, Property> listings = propertiesOf(page.getContent());
+        return page.map(review -> toSummary(review, listings.get(review.getPropertyId())));
     }
 
-    /**
-     * {@code GET /me/property-reviews} — the same queue narrowed to the caller's own listings. Here
-     * the unread count is the mirror image: ops messages the owner has not read.
-     */
+    /** Which of these listings have an owner message the desk has not read. */
     @Transactional(readOnly = true)
-    public Page<PropertyReviewSummary> listMyCases(AuthPrincipal actor, Pageable pageable) {
-        UUID ownerId = actor.userId();
-        return reviews.findAllForOwner(ownerId, pageable)
-                .map(review -> toSummary(review, ownerId, false));
+    public Set<UUID> awaitingStaff(java.util.Collection<UUID> propertyIds) {
+        return propertyIds.isEmpty() ? Set.of()
+                : new HashSet<>(reviews.propertyIdsAwaitingStaff(propertyIds));
     }
 
-    /**
-     * Owner id per case file, resolved in one query for the whole page — doing it inside the
-     * {@code map} would be the N+1 this method exists to avoid.
-     */
-    private Map<UUID, UUID> ownersOf(List<PropertyReview> page) {
+    @Transactional(readOnly = true)
+    public Page<ReviewBadge> listMyCases(AuthPrincipal actor, Pageable pageable) {
+        Page<PropertyReview> page = reviews.findAllForOwner(actor.userId(), pageable);
+        return page.map(review -> toBadge(review, actor.userId()));
+    }
+
+    private static ReviewBadge toBadge(PropertyReview review, UUID ownerId) {
+        long unread = review.getMessages().stream()
+                .filter(message -> message.getReadAt() == null)
+                .filter(message -> !message.isInternal())
+                .filter(message -> !ownerId.equals(message.getSenderId()))
+                .count();
+        ReviewMessage last = lastVisible(review);
+        return new ReviewBadge(
+                review.getPropertyId().toString(),
+                PropertyReviewStatuses.wire(review),
+                (int) unread,
+                last == null ? review.getCreatedAt() : last.getCreatedAt(),
+                review.getReasonCode(),
+                showsReason(review) ? review.getNotes() : null,
+                last == null ? null : last.getBody());
+    }
+
+    private static ReviewMessage lastVisible(PropertyReview review) {
+        return review.getMessages().stream().filter(message -> !message.isInternal())
+                .max(java.util.Comparator.comparing(ReviewMessage::getCreatedAt)
+                        .thenComparing(ReviewMessage::getId)).orElse(null);
+    }
+
+    // One query for the page avoids resolving owners inside the map.
+    private Map<UUID, Property> propertiesOf(List<PropertyReview> page) {
         List<UUID> ids = page.stream().map(PropertyReview::getPropertyId).toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
         return properties.findAllById(ids).stream()
-                .collect(Collectors.toMap(Property::getId, property -> property.getOwner().getId()));
+            .collect(Collectors.toMap(Property::getId, property -> property));
     }
 
-    /**
-     * @param ownerId the listing's owner, or {@code null} if the listing has since been hard-deleted
-     * @param forOps  {@code true} to count the owner's unread messages, {@code false} for ops'
-     */
-    private static PropertyReviewSummary toSummary(PropertyReview review, UUID ownerId, boolean forOps) {
-        long unread = ownerId == null ? 0 : review.getMessages().stream()
-                .filter(message -> message.getReadAt() == null)
-                // An internal note counts for nobody: the owner cannot see it, and the ops badge
-                // means "the owner is waiting on a reply".
-                .filter(message -> !message.isInternal())
-                .filter(message -> ownerId.equals(message.getSenderId()) == forOps)
-                .count();
-        return new PropertyReviewSummary(
-                review.getPropertyId().toString(),
-                review.getStatus(),
-                review.getReviewer(),
-                (int) unread,
-                review.getDecidedAt(),
-                review.getUpdatedAt());
+    private static PropertyReviewSummary toSummary(PropertyReview review, Property property) {
+        ReviewMessage last = lastVisible(review);
+        return new PropertyReviewSummary(review.getPropertyId().toString(),
+                property == null ? null : property.getTitle(), last == null ? null : last.getBody());
+    }
+
+    private static boolean showsReason(PropertyReview review) {
+        String status = PropertyReviewStatuses.wire(review);
+        return PropertyReviewStatuses.NEEDS_INFO.equals(status)
+                || PropertyReviewStatuses.REJECTED.equals(status);
     }
 }

@@ -1,66 +1,8 @@
-/**
- * Contract vocabularies, pinned against the client catalogues that talk to them.
- *
- *   node scripts/check-enum-vocabulary.mjs
- *
- * No backend process, no browser: this reads the OpenAPI contract as text and the client modules
- * as modules.
- *
- * ## Why this file exists
- *
- * The contract calls a half-furnished home `semi-furnished`. Every catalogue in `src/` calls it
- * `semi`. `propertyMapper` handed the value straight across without translating it, and one
- * untranslated word produced three separate failures:
- *
- *   - an owner could not post a semi-furnished home at all — 422, with nothing they could change
- *     to fix it, on the wizard's own default for a rental and the commonest answer in this market;
- *   - `furnishings=semi` matched no row, so the filter read as an empty catalogue rather than as a
- *     broken control;
- *   - a semi-furnished listing came back and rendered as an em-dash, because the label lookup only
- *     knows the UI keys.
- *
- * The whole mock e2e suite stayed green through all three. It had to: the mock provider stores and
- * returns `semi`, so both sides of the browser agreed with each other and disagreed only with
- * Postgres. Nothing that runs without a server can see a contract mismatch — unless it reads the
- * contract, which is what this does.
- *
- * The shape is what makes it survivable. `unfurnished` and `furnished` are spelled the same on both
- * sides; exactly one member of three differs. Two of the three chips worked, so the axis looked
- * wired. **A vocabulary that mostly agrees is more dangerous than one that plainly does not**, and
- * a sampled check would have passed. So this file enumerates every member of every bridged
- * vocabulary, in both directions.
- *
- * ## What is asserted
- *
- *   1. **The contract still declares the enums this file names.** A renamed or deleted schema is a
- *      failure here, not a silent skip — a checker that stops finding its subject stops checking.
- *   2. **Every UI value survives the write path.** Each catalogue member is pushed through the real
- *      exported writer (`toListingCreate`, `toFacetQuery`) and the result must be a member of the
- *      contract enum. This is the assertion with teeth: it exercises the translation table *and its
- *      call site*, which is the pair that actually failed. A correct table wired into the wrong
- *      function is exactly how the first fix of this bug was incomplete — `toQuery` was translated
- *      and `toFacetQuery`, the one the listings page calls, was not.
- *   3. **Every contract value survives the read path.** Each enum member is pushed through
- *      `toViewModel` and must land on a catalogue key, so a value the server can return but the
- *      browser cannot name is caught before it renders as an em-dash.
- *   4. **Vocabularies that are supposed to be identical still are.** Where client and contract
- *      share a spelling there is no table to protect them, so the sets are compared directly. This
- *      is what catches a rename on either side.
- *   5. **The flatmate fork stays forked.** The contract genuinely carries two furnishing
- *      vocabularies — `Furnishing` says `semi-furnished`, the three flatmate schemas say `semi` —
- *      so `VOCAB.furnishing` is correct *because* it is untranslated. Pinning it stops a later
- *      reader "fixing" the inconsistency and breaking the flatmate write path to match a bug that
- *      no longer exists.
- *   6. **The known-unmappable register is not stale.** A client value the contract has no bucket
- *      for is registered with a reason rather than quietly dropped, and the register itself is
- *      checked: an entry that has stopped drifting is a failure, so the list cannot rot into
- *      permanent noise.
- *
- * Exit code 0 = they agree, 1 = drift (suitable for CI).
- */
+/* Every member of every bridged vocabulary is pushed through the real read and write paths, both ways. */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { DETAIL_KEYS } from '../src/lib/listingFormDetails.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repo = join(here, '..', '..');
@@ -68,9 +10,9 @@ const repo = join(here, '..', '..');
 /* The contract is hand-written and single-source. The stale copies under the backend build
    directories are output, not source, and are deliberately not read. */
 const SPEC = join(repo, 'backend/src/main/resources/static/openapi/draazy-api.yaml');
+const FORM_DETAILS_JAVA = join(repo, 'backend/src/main/java/com/draazy/api/catalog/listing/ListingFormDetails.java');
 
 const failures = [];
-const notes = [];
 let checks = 0;
 
 const ok = (cond, msg) => {
@@ -91,15 +33,8 @@ const sameSet = (actual, expected, what) => {
   }
 };
 
-/* ─── Reading the contract ────────────────────────────────────────────────────────────────────
-   A line scanner rather than a parser, because the frontend has no yaml dependency and adding one
-   for this would be the only such dependency in the tree. Two shapes exist in the file and both
-   are handled: inline flow (`enum: [a, b, c]`, all but one declaration) and block form (`enum:`
-   followed by `- value` lines).
-
-   Two traps, both hit while writing this. The word "enum" appears in prose comments in the schema
-   region ("that enum has five values"), so the colon is part of the match. And a case-insensitive
-   match fires on `hideNumber` and `pageNumber` — hence case-sensitive throughout. */
+/* A line scanner rather than a parser: the frontend has no yaml dependency and this would be the only
+   reason to add one. Case-sensitive and colon-anchored, or `pageNumber` and schema prose fire. */
 const specText = readFileSync(SPEC, 'utf8');
 const specLines = specText.split(/\r?\n/);
 
@@ -127,18 +62,16 @@ function readEnums() {
       }
     }
     if (!values.length) continue;
-    /* The field this enum constrains. Two layouts, both present in the file: flow style, where the
-       enum sits on the field's own line (`furnishing: { type: string, enum: [...] }`), and block
-       style, where the field name is a standalone key some lines above. */
+    /* Two layouts, both present in the file: flow style puts the enum on the field's own line, block style
+       leaves the field name as a standalone key some lines above. */
     const STRUCTURAL = new Set(['items', 'properties', 'additionalProperties']);
     let inlineField = (/^\s{6,}([A-Za-z0-9_]+):\s*\{/.exec(line) || [])[1] || null;
     if (inlineField && STRUCTURAL.has(inlineField)) inlineField = null;
     let field = inlineField;
     for (let j = i; j >= 0 && !field; j -= 1) {
       const f = /^\s{6,}([A-Za-z0-9_]+):\s*$/.exec(specLines[j]);
-      /* `items` and `properties` are structure, not field names. An array-valued facet declares its
-         enum one level down (`tenants: { type: array, items: { enum: [...] } }`), so a scan that
-         stops at the first key up finds the wrapper and reports the field as missing. */
+      /* `items` and `properties` are structure, not field names: an array-valued facet declares its enum one
+         level down, so stopping at the first key up finds the wrapper and reports the field as missing. */
       if (f && !STRUCTURAL.has(f[1])) field = f[1];
     }
     const key = schema || '(root)';
@@ -184,41 +117,23 @@ function fieldEnum(schema, field) {
   return new Set(found.values);
 }
 
-/* ─── The client side ─────────────────────────────────────────────────────────────────────────── */
 const { FURN, CONSTR_STATUS, TENANTS, ROOM_TYPES } = await import('../src/pages/consumer/listings/constants.js');
-const { LAND_USE, PG_SHARING } = await import('../src/data/propertyTypes.js');
+const { LAND_USE } = await import('../src/data/propertyTypes.js');
 const { VOCAB } = await import('../src/services/providers/http/flatmateMapper.js');
+const { landUseFor, plotZoneOptions } = await import('../src/pages/consumer/list-property/constants.js');
 const { toViewModel, toListingCreate } = await import('../src/services/providers/http/propertyMapper.js');
 const { toFacetQuery } = await import('../src/lib/listings/facetQuery.js');
 
 const keysOf = (catalogue) => catalogue.map((e) => (Array.isArray(e) ? e[0] : e.value ?? e)).filter((k) => k !== '');
 
-/* A filter state complete enough for `toFacetQuery` to consider the axis relevant. `sectionVisible`
-   drops any facet the chosen property types do not make meaningful, so a bare `{}` would return
-   `undefined` for everything and every assertion below would pass without testing anything. */
+/* Complete enough for `toFacetQuery` to consider the axis relevant: `sectionVisible` drops facets the chosen
+   types do not make meaningful, so a bare `{}` would pass every assertion below without testing anything. */
 const filterState = (axis, value) => ({
   deal: axis === 'constr' ? 'buy' : 'rent',
   types: new Set(['flat']),
   [axis]: new Set([value]),
 });
 
-/* ─── Known-unmappable: client values the contract has no bucket for ─────────────────────────────
-   Registered rather than silently dropped, and each entry is itself checked below — an entry that
-   has stopped drifting fails, so this list cannot decay into permanent noise that everyone scrolls
-   past. */
-const KNOWN_UNMAPPABLE = [
-  {
-    catalogue: 'PG_SHARING',
-    value: 'dorm',
-    reason:
-      'The Indian PG model runs single → dormitory, and the wizard offers "Dormitory (6+)". The'
-      + ' contract\'s sharing facet stops at `five`, so selecting Dormitory narrows the search to'
-      + ' nothing. Sharing is not on ListingCreate either, so no owner-posted PG can carry any'
-      + ' occupancy yet — closing this needs a server bucket, not a client table.',
-  },
-];
-
-/* ─── 1–3. Furnishing: mismatched, translated, exercised in both directions ────────────────────── */
 console.log('  1. Furnishing');
 const furnishingWire = topLevelEnum('Furnishing');
 if (furnishingWire) {
@@ -250,7 +165,6 @@ if (furnishingWire) {
   }
 }
 
-/* ─── Possession: the same shape, translated since V79, kept honest by the same round trip ─────── */
 console.log('  2. PropertyPossession');
 const possessionWire = topLevelEnum('PropertyPossession');
 if (possessionWire) {
@@ -279,7 +193,6 @@ if (possessionWire) {
   }
 }
 
-/* ─── 4. Vocabularies that share a spelling, and so have nothing protecting them ───────────────── */
 console.log('  4. identical vocabularies (no table, nothing to protect them)');
 const identical = [
   ['LAND_USE', keysOf(LAND_USE), fieldEnum('PropertySummary', 'landUse')],
@@ -290,22 +203,6 @@ for (const [name, uiKeys, wire] of identical) {
   if (wire) sameSet(new Set(uiKeys), wire, `${name} vs the contract`);
 }
 
-/* Sharing is compared as a subset rather than a set, because the register below carries the one
-   member the contract has no bucket for. Everything else must still line up exactly. */
-const sharingWire = fieldEnum('PropertySummary', 'sharing');
-if (sharingWire) {
-  const registered = new Set(KNOWN_UNMAPPABLE.filter((k) => k.catalogue === 'PG_SHARING').map((k) => k.value));
-  const shareKeys = keysOf(PG_SHARING);
-  for (const key of shareKeys) {
-    if (registered.has(key)) continue;
-    ok(sharingWire.has(key), `PG_SHARING offers '${key}' but the contract's sharing facet does not accept it, so selecting it narrows the search to nothing`);
-  }
-  for (const wire of sharingWire) {
-    ok(shareKeys.includes(wire), `the contract's sharing facet accepts '${wire}' but PG_SHARING cannot offer it, so that occupancy is unreachable from the filter`);
-  }
-}
-
-/* ─── 5. The flatmate fork is deliberate — pin it so nobody "fixes" it ────────────────────────── */
 console.log('  5. the flatmate furnishing fork');
 const flatmateFurnishing = fieldEnum('FlatmateRoom', 'furnishing');
 if (flatmateFurnishing) {
@@ -319,25 +216,91 @@ if (flatmateFurnishing) {
   );
 }
 
-/* ─── 6. The register is still true ───────────────────────────────────────────────────────────── */
-console.log('  6. known-unmappable register');
-for (const entry of KNOWN_UNMAPPABLE) {
+/* Translated in one direction only: a zone whose translation the contract refuses is a 422 the owner cannot
+   act on, and a `LAND_USE` key no zone produces is a filter option no wizard-posted plot can match. */
+console.log('  6. plot zoning translated into land use');
+const landUseWire = fieldEnum('ListingFields', 'landUse');
+const plotZoneWire = fieldEnum('ListingFormDetails', 'plotZone');
+/* Containment, not equality: the contract also carries retired labels, which stay legal so a plot published
+   under one can be re-saved. The loop below runs over the contract, so a legacy label mapping to nothing still fails. */
+if (plotZoneWire) {
+  const absent = plotZoneOptions.filter((v) => !plotZoneWire.has(v));
   ok(
-    entry.reason && entry.reason.length > 40,
-    `KNOWN_UNMAPPABLE entry ${entry.catalogue}.${entry.value} has no reason recorded. A registered`
-    + ' mismatch without a reason is indistinguishable from an unnoticed one.',
+    absent.length === 0,
+    `the Zone picker offers ${absent.map((v) => `'${v}'`).join(', ')}, which the contract does not accept.`,
   );
-  if (entry.catalogue === 'PG_SHARING' && sharingWire) {
+}
+if (landUseWire) {
+  const translated = new Set();
+  for (const zone of [...(plotZoneWire || plotZoneOptions)].filter(Boolean)) {
+    const written = landUseFor('openplot', zone);
+    translated.add(written);
     ok(
-      !sharingWire.has(entry.value),
-      `KNOWN_UNMAPPABLE still lists PG_SHARING.'${entry.value}', but the contract now accepts it.`
-      + ' Delete the entry so the value is checked like every other one.',
+      landUseWire.has(written),
+      `posting an open plot zoned '${zone}' puts '${written}' on the wire, which is not one of`
+      + ` ${[...landUseWire].join(', ')}.`,
     );
-    notes.push(`PG_SHARING.'${entry.value}' is registered as unmappable — ${entry.reason}`);
+  }
+  const farm = landUseFor('farmland', '');
+  ok(
+    landUseWire.has(farm),
+    `farm land is never asked its zone and defaults to '${farm}', which the contract does not accept.`,
+  );
+  translated.add(farm);
+  ok(
+    landUseFor('flat', 'Residential') === undefined,
+    'a flat is being given a land use. A building has none of its own, and stating one files it'
+    + ' under a filter that exists to find bare land.',
+  );
+  for (const key of keysOf(LAND_USE)) {
+    ok(
+      translated.has(key),
+      `the Land-use filter offers '${key}', which no zone the wizard offers translates into — so no`
+      + ' wizard-posted plot can ever answer it.',
+    );
   }
 }
 
-/* ─── Report ──────────────────────────────────────────────────────────────────────────────────── */
+/* `formDetails` is free-form JSONB in the spec, so its allowlist is hand-written twice. A key on one side only
+   fails silently both ways: absent from JS the answer never ships, absent from Java the 422 names nothing. */
+const javaText = readFileSync(FORM_DETAILS_JAVA, 'utf8');
+
+const javaKeys = new Set();
+for (const table of ['TEXT', 'FLAGS', 'ARRAYS']) {
+  const block = new RegExp(`Set<String> ${table} = Set\\.of\\(([\\s\\S]*?)\\);`).exec(javaText);
+  ok(Boolean(block), `ListingFormDetails.java no longer declares a \`Set<String> ${table} = Set.of(...)\` this scanner can read.`);
+  if (block) for (const [, key] of block[1].matchAll(/"([^"]+)"/g)) javaKeys.add(key);
+}
+ok(javaKeys.size > 40, `Only ${javaKeys.size} formDetails keys read from Java — the scanner has gone blind.`);
+sameSet(DETAIL_KEYS, javaKeys, 'listingFormDetails.js DETAIL_KEYS vs ListingFormDetails.java TEXT+FLAGS+ARRAYS');
+
+/* Report reasons are a plain string in the spec, so the only allowlist is the Java `Set.of` the endpoint
+   validates against: a code the picker offers and Java lacks is a 422 on a reason the UI invited. */
+const REPORT_REASONS_JAVA = join(repo, 'backend/src/main/java/com/draazy/api/moderation/report/ReportReasons.java');
+const reportText = readFileSync(REPORT_REASONS_JAVA, 'utf8');
+
+/* `OTHER` is a constant, not a literal, so a bare `"([^"]+)"` scan would miss it on every set and
+   report four identical phantom failures. Substituted before the literals are read. */
+const javaReasonSet = (name) => {
+  const block = new RegExp(`Set<String> ${name} =\\s*Set\\.of\\(([^;]*?)\\);`).exec(reportText);
+  ok(Boolean(block), `ReportReasons.java no longer declares a \`Set<String> ${name} = Set.of(...)\` this scanner can read.`);
+  if (!block) return new Set();
+  const body = block[1].replace(/\bOTHER\b/g, '"other"');
+  return new Set([...body.matchAll(/"([^"]+)"/g)].map(([, v]) => v));
+};
+
+const { LISTING_REPORT_REASONS, SHARE_REPORT_REASONS, OWNER_REPORT_REASONS, REVIEW_REPORT_REASONS } =
+  await import('../src/lib/reportReasons.js');
+
+for (const [js, java, what] of [
+  [LISTING_REPORT_REASONS, 'FOR_PROPERTY', 'LISTING_REPORT_REASONS vs FOR_PROPERTY'],
+  [SHARE_REPORT_REASONS, 'FOR_POST', 'SHARE_REPORT_REASONS vs FOR_POST'],
+  [OWNER_REPORT_REASONS, 'FOR_USER', 'OWNER_REPORT_REASONS vs FOR_USER'],
+  [REVIEW_REPORT_REASONS, 'FOR_REVIEW', 'REVIEW_REPORT_REASONS vs FOR_REVIEW'],
+]) {
+  sameSet(new Set(keysOf(js)), javaReasonSet(java), `reportReasons.js ${what}`);
+}
+
 if (failures.length) {
   console.error(`\n  x ${failures.length} of ${checks} checks failed\n`);
   failures.forEach((f) => console.error(`    - ${f}\n`));
@@ -347,5 +310,4 @@ if (failures.length) {
   process.exit(1);
 }
 console.log(`\n  check-enum-vocabulary: ok (${checks} checks)`);
-notes.forEach((n) => console.log(`    note: ${n}`));
 console.log('');

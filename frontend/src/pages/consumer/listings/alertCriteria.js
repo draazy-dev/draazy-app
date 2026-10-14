@@ -1,20 +1,13 @@
-/* Shared alert/saved-search criteria helpers.
-   One place that turns the live listings filter state into (a) a persisted
-   saved-search/alert record and (b) a set of display chips. Used by the
-   listings "Create a property alert" card, the manual "Save search" action,
-   and the dashboard Alerts panel so every surface captures and shows the SAME
-   full filter set — property type, BHK, price, localities, furnishing,
-   amenities and commercial subtype. */
 import { fmtINR } from '../../../lib/format.js';
 import { fmtRent } from './format.js';
-import { BUY_TYPES, RENT_TYPES, COMMERCIAL_TYPES, SHARING_LBL } from '../../../data/propertyTypes.js';
+import { BUY_TYPES, RENT_TYPES, COMMERCIAL_TYPES } from '../../../data/propertyTypes.js';
 import { BHK_BUY, BHK_RENT, FURN_LBL, AMEN_LBL } from './constants.js';
 
 const TYPE_LBL = Object.fromEntries([...BUY_TYPES, ...RENT_TYPES]);
 const COMM_LBL = Object.fromEntries(COMMERCIAL_TYPES);
 
-// Default range bounds (mirror INITIAL() in Listings.jsx) — used to tell an
-// "any price" range from a real one so we don't show a noise chip.
+// Default range bounds (mirroring INITIAL() in Listings.jsx), so an "any price" range can be told
+// apart from a real one and not shown as a noise chip.
 const BUY_MAX = 50000000;
 const RENT_MAX = 100000;
 
@@ -28,7 +21,6 @@ const bhkLabel = (deal, k) => {
 
 const typeLabel = (k) => TYPE_LBL[k] || cap(k);
 
-/* Human price-range chip text, or null when the range is the default "any". */
 function priceChipText(deal, budget, rent) {
   if (deal === 'buy') {
     const [lo, hi] = Array.isArray(budget) ? budget : [0, BUY_MAX];
@@ -40,7 +32,6 @@ function priceChipText(deal, budget, rent) {
   return `${fmtRent(lo)} – ${fmtRent(hi)}${hi >= RENT_MAX ? '+' : ''}/mo`;
 }
 
-/* Short human summary of the whole search (used as the alert label). */
 export function alertLabel(rec, locNameBySlug = {}) {
   const types = asArr(rec.types);
   const bhk = asArr(rec.bhk);
@@ -53,27 +44,23 @@ export function alertLabel(rec, locNameBySlug = {}) {
   return parts.filter(Boolean).join(' · ') || `All ${rec.deal === 'rent' ? 'rentals' : 'homes'}`;
 }
 
-/* Convert live filter state (Sets) into a plain, persistable alert payload.
-   Accepts either the live `f` (Sets) or an already-normalised record (arrays). */
 export function buildAlertRecord(f, locNameBySlug = {}) {
   const rec = {
     deal: f.deal,
     types: asArr(f.types),
     commercialTypes: asArr(f.commercialTypes),
     bhk: asArr(f.bhk),
-    sharing: asArr(f.sharing),
     furnishing: asArr(f.furnishing),
     amenities: asArr(f.amenities),
     localities: asArr(f.localities),
     budget: Array.isArray(f.budget) ? f.budget : undefined,
     rent: Array.isArray(f.rent) ? f.rent : undefined,
+    pets: !!f.pets,
   };
   rec.label = alertLabel(rec, locNameBySlug);
   return rec;
 }
 
-/* Normalised list of display chips for an alert/saved-search record.
-   Works on both the live `f` (Sets) and a stored record (arrays). */
 export function criteriaChips(rec, locNameBySlug = {}) {
   const deal = rec.deal;
   const chips = [{ icon: deal === 'rent' ? 'key-round' : 'home', text: deal === 'rent' ? 'For Rent' : 'For Sale' }];
@@ -81,7 +68,6 @@ export function criteriaChips(rec, locNameBySlug = {}) {
   asArr(rec.types).forEach((k) => chips.push({ icon: 'building-2', text: typeLabel(k) }));
   asArr(rec.commercialTypes).forEach((k) => chips.push({ icon: 'briefcase', text: COMM_LBL[k] || cap(k) }));
   asArr(rec.bhk).forEach((k) => chips.push({ icon: 'bed-double', text: bhkLabel(deal, k) }));
-  asArr(rec.sharing).forEach((k) => chips.push({ icon: 'bed-double', text: SHARING_LBL[k] || cap(k) }));
 
   const price = priceChipText(deal, rec.budget, rec.rent);
   if (price) chips.push({ icon: 'wallet', text: price });
@@ -89,34 +75,41 @@ export function criteriaChips(rec, locNameBySlug = {}) {
   asArr(rec.localities).forEach((s) => chips.push({ icon: 'map-pin', text: locNameBySlug[s] || cap(s) }));
   asArr(rec.furnishing).forEach((k) => chips.push({ icon: 'sofa', text: FURN_LBL[k] || cap(k) }));
   asArr(rec.amenities).forEach((k) => chips.push({ icon: 'sparkles', text: AMEN_LBL[k] || cap(k) }));
+  if (rec.pets) chips.push({ icon: 'paw-print', text: 'Pet-friendly' });
 
   return chips;
 }
 
-/* Honest count of LIVE listings matching a saved-search/alert record's core
-   criteria (deal, locality, BHK). Fails safe to 0 on any mismatch — it never
-   fabricates matches. Localities are matched against BOTH a listing's slug and
-   its display name (case-insensitive) so a slug-keyed alert (e.g. 'baner')
-   still matches a catalog entry stored as locality 'Baner'. */
 export function countMatches(rec, props = []) {
   const locs = asArr(rec.localities).map((s) => String(s).toLowerCase());
   const bhks = asArr(rec.bhk).map(String);
+  const types = asArr(rec.types).map((s) => String(s).toLowerCase());
+  const furnishings = asArr(rec.furnishing).map((s) => String(s).toLowerCase());
+  const amenities = asArr(rec.amenities).map((s) => String(s).toLowerCase());
+  const [lo, hi] = rec.deal === 'rent'
+    ? (Array.isArray(rec.rent) ? rec.rent : [0, RENT_MAX])
+    : (Array.isArray(rec.budget) ? rec.budget : [0, BUY_MAX]);
   const wantsRent = rec.deal === 'rent';
   return props.filter((p) => {
     if (wantsRent ? p.deal !== 'rent' : p.deal === 'rent') return false;
+    if (p.price < lo || p.price > hi) return false;
     if (locs.length) {
       const slug = String(p.localitySlug || '').toLowerCase();
       const name = String(p.locality || '').toLowerCase();
       if (!locs.includes(slug) && !locs.includes(name)) return false;
     }
-    if (bhks.length && !bhks.includes(String(p.bhkNum))) return false;
+    if (types.length && !types.includes(String(p.type || '').toLowerCase())) return false;
+    if (bhks.length && !bhks.some((b) => b.endsWith('plus') ? Number(p.bhkNum) >= Number(b.replace('plus', '')) : b === String(p.bhkNum))) return false;
+    if (furnishings.length && !furnishings.includes(String(p.furnishing || '').toLowerCase())) return false;
+    if (amenities.length) {
+      const listingAmenities = asArr(p.amenities).map((s) => String(s).toLowerCase());
+      if (!amenities.every((a) => listingAmenities.includes(a))) return false;
+    }
+    if (rec.pets && p.pets !== true) return false;
     return true;
   }).length;
 }
 
-/* Build the listings deep-link that reproduces a saved search's core intent
-   (deal + first locality), so a retention nudge lands the user on the actual
-   filtered results rather than a generic /listings page. */
 export function searchHref(rec) {
   const params = new URLSearchParams();
   params.set('deal', rec.deal === 'rent' ? 'rent' : 'buy');

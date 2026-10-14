@@ -1,29 +1,26 @@
 import { Tag, Key, Home, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Pill } from './controls.jsx';
+import { Pill, FieldError } from './controls.jsx';
 import StepHeader from './StepHeader.jsx';
 import { lbl3 } from './styles.js';
 import PropertyDetailsWhole from './PropertyDetailsWhole.jsx';
 import PropertyDetailsFlatmate from './PropertyDetailsFlatmate.jsx';
 
 const PropertyDetailsStep = ({
-  form, set, onPropertyType, rentMode, setRentMode, isFlatmateMode, errors,
-  isResidential, isLand, isCommercial, isHouse, isPg, toggleInArray, nextStep,
-  money, onReset,
+  form, set, onPropertyType, onCommercialType, rentMode, setRentMode, isFlatmateMode, errors,
+  isResidential, isLand, isCommercial, isHouse, toggleInArray, nextStep,
+  money, onReset, allowFlatmate = true, lockDeal = false,
 }) => {
   const { t: tr } = useTranslation();
-  const pg = isPg ? isPg() : false;
 
-  // Flatmate-sharing only applies to a whole residential home. Switching type resets
-  // rentMode to "whole" for non-residential/PG (handled by the parent cascade).
   return (
                 <div className="lp-step">
                   <StepHeader title={tr('listProperty.steps.detailsTitle')} subtitle={tr('listProperty.steps.detailsSubtitle')} onReset={onReset} />
 
-                  {/* Property For */}
+                  {!lockDeal && (
                   <div className="mb-6">
                     <label className={lbl3}>{tr('listProperty.fields.propertyFor')}</label>
-                    <div className="flex flex-wrap gap-3">
+                    <div className={`flex flex-wrap gap-3 ${errors.deal ? 'dz-invalid-group' : ''}`} data-err="deal">
                       <Pill selected={form.deal === 'buy'} onClick={() => set('deal', 'buy')} className="px-6 py-3">
                         <span className="flex items-center gap-2"><Tag className="w-4 h-4" />{tr('listProperty.opt.sale')}</span>
                       </Pill>
@@ -31,11 +28,11 @@ const PropertyDetailsStep = ({
                         <span className="flex items-center gap-2"><Key className="w-4 h-4" />{tr('listProperty.opt.rent')}</span>
                       </Pill>
                     </div>
+                    <FieldError show={!!errors.deal}>{tr('listProperty.err.deal')}</FieldError>
                   </div>
+                  )}
 
-                  {/* Rent sub-mode — only a residential home can be shared with a
-                     flatmate, so this choice is hidden for commercial & land. */}
-                  {form.deal === 'rent' && isResidential() && !pg && (
+                  {allowFlatmate && form.deal === 'rent' && isResidential() && (
                     <div className="mb-6">
                       <label className={lbl3}>{tr('listProperty.fields.whatToDo')}</label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -55,16 +52,15 @@ const PropertyDetailsStep = ({
                     </div>
                   )}
 
-                  {/* Whole-place step-1 fields */}
                   {!isFlatmateMode && (
                     <PropertyDetailsWhole
                       form={form} set={set} onPropertyType={onPropertyType} errors={errors}
+                      onCommercialType={onCommercialType}
                       isResidential={isResidential} isLand={isLand} isCommercial={isCommercial}
-                      isHouse={isHouse} isPg={isPg} toggleInArray={toggleInArray} nextStep={nextStep}
+                      isHouse={isHouse} toggleInArray={toggleInArray} nextStep={nextStep}
                     />
                   )}
 
-                  {/* ===== Flatmate form ===== */}
                   {isFlatmateMode && (
                     <PropertyDetailsFlatmate
                       form={form} set={set} errors={errors} isHouse={isHouse}

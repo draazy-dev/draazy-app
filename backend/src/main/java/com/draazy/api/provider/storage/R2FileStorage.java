@@ -14,35 +14,24 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
-/**
- * Cloudflare R2 {@link FileStorage}, wired only when {@code draazy.providers.storage.enabled=true}
- * (ADR-013). R2 speaks the S3 API, so the AWS SDK v2 client points at the account endpoint with the
- * pseudo-region {@code auto} and path-style addressing (R2 does not do virtual-host buckets).
- *
- * <p>With the flag off this bean does not exist at all, which is stronger than a runtime {@code if}:
- * there is no code path, live or accidental, that reaches R2. The mock/stub storage is wired in its
- * place.
- *
- * <p><strong>Two buckets (ADR-013).</strong> Documents go to the private bucket ({@link #store},
- * read back through short-lived signed GETs); listing photos go to the public bucket ({@link
- * #storePublic}, served world-readable at a permanent CDN URL). Routing them to different buckets
- * here is what makes the interface's public/private boundary real at the vendor — a KYC file can
- * never come back as an unsigned, non-expiring URL because it never reaches the public bucket.
- */
+// Documents and photos go to separate buckets, making the seam's boundary real.
 @Component
 @ConditionalOnProperty(prefix = "draazy.providers.storage", name = "enabled", havingValue = "true")
 class R2FileStorage implements FileStorage, DisposableBean {
 
     private static final Logger log = LoggerFactory.getLogger(R2FileStorage.class);
 
-    /** Signed URLs are single-request handoffs; fifteen minutes is generous for one PUT or GET. */
     private static final Duration URL_TTL = Duration.ofMinutes(15);
+
+    // Every public key is written once under a fresh UUID, so its bytes can never change.
+    private static final String PUBLIC_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
     private final S3Client s3;
     private final S3Presigner presigner;
@@ -62,7 +51,7 @@ class R2FileStorage implements FileStorage, DisposableBean {
         }
         this.privateBucket = props.privateBucket();
         this.publicBucket = props.publicBucket();
-        // Trim a trailing slash so the public URL joins cleanly however the base URL was configured.
+
         this.publicBaseUrl = stripTrailingSlash(props.publicBaseUrl());
         StaticCredentialsProvider creds = StaticCredentialsProvider.create(
                 AwsBasicCredentials.create(props.accessKeyId(), props.secretAccessKey()));
@@ -114,15 +103,28 @@ class R2FileStorage implements FileStorage, DisposableBean {
     }
 
     @Override
+    public void delete(String key) {
+
+        // S3 DeleteObject is a no-op on a missing key, which gives the sweep its idempotency.
+        s3.deleteObject(DeleteObjectRequest.builder().bucket(privateBucket).key(key).build());
+    }
+
+    @Override
     public String storePublic(String key, byte[] content, String contentType) {
         s3.putObject(
                 PutObjectRequest.builder()
                         .bucket(publicBucket)
                         .key(key)
                         .contentType(contentType)
+                        .cacheControl(PUBLIC_CACHE_CONTROL)
                         .build(),
                 RequestBody.fromBytes(content));
         return publicBaseUrl + "/" + key;
+    }
+
+    @Override
+    public String publicUrlPrefix() {
+        return publicBaseUrl + "/";
     }
 
     @Override
@@ -138,4 +140,4 @@ class R2FileStorage implements FileStorage, DisposableBean {
     private static String stripTrailingSlash(String s) {
         return s.endsWith("/") ? s.substring(0, s.length() - 1) : s;
     }
-}
+    }

@@ -2,6 +2,7 @@ import { useSearchParams } from 'react-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import ServiceLanding from '../../../components/ServiceLanding.jsx';
+import { SUPPORT_PHONE } from '../../../lib/supportContact.js';
 import PackersEstimator from './PackersEstimator.jsx';
 
 export default function PackersMovers() {
@@ -21,13 +22,13 @@ export default function PackersMovers() {
 
   return (
     <ServiceLanding
-      team="packers"
+      desk="packers"
       flowType="packers"
       draftKey="dzDraft:packers-movers"
       trackerTitle={t('services.packers.trackerTitle')}
-      heroGradient="linear-gradient(140deg,#0a1120 0%,#0b2530 46%,#123a4a 100%)"
+      heroGradient="linear-gradient(140deg,rgb(var(--dz-c-slate-950)) 0%,rgb(var(--dz-c-teal-950)) 46%,rgb(var(--dz-c-teal-900)) 100%)"
       heroImage="https://images.unsplash.com/photo-1600518464441-9154a4dea21b?w=1600&q=80"
-      heroOverlay="linear-gradient(140deg,rgba(10,17,32,.93) 0%,rgba(11,37,48,.87) 46%,rgba(18,58,74,.9) 100%)"
+      heroOverlay="linear-gradient(140deg,rgb(var(--dz-c-slate-950) / .93) 0%,rgb(var(--dz-c-teal-950) / .87) 46%,rgb(var(--dz-c-teal-900) / .9) 100%)"
 
       badge={t('services.packers.badge')}
       titleTop={t('services.packers.titleTop')}
@@ -49,7 +50,7 @@ export default function PackersMovers() {
         ],
         successMessage: t('services.packers.successMessage'),
       }}
-      stats={[['50+', t('services.packers.stat.verifiedPartners')], ['12K+', t('services.packers.stat.homesRelocated')], ['4.7★', t('services.packers.stat.averageRating')], ['₹0', t('services.packers.stat.platformFee')]]}
+      stats={[['Free', t('services.packers.stat.survey')], ['24 hrs', t('services.packers.stat.callback')], ['All-in', t('services.packers.stat.allIn')], ['1', t('services.packers.stat.contact')]]}
       services={[
         [t('services.packers.service.0.name'), 'home', t('services.packers.service.0.desc')],
         [t('services.packers.service.1.name'), 'map-pinned', t('services.packers.service.1.desc')],
@@ -78,7 +79,7 @@ export default function PackersMovers() {
         [t('services.packers.faq.3.q'), t('services.packers.faq.3.a')],
         [t('services.packers.faq.4.q'), t('services.packers.faq.4.a')],
       ]}
-      cta={{ title: t('services.packers.ctaTitle'), sub: t('services.packers.ctaSub'), primary: t('services.packers.ctaPrimary'), icon: 'truck', phone: '1800 200 0000' }}
+      cta={{ title: t('services.packers.ctaTitle'), sub: t('services.packers.ctaSub'), primary: t('services.packers.ctaPrimary'), icon: 'truck', phone: SUPPORT_PHONE }}
     />
   );
 }

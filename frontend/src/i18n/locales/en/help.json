@@ -53,6 +53,7 @@
     "whatWasMissing": "What was missing?",
     "whatWasMissingHint": "Optional, but it is what actually gets the article fixed.",
     "feedbackPlaceholder": "e.g. it doesn't explain what happens if…",
+    "feedbackPrivacy": "Sent to the team that maintains this article, and never shown to other readers. Up to 500 characters. Please don't include your phone number here — use the ticket link if you need a reply.",
     "sendFeedback": "Send feedback",
     "cancel": "Cancel",
     "contactSupportInstead": "Contact support instead →",
@@ -83,8 +84,6 @@
     "contactUs": "Contact us",
     "deflectTitle": "Check the help centre first",
     "deflectBody": "Guides on deposits, verification, listings, payments and refunds — answered instantly.",
-    "notTranslatedTitle": "This article is not available in your language yet",
-    "notTranslatedBody": "You are reading the English version. We translate articles as they are written — the rest of the help centre is already in your language.",
     "runbooks": "Runbooks"
   }
 }

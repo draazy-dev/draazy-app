@@ -44,8 +44,8 @@
 ## 5. Business rules & logic  *(the meat)*
 
 ### 5.1 List, filter, search
-- `listUsers(undefined, { includeArchived: true })` loads all accounts including archived
-  (`src/lib/mockApi/users.js`); the page filters client-side (`rows` memo in `AdminUsers.jsx`):
+- `listUsers(undefined, { includeArchived: true })` loads all accounts including archived;
+  the page filters client-side (`rows` memo in `AdminUsers.jsx`):
   - **Role** filter (`owner|buyer|staff|admin`).
   - **Status** filter: `active|suspended|archived`. Choosing `archived` shows only archived rows;
     any other status hides archived rows and matches on `u.status`.
@@ -58,13 +58,52 @@
   per-user action button reads **"Grant Verified badge"** / **"Remove Verified badge"**.
 - Every toggle records context: `submitNote('user', id, note, verified ? 'Verified badge granted' :
   'Verified badge removed')` and `logAudit('User', '<Granted|Removed> Verified badge ... <name> (<id>)')`.
-- **Badge grant is admin-decided, not self-service.** The user (maker) opts in and presents identity
-  (DigiLocker via the consumer badge flow, or offline docs); the admin (checker) confirms and flips
-  `verified`. There is no second-approver step today - a single admin both reviews and grants.
+- **Badge grant is staff-decided, not self-service.** The user (maker) opts in and submits a
+  government document plus a live selfie through the consumer badge flow; a reviewer works the ops
+  identity queue (`/ops/kyc-review`, and `/admin/kyc-review` for the same screen behind the module
+  guard), or a manager or admin confirms offline docs here and grants the badge in one step with a
+  reason (§6). A reviewer can never decide their own case, and nobody can badge themselves (403).
+- **Review claims are soft assignment.** A reviewer may claim a pending case for 30 minutes; a fresh
+  claim blocks another reviewer from claiming or deciding, but stale claims are takeable and
+  unclaimed cases can still be decided directly.
 - **Badge-not-gate (ADR-019):** this `verified` flag is an **opt-in trust/ranking badge**. Owners do
-  **not** need to clear any Aadhaar gate to post — posting and contact stay at L1 mobile. Uniqueness
-  is enforced as **one identity → one badge** via the composite `identity_hash` (ADR-009b), inside the
-  opt-in badge flow only.
+  **not** need to clear any identity gate to post — posting and contact stay at L1 mobile. Uniqueness
+  is enforced as **one document → one badge** via the UNIQUE `identity_hash` (ADR-009b), set at
+  approval, inside the opt-in badge flow only.
+- **Both paths write the same `verified` boolean; the origin is derived.** Earned = an
+  `identity_verifications` row in `verified`; hand-granted = `verified` with no such row.
+  An earned badge is withdrawn only by **revoking** the identity case (reason required, audited);
+  a hand-granted one by the immediate withdraw on this screen. The back-office user payload carries
+  the derived `badgeSource` (`identity`/`manual`) so the console disables withdraw on an earned one.
+- **Name is locked while verified** - `PATCH /me` with a changed name answers 409
+  `NAME_LOCKED_WHILE_VERIFIED`; the badge vouches for that name. The identity approval itself
+  intentionally overwrites `users.name` with the reviewer-confirmed holder name and audits the
+  before/after change.
+- **Review SLA.** The age column turns amber at 24h and red ("overdue") at 48h pending, and the
+  Overdue filter asks the server for the same 48h cut; a case unreviewed for 14 days
+  (`draazy.identity.pending-ttl`) is auto-rejected as `not_reviewed`, images purged and the attempt
+  window reset so the user can resubmit at once.
+- **The KYC desk.** Three tabs, 10 cases a page, every filter a server query
+  (`GET /moderation/identity-reviews?status=&q=&docType=&claim=&overdue=&outcome=&sort=`, counts
+  from `/moderation/identity-reviews/summary`):
+  - *Needs review* (`pending`, oldest first) — the work. Claim chips All / Unclaimed / Mine n/3 /
+    Others replace a separate "my cases" tab, since a reviewer holds at most three.
+  - *QA sample* (`qa`) — sampled approvals awaiting a second reviewer; the approver's own are hidden.
+  - *Decided* (`verified`/`rejected`/`revoked`, newest first, Outcome chips) — revoke a badge or
+    read a case's history.
+
+  A row opens one case in a dialog: document images beside the applicant's entries and a per-document
+  checklist (Approve stays disabled until every line is ticked — the server cannot judge a photo),
+  the selfie and pose in their own group, history collapsed, and every action in one rail. Opening a
+  pending case claims it; closing it or moving to Next case releases the claim. A case someone else
+  holds is not claimed on open — the reviewer sees "Being reviewed by X" and no decide forms.
+- **Document already on another account** (409 `identity_already_registered`): the user can report
+  misuse from their recent submit conflict (`POST /me/verification/identity/dispute`), which opens
+  an `identity_dispute` support ticket; the staff-only link to the holder's case is in the `identity.dispute.opened` audit entry.
+  If upheld, staff revoke the holder's case and the reporter resubmits.
+- **Consent** is shown in English only (the app is English-only); the client always sends
+  `consent_language = en`, stored next to `consent_notice_version`. The column still accepts
+  `hi`/`mr` for rows recorded before the switch.
 
 ### 5.3 Moderation actions (single)
 `confirmAction` in `AdminUsers.jsx` switches on the action type, writes an audit entry, and patches
@@ -80,6 +119,8 @@ missed:
 | Restore | `restoreRecord('users', id, 'active')` | `archived=false`, `status='active'`; "Restored" |
 
 - **Suspend** is the ban lever: a suspended account keeps its data but is treated as inactive.
+  Its access tokens stop working at once (`users.sessions_revoked_at`), and an owner's listings
+  are hidden from search and the property page, taking no new visits or contacts, until reactivated.
 - **Archive** is soft-delete (cross-cutting section 4); restore reactivates.
 - A **staff note** on the account is a separate, deliberate act — see 5.6 — because the reason for a
   decision and what the team knows about a person are different records with different lifetimes.
@@ -92,7 +133,7 @@ Gated by the `users.bulkOps` admin flag. Each iterates the selected ids and writ
 Each is confirmed via a modal (`bulkConfirm`) before running.
 
 ### 5.5 Activity timeline (context for a decision)
-`getUserTimeline(userId)` (`src/lib/mockApi/users.js`) builds a newest-first feed by joining on the
+`getUserTimeline(userId)` builds a newest-first feed by joining on the
 user's `mobile` (and `id` for owners):
 1. Account creation (`joinedAt`).
 2. Enquiries sent (`enquiries` where `mobile` matches; labelled visit / callback / enquiry).
@@ -108,7 +149,7 @@ their own panel above the feed instead (5.6).
 
 ### 5.6 Staff notes on the account
 The same `note` domain the property console uses, with `entityType: 'user'`:
-`GET|POST /admin/notes/user/{id}`, `PATCH /admin/notes/{id}`. Mutable, author resolved server-side
+`GET|POST /admin/notes/user/{id}`. Append-only, author resolved server-side
 from the token, no per-team walls — any staffer or administrator reads any note, deliberately.
 Rendered as `data-testid="user-notes"` inside the Activity modal, with an explicit empty state
 rather than an absent panel, so "nobody has written one" is distinguishable from "the read failed".
@@ -124,16 +165,41 @@ rather than an absent panel, so "nobody has written one" is distinguishable from
 - The timeline join (server-side aggregation with proper access control over PII).
 
 ## 6. Maker-checker / approval
-- **Applicable: yes, in the single-approver form.** Maker = the user presenting identity/KYC;
-  checker = the admin who flips `verified`. On approval the account gains the trust badge and an audit
-  row is written. There is no distinct pending "verification request" record for accounts today (unlike
-  property verification, which has an explicit `property_reviews` record) - the admin acts directly on
-  the `users` row. See [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2; a
-  future backend should add a pending KYC-request record so verify/suspend can require a second approver.
+| Path | Maker | Checker | Enforced by |
+|---|---|---|---|
+| Earned badge (document + selfie) | the user (submits case) | identity reviewer (`identity:write`) | service 403 when reviewer = subject |
+| QA sample of an earned badge | identity reviewer who approved | second identity reviewer | service 403 + V62 CHECKs: checker ≠ approver, checker ≠ subject |
+| Hand-granted badge | - | single manager or admin (`PATCH /users/{id}/badge`), reason 10..300 | service 403 when actor = subject; 409 if already verified; audited `user.badge` |
+| Revoke earned badge | - | single admin, reason 10..300 | protective direction; audited |
+| Withdraw hand-granted badge | - | single manager or admin, reason | protective direction; audited |
+
+Every decision and every staff detail view of a case (it mints signed image URLs) writes an audit
+row. See [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.
+Approvals always enter `status=qa` when client liveness is not `passed`, the selfie carried no
+server-signed pose challenge, the reviewer overrode a number mismatch, or the case is a resubmission.
+A 25% random sample (`draazy.identity.qa-sample-rate`) covers the rest. Approvers do not see or
+work their own QA rows, and cannot revoke them while QA is open.
+
+**Approval checks (in order):** the number the reviewer types is the source of truth for the
+dedup hash. A hash already verified on another account is a hard stop (409
+`identity_already_registered`). When the case carries a pose challenge (`left` / `right` /
+`smile`, issued by `POST /me/verification/identity/challenge`, HMAC-signed to the user, 15 min), the
+reviewer must tick "selfie shows the pose" (400 `identity_pose_unconfirmed`). A typed number that
+differs from the applicant's entry is a soft stop (409 `identity_number_mismatch`); a
+`numberOverride` is stored (`number_overridden`), audited and always QA-sampled. The dev
+`simulate` system actor skips both human checks.
 
 ## 7. State machine
 - **`status`:** `active <-> suspended`; `active|suspended --(archive)--> archived --(restore)--> active`.
 - **`verified`:** `false <-> true` (independent boolean; not a lifecycle stage).
+- **Identity case:** `none → pending → verified | rejected`; `verified → revoked`; `rejected|revoked
+  → pending` (resubmit, 3 per 24h); `pending → rejected(not_reviewed)` after 14 days unreviewed
+  (images purged, attempt not consumed); any state → withdrawn on user withdrawal (DPDP: images
+  and claims erased, badge removed; the row keeps the attempt window, and a revoked or not_holder
+  case keeps its document hash so withdrawal cannot launder a fraud block). Reads as `none` to the
+  user.
+- **Identity QA:** `verified + qa_sampled_at → confirmed | revoked`; `confirmed` closes the sample,
+  `revoked` runs the earned-badge revoke path with the QA reviewer as revoker.
 - **`flagged`:** `false <-> true` (advisory marker; does not change access).
 - **Terminal-ish:** `archived` (re-openable by restore, which forces `status='active'`).
 
@@ -146,3 +212,81 @@ rather than an absent panel, so "nobody has written one" is distinguishable from
 - **Idempotent toggles:** verify/suspend/flag are toggles; re-applying flips back (no dedicated
   "already verified" error).
 - **Concurrency:** last write wins on the shared store; no locking.
+
+## User administration
+
+Rationale relocated from `UserAdminService` Javadoc.
+
+- **Masked list, audited reveal.** `GET /users` masks mobiles and writes no audit row; `GET
+  /users/{id}` reveals the number and records who looked. Ops genuinely need a phone number to act
+  on a case, but a paged list hands over thousands per request - one deliberate, individually
+  logged read per person keeps the cost of exfiltration linear and leaves a trail naming whose data
+  was read.
+- **Moderation lives next door.** Suspension, the identity badge and the internal review flag are
+  in `UserModerationService`: decisions about a person, as opposed to administration of the
+  directory row.
+- **Search wildcards are neutralised.** `likePrefix` escapes `%`/`_`/`\` and anchors the
+  pattern, so `?q=%` cannot become an unanchored scan the `text_pattern_ops` index cannot serve.
+  The escape character is declared in the query, so the two must agree.
+- **Email collisions are caught in the service.** `update` and `restore` both compare
+  case-insensitively against V70's `lower(email)` partial unique index. Without the guard the
+  flush hits the index and the operator sees a generic conflict naming neither field nor account.
+- **Restore is the dangerous one.** Archiving is a soft delete, so an address can legitimately be
+  re-used while the first account sits archived. Restoring it then puts two live rows on one
+  address, and `AuthService#staffLogin` uses an `Optional`-returning lookup - two rows is an
+  `IncorrectResultSizeDataAccessException`, i.e. a 500 on every later sign-in for both people,
+  with no route back through the console. Answered 409 (the platform's state forbids it, not the
+  caller's entitlement) with a message naming the address and the way out.
+- **Archive floors.** An admin may not archive themselves, nor the last remaining administrator:
+  restore is admin-only, so either would lock the platform out of its own back office with no
+  in-product recovery. 409, for the same reason as above.
+
+## Account moderation
+
+Rationale relocated from `UserModerationService` Javadoc.
+
+- **Suspension is not archiving.** Archiving is the soft delete and every read path filters the
+  account out - right for someone who has gone, wrong for someone under investigation, because it
+  hides the account from the colleagues who need to look at it.
+- **A suspension is only real because `AuthService` enforces it.** Writing the column alone would
+  produce a button that changes a badge while the person kept signing in. The refusal sits on every
+  path that mints a session, including refresh, and existing refresh families are revoked so the
+  window closes to the access-token TTL rather than at some unpredictable point in the next hour.
+- **Guarded like archiving** - not yourself, not the last administrator - and idempotent, so two
+  moderators reaching the same conclusion do not get a conflict.
+- **Reactivation is deliberately narrow.** It refuses an archived account, because that state
+  belongs to `UserAdminService#restore` and its live-email collision guard; promoting an archived
+  row here would leave `archived = true` with `status = active`, a row invisible to the
+  directory that claims to be fine.
+- **The manual badge exists because the document-and-selfie flow cannot reach everybody** - a
+  company account, or a person an administrator has met and whose documents they have seen. Without
+  it those people are permanently unverifiable and the judgement moves off-platform. Because it
+  skips the `identity_hash` dedup, every grant carries a written reason and an audit entry. There is
+  one administrator, so a second-admin approval could never complete; a manager or the admin
+  decides it directly. The old maker-checker table `badge_grant_requests` was dropped in V118.
+- **Withdrawing an earned badge is refused here** - doubt about the verification is an action
+  against the verification record (revoke), which keeps the evidence and the reason together.
+- **Badge changes propagate in both directions** to the person's listings, flatmate seeker posts and
+  group seats (and so the "verified only" filter), because the badge is sold on being the same claim
+  everywhere it shows.
+- **The flag has no self-check and no last-administrator guard.** It takes nothing away, so there is
+  nothing to lock yourself out of. A reason is required and validated in the service so the operator
+  gets a sentence rather than a constraint violation.
+- **The timeline loads the user first** so a mistyped id answers 404; an empty timeline is a real
+  and common answer for a fresh account, and would otherwise read as "this person has done nothing".
+
+## Back office user view
+
+Rationale relocated from `BackOfficeUserView` Javadoc.
+
+It owns one decision - *what a back-office caller is allowed to see of another person* - and is
+shared by two services that otherwise have nothing to do with each other (`UserAdminService`,
+which administers the directory, and `UserModerationService`, which acts on a person). It is not a
+`XService` + `XServiceHelper` split of the kind `package-structure.md` section 4.1 warns
+against; duplicating the masking rule in both callers would be the real hazard, because the two
+copies would drift and the drift would be one of them quietly serving an unmasked mobile.
+
+**The masking asymmetry it holds.** A list masks; a single-user read does not, and writes an audit
+row for the reveal. Ops genuinely need a phone number to act on a case, so refusing it would push
+the work off-platform - but a paged list hands over thousands of numbers per request for the cost of
+one click, which is a bulk-export surface wearing the clothes of a search screen.

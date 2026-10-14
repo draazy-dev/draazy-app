@@ -90,18 +90,17 @@ export const propertyListing = (over = {}) => ({
 
 // Seed every synchronous browser-store dependency before first render.
 export async function seed(page, {
-  user = null, listings = [], rooms = [], posts = [], groups = [], aadhaar = false,
+  user = null, listings = [], rooms = [], posts = [], groups = [], identityVerified = false,
   contactsUsed = null, referralStats = null, plan = null, referredBy = null,
 } = {}) {
   await page.addInitScript(([k, data]) => {
-    // `addInitScript` runs per navigation; this marker preserves state created during the test.
     if (sessionStorage.getItem('__e2eSeeded')) return;
     sessionStorage.setItem('__e2eSeeded', '1');
 
     // Remove stale state so each fixture begins isolated.
     Object.values(k).forEach((key) => localStorage.removeItem(key));
     Object.keys(localStorage)
-      .filter((key) => key.startsWith('draazyListings:') || key.startsWith('draazyAadhaar:')
+      .filter((key) => key.startsWith('draazyListings:') || key.startsWith('draazyIdentity:')
         || key.startsWith('dzContactsUsed:') || key.startsWith('dzReferralStats:')
         || key.startsWith('dzReferredBy:') || key.startsWith('dzPlan:'))
       .forEach((key) => localStorage.removeItem(key));
@@ -109,9 +108,9 @@ export async function seed(page, {
     if (data.user) {
       localStorage.setItem(k.user, JSON.stringify(data.user));
       localStorage.setItem('draazyListings:' + data.user.mobile, JSON.stringify(data.listings));
-      if (data.aadhaar) {
-        localStorage.setItem('draazyAadhaar:' + data.user.mobile, JSON.stringify({
-          verified: true, source: 'digilocker', at: Date.now(),
+      if (data.identityVerified) {
+        localStorage.setItem('draazyIdentity:' + data.user.mobile, JSON.stringify({
+          verified: true, at: Date.now(),
         }));
       }
       if (data.contactsUsed != null) localStorage.setItem('dzContactsUsed:' + data.user.mobile, JSON.stringify(data.contactsUsed));
@@ -122,7 +121,7 @@ export async function seed(page, {
     if (data.rooms.length) localStorage.setItem(k.rooms, JSON.stringify(data.rooms));
     if (data.posts.length) localStorage.setItem(k.posts, JSON.stringify(data.posts));
     if (data.groups.length) localStorage.setItem(k.groups, JSON.stringify(data.groups));
-  }, [KEYS, { user, listings, rooms, posts, groups, aadhaar, contactsUsed, referralStats, plan, referredBy }]);
+  }, [KEYS, { user, listings, rooms, posts, groups, identityVerified, contactsUsed, referralStats, plan, referredBy }]);
 }
 
 // Wait for the app signal because network-idle can precede lazy-route evaluation.
@@ -154,7 +153,7 @@ const whoChooser = (page) => page.getByRole('dialog', { name: /Who's looking/ })
 // A cold lazy route can accept a click before React attaches its handler, so click and assertion
 // retry as a unit; `isVisible()` reads false one frame after a success and re-clicks under the overlay.
 async function openSheet(page) {
-  const post = page.getByRole('button', { name: /^Post( Property)?$/ }).first();
+  const post = page.getByRole('button', { name: /^Post(?: Property| property — Free)?$/ }).first();
   await expect(async () => {
     await post.click();
     await expect(chooser(page)).toBeVisible({ timeout: 2000 });
@@ -175,7 +174,11 @@ export async function postAsSolo(page) {
 export async function postAsGroup(page) {
   await openSheet(page);
   await chooser(page).getByRole('button', { name: /I'm looking for a place/i }).click();
-  await whoChooser(page).getByRole('button', { name: /We're already a group/i }).click();
+  await whoChooser(page).getByRole('button', { name: /Start a flatmate group/i }).click();
+}
+
+export async function haveAFlat(page) {
+  await page.getByRole('button', { name: /I have a flat/i }).click();
 }
 
 export const FLATMATE_STORES = {
@@ -203,7 +206,6 @@ export async function approveFlatmates(page, ...kinds) {
   await page.locator('.sf-card').first().waitFor({ timeout: 10_000 }).catch(() => {});
 }
 
-// Address-less groups sort into Team up although creation returns to Move in now.
 export async function switchToTeamUp(page) {
   await page.getByRole('button', { name: /Team up/ }).first().click();
   await page.waitForTimeout(300);
@@ -215,12 +217,6 @@ export async function openFlatmateFilters(page) {
   await toggle.waitFor({ timeout: 10_000 });
   // Deep links can open the grid, so toggling only when it remains collapsed preserves it.
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
-}
-
-// Property details omit an `h1`, so wait for their last-mounted owner contact control.
-export async function openProperty(page, id) {
-  await page.goto(`/property/${id}`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('button', { name: /Request number/i }).first()).toBeVisible({ timeout: 30_000 });
 }
 
 export const cardIds = (page) =>
@@ -237,6 +233,8 @@ export async function setBudget(page, value) {
     slider.dispatchEvent(new Event('input', { bubbles: true }));
     slider.dispatchEvent(new Event('change', { bubbles: true }));
   }, value);
-  // The list memo is non-retrying, so wait for the committed filter to settle.
-  await page.waitForTimeout(400);
+  await expect.poll(() => new URL(page.url()).searchParams.get('budget') || '', { timeout: 5000 })
+    .toMatch(new RegExp(`-${value}$`));
 }
+
+export const detailCta = (page, name) => page.getByRole('button', { name }).filter({ visible: true }).first();

@@ -1,74 +1,117 @@
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import Icon from './Icon.jsx';
-import HScroll from './ui/HScroll.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { STEPS, stepStates, statusMeta, isActive, progressPct } from '../lib/serviceRequestStatus.js';
 import {
-  listServiceRequests, decideServiceRequestDraft, addServiceRequestMessage, markServiceRequestRead,
+  listServiceRequests, decideServiceRequestDraft, approveServiceRequestDraftParty, addServiceRequestMessage, markServiceRequestRead, markServiceRequestDraftOpened,
+  getServiceRequestDocumentUrl,
 } from '../services/serviceRequestService.js';
-import { openDocUrl } from '../lib/openDoc.js';
+import { openDocFrom } from '../lib/openDoc.js';
+import { timeAgo } from '../lib/format.js';
+import useScrollLock from '../hooks/useScrollLock.js';
+import RejectedPapers from './RejectedPapers.jsx';
+import RevisedTerms from './RevisedTerms.jsx';
+import IdentityRefill, { needsIdentityRefill } from './IdentityRefill.jsx';
 
-function ProgressBar({ status }) {
+const openRequestFile = (requestId, docId) => openDocFrom(() => getServiceRequestDocumentUrl(requestId, docId));
+
+const REUPLOADABLE = new Set(['docs_review', 'draft_shared', 'changes_requested', 'approved']);
+const rank = (r) => (r.status === 'cancelled' ? 2 : isActive(r.status) ? 0 : 1);
+const hasForeignTenant = (request) => {
+  const tenants = request.details?._state?.tenants;
+  return Array.isArray(tenants) && tenants.some((tenant) => tenant?.residency === 'foreign');
+};
+
+const SEGMENT = { done: 'bg-emerald-500', active: 'bg-teal-500', todo: 'bg-white/15' };
+
+// Segments, not labelled chips: five labels cannot share a 360px row without scrolling the current step away.
+function Progress({ status }) {
   const pct = progressPct(status);
   if (pct == null) return null;
-  const done = pct >= 100;
+  const states = stepStates(status);
+  const current = states.indexOf('active');
+  const caption = pct >= 100 ? 'All steps complete'
+    : current < 0 ? 'Not started yet'
+    : `Step ${current + 1} of ${STEPS.length} · ${STEPS[current]}`;
   return (
-    <div className="mb-3">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-[11px] text-gray-400 font-medium">Progress</span>
-        <span className={'text-[11px] font-semibold ' + (done ? 'text-emerald-300' : 'text-teal-300')}>{pct}% complete</span>
+    <div className="mb-4">
+      <div className="flex gap-1" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-valuetext={caption} aria-label="Request progress">
+        {states.map((st, i) => <span key={STEPS[i]} className={'h-1.5 flex-1 rounded-full ' + SEGMENT[st]} />)}
       </div>
-      <div className="h-2 rounded-full bg-white/15 overflow-hidden ring-1 ring-inset ring-white/5" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Request progress">
-        <div className="h-full rounded-full transition-[width] duration-500" style={{ width: (pct > 0 ? Math.max(pct, 4) : 0) + '%', background: done ? 'linear-gradient(to right,#10b981,#34d399)' : 'var(--brand-gradient)' }} />
+      <div className="mt-1.5 flex items-center justify-between gap-2 text-[11px]">
+        <span className="font-semibold text-gray-200">{caption}</span>
+        {current >= 0 && current < STEPS.length - 1 ? <span className="text-gray-500 truncate">Next: {STEPS[current + 1]}</span> : null}
       </div>
     </div>
   );
 }
 
-function Stepper({ status }) {
-  const states = stepStates(status);
+function PoliceIntimationStep({ request, t }) {
+  if (request.type !== 'rental' || request.status !== 'completed') return null;
+  const done = !!request.policeIntimation?.confirmed;
   return (
-    <HScroll wrapClassName="mb-4" className="flex items-center gap-1 pb-1" fadeColor="#211f2b">
-      {STEPS.map((lab, i) => {
-        const st = states[i];
-        const dot = st === 'done' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
-          : st === 'active' ? 'bg-teal-500/20 text-teal-300 border-teal-500/30'
-          : 'bg-white/5 text-gray-500 border-white/10';
-        return (
-          <div key={lab} className="flex items-center gap-1 flex-shrink-0">
-            <div className={'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-[11px] font-medium ' + dot}>
-              <Icon name={st === 'done' ? 'check' : st === 'active' ? 'loader' : 'circle'} className="w-3 h-3" /> {lab}
-            </div>
-            {i < STEPS.length - 1 ? <div className={'w-4 h-px ' + (st === 'done' ? 'bg-emerald-500/40' : 'bg-white/10')} /> : null}
+    <div className={`mt-3 rounded-xl border p-3 ${done ? 'border-emerald-500/25 bg-emerald-500/8' : 'border-amber-500/25 bg-amber-500/8'}`}>
+      <p className="text-sm font-semibold text-white flex items-center gap-2">
+        <Icon name={done ? 'check-circle-2' : 'shield-alert'} className={`w-4 h-4 ${done ? 'text-emerald-300' : 'text-amber-300'}`} />
+        {t('services.ra.police.title')}
+      </p>
+      <p className="mt-1 text-xs leading-relaxed text-gray-300">
+        {done ? t('services.ra.police.done') : t('services.ra.police.pending')}
+      </p>
+      {!done ? (
+        <>
+          <p className="mt-2 text-xs leading-relaxed text-gray-400">{t('services.ra.police.copyNote')}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <a href="https://punepolice.gov.in" target="_blank" rel="noopener noreferrer" className="btn-outline px-3 py-2 rounded-lg text-xs text-gray-200 inline-flex items-center gap-1.5">
+              {t('services.ra.police.pune')} <Icon name="external-link" className="w-3 h-3" />
+            </a>
+            <a href="https://pcpc.gov.in" target="_blank" rel="noopener noreferrer" className="btn-outline px-3 py-2 rounded-lg text-xs text-gray-200 inline-flex items-center gap-1.5">
+              {t('services.ra.police.pcmc')} <Icon name="external-link" className="w-3 h-3" />
+            </a>
           </div>
-        );
-      })}
-    </HScroll>
+        </>
+      ) : request.policeIntimation?.reference ? (
+        <p className="mt-2 text-xs text-gray-400">{t('services.ra.police.reference', { ref: request.policeIntimation.reference })}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function FormCStep({ request, t }) {
+  if (request.type !== 'rental' || request.status !== 'completed' || !hasForeignTenant(request)) return null;
+  return (
+    <div className="mt-3 rounded-xl border border-amber-500/25 bg-amber-500/8 p-3">
+      <p className="text-sm font-semibold text-white flex items-center gap-2"><Icon name="shield-alert" className="w-4 h-4 text-amber-300" /> {t('services.ra.formC.title')}</p>
+      <p className="mt-1 text-xs leading-relaxed text-gray-300">{t('services.ra.formC.tracker')}</p>
+    </div>
   );
 }
 
 export default function ServiceTracker({ typeFilter, title = 'Your requests' }) {
+  const { t } = useTranslation();
   const { user, isIn } = useAuth();
   const { toast } = useToast();
   const mobile = user?.mobile || '';
   const [tick, setTick] = useState(0);
   const [openId, setOpenId] = useState(null);
   const [msg, setMsg] = useState('');
-  const [changeReq, setChangeReq] = useState(null); // request awaiting a "request changes" note
+  const [changeReq, setChangeReq] = useState(null);
   const [changeNote, setChangeNote] = useState('');
+  const [otpDraft, setOtpDraft] = useState({});
+  const [showCancelled, setShowCancelled] = useState(false);
   const refresh = () => setTick((t) => t + 1);
 
-  // Lock scroll + close on Escape while the "Request changes" modal is open.
+  useScrollLock(Boolean(changeReq));
   useEffect(() => {
-    if (!changeReq) return;
-    document.body.style.overflow = 'hidden';
+    if (!changeReq) return undefined;
     const onKey = (e) => e.key === 'Escape' && setChangeReq(null);
     document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+    return () => document.removeEventListener('keydown', onKey);
   }, [changeReq]);
-
   // `tick` re-runs the API read after a mutation.
+
   const [requests, setRequests] = useState([]);
   useEffect(() => {
     if (!isIn || !mobile) { setRequests([]); return undefined; }
@@ -76,23 +119,47 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
     (async () => {
       try {
         const requests = await listServiceRequests(typeFilter);
-        if (alive) setRequests([...requests].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)));
+        if (alive) setRequests([...requests].sort((a, b) => (rank(a) - rank(b)) || ((b.updatedAt || 0) - (a.updatedAt || 0))));
       } catch (error) {
         if (alive) console.warn('[service-tracker] requests failed', error);
       }
     })();
     return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refreshes are driven by the explicit tick
   }, [mobile, isIn, typeFilter, tick]);
 
-  const openDraft = (r) => openDocUrl(r.draft?.dataUrl);
-  const openFinal = (r) => openDocUrl(r.finalDoc?.dataUrl);
+  const openDraft = async (r) => {
+    const opened = await openRequestFile(r.id, r.draft?.id);
+    if (!opened || r.draft?.opened) return;
+    try {
+      await markServiceRequestDraftOpened(r.id);
+      refresh();
+    } catch (e) { console.warn('[service-tracker] draft-opened failed', e); }
+  };
+  const openFinal = (r) => openRequestFile(r.id, r.finalDoc?.id);
   const approve = async (r) => {
     try {
       await decideServiceRequestDraft(r.id, 'accepted');
       refresh();
       toast('Draft approved — we\'ll proceed with registration.', 'success');
     } catch (e) { console.warn('[service-tracker] approve failed', e); toast('Could not approve the draft. Please try again.', 'error'); }
+  };
+  const sendPartyOtp = async (r, party) => {
+    try {
+      await approveServiceRequestDraftParty(r.id, party.key);
+      toast(`Code sent to ${party.mobile || party.label}.`, 'success');
+    } catch (e) { console.warn('[service-tracker] draft party otp send failed', e); toast('Could not send the code. Please try again.', 'error'); }
+  };
+  const verifyPartyOtp = async (r, party) => {
+    const key = `${r.id}:${party.key}`;
+    const otp = (otpDraft[key] || '').trim();
+    if (otp.length !== 6) return;
+    try {
+      await approveServiceRequestDraftParty(r.id, party.key, otp);
+      setOtpDraft((prev) => ({ ...prev, [key]: '' }));
+      refresh();
+      toast(`${party.label} approved this draft.`, 'success');
+    } catch (e) { console.warn('[service-tracker] draft party otp verify failed', e); toast('The code was not accepted. Please try again.', 'error'); }
   };
   const requestChanges = (r) => { setChangeNote(''); setChangeReq(r); };
   const submitChanges = async () => {
@@ -125,6 +192,9 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
 
   if (!isIn) return null;
 
+  const cancelledCount = requests.filter((r) => r.status === 'cancelled').length;
+  const shown = showCancelled ? requests : requests.filter((r) => r.status !== 'cancelled');
+
   return (
     <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pt">
       <div className="glass-card rounded-2xl p-5 sm:p-6">
@@ -133,7 +203,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
         </div>
         <p className="text-gray-400 text-sm mb-4">Track progress, review the draft we prepare, and approve it so we can register it with the government.</p>
 
-        {requests.length === 0 ? (
+        {shown.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/15 p-6 text-center">
             <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mx-auto mb-3"><Icon name="file-clock" className="w-6 h-6 text-gray-500" /></div>
             <p className="text-white text-sm font-semibold">No active request yet</p>
@@ -141,34 +211,61 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
           </div>
         ) : (
           <div className="space-y-4">
-            {requests.map((r) => {
+            {shown.map((r) => {
               const m = statusMeta(r.status);
               const unreadStaff = (r.messages || []).filter((x) => x.from === 'staff' && !x.read).length;
               return (
-                <div key={r.id} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
-                  <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
-                    <div className="min-w-0">
-                      <p className="text-white font-semibold text-sm">{r.service}</p>
-                      <p className="text-gray-500 text-xs truncate">{r.details?.property || r.details?.from || 'Request'} · {r.id.slice(0, 10)}</p>
-                    </div>
-                    <span className="inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-lg font-semibold" style={{ background: m.bg, color: m.color }}><Icon name={m.icon} className="w-3 h-3" /> {m.label}</span>
+                <div key={r.id} className="rounded-xl border border-white/10 border-l-4 bg-white/[0.03] p-4" style={{ borderLeftColor: m.color }}>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold" style={{ background: m.bg, color: m.color }}><Icon name={m.icon} className="w-3.5 h-3.5 flex-shrink-0" /> {m.label}</span>
+                    {r.updatedAt ? <span className="text-[11px] text-gray-500 flex-shrink-0 mt-1">{timeAgo(r.updatedAt)}</span> : null}
                   </div>
+                  <p className="text-white font-semibold text-sm line-clamp-2">{r.details?.property || r.details?.from || r.service}</p>
+                  <p className="text-gray-500 text-xs mt-0.5 mb-3">{r.service} · Ref {r.id.slice(0, 10)}</p>
+                  <Progress status={r.status} />
 
-                  <ProgressBar status={r.status} />
-                  <Stepper status={r.status} />
+                  {r.type === 'rental' && REUPLOADABLE.has(r.status) ? <RejectedPapers requestId={r.id} onUploaded={refresh} /> : null}
+                  {r.type === 'rental' && r.amendment ? <RevisedTerms request={r} onChanged={refresh} /> : null}
+                  {r.type === 'rental' && isActive(r.status) && needsIdentityRefill(r) ? <IdentityRefill request={r} viewerMobile={mobile} onSaved={refresh} /> : null}
+                  {r.status === 'draft_shared' && r.draftApproval ? (
+                    <div className="mb-3 rounded-xl border border-white/8 bg-white/[0.03] p-3">
+                      <p className="text-xs font-semibold text-gray-200">
+                        Waiting for {Math.max(0, r.draftApproval.total - r.draftApproval.approved)} of {r.draftApproval.total} parties
+                      </p>
+                      <ul className="mt-2 space-y-2">
+                        {r.draftApproval.parties.map((party) => {
+                          const key = `${r.id}:${party.key}`;
+                          return (
+                            <li key={party.key} className="flex flex-col gap-2 rounded-lg border border-white/5 p-2 text-xs text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+                              <span>{party.label}{party.mobile ? ` · ${party.mobile}` : ''} — {party.approved ? 'approved' : party.opened ? 'opened' : 'pending'}</span>
+                              {!party.approved && party.method === 'otp' ? (
+                                <span className="flex gap-2">
+                                  <button type="button" onClick={() => sendPartyOtp(r, party)} className="btn-outline px-2 py-1 text-[11px]">Send code</button>
+                                  <input value={otpDraft[key] || ''} onChange={(e) => setOtpDraft((prev) => ({ ...prev, [key]: e.target.value.replace(/\D/g, '').slice(0, 6) }))} inputMode="numeric" maxLength={6} aria-label={`OTP for ${party.label}`} className="w-20 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-white" placeholder="OTP" />
+                                  <button type="button" onClick={() => verifyPartyOtp(r, party)} disabled={(otpDraft[key] || '').length !== 6} className="btn-teal px-2 py-1 text-[11px] disabled:opacity-50">Verify</button>
+                                </span>
+                              ) : null}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  ) : null}
+                  <PoliceIntimationStep request={r} t={t} />
+                  <FormCStep request={r} t={t} />
 
+                  {/* Mobile lays the actions out as an even 2-col grid so long labels don't wrap into a ragged
+                     staircase; a solo Messages button spans the full width. */}
                   {(() => {
-                  // Mobile: lay the actions out as an even 2-col grid so long labels
-                  // don't wrap into a ragged staircase; desktop keeps them inline.
-                  // When Messages is the only action, let it span the full width.
                   const soloMsg = r.status !== 'draft_shared' && !(r.status === 'completed' && r.finalDoc);
                   return (
                   <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
                     {r.status === 'draft_shared' ? (
                       <>
                         <button onClick={() => openDraft(r)} className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="file-text" className="w-3.5 h-3.5" /> View draft{r.draft?.version ? ' v' + r.draft.version : ''}</button>
-                        <button onClick={() => approve(r)} className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
+                        <button onClick={() => approve(r)} disabled={!r.draft?.opened} title={r.draft?.opened ? undefined : 'Open the draft first'} className="btn-teal w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"><Icon name="check" className="w-3.5 h-3.5" /> Approve</button>
                         <button onClick={() => requestChanges(r)} className="btn-outline w-full sm:w-auto justify-center px-3 py-2 rounded-lg text-gray-200 text-xs font-semibold inline-flex items-center gap-1.5"><Icon name="rotate-ccw" className="w-3.5 h-3.5" /> Request changes</button>
+                        {!r.draft?.opened ? <p className="col-span-2 sm:basis-full text-[11px] text-gray-500">Open the draft to approve it.</p> : null}
                       </>
                     ) : null}
                     {r.status === 'completed' && r.finalDoc ? (
@@ -204,6 +301,12 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
             })}
           </div>
         )}
+        {cancelledCount ? (
+          <button type="button" onClick={() => setShowCancelled((v) => !v)} aria-expanded={showCancelled} className="mt-3 w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold text-gray-400 hover:text-white cursor-pointer">
+            <Icon name="chevron-down" className={'w-4 h-4 transition-transform ' + (showCancelled ? 'rotate-180' : '')} />
+            {showCancelled ? 'Hide cancelled requests' : `Show ${cancelledCount} cancelled request${cancelledCount === 1 ? '' : 's'}`}
+          </button>
+        ) : null}
       </div>
 
       {changeReq ? (

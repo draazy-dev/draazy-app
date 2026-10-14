@@ -1,161 +1,107 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Search, Bell, Building2, User, Wrench, ShieldCheck, LayoutDashboard, BarChart3, MessageSquare, FileText, Flag, LifeBuoy, Users, Settings, IndianRupee, Gift, Compass, BookOpen } from 'lucide-react';
-/* The Ctrl+K palette. Register item 22 in `tasks/DECISIONS-NEEDED.md`, resolved as option (1).
-
-   ## What this used to be
-
-   Seven categories, five of which answered from `rawDb()` — a synchronous read of the localStorage
-   store `main.jsx` seeds from `db.json` at boot, with no reference to the domain allow-list. In
-   mock mode that store *is* the system being administered and the answers were right; the moment a
-   domain went live it became a stale copy of a fixture file, and the palette handed an operator 80
-   fixture listings and 62 fixture users dressed as production rows, whose ids resolve to nothing on
-   the console each result links to.
-
-   The first repair gated each category on `!isHttpDomain(<its domain>)`, which stopped the lie but
-   left a live build with a palette that is only a nav-jumper — and, worse, one whose search field
-   went quiet exactly as the catalogue it should search got big enough to need searching. Item 22
-   listed the alternatives; option (1), the fan-out, is what this file now does.
-
-   ## Which two categories, and why not the other three
-
-   `listings` and `people` go through the **seam**, not through `lib/`: `propertyService
-   .searchForModeration` and `usersService.listUsers` both already forward a `q` to their http
-   provider *and* implement it in their mock one, so one call site is correct in both builds and the
-   `isHttpDomain` branch disappears rather than being inverted. No endpoint was added — see
-   `toModerationQuery` and `GET /users?q=`, which were already there and already role-gated. The
-   authorization question item 22 raised is answered by using the console's own endpoints: a caller
-   who may not read `/admin/properties` gets the same refusal here as on the page itself.
-
-   Services, enquiries and deals are **dropped**, not hidden. `ticket` is live-only by D184 and has
-   no mock provider at all, and neither `contact` nor `deal` has a search parameter on its list
-   endpoint — so keeping them would mean either re-reading `db.json` (the original defect) or
-   fetching a page and filtering it in the browser, which is the "confident empty on a row that
-   exists" failure `searchForModeration`'s own docblock was written about. Three categories that
-   cannot answer honestly are better spent as three that can.
-
-   ## Asynchrony is the cost, and it is paid here
-
-   The old `results` was a `useMemo` because the store was in memory. A network fan-out cannot be,
-   so the two halves are now separated: pages and features stay synchronous and appear on the first
-   keystroke, and the two data categories arrive when they arrive. Each is `allSettled` — a 403 on
-   one desk must not blank the other — and the failure is *named on screen* rather than rendered as
-   an empty category, because an empty category is indistinguishable from "no such listing". */
-import { searchForModeration } from '../../services/propertyService.js';
+import { Search, Bell, Building2, User, Wrench, ShieldCheck, LayoutDashboard, BarChart3, MessageSquare, FileText, Flag, LifeBuoy, Users, Settings, IndianRupee, Gift, Compass, BookOpen, Undo2 } from 'lucide-react';
+import { lookupForModeration } from '../../services/propertyService.js';
 import { listUsers } from '../../services/usersService.js';
-import { listTicketQueue } from '../../services/ticketService.js';
+import { adminBell } from '../../services/analyticsService.js';
 import { useAdminFlags } from '../../context/AdminFlagsContext.jsx';
-
+import { useAuth } from '../../context/AuthContext.jsx';
+import { useHelpTree } from '../../lib/useHelp.js';
+import { useNotifications } from '../../context/NotificationContext.jsx';
+import { listNotifications, markAllRead, markRead } from '../../services/notificationService.js';
+import { safeNotificationLink } from '../notifications/notificationModel.js';
+import { SERVICE_DESKS, canOpenPath, hasPermission, portalPath, runbooksFor, ticketPath } from '../../lib/adminModules.js';
 /** Rows shown per data category. The chip beside it carries the size of the whole match. */
-const RESULT_CAP = 6;
 
+const RESULT_CAP = 6;
 /** Rows shown per queue in the bell, on the same split: heading counts, list samples. */
-const BELL_CAP = 5;
 
 /** One request per pause in typing rather than one per keystroke. */
-const DEBOUNCE_MS = 200;
 
+const DEBOUNCE_MS = 200;
+const BELL_REFRESH_MS = 90_000;
 /** "a", "a and b", "a, b and c" — so the notices below read as sentences rather than lists. */
+
 const prose = (words) =>
   words.length < 2 ? (words[0] || '') : `${words.slice(0, -1).join(', ')} and ${words[words.length - 1]}`;
 
 const SEARCH_PLACEHOLDER = 'Search pages, features, listings and people...';
+/* `term` is what the rows in here answer, which is not always what is in the field: it is how the render knows
+   whether it is holding this search's results or the previous one's. */
 
-/* `term` is what the rows in here answer, which is not always what is in the field: it is how the
-   render knows whether it is holding this search's results or the previous one's. */
 const NO_RESULTS = { term: '', listings: [], listingsTotal: 0, users: [], usersTotal: 0, failed: [] };
+const NOTHING = { items: [], total: 0 };
 
 const NAV_INDEX_FULL = [
   { label: 'Dashboard', keywords: 'dashboard home overview', path: '/admin', icon: LayoutDashboard, flag: null },
   { label: 'Analytics', keywords: 'analytics stats chart graph', path: '/admin/analytics', icon: BarChart3, flag: 'analytics' },
   { label: 'Properties', keywords: 'properties listings homes flats apartments manage', path: '/admin/properties', icon: Building2, flag: null },
   { label: 'Users', keywords: 'users people accounts customers owners tenants members', path: '/admin/users', icon: Users, flag: null },
-  { label: 'Services', keywords: 'services requests tickets packers movers legal interior valuation rent agreement home loans finance', path: '/admin/services', icon: Wrench, flag: null },
+  ...SERVICE_DESKS.map((d) => ({ label: d.label, keywords: `services desk requests tickets ${d.label.toLowerCase()}`, path: d.path, icon: d.icon, flag: null })),
   { label: 'Enquiries', keywords: 'enquiries messages inbox contact leads', path: '/admin/enquiries', icon: MessageSquare, flag: null },
   { label: 'Finance', keywords: 'finance billing payments revenue invoices subscriptions money', path: '/admin/finance', icon: IndianRupee, flag: 'finance' },
   { label: 'Content', keywords: 'content cms pages blog posts manage text', path: '/admin/content', icon: FileText, flag: null },
   { label: 'Reports', keywords: 'reports flagged abuse spam moderation', path: '/admin/reports', icon: Flag, flag: 'reports' },
   { label: 'Support', keywords: 'support help tickets complaints issues', path: '/admin/support', icon: LifeBuoy, flag: 'support' },
-  { label: 'Flatmates', keywords: 'flatmates roommate matching seekers moderation', path: '/ops/flatmate-review', icon: Users, flag: 'flatmates' },
-  { label: 'Societies', keywords: 'societies society claim resident verification rwa committee gated community buildings', path: '/admin/societies', icon: Building2, flag: null },
-  { label: 'Localities', keywords: 'localities locality area neighbourhood neighborhood registry pending mint verify curated community pune', path: '/admin/localities', icon: Compass, flag: null },
+  { label: 'Flatmates', keywords: 'flatmates roommate matching seekers moderation', path: '/admin/flatmates', icon: Users, flag: 'flatmates' },
+  { label: 'Places', keywords: 'places societies society localities locality area neighbourhood neighborhood merge duplicate buildings pune', path: '/admin/places', icon: Compass, flag: null },
   { label: 'Settings', keywords: 'settings configuration preferences site general email notifications sms seo', path: '/admin/settings', icon: Settings, flag: null },
-  { label: 'Referrals (Ops)', keywords: 'referrals ops refer bonus', path: '/ops/referrals', icon: Gift, flag: null },
-  { label: 'Help & Runbooks', keywords: 'help runbook runbooks docs documentation guide guides knowledge base handbook playbook ops internal how to', path: '/help/c/ops-playbook', icon: BookOpen, flag: null },
+  { label: 'Integrations', keywords: 'integrations email whatsapp otp payments cashfree zoho webhook delivery failures providers', path: '/admin/integrations', icon: Settings, flag: null },
+  { label: 'Referrals', keywords: 'referrals ops refer bonus', path: '/admin/referrals', icon: Gift, flag: null },
+  { label: 'Refunds', keywords: 'refunds refund money back credit note dispute chargeback pass pack', path: '/admin/refunds', icon: Undo2, flag: null },
+  { label: 'Runbooks', keywords: 'help runbook runbooks docs documentation guide guides knowledge base handbook playbook ops internal how to checklist', path: '/admin/runbooks', icon: BookOpen, flag: null },
 ];
 
 const FEATURES_INDEX = [
-  { label: 'Traffic', keywords: 'traffic visits pageviews sessions visitors', path: '/admin/analytics?tab=traffic', parent: 'Analytics', flag: 'analytics.traffic' },
-  { label: 'Engagement', keywords: 'engagement session duration bounce rate top pages', path: '/admin/analytics?tab=engagement', parent: 'Analytics', flag: 'analytics.engagement' },
-  { label: 'Anonymous Surfers', keywords: 'anonymous surfers non-registered visitors tracking', path: '/admin/analytics?tab=surfers', parent: 'Analytics', flag: 'analytics.anonymous' },
-  { label: 'Geography', keywords: 'geography locality area demand listings rates pune', path: '/admin/analytics?tab=geography', parent: 'Analytics', flag: 'analytics.geography' },
-  { label: 'Supply Gap', keywords: 'supply gap demand market opportunity underserved', path: '/admin/analytics?tab=supply-gap', parent: 'Analytics', flag: 'analytics.supplyGap' },
-  { label: 'City Requests', keywords: 'city request expansion request your city geographic demand waitlist new city', path: '/admin/analytics?tab=supply-gap', parent: 'Analytics', flag: 'analytics.supplyGap' },
-  { label: 'Pricing Intelligence', keywords: 'pricing market rate comparison sqft intelligence', path: '/admin/analytics?tab=pricing', parent: 'Analytics', flag: 'analytics.pricing' },
-  { label: 'SLA Compliance', keywords: 'sla compliance service level response time ticket pickup delivery concierge turnaround', path: '/admin/analytics?tab=sla', parent: 'Analytics', flag: 'analytics.sla' },
+  { label: 'Traffic', keywords: 'traffic visits pageviews sessions visitors', path: '/admin/analytics?tab=traffic', parent: 'Analytics', flag: 'analytics' },
+  { label: 'Engagement', keywords: 'engagement session duration bounce rate top pages', path: '/admin/analytics?tab=engagement', parent: 'Analytics', flag: 'analytics' },
+  { label: 'Funnel', keywords: 'funnel conversion listings approved contacts visits deals closed', path: '/admin/analytics?tab=funnel', parent: 'Analytics', flag: 'analytics' },
+  { label: 'Supply Gap', keywords: 'supply gap demand market opportunity underserved locality area', path: '/admin/analytics?tab=supply-gap', parent: 'Analytics', flag: 'analytics' },
+  { label: 'City Requests', keywords: 'city request expansion request your city geographic demand waitlist new city', path: '/admin/analytics?tab=supply-gap', parent: 'Analytics', flag: 'analytics' },
+  { label: 'Pricing Intelligence', keywords: 'pricing market rate comparison sqft intelligence', path: '/admin/analytics?tab=pricing', parent: 'Analytics', flag: 'analytics' },
+  { label: 'SLA Compliance', keywords: 'sla compliance service level response time ticket pickup delivery concierge turnaround', path: '/admin/analytics?tab=sla', parent: 'Analytics', flag: 'analytics' },
 
-  { label: 'All Listings', keywords: 'all listings approved active', path: '/admin/properties?tab=all', parent: 'Properties', flag: null },
-  { label: 'Verification Queue', keywords: 'verification queue pending review approve reject', path: '/admin/properties?tab=verify', parent: 'Properties', flag: null },
-  { label: 'Needs Follow-up', keywords: 'follow-up followup stale awaiting', path: '/admin/properties?tab=followup', parent: 'Properties', flag: null },
-  { label: 'Staff Posted', keywords: 'staff posted on behalf', path: '/admin/properties?tab=staff', parent: 'Properties', flag: null },
+  { label: 'To Verify', keywords: 'verification queue pending review approve reject', path: '/admin/properties?tab=verify', parent: 'Properties', flag: null },
+  { label: 'Re-checks', keywords: 'recheck re-check edited live price furnishing possession', path: '/admin/properties?tab=recheck', parent: 'Properties', flag: null },
+  { label: 'Badge Requests', keywords: 'verified badge ownership documents vault', path: '/admin/properties?tab=badge', parent: 'Properties', flag: null },
+  { label: 'Needs Follow-up', keywords: 'follow-up followup stale unconfirmed nudge', path: '/admin/properties?tab=followup', parent: 'Properties', flag: null },
   { label: 'Flagged Listings', keywords: 'flagged reported abuse', path: '/admin/properties?tab=flagged', parent: 'Properties', flag: null },
-  { label: 'Featured Listings', keywords: 'featured premium spotlight promoted', path: '/admin/properties?tab=featured', parent: 'Properties', flag: null },
-  { label: 'Sales Pipeline', keywords: 'pipeline sales conversion deal', path: '/admin/properties?tab=pipeline', parent: 'Properties', flag: null },
+  { label: 'All Listings', keywords: 'all listings approved active staff posted featured', path: '/admin/properties?tab=all', parent: 'Properties', flag: null },
 
   { label: 'Enquiries List', keywords: 'enquiries list leads inbox messages contact', path: '/admin/enquiries?tab=enquiries', parent: 'Enquiries', flag: null },
-  { label: 'Site Visits', keywords: 'visits site scheduling calendar viewing property', path: '/admin/enquiries?tab=visits', parent: 'Enquiries', flag: 'enquiries.visits' },
-  { label: 'Deals', keywords: 'deals closed gmv transactions negotiation', path: '/admin/enquiries?tab=deals', parent: 'Enquiries', flag: 'enquiries.deals' },
+  { label: 'Site Visits', keywords: 'visits site scheduling calendar viewing property', path: '/admin/enquiries?tab=visits', parent: 'Enquiries', flag: null },
+  { label: 'Deals', keywords: 'deals closed gmv transactions negotiation', path: '/admin/enquiries?tab=deals', parent: 'Enquiries', flag: null },
   { label: 'Conversion Funnel', keywords: 'funnel conversion pipeline enquiry visit deal time drop-off', path: '/admin/enquiries?tab=funnel', parent: 'Enquiries', flag: null },
 
-  { label: 'Revenue Charts', keywords: 'revenue charts mrr subscriptions services featured', path: '/admin/finance', parent: 'Finance', flag: 'finance.charts' },
-  { label: 'Transactions', keywords: 'transactions ledger payments billing invoices', path: '/admin/finance', parent: 'Finance', flag: 'finance.transactions' },
-  { label: 'Financial Models', keywords: 'models subscription payout calculations', path: '/admin/finance', parent: 'Finance', flag: 'finance.models' },
+  { label: 'Revenue Charts', keywords: 'revenue charts mrr subscriptions services featured', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
+  { label: 'Transactions', keywords: 'transactions ledger payments billing invoices', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
+  { label: 'Financial Models', keywords: 'models subscription payout calculations', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
 
-  { label: 'Banners', keywords: 'banners promotional homepage carousel', path: '/admin/content?tab=banners', parent: 'Content', flag: 'content.banners' },
-  { label: 'FAQs', keywords: 'faqs frequently asked questions help', path: '/admin/content?tab=faqs', parent: 'Content', flag: 'content.faqs' },
-  { label: 'Announcements', keywords: 'announcements notifications alerts', path: '/admin/content?tab=announcements', parent: 'Content', flag: 'content.announcements' },
-  { label: 'Reviews Moderation', keywords: 'reviews moderation feedback ratings', path: '/admin/content?tab=reviews', parent: 'Content', flag: 'content.reviews' },
+  { label: 'FAQs', keywords: 'faqs frequently asked questions help', path: '/admin/content', parent: 'Content', flag: 'content.enabled' },
 
   { label: 'General Settings', keywords: 'general site email notifications sms configuration', path: '/admin/settings?tab=general', parent: 'Settings', flag: null },
   { label: 'Fee Configuration', keywords: 'fees pricing commission brokerage charges', path: '/admin/settings?tab=fees', parent: 'Settings', flag: null },
   { label: 'Feature Flags', keywords: 'feature flags toggles enable disable modules', path: '/admin/settings?tab=flags', parent: 'Settings', flag: null },
-  { label: 'Audit Log', keywords: 'audit log history actions trail who changed', path: '/admin/settings?tab=audit', parent: 'Settings', flag: null },
+  { label: 'Activity Log', keywords: 'audit log history actions trail who changed staff activity', path: '/admin/staff-activity?tab=log', parent: 'Team Activity', flag: null },
 
   { label: 'Reported Properties', keywords: 'reported abuse fake fraud listings', path: '/admin/reports?tab=listings', parent: 'Reports', flag: 'reports' },
   { label: 'Reported Users', keywords: 'reported impersonation abuse spam', path: '/admin/reports?tab=users', parent: 'Reports', flag: 'reports' },
+  { label: 'Reviews Moderation', keywords: 'reviews moderation feedback ratings approve reject', path: '/admin/reports?tab=reviews', parent: 'Reports', flag: 'reports' },
 
-  { label: 'Host Verification', keywords: 'verification tenant owner badge flatmate agreement', path: '/ops/flatmate-review', parent: 'Flatmates', flag: 'flatmates' },
-  { label: 'Flatmate Moderation', keywords: 'seekers rooms groups flatmate share roommate posts publish', path: '/ops/flatmate-review', parent: 'Flatmates', flag: 'flatmates' },
-  { label: 'Group Applications', keywords: 'applications join group flatmate', path: '/ops/flatmate-review', parent: 'Flatmates', flag: 'flatmates' },
+  { label: 'Host Verification', keywords: 'verification tenant owner badge flatmate agreement', path: '/admin/flatmates', parent: 'Flatmates', flag: 'flatmates' },
+  { label: 'Flatmate Moderation', keywords: 'seekers rooms groups flatmate share roommate posts publish', path: '/admin/flatmates', parent: 'Flatmates', flag: 'flatmates' },
+  { label: 'Group Applications', keywords: 'applications join group flatmate', path: '/admin/flatmates', parent: 'Flatmates', flag: 'flatmates' },
 
-  { label: 'Society Claims', keywords: 'society claims rwa committee onboard manage', path: '/admin/societies?tab=claims', parent: 'Societies', flag: null },
-  { label: 'Resident Verifications', keywords: 'resident verification proof live here badge', path: '/admin/societies?tab=residents', parent: 'Societies', flag: null },
-  { label: 'Society Directory', keywords: 'society directory catalogue edit overlay maintenance', path: '/admin/societies?tab=directory', parent: 'Societies', flag: null },
+  { label: 'Areas', keywords: 'areas localities locality retire restore registry community', path: '/admin/places?tab=areas', parent: 'Places', flag: null },
+  { label: 'Duplicate Societies', keywords: 'society candidates merge duplicate minted community', path: '/admin/places?tab=duplicates', parent: 'Places', flag: null },
+  { label: 'Society Details', keywords: 'society directory catalogue edit registration conveyance maintenance', path: '/admin/places?tab=societies', parent: 'Places', flag: null },
+  /* Three Dashboard entries stood here — Smart Alerts, SLA Health and Daily Scorecard. */
 
-  { label: 'Pending Localities', keywords: 'pending localities review verify promote minted community area', path: '/admin/localities?tab=pending', parent: 'Localities', flag: null },
-  { label: 'Locality Directory', keywords: 'locality directory registry curated community areas', path: '/admin/localities?tab=directory', parent: 'Localities', flag: null },
+  { label: 'Team Performance', keywords: 'staff kpi performance metrics summary leaderboard turnaround', path: '/admin/staff-activity?tab=performance', parent: 'Team Activity', flag: null },
 
-  /* Three Dashboard entries stood here — Smart Alerts, SLA Health and Daily Scorecard. All three
-     jumped to `/admin` to land on a panel that was generated in the browser from a seeded PRNG, and
-     the panels have been removed rather than repointed (no route produces them; see the comment in
-     AdminDashboard.jsx and the rows in tasks/DECISIONS-NEEDED.md). A palette entry that navigates
-     somewhere real and then finds nothing is worse than no entry, so they go with the panels. The
-     `dash.*` flags they were gated on stay in AdminFlagsContext for whoever restores the work. */
+  { label: 'Priority Levels', keywords: 'priority high medium low urgent tickets', path: '/admin/home-loans', parent: 'Home Loans', flag: 'services.enabled' },
+  { label: 'Staff Assignment', keywords: 'staff assignment assign tickets individual', path: '/admin/home-loans', parent: 'Home Loans', flag: 'services.enabled' },
 
-  { label: 'Staff KPIs', keywords: 'staff kpi performance metrics summary', path: '/admin/staff-activity', parent: 'Staff Activity', flag: 'staffActivity.kpis' },
-  { label: 'Staff Leaderboard', keywords: 'leaderboard ranking staff top performer', path: '/admin/staff-activity', parent: 'Staff Activity', flag: 'staffActivity.leaderboard' },
-
-  { label: 'Team Routing', keywords: 'team routing assign tickets', path: '/admin/services', parent: 'Services', flag: 'services.teamRouting' },
-  { label: 'Priority Levels', keywords: 'priority high medium low urgent tickets', path: '/admin/services', parent: 'Services', flag: 'services.priority' },
-  { label: 'Staff Assignment', keywords: 'staff assignment assign tickets individual', path: '/admin/services', parent: 'Services', flag: 'services.staffAssignment' },
-
-  /* Staff runbooks. Indexed here so the answer to "what is the SLA on this queue?"
-     is one ⌘K away from the queue itself, rather than something you have to know
-     the help centre exists to find. These are the same articles gated by role in
-     lib/help.js — only internal accounts can reach the back-office at all. */
-  { label: 'Verification SLAs', keywords: 'sla slas turnaround target verification kyc queue breach escalation runbook internal ops deadline', path: '/help/a/verification-sla', parent: 'Runbooks', flag: null },
-  { label: 'Ticket Handling & Escalation', keywords: 'ticket handling escalation priority p0 p1 p2 p3 support refund approval ladder runbook internal ops', path: '/help/a/ticket-escalation', parent: 'Runbooks', flag: null },
-  { label: 'Ops Playbook', keywords: 'ops playbook runbook internal staff procedures guide index', path: '/help/c/ops-playbook', parent: 'Runbooks', flag: null },
   { label: 'Product Changelog', keywords: 'changelog release notes shipped whats new version updates', path: '/help/changelog', parent: 'Runbooks', flag: null },
 ];
 
@@ -169,17 +115,16 @@ function useOutside(refs, onOutside, active) {
     return () => document.removeEventListener('mousedown', onDown);
   }, [refs, onOutside, active]);
 }
+/* Fixed, because all four are answerable on every deployment now. */
 
-/* Fixed, because all four are answerable on every deployment now. The previous list was derived
-   from the allow-list, which meant an operator's palette silently grew and shrank between builds. */
 const FILTER_CHIPS = [
   { key: 'all', label: 'All' },
   { key: 'features', label: 'Features' },
   { key: 'listings', label: 'Listings' },
   { key: 'users', label: 'People' },
 ];
-
 /** Listing moderation statuses, which are the only ones this palette renders now. */
+
 function StatusPill({ status }) {
   const colors = {
     approved: 'bg-emerald-500/15 text-emerald-300',
@@ -194,42 +139,71 @@ function StatusPill({ status }) {
   );
 }
 
+// A section the caller may read but the server left out is dark, never zero; a failed read darkens all of them.
+function toNotif(bell, canReadProperties, canReadTickets) {
+  const pending = bell?.pendingListings;
+  const open = bell?.openTickets;
+  const replied = bell?.ownerReplies;
+  return {
+    pending: pending?.items || [],
+    pendingTotal: pending?.total || 0,
+    open: open?.items || [],
+    openTotal: open?.total || 0,
+    replied: replied?.items || [],
+    repliedTotal: replied?.total || 0,
+    blind: [
+      ...(canReadProperties && !pending ? ['Pending verifications'] : []),
+      ...(canReadTickets && !open ? ['Open service requests'] : []),
+      ...(canReadProperties && !replied ? ['Owner replies'] : []),
+    ],
+    total: (pending?.total || 0) + (open?.total || 0) + (replied?.total || 0),
+  };
+}
 export default function AdminTopbarTools() {
   const navigate = useNavigate();
-  const { adminFlags, tabEnabled, optionEnabled } = useAdminFlags();
+  const { unread, refresh: refreshUnread } = useNotifications();
+  const { tabEnabled, optionEnabled } = useAdminFlags();
+  const { user } = useAuth();
+  const canReadProperties = hasPermission(user, 'properties:read');
+  const canReadUsers = hasPermission(user, 'users:read');
+  const canReadTickets = hasPermission(user, 'tickets:read');
   const [q, setQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
+  const [phoneSearch, setPhoneSearch] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [filter, setFilter] = useState('all');
   const searchRef = useRef(null);
   const notifRef = useRef(null);
 
   const NAV_INDEX = useMemo(
-    () => NAV_INDEX_FULL.filter((item) => !item.flag || tabEnabled(item.flag)),
-    [adminFlags.tab, tabEnabled],
+    () => NAV_INDEX_FULL.filter((item) => (!item.flag || tabEnabled(item.flag)) && canOpenPath(user, item.path)),
+    [tabEnabled, user],
   );
 
-  const FEATURES = useMemo(
-    () => FEATURES_INDEX.filter((f) => !f.flag || optionEnabled(f.flag)),
-    [optionEnabled],
-  );
+  const { articles } = useHelpTree();
+  const FEATURES = useMemo(() => {
+    const runbooks = runbooksFor(articles, user)
+      .map((a) => ({ label: a.title, keywords: `${a.summary} runbook internal ops`, path: `/admin/runbooks/${a.slug}`, parent: 'Runbooks', flag: null }));
+    return [...FEATURES_INDEX, ...runbooks].filter((f) => (!f.flag || optionEnabled(f.flag)) && canOpenPath(user, f.path));
+  }, [optionEnabled, user, articles]);
 
-  useOutside([searchRef], () => { setSearchOpen(false); setQ(''); setFilter('all'); }, searchOpen);
+  useOutside([searchRef], () => { setSearchOpen(false); setPhoneSearch(false); setQ(''); setFilter('all'); }, searchOpen || phoneSearch);
   useOutside([notifRef], () => setNotifOpen(false), notifOpen);
 
   const inputRef = useRef(null);
 
+  useEffect(() => { if (phoneSearch) inputRef.current?.focus(); }, [phoneSearch]);
+
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === 'Escape') { setSearchOpen(false); setNotifOpen(false); setQ(''); setFilter('all'); inputRef.current?.blur(); }
+      if (e.key === 'Escape') { setSearchOpen(false); setPhoneSearch(false); setNotifOpen(false); setQ(''); setFilter('all'); inputRef.current?.blur(); }
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') { e.preventDefault(); inputRef.current?.focus(); }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
+  /* Pages and features only. */
 
-  /* Pages and features only. Both indexes are in this file, so this half is instant and stays a
-     memo — the palette must open on the first keystroke rather than after a round trip. */
   const nav = useMemo(() => {
     const term = q.trim().toLowerCase();
     if (term.length < 2) return null;
@@ -242,35 +216,31 @@ export default function AdminTopbarTools() {
       : [];
     return { pages: pages.slice(0, 4), features: features.slice(0, 8), pageCount: pages.length, featureCount: features.length };
   }, [q, filter, NAV_INDEX, FEATURES]);
+  /* Listings and people, over the seam. */
 
-  /* Listings and people, over the seam. Not filtered by the chip: narrowing the view is not a
-     reason to re-ask the server, and the rows are already here when the operator changes their
-     mind. */
   const [remote, setRemote] = useState(NO_RESULTS);
 
   useEffect(() => {
     const term = q.trim();
+    /* Re-armed on every run rather than only cleared on teardown: a ref initialised once outside the effect stays
+       `false` after StrictMode's mount/unmount/mount and swallows every result for the rest of the session. */
     if (term.length < 2) { setRemote(NO_RESULTS); return undefined; }
-    /* Re-armed on every run rather than only cleared on teardown: a ref initialised once outside
-       the effect stays `false` after StrictMode's mount/unmount/mount and swallows every result
-       for the rest of the session. */
     let live = true;
     const timer = setTimeout(async () => {
       const [listings, people] = await Promise.allSettled([
-        searchForModeration({ q: term }, 'newest', { page: 1, size: RESULT_CAP }),
-        listUsers({ q: term, page: 0, size: RESULT_CAP }),
-      ]);
+        canReadProperties ? lookupForModeration(term, { size: RESULT_CAP }) : NOTHING,
+        canReadUsers ? listUsers({ q: term, page: 0, size: RESULT_CAP }) : NOTHING,
       // Two guards, not one: `live` drops a response whose search has been superseded, and the
       // debounce above means the superseded one usually never left.
+      ]);
       if (!live) return;
       setRemote({
         term,
         listings: listings.status === 'fulfilled' ? (listings.value.items || []) : [],
         listingsTotal: listings.status === 'fulfilled' ? (listings.value.total || 0) : 0,
         users: people.status === 'fulfilled' ? (people.value.items || []) : [],
+        /* Named, never silently empty. */
         usersTotal: people.status === 'fulfilled' ? (people.value.total || 0) : 0,
-        /* Named, never silently empty. A desk this operator may not read returns 403, and an empty
-           Listings section says "no such listing" — which is a different and much worse claim. */
         failed: [
           ...(listings.status === 'rejected' ? ['listings'] : []),
           ...(people.status === 'rejected' ? ['people'] : []),
@@ -278,7 +248,7 @@ export default function AdminTopbarTools() {
       });
     }, DEBOUNCE_MS);
     return () => { live = false; clearTimeout(timer); };
-  }, [q]);
+  }, [q, canReadProperties, canReadUsers]);
 
   const results = useMemo(() => {
     if (!nav) return null;
@@ -309,46 +279,47 @@ export default function AdminTopbarTools() {
     };
   }, [nav, remote, q, filter]);
 
-  /* The bell. Both queues over the seam, both `allSettled` for the same reason as the palette —
-     and `ticket` is live-only (D184), so in a mock build that half legitimately refuses and says
-     so. It must never fall back to "All caught up.": a console that agrees with you is more
-     dangerous than one that errors (D231). */
-  const [notif, setNotif] = useState({ pending: [], pendingTotal: 0, open: [], openTotal: 0, blind: [], total: 0 });
+  const [notif, setNotif] = useState({ pending: [], pendingTotal: 0, open: [], openTotal: 0, replied: [], repliedTotal: 0, blind: [], total: 0 });
 
+  // Read on mount, on open, and on a slow timer while the tab is visible; a route change does not refetch.
+  const readBell = useCallback(() => {
+    const settle = (bell) => setNotif(toNotif(bell, canReadProperties, canReadTickets));
+    adminBell().then(settle, () => settle(null));
+  }, [canReadProperties, canReadTickets]);
+  const canReadBell = canReadProperties || canReadTickets;
   useEffect(() => {
-    let live = true;
-    (async () => {
-      const [pending, tickets] = await Promise.allSettled([
-        searchForModeration({ status: 'pending' }, 'newest', { page: 1, size: BELL_CAP }),
-        // `open` is the server's word for unclaimed; the mock's `new` is not in `TicketStatuses`.
-        listTicketQueue({ status: 'open', page: 0, size: BELL_CAP }),
-      ]);
-      if (!live) return;
-      const pendingTotal = pending.status === 'fulfilled' ? (pending.value.total || 0) : 0;
-      const openTotal = tickets.status === 'fulfilled' ? (tickets.value.total || 0) : 0;
-      setNotif({
-        pending: pending.status === 'fulfilled' ? (pending.value.items || []) : [],
-        pendingTotal,
-        open: tickets.status === 'fulfilled' ? (tickets.value.items || []) : [],
-        openTotal,
-        blind: [
-          ...(pending.status === 'rejected' ? ['Pending verifications'] : []),
-          ...(tickets.status === 'rejected' ? ['Open service requests'] : []),
-        ],
-        total: pendingTotal + openTotal,
-      });
-    })();
-    return () => { live = false; };
-  }, [notifOpen]);
+    if (!canReadBell) return undefined;
+    readBell();
+    const timer = setInterval(() => { if (document.visibilityState === 'visible') readBell(); }, BELL_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [canReadBell, readBell]);
+  useEffect(() => { if (notifOpen && canReadBell) readBell(); }, [notifOpen, canReadBell, readBell]);
 
-  const go = (path) => { setSearchOpen(false); setNotifOpen(false); setQ(''); navigate(path); };
+  const [mine, setMine] = useState([]);
+  useEffect(() => {
+    if (!notifOpen) return undefined;
+    let live = true;
+    listNotifications({ page: 0, size: 20 })
+      .then((page) => { if (live) setMine(page.items.filter((n) => !n.read).slice(0, 5)); })
+      .catch(() => { if (live) setMine([]); });
+    return () => { live = false; };
+  }, [notifOpen, unread]);
+
+  // Queues are standing work, not news: only unread notifications and owner replies light the dot.
+  const unseen = unread + notif.repliedTotal;
+  const go = (path) => { setSearchOpen(false); setPhoneSearch(false); setNotifOpen(false); setQ(''); navigate(portalPath(user, path)); };
+  const openMine = (n) => {
+    markRead(n.id).catch(() => {}).finally(refreshUnread);
+    go(safeNotificationLink(n.link));
+  };
+  const readAll = () => { markAllRead().catch(() => {}).finally(refreshUnread); };
   const roleIcon = (role) => (role === 'staff' ? Wrench : role === 'owner' ? ShieldCheck : User);
 
   return (
+      /* Global search */
     <div className="flex items-center gap-3 flex-1 ml-2">
-      {/* Global search */}
       <div className="relative flex-1 max-w-md" ref={searchRef}>
-        <div className="hidden items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.06] px-3.5 py-2 sm:flex hover:border-white/20 focus-within:border-teal-500/40 focus-within:bg-white/[0.08] transition-all">
+        <div className={(phoneSearch ? 'flex' : 'hidden') + ' items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.06] px-3.5 py-2 sm:flex hover:border-white/20 focus-within:border-teal-500/40 focus-within:bg-white/[0.08] transition-all'}>
           <Search className="h-4 w-4 text-gray-400 shrink-0" />
           <input
             ref={inputRef}
@@ -361,7 +332,7 @@ export default function AdminTopbarTools() {
           />
           <kbd className="hidden lg:inline-flex items-center rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">Ctrl+K</kbd>
         </div>
-          <button onClick={() => setSearchOpen((o) => !o)} className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:text-white sm:hidden" aria-label="Search">
+          <button onClick={() => setPhoneSearch(true)} className={(phoneSearch ? 'hidden' : 'grid') + ' h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:text-white sm:hidden'} aria-label="Search">
           <Search className="h-4 w-4" />
         </button>
 
@@ -380,10 +351,8 @@ export default function AdminTopbarTools() {
             </div>
 
             <div className="overflow-y-auto p-2 flex-1">
+              {/* "No matches" is an answer; it must not show before both listing and people searches settle. */}
               {results.total === 0 ? (
-                /* Two different facts, and conflating them is the whole reason this branch is not
-                   one string: "no matches" is an answer, and it must not be given before the two
-                   desks have answered. */
                 <div className="px-3 py-6 text-center text-sm text-gray-500">
                   {results.awaiting ? 'Searching listings and people…' : 'No matches found'}
                 </div>
@@ -427,7 +396,7 @@ export default function AdminTopbarTools() {
                     <>
                       <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">People ({results.counts.users})</div>
                       {results.users.map((u) => { const RI = roleIcon(u.role); return (
-                        <button key={u.id} onClick={() => go('/admin/users')} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <button key={u.id} onClick={() => go(u.role === 'owner' || u.role === 'buyer' ? '/admin/users' : '/admin/team')} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300"><RI className="h-4 w-4" /></span>
                           <span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{u.name}</span><span className="block truncate text-xs text-gray-400">{u.role} &middot; {u.mobile}</span></span>
                           {u.verified && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-teal-400" />}
@@ -437,11 +406,9 @@ export default function AdminTopbarTools() {
                   )}
                 </>
               )}
+            {/* Outside the scroll area on purpose: an operator who typed a colleague's name and got a short list has
+               to be able to read that a desk refused without scrolling to it. */}
             </div>
-            {/* Outside the scroll area on purpose: an operator who typed a colleague's name and got
-                a short list has to be able to read that a desk refused without scrolling to it.
-                Names the category and what it means — not "an error occurred", which is nothing
-                anyone can act on. */}
             {results.failed.length > 0 && (
               <div data-testid="palette-partial" className="shrink-0 border-t border-white/10 px-3 py-2.5 text-[11px] leading-relaxed text-amber-200/80">
                 <span className="font-semibold text-amber-200">Some of this search did not answer.</span>{' '}
@@ -454,22 +421,42 @@ export default function AdminTopbarTools() {
         )}
       </div>
 
-      {/* Notifications */}
       <div className="relative" ref={notifRef}>
-        {/* tap-extend rather than a bigger square: this is a 36px bordered chip in a
-            topbar whose height is set by the search field next to it, and painting it
-            44px would make it the loudest thing in the bar. `relative` is already
-            here for the unread badge, so the pseudo has its context. */}
-        <button onClick={() => setNotifOpen((o) => !o)} className="tap-extend relative grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:text-white" aria-label="Notifications">
+        <button onClick={() => setNotifOpen((o) => !o)} className="tap-extend relative grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:text-white" aria-label="Notifications" title={unseen > 0 ? `${unseen} unread` : 'Notifications'}>
           <Bell className="h-4 w-4" />
-          {notif.total > 0 && <span data-testid="notif-unread-dot" className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-400" />}
+          {unseen > 0 && <span data-testid="notif-unread-dot" className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-400" />}
         </button>
         {notifOpen && (
           <div data-testid="admin-notifications" className="absolute right-0 z-40 mt-2 w-80 overflow-y-auto rounded-2xl border border-white/10 bg-ink-2 p-2 shadow-2xl" style={{ maxHeight: '70vh' }}>
-            {notif.total === 0 && notif.blind.length === 0 ? (
+            {notif.total === 0 && notif.blind.length === 0 && unread === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-gray-500">All caught up.</div>
             ) : (
               <>
+                {unread > 0 && (
+                  <>
+                    <div className="flex items-center justify-between px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">
+                      <span>For you ({unread})</span>
+                      <button onClick={readAll} className="normal-case tracking-normal text-teal-300 hover:text-teal-200">Mark all read</button>
+                    </div>
+                    {mine.map((n) => (
+                      <button key={n.id} onClick={() => openMine(n)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-rose-500/15 text-rose-300"><Bell className="h-4 w-4" /></span>
+                        <span className="min-w-0"><span className="block truncate text-sm text-white">{n.title}</span><span className="block truncate text-xs text-gray-400">{n.desc}</span></span>
+                      </button>
+                    ))}
+                  </>
+                )}
+                {notif.replied.length > 0 && (
+                  <>
+                    <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Owner replied ({notif.repliedTotal})</div>
+                    {notif.replied.map((r) => (
+                      <button key={r.propertyId} onClick={() => go(`/admin/properties?review=${encodeURIComponent(r.propertyId)}`)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet-500/15 text-violet-300"><MessageSquare className="h-4 w-4" /></span>
+                        <span className="min-w-0"><span className="block truncate text-sm text-white">{r.propertyTitle || 'Listing'}</span><span className="block truncate text-xs text-gray-400">{r.lastMessage}</span></span>
+                      </button>
+                    ))}
+                  </>
+                )}
                 {notif.pending.length > 0 && (
                   <>
                     <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Pending verification ({notif.pendingTotal})</div>
@@ -485,7 +472,7 @@ export default function AdminTopbarTools() {
                   <>
                     <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Open service requests ({notif.openTotal})</div>
                     {notif.open.map((t) => (
-                      <button key={t.id} onClick={() => go('/admin/services')} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                      <button key={t.id} onClick={() => go(ticketPath(t, true))} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
                         <span className="grid h-8 w-8 place-items-center rounded-lg bg-amber-500/15 text-amber-300"><Wrench className="h-4 w-4" /></span>
                         <span className="min-w-0"><span className="block truncate text-sm text-white">{t.service}</span><span className="block truncate text-xs text-gray-400">{t.customer} &middot; {t.mobile}</span></span>
                       </button>
@@ -493,18 +480,14 @@ export default function AdminTopbarTools() {
                   </>
                 )}
                 {notif.blind.length > 0 && (
-                  /* Not "All caught up." — that is the sentence this bell used to print once its
-                     fixture rows ran out, and a console that agrees with you is more dangerous than
-                     one that errors (D231). It names the queues instead, because those are the
-                     record while nothing counts them for you. */
                   <div data-testid="notif-blind" className={'px-3 py-3 text-[11px] leading-relaxed text-amber-200/80' + (notif.total > 0 ? ' mt-1 border-t border-white/10' : '')}>
                     <p className="text-xs font-semibold text-amber-200">
-                      {notif.blind.length === 2 ? 'This bell is not counting anything here.' : 'Half of this bell is dark here.'}
+                      {notif.blind.length === 3 ? 'This bell is not counting anything here.' : 'Part of this bell is dark here.'}
                     </p>
                     <p className="mt-1">
                       {prose(notif.blind)} could not be counted &mdash; the desk that holds them is
                       not answering for this build or not open to your role &mdash; so the count is
-                      switched off rather than made up. Open Properties and Services; those queues
+                      switched off rather than made up. Open Properties and the service desks; those queues
                       are the record.
                     </p>
                   </div>

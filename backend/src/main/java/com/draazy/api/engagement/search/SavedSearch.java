@@ -12,15 +12,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
-/**
- * A user's persisted search with optional alert preferences. The table has no {@code archived}
- * column — saved searches are hard-deleted (D8.9), because they are a personal preference
- * (like a shortlist toggle) rather than an auditable business record.
- *
- * <p>Extends {@link BaseEntity} (id + created_at). {@code updated_at} is mapped explicitly because
- * the table has it but there is no archived triplet to warrant extending {@code AuditedEntity}
- * without creating a misleading inheritance hierarchy.
- */
+/** A user's persisted search with optional alert preferences. Hard-deleted (no archived column): it is a
+ * personal preference, not an auditable record; updated_at is mapped here because there is no archived triplet. */
 @Entity
 @Table(name = "saved_searches")
 @Getter
@@ -37,13 +30,7 @@ public class SavedSearch extends BaseEntity {
     @Column(name = "query")
     private String query;
 
-    /**
-     * Which discovery surface this alert watches.
-     *
-     * <p>A listings alert IS a URL query string; a flatmates alert is a structured criteria object
-     * over a tab-gated filter set. Squeezing the second into {@link #query} would mean parsing a
-     * query string to discover which tab an alert belongs to.
-     */
+    // A listings alert is a URL query string; a flatmates alert is a criteria object, so the kind is explicit.
     @Column(name = "kind", nullable = false)
     @Setter
     private String kind = "listings";
@@ -59,10 +46,7 @@ public class SavedSearch extends BaseEntity {
     @Setter
     private String label;
 
-    /**
-     * The signed-out lead path: an anonymous alert is keyed by mobile so it re-homes on sign-in.
-     * Null for every alert created by an authenticated caller, who already has an identity.
-     */
+    // Signed-out alerts are keyed by mobile so they re-home on sign-in; null for signed-in callers.
     @Column(name = "mobile")
     @Setter
     private String mobile;
@@ -78,29 +62,14 @@ public class SavedSearch extends BaseEntity {
 
     @Column(name = "channel", nullable = false)
     @Setter
-    private String channel = "whatsapp";
+    private String channel = AlertChannels.PUSH;
 
     @Column(name = "new_count", nullable = false)
     @Setter
     private int newCount = 0;
 
-    /**
-     * When this alert last actually told its owner something. Null means it never has.
-     *
-     * <p><strong>Not derivable from {@link #updatedAt}, which is why it is a column.</strong> The
-     * sweep writes {@code updated_at} whenever {@link #newCount} changes, and the count changes in
-     * both directions — it falls back to zero on the tick after an alert fires, because the
-     * baseline has moved. Measuring a "daily" cadence from {@code updated_at} would therefore
-     * measure time since the last bookkeeping write rather than time since the last thing the user
-     * saw, and would reset itself on a write the user was never told about.
-     *
-     * <p>Written by the sweep when it publishes an alert. "Published" and "delivered" are not the
-     * same claim, and this column only makes the first: {@code Notifier} returns nothing, so the
-     * sweep cannot learn that the master {@code matchAlerts} switch dropped the row, or that quiet
-     * hours deferred it to the morning. Neither case makes the clock wrong. A user with alerts off
-     * receives nothing whatever this column says, and a deferred notification has still been sent —
-     * it is waiting, and sending a second one on top of it would be the bug.
-     */
+    // When the sweep last published an alert; the next count starts here, or at creation if never alerted.
+    // Published, not delivered: quiet hours may defer it, and a second alert on top would be the bug.
     @Column(name = "last_alerted_at")
     @Setter
     private Instant lastAlertedAt;
@@ -116,13 +85,7 @@ public class SavedSearch extends BaseEntity {
         this.query = query;
     }
 
-    /**
-     * A flatmates alert: no query string, a criteria document instead.
-     *
-     * <p>A second constructor rather than a nullable-query one, because the two kinds genuinely
-     * require different things and a single constructor would accept a row the CHECK constraint
-     * then rejects at flush time — a 500 for what is really a programming error.
-     */
+    // A separate factory so a listings-shaped row can't reach the kind CHECK constraint and fail at flush.
     static SavedSearch forFlatmates(UUID userId, String criteria, String label) {
         SavedSearch entity = new SavedSearch();
         entity.userId = userId;

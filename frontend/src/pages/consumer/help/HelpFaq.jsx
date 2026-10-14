@@ -5,37 +5,13 @@ import Icon from '../../../components/Icon.jsx';
 import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import { Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
 import { listFaqs } from '../../../services/contentService.js';
-import { localizeRecord } from '../../../lib/contentLang.js';
-import { useHelpSearch, useHelpLang, useHelpPath } from '../../../lib/useHelp.js';
-import { useHelpSeo } from '../../../lib/useHelpSeo.js';
-
-/* FAQ page.
- *
- * Reads the content seam (`services/contentService.listFaqs`) rather than
- * duplicating the questions into Markdown — one answer, two surfaces, and the
- * same source the support page uses.
- *
- * FAQs are admin-editable records, so their translations live on the record
- * itself under a nested `translations` object and are resolved by
- * lib/contentLang.js; see that file for why they cannot sit in the locale
- * bundles. The seam speaks the server's vocabulary — `question` / `answer` /
- * `category`, not the mock's `q` / `a` / `cat`.
- *
- * The list is rendered in whatever order it arrives. `GET /faqs` makes no order
- * promise (see contentService.js), so sorting here would invent one; the page
- * groups by category instead, which is an order the copy itself supplies.
- *
- * FAQs are short answers. Anything needing more than a paragraph belongs in an
- * article, which is why each open question links onward into the help centre. */
-
-const LOCALIZED_FIELDS = ['question', 'answer', 'category'];
+import { useHelpSearch } from '../../../lib/useHelp.js';
+/* FAQs are admin-editable records, so their translations live on the record under a nested `translations` object and
+   are resolved by lib/contentLang.js. */
 
 export default function HelpFaq() {
   const { t } = useTranslation();
-  const lang = useHelpLang();
-  const hp = useHelpPath();
-  useHelpSeo('/help/faq', lang);
-  const [raw, setRaw] = useState([]);
+  const [faqs, setFaqs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
   const [open, setOpen] = useState(null);
@@ -43,15 +19,10 @@ export default function HelpFaq() {
   useEffect(() => {
     let alive = true;
     listFaqs()
-      .then((f) => { if (alive) { setRaw(Array.isArray(f) ? f : []); setLoading(false); } })
+      .then((f) => { if (alive) { setFaqs(Array.isArray(f) ? f : []); setLoading(false); } })
       .catch(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, []);
-
-  const faqs = useMemo(
-    () => raw.map((f) => localizeRecord(f, LOCALIZED_FIELDS, lang)),
-    [raw, lang],
-  );
 
   const visible = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -68,16 +39,16 @@ export default function HelpFaq() {
     }
     return [...map.entries()];
   }, [visible, t]);
-
   // Where a question needs more than a paragraph, point at the article that has it.
+
   const openFaq = faqs.find((f) => f.id === open);
   const relatedResults = useHelpSearch(openFaq ? openFaq.question : '', 1);
   const related = relatedResults[0]?.article || null;
 
   return (
-    <HelpLayout title={t('help.faq')}>
+    <HelpLayout title={t('help.faq')} description={t('help.faqSubtitle')} path="/help/faq">
       <div className="max-w-3xl">
-        <Breadcrumbs trail={[[t('help.centre'), hp('/help')], [t('help.faq'), null]]} />
+        <Breadcrumbs trail={[[t('help.centre'), '/help'], [t('help.faq'), null]]} />
 
         <h1 className="text-xl font-extrabold text-white sm:text-2xl">{t('help.faqTitle')}</h1>
         <p className="mt-1.5 text-sm leading-relaxed text-gray-400">{t('help.faqSubtitle')}</p>
@@ -100,7 +71,7 @@ export default function HelpFaq() {
             <p className="text-sm text-gray-500">{t('help.faqLoading')}</p>
           ) : groups.length === 0 ? (
             <EmptyState title={filter ? t('help.faqNoMatch', { query: filter }) : t('help.faqNone')}>
-              <Link to={hp('/help')} className="text-teal-400 hover:underline">{t('help.browseHelp')}</Link>
+              <Link to="/help" className="text-teal-400 hover:underline">{t('help.browseHelp')}</Link>
             </EmptyState>
           ) : (
             groups.map(([cat, items]) => (
@@ -131,7 +102,7 @@ export default function HelpFaq() {
                             <p className="text-sm leading-relaxed text-gray-400">{f.answer}</p>
                             {related && (
                               <Link
-                                to={hp(`/help/a/${related.slug}`)}
+                                to={`/help/a/${related.slug}`}
                                 className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-teal-400 hover:underline"
                               >
                                 {t('help.faqReadMore', { title: related.title })}

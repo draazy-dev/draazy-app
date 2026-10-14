@@ -6,154 +6,18 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * <strong>What the data export contains, what it leaves out, and how the second person on a shared
- * record is protected.</strong>
- *
- * <p>This class is to {@link DataExportService} what {@link
- * com.draazy.api.identity.user.erasure.ErasureRetention} is to {@code ErasureService}: it holds
- * almost no behaviour, and exists because the hard part of a right-to-access implementation is not
- * the {@code SELECT} statements. It is deciding <em>which</em> rows are the subject's to see, and
- * that decision is invisible in the code that acts on it. A future reader can reconstruct what the
- * service does by reading it. They cannot reconstruct why a landlord's export of a tenancy carries
- * the rent but not the tenant's mobile, and getting that wrong in either direction is a legal
- * failure: disclose too little and the platform has not honoured a statutory right; disclose too
- * much and it has committed a personal-data breach against somebody who never asked for anything.
- *
- * <h2>The governing rule</h2>
- *
- * <p>Digital Personal Data Protection Act 2023 (India), <strong>s.11(1)</strong> — a Data Principal
- * has the right to obtain from the Data Fiduciary a summary of the personal data being processed
- * about them, the processing activities, and the identities of anybody it has been shared with.
- * <strong>s.11(2)</strong> is the limit that makes the rest of this file necessary: nothing in
- * s.11(1) requires disclosure that would <em>"reveal the identity of any other Data Principal"</em>.
- * That is not a courtesy the platform extends to counterparties. It is the statute, and it says the
- * export must stop at exactly the boundary this class draws.
- *
- * <h2>Where the scope came from — and why it is not a fresh list</h2>
- *
- * <p>Every table below was taken from the erasure coverage map, not enumerated afresh. {@code
- * ErasureCoverageTest} classifies every personal-data column in the migrated schema as swept,
- * retained, or a disclosed gap; between them those three maps <em>are</em> the platform's inventory
- * of where it keeps personal data, and they are already proved against {@code information_schema}
- * rather than against a second hand-written list. Deriving the export from them means the two
- * features cannot silently drift: {@code DataExportCoverageTest} fails the build if a table named in
- * {@link com.draazy.api.identity.user.erasure.ErasureRetention#knownGaps()} is neither exported
- * nor explicitly excluded here.
- *
- * <p>The principle behind that coupling is simple and worth stating plainly: <strong>if the platform
- * is willing to destroy a table's rows on the subject's say-so, it cannot claim those rows are none
- * of the subject's business.</strong> The erasure gaps matter most of all. Those are the places
- * where personal data survives an erasure request, and the subject is entitled to see them
- * <em>more</em> urgently than the rest, not less — so {@code saved_searches
- * .mobile}, {@code flatmate_group_members.name}, {@code society_leads}, {@code city_waitlist},
- * {@code deal_parties}, {@code personal_documents}, {@code flatmate_seeker_posts} and the referral
- * tables are all in the export even though the erasure sweep does not reach them.
- *
- * <h2>The redaction rule</h2>
- *
- * <p>A tenancy, a deal, a chat thread, a contact request, an offer and a flatmate group each involve
- * a second person. The rule applied uniformly to every one of them is:
- *
- * <ol>
- *   <li><strong>The record is the subject's.</strong> That it happened, when, its status, its money,
- *       and the property it concerns are exported in full. Those facts are as much the subject's
- *       history as the counterparty's, and withholding them would leave an export that says a
- *       tenancy existed without saying what its rent was.</li>
- *   <li><strong>The subject's own contribution is exported in full</strong> — every word they wrote,
- *       every number they supplied, including free text in which they happened to name somebody else
- *       ({@code tenant_profiles.prior_landlord}, {@code managed_properties.tenant_name}). They typed
- *       it, they can already read it back in the product, and returning it to them discloses nothing
- *       new.</li>
- *   <li><strong>The counterparty is reduced to {@code partyRef}</strong> — see {@link
- *       DataExportRedaction}. Stable across this subject's exports so they can see that the same
- *       person appears on three records; meaningless outside them, because the digest is salted with
- *       the subject's own id.</li>
- *   <li><strong>The counterparty's own contribution is exported only where the product already shows
- *       it to the subject.</strong> A message in their chat thread, the note on an enquiry they
- *       received, the name on a referral they made — the subject is looking at all of these on
- *       screen right now, and an export that hid them would be a worse record of the correspondence
- *       than the inbox it came from.</li>
- *   <li><strong>The counterparty's contact details, government identifiers, documents, KYC and
- *       verification state are never exported, in any dataset, under any framing.</strong> This is
- *       the line that does not move. It is why {@code deals.counterparty_mobile} appears when the
- *       subject <em>is</em> the counterparty and is absent from the same table when they are the
- *       owner, and why {@code rent_agreements} is two datasets rather than one.</li>
- * </ol>
- *
- * <p><strong>The mechanical form of the rule, which is what the test actually checks:</strong> no
- * query in this file reads a second person's {@code users} row. {@code users} appears exactly once
- * in the whole scope, in the {@code account} dataset, keyed on {@code id = :subjectId}. Everything
- * else about another person would have to arrive either through that join — which does not exist —
- * or through a denormalised column, and every such column is either omitted from its select list or
- * routed through {@code party_ref_src}. Stating the rule this way makes it checkable by reading the
- * SQL rather than by trusting a paragraph, which is the only kind of rule that survives a year of
- * edits.
- *
- * <h2>The staff rule</h2>
- *
- * <p>A second and much smaller rule, applied just as uniformly: <strong>free text a staff member
- * wrote about the subject is not exported, and the staff member is never named.</strong> That covers
- * {@code users.flag_reason}, {@code properties.flag_reason} and {@code archive_reason}, {@code
- * internal_notes}, {@code ticket_notes}, {@code property_reviews} and the {@code decided_by} /
- * {@code recorded_by} / {@code assignee_id} / {@code handled_by} columns. Two reasons, and the
- * second is the load-bearing one: a moderator's assessment is a statement by an identifiable
- * employee, and a fraud investigation that hands its subject the investigator's notes is not an
- * investigation. The single deliberate exception is {@code erasure_requests.decision_note}, which
- * {@code GET /me/erasure} already returns to the subject on purpose — a refusal they cannot
- * understand is a refusal they cannot act on — so withholding it here would make the two endpoints
- * disagree about the same row.
- *
- * <h2>Named columns, not {@code select *}</h2>
- *
- * <p>Every query below lists its columns. This is the same choice {@code ErasureService} made for
- * its {@code UPDATE}s and for the same reason inverted: a named-column {@code SELECT} is the form in
- * which a reviewer can see exactly what leaves the building, and it is the only form under which a
- * migration adding a column to a table cannot silently start exporting it. {@code select *} on
- * {@code deals} would have begun disclosing {@code counterparty_mobile} to landlords the day V11
- * shipped, with no diff anywhere to notice.
- */
+/** DPDP s.11 export scope: which rows are the subject's, and the redaction rule for shared records.
+ * Rationale: docs/system/legal-entity-and-compliance.md (section 12). */
 public final class DataExportScope {
 
     private DataExportScope() {
     }
 
-    /**
-     * The alias that marks a column as another person's identifier.
-     *
-     * <p><strong>Every value selected under this alias is hashed before it reaches the wire</strong>
-     * — see {@link DataExportRedaction#partyRef}. That is deliberately a property of the alias and
-     * not of the column, because it makes the mechanism safe against being wrong: {@code
-     * offer_history.by} and {@code service_request_timeline.by} are {@code text}, and nothing in the
-     * schema says whether they hold a user id, a staff email or a display name. Routing them through
-     * here means a wrong guess about their contents costs an unhelpfully opaque field rather than a
-     * disclosure.
-     */
     static final String PARTY_REF_SOURCE = "party_ref_src";
 
-    /** What {@link #PARTY_REF_SOURCE} becomes on the wire. */
     static final String PARTY_REF = "partyRef";
 
-    /**
-     * One table's contribution to the export.
-     *
-     * @param domain   the group this appears under in the document, so a person reading it can find
-     *                 "my listings" without knowing that listings live in {@code properties}
-     * @param name     the dataset's name on the wire. Usually the table name — the export is a
-     *                 disclosure document and naming the actual table is part of being honest about
-     *                 what is held — but split into {@code _sent} / {@code _received} halves where
-     *                 the two directions have different redaction, because one name over two column
-     *                 lists would hide exactly the difference that matters
-     * @param describes one sentence a non-technical reader can understand. Written for the data
-     *                 subject, who is the only guaranteed reader of this document
-     * @param sql      a named-column {@code SELECT} over {@code :subjectId}, {@code :subjectIdText}
-     *                 and {@code :subjectMobile}. Must be wrappable in {@code select * from (…) d
-     *                 limit ?}, so no trailing semicolon and no CTE that would break the wrap
-     * @param withheld columns present in the table and deliberately absent from {@code sql}, with
-     *                 the reason. Serialised into the response: a dataset that quietly dropped a
-     *                 column would be the silent-omission failure this whole feature is built to
-     *                 avoid
-     */
+    /** One table's contribution to the export; {@code sql} must be wrappable in {@code select * from (…) d limit ?}. */
     record Dataset(String domain, String name, String describes, String sql,
             Map<String, String> withheld) {
     }
@@ -161,8 +25,6 @@ public final class DataExportScope {
     /** A whole table left out of the export, and why. Serialised into the response. */
     record Exclusion(String name, String reason) {
     }
-
-    // ------------------------------------------------------------------ the datasets
 
     private static final List<Dataset> DATASETS = datasets();
 
@@ -180,15 +42,13 @@ public final class DataExportScope {
         return List.copyOf(out);
     }
 
-    // --- account ----------------------------------------------------------------------------
-
     private static void account(List<Dataset> out) {
         out.add(new Dataset("account", "users",
                 "Your account: the name, number, email and city you gave us, and the trust flags we "
                         + "derived from them.",
                 """
                 select id, name, mobile, email, role, team, status, city,
-                       mobile_verified, verified, aadhaar_verified, verified_contact_only,
+                       mobile_verified, verified, verified_contact_only,
                        hide_number, listings_count, avatar, joined_at, last_active,
                        flagged, flagged_at, archived, archived_at, created_at, updated_at
                   from users
@@ -212,6 +72,17 @@ public final class DataExportScope {
                  where user_id = :subjectId
                 """,
                 Map.of()));
+
+        out.add(new Dataset("account", "push_subscriptions",
+                "Browser push endpoints registered to your account.",
+                """
+                select id, endpoint, created_at
+                  from push_subscriptions
+                 where user_id = :subjectId
+                 order by created_at desc
+                """,
+                withheld("p256dh / auth", "Live browser push credentials. Returning them would "
+                        + "put delivery secrets into a portable export document.")));
 
         out.add(new Dataset("account", "back_office_permissions",
                 "If you hold a staff account, the permission atoms it resolves to. Empty for "
@@ -268,26 +139,51 @@ public final class DataExportScope {
                                 + "note they wrote is included; who wrote it is not.")));
     }
 
-    // --- identity ---------------------------------------------------------------------------
-
     private static void identity(List<Dataset> out) {
         out.add(new Dataset("identity", "identity_verifications",
-                "Your Aadhaar-based identity check: its outcome, and the masked number we kept.",
+                "Your identity check: which document you showed, its outcome, and the last four "
+                        + "characters, name and date of birth the reviewer confirmed.",
                 """
-                select id, ref, badge, status, source, masked_aadhaar, mobile_match,
-                       expires_at, verified_at, created_at, updated_at
+                select id, status, doc_type, claimed_number_last4, claimed_name, claimed_dob,
+                       doc_last4, holder_name, holder_dob, consent_at, submitted_at, attempt_count,
+                       decided_at, rejection_reason, rejection_note, revoked_at, revocation_reason,
+                       qa_sampled_at, qa_reviewed_at, qa_outcome, files_purged_at,
+                       created_at, updated_at
                   from identity_verifications
                  where user_id = :subjectId
                 """,
                 withheld(
-                        "identity_hash", "An irreversible digest of your Aadhaar, held only so that "
-                                + "one document cannot open two accounts. It is not readable, it "
-                                + "tells you nothing about yourself that masked_aadhaar does not, "
+                        "identity_hash", "An irreversible digest of your document number, held only "
+                                + "so that one document cannot open two accounts. It is not readable, "
+                                + "it tells you nothing about yourself that doc_last4 does not, "
                                 + "and putting it in a portable document would create a token by "
                                 + "which two services could confirm they hold the same person.",
-                        "verification_url", "A provider callback link from the verification "
-                                + "session. It is a route into a third-party flow rather than a "
-                                + "fact about you.")));
+                        "claimed_hash", "The same kind of digest, computed from the number your "
+                                + "phone read off the card before a reviewer confirmed it.",
+                        "person_key", "A digest of your name and date of birth used only to flag "
+                                + "possible duplicate accounts to a reviewer.",
+                        "reviewer_id", "Which member of staff decided your case is about them, "
+                                + "not about you.",
+                        "revoked_by", "Which member of staff revoked your badge is about them, "
+                                + "not about you.",
+                        "claimed_by", "Which member of staff temporarily held your review is "
+                                + "about their workload, not about you.",
+                        "qa_reviewed_by", "Which second checker reviewed the decision is about "
+                                + "them, not about you.")));
+
+        out.add(new Dataset("identity", "identity_conflicts",
+                "Document already-in-use conflicts your account hit while submitting identity verification.",
+                """
+                select id, doc_type, created_at
+                  from identity_conflicts
+                 where user_id = :subjectId
+                 order by created_at desc
+                """,
+                withheld(
+                        "claimed_hash", "An irreversible digest used only to connect your dispute "
+                                + "to the conflict the submit path saw.",
+                        "holder_verification_id", "The internal case staff investigate; exposing it "
+                                + "would identify another data principal.")));
 
         out.add(new Dataset("identity", "owner_kyc",
                 "The masked PAN and Aadhaar recorded when you were verified as an owner.",
@@ -326,15 +222,13 @@ public final class DataExportScope {
                 "Homes you rent that you recorded yourself, including ones the platform was "
                         + "never involved in.",
                 """
-                select address, landlord_name, monthly_rent, deposit, lease_start, lease_end,
+                select address, monthly_rent, deposit, lease_start, lease_end,
                        status, archived, created_at, updated_at
                   from tenant_rentals
                  where tenant_id = :subjectId
                 """,
                 Map.of()));
     }
-
-    // --- listings ---------------------------------------------------------------------------
 
     private static void listings(List<Dataset> out) {
         out.add(new Dataset("listings", "properties",
@@ -343,14 +237,14 @@ public final class DataExportScope {
                 select id, slug, title, deal, property_type, bhk, price, price_unit, deposit,
                        maintenance, negotiable, area, area_unit, carpet_area, built_up_area,
                        super_built_up_area, furnishing, floor, total_floors, facing, possession,
-                       locality, locality_slug, society_id, city, lat, lng, address, pincode,
+                       locality, locality_slug, society_id, city, lat, lng, address, pincode, form_details,
                        rera_id, description, amenities, images, cover_image, floor_plan, video,
-                       posted_by_type, status, featured, verified, owner_verified,
-                       ownership_verified, society_verified, conveyance_done, docs_count, views,
-                       enquiries, archived, archived_at, deal_status, boosted_until,
+                       status, verified, owner_verified,
+                       ownership_verified, docs_count, views,
+                       enquiries, archived, archived_at, deal_status,
                        ownership_verified_at, ownership_verified_until, electricity_meter_no,
-                       address_key, last_confirmed_at, handback_milestone, quality_score, land_use,
-                       age_years, room, tenants, available_from, pets, sharing, property_type_key,
+                       address_key, last_confirmed_at, owner_confirmed_at, quality_score, land_use,
+                       age_years, room, tenants, available_on, pets, property_type_key,
                        commercial_use_key, share_type, created_at, updated_at
                   from properties
                  where owner_id = :subjectId
@@ -360,11 +254,12 @@ public final class DataExportScope {
                         "flag_reason", "Staff free text from a moderation review.",
                         "archive_reason", "As flag_reason.",
                         "recheck_reason", "As flag_reason.",
-                        "pipeline_stage", "Internal ops workflow state, written by staff about how "
+                        "admin_pipeline", "Internal ops workflow state, written by staff about how "
                                 + "they are handling the listing rather than about you.",
-                        "admin_pipeline", "As pipeline_stage.",
                         "posted_by_admin", "Whether a staff member posted on your behalf; it names "
-                                + "the operating model, not you.")));
+                                + "the operating model, not you.",
+                        "featured", "No longer read (D292): featured now follows ownership "
+                                + "verification, which the listing's verification fields already export.")));
 
         out.add(new Dataset("listings", "ownership_basis",
                 "What you told us you paid for a property, and what you think it is worth now. "
@@ -442,18 +337,6 @@ public final class DataExportScope {
                 """,
                 withheld("archive_reason", "Staff free text.")));
 
-        out.add(new Dataset("listings", "boosts",
-                "Paid promotions you bought for a listing.",
-                """
-                select id, property_id, pack_id, starts_at, ends_at, status, payment_ref,
-                       paid_at, created_at, updated_at
-                  from boosts
-                 where buyer_id = :subjectId
-                 order by created_at desc
-                """,
-                withheld("idempotency_key", "A client-supplied token that stops a double tap "
-                        + "charging you twice. Internal plumbing, not information about you.")));
-
         out.add(new Dataset("listings", "subscriptions",
                 "Subscription plans you have held.",
                 """
@@ -463,8 +346,52 @@ public final class DataExportScope {
                  where user_id = :subjectId
                  order by created_at desc
                 """,
-                withheld("idempotency_key", "See boosts.idempotency_key.")));
+                withheld("idempotency_key", "A client-supplied token that stops a double tap "
+                        + "charging you twice. Internal plumbing, not information about you.")));
 
+        out.add(new Dataset("listings", "refund_requests",
+                "Refunds you asked for on a listing pass or contact pack, and what staff decided.",
+                """
+                select id, subscription_id, kind, status, basis, amount, customer_reason,
+                       decided_at, decision_reason, created_at
+                  from refund_requests
+                 where user_id = :subjectId
+                 order by created_at desc
+                """,
+                withheld("device_id_hash / instrument_hash", "Salted digests of your browser and payment "
+                        + "instrument, kept only to stop one refund being claimed from two accounts. "
+                        + "A digest is not something you could read or use.")));
+
+        out.add(new Dataset("listings", "invoices",
+                "Invoices issued to you when a payment of yours succeeded.",
+                """
+                select number, source_type, order_ref, amount, taxable_amount, issued_at
+                  from invoices
+                 where user_id = :subjectId
+                 order by issued_at desc
+                """,
+                Map.of()));
+
+        out.add(new Dataset("listings", "credit_notes",
+                "Credit notes issued to you when a refund went through.",
+                """
+                select number, invoice_no, source_type, order_ref, amount, taxable_amount, issued_at
+                  from credit_notes
+                 where user_id = :subjectId
+                 order by issued_at desc
+                """,
+                Map.of()));
+
+        out.add(new Dataset("listings", "payment_disputes",
+                "Chargebacks your bank raised against a payment of yours.",
+                """
+                select dispute_ref, order_ref, status, provider_status, amount, reason,
+                       opened_at, closed_at
+                  from payment_disputes
+                 where user_id = :subjectId
+                 order by opened_at desc
+                """,
+                Map.of()));
         out.add(new Dataset("listings", "saved_properties",
                 "Listings you shortlisted.",
                 """
@@ -506,7 +433,7 @@ public final class DataExportScope {
                 Map.of()));
 
         out.add(new Dataset("listings", "page_views",
-                "Pages you viewed while signed in, for the ninety days we keep them. This is usually "
+                "Pages you viewed while signed in, for the thirty days we keep them. This is usually "
                         + "the largest dataset here and the most likely to be truncated.",
                 """
                 select session_id, path, referrer_host, device, occurred_at
@@ -515,9 +442,18 @@ public final class DataExportScope {
                  order by occurred_at desc
                 """,
                 Map.of()));
-    }
 
-    // --- enquiries: the two-party read surfaces ----------------------------------------------
+        out.add(new Dataset("listings", "help_article_feedback",
+                "Help-centre articles you told us were or were not useful, and anything you wrote "
+                        + "about what was missing.",
+                """
+                select slug, lang, helpful, comment, created_at
+                  from help_article_feedback
+                 where user_id = :subjectId
+                 order by created_at desc
+                """,
+                Map.of()));
+    }
 
     private static void enquiries(List<Dataset> out) {
         out.add(new Dataset("enquiries", "contact_requests_sent",
@@ -628,8 +564,6 @@ public final class DataExportScope {
                         "requester_id", "Replaced by partyRef.",
                         "share_token", "See document_requests_sent.share_token.")));
     }
-
-    // --- agreements, deals and money ---------------------------------------------------------
 
     private static void agreements(List<Dataset> out) {
         out.add(new Dataset("agreements", "finalization_requests",
@@ -753,36 +687,73 @@ public final class DataExportScope {
                 withheld("owner_id", "Replaced by partyRef.")));
     }
 
-    // --- messaging --------------------------------------------------------------------------
-
     private static void messaging(List<Dataset> out) {
         out.add(new Dataset("messaging", "conversations",
-                "Chat threads you are in.",
+                "Chat threads you are in, and flatmate group threads you are in or wrote in.",
                 """
-                select id, property_id, last_message, created_at, updated_at,
-                       case when user_a_id = :subjectId then user_b_id else user_a_id end
+                select id, property_id, flatmate_group_id, last_message, created_at, updated_at,
+                       case when flatmate_group_id is not null then null
+                            when user_a_id = :subjectId then user_b_id else user_a_id end
                            as party_ref_src
                   from conversations
                  where user_a_id = :subjectId or user_b_id = :subjectId
+                    or flatmate_group_id in (select group_id from flatmate_group_members
+                                              where user_id = :subjectId)
+                    or (flatmate_group_id is not null and id in (select conversation_id from messages
+                                                                  where author_id = :subjectId))
                  order by updated_at desc
                 """,
                 withheld("user_a_id / user_b_id", "Whichever is not you is replaced by partyRef.")));
 
         out.add(new Dataset("messaging", "messages",
-                "Every message in those threads, yours and theirs. partyRef is 'self' on the ones "
-                        + "you wrote.",
+                "Every message in those threads, yours and theirs (in a group you have left, only "
+                        + "yours). partyRef is 'self' on the ones you wrote.",
                 """
                 select m.id, m.conversation_id, m.author_role, m.body, m.attachments, m.read,
-                       m.created_at, m.author_id as party_ref_src
+                       m.client_id, m.reply_to_id, m.created_at, m.author_id as party_ref_src
                   from messages m
                   join conversations c on c.id = m.conversation_id
                  where c.user_a_id = :subjectId or c.user_b_id = :subjectId
+                    or c.flatmate_group_id in (select group_id from flatmate_group_members
+                                                where user_id = :subjectId)
+                    or m.author_id = :subjectId
                  order by m.created_at desc
                 """,
                 withheld("author_id", "Replaced by partyRef. The bodies of the other side's "
                         + "messages are included: this is your correspondence, you are reading it "
                         + "in the product today, and an export that returned only your half would "
                         + "be a worse record than the inbox it came from.")));
+
+        out.add(new Dataset("messaging", "conversation_user_state",
+                "Per-thread archive and mute choices you set.",
+                """
+                select conversation_id, archived, muted, updated_at
+                  from conversation_user_state
+                 where user_id = :subjectId
+                 order by updated_at desc
+                """,
+                withheld("user_id", "Scoped to you by the predicate.")));
+
+        out.add(new Dataset("messaging", "hidden_conversation_messages",
+                "Chat messages you hid for yourself.",
+                """
+                select conversation_id, message_id, created_at
+                  from hidden_conversation_messages
+                 where user_id = :subjectId
+                 order by created_at desc
+                """,
+                withheld("user_id", "Scoped to you by the predicate.")));
+
+        out.add(new Dataset("messaging", "user_blocks",
+                "People you blocked from messaging you.",
+                """
+                select blocked_id as party_ref_src, created_at
+                  from user_blocks
+                 where blocker_id = :subjectId
+                 order by created_at desc
+                """,
+                withheld("blocker_id", "Scoped to you by the predicate.",
+                        "blocked_id", "Replaced by partyRef.")));
 
         out.add(new Dataset("messaging", "message_attachments",
                 "Files you attached to a chat or support thread.",
@@ -822,8 +793,6 @@ public final class DataExportScope {
                 Map.of()));
     }
 
-    // --- support and services -----------------------------------------------------------------
-
     private static void support(List<Dataset> out) {
         out.add(new Dataset("support", "service_requests",
                 "Services you asked us to arrange — rent agreements, painting, packers and so on.",
@@ -849,6 +818,19 @@ public final class DataExportScope {
                         "invited_by", "Replaced by partyRef.",
                         "the other parties on the same request", "Scoped to your own party rows. "
                                 + "The other side of a rent agreement is another data principal.")));
+
+        out.add(new Dataset("support", "service_request_draft_approvals",
+                "Agreement draft versions you were asked to approve, and when you approved them.",
+                """
+                select a.id, a.request_id, a.draft_version, a.party_label, a.method,
+                       a.mobile_masked, a.opened_at, a.approved_at, a.created_at, a.updated_at
+                  from service_request_draft_approvals a
+                 where a.user_id = :subjectId
+                 order by a.created_at desc
+                """,
+                withheld(
+                        "mobile_hash", "A one-way hash; mobileMasked is the readable form.",
+                        "party_key", "An internal slot name; partyLabel says the same thing.")));
 
         out.add(new Dataset("support", "service_request_messages",
                 "Messages on service requests you raised.",
@@ -882,7 +864,7 @@ public final class DataExportScope {
                  where user_id = :subjectId
                  order by created_at desc
                 """,
-                withheld("idempotency_key", "See boosts.idempotency_key.")));
+                withheld("idempotency_key", "See subscriptions.idempotency_key.")));
 
         out.add(new Dataset("support", "support_tickets",
                 "Support conversations you opened.",
@@ -920,17 +902,6 @@ public final class DataExportScope {
                 """,
                 withheld("assignee_id", "Identifies the staff member handling the ticket.")));
 
-        out.add(new Dataset("support", "society_leads",
-                "Enquiries you submitted about getting your building onto the platform.",
-                """
-                select id, society_name, contact_name, mobile, units, interest, status,
-                       created_at, updated_at
-                  from society_leads
-                 where mobile = :subjectMobile
-                 order by created_at desc
-                """,
-                withheld("note", "Staff free text about how the lead is being worked.")));
-
         out.add(new Dataset("support", "city_waitlist",
                 "Requests you made for us to launch in a city, matched by your phone number. These "
                         + "rows are written by a signed-out form and carry no account id, so this is "
@@ -944,24 +915,8 @@ public final class DataExportScope {
                 Map.of()));
     }
 
-    // --- community --------------------------------------------------------------------------
-
     private static void community(List<Dataset> out) {
-        // target_id is polymorphic: a property, locality or society id for most reviews, and a
-        // *person's* id when target_type = 'owner'. Selecting it raw would have handed back the
-        // reviewed person's primary key — the one identifier the whole redaction rule exists to keep
-        // out — through a column whose name gives no hint that it sometimes holds one. So it is
-        // split: the personal case is routed through party_ref_src like every other counterparty
-        // reference, and the impersonal case keeps the real id, which the subject needs in order to
-        // know which flat they were writing about. Neither is populated at the same time as the
-        // other.
-        //
-        // The discriminator is 'owner', not 'user'. Worth stating because the neighbouring `reports`
-        // table spells the same concept 'user', and the first draft of this file used that value in
-        // both places — which compiles, runs, returns rows and redacts nothing, because a CASE whose
-        // condition is never true simply passes the id through. Only the check constraint in V7
-        // distinguishes them, so any change here should be read against the migration rather than
-        // against the sibling dataset below.
+
         out.add(new Dataset("community", "reviews_written",
                 "Reviews you wrote. Where you reviewed a person rather than a place, their id is "
                         + "replaced by the same reference used everywhere else in this document.",
@@ -1006,13 +961,8 @@ public final class DataExportScope {
                         "flag_for_review", "An internal triage flag rather than an outcome; status "
                                 + "is the decision you are entitled to.")));
 
-        // Split for the same reason as reviews_written, and the rule is applied here even though
-        // the subject obviously already knows who they reported. Uniformity is the point: the moment
-        // the redaction has an "unless they already know" branch, every future dataset has to be
-        // argued individually, and one of those arguments will eventually be wrong. It also matters
-        // that "already knows the person" is not the same as "should be handed their primary key in
-        // a file" — the id is a durable global identifier the product never shows, and it is exactly
-        // what would let two exports be joined together.
+        // Split for the same reason as reviews_written; the "subject already knows who they
+        // reported" argument is refused because uniformity is the redaction rule's only guard.
         out.add(new Dataset("community", "reports_filed",
                 "Reports you filed about a listing or another user. Where you reported a person, "
                         + "their id is replaced by a reference.",
@@ -1029,19 +979,17 @@ public final class DataExportScope {
                         "Replaced by partyRef. See the redaction rule.")));
     }
 
-    // --- flatmate ---------------------------------------------------------------------------
-
     private static void flatmate(List<Dataset> out) {
         out.add(new Dataset("flatmate", "flatmate_rooms",
                 "Rooms you listed.",
                 """
                 select id, property_id, room_kind, room_type, attached_bath, price_basis, budget,
                        deposit, occupants, max_occupants, seats_total, seats_open, host_role,
-                       verification_tier, verified, agreement_declared, society_id, society,
+                       verification_tier, agreement_declared, society_id, society,
                        flat_number, locality, localities, lat, lng, bhk, flat_type,
                        home_type_label, gated_community, furnishing, move_in, available_from,
                        gender, food, tags, note, photos, status, archived, archived_at,
-                       created_at, updated_at
+                       active_until, created_at, updated_at
                   from flatmate_rooms
                  where host_id = :subjectId
                  order by created_at desc
@@ -1059,7 +1007,9 @@ public final class DataExportScope {
                 """
                 select id, title, locality, policy, rent, seats_total, seats_open, property_id,
                        host_role, verification_tier, agreement_declared, owner_consent, tags,
-                       note, archived, archived_at, created_at, updated_at
+                       note, hunting, localities, pref_bhk, rent_min, deposit_min, deposit_max,
+                       gated_only, bachelors, furnishing, move_in_by,
+                       archived, archived_at, active_until, created_at, updated_at
                   from flatmate_groups
                  where host_id = :subjectId
                  order by created_at desc
@@ -1116,7 +1066,7 @@ public final class DataExportScope {
                 """
                 select id, name, gender, age, occupation, budget, localities, move_in, move_in_at,
                        flat_pref, room_pref, tags, note, verified_contact_only, verified, lat,
-                       lng, archived, archived_at, created_at, updated_at
+                       lng, archived, archived_at, active_until, created_at, updated_at
                   from flatmate_seeker_posts
                  where user_id = :subjectId
                  order by created_at desc
@@ -1139,10 +1089,12 @@ public final class DataExportScope {
                 "People you referred. Their name is included because the referrals screen already "
                         + "shows it to you; their phone number is not, because that screen masks it.",
                 """
-                select id, referred, channel, reward, reward_amount, status, risk,
-                       aadhaar_verified, aadhaar_unique, same_device, same_ip, velocity_high,
-                       activated, at, qualified_at, qualified_property_id, share_channel,
-                       referrer_mobile, created_at, updated_at
+                select id, referred, channel, reward, reward_amount, status, track, risk,
+                       identity_verified, identity_unique, same_device, same_ip, velocity_high,
+                       activated, at, qualified_at,
+                       case when track = 'owner' then qualified_property_id end as qualified_property_id,
+                       share_channel,
+                       hold_until, granted_at, referrer_mobile, created_at, updated_at
                   from referrals
                  where referrer_id = :subjectId
                  order by created_at desc
@@ -1151,18 +1103,21 @@ public final class DataExportScope {
                         "referred_mobile", "The referred person's phone number. The product masks "
                                 + "it on screen; an export that unmasked it would be a way to turn "
                                 + "a referral link into a contact list.",
-                        "referred_ip_hash / referred_device_hash", "Salted digests of the address "
-                                + "and browser the referral was redeemed from, held only to detect "
-                                + "referral fraud and cleared automatically after ninety days. They "
+                        "referred_ip_hash / referred_device_hash / referred_device_id_hash",
+                                "Salted digests of the address, browser and device the referral was "
+                                + "redeemed from, held only to detect referral fraud and cleared "
+                                + "automatically after the retention window the platform sets. They "
                                 + "describe the person you referred, not you.",
+                        "auto_reason", "The automatic fraud check's reason code. Naming the signal "
+                                + "that tripped is how a detection system gets tuned against itself.",
                         "handled_by / handled_reason", "Which staff member reviewed a flagged "
                                 + "referral, and their note.")));
 
         out.add(new Dataset("flatmate", "referrals_received",
                 "The referral you joined under, matched by your phone number.",
                 """
-                select id, referred, referred_mobile, channel, reward, status, activated, at,
-                       created_at, updated_at, referrer_id as party_ref_src
+                select id, referred, referred_mobile, channel, reward, status, track, activated, at,
+                       hold_until, granted_at, created_at, updated_at, referrer_id as party_ref_src
                   from referrals
                  where referred_mobile = :subjectMobile
                  order by created_at desc
@@ -1170,7 +1125,7 @@ public final class DataExportScope {
                 withheld(
                         "referrer_mobile", "The referrer's phone number.",
                         "referrer_id", "Replaced by partyRef.",
-                        "risk, same_device, same_ip, velocity_high, handled_by",
+                        "risk, same_device, same_ip, velocity_high, auto_reason, handled_by",
                         "Fraud-detection signals and the staff review of them. Returning a "
                                 + "would-be fraudster the exact list of signals that caught them is "
                                 + "how a detection system gets tuned against itself.")));
@@ -1182,28 +1137,15 @@ public final class DataExportScope {
                   from referral_codes
                  where user_id = :subjectId
                 """,
-                withheld("referrer_ip_hash / referrer_device_hash", "Salted digests of the address "
-                        + "and browser your code was minted from. Irreversible, cleared "
-                        + "automatically after ninety days, and readable by nobody including you — "
+                withheld("referrer_ip_hash / referrer_device_hash / referrer_device_id_hash",
+                        "Salted digests of the address, browser and device your code was used from. "
+                        + "Irreversible, cleared automatically after the retention window the "
+                        + "platform sets, and readable by nobody including you — "
                         + "returning them would create a correlation token and disclose nothing.")));
     }
 
-    // ------------------------------------------------------------------ the exclusions
-
-    /**
-     * <strong>Whole tables holding data about the subject that this export does not return.</strong>
-     *
-     * <p>Serialised into every response, for the same reason {@link
-     * com.draazy.api.identity.user.erasure.ErasureRetention#knownGaps()} is serialised into every
-     * erasure record: a document that quietly omits a category is worse than one that names it. The
-     * subject is told what we hold and can then ask about it specifically; a silent omission leaves
-     * them believing this is everything.
-     *
-     * <p>Three of these are the interesting ones and the rest are bookkeeping. {@code reports} about
-     * the subject and {@code service_request_identities} are excluded because <em>no</em> redaction
-     * of them is safe — see their reasons. {@code audit_log} is excluded because it is a record of
-     * what staff did, indexed by the subject rather than about them.
-     */
+    /** Tables holding data about the subject that this export does not return; serialised into every
+     * response so an omission is never silent. */
     static List<Exclusion> exclusions() {
         return List.of(
                 new Exclusion("reports_about_me",
@@ -1245,17 +1187,17 @@ public final class DataExportScope {
                                 + "an export that had to get one boolean right to avoid disclosing "
                                 + "staff deliberation is an export one migration away from getting "
                                 + "it wrong."),
-                new Exclusion("staff_invites / staff_account_approvals",
+                new Exclusion("staff_invites",
                         "The paperwork behind a staff account, naming the administrator who "
-                                + "invited and approved it."),
+                                + "invited it."),
                 new Exclusion("page_view_daily and its path/referrer rollups",
                         "Daily traffic totals. They carry no user id, no session id and no path "
                                 + "attributable to a person — they are what the raw page_views "
                                 + "rows are counted into before deletion. There is nothing in them "
                                 + "that is about you rather than about the site."),
                 new Exclusion("reference and catalogue tables",
-                        "cities, localities, societies, plans, boost_packs, service_offerings, "
-                                + "cms_services, faqs, banners, announcements, reels, "
+                        "cities, localities, societies, plans, service_offerings, "
+                                + "faqs, reels, "
                                 + "message_template, platform_fees and settings. Reference data "
                                 + "with no data subject behind it, identical for every user."),
                 new Exclusion("other people's rows",
@@ -1265,20 +1207,11 @@ public final class DataExportScope {
                                 + "and it is the whole design of this endpoint."));
     }
 
-    // ------------------------------------------------------------------ accessors and plumbing
-
     static List<Dataset> all() {
         return DATASETS;
     }
 
-    /**
-     * The redaction rule, in the response, in the subject's own document.
-     *
-     * <p>Not decoration. Two of the datasets return a record with the other side removed, and a
-     * reader who does not know that is entitled to conclude the platform holds nothing more. Saying
-     * so in the payload rather than only in the API documentation means the statement travels with
-     * the data to whoever the subject sends it to.
-     */
+    /** Ships the redaction rule in the response payload so it travels with the data itself. */
     static String redactionRule() {
         return "Records you share with somebody else are included in full — that they happened, "
                 + "when, their status, the money, the property — together with everything you "
@@ -1293,19 +1226,13 @@ public final class DataExportScope {
                 + "of another data principal.";
     }
 
-    /**
-     * Ordered map literal, because {@link Map#of} is not.
-     *
-     * <p>The withheld list is read by a person deciding whether to complain about what is missing,
-     * and a list that shuffles between two calls is a list nobody can diff.
-     */
+    /** Ordered map literal; the withheld list must diff cleanly between calls. */
     private static Map<String, String> withheld(String... pairs) {
         Map<String, String> map = new LinkedHashMap<>();
         for (int i = 0; i < pairs.length; i += 2) {
             map.put(pairs[i], pairs[i + 1]);
         }
-        // Not Map.copyOf: its iteration order is deliberately unspecified, which would defeat the
-        // point of building the map in a LinkedHashMap in the first place.
+
         return Collections.unmodifiableMap(map);
     }
 }

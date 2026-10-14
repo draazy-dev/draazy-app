@@ -1,235 +1,117 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
-import { useAdminFlags } from '../../context/AdminFlagsContext.jsx';
-import { listLocalities } from '../../services/localityService.js';
+import { ExternalLink } from 'lucide-react';
 import { listCityWaitlist } from '../../services/cityService.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
-import Tabs from '../../components/ui/Tabs.jsx';
+import Select from '../../components/ui/Select.jsx';
+import { QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import { supplyGap as fetchSupplyGap } from '../../services/demandService.js';
 import {
   localityPricing,
   reviewSla,
   traffic as fetchTraffic,
   engagement as fetchEngagement,
-  surfers as fetchSurfers,
+  funnel as fetchFunnel,
+  surfers as fetchAudience,
 } from '../../services/analyticsService.js';
 import TrafficTab from './analytics/TrafficTab.jsx';
 import EngagementTab from './analytics/EngagementTab.jsx';
-import GeographyTab from './analytics/GeographyTab.jsx';
-import SurfersTab from './analytics/SurfersTab.jsx';
 import SupplyGapTab from './analytics/SupplyGapTab.jsx';
 import PricingTab from './analytics/PricingTab.jsx';
 import SlaTab from './analytics/SlaTab.jsx';
+import FunnelTab from './analytics/FunnelTab.jsx';
+import { RANGE_OPTIONS } from './analytics/constants.jsx';
+import { useIsLightTheme } from '../../lib/themeColour';
+
+const POSTHOG_APP_URL = import.meta.env.VITE_POSTHOG_APP_URL || '';
+
+// Pricing is a snapshot of the live catalogue, so it has no window to pick.
+const WINDOWED_TABS = new Set(['funnel', 'traffic', 'engagement', 'supply-gap', 'sla']);
+const TAB_KEYS = ['traffic', 'engagement', 'funnel', 'supply-gap', 'pricing', 'sla'];
+
+/* Reads one report when its tab is first shown and again when `key` changes; three-state because a `[]` default would render an all-clear from a 500. */
+function useTabReport(load, shown, key) {
+  const [state, setState] = useState({ data: null, failed: false, key: undefined });
+  const current = state.key === key;
+  useEffect(() => {
+    if (!shown || current) return undefined;
+    let alive = true;
+    load()
+      .then((data) => { if (alive) setState({ data, failed: false, key }); })
+      .catch(() => { if (alive) setState({ data: null, failed: true, key }); });
+    return () => { alive = false; };
+    // `key` stands for everything `load` closes over; `load` itself is a fresh closure every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shown, current, key]);
+  return state;
+}
 
 export default function AdminAnalytics() {
+  /* Chart options below read cssColour at render, so a theme flip must re-render them. */
+  useIsLightTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const [days, setDays] = useState(90);
-  const { optionEnabled } = useAdminFlags();
 
-  /*
-   * A `getAnalytics()` call from `mockApi` stood here, and a `if (!analytics) return <Loading />;`
-   * gate stood below. Everything it fetched was one five-row constant feeding one doughnut on the
-   * Traffic tab, so the page held all eight tabs behind a spinner waiting on a localStorage read
-   * for a chart whose two neighbours were already hardcoded. That constant is gone: the Traffic
-   * tab's source mix is a real referrer rollup now, so the doughnut is measured rather than drawn.
-   *
-   * Nothing on this page is generated any more. Three tabs — Traffic, Engagement and Anonymous
-   * surfers — read the page-view aggregates below; Supply Gap is a server aggregate; Pricing and SLA
-   * are server reports. The eighth tab, Seasonal, is deleted: a month-over-month demand curve needs
-   * one to three years of history that collection started far too recently to have, and the only
-   * thing standing in for it was a seeded generator with a `Sample` chip. Deleting it is the honest
-   * version of that chip. `lib/data/analytics-extra.js` no longer feeds this page at all.
-   */
+  // An unknown `?tab=` falls back to the first tab, never to an empty page.
+  const activeTab = TAB_KEYS.includes(requestedTab) ? requestedTab : TAB_KEYS[0];
+  const on = (key) => activeTab === key;
 
-  // The supply gap is a server aggregate now, so it is fetched rather than derived. Kept out of the
-  // `analytics` gate above because it is one tab: an outage in the demand report should leave the
-  // other seven tabs rendering, so a failure here empties this tab rather than the page.
-  const [supplyGap, setSupplyGap] = useState([]);
-  const showSupplyGap = optionEnabled('analytics.supplyGap');
-  const [locs, setLocs] = useState([]);
-  const showGeography = optionEnabled('analytics.geography');
-  useEffect(() => {
-    if (!showSupplyGap) { setSupplyGap([]); return undefined; }
-    let alive = true;
-    fetchSupplyGap()
-      .then((rows) => { if (alive) setSupplyGap(rows); })
-      .catch(() => { if (alive) setSupplyGap([]); });
-    return () => { alive = false; };
-  }, [showSupplyGap]);
-
-  /*
-   * The other half of the Supply Gap tab: which cities people want Draazy to launch in.
-   *
-   * A second request rather than a field on the supply-gap report, because they are answers to two
-   * different questions against two unrelated tables — localities inside a city we serve, and cities
-   * we do not. Fetched separately for the same reason Supply Gap is fetched apart from the rest of
-   * the page: one report failing should empty one panel.
-   *
-   * Three states, like Pricing and SLA below and unlike `supplyGap` above, and the difference is
-   * deliberate. `[]` in the catch renders "No city requests yet" — a claim that nobody has asked,
-   * assembled out of a failed read. This panel exists because it spent its whole life making
-   * exactly that claim wrongly; shipping it back with a catch that can re-make it would be a poor
-   * joke.
-   */
-  const [cityWaitlist, setCityWaitlist] = useState(null);
-  const [cityWaitlistFailed, setCityWaitlistFailed] = useState(false);
-  /* The retry exists because `showSupplyGap` never changes on its own, so without it the only way
-     out of the failed state is a full page reload — the panel would tell the operator not to read
-     the outage as "nobody asked" and then offer them no way to find out what it really was. */
+  const supplyGap = useTabReport(() => fetchSupplyGap({ days }), on('supply-gap'), days);
+  /* Which cities people want Draazy in: a separate read because a different table answers it, so one failing report empties one panel. */
   const [cityWaitlistAttempt, setCityWaitlistAttempt] = useState(0);
   const retryCityWaitlist = () => setCityWaitlistAttempt((n) => n + 1);
-  useEffect(() => {
-    if (!showSupplyGap) { setCityWaitlist(null); setCityWaitlistFailed(false); return undefined; }
-    let alive = true;
-    listCityWaitlist()
-      .then((rows) => { if (alive) { setCityWaitlist(rows); setCityWaitlistFailed(false); } })
-      .catch(() => { if (alive) { setCityWaitlist(null); setCityWaitlistFailed(true); } });
-    return () => { alive = false; };
-  }, [showSupplyGap, cityWaitlistAttempt]);
-
-  useEffect(() => {
-    if (!showGeography) { setLocs([]); return undefined; }
-    let alive = true;
-    listLocalities()
-      .then((rows) => {
-        if (!alive) return;
-        setLocs(rows.map((row) => ({
-          name: row.name,
-          listings: row.listingCount,
-          demand: row.demand ?? 0,
-          ratePerSqft: row.ratePerSqft ?? 0,
-        })));
-      })
-      .catch(() => { if (alive) setLocs([]); });
-    return () => { alive = false; };
-  }, [showGeography]);
-
-  /*
-   * Pricing and SLA are measured, so they are fetched rather than generated.
-   *
-   * Each gets its own effect and its own catch, like Supply Gap above and for the same reason: a
-   * failure should empty one tab, not the page. `null` is the pre-arrival state and the tabs render
-   * nothing for it — distinct from a loaded report that happens to be empty, which they do render.
-   *
-   * Neither takes a generated figure any more. The cards that had no server source — six-month
-   * price trends, per-listing price position, the weekly compliance line — are deleted, and ticket
-   * and concierge turnaround are served by the SLA endpoint itself. See `analyticsService.js`.
-   */
-  /*
-   * Three states, not two, and the third is why this is not simply `useState(null)` with a `[]` in
-   * the catch. `[]` means "the report loaded and found nothing", which renders a full KPI strip
-   * reading 0 overpriced and 0 underpriced areas — a confident all-clear manufactured out of a 500.
-   * That is the same class of lie the endpoints were written to retire, one layer up, so a failure
-   * has to be able to say so.
-   */
-  const [pricingRows, setPricingRows] = useState(null);
-  const [pricingFailed, setPricingFailed] = useState(false);
-  const showPricing = optionEnabled('analytics.pricing');
-  useEffect(() => {
-    if (!showPricing) { setPricingRows(null); setPricingFailed(false); return undefined; }
-    let alive = true;
-    localityPricing()
-      .then((rows) => { if (alive) { setPricingRows(rows); setPricingFailed(false); } })
-      .catch(() => { if (alive) { setPricingRows(null); setPricingFailed(true); } });
-    return () => { alive = false; };
-  }, [showPricing]);
-
-  const [slaSummary, setSlaSummary] = useState(null);
-  const [slaFailed, setSlaFailed] = useState(false);
-  const showSla = optionEnabled('analytics.sla');
-  useEffect(() => {
-    if (!showSla) { setSlaSummary(null); setSlaFailed(false); return undefined; }
-    let alive = true;
-    reviewSla()
-      .then((summary) => { if (alive) { setSlaSummary(summary); setSlaFailed(false); } })
-      .catch(() => { if (alive) { setSlaSummary(null); setSlaFailed(true); } });
-    return () => { alive = false; };
-  }, [showSla]);
-
-  /*
-   * Traffic, Engagement and Anonymous surfers are measured now.
-   *
-   * All three read the same `days` window, and the picker that sets it lives on the Traffic tab.
-   * That is one window for one page rather than three independent ones, but it does mean a change
-   * made on Traffic silently moves the other two — so both of them state the window they drew
-   * rather than leaving the reader to remember where the control was.
-   *
-   * Same three-state shape as Pricing and SLA above, for the same reason. `[]` in the catch would
-   * render "0 sessions, 0 anonymous, 0% bounce" — a confident report that nobody visited the site,
-   * assembled out of a 500. The one figure a traffic console must never invent is zero traffic.
-   */
-  const [trafficReport, setTrafficReport] = useState(null);
-  const [trafficFailed, setTrafficFailed] = useState(false);
-  const showTraffic = optionEnabled('analytics.traffic');
-  useEffect(() => {
-    if (!showTraffic) { setTrafficReport(null); setTrafficFailed(false); return undefined; }
-    let alive = true;
-    fetchTraffic({ days })
-      .then((r) => { if (alive) { setTrafficReport(r); setTrafficFailed(false); } })
-      .catch(() => { if (alive) { setTrafficReport(null); setTrafficFailed(true); } });
-    return () => { alive = false; };
-  }, [showTraffic, days]);
-
-  const [engagementReport, setEngagementReport] = useState(null);
-  const [engagementFailed, setEngagementFailed] = useState(false);
-  const showEngagement = optionEnabled('analytics.engagement');
-  useEffect(() => {
-    if (!showEngagement) { setEngagementReport(null); setEngagementFailed(false); return undefined; }
-    let alive = true;
-    fetchEngagement({ days })
-      .then((r) => { if (alive) { setEngagementReport(r); setEngagementFailed(false); } })
-      .catch(() => { if (alive) { setEngagementReport(null); setEngagementFailed(true); } });
-    return () => { alive = false; };
-  }, [showEngagement, days]);
-
-  const [surfersReport, setSurfersReport] = useState(null);
-  const [surfersFailed, setSurfersFailed] = useState(false);
-  const showSurfers = optionEnabled('analytics.anonymous');
-  useEffect(() => {
-    if (!showSurfers) { setSurfersReport(null); setSurfersFailed(false); return undefined; }
-    let alive = true;
-    fetchSurfers({ days })
-      .then((r) => { if (alive) { setSurfersReport(r); setSurfersFailed(false); } })
-      .catch(() => { if (alive) { setSurfersReport(null); setSurfersFailed(true); } });
-    return () => { alive = false; };
-  }, [showSurfers, days]);
+  const cityWaitlist = useTabReport(listCityWaitlist, on('supply-gap'), cityWaitlistAttempt);
+  const pricing = useTabReport(localityPricing, on('pricing'), 0);
+  const sla = useTabReport(() => reviewSla({ days }), on('sla'), days);
+  const traffic = useTabReport(() => fetchTraffic({ days }), on('traffic'), days);
+  const audience = useTabReport(() => fetchAudience({ days }), on('traffic'), days);
+  const engagement = useTabReport(() => fetchEngagement({ days }), on('engagement'), days);
+  const funnel = useTabReport(() => fetchFunnel({ days }), on('funnel'), days);
 
   const tabs = [
-    optionEnabled('analytics.traffic') && { key: 'traffic', label: 'Traffic', content: <TrafficTab report={trafficReport} failed={trafficFailed} days={days} setDays={setDays} /> },
-    optionEnabled('analytics.engagement') && { key: 'engagement', label: 'Engagement', content: <EngagementTab report={engagementReport} failed={engagementFailed} days={days} /> },
-    optionEnabled('analytics.anonymous') && { key: 'surfers', label: 'Anonymous surfers', content: <SurfersTab report={surfersReport} failed={surfersFailed} days={days} /> },
-    optionEnabled('analytics.geography') && { key: 'geography', label: 'Geography', content: <GeographyTab locs={locs} /> },
-    optionEnabled('analytics.supplyGap') && { key: 'supply-gap', label: 'Supply Gap', content: <SupplyGapTab supplyGap={supplyGap} cityWaitlist={cityWaitlist} cityWaitlistFailed={cityWaitlistFailed} onRetryCityWaitlist={retryCityWaitlist} /> },
-    optionEnabled('analytics.pricing') && { key: 'pricing', label: 'Pricing', content: <PricingTab rows={pricingRows} failed={pricingFailed} /> },
-    optionEnabled('analytics.sla') && { key: 'sla', label: 'SLA', content: <SlaTab sla={slaSummary} failed={slaFailed} /> },
-  ].filter(Boolean);
-
-  /*
-   * Resolved against the tabs that exist, not taken from the URL as read.
-   *
-   * `searchParams.get('tab') || 'traffic'` stood here, which handles a missing parameter and
-   * nothing else: any other value selected a tab that was not in the list, and `Tabs` rendered the
-   * strip with nothing under it. That is not a hypothetical URL. Seasonal was a real tab with a
-   * real address until D252 deleted it, so bookmarks and pasted links to `?tab=seasonal` exist and
-   * every one of them landed on a heading above an empty page — which reads as an outage rather
-   * than as a removal, and is the version of this an operator reports as "analytics is down".
-   *
-   * The same hole swallowed a tab an operator had switched off in Settings: the flags filter the
-   * list, so deep-linking a disabled tab produced the identical blank. Falling back to the first
-   * tab that survived both filters is the only answer that cannot render nothing.
-   */
-  const activeTab = tabs.some((t) => t.key === requestedTab) ? requestedTab : tabs[0]?.key;
+    { key: 'traffic', label: 'Traffic', content: <TrafficTab report={traffic.data} failed={traffic.failed} audience={audience.data} audienceFailed={audience.failed} days={days} /> },
+    { key: 'engagement', label: 'Engagement', content: <EngagementTab report={engagement.data} failed={engagement.failed} days={days} /> },
+    { key: 'funnel', label: 'Funnel', content: <FunnelTab report={funnel.data} failed={funnel.failed} days={days} /> },
+    { key: 'supply-gap', label: 'Supply Gap', content: <SupplyGapTab supplyGap={supplyGap.data} failed={supplyGap.failed} days={days} cityWaitlist={cityWaitlist.data} cityWaitlistFailed={cityWaitlist.failed} onRetryCityWaitlist={retryCityWaitlist} /> },
+    { key: 'pricing', label: 'Pricing', content: <PricingTab rows={pricing.data} failed={pricing.failed} /> },
+    { key: 'sla', label: 'SLA', content: <SlaTab sla={sla.data} failed={sla.failed} days={days} /> },
+  ];
 
   return (
     <div>
-      <PageHeader title="Analytics" subtitle="Traffic, engagement & geographic insights" />
-      <div className="mt-6">
-        <Tabs
-          active={activeTab}
-          onChange={(key) => setSearchParams({ tab: key }, { replace: true })}
-          items={tabs}
-        />
+      <PageHeader
+        title="Analytics"
+        subtitle="Traffic, funnel, demand, pricing & SLA"
+        actions={(
+          <div className="flex flex-wrap items-center gap-2">
+            {WINDOWED_TABS.has(activeTab) ? (
+              <div style={{ width: 170 }}>
+                <Select value={String(days)} onChange={(v) => setDays(Number(v))} options={RANGE_OPTIONS} ariaLabel="Report window" />
+              </div>
+            ) : null}
+            {POSTHOG_APP_URL ? (
+              <a
+                href={POSTHOG_APP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 px-3 py-1.5 text-sm font-semibold text-gray-300 hover:bg-white/5 hover:text-white transition"
+              >
+                Product analytics <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
+          </div>
+        )}
+      />
+      <QueueTabs
+        tabs={tabs.map(({ key, label }) => ({ key, label, count: null }))}
+        active={activeTab}
+        onChange={(key) => setSearchParams({ tab: key }, { replace: true })}
+        label="Analytics reports"
+        idPrefix="analytics"
+      />
+      <div id="analytics-panel" role="tabpanel" aria-labelledby={`analytics-tab-${activeTab}`}>
+        {tabs.find((t) => t.key === activeTab)?.content}
       </div>
     </div>
   );

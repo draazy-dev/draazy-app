@@ -13,25 +13,37 @@ import org.springframework.data.repository.query.Param;
 
 public interface OtpCodeRepository extends JpaRepository<OtpCode, UUID> {
 
-    /**
-     * Row-locked so two concurrent verifies cannot both read the same {@code attempts} and slip past
-     * the brute-force ceiling. Verify runs in a transaction, so the lock stays tightly scoped.
-     */
+    /** Row-locked so two concurrent verifies cannot both read the same {@code attempts} and slip
+     * past the brute-force ceiling. Verify runs in a transaction, so the lock stays tightly scoped. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<OtpCode> findFirstByMobileAndPurposeAndConsumedFalseOrderByCreatedAtDesc(
             String mobile, String purpose);
 
-    /**
-     * Backs the per-recipient send budget in {@link OtpService#sendLoginCode}. Counts <em>sends</em>,
-     * not live codes — rationale in docs/flows/consumer/auth.md.
-     */
-    List<OtpCode> findByMobileAndPurposeOrderByCreatedAtDesc(
-            String mobile, String purpose, Pageable pageable);
+    @Query("select c.createdAt from OtpCode c where c.mobile = :mobile"
+            + " and (c.purpose = :family or c.purpose like concat(:family, ':%'))"
+            + " order by c.createdAt desc")
+    List<Instant> findRecentSendTimesForRecipient(@Param("mobile") String mobile,
 
-    /**
-     * Backs the platform-wide spend ceiling in {@link OtpService#sendCode}, keyed on nothing so a
-     * rotating recipient cannot walk past the per-mobile limits. Oldest first: row one reopens.
-     */
+            @Param("family") String family, Pageable pageable);
+    /** Platform-wide ceiling, keyed on nothing so a rotating recipient cannot walk past the
+     * per-mobile limits. Oldest first: row one is the send whose expiry reopens a slot. */
     @Query("select c.createdAt from OtpCode c where c.createdAt >= :since order by c.createdAt")
     List<Instant> findSendTimesSince(@Param("since") Instant since, Pageable pageable);
+
+    /** Per-purpose share of that ceiling, so a side flow whose caller names the recipient cannot
+     * spend the whole pool. */
+    @Query("select c.createdAt from OtpCode c"
+            + " where (c.purpose = :family or c.purpose like concat(:family, ':%'))"
+            + " and c.createdAt >= :since order by c.createdAt")
+    List<Instant> findSendTimesForPurposeSince(@Param("family") String family,
+            @Param("since") Instant since, Pageable pageable);
+    @Query("select c.createdAt from OtpCode c where c.requestedBy = :requestedBy"
+            + " and (c.purpose = :family or c.purpose like concat(:family, ':%'))"
+            + " and c.createdAt >= :since order by c.createdAt")
+    List<Instant> findSendTimesForCallerSince(@Param("requestedBy") UUID requestedBy,
+            @Param("family") String family, @Param("since") Instant since, Pageable pageable);
+    @Query("select c.createdAt from OtpCode c where c.purpose like concat(:prefix, ':%')"
+            + " and c.createdAt >= :since order by c.createdAt")
+    List<Instant> findSendTimesForPurposePrefixSince(@Param("prefix") String prefix,
+            @Param("since") Instant since, Pageable pageable);
 }

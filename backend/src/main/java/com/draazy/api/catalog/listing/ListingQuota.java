@@ -1,59 +1,83 @@
 package com.draazy.api.catalog.listing;
 
+import com.draazy.api.catalog.property.ListingLiveGate;
+import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
-import com.draazy.api.common.error.ListingQuotaExhaustedException;
+import com.draazy.api.common.error.RateLimitedException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.ListingAllowanceLookup;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * How many listings an owner may have, and whether they may have another.
- * Ceiling rules and the concierge exemption: docs/flows/consumer/list-property-wizard.md section 9.2.
- */
 @Service
-public class ListingQuota {
+public class ListingQuota implements ListingLiveGate {
+
+    private static final Duration PACE_WINDOW = Duration.ofDays(1);
 
     private final PropertyRepository properties;
     private final ListingAllowanceLookup allowances;
+    private final RateLimitLock locks;
+    private final int maxPostsPerDay;
 
-    public ListingQuota(PropertyRepository properties, ListingAllowanceLookup allowances) {
+    public ListingQuota(PropertyRepository properties, ListingAllowanceLookup allowances, RateLimitLock locks,
+            @Value("${draazy.listings.max-posts-per-day:3}") int maxPostsPerDay) {
         this.properties = properties;
         this.allowances = allowances;
+        this.locks = locks;
+        this.maxPostsPerDay = maxPostsPerDay;
     }
 
-    /**
-     * Refuse a post that would put the owner over their freemium ceiling. Callers must check before
-     * anything is loaded or written, so a refused post leaves no half-built row behind.
-     */
-    public void require(UUID userId) {
-        ListingStanding standing = standingFor(userId);
-        if (standing.held() >= standing.allowance()) {
-            throw new ListingQuotaExhaustedException(
-                    "You already have " + standing.held() + " of " + standing.allowance()
-                    + " listings live. "
-                    + "Take one down, upgrade your plan, or refer an owner to earn another slot.");
+    public void requirePace(UUID userId) {
+        if (properties.countPostedSince(userId, Instant.now().minus(PACE_WINDOW)) >= maxPostsPerDay) {
+            throw new RateLimitedException("You can post up to " + maxPostsPerDay
+                    + " new listings a day. Please try again tomorrow.", (int) PACE_WINDOW.toSeconds());
         }
     }
 
-    /**
-     * How much of their ceiling an owner ({@code userId}, not the caller) is using - the same two
-     * numbers {@link #require} refuses on, published so the concierge desk can judge instead.
-     */
+    @Override
+    public boolean mayGoLive(Property property) {
+        return mayGoLive(property, Instant.now());
+    }
+
+    /** Pass-covered listings always may; others need a free slot beside the owner's other uncovered live
+     * ones. Holds the owner's slot lock to commit, so two listings cannot both take the last slot. */
+    @Transactional
+    public boolean mayGoLive(Property property, Instant now) {
+        UUID ownerId = property.getOwner().getId();
+        locks.holdUntilCommit(RateLimitLock.Limit.LISTING_LIVE, ownerId.toString());
+        if (properties.hasActivePass(property.getId(), now)) {
+            return true;
+        }
+        long others = properties.countLiveUncovered(
+                ownerId, PropertyStatus.OCCUPIES_LISTING_SLOT, property.getId(), now);
+        return others < allowances.listingAllowance(ownerId);
+    }
+
+    /** The owner's uncovered live listings past their allowance; the oldest are kept. */
+    @Transactional
+    public List<UUID> liveBeyondAllowance(UUID ownerId, Instant now) {
+        locks.holdUntilCommit(RateLimitLock.Limit.LISTING_LIVE, ownerId.toString());
+        List<UUID> live = properties.findLiveUncoveredIds(ownerId, PropertyStatus.OCCUPIES_LISTING_SLOT, now);
+        int keep = allowances.listingAllowance(ownerId);
+        return live.size() <= keep ? List.of() : live.subList(keep, live.size());
+    }
+
+    /** How much of their free tier an owner ({@code userId}, not the caller) is using, so the
+     * concierge desk can judge instead of refusing. */
     @Transactional(readOnly = true)
     public ListingStanding standingFor(UUID userId) {
         return new ListingStanding(allowances.listingAllowance(userId),
-                properties.countOccupyingListingSlots(userId, PropertyStatus.OCCUPIES_LISTING_SLOT));
+                properties.countLiveUncovered(userId, Instant.now()));
     }
 
-    /**
-     * An owner's listing quota: what their plan and referrals permit, and how many listings
-     * currently occupy a slot ({@code pending} and {@code approved}).
-     */
     public record ListingStanding(int allowance, long held) {
 
-        /** Whether they are past the ceiling — only reachable via the concierge desk. */
         public boolean overAllowance() {
             return held > allowance;
         }

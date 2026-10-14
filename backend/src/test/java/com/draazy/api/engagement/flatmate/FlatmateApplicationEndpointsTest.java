@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -26,18 +27,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * A group applies to a whole flat, and the flat's owner answers.
- *
- * <p>These three routes exist because the admin board over {@code flatmate_group_applications} was
- * a correct, guarded, paged read over a table nothing could write to: the entity's constructor had
- * no callers and {@code decide()} had none either. So the interesting assertions here are not the
- * happy paths — they are the ones that prove the two axes stay apart. An owner writes
- * {@code status} and can never write {@code modStatus}; a moderator writes {@code modStatus} and
- * can never decide on the owner's behalf; and a removed row leaves the owner's inbox without its
- * {@code status} moving, because "ops took this down" is not the same statement as "the owner said
- * no".
- */
+// These routes prove owner status and moderation status stay separate: ops removing a row
+// must never be recorded as the owner saying no.
 @DisplayName("Flatmate group applications — the group applies, the owner answers")
 class FlatmateApplicationEndpointsTest extends AbstractApiTest {
 
@@ -80,12 +71,8 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
-    /**
-     * A group, published past the D72 queue.
-     *
-     * <p>Applying deliberately requires a <em>visible</em> group, so a test that skipped this would
-     * be asserting against a 400 rather than the thing it meant to assert.
-     */
+    // Applying deliberately requires a visible group, so skipping approval would assert
+    // against a 400 rather than the intended branch.
     private String group(User host, String title) throws Exception {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -98,10 +85,8 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                 .andReturn().getResponse().getContentAsString();
         String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
-        /* The whole test class runs in one transaction, so the row Hibernate is holding still says
-           `pending` after that UPDATE — and `apply` reads visibility off the entity, not off the
-           WHERE clause. Clearing forces the next read to come from the database, which is what the
-           running application would always have done. */
+        // The transaction still holds the pending entity; clearing forces the next read
+        // through the database, matching the running application.
         em.clear();
         return id;
     }
@@ -137,11 +122,20 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.groupTitle").value("Three of us for a 3BHK"))
                     .andExpect(jsonPath("$.applicantName").value("Host One"))
                     .andExpect(jsonPath("$.status").value("pending"))
-                    // 45000 over 3 seats. The per-head figure is what an owner actually reads, and
-                    // it is computed from the group's seats rather than its current members —
-                    // a group applies for the seats it intends to fill.
+                    // The owner reads the per-head figure, which comes from intended seats
+                    // rather than current members.
                     .andExpect(jsonPath("$.perHead").value(15000))
                     .andExpect(jsonPath("$.seatsTotal").value(3));
+
+            assertThat(jdbc.queryForMap(
+                    "select type, title, body, link from notifications where user_id = ?", owner.getId()))
+                    .containsEntry("type", "flatmate.groupApplication.received")
+                    .containsEntry("title", "A group applied to your flat")
+                    .containsEntry("body", "Three of us for a 3BHK would like to rent 3BHK in Kothrud.")
+                    .containsEntry("link", "/dashboard");
+            assertThat(jdbc.queryForObject(
+                    "select count(*) from notifications where user_id = ?", Long.class, host.getId()))
+                    .isZero();
         }
 
         @Test
@@ -233,6 +227,18 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
         }
 
         @Test
+        @DisplayName("an unknown ?sort= is ignored rather than a 500")
+        void unknownSortIsIgnored() throws Exception {
+            User owner = user("9811100016", "Owner Sort", Roles.Wire.OWNER);
+            User host = user("9811100017", "Host Sort");
+            apply(host, group(host, "Group S"), listing(owner, "Sort flat", "rent", 45000L));
+
+            mvc.perform(get(Routes.Flatmates.MY_GROUP_APPLICATIONS).param("sort", "bogus")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content.length()").value(1));
+        }
+        @Test
         @DisplayName("a moderator's removal hides the row without answering for the owner")
         void moderationRemovalHides() throws Exception {
             User owner = user("9811100014", "Owner Five", Roles.Wire.OWNER);
@@ -290,7 +296,11 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"status\":\"declined\"}"))
-                    .andExpect(status().isOk());
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("declined"));
+            assertThat(jdbc.queryForList(
+                    "select type from notifications where user_id = ?", String.class, host.getId()))
+                    .containsExactly("flatmate.groupApplication.declined");
 
             mvc.perform(patch(path)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -331,6 +341,95 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"status\":\"pending\"}"))
                     .andExpect(status().isBadRequest());
+        }
+
+        private void decide(User owner, String appId, String verdict, org.springframework.test.web.servlet.ResultMatcher expected) throws Exception {
+            mvc.perform(patch(Routes.Flatmates.MY_GROUP_APPLICATION_BY_ID.replace("{id}", appId))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"status\":\"" + verdict + "\"}"))
+                    .andExpect(expected);
+        }
+
+        private String statusOf(String appId) {
+            return jdbc.queryForObject(
+                    "select status from flatmate_group_applications where id = ?::uuid", String.class, appId);
+        }
+
+        @Test
+        @DisplayName("accepting one group declines the rest and tells them")
+        void acceptDeclinesOtherPending() throws Exception {
+            User owner = user("9811100030", "Owner Close", Roles.Wire.OWNER);
+            User hostA = user("9811100031", "Host A");
+            User hostB = user("9811100032", "Host B");
+            User hostC = user("9811100033", "Host C");
+            Property flat = listing(owner, "One flat", "rent", 45000L);
+            String a = apply(hostA, group(hostA, "Group A1"), flat);
+            String b = apply(hostB, group(hostB, "Group B1"), flat);
+            String c = apply(hostC, group(hostC, "Group C1"), flat);
+
+            decide(owner, a, "accepted", status().isOk());
+
+            assertThat(statusOf(a)).isEqualTo("accepted");
+            assertThat(statusOf(b)).isEqualTo("declined");
+            assertThat(statusOf(c)).isEqualTo("declined");
+            assertThat(jdbc.queryForList("select type from notifications where user_id = ?",
+                    String.class, hostB.getId())).containsExactly("flatmate.groupApplication.declined");
+            assertThat(jdbc.queryForList("select type from notifications where user_id = ?",
+                    String.class, hostA.getId())).containsExactly("flatmate.groupApplication.accepted");
+        }
+
+        @Test
+        @DisplayName("a second acceptance on the same flat is a 409, even for an application that slipped in")
+        void secondAcceptRefused() throws Exception {
+            User owner = user("9811100034", "Owner Twice", Roles.Wire.OWNER);
+            User hostA = user("9811100035", "Host A2");
+            User hostB = user("9811100036", "Host B2");
+            Property flat = listing(owner, "Taken flat", "rent", 45000L);
+            String a = apply(hostA, group(hostA, "Group A2"), flat);
+            String b = apply(hostB, group(hostB, "Group B2"), flat);
+
+            decide(owner, a, "accepted", status().isOk());
+            jdbc.update("update flatmate_group_applications set status = 'pending', decided_at = null"
+                    + " where id = ?::uuid", b);
+            em.clear();
+
+            decide(owner, b, "accepted", status().isConflict());
+            assertThat(statusOf(b)).isEqualTo("pending");
+        }
+
+        @Test
+        @DisplayName("once a group is accepted the flat takes no new group applications")
+        void applyRefusedAfterAccept() throws Exception {
+            User owner = user("9811100037", "Owner Shut", Roles.Wire.OWNER);
+            User hostA = user("9811100038", "Host A3");
+            User hostB = user("9811100039", "Host B3");
+            Property flat = listing(owner, "Shut flat", "rent", 45000L);
+            String lateGroup = group(hostB, "Late group");
+            decide(owner, apply(hostA, group(hostA, "Group A3"), flat), "accepted", status().isOk());
+
+            mvc.perform(post(Routes.Flatmates.GROUP_APPLY.replace("{id}", lateGroup))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(hostB))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"listingId\":\"" + flat.getId() + "\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message", Matchers.containsString("closed to new group")));
+        }
+
+        @Test
+        @DisplayName("a moderator removing the accepted application reopens the flat")
+        void removedAcceptanceReopens() throws Exception {
+            User owner = user("9811100040", "Owner Reopen", Roles.Wire.OWNER);
+            User hostA = user("9811100041", "Host A4");
+            User hostB = user("9811100042", "Host B4");
+            Property flat = listing(owner, "Reopened flat", "rent", 45000L);
+            String lateGroup = group(hostB, "Later group");
+            String a = apply(hostA, group(hostA, "Group A4"), flat);
+            decide(owner, a, "accepted", status().isOk());
+            jdbc.update("update flatmate_group_applications set mod_status = 'removed' where id = ?::uuid", a);
+            em.clear();
+
+            apply(hostB, lateGroup, flat);
         }
     }
 

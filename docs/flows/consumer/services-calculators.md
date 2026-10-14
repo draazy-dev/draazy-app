@@ -26,7 +26,7 @@
 - **Routes (from `src/App.jsx`):**
   - `/services` - hub (`Services.jsx`).
   - `/home-loans` - home loans page with `LoanEmiCalc` (`services/HomeLoans.jsx`).
-  - `/emi-calculator` - full EMI calculator, behind `AppFlagRoute flag="emiCalculator"`
+  - `/emi-calculator` - full EMI calculator
     (`EmiCalculator.jsx`).
   - `/services/property-legal` - legal page with `LegalCostCalc` (`services/PropertyLegal.jsx`).
   - `/services/packers-movers` - packers page with `PackersEstimator` (`services/PackersMovers.jsx`).
@@ -53,7 +53,7 @@
 ## 4. Entities touched
 Link to [`../../system/data-model.md`](../../system/data-model.md).
 - **Service ticket** - `createServiceRequest({ team, service, customer, mobile, detail, value, ref })`
-  in `mockApi` -> admin/ops services queue. Created by every lead form (legal/packers/valuation/
+  -> admin/ops services queue. Created by every lead form (legal/packers/valuation/
   interior/rent-agreement/move-in-pack + waitlist).
 - **Service workflow request** - a server `service_requests` record for the customer tracker
   (valuation, rent agreement). See section 5 and [`./rent-agreement.md`](./rent-agreement.md).
@@ -87,19 +87,17 @@ interest = max(total - P, 0)
   `{ principal, interest, balance }`.
 - Card version (`computeEmi` in `LoanEmiCalc.jsx`) is the same formula with `n = max(years,1)*12`
   and rounded outputs; ranges amount 5L..3Cr, rate 7..12%, tenure 5..30y (defaults 50L/8.5/20).
-  Its CTA to the full page shows only when `flagEnabled('emiCalculator')`.
+  Its CTA always links to the full page.
 
 ### 5.2 Legal stamp-duty & registration (`LegalCostCalc.jsx`, `computeStampDuty`)
-Maharashtra ready-reckoner-style estimate for a *purchase*:
+Maharashtra ready-reckoner-style estimate for a *purchase* in PMC/PCMC limits:
 ```
-rate = max(ratePct - (femaleConcession ? 1 : 0), 1)   // 1% women concession (residential)
-stamp = round(value * rate / 100)
+stamp = round(value * 7 / 100)                         // PUNE_STAMP_RATE_PCT; no concession or other-area rates
 reg   = min(round(value * 0.01), 30000)               // registration 1%, capped at Rs 30,000
 total = stamp + reg
 ```
-- `ratePct` by area: Municipal Corporation (Pune/PCMC) = 6, Municipal Council/Nagar Panchayat = 5,
-  Gram Panchayat (rural) = 4. Buyer: "Female (sole owner)" applies the 1% concession.
-- Default property value 75L; slider 10L..5Cr.
+- Only the PMC/PCMC 7% rate is shown; the women-buyer concession and the 5%/4% council/rural rates were removed
+  because none had an official source. Default property value 75L; slider 10L..5Cr.
 
 ### 5.3 Packers moving-cost estimator (`PackersEstimator.jsx`, `estimateMove`)
 ```
@@ -156,10 +154,6 @@ conf   = clamp(72..95) of 92, minus 12 if area<400 or >3000, minus 3 if ageM<0.9
   still created, unlinked — a failed lead must not also cost the customer their request. The
   confirmation is optimistic because it acknowledges the enquiry the customer just made, not a round
   trip they cannot see.
-- **There is deliberately no mock-mode fallback for the `ticket` domain.** The mock store knows three
-  ticket statuses where the desk knows nine, so `/admin/services` tells an operator the queue needs
-  the API rather than rendering one that cannot be worked. A lead filed where no desk can read it is
-  a record of somebody being missed.
 - `serviceRequestMapper.toCreate` refuses to forward a browser-minted `TR…` ref — the seam's
   statement that such a pairing is not a server id — and the flatmate and rent-agreement flows can
   still hand it one.
@@ -201,5 +195,4 @@ conf   = clamp(72..95) of 92, minus 12 if area<400 or >3000, minus 3 if ageM<0.9
   Move-in waitlist requires a valid mobile (`isValidMobile`).
 - **Admin config unavailable:** Move-in Pack uses `DEFAULT_PACK_PRICES` until `settings.movePack`
   loads; if `enabled` is false the whole section is a waitlist.
-- **Feature flags:** `/emi-calculator` and the card's "open full" CTA require `emiCalculator`;
-  the flag being off hides the deep link but the card math still works.
+- **Feature flags:** none — the EMI calculator is always on.

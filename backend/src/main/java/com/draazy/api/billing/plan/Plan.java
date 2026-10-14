@@ -10,23 +10,15 @@ import lombok.Getter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * A subscription plan on the public price list. Maps {@code plans} (V8), seeded as reference data
- * in {@code R__DML_seed_reference_data.sql}.
- *
- * <p>Read-only from the application's point of view: nothing in the platform creates or edits a
- * plan, because a price list is a business decision made in the back office and a migration, not a
- * runtime write. There is deliberately no setter — when plan administration is needed it belongs
- * under {@code /admin/}, with an audit trail.
- *
- * <p><strong>A {@code price} of zero is a real plan, not a missing one.</strong> "Owner Free" is
- * what every owner is on until they upgrade, and {@link SubscriptionService} keys the entire
- * payment decision off this being zero.
- */
+/** A plan on the public price list; maps {@code plans}. */
 @Entity
 @Table(name = "plans")
 @Getter
 public class Plan extends AuditedEntity {
+
+    public static final String KIND_PLAN = "plan";
+    public static final String KIND_LISTING_PASS = "listing-pass";
+    public static final String KIND_CONTACT_PACK = "contact-pack";
 
     @Column(name = "name", nullable = false)
     private String name;
@@ -34,39 +26,34 @@ public class Plan extends AuditedEntity {
     @Column(name = "audience")
     private String audience;
 
-    /** Whole rupees for one {@link #billingCycle}. Zero means free. */
+    /** Whole rupees for one {@link #billingCycle}; zero means free. Ignored for plans the admin fee
+     * schedule prices — see {@link PlanMapper#price}. */
     @Column(name = "price", nullable = false)
     private long price;
 
     @Column(name = "billing_cycle")
     private String billingCycle;
 
-    /**
-     * Live listings this plan allows, or {@code null} for no cap. The paywall's real ceiling, kept as
-     * a number rather than parsed out of {@link #features} prose (D109); {@code null} is a genuine
-     * answer meaning the limit does not apply to this plan's audience.
-     */
+    /** Paid term in days from payment; when set it overrides {@link #billingCycle}. */
+    @Column(name = "term_days")
+    private Integer termDays;
+
+    @Column(name = "kind", nullable = false)
+    private String kind;
+
+    /** Whether the plan is on sale; one already bought is honoured either way. */
+    @Column(name = "active", nullable = false)
+    private boolean active;
+
+    /** The paywall's real ceiling; {@code null} resolves to the free-tier floor of one, never unlimited. */
     @Column(name = "listing_limit")
     private Integer listingLimit;
 
-    /** Owner contacts this plan grants, or {@code null} for unlimited / not-applicable (see D109). */
+    /** Owner contacts this plan grants, or {@code null} for unlimited / not-applicable. */
     @Column(name = "contact_limit")
     private Integer contactLimit;
 
-    /**
-     * Whether this plan lifts the owner-contact ceiling entirely (V91, D31b).
-     *
-     * <p>A separate column from {@link #contactLimit} rather than a convention over it, because that
-     * one is nullable and its own comment admits {@code null} means "unlimited <em>or</em>
-     * not-applicable" — two different answers stored identically, which is exactly the question an
-     * entitlement check asks. {@code contactLimit} stayed as it was: it is display data on the
-     * pricing page, and nothing reads it to decide anything.
-     *
-     * <p>{@code false} on Owner Free and {@code true} on the three priced plans, which is precisely
-     * what the browser enforced before the quota moved server-side. Set from the seeded ids rather
-     * than from {@code price > 0}: "priced" and "unlimited" coincide today but are two decisions, and
-     * a promotional free month must not withdraw the entitlement it is promoting.
-     */
+    /** Lifts the owner-contact ceiling; separate from {@link #contactLimit}, which is display-only. */
     @Column(name = "unlimited_contacts", nullable = false)
     private boolean unlimitedContacts;
 

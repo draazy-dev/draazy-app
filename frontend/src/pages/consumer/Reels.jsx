@@ -4,55 +4,30 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import '../../styles/routes/reels.css';
 import { fmtINR, rentLabel } from '../../lib/format.js';
-import { listProperties, getProperty } from '../../services/propertyService.js';
-import { isResidentialHome } from '../../data/propertyTypes.js';
+import { referralShareUrlNow } from '../../lib/referralShare.js';
+import { usePrefetchReferralCode } from '../../lib/usePrefetchReferralCode.js';
+import { propertyReels } from '../../services/propertyService.js';
+import { RESIDENTIAL_KEYS } from '../../data/propertyTypes.js';
 import { useSaved } from '../../context/SavedContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+/* The feed is the live catalogue, not a curated list — a hardcoded set means a newly posted home can never appear
+   here and its caption can drift from the listing it links to. */
 
-/* The feed is the live catalogue, not a curated list — it used to be eight hardcoded
-   entries with stock photos whose CTAs merely *pointed* at real IDs, so a newly posted
-   home could never appear here and the captions could drift from the listing they
-   linked to. Two gates decide what earns a reel:
-
-     isResidentialHome  Reels is deliberately homes-only (see data/propertyTypes.js).
-                        Land and commercial are reachable from /listings instead.
-     MIN_PHOTOS         A reel is a walkthrough. One or two frames is a card, not a
-                        tour, and swiping into a dead end reads as a broken listing. */
 const MIN_PHOTOS = 3;
-/* Past this the horizontal swipe outlasts the viewer, and the vertical feed — which is
-   the point of the page — stops advancing. The rest of the gallery is on the detail page. */
-const MAX_PHOTOS = 5;
-/* How many listings the feed will open detail requests for. The catalogue read tells us who
-   *qualifies*; only the detail response carries the photos themselves, so every reel costs a second
-   request. That is fine at today's dozen-and-a-half and would not be at five hundred, and a feed
-   nobody scrolls to the bottom of gains nothing from the tail. */
-const FEED_MAX = 24;
-
-/* How many photos this listing has, which is not the same as which ones it has.
-
-   A card row carries `photoCount` and an empty `gallery`; a detail row carries both and they agree.
-   Reading `gallery.length` on a list row is exactly the bug this replaces — it has never been
-   populated there, so every listing scored zero, no listing ever cleared MIN_PHOTOS, and the feed
-   was permanently empty while looking like a slow network. */
-const photoCountOf = (p) => p.photoCount ?? (p.gallery || []).length;
+/* `flatmates` keeps shared rooms in the feed: the server's building keys alone exclude any share-type listing. */
+const REEL_QUERY = { types: [...RESIDENTIAL_KEYS, 'flatmates'], minPhotos: MIN_PHOTOS };
 
 const toReel = (p) => ({
-  id: p.id,
-  /* Carried alongside `id` because they are different strings and the save needs the other one.
-     `id` is the slug the URL and every membership check use; `uuid` is the row's primary key, which
-     is what `PUT /me/saved/{propId}` binds. Dropping it here left `saved.toggle` falling back to the
-     slug, and the write 400s — so a reel could not be saved at all unless the property already
-     happened to be in the shortlist, which is the one case where the context could recover the uuid
-     itself. Undefined in mock mode, where nothing carries a uuid and the slug is the key. */
-  uuid: p.uuid,
-  photos: (p.gallery || []).slice(0, MAX_PHOTOS),
+  /* Carried alongside `id` because they are different strings and the save needs the other one. */
+  id: p.slug || p.id,
+  uuid: p.id,
+  photos: p.photos || [],
   title: p.title,
   loc: p.locality,
   deal: p.deal,
   price: p.price,
-  bhk: p.bhkNum,
+  bhk: p.bhk ?? null,
   area: p.area,
-  views: p.views,
 });
 
 const FILTERS = [
@@ -61,7 +36,7 @@ const FILTERS = [
   { key: 'buy', labelKey: 'reels.filterBuy', icon: 'home' },
 ];
 
-const TOUR_MS = 7000; // auto-advance duration per reel
+const TOUR_MS = 7000;
 const prefersReducedMotion = () =>
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
@@ -74,53 +49,22 @@ const compact = (n) => {
 const priceLabel = (r) => (r.deal === 'rent' ? rentLabel(r.price) : fmtINR(r.price));
 
 export default function Reels() {
+  usePrefetchReferralCode();
   const { t } = useTranslation();
   const { toast } = useToast();
   const [reduced, setReduced] = useState(prefersReducedMotion);
 
   const [filter, setFilter] = useState('all');
-  const [feed, setFeed] = useState(null); // null until the catalogue resolves
+  const [feed, setFeed] = useState(null);
 
   useEffect(() => {
     let alive = true;
-    /* Two rounds, because the two halves of a reel live on two different responses.
-
-       The catalogue read decides *who qualifies* — homes only, and enough frames to be a walkthrough
-       rather than a card — from `photoCount`, which is the only thing about the gallery a card row
-       carries. The detail read then supplies the photos themselves, and `views` with them, for the
-       handful that survive.
-
-       Filtering first and fetching second is the whole point: the alternative is opening a detail
-       request for every listing in the catalogue to discover that most of them have one photo. */
-    listProperties({}, 'newest').then(async (all) => {
+    propertyReels(REEL_QUERY).then((rows) => {
       if (!alive) return;
-      const eligible = all
-        .filter((p) => isResidentialHome(p.type) && photoCountOf(p) >= MIN_PHOTOS)
-        .slice(0, FEED_MAX);
-
-      const hydrated = await Promise.all(eligible.map(async (p) => {
-        // Already complete in mock mode, where the list rows carry their galleries. Skipping the
-        // fetch there keeps this one code path honest in both modes instead of two.
-        if ((p.gallery || []).length >= MIN_PHOTOS) return p;
-        try {
-          return (await getProperty(p.id)) || null;
-        } catch {
-          // One listing failing to open is not a reason to show an empty feed. Drop it and keep the
-          // rest — the gate below re-checks, so a partial detail cannot slip through as a one-frame
-          // "tour".
-          return null;
-        }
-      }));
-
-      if (!alive) return;
-      setFeed(hydrated
-        .filter((p) => p && (p.gallery || []).length >= MIN_PHOTOS)
-        .map(toReel));
+      setFeed(rows.map(toReel));
+      // `feed` stays null forever on a rejection, and null is the loading state — so a failed catalogue read renders
+      // "loading" indefinitely.
     }).catch(() => {
-      // `feed` stays null forever on a rejection, and null is the loading state —
-      // so a failed catalogue read renders "loading" indefinitely, which is exactly
-      // the dead-end-disguised-as-slow-network this screen's empty state exists to
-      // avoid. Fall through to the empty state instead.
       if (alive) setFeed([]);
     });
     return () => { alive = false; };
@@ -130,18 +74,15 @@ export default function Reels() {
     const list = feed || [];
     return filter === 'all' ? list : list.filter((r) => r.deal === filter);
   }, [feed, filter]);
+  /* Liked is session-only and intentionally uncounted. */
 
-  /* Liked is session-only and intentionally uncounted. There is no like on a listing
-     to read, so any number next to the heart would be invented — and the badge row
-     already carries `views`, which is real. The heart stays because double-tap is the
-     gesture this surface is built on. */
   const [liked, setLiked] = useState(() => new Set());
   // The context exposes the same `has(id)` the local Set did, so the markup below is unchanged.
   const saved = useSaved();
   const [active, setActive] = useState(0);
   const [playing, setPlaying] = useState(!prefersReducedMotion());
-  const [burst, setBurst] = useState(null); // { id, key }
-  const [photoIdx, setPhotoIdx] = useState({}); // { [reelId]: activePhotoIndex }
+  const [burst, setBurst] = useState(null);
+  const [photoIdx, setPhotoIdx] = useState({});
 
   const wrapRef = useRef(null);
   const reelRefs = useRef({});
@@ -153,8 +94,8 @@ export default function Reels() {
   const setReelRef = useCallback((id) => (el) => {
     if (el) reelRefs.current[id] = el; else delete reelRefs.current[id];
   }, []);
-
   // React to OS "reduce motion" changes mid-session.
+
   useEffect(() => {
     const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
     if (!mq) return undefined;
@@ -162,11 +103,11 @@ export default function Reels() {
     mq.addEventListener('change', onChange);
     return () => mq.removeEventListener('change', onChange);
   }, []);
-
   // Clear any pending single-tap timer on unmount.
-  useEffect(() => () => { if (tapRef.current.t) clearTimeout(tapRef.current.t); }, []);
 
+  useEffect(() => () => { if (tapRef.current.t) clearTimeout(tapRef.current.t); }, []);
   // Track which reel is in view via IntersectionObserver.
+
   useEffect(() => {
     const root = wrapRef.current;
     if (!root) return undefined;
@@ -185,8 +126,8 @@ export default function Reels() {
     reels.forEach((r) => { const el = reelRefs.current[r.id]; if (el) { io.observe(el); observed.push(el); } });
     return () => { observed.forEach((el) => io.unobserve(el)); io.disconnect(); };
   }, [reels]);
-
   // Reset to top when the intent filter changes.
+
   useEffect(() => { wrapRef.current?.scrollTo({ top: 0 }); setActive(0); }, [filter]);
 
   const goTo = useCallback((idx) => {
@@ -194,9 +135,9 @@ export default function Reels() {
     const el = reelRefs.current[reels[clamped]?.id];
     el?.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
   }, [reels, reduced]);
+  // Story-style auto-advance. With no segmented progress bar there is nothing to paint per frame,
+  // so one timer does the job of a rAF loop.
 
-  // Story-style auto-advance. With the segmented progress bar gone there is nothing
-  // to paint per frame, so a single timer replaces the old rAF loop.
   useEffect(() => {
     if (!playing || reduced || reels.length === 0) return undefined;
     const timer = setTimeout(() => {
@@ -211,8 +152,8 @@ export default function Reels() {
     }, TOUR_MS);
     return () => clearTimeout(timer);
   }, [playing, reduced, active, reels]);
-
   // Keyboard navigation (reads active via ref to avoid re-binding each change).
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === 'ArrowDown') { e.preventDefault(); goTo(activeRef.current + 1); }
@@ -235,20 +176,26 @@ export default function Reels() {
   const save = async (r) => {
     // Toast on the settled state, not the intent: if the write failed the context rolls back, and
     // "Saved" over a property that was not saved is worse than no toast at all.
-    const nowSaved = await saved.toggle(r.id, r.uuid);
-    toast(nowSaved ? t('reels.savedToast', { title: r.title }) : t('reels.removedToast', { title: r.title }), nowSaved ? 'success' : 'info');
+    if (saved.busyIds?.has(r.id)) return;
+    const wasSaved = saved.has(r.id);
+    const ok = wasSaved ? await saved.unsave(r.id, r.uuid) : await saved.save(r.id, r.uuid);
+    if (!ok) {
+      toast(t('saved.updateFailed', { defaultValue: "Couldn't update saved homes. Try again." }), 'error');
+      return;
+    }
+    toast(wasSaved ? t('reels.removedToast', { title: r.title }) : t('reels.savedToast', { title: r.title }), wasSaved ? 'info' : 'success');
   };
 
   const shareReel = async (r) => {
-    const url = window.location.origin + '/property/' + r.id;
+    const url = referralShareUrlNow(window.location.origin + '/property/' + r.id);
     const text = t('reels.shareText', { title: r.title, price: priceLabel(r) });
     if (navigator.share) {
       try { await navigator.share({ title: r.title, text, url }); return; } catch (err) { if (err?.name === 'AbortError') return; }
     }
     window.open('https://wa.me/?text=' + encodeURIComponent(`${text} — ${url}`), '_blank');
   };
-
   // Media tap: double-tap → like burst, single tap → play/pause.
+
   const onMediaTap = (id) => {
     const now = Date.now();
     const last = tapRef.current;
@@ -261,16 +208,16 @@ export default function Reels() {
     const t = setTimeout(() => setPlaying((p) => !p), 280);
     tapRef.current = { time: now, id, t };
   };
-
   // Horizontal photo swipe: derive the active photo index from scroll position.
+
   const onGalleryScroll = (id, el) => {
     const idx = Math.round(el.scrollLeft / el.clientWidth);
     setPhotoIdx((m) => (m[id] === idx ? m : { ...m, [id]: idx }));
   };
 
   return (
+      /* Top overlay: brand + intent filters */
     <div className="reels-page">
-      {/* Top overlay: brand + intent filters */}
       <header className="reels-top">
         <div className="reels-topbar">
           <div className="reels-brand">
@@ -294,10 +241,8 @@ export default function Reels() {
         </div>
       </header>
 
+        {/* Two distinct nothing-states. */}
       <div className="reel-wrap" ref={wrapRef}>
-        {/* Two distinct nothing-states. "Loading" means the catalogue has not resolved;
-            "empty" means it did and this intent has no tourable home in it. Collapsing
-            them into one spinner leaves a real dead end looking like a slow network. */}
         {feed === null && (
           <div className="reel-note" role="status">
             <Icon name="video" className="w-8 h-8 text-brand-teal-3" />
@@ -313,8 +258,8 @@ export default function Reels() {
           </div>
         )}
         {reels.map((r, i) => (
+            /* Horizontal photo carousel for this property */
           <section key={r.id} data-idx={i} ref={setReelRef(r.id)} className="reel">
-            {/* Horizontal photo carousel for this property */}
             <div
               className="reel-gallery"
               role="button"
@@ -334,8 +279,8 @@ export default function Reels() {
               ))}
             </div>
             <div className="reel-scrim" aria-hidden="true" />
-
             {/* Center play/pause badge */}
+
             <div className={`play-badge${playing && i === active ? ' is-playing' : ''}`} aria-hidden="true">
               <Icon name={playing && i === active ? 'timer' : 'play'} weight="fill" className="w-7 h-7 text-white" />
             </div>
@@ -358,8 +303,6 @@ export default function Reels() {
               <button type="button" onClick={() => shareReel(r)} aria-label={t('reels.shareAria')}>
                 <span className="ic"><Icon name="send" className="w-5 h-5" /></span><span className="lb">{t('reels.share')}</span>
               </button>
-              {/* The two CTAs live on the rail rather than as a full-width row, so the
-                  photo keeps the bottom third of the screen it used to give away. */}
               <Link to={`/property/${r.id}`} aria-label={t('reels.viewHome')} className="is-cta">
                 <span className="ic"><Icon name="eye" className="w-5 h-5" /></span><span className="lb">{t('reels.viewHome')}</span>
               </Link>
@@ -380,7 +323,7 @@ export default function Reels() {
                 {r.deal === 'rent'
                   ? <span className="reels-badge bg-teal-600/70 text-teal-50">{t('reels.badgeRent')}</span>
                   : <span className="reels-badge bg-emerald-600/70 text-emerald-50">{t('reels.badgeSale')}</span>}
-                <span className="reels-badge text-white" style={{ background: 'rgba(16,185,129,.85)' }}>{t('reels.zeroBrokerage')}</span>
+                <span className="reels-badge text-white" style={{ background: 'rgb(var(--dz-c-emerald-500) / .85)' }}>{t('reels.zeroBrokerage')}</span>
                 <span className="reels-tag"><Icon name="camera" className="w-3 h-3" /> {t('reels.photoCount', { count: r.photos.length })}</span>
                 <span className="reels-tag"><Icon name="eye" className="w-3 h-3" /> {compact(r.views)}</span>
               </div>

@@ -3,32 +3,14 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { classNames } from '../../lib/format.js';
 import useSheetViewport from '../../lib/useSheetViewport.js';
+import useVisualViewportInsets from '../../lib/useVisualViewportInsets.js';
 import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
+import useScrollLock from '../../hooks/useScrollLock.js';
 import Icon from '../Icon.jsx';
 import PoweredByGoogle from './PoweredByGoogle.jsx';
+import { isSearchableList } from './dropdownSearch.js';
+/* Custom dropdown select (themed, dark, with search for long lists). */
 
-/**
- * Custom dropdown select (themed, dark, with search for long lists).
- * @param {object} props
- * @param {string} props.value - Currently selected value.
- * @param {(value: string) => void} props.onChange - Callback when selection changes.
- * @param {Array<{value: string, label: string}>} props.options - Menu options.
- * @param {string} [props.placeholder] - Placeholder when no value selected; defaults to the translated "Select…".
- * @param {boolean} [props.searchable] - Force search input (auto-enabled for ≥8 options).
- * @param {string} [props.className] - Additional class on the trigger wrapper.
- * @param {boolean} [props.disabled] - Disable interaction.
- * @param {string} [props.ariaLabel] - Accessible label for the trigger button.
- * @param {boolean} [props.invalid] - Show error styling.
- * @param {string} [props.dataErr] - data-err attribute for field-error binding.
- * @param {'md'|'sm'} [props.size='md'] - Trigger density; 'sm' is a compact pill for tight rows.
- * @param {(query: string) => Promise<Array>} [props.asyncSearch] - Optional live search. When
- *   provided, forces a search box; typing (≥2 chars, debounced) fetches options to show instead
- *   of the static list, falling back to static filtering when it returns nothing/errors.
- * @param {(option: object) => void} [props.onPick] - Called with the full chosen option (incl. any
- *   `meta`) in addition to onChange(value); lets async callers resolve extra details on select.
- * @param {string} [props.prefix] - Optional muted label rendered before the selected value on the
- *   trigger (e.g. "Type") so an always-valued filter still reads as a labelled control.
- */
 const Select = forwardRef(function Select({
   value,
   onChange,
@@ -38,6 +20,8 @@ const Select = forwardRef(function Select({
   className,
   disabled,
   ariaLabel,
+  ariaDescribedBy,
+  id,
   invalid,
   dataErr,
   size = 'md',
@@ -45,18 +29,18 @@ const Select = forwardRef(function Select({
   onPick,
   prefix,
   noResultsText,
+  anchored,
 }, ref) {
+  /* Resolved at render rather than as a default parameter: a default is evaluated against whatever language was
+     active on first mount and would never follow a later switch. */
   const { t } = useTranslation();
-  /* Resolved at render rather than as a default parameter: a default is evaluated
-     against whatever language was active on first mount and would never follow a
-     later switch. */
   const ph = placeholder || t('ui.selectPlaceholder');
   const noResults = noResultsText || t('ui.noMatches');
   const opts = useMemo(
     () => options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o)),
     [options],
   );
-  const isSearchable = searchable ?? (asyncSearch ? true : opts.length >= 8);
+  const isSearchable = isSearchableList(searchable, asyncSearch, opts.length);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -68,14 +52,15 @@ const Select = forwardRef(function Select({
   const searchRef = useRef(null);
   useImperativeHandle(ref, () => triggerRef.current, []);
   const [portalOpen, setPortalOpen] = useState(false);
-  const listId = useId();
-  /* On phones the menu docks to the bottom edge as a sheet instead of hanging off
-     the trigger: an anchored panel there opens under the thumb's own hand and is
+  /* On phones the menu docks to the bottom edge as a sheet: an anchored panel there opens under the thumb and is
      routinely half-covered by the keyboard when the field is searchable. */
-  const sheet = useSheetViewport();
-
+  const listId = useId();
+  const sheet = useSheetViewport() && !anchored;
+  const picker = sheet && isSearchable;
+  useVisualViewportInsets(open && picker);
   // Fall back to showing the raw value as its own label so a locality picked from
   // live search (not in the static list) still displays on the trigger.
+
   const selected = opts.find((o) => o.value === value)
     || (value != null && value !== '' ? { value, label: String(value) } : null);
   const asyncNorm = useMemo(
@@ -98,9 +83,9 @@ const Select = forwardRef(function Select({
     setAsyncOpts([]);
     setLoading(false);
   }, []);
-
   // Debounced live search. Fires only while open with a ≥2-char query; races are
   // guarded by a cancelled flag so a stale response can't clobber a newer one.
+
   useEffect(() => {
     if (!asyncSearch || !open) return undefined;
     const q = query.trim();
@@ -140,10 +125,9 @@ const Select = forwardRef(function Select({
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [open, close]);
+  // Portal the menu to <body> with fixed positioning (mirrors dropdowns.js) so it escapes any
+  // ancestor overflow/transform/stacking trap and can flip up near the viewport edge.
 
-  // Portal the menu to <body> and anchor it to the trigger with fixed
-  // positioning — mirrors dropdowns.js so the menu escapes any ancestor
-  // overflow/transform/stacking trap and can flip up near the viewport edge.
   const position = useCallback(() => {
     const trigger = triggerRef.current;
     const menu = menuRef.current;
@@ -154,9 +138,8 @@ const Select = forwardRef(function Select({
     const r = trigger.getBoundingClientRect();
     menu.style.position = 'fixed';
     menu.style.right = 'auto';
-    // Anchor to the pill's left edge. The menu is at least as wide as the pill
-    // but may grow to fit its widest option (options never wrap), clamped to the
-    // viewport so it never overflows the screen.
+    // Anchor to the pill's left edge: at least as wide as the pill, growing to its widest option
+    // (options never wrap), clamped to the viewport so it never overflows the screen.
     menu.style.width = 'auto';
     menu.style.minWidth = `${r.width}px`;
     menu.style.maxWidth = `${window.innerWidth - 16}px`;
@@ -185,20 +168,12 @@ const Select = forwardRef(function Select({
       window.removeEventListener('resize', onAnchor);
     };
   }, [open, position, visible.length]);
-
   /* A sheet covers the page, so the page behind it must not scroll with it. */
-  useEffect(() => {
-    if (!open || !sheet) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, [open, sheet]);
 
-  // Focus the search box only AFTER position() (the layout effect above) has
-  // anchored the portaled menu inside the viewport. Focusing during the render
-  // commit — while the menu still resolves to its static page-bottom position —
-  // is what dragged the whole window down to the footer (amplified by
-  // html{scroll-behavior:smooth}). preventScroll stays as a second guard.
+  useScrollLock(open && sheet);
+  // Focus the search box only after position() has anchored the portaled menu: focusing while it
+  // still resolves to its static page-bottom position drags the window to the footer.
+
   useLayoutEffect(() => {
     if (!open || !isSearchable) return;
     searchRef.current.focus({ preventScroll: true });
@@ -206,12 +181,12 @@ const Select = forwardRef(function Select({
 
   const choose = (opt) => {
     if (opt.disabled) return;
-    onChange(opt.value);
+    if (!opt.deferChange) onChange(opt.value);
     if (onPick) onPick(opt);
     close();
   };
-
   /* Drag the sheet's grab handle down to dismiss. Mobile-only by construction. */
+
   const swipe = useSwipeDismiss(close);
 
   const onKeyDown = (e) => {
@@ -248,7 +223,9 @@ const Select = forwardRef(function Select({
         }
         break;
       case 'Escape':
+        /* Escape closes the innermost thing only. */
         e.preventDefault();
+        e.stopPropagation();
         close();
         break;
       default:
@@ -261,10 +238,12 @@ const Select = forwardRef(function Select({
       <button
         type="button"
         ref={triggerRef}
+        id={id}
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
         className={classNames('dz-dropdown__trigger', invalid && 'dz-invalid dz-shake')}
         onClick={() => (open ? close() : setOpen(true))}
         onKeyDown={onKeyDown}
@@ -280,14 +259,13 @@ const Select = forwardRef(function Select({
 
       {open && typeof document !== 'undefined'
         ? createPortal(
+              /* Scrim: a sheet is modal, so the page behind it must read as dismissed, not merely covered. */
             <>
-              {/* Scrim: a sheet is a modal surface, so the page behind it has to
-                  read as dismissed rather than merely covered. */}
               {sheet ? <div className="dz-dropdown__scrim" onClick={close} aria-hidden="true" /> : null}
               <div
                 ref={menuRef}
                 {...(sheet ? swipe : null)}
-                className={classNames('dz-dropdown__menu', 'dz-dropdown__menu--portal', sheet && 'dz-dropdown__menu--sheet', portalOpen && 'is-portal-open')}
+                className={classNames('dz-dropdown__menu', 'dz-dropdown__menu--portal', sheet && 'dz-dropdown__menu--sheet', picker && 'dz-dropdown__menu--picker', portalOpen && 'is-portal-open')}
                 role="listbox"
                 id={listId}
                 aria-label={ariaLabel}
@@ -304,6 +282,11 @@ const Select = forwardRef(function Select({
                       placeholder={t('ui.searchPlaceholder')}
                       ref={searchRef}
                     />
+                    {picker ? (
+                      <button type="button" className="dz-dropdown__search-close" onClick={close}>
+                        {t('ui.pickerCancel')}
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
 

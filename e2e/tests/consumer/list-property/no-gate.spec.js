@@ -1,0 +1,71 @@
+/* ADR-019: an owner who has never started a verification can post, so no badge is granted here.
+   The second test holds a listing to show the tier is never mistaken for an identity wall. */
+import { test, expect, ACTORS } from '../../../fixtures/live.js';
+import { signedInAsNew, authHeaders, API, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+
+const BASE_LISTING = {
+  deal: 'rent',
+  propertyType: 'Flat',
+  price: 24000,
+  city: 'Pune',
+  bhk: 2,
+  area: 720,
+  locality: 'Baner',
+};
+/* Listings this file put in the database. Rejected rather than deleted, because there is no delete
+   and rejection is the state a shared live database needs them left in. */
+
+const created = new Set();
+
+test.afterEach(async () => {
+  if (!created.size) return;
+  const headers = await authHeaders(ACTORS.admin);
+  for (const id of created) {
+    await fetch(`${API}/properties/${id}/status`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup \u2014 synthetic no-gate fixture' }),
+    });
+  }
+  created.clear();
+});
+// Sign the owner in WITHOUT any identity badge — they must still reach the form.
+async function gotoOwner(page, { withListing = false } = {}) {
+  const mobile = await signedInAsNew(page);
+  if (withListing) {
+    const headers = await authHeaders(mobile);
+    const res = await fetch(`${API}/me/listings`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ...BASE_LISTING, title: `Zztest no-gate ${Date.now()}`, images: await uploadedListingPhotos(headers) }),
+    });
+    expect(res.status).toBe(201);
+    created.add((await res.json()).id);
+  }
+  await page.goto('/list-property');
+  return mobile;
+}
+
+const formLocator = (page) => page.locator('[data-err="propertyType"]');
+// The removed gate heading — must never appear now.
+const gateHeading = (page) => page.getByRole('heading', { name: 'Verify your identity to start' });
+
+test('a signed-in owner reaches the wizard form immediately and after a reload ? no identity gate', async ({ page }) => {
+  await gotoOwner(page);
+
+  await expect(page.locator('.lp-meter')).toBeVisible();
+  await expect(formLocator(page)).toBeVisible({ timeout: 20000 });
+  await expect(gateHeading(page)).toHaveCount(0);
+
+  await page.reload();
+  await expect(formLocator(page)).toBeVisible({ timeout: 20000 });
+  await expect(gateHeading(page)).toHaveCount(0);
+});
+
+test('an existing listing never triggers an identity gate and does not block the form', async ({ page }) => {
+  await gotoOwner(page, { withListing: true });
+  await expect(page.locator('.lp-meter')).toBeVisible({ timeout: 20000 });
+  await expect(formLocator(page)).toBeVisible({ timeout: 20000 });
+  await expect(gateHeading(page)).toHaveCount(0);
+  await expect(page.getByText('Is this the mobile number linked to your identity document?')).toHaveCount(0);
+});

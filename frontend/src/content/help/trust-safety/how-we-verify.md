@@ -5,36 +5,51 @@ category: trust-safety
 audience: everyone
 order: 1
 featured: true
-updated: 2026-07-30
-summary: What the verified badge means, what we check, and what it deliberately does not promise.
-tags: [verification, trust, kyc, badge]
+updated: 2026-10-10
+summary: Identity, listing, ownership and flatmate verification badges - what each proves and what it does not.
+tags: [verification, trust, kyc, badge, rera, ownership]
 ---
 
-A **Verified** badge on a listing means we have confirmed the identity of the person who posted it, and that the listing passed our content checks. It is a meaningful signal, but it is not a guarantee of ownership or condition — read on for exactly where the line is.
+Draazy uses separate badges for separate checks. A listing can be live with no badge, or carry identity, ownership and RERA signals together. Each badge is a meaningful signal, but none is a guarantee of ownership, condition or final terms - read on for exactly where the line is.
+
+## Verification is a badge, not a gate
+
+You never need a badge to use Draazy. Signing in with a verified mobile number is the only floor: you can search, contact owners, schedule visits, post a listing and post a flatmate share without ever submitting an ID.
+
+What a badge changes is how much other people trust you - owners approve verified enquirers faster, and verified listings rank higher. Two places where it is more than cosmetic:
+
+- An owner can switch on **verified enquirers only**, and their listings then ask you for the badge before you can send a contact request.
+- Some flatmate posts with a flat wait for our team to publish them, and tenant or owner badges are checked separately from that publishing decision.
+
+Start verification from **Verify identity** in your account. It is reviewed by a person, so submitting is not the same as passing.
 
 ## What we check
 
 ### Identity
 
 - Mobile number verified by OTP
-- Government ID verified against the name on the account (Aadhaar-based, where the owner consents)
-- Duplicate-account detection across numbers and devices
+- A government ID - Aadhaar, PAN, driving licence or passport - captured with the camera alongside a live selfie, then read by a trained reviewer on our team. No badge is ever granted by software; the only other route is a staff member granting it by hand, and every such grant is recorded in an audit trail.
+- An ID document that is already verified on another account is refused
 
 ### The listing itself
 
-- Address resolves to a real building or society in our Pune/PCMC dataset
-- Photos are not stock images and have not been reused from another live listing
-- Rent or price is within a sane band for the locality and configuration
-- Required fields — carpet area, floor, furnishing, availability date — are present and consistent
+- The location was picked from Google Maps (society first, then locality) and a reviewer checks that it looks right
+- Photos were uploaded through Draazy; a reviewer checks they are real, match the listing and are not a duplicate of another listing
+- Price, deposit and area must fall within plausible limits
+- Required fields - carpet area, floor, furnishing, availability date - are present and consistent
+
+### Ownership evidence
+
+Ownership evidence is optional and earns its own badge. For flats and houses, one relevant document is enough to start review: electricity bill, Index II, property tax receipt, sale deed, property card or society share certificate. For land, the accepted evidence includes 7/12 extract and 8A. A Power of Attorney supports authority but is not title proof by itself.
 
 ### Ongoing checks
 
-Owners are asked to confirm availability periodically. Listings that go unconfirmed are demoted and eventually delisted, so what you see should still be on the market. See [Listing freshness](/help/a/listing-freshness).
+Owners are asked to confirm availability periodically. Listings that go unconfirmed are demoted and eventually hidden from buyers, so what you see should still be on the market. See [Listing freshness](/help/a/listing-freshness).
 
 ## What verification does *not* mean
 
 > [!IMPORTANT]
-> Verification confirms **who** posted the listing. It does not certify legal title, structural condition, society approvals, or that the advertised rent is final.
+> An identity badge confirms **who** posted the listing. An ownership badge means accepted evidence was current when reviewed. Neither certifies legal title, structural condition, society approvals, or that the advertised rent is final.
 
 For a sale, always run an independent title check before paying anything. We offer this as a paid service under [Home services](/help/c/services), but you are free to use your own lawyer.
 
@@ -42,9 +57,15 @@ For a sale, always run an independent title check before paying anything. We off
 
 | Badge | Meaning |
 | --- | --- |
-| Verified owner | ID verified, listing checks passed |
-| Ownership documents seen | Owner additionally shared a document proving ownership |
-| Unverified | Newly posted, still in review — treat with normal caution |
+| ID verified owner | The poster's ID and live selfie were reviewed and accepted |
+| Verified property | Ownership evidence was accepted and is still current |
+| RERA registered | The listing shows a MahaRERA registration number. The property page links it to the MahaRERA site so you can look it up yourself |
+| No badge | Nobody has submitted anything yet. Common and not suspicious - treat with normal caution. |
+
+A listing can carry several of these at once, and the search filters let you require any of them.
+
+> [!NOTE]
+> **Verified property can lapse.** Documents are accepted for a period. When that period ends the badge disappears and the listing stops earning the ranking credit, until the owner re-submits. A badge you can see is always current.
 
 ## Related
 

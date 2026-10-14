@@ -17,7 +17,7 @@
 
 ## 2. Entry points
 - **Routes:** `/admin/settings` (tabs: general, fees, maps, flags [sub-tabs application/admin], audit),
-  `/admin/team` (tabs: members, pending approvals). Both are `adminOnly` modules.
+  `/admin/team` (members and permissions). Both are `adminOnly` modules.
 - **Tiles / triggers:** Settings save buttons per section, flag toggles (confirmation-gated), audit
   export/clear; Team "Add member" and per-row Edit / Suspend. Dashboard "Feature flags"
   and "Add staff" quick actions link here.
@@ -25,12 +25,11 @@
   - `src/pages/admin/AdminSettings.jsx` + `settings/AppFlagsPanel.jsx`, `AdminFlagsPanel.jsx`, `MapsGeoPanel.jsx`.
   - `src/pages/admin/AdminTeam.jsx` (members + the permission grid); `src/lib/adminModules.js`,
     `src/services/permissionsService.js`.
-  - Persistence `src/lib/mockApi/collections.js` (`getSettings`, `updateSettings`), `src/lib/mockApi/team.js`.
 
 ## 3. Actors & roles
-- **Administrators only.** `/admin` is `RoleRoute roles={['admin']}`, and both `team` and `settings`
-  carry administrator-only atoms (`users:write`, `settings:read`/`settings:write`) that are excluded
-  from `STAFF_BASELINE`, so no grant can add them to an operations account.
+- **One shared console.** `/admin` is `RoleRoute roles={['staff', 'manager', 'admin']}`; the nav shows
+  only modules whose atom the caller holds, and `/ops/*` redirects into it. `team` opens with
+  `users:write`, so managers manage staff; `settings` and `finance` stay administrator-only.
 - Enforcement is server-side: every guarded route carries `@PreAuthorize` over the same atom the
   console reads from `GET /me`, so the nav filter is a convenience and not the control.
 
@@ -48,12 +47,12 @@
 ## 5. Business rules & logic  *(the meat)*
 
 ### 5.1 General (site) settings
-`SITE_FIELDS` = name, legalName, tagline, supportEmail, supportPhone, whatsapp, supportHours, address, gst.
+`SITE_FIELDS` = name, legalName, tagline, supportEmail, supportPhone, whatsapp, supportHours, address.
 `saveSite()` -> `updateSettings({ site })` + audit "Updated branding / contact / legal details". Free-text; no validation today.
 
 ### 5.2 Fees + Move-in Pack
 - Fees are the flat `settings.fees` map (seed: `ownerPlanYearly 999`, `ownerProYearly 2499`,
-  `rentAgreementPlatform 500`, `seekerPlusTopup 199`, `featuredListing 999`, `gstPercent 18`).
+  `rentAgreementPlatform 500`, `seekerPlusTopup 199`).
   `setFee(k, v) = Number(v) || 0`; keys containing "percent" render a `%` suffix (else a rupee prefix). Labels are humanized.
   `saveFees()` -> `updateSettings({ fees })` + audit "Updated platform charges & fee schedule". These feed Finance math.
 - **Move-in Pack** (`settings.movePack`): `{ enabled, items:{ movers, clean, agreement, paint, verify, internet } }`.
@@ -82,27 +81,35 @@ Detail). `exportAudit()` -> CSV `['When','User','Action','Detail']`; `wipeAudit(
 A banner cross-links to `/admin/staff-activity` for operational (staff) activity.
 
 ### 5.6 Team & Access - the RBAC model (server-resolved permission atoms)
-**Two internal roles, and only two.** `Role` is `buyer|owner|staff|admin`; `manager` was never one of
-them. It was a console label attached to a custom-role bundle, and D209 retired both.
-- **admin:** holds all 27 atoms and is the only role that may open `/admin`
-  (`RoleRoute roles={['admin']}`, `src/App.jsx`).
-- **staff (ops):** holds the 20 non-administrator-only atoms by default and lives in the `/ops`
-  portal. Those atoms govern what the **API** grants them, not which console they may load - the
-  admin shell stays administrator-only, so an ops staffer's grid narrows their API reach rather than
-  promoting them to a different screen.
+**Three internal roles.** `Role` is `buyer|owner|staff|manager|admin`; D209 removed only the old
+dead manager label, not this real schema role.
+- **admin:** exactly one; always holds every atom and cannot be narrowed (`PUT .../permissions` is
+  422 for the admin).
+- **manager:** below admin, above staff. Holds every function by default plus `users:write` and
+  `audit:read`; creates and manages staff only, and can add only functions it holds (it may keep or remove ones the
+  administrator granted). Reset-2FA and reissue-invite on a staffer holding a function the manager
+  lacks are 403, since either hands over that account. Monitors
+  staff via Staff Activity and Team Performance.
+- **staff:** granted **functions** (`kyc`, `propertyVerification`, `listingModeration`,
+  `postOnBehalf`, `flatmates`, `localities`, `reviews`, `desk:*`, `support`, `enquiries`, `users`,
+  `reports`, `referrals`, `content`, `societies`, `analytics`); one person may hold many.
+  The server derives atoms from them. No stored functions means dashboard only. Analytics
+  (`analytics:read`: Analytics page, scorecard, SLA, traffic) is never granted by default. A staff
+  dashboard is `GET /admin/my-work`: only the caller's own handled counts and the queues of the
+  functions they hold. Desk scoping for service requests and tickets comes from `desk:*` functions.
 
 The browser resolves nothing. `GET /me` returns `User.permissions`, the caller's own resolved atom
 list, and `canAccessModule(user, key)` in `adminModules.js` is a set membership test against it. The
-grantable grid is `GET /admin/permission-catalogue`; the console holds no list of its own, so a
+grantable grid is `GET /admin/function-catalogue`; the console holds no list of its own, so a
 renamed atom cannot leave a tickable box that grants nothing.
 
-The six administrator-only atoms are `finance:read`, `users:write`, `conversations:read`,
-`audit:read`, `settings:read`, `settings:write`. They are excluded from `STAFF_BASELINE`, so an ops
+The five administrator-only atoms are `finance:read`, `users:write`, `audit:read`,
+`settings:read`, `settings:write`. They are excluded from `STAFF_BASELINE`, so an ops
 account cannot be granted one - the `PUT` answers 422, and the console hides the row rather than
 offering something that will be refused.
 
 **`properties:verify` is gone.** It was a console-only sub-scope with no route behind it, invented by
-the module map; `live-rbac.spec.js` asserts it never reappears in the catalogue.
+the module map; `rbac.spec.js` asserts it never reappears in the catalogue.
 
 ### 5.7 Team & Access - member CRUD + guardrails
 `accessSummary(m)`: admin -> "Every module"; staff -> its team labels; otherwise "Open the record to
@@ -116,6 +123,8 @@ see" (a per-row summary would cost one request per member to answer a question n
   console-only path precisely because the contract has no role-change route at all - `teamProvider`
   refuses a role or team change outright rather than PATCHing the subset the server accepts and
   reporting success for the rest.
+- The roster is one read, `GET /admin/team`: every back-office account (live and archived) with its
+  `functions`, in two queries. Desks reuse it for the assignee picker (`listTeamMembers`).
 - `saveTeamMember` posts to `/users/staff` on create and `PATCH /users/{id}` (name, email) on edit.
 - Suspend is `PATCH /users/{id}/archive`; there is no `DELETE /users/{id}` anywhere in the contract,
   so the console offers no Remove.
@@ -161,17 +170,15 @@ for assignment, and the staff portal shows a member only their own desk — enfo
 - Flag writes and settings persistence (a manipulated client must not be able to grant itself `settings`/`team`).
 - Fee/geo changes must be validated and authorized server-side (they change money and search behaviour).
 
-## 6. Maker-checker / approval
+## 6. Staff creation and audit
 - **This console is not a maker-checker flow** in the propose/approve sense - a single super-admin edits and it
   takes effect immediately (flag toggles are only *confirmation*-gated, not two-person). Audit provides the
   after-the-fact trail.
-- **Creating a back-office account is the exception, and it is real server-side.** `POST /users/staff` mints the
-  account in a pending state and a *second* administrator must clear it (`staff_account_approvals`, D200) before
-  it can authenticate. The maker also never sets the credential: the account is created with **no usable
-  password** and a single-use, time-limited invite is issued to the colleague's own handset, redeemed by them
-  through `POST /auth/staff-invite/redeem` (`staff_invites`, V71, D206). Neither administrator ever learns the
-  token, and an unredeemed invite blocks login on every path. The admin console has no screen for either yet
-  (D205), which is why nothing on this page reflects it.
+- **Creating a back-office account is staff-or-manager only.** `POST /users/staff` refuses
+  `role=admin`; there is one administrator per environment, created by startup bootstrap. Staff and
+  manager accounts are created with **no usable password**, and the response returns a one-time,
+  time-limited `/staff-invite#...` link to the creator. An unredeemed invite blocks login on every
+  path.
 - Maker-checker on the *other* sensitive changes (fee schedule, kill-switches like `maintenanceMode`) per
   [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2 is still not present today.
 
@@ -191,3 +198,34 @@ for assignment, and the staff portal shows a member only their own desk — enfo
 - **Fee coercion:** non-numeric fee input becomes `0`.
 - **Cross-tab sync:** `updateSettings` and role writes dispatch `draazy-settings-change` so nav/guards refresh in-tab.
 - **Concurrency:** shared store; `updateSettings` merges by section, but two concurrent section saves can clobber each other (last write wins).
+
+## Staff account creation
+
+Rationale relocated from `UserAdminService.addStaff` Javadoc.
+
+- **Role is validated, not trusted.** The contract's `StaffCreate` carries a free `role` field;
+  without a `staff|manager` check the endpoint is a general-purpose account factory, and an admin
+  typo mints an account with a role the platform has no notion of.
+- **`mobile` is required** (spec fix S33). `users.mobile` is `NOT NULL UNIQUE`, so the row
+  cannot be inserted without it; relaxing the column would have weakened the natural key for every
+  user to accommodate a handful of colleagues.
+- **Activation (D206).** The account is created with no usable password and a single-use,
+  time-limited invite link is returned once to the creator; the colleague sets their own credential
+  via `POST /auth/staff-invite/redeem`. The token reaches neither logs nor the audit row.
+- **Single administrator.** `POST /users/staff` refuses `role=admin`; the only administrator is
+  created by startup bootstrap and can be recovered with a one-use nonce.
+- **Blocked at authentication, not at permissions.** An account with an open invite cannot obtain a
+  token until its holder sets a password. A token-capable account with no permissions is still a
+  foothold if a future route misses its guard.
+- **Access is functions, not a team.** `POST /users/staff` takes `functions`; the legacy
+  `users.team` is no longer written, and unknown function names are 422.
+- **Approval is not idempotent.** Re-approving is 409, not a silent repeat: the second caller would
+  believe they were the checker on a decision somebody else made. Approving an account that was
+  never held is 409 for the same reason - it would manufacture a record of a decision that never
+  happened. The maker/checker split is enforced here *and* by a CHECK constraint in V67, because a
+  two-key rule enforced in one place is a one-key rule with extra steps.
+- **The approver's liveness is checked here.** Reaching the method proves only that the caller held
+  a valid access token; an administrator archived five minutes ago still holds one until it expires.
+- **Audit rows survive the refusals** because `AuditService` is `REQUIRES_NEW`. Nothing else on
+  the refusal paths mutates state - if you add a write above them it will roll back and the audit
+  row will not.

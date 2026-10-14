@@ -12,6 +12,7 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
+import com.draazy.api.security.Teams;
 import com.draazy.api.support.AbstractApiTest;
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,35 +23,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/**
- * {@code /admin/analytics/pricing} — the read that replaced a browser-side comparison.
- *
- * <p><strong>Every locality here is created by the test.</strong> The reference seed carries real
- * Pune localities with curated rates and, in a freshly migrated database, no approved listings
- * behind them. Asserting against those would produce a class that passes whether the aggregate is
- * right or wrong, because every figure it could check is null either way — and it would start
- * failing the day somebody seeds a listing in Baner for an unrelated reason. Each test inserts the
- * locality whose shape it is asserting, under a slug nothing else uses, and {@code @Transactional}
- * rolls it back.
- *
- * <p><strong>The fixture prices are chosen so that the wrong implementations disagree.</strong> Two
- * buy listings at ₹10,000 and ₹12,000 a square foot average to ₹11,000 against a curated market rate
- * of ₹9,000. Every number is distinct: an implementation that returned the market rate reports
- * 9,000, one that averaged in a zero-area listing as zero reports 5,500, one that summed rupees and
- * divided by summed area rather than averaging the rates would separate too if the areas differed.
- * A locality whose curated rate happened to equal its listings' average would have made all of those
- * pass.
- */
-@DisplayName("/admin/analytics/pricing — asking price against the curated rate")
+/** {@code /admin/analytics/pricing}. Every locality is created by the test, under a slug nothing
+ *  else uses, with prices chosen so each wrong implementation reports a different number. */
+@DisplayName("/admin/analytics/pricing — what live flats are asked for, from the listings alone")
 class AdminPricingAnalyticsTest extends AbstractApiTest {
-
-    /** The curated capital rate on every fixture locality. Unlike any average the tests expect. */
-    private static final long MARKET_RATE = 9_000L;
-
-    /** The curated monthly rent reference. Carried through untouched, so it is asserted as-is. */
-    private static final long AVG_RENT = 27_000L;
-
-    private static final int DEMAND = 71;
 
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
@@ -59,6 +35,9 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         User u = new User(mobile, role);
         u.setName(name);
         u.setMobileVerified(true);
+        // A staff account is keyed in the permission map by its desk, and one with no desk is refused
+        // outright. Which desk is immaterial here — the seeded document grants all six the same set.
+        if (Roles.Wire.STAFF.equals(role)) u.setTeam(Teams.RENTAL);
         return bearer(users.saveAndFlush(u));
     }
 
@@ -71,11 +50,8 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         return bearerFor("9877750002", Roles.Wire.BUYER, "Pricing seeker");
     }
 
-    /**
-     * A distinct owner per listing. The mobile is drawn from a counter rather than built out of the
-     * caller's suffix: the suffix also names the fixture, so the moment one was not a digit it
-     * produced a mobile the column's check constraint rejected.
-     */
+    /** The mobile is drawn from a counter rather than the fixture suffix, which is not always a
+     *  digit and produced values the column's check constraint rejected. */
     private final AtomicInteger ownerSeq = new AtomicInteger();
 
     private User owner(String suffix) {
@@ -85,22 +61,21 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    /** An active locality with a full set of curated figures, so nothing is null by accident. */
     private void locality(String slug) {
-        jdbc.update("""
-                insert into localities (slug, name, city, rate_per_sqft, avg_rent, demand, active)
-                values (?, ?, 'Pune', ?, ?, ?, true)
-                """, slug, "Fixture " + slug, MARKET_RATE, AVG_RENT, DEMAND);
+        jdbc.update("insert into localities (slug, name, city, active) values (?, ?, 'Pune', true)",
+                slug, "Fixture " + slug);
     }
 
-    /**
-     * An approved listing. {@code area} is passed as a {@code BigDecimal} so a test can hand in null
-     * or zero, which is the case the averages have to survive. Returns the saved row so a caller can
-     * push it out of the report's scope afterwards — the visibility filters need rows to exclude.
-     */
+    /** {@code area} is a {@code BigDecimal} so a test can hand in null or zero, the case the
+     *  averages have to survive. Returns the saved row so callers can push it out of scope. */
     private Property listing(String slug, String deal, long price, BigDecimal area, String suffix) {
+        return listing(slug, deal, "apartment", price, area, suffix);
+    }
+
+    private Property listing(String slug, String deal, String type, long price, BigDecimal area,
+                             String suffix) {
         Property p = new Property(owner(suffix), "Fixture " + slug + " " + suffix,
-                deal, "apartment", price, "Fixture " + slug, "Pune");
+                deal, type, price, "Fixture " + slug, "Pune");
         p.setLocalitySlug(slug);
         p.setArea(area);
         p.setStatus(PropertyStatus.APPROVED);
@@ -129,48 +104,93 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         String slug = "d999-pricing-shape";
         locality(slug);
         listing(slug, "buy", 10_000_000L, new BigDecimal("1000"), "1");
+        listing(slug, "buy", 11_000_000L, new BigDecimal("1000"), "1b");
         listing(slug, "buy", 12_000_000L, new BigDecimal("1000"), "2");
         listing(slug, "rent", 30_000L, new BigDecimal("1000"), "3");
+        listing(slug, "rent", 30_000L, new BigDecimal("1000"), "3b");
+        listing(slug, "rent", 30_000L, new BigDecimal("1000"), "3c");
 
         Map<String, Object> row = row(admin(), slug);
 
         assertThat(row.get("name")).isEqualTo("Fixture " + slug);
-        assertThat(num(row, "marketRatePerSqft")).isEqualTo(MARKET_RATE);
-        assertThat(num(row, "avgActualRatePerSqft"))
-                .as("the mean of the two asking rates, not the curated ₹%d", MARKET_RATE)
-                .isEqualTo(11_000L);
-        assertThat(num(row, "avgRent")).isEqualTo(AVG_RENT);
-        assertThat(num(row, "buyCount")).isEqualTo(2L);
-        assertThat(num(row, "rentCount")).isEqualTo(1L);
-        assertThat(num(row, "totalListings")).isEqualTo(3L);
-        assertThat(num(row, "demand")).isEqualTo((long) DEMAND);
+        assertThat(num(row, "avgActualRatePerSqft")).isEqualTo(11_000L);
+        assertThat(num(row, "avgRent")).isEqualTo(30_000L);
+        assertThat(((Number) row.get("rentalYieldPct")).doubleValue()).isEqualTo(3.3);
+        assertThat(num(row, "buyCount")).isEqualTo(3L);
+        assertThat(num(row, "rentCount")).isEqualTo(3L);
+        assertThat(num(row, "totalListings")).isEqualTo(6L);
+        assertThat(row).doesNotContainKeys("marketRatePerSqft", "demand");
     }
 
-    /**
-     * ₹30,000 a month over 1,000 sqft is ₹30 per sqft per month, ₹360 a year, against a capital rate
-     * of ₹9,000 — exactly 4%. The report's only figure that combines both halves of the schema, so
-     * it is the one that catches a query that annualised the wrong side or forgot to at all: a
-     * missing ×12 reports 0.3, and dividing by the monthly rent instead reports something absurd.
-     */
+    /** One or two listings are an owner's opinion, not a locality's price, and a verdict of
+     *  "overpriced area" off them sends sourcing after noise. */
+    @Test
+    void fewerThanThreeFlatsIsTooFewToPrice() throws Exception {
+        String slug = "d999-pricing-thin";
+        locality(slug);
+        listing(slug, "buy", 10_000_000L, new BigDecimal("1000"), "t1");
+        listing(slug, "buy", 12_000_000L, new BigDecimal("1000"), "t2");
+        listing(slug, "rent", 30_000L, new BigDecimal("1000"), "t3");
+
+        Map<String, Object> row = row(admin(), slug);
+
+        assertThat(row.get("avgActualRatePerSqft")).isNull();
+        assertThat(row.get("avgRent")).isNull();
+        assertThat(row.get("rentalYieldPct")).isNull();
+        assertThat(num(row, "buyCount")).as("still supply").isEqualTo(2L);
+    }
+
+    /** The curated rate is a flat rate; a plot or a shop at a tenth of it per sqft is a different
+     *  market, not a bargain. */
+    @Test
+    void onlyFlatsAreAveragedAgainstTheMarketRate() throws Exception {
+        String slug = "d999-pricing-mixed";
+        locality(slug);
+        listing(slug, "buy", 10_000_000L, new BigDecimal("1000"), "m1");
+        listing(slug, "buy", 10_000_000L, new BigDecimal("1000"), "m2");
+        listing(slug, "buy", 10_000_000L, new BigDecimal("1000"), "m3");
+        listing(slug, "buy", "Plot", 1_000_000L, new BigDecimal("1000"), "m4");
+        listing(slug, "buy", "Office Space", 30_000_000L, new BigDecimal("1000"), "m5");
+
+        Map<String, Object> row = row(admin(), slug);
+
+        assertThat(num(row, "avgActualRatePerSqft")).isEqualTo(10_000L);
+        assertThat(num(row, "buyCount")).as("every type is still supply").isEqualTo(5L);
+    }
+
+    /** The only figure combining both halves: a missing ×12 reports 0.3, and dividing
+     *  by the monthly rent reports something absurd. */
     @Test
     void rentalYieldAnnualisesTheAskingRentOverTheCapitalRate() throws Exception {
         String slug = "d999-pricing-yield";
         locality(slug);
         listing(slug, "rent", 30_000L, new BigDecimal("1000"), "4");
+        listing(slug, "rent", 30_000L, new BigDecimal("1000"), "4b");
+        listing(slug, "rent", 30_000L, new BigDecimal("1000"), "4c");
+        listing(slug, "buy", 9_000_000L, new BigDecimal("1000"), "4d");
+        listing(slug, "buy", 9_000_000L, new BigDecimal("1000"), "4e");
+        listing(slug, "buy", 9_000_000L, new BigDecimal("1000"), "4f");
 
         Map<String, Object> row = row(admin(), slug);
 
         assertThat(((Number) row.get("rentalYieldPct")).doubleValue()).isEqualTo(4.0);
     }
 
-    /**
-     * <strong>The regression this endpoint exists for.</strong> The browser version fell back to the
-     * curated market rate whenever it had no listings to average, so a locality Draazy has never
-     * sold a home in showed a deviation of exactly zero and read as the best-priced place in the
-     * city. An empty locality has no asking average, and the report has to say so.
-     */
     @Test
-    void aLocalityWithNoApprovedListingsReportsNullNotTheMarketRate() throws Exception {
+    void rentalYieldNeedsBothSidesSampled() throws Exception {
+        String slug = "d999-pricing-yield-one-sided";
+        locality(slug);
+        listing(slug, "rent", 30_000L, new BigDecimal("1000"), "y1");
+        listing(slug, "rent", 30_000L, new BigDecimal("1000"), "y2");
+        listing(slug, "rent", 30_000L, new BigDecimal("1000"), "y3");
+
+        assertThat(row(admin(), slug).get("rentalYieldPct")).isNull();
+    }
+
+    /** A fallback figure gives an empty locality a deviation of exactly zero, which
+     *  reads as the best-priced place in the city. */
+    @Test
+    void aLocalityWithNoApprovedListingsReportsNull() throws Exception {
         String slug = "d999-pricing-empty";
         locality(slug);
 
@@ -180,29 +200,23 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
                 .as("the field is present and null, not omitted — an absent key invites a ?? on the client")
                 .containsKey("avgActualRatePerSqft");
         assertThat(row.get("avgActualRatePerSqft"))
-                .as("no listings means no average, and emphatically not ₹%d", MARKET_RATE)
+                .as("no listings means no average")
                 .isNull();
         assertThat(row.get("rentalYieldPct"))
                 .as("nothing is let here, so there is no yield to report")
                 .isNull();
-        assertThat(num(row, "marketRatePerSqft"))
-                .as("the curated side is still known, which is what makes the null meaningful")
-                .isEqualTo(MARKET_RATE);
         assertThat(num(row, "totalListings")).isZero();
         assertThat(num(row, "buyCount")).isZero();
     }
 
-    /**
-     * A listing with no usable area is supply without a price signal. It must count as the former
-     * and contribute nothing to the latter: coalescing the missing area to zero rupees a square foot
-     * would pull this locality's average from ₹11,000 down to ₹5,500 — a 50% drop caused entirely by
-     * two owners skipping a form field.
-     */
+    /** Coalescing a missing area to zero rupees a square foot halves this locality's average —
+     *  a 50% drop caused entirely by two owners skipping a form field. */
     @Test
     void aListingWithNoUsableAreaDoesNotCorruptTheAverage() throws Exception {
         String slug = "d999-pricing-noarea";
         locality(slug);
         listing(slug, "buy", 10_000_000L, new BigDecimal("1000"), "5");
+        listing(slug, "buy", 11_000_000L, new BigDecimal("1000"), "5b");
         listing(slug, "buy", 12_000_000L, new BigDecimal("1000"), "6");
         listing(slug, "buy", 8_000_000L, null, "7");
         listing(slug, "buy", 8_000_000L, BigDecimal.ZERO, "8");
@@ -210,18 +224,15 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         Map<String, Object> row = row(admin(), slug);
 
         assertThat(num(row, "avgActualRatePerSqft"))
-                .as("averaged over the two listings that carry an area, and only those")
+                .as("averaged over the three listings that carry an area, and only those")
                 .isEqualTo(11_000L);
         assertThat(num(row, "buyCount"))
-                .as("all four are still listings — supply and the sample are different questions")
-                .isEqualTo(4L);
-        assertThat(num(row, "totalListings")).isEqualTo(4L);
+                .as("all five are still listings — supply and the sample are different questions")
+                .isEqualTo(5L);
+        assertThat(num(row, "totalListings")).isEqualTo(5L);
     }
 
-    /**
-     * Locality-by-locality pricing is commercially sensitive and staff-gated. A signed-in seeker is
-     * still the public.
-     */
+    /** Locality-by-locality pricing is commercially sensitive; a signed-in seeker is still public. */
     @Test
     void aPlainConsumerIsRefused() throws Exception {
         mvc.perform(get(Routes.Admin.ANALYTICS_PRICING)
@@ -229,11 +240,8 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    /**
-     * The other end of the same guard. Refusing everyone is a way to pass {@link
-     * #aPlainConsumerIsRefused()} while the report is unreachable by the team that sources on it, so
-     * the acceptance side is asserted too — sourcing is ops work, not an admin-only privilege.
-     */
+    /** The acceptance half: refusing everyone would pass the test above while leaving the report
+     *  unreachable by the team that sources on it. */
     @Test
     void opsStaffReachesIt() throws Exception {
         mvc.perform(get(Routes.Admin.ANALYTICS_PRICING)
@@ -249,17 +257,15 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    /**
-     * The two clauses that keep the report about the catalogue a buyer can actually see. Both are
-     * invisible to a fixture that only ever builds approved, non-archived rows: delete either from
-     * the query and every other test here still passes, while the report starts pricing a locality
-     * off listings nobody can buy — and a withdrawn ₹40,000/sqft outlier moves a mean a long way.
-     */
+    /** The only test that builds a non-approved or archived row: drop either clause and everything
+     *  else here still passes while the report prices localities off listings nobody can buy. */
     @Test
     void aPendingOrArchivedListingIsNeitherCountedNorAveraged() throws Exception {
         String slug = "d999-pricing-invisible";
         locality(slug);
         listing(slug, "buy", 10_000_000L, new BigDecimal("1000"), "9");
+        listing(slug, "buy", 10_000_000L, new BigDecimal("1000"), "9b");
+        listing(slug, "buy", 10_000_000L, new BigDecimal("1000"), "9c");
 
         Property pending = listing(slug, "buy", 30_000_000L, new BigDecimal("1000"), "a");
         pending.setStatus(PropertyStatus.PENDING);
@@ -271,20 +277,24 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
         Map<String, Object> row = row(admin(), slug);
 
         assertThat(num(row, "avgActualRatePerSqft"))
-                .as("the one approved listing; ₹30,000 or ₹40,000 per sqft would be unmissable in the mean")
+                .as("the approved listings; ₹30,000 or ₹40,000 per sqft would be unmissable in the mean")
                 .isEqualTo(10_000L);
         assertThat(num(row, "buyCount"))
                 .as("a listing awaiting review is not supply, and an archived one is gone")
-                .isEqualTo(1L);
-        assertThat(num(row, "totalListings")).isEqualTo(1L);
+                .isEqualTo(3L);
+        assertThat(num(row, "totalListings")).isEqualTo(3L);
     }
 
-    /** An inactive locality is not part of the catalogue and is not part of the report. */
+    /** A non-live locality is reported only while approved listings are still bound to it. */
     @Test
-    void anInactiveLocalityIsNotReported() throws Exception {
-        String slug = "d999-pricing-inactive";
+    void aRetiredLocalityIsReportedOnlyWhileItHasLiveListings() throws Exception {
+        String slug = "d999-pricing-retired";
         locality(slug);
-        jdbc.update("update localities set active = false where slug = ?", slug);
+        jdbc.update("update localities set archived_at = now() where slug = ?", slug);
+        String busy = "d999-pricing-retired-live";
+        locality(busy);
+        jdbc.update("update localities set archived_at = now() where slug = ?", busy);
+        listing(busy, "buy", 10_000_000L, new BigDecimal("1000"), "r1");
 
         String json = mvc.perform(get(Routes.Admin.ANALYTICS_PRICING)
                         .header(HttpHeaders.AUTHORIZATION, admin()))
@@ -293,5 +303,6 @@ class AdminPricingAnalyticsTest extends AbstractApiTest {
 
         assertThat(JsonPath.read(json, "$[?(@.slug=='" + slug + "')]").toString())
                 .isEqualTo("[]");
+        assertThat(JsonPath.<List<Object>>read(json, "$[?(@.slug=='" + busy + "')]")).hasSize(1);
     }
 }

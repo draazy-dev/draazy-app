@@ -1,7 +1,9 @@
 package com.draazy.api.catalog.property;
 
+import com.draazy.api.catalog.locality.LocalityRepository;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.web.Ids;
+import com.draazy.api.identity.user.UserStatuses;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -14,31 +16,37 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Read side of the catalogue: anonymous search, the featured strip, and single-listing detail. Every
- * method serves {@code security: []}, so the approved + non-archived floor is enforced in the query.
- */
+/** Every method serves {@code security: []}, so the approved + non-archived floor is enforced in the query. */
 @Service
 public class PropertyService {
 
-    /** Homepage strip cap — the contract's featured endpoint takes no limit, so we bound it here. */
-    private static final int FEATURED_CAP = 12;
+    /** The home strip draws six; the contract's featured endpoint takes no limit, so we bound it here. */
+    private static final int FEATURED_CAP = 6;
+
+    /** A rail of recently viewed listings never holds more than this. */
+    public static final int CARDS_CAP = 16;
+
+    // ponytail: newest 100 only, so counts undercount once live stock outgrows it; aggregate server-side then.
+    private static final int SEARCH_INDEX_CAP = 100;
+
+    private static final int REELS_CAP = 24;
+
+    private static final PropertySearchQuery NO_FILTERS =
+            new PropertySearchQuery(null, null, null, null, null, null, null, null, null, null, null);
 
     private final PropertyRepository properties;
+    private final LocalityRepository localities;
 
-    public PropertyService(PropertyRepository properties) {
+    public PropertyService(PropertyRepository properties, LocalityRepository localities) {
         this.properties = properties;
+        this.localities = localities;
     }
 
-    /**
-     * Faceted public search - the page <em>and</em> both totals, which describe the whole match rather
-     * than the page. Ranking and {@code newestOnly}: search-listings.md sections 9.3, 9.7.
-     */
     @Transactional(readOnly = true)
     public SearchResult searchWithTotals(PropertySearchQuery filters, ListingFacets extra,
-            Pageable pageable, boolean newestOnly) {
+            Pageable pageable, PropertySort.Rank rank) {
         Pageable safe = PropertySort.sanitize(pageable);
-        Specification<Property> match = PropertySpecs.publicSearch(filters, extra);
+        Specification<Property> match = PropertySpecs.publicSearch(filters, extra, localityCenter(filters.locality()));
         Instant now = Instant.now();
 
         Specification<Property> ordered;
@@ -47,54 +55,88 @@ public class PropertyService {
             ordered = match;
             exec = safe;
         } else {
-            ordered = match.and(newestOnly ? PropertySpecs.boostedFirst(now) : PropertySpecs.relevanceFirst(now));
+            ordered = match.and(switch (rank) {
+                case NEWEST -> PropertySpecs.newestFirst();
+                case PRICE_PER_SQFT -> PropertySpecs.pricePerSqftFirst();
+                case VERIFIED -> PropertySpecs.verifiedFirst(now);
+                case RELEVANCE -> PropertySpecs.relevanceFirst(now);
+            });
             exec = PageRequest.of(safe.getPageNumber(), safe.getPageSize());
         }
 
         List<Property> rows = properties.findPage(ordered, exec);
-        PropertySearchFragment.Totals totals = properties.countTotals(match, PropertySpecs.anyVerified(now));
+        PropertySearchFragment.Totals totals = properties.countTotals(
+                match, PropertySpecs.anyVerified(now), PropertySpecs.unstatedFiltered(extra));
+
         // `exec`, not `safe` — the page must carry the pageable its rows were actually read with, or
         // a client reading `sort` off the response would be told about an order that was overridden.
-        return new SearchResult(new PageImpl<>(rows, exec, totals.total()), totals.subset());
+        return new SearchResult(new PageImpl<>(rows, exec, totals.total()), totals.verified(),
+                totals.unstated());
     }
 
-    /**
-     * A page of search results and the verified count over the whole match - the second of which a
-     * {@link Page} has no room for.
-     */
-    public record SearchResult(Page<Property> page, long verifiedTotal) {
+    /** Null for a blank or unknown slug, or a locality with no pin: those match on the slug alone. */
+    PropertySpecs.LocalityPoint localityCenter(String slug) {
+        if (slug == null || slug.isBlank()) {
+            return null;
+        }
+        return localities.findById(slug)
+                .filter(l -> l.getLat() != null && l.getLng() != null)
+                .map(l -> new PropertySpecs.LocalityPoint(l.getLat(), l.getLng()))
+                .orElse(null);
     }
 
-    /**
-     * Moderation search: the same facets with <strong>no visibility floor</strong>, guarded only by
-     * {@code @PreAuthorize} on its single controller method. Any new caller must carry its own.
-     */
+    /** The two counts describe the whole match, not the page, so neither fits in a {@link Page}. */
+    public record SearchResult(Page<Property> page, long verifiedTotal, long unstatedTotal) {
+    }
+
+    /** No visibility floor, only {@code @PreAuthorize} on its one caller, so a new one needs its own. */
     @Transactional(readOnly = true)
     public Page<Property> searchForModeration(PropertySearchQuery filters, ModerationFacets mod,
             Pageable pageable) {
         return properties.findAll(PropertySpecs.adminSearch(filters, mod),
-                PropertySort.sanitize(pageable));
+                PropertySort.sanitizeModeration(pageable));
     }
 
-    /** Featured-first live listings for the homepage (contract {@code featuredProperties}). */
     @Transactional(readOnly = true)
     public List<Property> featured() {
-        return properties.findByStatusAndArchivedFalseOrderByFeaturedDescCreatedAtDesc(
-                PropertyStatus.APPROVED, PageRequest.of(0, FEATURED_CAP));
+        return properties.findByStatusAndArchivedFalseAndOwner_StatusNotOrderByFeaturedDescCreatedAtDesc(
+                PropertyStatus.APPROVED, UserStatuses.SUSPENDED, PageRequest.of(0, FEATURED_CAP));
     }
 
-    /**
-     * Single public listing by slug-or-id. A missing, archived or unapproved row is a {@code 404}; a
-     * sold or rented one stays reachable so a held link opens the badged page.
-     */
+    /** The publicly live rows among {@code ids} (slugs or UUIDs), in no particular order. */
     @Transactional(readOnly = true)
-    public Property getPublic(String idOrSlug) {
-        Property p = resolve(idOrSlug).filter(Property::isDirectlyReachable)
-                .orElseThrow(() -> NotFoundException.of("Property"));
+    public List<Property> publicByIds(List<String> ids) {
+        return properties.findPage(PropertySpecs.publicSearch(NO_FILTERS, ListingFacets.ofIds(ids)),
+                PageRequest.of(0, CARDS_CAP));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Property> newestReels(ListingFacets facets) {
+        return properties.findPage(PropertySpecs.publicSearch(NO_FILTERS, facets).and(PropertySpecs.newestFirst()),
+                PageRequest.of(0, REELS_CAP));
+    }
+
+    @Transactional(readOnly = true)
+    public List<Property> newestLive() {
+        return properties.findPage(PropertySpecs.publicSearch(NO_FILTERS).and(PropertySpecs.newestFirst()),
+                PageRequest.of(0, SEARCH_INDEX_CAP));
+    }
+
+    @Transactional(readOnly = true)
+    public Property getPublic(String idOrSlug, UUID viewerId, boolean staff) {
+        Property p = resolve(idOrSlug).orElseThrow(() -> NotFoundException.of("Property"));
+        if (!p.isDirectlyReachable() && !isOwnedBy(p, viewerId) && !(staff && !p.isArchived())) {
+            throw NotFoundException.of("Property");
+        }
         return p;
     }
 
-    /** Resolve a path token to a listing: parse as UUID → by id; otherwise treat as a slug. */
+    /** A signed-in viewer owning a listing that has not been taken down. */
+    private static boolean isOwnedBy(Property p, UUID viewerId) {
+        return viewerId != null && !p.isArchived() && p.getOwner() != null
+                && viewerId.equals(p.getOwner().getId());
+    }
+
     private Optional<Property> resolve(String idOrSlug) {
         UUID id = tryUuid(idOrSlug);
         return id != null ? properties.findById(id) : properties.findBySlug(idOrSlug);

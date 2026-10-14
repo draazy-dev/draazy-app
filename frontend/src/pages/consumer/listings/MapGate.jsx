@@ -1,31 +1,62 @@
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import LocalitySearchInput from '../../../components/search/LocalitySearchInput.jsx';
 
-/* Map view is "area-first": rendering a whole city of markers is expensive, so the
-   map only appears once the user has focused on 1–maxAreas localities. This panel is
-   shown in place of the map for the two gated states:
-     • no areas selected  → a "focus your map" popular-area picker.
-     • too many areas (> maxAreas) → a trim-down prompt with a grid-view fallback.
-   Picking a single area is enough to unlock the map. */
+/* The map only appears after focusing on 1–maxAreas localities: a whole city of markers is expensive. */
 
-// Areas worth suggesting first: most stock, then strongest demand.
+// Areas worth suggesting first: most live stock.
 const popularAreas = (localities, limit = 8) =>
   localities
-    .filter((l) => l.active !== false)
+    .filter((l) => !l.archived)
     .slice()
-    .sort((a, b) => (b.listings || 0) - (a.listings || 0) || (b.demand || 0) - (a.demand || 0))
+    .sort((a, b) => (b.liveListings || 0) - (a.liveListings || 0))
     .slice(0, limit);
 
-export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, setView }) {
+export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, setView, suggestedLocalities = [], onAddLocality }) {
   const { t } = useTranslation();
   const selected = [...f.localities];
   const overLimit = selected.length > maxAreas;
+  const initialDraft = useMemo(() => suggestedLocalities.slice(0, maxAreas), [suggestedLocalities, maxAreas]);
+  const [draft, setDraft] = useState(() => new Set(initialDraft));
+
+  useEffect(() => {
+    if (f.localities.size === 0) setDraft(new Set(initialDraft));
+  }, [f.localities.size, initialDraft]);
+
+  const bySlug = useMemo(() => new Map(localities.filter((l) => !l.archived).map((l) => [l.slug, l])), [localities]);
+  // A stored slug that is retired or failed to load is never drawn, so it must not count as chosen either.
+  const shown = [...draft].filter((slug) => bySlug.has(slug));
+  const choices = useMemo(() => {
+    const first = [...new Set([...initialDraft, ...draft])];
+    const picked = first.map((slug) => bySlug.get(slug)).filter(Boolean);
+    const rest = popularAreas(localities, 10).filter((l) => !first.includes(l.slug));
+    return [...picked, ...rest].slice(0, 8);
+  }, [localities, bySlug, initialDraft, draft]);
+  const pickArea = (loc) => {
+    onAddLocality(loc);
+    setDraft((prev) => {
+      const kept = [...prev].filter((slug) => bySlug.has(slug));
+      return kept.length < maxAreas ? new Set([...kept, loc.slug]) : new Set(kept);
+    });
+  };
 
   const toggleArea = (slug) => {
     const next = new Set(f.localities);
     if (next.has(slug)) next.delete(slug);
     else next.add(slug);
     set({ localities: next });
+  };
+  const toggleDraftArea = (slug) => {
+    setDraft((prev) => {
+      const next = new Set([...prev].filter((s) => bySlug.has(s)));
+      if (next.has(slug)) next.delete(slug);
+      else if (next.size < maxAreas) next.add(slug);
+      return next;
+    });
+  };
+  const showMap = () => {
+    if (shown.length) set({ localities: new Set(shown.slice(0, maxAreas)) });
   };
 
   return (
@@ -73,17 +104,21 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
               {t('listings.focusIntro')} <span className="text-teal-300 font-semibold">{maxAreas}</span>.
             </p>
 
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-              {popularAreas(localities).map((l) => {
-                const on = f.localities.has(l.slug);
+            <div className="mx-auto mt-5 max-w-sm text-left">
+              <LocalitySearchInput onPick={pickArea} clearOnPick placeholder={t('listings.searchLocalityPlaceholder')} ariaLabel={t('listings.localities')} />
+            </div>
+
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              {choices.map((l) => {
+                const on = draft.has(l.slug);
                 return (
                   <button
                     key={l.slug}
                     type="button"
-                    onClick={() => toggleArea(l.slug)}
+                    onClick={() => toggleDraftArea(l.slug)}
                     aria-pressed={on}
                     className={
-                      'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-sm font-medium t-all ' +
+                      'inline-flex min-h-11 items-center gap-1.5 px-3.5 py-2 rounded-full border text-sm font-medium t-all ' +
                       (on
                         ? 'bg-teal-500/15 border-teal-400/40 text-teal-200'
                         : 'bg-white/5 border-white/10 text-gray-300 hover:border-teal-400/40 hover:text-white')
@@ -94,6 +129,15 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
                 );
               })}
             </div>
+
+            <button
+              type="button"
+              onClick={showMap}
+              disabled={shown.length === 0}
+              className="mt-6 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-bold text-slate-950 transition-all disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-gray-500"
+            >
+              <Icon name="map" className="w-4 h-4" /> {t('listings.showBtn')} {t('listings.mapView')}
+            </button>
 
             <p className="mt-6 text-xs text-gray-600">
               {t('listings.preferSwitch')}{' '}

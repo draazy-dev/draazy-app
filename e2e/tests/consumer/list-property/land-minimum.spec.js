@@ -1,0 +1,215 @@
+/* Driven through the wizard rather than the API on purpose: the claim is about what the form lets
+   an owner submit, which an API post cannot prove. A NEW owner per listing. */
+import { test, expect, ACTORS } from '../../../fixtures/live.js';
+import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { signedInAsNew, authHeaders, API } from '../../../helpers/liveAuth.js';
+import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
+import { fillSociety } from '../../../helpers/places.js';
+import { pickLocality } from '../../../helpers/locality.js';
+
+const owners = new Set();
+
+test.afterEach(async () => {
+  if (!owners.size) return;
+  const adminHeaders = await authHeaders(ACTORS.admin);
+  for (const mobile of owners) {
+    const res = await fetch(`${API}/me/listings`, { headers: await authHeaders(mobile) });
+    if (res.status !== 200) continue;
+    const body = await res.json();
+    const rows = Array.isArray(body) ? body : (body.content ?? body.items ?? []);
+    for (const row of rows) {
+      await fetch(`${API}/properties/${row.id}/status`, {
+        method: 'PATCH',
+        headers: adminHeaders,
+        body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup — synthetic land fixture' }),
+      });
+    }
+  }
+  owners.clear();
+});
+
+const menuOpen = (page) => expect(page.locator('.dz-dropdown__menu.is-portal-open')).toBeVisible();
+
+async function pickOption(page, dataErr, label) {
+  await page.locator(`[data-err="${dataErr}"] .dz-dropdown__trigger`).click();
+  await menuOpen(page);
+  await page.locator('.dz-dropdown__option', { hasText: label }).first().click();
+}
+
+const nextStep = (page) => page.getByRole('button', { name: /Next Step/i }).click();
+const inDays = (days) => new Date(Date.now() + days * 86400000).toISOString().slice(0, 10);
+
+async function gotoForm(page, { deal = 'buy', type } = {}) {
+  const mobile = await signedInAsNew(page);
+  owners.add(mobile);
+  await page.goto('/list-property');
+  await page.waitForSelector('.lp-steps', { timeout: 20000 });
+  await page.locator('.radio-pill', { hasText: deal === 'rent' ? 'Rent' : 'Sale' }).first().click();
+  if (type) await pickOption(page, 'propertyType', type);
+  return mobile;
+}
+/* Deliberately the least the wizard accepts. `Deemed NA` rather than a sanctioned order, which is the one land
+   claim needing a document — a minimum-effort walk would then be proving the upload gate instead. */
+
+async function fillLandStep1(page, { type, deal, area }) {
+  await page.locator('input[data-err="carpetArea"]').fill(area);
+  await pickOption(page, 'naStatus', 'Deemed NA');
+  await pickOption(page, 'otherRights', 'Clear');
+  if (type === 'Farm Land' && deal === 'buy') await pickOption(page, 'buyerEligibility', 'Agriculturist buyer only');
+}
+
+const BANER_PIN = { lat: 18.5602, lng: 73.7861, locality: 'Baner', pincode: '411045' };
+
+async function fillLocation(page) {
+  await nextStep(page);
+  await page.waitForSelector('.gm-style', { timeout: 30000 });
+  await pickLocality(page, 'Baner');
+  await page.locator('input[data-err="pincode"]').fill('411045');
+}
+
+async function fillPricing(page, deal, { type, possession } = {}) {
+  await nextStep(page);
+  await page.waitForSelector('text=/Price & terms/i', { timeout: 15000 });
+  if (deal === 'rent') {
+    await page.locator('input[data-err="monthlyRent"]').fill('18000');
+    await page.locator('input[data-err="deposit"]').fill('108000');
+    await pickDate(page, '[data-err="availableFrom"]', inDays(30));
+  } else {
+    await page.locator('input[data-err="price"]').fill('6500000');
+    await pickOption(page, 'ownership', 'Freehold');
+    if (type === 'Open Plot') await page.locator('[data-err="plottedProject"]').getByRole('button', { name: 'No', exact: true }).click();
+    // Land has no possession block at all, so only a built property can answer this.
+    if (possession) await page.locator('[data-err="possession"]').getByText(possession, { exact: true }).click();
+  }
+  await nextStep(page);
+  await page.waitForSelector('text=/Photos & description/i', { timeout: 15000 });
+}
+
+const submitted = (page) => page.waitForResponse((res) => res.request().method() === 'POST'
+  && new URL(res.url()).pathname === '/api/me/listings');
+/* A parcel publishes on where its edges run and what the layout sanctions, so the two key
+   categories a land listing must cover are the same for both types. */
+
+const LAND_KEY_PHOTOS = ['Layout Plan', 'Road / Access'];
+
+const PROFILES = {
+  'Open Plot': { area: '2400', unit: 'sqft' },
+  'Farm Land': { area: '20', unit: 'guntha' },
+};
+
+for (const [type, profile] of Object.entries(PROFILES)) {
+  for (const deal of ['buy', 'rent']) {
+    test(`a ${deal} ${type} publishes without naming a project or layout`, async ({ page }) => {
+      await gotoForm(page, { deal, type });
+      await fillLandStep1(page, { type, deal, area: profile.area });
+      await fillLocation(page);
+      await expect(page.locator('input[data-err="society"]')).toHaveValue('');
+      await fillPricing(page, deal, { type });
+      await uploadPublishablePhotos(page, { categories: LAND_KEY_PHOTOS });
+
+      const posted = submitted(page);
+      await page.getByRole('button', { name: /Submit Property/i }).click();
+      const response = await posted;
+      expect(response.status(), await response.text()).toBe(201);
+
+      const body = response.request().postDataJSON();
+      expect(body.formDetails.society ?? '').toBe('');
+      expect(body.formDetails.buyerEligibility).toBe(
+        type === 'Farm Land' && deal === 'buy' ? 'agriculturist' : undefined,
+      );
+      /* The parcel is quoted in the unit the owner chose and posted as `area` alone: `carpetArea`
+         is a square-foot carpet figure, which a plot does not have. */
+      expect(body.areaUnit).toBe(profile.unit);
+      expect(body.area).toBe(Number(profile.area));
+      expect(body.carpetArea).toBeFalsy();
+    });
+  }
+}
+
+test('switching a flat to a plot posts neither its possession nor its age', async ({ page }) => {
+  const ageField = page.locator('div').filter({ has: page.locator('label:text-is("Age of Property")') }).last();
+  await gotoForm(page, { type: 'Flat / Apartment' });
+  await page.locator('[data-err="bhk"]').getByRole('button', { name: '2', exact: true }).click();
+  await page.locator('input[data-err="carpetArea"]').fill('1150');
+  await ageField.locator('.dz-dropdown__trigger').click();
+  await menuOpen(page);
+  await page.locator('.dz-dropdown__option', { hasText: '5 - 10 years' }).first().click();
+  for (const [key, storey] of [['floor', '9'], ['totalFloors', '14']]) {
+    await page.locator(`[data-err="${key}"] .dz-dropdown__trigger`).click();
+    await menuOpen(page);
+    await page.getByRole('option', { name: storey, exact: true }).click();
+  }
+
+  await fillLocation(page);
+  await page.locator('input[data-err="flatNumber"]').fill('B-904');
+  await fillSociety(page, 'Zztest Baner Heights', BANER_PIN);
+  await fillPricing(page, 'buy', { possession: 'Ready to Move' });
+
+  for (let i = 0; i < 3; i += 1) await page.getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.locator('[data-err="propertyType"]')).toBeVisible();
+  await pickOption(page, 'propertyType', 'Open Plot');
+  await expect(ageField).toHaveCount(0);
+
+  await fillLandStep1(page, { type: 'Open Plot', deal: 'buy', area: '2400' });
+  await fillLocation(page);
+  await fillPricing(page, 'buy', { type: 'Open Plot' });
+  await uploadPublishablePhotos(page, { categories: LAND_KEY_PHOTOS });
+
+  const posted = submitted(page);
+  await page.getByRole('button', { name: /Submit Property/i }).click();
+  const response = await posted;
+  expect(response.status(), await response.text()).toBe(201);
+
+  const body = response.request().postDataJSON();
+  expect(body.possession).toBeFalsy();
+  expect(body.ageYears ?? null).toBeNull();
+});
+
+test('land listings: a farm is asked no length and width, a farm sale to rent drops buyer eligibility, and the meter does not dock a land sale for no MahaRERA number', async ({ page }) => {
+  test.slow();
+  await gotoForm(page, { type: 'Open Plot' });
+
+  await test.step('a farm is not asked for a length and width in feet', async () => {
+    await expect(page.locator('label', { hasText: 'Plot Length' })).toHaveCount(1);
+
+    await pickOption(page, 'propertyType', 'Farm Land');
+    await expect(page.locator('label', { hasText: 'Land Area' })).toHaveCount(1);
+    await expect(page.locator('label', { hasText: 'Plot Length' })).toHaveCount(0);
+    await expect(page.locator('label', { hasText: 'Plot Width' })).toHaveCount(0);
+  });
+
+  await test.step('changing a farm sale to rent removes the inapplicable buyer eligibility', async () => {
+    const patch = await page.evaluate(async () => {
+      const { editPayload } = await import('/src/pages/consumer/list-property/editPayload.js');
+      return editPayload(
+        { deal: 'rent', formDetails: { naStatus: 'agricultural', otherRights: 'clear' } },
+        { deal: 'rent', propertyType: 'farmland' },
+        {
+          form: { deal: 'buy', propertyType: 'farmland' },
+          formDetails: { buyerEligibility: 'agriculturist', naStatus: 'agricultural', otherRights: 'clear' },
+        },
+      );
+    });
+    expect(patch.formDetails).toEqual({ naStatus: 'agricultural', otherRights: 'clear' });
+  });
+
+  await test.step('the strength meter does not dock a land sale for having no MahaRERA number', async () => {
+    const scores = await page.evaluate(async () => {
+      const { computeProgress } = await import('/src/pages/consumer/list-property/progress.js');
+      const form = {
+        deal: 'buy', propertyType: 'openplot', areaUnit: 'sqft', carpetArea: '2400',
+        locality: 'Wagholi', pincode: '412207', price: '6500000', ownership: 'Freehold',
+        naStatus: 'deemed', otherRights: 'clear',
+      };
+      return {
+        blank: computeProgress({ form, photos: [], documents: {} }).pct,
+        quoted: computeProgress({ form: { ...form, reraId: 'P52100000001' }, photos: [], documents: {} }).pct,
+        flatBlank: computeProgress({ form: { ...form, propertyType: 'flat' }, photos: [], documents: {} }).pct,
+        flatQuoted: computeProgress({ form: { ...form, propertyType: 'flat', reraId: 'P52100000001' }, photos: [], documents: {} }).pct,
+      };
+    });
+    expect(scores.blank).toBe(scores.quoted);
+    // The row is still scored where it is genuinely expected, so the land case is a carve-out.
+    expect(scores.flatQuoted).toBeGreaterThan(scores.flatBlank);
+  });
+});

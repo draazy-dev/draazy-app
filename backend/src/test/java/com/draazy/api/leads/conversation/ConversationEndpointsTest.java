@@ -3,7 +3,9 @@ package com.draazy.api.leads.conversation;
 import com.draazy.api.support.AbstractApiTest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -13,6 +15,7 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.identity.user.UserStatuses;
 import com.draazy.api.leads.contact.ContactRequest;
 import com.draazy.api.leads.contact.ContactRequestRepository;
 import com.draazy.api.leads.contact.ContactRequestStatuses;
@@ -27,15 +30,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * In-app messaging, organised around the three things that can go wrong rather than around the four
- * endpoints: <strong>who may open a thread</strong>, <strong>whether the refusal leaks</strong>, and
- * <strong>whether a thread can fork</strong>.
- *
- * <p>The enumeration-oracle test is the one that matters most and is the easiest to delete by
- * accident, because it asserts that two different situations produce the <em>same</em> response —
- * which reads like a redundant test until you remember that the difference is the vulnerability.
- */
 @DisplayName("Slice 12 — conversations: who may talk to whom")
 class ConversationEndpointsTest extends AbstractApiTest {
 
@@ -60,8 +54,8 @@ class ConversationEndpointsTest extends AbstractApiTest {
             Property p = listing(owner);
             approve(buyer, p);
 
-            // Buyer -> owner: the buyer is the one who asked.
             start(buyer, owner, p, 201);
+
             // Owner -> buyer, about the same listing: the guard looks both ways, so the owner does
             // not have to raise a contact request against their own flat to answer.
             start(owner, buyer, p, 200);
@@ -119,15 +113,52 @@ class ConversationEndpointsTest extends AbstractApiTest {
             // of them — otherwise propertyId is an arbitrary id that drives the title and the gate.
             start(buyer, owner, elsewhere, 403);
         }
+
+        @Test
+        @DisplayName("approval on one listing does not open a thread about another listing of the same owner")
+        void approvalIsPerListing() throws Exception {
+            User owner = user("9830000113", Roles.Wire.OWNER, "Owner Per Listing");
+            User buyer = user("9830000114", Roles.Wire.BUYER, "Buyer Per Listing");
+            Property approved = listing(owner);
+            Property other = listing(owner);
+            approve(buyer, approved);
+
+            start(buyer, owner, other, 403);
+            start(buyer, owner, approved, 201);
+        }
+
+        @Test
+        @DisplayName("a buyer cannot open a listing-less thread on the strength of a listing approval")
+        void buyerCannotOpenGeneralThread() throws Exception {
+            User owner = user("9830000115", Roles.Wire.OWNER, "Owner General");
+            User buyer = user("9830000116", Roles.Wire.BUYER, "Buyer General");
+            approve(buyer, listing(owner));
+
+            start(buyer, owner, null, 403);
+        }
+
+        @Test
+        @DisplayName("an owner may open a listing-less thread to a buyer they approved")
+        void ownerMayOpenGeneralThread() throws Exception {
+            User owner = user("9830000117", Roles.Wire.OWNER, "Owner Opens");
+            User buyer = user("9830000118", Roles.Wire.BUYER, "Buyer Approved");
+            approve(buyer, listing(owner));
+
+            start(owner, buyer, null, 201);
+        }
+
+        @Test
+        @DisplayName("an owner cannot open a listing thread to a buyer who was only approved elsewhere")
+        void ownerCannotOpenUnapprovedListingThread() throws Exception {
+            User owner = user("9830000119", Roles.Wire.OWNER, "Owner Opens Other");
+            User buyer = user("9830000120", Roles.Wire.BUYER, "Buyer Elsewhere");
+            approve(buyer, listing(owner));
+
+            start(owner, buyer, listing(owner), 403);
+        }
     }
 
-    /**
-     * Addressing a thread by listing instead of by number.
-     *
-     * <p>Under D5 the owner's raw mobile is masked for every non-owner, so the buyer half of
-     * {@code POST /messages} had no address it could legitimately hold. These cover the derivation
-     * added for that — and, more importantly, that it did not become a way around the guard.
-     */
+    // These cover the derivation added for that — and, more importantly, that it did not become a way around the guard.
     @Nested
     @DisplayName("addressing by listing")
     class ByListing {
@@ -146,10 +177,7 @@ class ConversationEndpointsTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(byListing(p, "is this still available?")))
                     .andExpect(status().isCreated())
-                    /* Named, not "some counterparty": the whole point is *which* user was derived.
-                       The number comes back in the clear per ADR-019 (see `Masking.asymmetry`) —
-                       which does not make the derivation redundant, because that reveal lives on
-                       the thread and the thread is the thing the buyer could not open. */
+
                     .andExpect(jsonPath("$.counterpartyName").value("Owner Sixty-one"))
                     .andExpect(jsonPath("$.counterpartyMobile").value("9830000161"))
                     .andExpect(jsonPath("$.propertyId").value(p.getId().toString()));
@@ -184,9 +212,8 @@ class ConversationEndpointsTest extends AbstractApiTest {
             User stranger = user("9830000166", Roles.Wire.BUYER, "Stranger Sixty-six");
             Property p = listing(owner);
 
-            // Byte-identical to the request in `derivesTheOwnerFromTheListing`; the only difference
-            // is the missing approval. Anyone can read a listing id off a public page, so if this
-            // ever answers 201 the derivation has replaced the guard rather than fed it.
+            // Byte-identical to the request in `derivesTheOwnerFromTheListing`; the only difference is the missing
+            // approval.
             mvc.perform(post(Routes.Conversations.BASE)
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -195,8 +222,8 @@ class ConversationEndpointsTest extends AbstractApiTest {
 
             approve(stranger, p);
 
-            // And the same request now succeeds, so the 403 above was the approval's absence and
-            // not some unrelated refusal the request would have hit anyway.
+            // The derived branch has to match it, or the same person becomes addressable by listing after they have
+            // gone.
             mvc.perform(post(Routes.Conversations.BASE)
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -214,9 +241,8 @@ class ConversationEndpointsTest extends AbstractApiTest {
             owner.archive("Erased on the account holder's request");
             users.saveAndFlush(owner);
 
-            // `findByMobileAndArchivedFalse` already excluded an archived counterparty on the mobile
-            // branch. The derived branch has to match it, or the same person becomes addressable by
-            // listing after they have gone.
+            // Answering it with the enumeration-safe 403 would hide a client bug behind a refusal the client is told
+            // to expect, and would leave `counterpartyMobile` looking optional in every case.
             mvc.perform(post(Routes.Conversations.BASE)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -229,9 +255,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
         void addressingNobodyIsAValidationError() throws Exception {
             User caller = user("9830000169", Roles.Wire.BUYER, "Caller Sixty-nine");
 
-            // "You addressed nobody" is a malformed request, not a trust decision. Answering it with
-            // the enumeration-safe 403 would hide a client bug behind a refusal the client is told
-            // to expect, and would leave `counterpartyMobile` looking optional in every case.
             mvc.perform(post(Routes.Conversations.BASE)
                             .header(HttpHeaders.AUTHORIZATION, bearer(caller))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -274,9 +297,7 @@ class ConversationEndpointsTest extends AbstractApiTest {
         void malformedMobileIsRejectedAtTheEdge() throws Exception {
             User caller = user("9830000123", Roles.Wire.BUYER, "Edge caller");
 
-            // @IndianMobile refuses anything that does not normalise to a valid ten-digit mobile:
-            // non-numeric text, and a landline-style leading digit that strips to ten but does not
-            // start 6-9. Both are 422 at the edge, before any lookup.
+            // Both are 422 at the edge, before any lookup.
             for (String notAMobile : new String[] {"not-a-number", "2012345678"}) {
                 mvc.perform(post(Routes.Conversations.BASE)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(caller))
@@ -285,9 +306,7 @@ class ConversationEndpointsTest extends AbstractApiTest {
                         .andExpect(status().isUnprocessableEntity());
             }
 
-            // The oracle property survives, and Q1's input leniency does not dent it: a well-formed
-            // number and its +91-prefixed twin both normalise and both take the catch-all 403,
-            // whether or not they are registered. A 422 only ever says "not mobile-shaped".
+            // A 422 only ever says "not mobile-shaped".
             for (String wellFormed : new String[] {"9899999998", "919899999998"}) {
                 mvc.perform(post(Routes.Conversations.BASE)
                                 .header(HttpHeaders.AUTHORIZATION, bearer(caller))
@@ -328,8 +347,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
             String fromBuyer = start(buyer, owner, p, 201);
             String fromOwner = start(owner, buyer, p, 200);
 
-            // The canonical ordering is what makes this true: whoever posts first, the pair lands in
-            // the same two columns, so the second lookup hits the existing row.
             assertThat(id(fromBuyer)).isEqualTo(id(fromOwner));
             assertThat(conversations.inboxOf(owner.getId(), Pageable.unpaged())).hasSize(1);
         }
@@ -343,10 +360,8 @@ class ConversationEndpointsTest extends AbstractApiTest {
             approve(buyer, p);
 
             start(buyer, owner, p, 201);
-            start(buyer, owner, null, 201);
+            start(owner, buyer, null, 201);
 
-            // Two rows, and the null-property one is reachable — a plain `property_id = null`
-            // comparison would have missed it and forked the general thread on every send.
             assertThat(conversations.inboxOf(buyer.getId(), Pageable.unpaged())).hasSize(2);
         }
     }
@@ -354,6 +369,23 @@ class ConversationEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("the thread itself")
     class Thread {
+
+        @Test
+        @DisplayName("a suspended owner's listing shows as unavailable in the inbox")
+        void suspendedOwnerListingIsUnavailable() throws Exception {
+            User owner = user("9830000149", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000150", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            start(buyer, owner, p, 201);
+            owner.setStatus(UserStatuses.SUSPENDED);
+            users.saveAndFlush(owner);
+
+            mvc.perform(get(Routes.Conversations.BASE).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].propertyAvailable").value(false))
+                    .andExpect(jsonPath("$.content[0].propertyPrice").doesNotExist());
+        }
 
         @Test
         @DisplayName("the inbox omits messages; the detail carries them")
@@ -370,26 +402,35 @@ class ConversationEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content", hasSize(1)))
                     .andExpect(jsonPath("$.content[0].lastMessage").value("hello"))
                     .andExpect(jsonPath("$.content[0].propertyTitle").value("2BHK in Kothrud"))
+                    .andExpect(jsonPath("$.content[0].youAre").value("buyer"))
+                    .andExpect(jsonPath("$.content[0].propertyPrice").value(25000))
+                    .andExpect(jsonPath("$.content[0].propertyDeal").value("rent"))
+                    .andExpect(jsonPath("$.content[0].propertyBhk").value("2 BHK"))
+                    .andExpect(jsonPath("$.content[0].propertyLocality").value("Kothrud"))
+                    .andExpect(jsonPath("$.content[0].propertyAvailable").value(true))
+                    .andExpect(jsonPath("$.content[0].archived").value(false))
+                    .andExpect(jsonPath("$.content[0].muted").value(false))
+                    .andExpect(jsonPath("$.content[0].blocked").value(false))
+                    .andExpect(jsonPath("$.content[0].awaitingReply").value(false))
+                    .andExpect(jsonPath("$.content[0].counterpartyMobile").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].presence").doesNotExist())
                     .andExpect(jsonPath("$.content[0].messages").doesNotExist());
 
+            // Both people are called "Same Name", so `author` cannot separate them and `mine`
+            // is the only field that can. That is the whole reason this test uses a duplicate name.
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.messages", hasSize(1)))
                     .andExpect(jsonPath("$.messages[0].body").value("hello"))
+                    .andExpect(jsonPath("$.messages[0].read").value(false))
                     .andExpect(jsonPath("$.messages[0].author").value("Buyer"))
                     .andExpect(jsonPath("$.counterpartyName").value("Owner"));
         }
 
-        /**
-         * {@code authorId} is what a client must use to render a message on the correct side of the
-         * thread. It was added because the only alternative on the wire was {@code author}, a
-         * display <em>name</em> — and attributing identity by name works right up until two users
-         * share one, at which point a stranger's message appears as the reader's own.
-         */
         @Test
-        @DisplayName("a message carries its author's id, not just a display name")
-        void messageCarriesAuthorId() throws Exception {
+        @DisplayName("a message says whether the reader wrote it, not whose id it carries")
+        void messageCarriesMineNotAuthorId() throws Exception {
             User owner = user("9830000151", Roles.Wire.OWNER, "Same Name");
             User buyer = user("9830000152", Roles.Wire.BUYER, "Same Name");
             Property p = listing(owner);
@@ -397,20 +438,15 @@ class ConversationEndpointsTest extends AbstractApiTest {
             String id = id(start(buyer, owner, p, 201));
             reply(owner, id, "replying", 201);
 
-            // Both people are called "Same Name", so `author` cannot separate them and `authorId`
-            // is the only field that can. That is the whole reason this test uses a duplicate name.
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.messages[0].authorId").value(buyer.getId().toString()))
-                    .andExpect(jsonPath("$.messages[1].authorId").value(owner.getId().toString()));
+                    .andExpect(jsonPath("$.messages[0].mine").value(true))
+                    .andExpect(jsonPath("$.messages[1].mine").value(false))
+                    .andExpect(jsonPath("$.messages[1].authorId").doesNotExist())
+                    .andExpect(jsonPath("$.messages[1].authorRole").doesNotExist());
         }
 
-        /**
-         * Messaging shipped without a notification writer, which is most of why the notification
-         * inbox was empty for anyone who had not used flatmates (tech-debt D92). A new message is
-         * the single most obvious thing to be told about.
-         */
         @Test
         @DisplayName("a message notifies the recipient — and only the recipient")
         void messageNotifiesTheOtherSide() throws Exception {
@@ -420,11 +456,11 @@ class ConversationEndpointsTest extends AbstractApiTest {
             approve(buyer, p);
             String id = id(start(buyer, owner, p, 201));
 
-            // Opening the thread notified the owner...
             assertThat(notificationsFor(owner)).hasSize(1);
             assertThat(notificationsFor(owner).getFirst().get("type")).isEqualTo("message.received");
             assertThat((String) notificationsFor(owner).getFirst().get("title")).contains("Buyer");
-            // ...and nobody notifies you about your own message.
+            assertThat((String) notificationsFor(owner).getFirst().get("link")).isEqualTo("/messages?c=" + id);
+
             assertThat(notificationsFor(buyer)).isEmpty();
 
             reply(owner, id, "sure, come by", 201);
@@ -432,7 +468,26 @@ class ConversationEndpointsTest extends AbstractApiTest {
             assertThat(notificationsFor(owner)).hasSize(1);
         }
 
-        /** A notification is a summons to the thread, not a copy of it. */
+        @Test
+        @DisplayName("a burst of unread messages makes one bell row; reading re-arms it")
+        void unreadBurstCollapsesToOneRow() throws Exception {
+            User owner = user("9830000197", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000198", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            String id = id(start(buyer, owner, p, 201));
+
+            reply(buyer, id, "are you there?", 201);
+            reply(buyer, id, "hello?", 201);
+            assertThat(notificationsFor(owner)).hasSize(1);
+
+            mvc.perform(post(Routes.Conversations.READ, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                    .andExpect(status().isNoContent());
+            reply(buyer, id, "one more thing", 201);
+            assertThat(notificationsFor(owner)).hasSize(2);
+        }
+
         @Test
         @DisplayName("a long message is truncated in the notification body")
         void longMessageIsPreviewed() throws Exception {
@@ -471,14 +526,257 @@ class ConversationEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isNoContent());
 
             expectUnread(buyer, 0);
-            // Reading my side does not read yours.
+
             expectUnread(owner, 1);
 
-            // Idempotent: the client marks read on every open.
             mvc.perform(post(Routes.Conversations.READ, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                     .andExpect(status().isNoContent());
             expectUnread(buyer, 0);
+        }
+
+        @Test
+        @DisplayName("unread-count excludes muted threads, and read clears message notifications")
+        void unreadCountExcludesMutedAndReadClearsNotification() throws Exception {
+            User owner = user("9830000171", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000172", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            String id = id(start(buyer, owner, p, 201));
+
+            mvc.perform(get(Routes.Conversations.UNREAD_COUNT)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                    .andExpect(jsonPath("$.count").value(1));
+
+            mvc.perform(patch(Routes.Conversations.STATE, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"muted\":true,\"archived\":true}"))
+                    .andExpect(status().isNoContent());
+            mvc.perform(get(Routes.Conversations.UNREAD_COUNT)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                    .andExpect(jsonPath("$.count").value(0));
+
+            mvc.perform(post(Routes.Conversations.READ, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                    .andExpect(status().isNoContent());
+            assertThat((Boolean) jdbc.queryForList(
+                    "select read from notifications where user_id = ?", owner.getId())
+                    .getFirst().get("read")).isTrue();
+        }
+
+        @Test
+        @DisplayName("state patch accepts one field on create and update")
+        void statePatchAcceptsSingleField() throws Exception {
+            User owner = user("9830000190", Roles.Wire.OWNER, "Owner");
+            User otherOwner = user("9830000191", Roles.Wire.OWNER, "Other");
+            User buyer = user("9830000192", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            Property other = listing(otherOwner);
+            approve(buyer, p);
+            approve(buyer, other);
+            String id = id(start(buyer, owner, p, 201));
+            String otherId = id(start(buyer, otherOwner, other, 201));
+
+            mvc.perform(patch(Routes.Conversations.STATE, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"archived\":true}"))
+                    .andExpect(status().isNoContent());
+            // ADR-019: approval reveals the *owner's* number to the buyer who asked, never the
+            // buyer's number to the owner. Being in one thread is not a mutual reveal.
+            mvc.perform(get(Routes.Conversations.BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(jsonPath("$.archived").value(true))
+                    .andExpect(jsonPath("$.muted").value(false));
+            mvc.perform(patch(Routes.Conversations.STATE, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"muted\":true}"))
+                    .andExpect(status().isNoContent());
+            mvc.perform(get(Routes.Conversations.BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(jsonPath("$.archived").value(true))
+                    .andExpect(jsonPath("$.muted").value(true));
+
+            mvc.perform(patch(Routes.Conversations.STATE, otherId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"muted\":true}"))
+                    .andExpect(status().isNoContent());
+            mvc.perform(get(Routes.Conversations.BY_ID, otherId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(jsonPath("$.archived").value(false))
+                    .andExpect(jsonPath("$.muted").value(true));
+            mvc.perform(patch(Routes.Conversations.STATE, otherId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"archived\":true}"))
+                    .andExpect(status().isNoContent());
+            mvc.perform(get(Routes.Conversations.BY_ID, otherId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(jsonPath("$.archived").value(true))
+                    .andExpect(jsonPath("$.muted").value(true));
+        }
+
+        @Test
+        @DisplayName("clientId makes replies idempotent and replyTo must be in the same thread")
+        void clientIdAndReplyTo() throws Exception {
+            User owner = user("9830000173", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000174", Roles.Wire.BUYER, "Buyer");
+            User otherOwner = user("9830000175", Roles.Wire.OWNER, "Other");
+            Property p = listing(owner);
+            Property other = listing(otherOwner);
+            approve(buyer, p);
+            approve(buyer, other);
+            String id = id(start(buyer, owner, p, 201));
+            String otherId = id(start(buyer, otherOwner, other, 201));
+            String parent = firstMessageId(id, buyer);
+            String foreign = firstMessageId(otherId, buyer);
+
+            mvc.perform(post(Routes.Conversations.REPLY, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"body\":\"replying\",\"clientId\":\"c1\",\"replyToId\":\"" + parent + "\"}"))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.clientId").value("c1"))
+                    .andExpect(jsonPath("$.replyTo.id").value(parent));
+            mvc.perform(post(Routes.Conversations.REPLY, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"body\":\"replying twice\",\"clientId\":\"c1\"}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.body").value("replying"));
+            mvc.perform(post(Routes.Conversations.REPLY, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"body\":\"bad\",\"replyToId\":\"" + foreign + "\"}"))
+                    .andExpect(status().isBadRequest());
+        }
+
+        @Test
+        @DisplayName("delete-for-me hides only that viewer's copy")
+        void deleteForMe() throws Exception {
+            User owner = user("9830000176", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000177", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            String id = id(start(buyer, owner, p, 201));
+            String message = firstMessageId(id, buyer);
+
+            mvc.perform(delete(Routes.Conversations.ITEM, id, message)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(status().isNoContent());
+            mvc.perform(get(Routes.Conversations.BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(jsonPath("$.messages", hasSize(0)));
+            mvc.perform(get(Routes.Conversations.BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                    .andExpect(jsonPath("$.messages", hasSize(1)));
+        }
+
+        @Test
+        @DisplayName("block stops replies until unblocked")
+        void blockStopsReplies() throws Exception {
+            User owner = user("9830000178", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000179", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            String id = id(start(buyer, owner, p, 201));
+
+            mvc.perform(post(Routes.Conversations.BLOCK, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                    .andExpect(status().isNoContent());
+            reply(buyer, id, "blocked", 403);
+            mvc.perform(get(Routes.Conversations.BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                    .andExpect(jsonPath("$.blocked").value(true));
+            mvc.perform(delete(Routes.Conversations.BLOCK, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                    .andExpect(status().isNoContent());
+            reply(buyer, id, "works", 201);
+        }
+
+        @Test
+        @DisplayName("first-contact spam is rate-limited before the counterparty replies")
+        void firstContactRateLimit() throws Exception {
+            User owner = user("9830000180", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000181", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            String id = id(start(buyer, owner, p, 201));
+
+            for (int i = 0; i < 19; i++) {
+                reply(buyer, id, "ping " + i, 201);
+            }
+            reply(buyer, id, "one too many", 429);
+        }
+
+        @Test
+        @DisplayName("the first-contact limit is shared by every thread between the same pair")
+        void firstContactRateLimitIsPerPair() throws Exception {
+            User owner = user("9830000182", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000183", Roles.Wire.BUYER, "Buyer");
+            Property first = listing(owner);
+            Property second = listing(owner);
+            approve(buyer, first);
+            approve(buyer, second);
+            String firstId = id(start(buyer, owner, first, 201));
+            String secondId = id(start(buyer, owner, second, 201));
+
+            for (int i = 0; i < 9; i++) {
+                reply(buyer, firstId, "ping " + i, 201);
+                reply(buyer, secondId, "pong " + i, 201);
+            }
+            reply(buyer, firstId, "one too many", 429);
+            reply(buyer, secondId, "one too many", 429);
+            start(buyer, owner, first, 429);
+        }
+
+        @Test
+        @DisplayName("an owner reply anywhere in the pair lifts the first-contact limit")
+        void ownerReplyLiftsPairLimit() throws Exception {
+            User owner = user("9830000184", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000185", Roles.Wire.BUYER, "Buyer");
+            Property first = listing(owner);
+            Property second = listing(owner);
+            approve(buyer, first);
+            approve(buyer, second);
+            String firstId = id(start(buyer, owner, first, 201));
+            String secondId = id(start(buyer, owner, second, 201));
+            for (int i = 0; i < 18; i++) {
+                reply(buyer, firstId, "ping " + i, 201);
+            }
+            reply(buyer, firstId, "too many", 429);
+
+            reply(owner, secondId, "hello", 201);
+
+            reply(buyer, firstId, "thanks", 201);
+        }
+
+        @Test
+        @DisplayName("notification previews mask phones, email and links")
+        void notificationPreviewMasksPersonalData() throws Exception {
+            User owner = user("9830000182", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000183", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+
+            mvc.perform(post(Routes.Conversations.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body(owner.getMobile(), p.getId().toString(),
+                                    "call 09876543210, 98765.43210, +91 98765 43210, 9876543210 or a@b.com https://x.test/a")))
+                    .andExpect(status().isCreated());
+
+            String body = (String) notificationsFor(owner).getFirst().get("body");
+            assertThat(body).contains("98XXXXX210", "[email]", "[link]")
+                    .doesNotContain("09876543210")
+                    .doesNotContain("98765.43210")
+                    .doesNotContain("+91 98765 43210")
+                    .doesNotContain("9876543210")
+                    .doesNotContain("a@b.com")
+                    .doesNotContain("https://x.test");
         }
 
         @Test
@@ -500,8 +798,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(nosy)))
                     .andExpect(status().isNotFound());
 
-            // Admin is not exempt: a private chat is not an ops surface. If moderation ever needs
-            // one it should arrive as its own audited endpoint, not as a role check hidden here.
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(boss)))
                     .andExpect(status().isNotFound());
@@ -517,7 +813,7 @@ class ConversationEndpointsTest extends AbstractApiTest {
     class Masking {
 
         @Test
-        @DisplayName("the approved buyer sees the owner's number; the owner still sees a mask")
+        @DisplayName("the approved buyer sees the owner's number, and the owner sees the buyer")
         void asymmetry() throws Exception {
             User owner = user("9830000151", Roles.Wire.OWNER, "Owner");
             User buyer = user("9830000152", Roles.Wire.BUYER, "Buyer");
@@ -525,14 +821,12 @@ class ConversationEndpointsTest extends AbstractApiTest {
             approve(buyer, p);
             String id = id(start(buyer, owner, p, 201));
 
-            // ADR-019: approval reveals the *owner's* number to the buyer who asked, never the
-            // buyer's number to the owner. Being in one thread is not a mutual reveal.
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                     .andExpect(jsonPath("$.counterpartyMobile").value("9830000151"));
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                    .andExpect(jsonPath("$.counterpartyMobile").value("98XXXXX152"));
+                    .andExpect(jsonPath("$.counterpartyMobile").value("9830000152"));
         }
 
         @Test
@@ -542,7 +836,7 @@ class ConversationEndpointsTest extends AbstractApiTest {
             User buyer = user("9830000154", Roles.Wire.BUYER, "Buyer");
             Property p = listing(owner);
             approve(buyer, p);
-            String id = id(start(buyer, owner, null, 201));
+            String id = id(start(owner, buyer, null, 201));
 
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
@@ -551,9 +845,67 @@ class ConversationEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                     .andExpect(jsonPath("$.counterpartyMobile").value("98XXXXX154"));
         }
-    }
 
-    // --- fixtures -------------------------------------------------------------------------
+        @Test
+        @DisplayName("message bodies from a hidden counterparty are masked, including reply previews")
+        void hiddenCounterpartyBodiesAreMasked() throws Exception {
+            User owner = user("9830000193", Roles.Wire.OWNER, "Owner");
+            owner.setHideNumber(true);
+            users.saveAndFlush(owner);
+            User buyer = user("9830000194", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            String id = id(start(buyer, owner, p, 201));
+            String ownerMessage = id(mvc.perform(post(Routes.Conversations.REPLY, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"body\":\"owner says 09876543210 owner@example.com https://x.test/a\"}"))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString());
+
+            mvc.perform(post(Routes.Conversations.REPLY, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"body\":\"my number stays raw 9876543210 me@example.com\","
+                                    + "\"replyToId\":\"" + ownerMessage + "\"}"))
+                    .andExpect(status().isCreated());
+            mvc.perform(get(Routes.Conversations.BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(jsonPath("$.messages[1].body")
+                            .value("owner says 98XXXXX210 [email] https://x.test/a"))
+                    .andExpect(jsonPath("$.messages[2].body")
+                            .value("my number stays raw 9876543210 me@example.com"))
+                    .andExpect(jsonPath("$.messages[2].replyTo.body")
+                            .value("owner says 98XXXXX210 [email] https://x.test/a"));
+        }
+
+        @Test
+        @DisplayName("revealed counterparties see raw message bodies and reply previews")
+        void revealedCounterpartyBodiesStayRaw() throws Exception {
+            User owner = user("9830000195", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000196", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            String id = id(start(buyer, owner, p, 201));
+            String ownerText = "owner says 09876543210 owner@example.com https://x.test/a";
+            String ownerMessage = id(mvc.perform(post(Routes.Conversations.REPLY, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"body\":\"" + ownerText + "\"}"))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString());
+
+            mvc.perform(post(Routes.Conversations.REPLY, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"body\":\"ack\",\"replyToId\":\"" + ownerMessage + "\"}"))
+                    .andExpect(status().isCreated());
+            mvc.perform(get(Routes.Conversations.BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(jsonPath("$.messages[1].body").value(ownerText))
+                    .andExpect(jsonPath("$.messages[2].replyTo.body").value(ownerText));
+        }
+    }
 
     private User user(String mobile, String role, String name) {
         return user(mobile, role, name, null);
@@ -609,10 +961,17 @@ class ConversationEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].unread").value(expected));
     }
 
-    /** Read straight from the table: the notification is a side effect, not part of any response. */
+    private String firstMessageId(String id, User caller) throws Exception {
+        String json = mvc.perform(get(Routes.Conversations.BY_ID, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return json.replaceAll("(?s)^.*?\"messages\":\\[\\{\"id\":\"([^\"]+)\".*$", "$1");
+    }
+
     private java.util.List<java.util.Map<String, Object>> notificationsFor(User user) {
         return jdbc.queryForList(
-                "select type, title, body from notifications where user_id = ?", user.getId());
+                "select type, title, body, link from notifications where user_id = ?", user.getId());
     }
 
     private static String body(String mobile, String propertyId, String text) {
@@ -621,7 +980,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
                 + ",\"body\":\"" + text + "\"}";
     }
 
-    /** The buyer's shape: a listing id and nothing else naming the other party. */
     private static String byListing(Property property, String text) {
         return "{\"propertyId\":\"" + property.getId() + "\",\"body\":\"" + text + "\"}";
     }
@@ -630,7 +988,6 @@ class ConversationEndpointsTest extends AbstractApiTest {
         return json.replaceAll("(?s)^.*?\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-    /** Drop anything per-request (timestamps, correlation ids) so two errors can be compared. */
     private static String strip(String json) {
         return json.replaceAll("\"(timestamp|correlationId|traceId|path)\":\"[^\"]*\"", "");
     }

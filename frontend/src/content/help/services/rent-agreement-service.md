@@ -5,32 +5,38 @@ category: services
 audience: everyone
 order: 1
 featured: true
-updated: 2026-07-23
-summary: Drafting, e-stamping, Aadhaar e-signing and doorstep delivery — what you get, what it costs, how long it takes.
-tags: [rent agreement, e-stamp, service, legal]
+updated: 2026-10-13
+summary: Co-fill, drafting, Article 36A charges, draft approval, registration and refunds for a rent agreement.
+tags: [rent agreement, e-stamp, service, legal, co-fill]
 ---
 
-[Rent agreement](/services/rent-agreement) handles the whole document end to end so neither party has to visit a registrar's office.
+[Rent agreement](/services/rent-agreement) guides the owner and tenant through a Maharashtra Leave & Licence draft for a **residential** property and the registration workflow. Commercial lettings are quoted by the legal desk — see [Home loans and legal](/help/a/home-loans-legal).
 
 ## What is included
 
 - A drafted agreement based on your terms
-- Maharashtra **e-stamp** at the correct duty
-- **Aadhaar-based e-signing** for both parties
-- Online registration where applicable
-- A digitally signed PDF, plus optional printed doorstep delivery
+- Maharashtra Article 36A stamp duty and registration-fee calculation
+- Co-fill invites, so the other side enters their own identity details and papers
+- Tenant police record details, collected up front so the owner can file police intimation later
+- Draft review, amendments and approval before registration
+- Registered copy upload and tracking after the Sub-Registrar step
 
-Pricing starts at **₹999** and varies with rent, deposit and whether you want registration and physical delivery.
+The Draazy service fee is shown in the cost breakdown before you pay, with Article 36A stamp duty, registration fee, the document handling charge and any other statutory charges itemised separately. We pay the government charges on your behalf, in the parties' names, at exactly what you paid us for them — they are not part of our fee. Stamp duty is rounded up to the next ₹100.
 
 ## The process
 
-1. **Enter terms** — parties, property, rent, deposit, notice, lock-in, maintenance.
-2. **Review the draft** — you get an editable draft within a few hours; both parties can request changes.
-3. **Pay** — the fee plus stamp duty, itemised.
-4. **e-Sign** — both parties authenticate with Aadhaar OTP. No physical presence needed.
-5. **Delivery** — signed PDF immediately; printed copy in 2–4 working days if selected.
+1. **Enter details** — Property, Owner, Tenant, Terms, Witnesses and Review are the six form steps. Property is open to everyone; the later steps ask for PAN and Aadhaar, so you need to sign in. The term can be up to 60 months, and the deed is in English or Marathi.
+2. **Invite the other side** — tenant or owner can co-fill their own details from a secure invite.
+3. **File documents** — PAN, Aadhaar, photos, ownership proof and witness details are checked before checkout.
+4. **Pay** — service fee plus government charges, itemised. Your request reaches our team only after payment, and once it is submitted the details are locked — changes go through the tracker.
+5. **Review the draft** — Draazy shares a versioned draft. Every party — owner, tenant and each co-owner — must open it and approve it; any party can ask for changes instead.
+6. **Register** — after approval, the registered copy is uploaded back to the request tracker. If a party is an NRI or foreign national, Aadhaar e-registration is not available: we book a Sub-Registrar Office appointment instead, and that party attends with a passport or signs through a registered Power of Attorney.
 
-Typical end-to-end time is **24–48 hours** once both parties respond promptly.
+The tracker shows Submitted, Documents, Draft & approval, Registration and Ready. Timelines depend on how quickly both parties provide documents and approve the draft. If we need to reprice the agreement after you have paid, the tracker shows **Revised terms**: pay the difference and accept them, or accept a lower fee with nothing more to pay.
+
+## After registration
+
+The owner must submit tenant information to the police commissionerate — the tracker links to the Pune City and Pimpri-Chinchwad portals. Draazy does not file it for you; our team marks it done once you confirm. For a foreign national tenant the owner also files Form C with FRRO within 24 hours of arrival.
 
 ## What you should check in the draft
 
@@ -52,7 +58,7 @@ By convention the tenant pays, but it is negotiable and often split. Whoever pay
 
 ## Cancelling
 
-Full refund before drafting starts. Once the draft is delivered, the drafting component is non-refundable; stamp duty is refunded if it has not been paid to the government. See [Invoices, refunds and receipts](/help/a/invoices-and-refunds).
+Everything you paid is refundable until the stamp duty is paid to the government on GRAS. After that the duty and registration charges are spent, and only eligible service-fee or overpayment refunds can come back. See [Invoices, refunds and receipts](/help/a/invoices-and-refunds).
 
 ## Related
 

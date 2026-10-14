@@ -1,388 +1,259 @@
-# Free AI/ML Libraries for React Real Estate Platform
+# AI/ML roadmap — where AI earns its place in Draazy
 
-> Comprehensive guide to open-source, no-API-key-required AI/ML libraries suitable for a React-based real estate web application (Draazy). All libraries listed are truly free -- no paid tiers, no cloud API keys needed.
-
----
-
-## Table of Contents
-
-1. [Search & NLP](#1-search--nlp)
-2. [Image & Video Processing](#2-image--video-processing)
-3. [Analytics & Recommendations](#3-analytics--recommendations)
-4. [Chatbot / Conversational AI](#4-chatbot--conversational-ai)
-5. [OCR & Document Processing](#5-ocr--document-processing)
-6. [Foundation / Runtime Libraries](#6-foundation--runtime-libraries)
-7. [Recommended Architecture for Draazy](#7-recommended-architecture-for-draazy)
+> **Status:** proposal, grounded in the code on `feature/backend-integration` (2026-10-13). Nothing here
+> is built yet unless §1 lists it or an item is marked **Shipped**. Every library listed is open source under a permissive licence
+> (Apache 2.0 / MIT / PostgreSQL).
+>
+> **Companion docs:** [platform-architecture.md](../system/platform-architecture.md) (ADR-019
+> badge-not-gate, ADR-021 hosting), [search-listings.md](../flows/consumer/search-listings.md),
+> [list-property-wizard.md](../flows/consumer/list-property-wizard.md),
+> [property-verification.md](../flows/admin/property-verification.md).
 
 ---
 
-## 1. Search & NLP
+## 0. Ground rules every AI feature must respect
 
-### 1.1 FlexSearch
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Next-generation full-text search with advanced indexing, phonetic matching, fuzzy search, autocomplete, and boolean queries |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (client-side) AND Node.js |
-| **Maturity** | High -- 12k+ GitHub stars, actively maintained, extremely fast benchmarks (millions of queries/sec) |
-| **Bundle size** | ~6KB gzipped |
-| **Real Estate Use Case** | Instant property search by title, description, locality, amenities. Supports multi-field search so users can search across property name + locality + features simultaneously. Phonetic matching handles misspellings of Indian locality names (e.g., "Koregaon" vs "Koregoan") |
-
-### 1.2 Orama
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Full-text, vector, and hybrid search engine with BM25 ranking, typo tolerance, geosearch, facets, and RAG pipeline support -- all in under 2KB |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (client-side), server, and edge |
-| **Maturity** | High -- rapidly growing, supports 30 languages, plugin ecosystem |
-| **Real Estate Use Case** | Semantic property search using vector embeddings (find "spacious 2BHK near park" even if listing says "large two-bedroom apartment adjacent to garden"). Geosearch for location-based filtering. Faceted search for price ranges, BHK types, amenities |
-
-### 1.3 MiniSearch
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Lightweight in-memory full-text search with prefix search, fuzzy matching, field boosting, auto-suggestions, and dynamic indexing |
-| **License** | MIT |
-| **Runs in** | Browser (client-side) AND Node.js |
-| **Maturity** | High -- well-documented, actively maintained, designed for real-time "as-you-type" search |
-| **Bundle size** | ~7KB gzipped |
-| **Real Estate Use Case** | Real-time autocomplete for property search. As users type "3 BHK Hin...", instantly suggest matching properties. Field boosting prioritizes title matches over description matches |
-
-### 1.4 Lunr.js
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Client-side full-text search with multi-language support (14 languages), term boosting, field filtering, wildcards, and fuzzy matching |
-| **License** | MIT |
-| **Runs in** | Browser (client-side) |
-| **Maturity** | Very High -- established project (10+ years), stable API, widely used |
-| **Real Estate Use Case** | Offline-capable property search for PWA scenarios. Pre-build index at deploy time for static property catalogs. Good for smaller datasets (< 10,000 properties) |
-
-### 1.5 Compromise (NLP)
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Lightweight NLP library for tokenization, POS tagging, named entity recognition, number/date/money extraction, text transformation |
-| **License** | MIT |
-| **Runs in** | Browser (client-side) -- ~250KB, runs on keypress |
-| **Maturity** | High -- 11k+ stars, actively maintained, extensive plugin system |
-| **Real Estate Use Case** | Parse natural language property queries: "3 BHK flat under 80 lakhs in Kothrud" -> extract {bhk: 3, type: "flat", maxPrice: 8000000, locality: "Kothrud"}. Entity extraction for prices, locations, dates from user input |
-
-### 1.6 Wink-NLP
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Fast NLP pipeline with tokenization (650K tokens/sec), POS tagging (95% accuracy), NER, sentiment analysis, negation handling, custom entity recognition |
-| **License** | MIT |
-| **Runs in** | Browser AND Node.js (use wink-eng-lite-web-model for browser) |
-| **Maturity** | High -- zero dependencies, ~10KB minified+gzipped, well-documented |
-| **Real Estate Use Case** | Sentiment analysis on property reviews. Custom entity recognition for real estate terms (carpet area, built-up area, RERA number). Parse property descriptions to extract structured features |
-
-### 1.7 Natural (NLP)
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Comprehensive NLP toolkit: tokenization, stemming, classification (Naive Bayes, logistic regression), TF-IDF, phonetics, string distance, WordNet integration |
-| **License** | MIT |
-| **Runs in** | Node.js backend (not browser-native) |
-| **Maturity** | Very High -- 10.9k stars, long-standing project, extensive documentation |
-| **Real Estate Use Case** | Backend text classification for property listings (categorize as residential/commercial/plot). TF-IDF for finding similar property descriptions. Naive Bayes classifier to auto-tag property features from descriptions |
+| Constraint | Consequence |
+|---|---|
+| **Hosting budget ~$25/mo** (Cloud Run + Supabase sandbox, DO candidate — ADR-021) | No always-on GPU. Server-side inference is CPU-only, small models, and runs in a **background job**, never on the request path. |
+| **Provider-seam pattern, zero paid keys in dev** | Any model/LLM call sits behind an interface with a deterministic dev stub, like the OTP/storage/payments seams. |
+| **Mobile-first India** — mid-range Android, metered data | Nothing over ~10 MB on a consumer route. Models load lazily (dynamic `import()`, as [face.js](../../frontend/src/lib/identity-verification/face.js) already does), run in a worker, and are cached by the PWA service worker. |
+| **DPDP Act 2023** — photos, ID documents, chats are personal data | They never go to a third-party AI API. Self-hosted models only. |
+| **Badge-not-gate + maker-checker** (ADR-019) | AI **flags and suggests**; a human approves, rejects, or hides. No auto-reject. |
+| **CSP** | `'wasm-unsafe-eval'` is already allowed and guarded by `check-csp.mjs` (MediaPipe needs it). Models are self-hosted under `public/models/` via [fetch-models.mjs](../../frontend/scripts/fetch-models.mjs) — no runtime model CDN. |
+| **Postgres portability** | `pg_trgm`, `unaccent` and `pgvector` are available on both Supabase and DO Managed Postgres, so they don't add lock-in. |
 
 ---
 
-## 2. Image & Video Processing
+## 1. Already in the codebase — build on it, don't replace it
 
-### 2.1 Transformers.js (Hugging Face)
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Run 170+ pre-trained model architectures in-browser: image classification, object detection, image segmentation, depth estimation, zero-shot classification, and more |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (WebAssembly + optional WebGPU) AND Node.js |
-| **Maturity** | Very High -- backed by Hugging Face, rapidly growing ecosystem, extensive model hub |
-| **Real Estate Use Case** | **Object detection** in property photos (detect rooms, furniture, appliances). **Image classification** (identify room type: bedroom/kitchen/bathroom/balcony). **Zero-shot classification** to tag images without training ("Does this image show a swimming pool?"). **Image segmentation** for virtual staging |
-
-### 2.2 TensorFlow.js
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Full ML framework for training and inference in browser/Node.js. Pre-trained models for object detection (COCO-SSD), pose estimation, image classification (MobileNet), body segmentation |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (WebGL, WebGPU, WASM backends) AND Node.js |
-| **Maturity** | Very High -- Google-backed, massive ecosystem, extensive documentation, large community |
-| **Pre-trained models** | COCO-SSD (object detection), MobileNet (classification), DeepLab (segmentation), BlazeFace (face detection) |
-| **Real Estate Use Case** | **COCO-SSD** for detecting objects in property photos (furniture, appliances, vehicles in parking). **MobileNet** for room classification. **Custom model training** for property-specific tasks. **DeepLab segmentation** for floor plan analysis |
-
-### 2.3 @imgly/background-removal
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Remove image backgrounds entirely in-browser using ONNX-based segmentation models. No server required |
-| **License** | AGPL-3.0 (free for open-source use; commercial license available) |
-| **Runs in** | Browser (client-side) AND Node.js |
-| **Maturity** | Moderate-High -- backed by IMG.LY company, production-quality results |
-| **Real Estate Use Case** | Remove backgrounds from property photos for consistent listing presentations. Isolate furniture/objects for virtual staging mockups. Clean agent profile photos |
-
-### 2.4 face-api.js
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Face detection, landmark recognition (68 points), face matching/recognition, expression analysis, age/gender estimation -- all in-browser on TensorFlow.js |
-| **License** | MIT |
-| **Runs in** | Browser (client-side) AND Node.js |
-| **Maturity** | High -- 16k+ stars, widely used (note: maintenance has slowed, but still functional) |
-| **Real Estate Use Case** | Auto-blur faces in property photos for privacy compliance. Verify agent identity photos. Detect people in property images that should be removed before listing |
-
-### 2.5 ml5.js
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Friendly ML library built on TensorFlow.js: image classification, object detection, pose estimation, style transfer, sound classification |
-| **License** | MIT |
-| **Runs in** | Browser (client-side) |
-| **Maturity** | High -- backed by NYU ITP, good documentation, educational focus |
-| **Real Estate Use Case** | Quick prototyping of image classification (room type detection). Style transfer for artistic property visualizations. Simple object detection with minimal code |
+| Capability | Where | Implication |
+|---|---|---|
+| Rule-based natural-language search ("2bhk under 80 lakh near Baner") | [listingsSmartQuery.js](../../frontend/src/pages/consumer/listings/listingsSmartQuery.js) `parseSmartQuery` | Keep the rules; an LLM is only a fallback for what they leave over (C2). |
+| Free-text match: word-by-word `LIKE '%w%'` over title/locality/society/type | [PropertySpecs.java](../../backend/src/main/java/com/draazy/api/catalog/property/PropertySpecs.java) `publicTextSearch` | No typo tolerance, and a leading-wildcard `LIKE` can't use a btree (A1). |
+| Society search: substring `LIKE` | [SocietySpecs.java](../../backend/src/main/java/com/draazy/api/catalog/society/SocietySpecs.java) | Typos split one building into two societies (A2). |
+| "Similar homes": geo radius + BHK ±1 + price band | [SimilarListings.java](../../backend/src/main/java/com/draazy/api/catalog/property/SimilarListings.java) | Good hard filters; a semantic re-rank comes later (B4). |
+| Duplicate photos: 64-bit **average hash** + LSH bands | [PhotoHash.java](../../backend/src/main/java/com/draazy/api/catalog/property/PhotoHash.java), `ListingDuplicateClusterService` | aHash misses crops and re-angled shots (B2). Desk dismissals are free training labels. |
+| Contact-leak filter for **text** (digits, Hindi/Marathi number words, emails, handles) | [NoContactDetails.java](../../backend/src/main/java/com/draazy/api/catalog/listing/NoContactDetails.java), client mirror [contactDetails.js](../../frontend/src/pages/consumer/list-property/contactDetails.js) | **Photos are not covered** — the contact gate's remaining back door (B1). |
+| "Write it for me" description draft (template) | [describe.js](../../frontend/src/pages/consumer/list-property/describe.js) | Factual and free; an LLM only polishes/translates it (C1). |
+| Selfie guidance: **MediaPipe** FaceLandmarker + brightness/sharpness probe | [face.js](../../frontend/src/lib/identity-verification/face.js), [capture.js](../../frontend/src/lib/identity-verification/capture.js) `readFrameQuality` | `@mediapipe/tasks-vision` is already a dependency — reuse it for listing photos (A3, B2, B3). |
+| Photo re-encode in a worker | [image.worker.js](../../frontend/src/lib/uploads/image.worker.js) | The decoded frame is already in hand — the cheapest place to run photo checks. |
+| Asking rate per sq ft by locality | [LocalityService.java](../../backend/src/main/java/com/draazy/api/catalog/locality/LocalityService.java) `marketRate` | Basis of a fair-price signal without ML (B5). |
+| Locality demand telemetry, PostHog product analytics | `recordSignal`, [productAnalytics.js](../../frontend/src/lib/productAnalytics.js) | Measure every feature below with what's already wired. |
 
 ---
 
-## 3. Analytics & Recommendations
+## 2. Opportunities at a glance
 
-### 3.1 Brain.js
+Ranked by value ÷ effort. **S** ≈ days, **M** ≈ 1–2 weeks, **L** ≈ 3+ weeks.
 
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | GPU-accelerated neural networks in JavaScript: feedforward, RNN, LSTM, GRU, autoencoders. Supports training and inference |
-| **License** | MIT |
-| **Runs in** | Browser (GPU via WebGL) AND Node.js |
-| **Maturity** | High -- 14k+ stars, actively maintained |
-| **Real Estate Use Case** | **Price prediction**: Train LSTM on historical property prices to predict trends. **User behavior prediction**: RNN to predict which properties a user will click next. **Anomaly detection**: Autoencoder to flag unusually priced listings. **Time-series forecasting**: Predict rental yield trends by locality |
-
-### 3.2 TensorFlow.js (for Analytics)
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Build and train custom recommendation models, regression models, and classification models directly in-browser or Node.js |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser AND Node.js |
-| **Real Estate Use Case** | **Collaborative filtering** for property recommendations ("users who viewed this also viewed..."). **Linear/polynomial regression** for price estimation based on area, locality, floor, age. **K-means clustering** to group similar properties. **Transfer learning** to fine-tune models on local property data |
-
-### 3.3 Transformers.js (for Embeddings & Similarity)
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Generate text embeddings using sentence-transformers models in-browser for semantic similarity computation |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (client-side) |
-| **Real Estate Use Case** | **Content-based recommendations**: Compute embeddings of property descriptions, recommend similar listings based on cosine similarity. **Semantic matching**: Match user preferences described in natural language to property features. "I want a quiet place with garden" matches listings mentioning "peaceful locality" and "landscaped lawn" |
-
-### 3.4 Orama (for Recommendations via Vector Search)
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Store property embeddings and find nearest neighbors for recommendations using built-in vector search |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (client-side) |
-| **Real Estate Use Case** | Build a client-side recommendation engine: embed all property descriptions, store vectors in Orama index, find top-N similar properties when user views a listing. No backend needed for small-to-medium catalogs |
+| # | Opportunity | Who benefits | Library | Runs in | Effort |
+|---|---|---|---|---|---|
+| A1 | Typo-tolerant, index-backed listing text search | Seekers · **performance** | `pg_trgm`, `unaccent`, Postgres FTS | DB | S |
+| A2 | "Did you mean…" society match before minting a new one | Owners · data quality | `pg_trgm` | DB | S |
+| A3 | Listing photo coach: dark/blurry hints, blur faces | Owners · approval speed | MediaPipe FaceDetector (shipped pkg) | Browser worker | S–M |
+| A4 | Voice search in Hindi/Marathi/English | Seekers (mobile) | Web Speech API (native) | Browser | S |
+| A5 | FAQ deflection as the user types a support ticket | Seekers · support load | MiniSearch | Browser | S |
+| B1 | Phone numbers / competitor watermarks **inside photos** | Contact gate · reviewers | Tesseract.js → Tess4J / RapidOCR | Reviewer's browser → job | M |
+| B2 | Crop- and angle-robust duplicate detection | Reviewers · supply quality | pHash (JImageHash) → MediaPipe ImageEmbedder + pgvector | JVM / browser + DB | M |
+| B3 | Room tagging, smart cover, "add a kitchen photo" nudge | Owners · seekers | SigLIP (ONNX) → MediaPipe Model Maker | Job → browser | M–L |
+| B4 | Semantic/hybrid search and better similar homes | Seekers | multilingual-e5-small + ONNX Runtime Java + pgvector | Job + DB | L |
+| B5 | Fair-price signal ("12% above similar 2 BHKs in Baner") | Seekers · owners pricing | SQL percentiles → LightGBM → ONNX | DB → JVM | S → L |
+| C1 | Polished descriptions + Marathi/Hindi versions | Owners · regional seekers | Qwen3 via llama.cpp/Ollama; IndicTrans2 | Job | M |
+| C2 | LLM fallback for unparsed smart-search text | Seekers | Same LLM seam, JSON-schema output | Server | M |
+| C3 | Staff copilot: ticket reply drafts grounded in FAQs | Support staff | Same LLM seam + pgvector | Server | M |
 
 ---
 
-## 4. Chatbot / Conversational AI
+## 3. Tier A — no model, or a model we already ship
 
-### 4.1 WebLLM (MLC-AI)
+### A1. Typo-tolerant, index-backed listing search
+- **Today:** `publicTextSearch` ANDs a `LIKE '%word%'` per word across four columns. "Koregoan", "Hinjwadi"
+  vs "Hinjewadi", "Magarpata" return nothing, and a leading-wildcard `LIKE` can't use a btree —
+  V02 already notes that substring search "needs pg_trgm and a GIN index".
+- **Do:** one migration — `CREATE EXTENSION pg_trgm, unaccent`; a GIN `gin_trgm_ops` index on
+  `lower(title || ' ' || locality || ' ' || society)`; keep the word-by-word AND, but match each word
+  with `word_similarity(word, doc) > 0.4` (`<%` operator, index-backed) instead of `LIKE`. Optionally add a
+  generated `tsvector` column for stemming ("furnished" ↔ "furnishing"). Keep the existing 120-char /
+  6-word caps.
+- **Locality aliases:** add a small `aliases text[]` per locality (Devanagari spelling, old names) and
+  match it the same way — cheaper and more exact than a transliteration model.
+- **Performance:** turns a sequential scan per keystroke into a GIN index lookup.
+- **Measure:** zero-result rate for searches with `q`; p95 latency of `GET /properties?q=`.
+- **Shipped (first step):** with `pg_trgm` enabled, a letter-only word of 5+ letters that no live
+  listing matches exactly falls back to `word_similarity ≥ 0.5` (a fallback, because "balewadi" vs
+  Kalewadi scores as high as a real typo). Not index-backed yet — the GIN index, `unaccent` and
+  aliases remain.
 
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Run full LLMs (Llama 3, Phi-3, Mistral 7B, Gemma, Qwen) directly in the browser using WebGPU acceleration. OpenAI-compatible API |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (client-side, requires WebGPU support) |
-| **Maturity** | High -- backed by MLC-AI/TVM team, active development, growing model support |
-| **Requirements** | WebGPU-capable browser (Chrome 113+), 4-16GB+ RAM depending on model |
-| **Real Estate Use Case** | **Property assistant chatbot** that runs entirely in-browser: answer questions about listings, explain RERA regulations, help users refine search criteria. Zero server cost. Complete privacy -- user queries never leave the device. Use smaller models (Phi-3 Mini, Gemma-2B) for faster loading |
+### A2. Society "did you mean" before minting
+- **Today:** `SocietySpecs` does a substring `LIKE`; its own comment warns that a duplicate society
+  "splits one building's listings, followers and reviews across two cards".
+- **Do:** on `SocietyMintRequest`, return the top 3 `similarity(name, :q) > 0.45` matches in the same
+  locality and ask "Is it one of these?" before creating. Same `pg_trgm` index as A1.
 
-### 4.2 Ollama (Self-Hosted Backend)
+### A3. Listing photo coach in the wizard
+- **Today:** only size and resolution are checked; dark, blurry or people-filled photos reach the
+  reviewer, who asks for a retake — a full round trip.
+- **Do:** in [image.worker.js](../../frontend/src/lib/uploads/image.worker.js), where the frame is
+  already decoded, compute brightness and sharpness (the `readFrameQuality` maths). Show a one-line tile
+  hint ("Looks dark — retake in daylight?"), never a block. Run MediaPipe **FaceDetector** (BlazeFace,
+  ~200 KB, same package already shipped) and offer "Blur faces" — useful for tenant privacy under DPDP.
+- **Measure:** first-pass approval rate; "ask for info: photos" rate on the verification desk.
+- **Shipped (first step):** dark/blurry tile hint ([photoLook.js](../../frontend/src/lib/uploads/photoLook.js)).
+  Face blur remains.
 
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Run LLMs locally on your server: Llama 3, Mistral, DeepSeek, Qwen, Gemma, and many more. REST API for easy integration |
-| **License** | MIT |
-| **Runs in** | Self-hosted backend (Linux/macOS/Windows/Docker) |
-| **Maturity** | Very High -- 100k+ stars, massive ecosystem (200+ integrations), active development |
-| **Real Estate Use Case** | **Backend chatbot API** for property Q&A, negotiation assistance, document summarization. **Property description generation** from structured data. **Automated email/WhatsApp responses** to inquiries. **RAG system** combining property database with LLM for intelligent search. No API costs regardless of volume |
+### A4. Voice search
+- **Do:** a mic button on the search box using the browser's native `SpeechRecognition`
+  (`hi-IN`, `mr-IN`, `en-IN`), with the transcript fed into `parseSmartQuery`. Hide where unsupported
+  (Firefox, some iOS versions).
+- **Caveat:** Chrome sends the audio to Google's recognition service. It's user-initiated, but the
+  privacy notice should say so. A self-hosted Whisper (MIT) only if usage justifies a server.
 
-### 4.3 Transformers.js (Text Generation)
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Run smaller text generation models (GPT-2, DistilGPT2, Phi) in-browser for simple conversational responses |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (client-side) |
-| **Real Estate Use Case** | Lightweight property description completion/suggestions. Simple Q&A with fine-tuned small models. FAQ auto-responses for common property queries |
-
-### 4.4 Wink-NLP + Rule-Based Chatbot
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Combine NLP parsing with rule-based intent matching for lightweight chatbot without LLM overhead |
-| **License** | MIT |
-| **Runs in** | Browser (client-side) |
-| **Real Estate Use Case** | Intent classification for structured queries: detect if user wants to search, schedule visit, ask about price, or get locality info. Route to appropriate handler. Very fast, no model download required |
-
----
-
-## 5. OCR & Document Processing
-
-### 5.1 Tesseract.js
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Full OCR engine (port of Tesseract) supporting 100+ languages via WebAssembly. Extract text from images/scanned documents |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (client-side) AND Node.js |
-| **Maturity** | Very High -- 34k+ stars, well-maintained, widely deployed in production |
-| **Real Estate Use Case** | **Extract text from property documents**: Scan agreement papers, society NOCs, RERA certificates. **Read floor plan labels** and room dimensions from images. **Digitize old property records** (Index-II, 7/12 extracts). **Extract data from visiting cards** of brokers/builders. Supports Devanagari script for Marathi/Hindi documents |
-
-### 5.2 Transformers.js (Document Understanding)
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Run document AI models in-browser: LayoutLM for document understanding, document question answering, table extraction |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (client-side) |
-| **Real Estate Use Case** | **Structured extraction from property documents**: Given a scanned agreement, extract buyer name, seller name, property address, sale amount. **Document classification**: Automatically categorize uploaded documents (sale deed, agreement, NOC, tax receipt). **Table extraction** from society maintenance bills |
-
-### 5.3 pdf.js (Mozilla)
-
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Render and extract text from PDF documents in-browser |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser (client-side) |
-| **Maturity** | Very High -- Mozilla-maintained, used in Firefox, battle-tested |
-| **Real Estate Use Case** | Extract text from property PDFs (brochures, floor plans, agreement drafts) for indexing and search. Render PDFs inline for document viewing. Combine with Tesseract.js for scanned PDFs |
+### A5. FAQ deflection on the support form
+- **Today:** [FaqSection.jsx](../../frontend/src/pages/consumer/support/FaqSection.jsx) is a static
+  list with no search, and the ticket form doesn't suggest answers.
+- **Do:** index the already-fetched `getFaqs()` with **MiniSearch** (MIT, ~7 KB gz, fuzzy + prefix) and
+  show the top 3 answers under the subject field as the user types.
+- **Measure:** tickets per 1,000 support-page visits.
+- **Shipped:** without MiniSearch — a keyword match over the loaded FAQs is enough at ~10 entries
+  ([suggestFaqs.js](../../frontend/src/pages/consumer/support/suggestFaqs.js)). Revisit if FAQs grow
+  past a few dozen.
 
 ---
 
-## 6. Foundation / Runtime Libraries
+## 4. Tier B — small models, background jobs, reviewer aids
 
-### 6.1 ONNX Runtime Web
+### B1. Contact details and competitor watermarks inside photos
+- **Why first in Tier B:** the contact gate is the business model, and `NoContactDetails` covers text
+  only. Owners routinely put a phone number or a NoBroker/MagicBricks/99acres watermark into a photo.
+- **Step 1 (zero server cost):** when `PropertyReviewModal` opens, run **Tesseract.js** (Apache 2.0,
+  `eng`+`hin`+`mar` traineddata) over the listing's photos **in the reviewer's browser** — a trusted,
+  desktop client. Run the text through the same rules as `hasContactDetails` plus a competitor-brand list,
+  and show a chip: "Photo 3 may contain a phone number". Lazy-load it on the back-office route only.
+- **Step 2 (at volume):** the same check as a background job after upload, using **Tess4J** (Apache 2.0)
+  or **RapidOCR** (PaddleOCR models on ONNX Runtime, Apache 2.0 — better on stylised watermark text).
+  The job only **holds the photo for review**; it never rejects.
+- **Measure:** leaks caught per 1,000 new listings; reviewer time per listing.
 
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Run any ONNX-format ML model in-browser with GPU acceleration (WebGL/WebGPU/WebNN) or CPU (WASM). Universal model inference engine |
-| **License** | MIT |
-| **Runs in** | Browser (client-side) AND Node.js |
-| **Maturity** | Very High -- Microsoft-backed, production-grade, supports all ONNX operators via WASM |
-| **Real Estate Use Case** | **Foundation layer** for running custom-trained models (price prediction, image classification) exported from PyTorch/TensorFlow/scikit-learn. Run any model from ONNX Model Zoo. Powers Transformers.js and background-removal-js under the hood |
+### B2. Stronger duplicate photo detection
+- **Today:** a 64-bit average hash. It catches re-uploads, but misses crops, mirrors, re-angled shots of
+  the same room and photos re-saved with a different tone curve — the typical broker re-post.
+- **Step 1:** switch to a **perceptual (DCT) hash** — JImageHash (MIT) or ~40 lines in `PhotoHash`.
+  It keeps the band scheme; backfill with a one-off job.
+- **Step 2:** compute a **MediaPipe ImageEmbedder** vector (MobileNet-V3, ~4 MB, same package) in the
+  upload worker, store it in **pgvector**, and cosine-match within the locality. Embeddings catch
+  "same flat, different photo", which no hash can.
+- **Labels for free:** `ListingDuplicateDismissal` rows are reviewer-confirmed "not a duplicate" pairs
+  — use them to tune the threshold and track precision.
 
-### 6.2 TensorFlow.js (as Foundation)
+### B3. Room tagging, smart cover and gallery nudges
+- **Value:** order the gallery (living room first), suggest the cover, nudge "Add a kitchen photo"
+  (listings with complete room coverage convert better), and add room tabs on the detail page.
+- **Step 1 — bootstrap labels:** a nightly job runs **SigLIP** (Apache 2.0) zero-shot through
+  **ONNX Runtime Java** (MIT) with prompts like "a photo of a bedroom / kitchen / bathroom / balcony /
+  building exterior / floor plan". Reviewers correct wrong tags in the review modal.
+- **Step 2 — go on-device:** train a small classifier on those labels with **MediaPipe Model Maker**
+  (Apache 2.0) and run it in the upload worker for instant tagging. The ONNX job then retires.
 
-| Attribute | Details |
-|-----------|---------|
-| **What it does** | Complete ML framework: define, train, and run models. Multiple backends (WebGL, WebGPU, WASM). Load models from TF/Keras/TFLite |
-| **License** | Apache 2.0 |
-| **Runs in** | Browser AND Node.js AND React Native |
-| **Maturity** | Very High -- Google-backed, massive ecosystem |
-| **Real Estate Use Case** | Base layer for ml5.js and face-api.js. Load any pre-trained TensorFlow model. Train custom models with transfer learning using local property data |
+### B4. Semantic/hybrid search and better similar homes
+- **Value:** "peaceful society with a big garden near Hinjewadi phase 1" finds listings that say
+  "landscaped lawn, quiet lane", and similar homes respect style and amenities, not only distance.
+- **Model:** **multilingual-e5-small** (MIT, 384-dim, ~120 MB int8) — handles English, Hindi,
+  Marathi and Hinglish in one space. Tokenise with **DJL HuggingFace tokenizers** (Apache 2.0), infer with
+  **ONNX Runtime Java**.
+- **Store:** `pgvector` column + HNSW index. Embed **on write** (a job after create/edit), never on read
+  except for the one query string.
+- **Rank:** hybrid — A1's trigram/FTS score and vector distance fused with Reciprocal Rank Fusion in
+  SQL — inside the existing `publicSearch` floor and ahead of the existing `relevanceFirst` boosts.
+  `SimilarListings` keeps its hard geo/BHK/price filters and re-ranks the pool by cosine.
+- **Prerequisite:** A1. **Cold start:** the JVM loads the model only in the job runner, not in the
+  web instance, so Cloud Run cold starts don't grow.
 
----
-
-## 7. Recommended Architecture for Draazy
-
-### Tier 1: Immediate Value (Easy Integration, High Impact)
-
-| Use Case | Library | Effort | Impact |
-|----------|---------|--------|--------|
-| Property search autocomplete | **FlexSearch** or **MiniSearch** | Low | High |
-| Natural language query parsing | **Compromise** | Low | High |
-| OCR for property documents | **Tesseract.js** | Low | High |
-| PDF text extraction | **pdf.js** | Low | Medium |
-
-### Tier 2: Medium Effort, High Value
-
-| Use Case | Library | Effort | Impact |
-|----------|---------|--------|--------|
-| Semantic/hybrid search | **Orama** | Medium | Very High |
-| Room type classification (photos) | **Transformers.js** | Medium | High |
-| Background removal (listing photos) | **@imgly/background-removal** | Medium | Medium |
-| Property chatbot (self-hosted) | **Ollama** | Medium | Very High |
-| Sentiment on reviews | **Wink-NLP** | Low | Medium |
-
-### Tier 3: Advanced (Higher Effort, Differentiating)
-
-| Use Case | Library | Effort | Impact |
-|----------|---------|--------|--------|
-| In-browser LLM chatbot | **WebLLM** | High | High |
-| Price prediction model | **Brain.js** or **TensorFlow.js** | High | Very High |
-| Property recommendations (embeddings) | **Transformers.js + Orama** | High | Very High |
-| Object detection in photos | **TensorFlow.js (COCO-SSD)** | Medium | Medium |
-| Document understanding | **Transformers.js (LayoutLM)** | High | High |
-| Face blurring for privacy | **face-api.js** | Medium | Low |
-
-### Suggested Minimal Stack
-
-```
-Client-Side (React):
-  - FlexSearch/MiniSearch  -> instant property search
-  - Compromise             -> parse "3BHK under 80L in Kothrud"
-  - Tesseract.js           -> scan documents, extract text
-  - Transformers.js        -> image classification, embeddings
-  - Orama                  -> vector search + recommendations
-
-Self-Hosted Backend:
-  - Ollama                 -> chatbot, description generation
-  - Natural                -> text classification, TF-IDF similarity
-  - ONNX Runtime           -> custom trained models (price prediction)
-```
-
-### Performance Considerations
-
-| Library | Initial Download | Runtime Performance | Memory |
-|---------|-----------------|-------------------|--------|
-| FlexSearch | ~6KB | Instant | Low |
-| MiniSearch | ~7KB | Instant | Low |
-| Compromise | ~250KB | Runs on keypress | Low |
-| Wink-NLP | ~10KB + model | 650K tokens/sec | Low |
-| Tesseract.js | ~2MB (worker + lang data) | 1-5 sec/page | Medium |
-| Transformers.js | 50-500MB (per model) | Varies | High |
-| WebLLM | 1-8GB (per model) | Requires WebGPU | Very High |
-| TensorFlow.js | ~1MB + model | GPU-accelerated | Medium-High |
-| Brain.js | ~100KB | GPU via WebGL | Medium |
-| Orama | ~2KB | Very fast | Low-Medium |
-
-### Key Recommendations
-
-1. **Start with search**: FlexSearch + Compromise gives immediate "smart search" feel with minimal effort
-2. **Add OCR early**: Tesseract.js is drop-in and immediately useful for document upload flows
-3. **Ollama for chatbot**: Self-host on a modest GPU server; far more capable than browser LLMs for now
-4. **WebLLM as progressive enhancement**: Offer browser-based chat for users with capable hardware, fall back to Ollama backend
-5. **Transformers.js for image intelligence**: Use it to auto-tag photos (room type, features) at listing creation time
-6. **Orama for semantic search**: Once you have embeddings (from Transformers.js), Orama provides instant vector search with no backend
+### B5. Fair-price signal
+- **Step 1 (no ML):** extend `marketRate` to `percentile_cont` by locality × BHK × deal over live
+  listings. Show "Asking rent is in the usual range for 2 BHKs in Baner" on the detail page and "Similar
+  flats ask ₹X–Y" on the wizard's price step. Hide below a minimum sample.
+- **Step 2 (when data exists):** finalised deals already record `agreed_price`. Once there are a few
+  thousand, train **LightGBM** (MIT) offline on area, floor, age, furnishing, amenities and distance;
+  export with `onnxmltools` and serve through ONNX Runtime Java. Asking prices alone are too noisy to
+  train on.
 
 ---
 
-## License Summary
+## 5. Tier C — LLMs, only behind a seam and only async
 
-| Library | License | Commercial Use |
-|---------|---------|---------------|
-| TensorFlow.js | Apache 2.0 | Yes |
-| Transformers.js | Apache 2.0 | Yes |
-| ONNX Runtime Web | MIT | Yes |
-| WebLLM | Apache 2.0 | Yes |
-| Ollama | MIT | Yes |
-| Brain.js | MIT | Yes |
-| ml5.js | MIT | Yes |
-| FlexSearch | Apache 2.0 | Yes |
-| MiniSearch | MIT | Yes |
-| Lunr.js | MIT | Yes |
-| Orama | Apache 2.0 | Yes |
-| Tesseract.js | Apache 2.0 | Yes |
-| face-api.js | MIT | Yes |
-| Compromise | MIT | Yes |
-| Wink-NLP | MIT | Yes |
-| Natural | MIT | Yes |
-| pdf.js | Apache 2.0 | Yes |
-| @imgly/background-removal | AGPL-3.0 | Open-source only (paid license for proprietary) |
+**Serving:** **llama.cpp** / **Ollama** (MIT) or **vLLM** (Apache 2.0); all expose an
+OpenAI-compatible API, so the Java side is a plain `RestClient` behind an `LlmProvider` seam with a
+canned dev stub — no AI framework needed for a handful of prompts. **Models:** **Qwen3** 4B–8B
+(Apache 2.0) or **Phi-4-mini** (MIT).
+**Cost reality:** a GPU box breaks the hosting envelope. A 4B model, 4-bit, on CPU gives roughly
+5–15 tokens/s — fine for queued jobs, too slow for interactive chat. That's why every item below is async.
 
-All libraries listed are fully free and open-source. The only exception requiring attention is `@imgly/background-removal` which uses AGPL-3.0 (requires your code to be open-source if distributed, or purchase a commercial license).
+### C1. Better descriptions, in the reader's language
+- Feed only the structured fields `describe.js` already uses; the model rewrites the template draft. The
+  output must pass `NoContactDetails`, and the owner sees and edits it before saving — no invented facts.
+- Marathi/Hindi versions with **IndicTrans2** (MIT, AI4Bharat) — purpose-built for Indic languages and
+  stronger than a general LLM at it. Store per language; i18next already handles the UI side.
+
+### C2. Fallback for unparsed smart-search text
+- **First** log the remainders `parseSmartQuery` forwards as `?q=` (PostHog event). Most gaps will be
+  new rules, not AI. Only for remainders that still miss, call the LLM with a JSON-schema-constrained
+  output (llama.cpp grammars / Ollama structured outputs) that can only produce known filter keys.
+
+### C3. Staff copilot for support
+- Draft a reply to a ticket from the FAQ/help corpus (RAG over pgvector from B4). Staff edit and send;
+  nothing is auto-sent.
+
+---
+
+## 6. Performance playbook for any AI feature
+
+1. **Precompute on write, read from an index.** Embeddings, tags, hashes and OCR results are columns,
+   filled by a job. Search reads them like any other column.
+2. **Ship the cheapest layer first.** Postgres extension → native browser API → already-shipped
+   MediaPipe → new model.
+3. **Lazy-load, worker, cache.** Dynamic `import()` per route, inference off the main thread, and a
+   `runtimeCaching` rule in `vite-plugin-pwa` for `/models/*` so a model downloads once per device.
+4. **Keep models out of the consumer critical path.** No model on the home, search or detail routes'
+   initial load. Back-office routes can afford more (desktop, Wi-Fi).
+5. **Keep the web instance lean.** ONNX Runtime and tokenizers load only in the job runner, so the
+   Cloud Run cold start and memory limit are unaffected.
+6. **Every feature ships its metric** (named per item above) through PostHog or `recordSignal`, and
+   is dropped if it doesn't move it.
+
+---
+
+## 7. Library shortlist
+
+| Library | Licence | Runs in | Used for | In repo? |
+|---|---|---|---|---|
+| PostgreSQL `pg_trgm`, `unaccent`, FTS | PostgreSQL | DB | A1, A2 | No |
+| `pgvector` | PostgreSQL | DB | B2, B4, C3 | No |
+| `@mediapipe/tasks-vision` (FaceDetector, ImageEmbedder, ImageClassifier) | Apache 2.0 | Browser (WASM) | A3, B2, B3 | **Yes** (FaceLandmarker) |
+| MediaPipe Model Maker | Apache 2.0 | Offline (Python) | B3 | No |
+| Web Speech API | Browser-native | Browser | A4 | — |
+| MiniSearch | MIT | Browser | A5 | No |
+| Tesseract.js | Apache 2.0 | Browser (WASM) | B1 step 1 | No |
+| Tess4J / RapidOCR | Apache 2.0 | JVM / sidecar | B1 step 2 | No |
+| JImageHash | MIT | JVM | B2 step 1 | No |
+| ONNX Runtime Java | MIT | JVM | B3, B4, B5 | No |
+| DJL HuggingFace tokenizers | Apache 2.0 | JVM | B4 | No |
+| multilingual-e5-small (weights) | MIT | via ONNX | B4, C3 | No |
+| SigLIP (weights) | Apache 2.0 | via ONNX | B3 | No |
+| LightGBM + onnxmltools | MIT / Apache 2.0 | Offline → ONNX | B5 | No |
+| llama.cpp / Ollama / vLLM | MIT / MIT / Apache 2.0 | Server | C1–C3 | No |
+| Qwen3 / Phi-4-mini (weights) | Apache 2.0 / MIT | via LLM server | C1–C3 | No |
+| IndicTrans2 | MIT | Server | C1 | No |
+| pdf.js (`pdfjs-dist`) | Apache 2.0 | Browser | Rasterise PDFs before OCR in B1 | **Yes** |
+
+---
+
+## 8. Suggested sequence
+
+1. **A1 + A2** — one Flyway migration (extensions + GIN indexes) and two spec changes. Biggest
+   UX-per-hour win, and a performance win too.
+2. **A3, A5, B5 step 1** — frontend-only or SQL-only, each independently shippable.
+3. **B1 step 1** — closes the photo back door on the contact gate using reviewer machines.
+4. **B2** — pHash first, embeddings after pgvector lands.
+5. **B4** — embeddings job + pgvector + hybrid ranking; it also unlocks B2 step 2 and C3.
+6. **B3, then Tier C** — once the job runner and the `LlmProvider` seam exist and A–B metrics justify it.

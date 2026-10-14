@@ -13,12 +13,13 @@
 - **Job-to-be-done:** "Stop the fake, brokered or abusive share posts before a seeker meets a
   stranger through them, and clear the honest ones quickly enough that honest supply still bothers."
 - **Why it matters:** Flatmates is the one place on the platform where strangers agree to share a
-  home. D72 made every flatmate row start invisible; this desk is the only thing that makes it
-  visible again, so a backlog here is not a queue getting long - it is a marketplace with no supply.
+  home. Rooms and groups with a flat start invisible and this desk is what makes them visible, so a
+  backlog here is not a queue getting long - it is a marketplace with no supply. Seeker posts and
+  hunting groups (no flat to verify) go live at once and arrive here as *Live · not yet reviewed*
+  re-checks, to be cleared with **Looks fine** or pulled.
 
-> **Why this desk exists at all.** `/admin/flatmates`
-> ([`../admin/flatmates-moderation.md`](../admin/flatmates-moderation.md)) already moderated seekers,
-> groups and applications - on the mock. Converting it would have been the smaller change, but it
+> **Why this desk exists at all.** A retired `/admin/flatmates` screen already moderated seekers,
+> groups and applications. Converting it would have been the smaller change, but it
 > only ever knew **one** of the two verdicts a flatmate row carries, has never been able to show a
 > group application (nothing could create one), and cannot see rooms at all. This page is the whole
 > surface, live.
@@ -29,15 +30,20 @@
 - **Route:** `/ops/flatmate-review`, inside the back-office guard. Nav entry "Flatmate"
   (`AdminLayout.jsx`).
 - **Source components:**
-  - `src/pages/ops/OpsFlatmateReview.jsx` - the page, the three-board switcher, the offline panel.
-  - `src/pages/ops/flatmate/VerificationBoard.jsx` - host verification.
-  - `src/pages/ops/flatmate/ModerationBoard.jsx` - publication.
-  - `src/pages/ops/flatmate/ApplicationsBoard.jsx` - group applications.
-  - `src/pages/ops/flatmate/board.jsx` - the shared parts (`useBoard`, `Tabs`, `BoardState`,
-    `BoardCount`, `InlineNote`, `fmtDate`).
+  - `src/pages/ops/OpsFlatmateReview.jsx` - the page: three tabs (Pending / Published / Hidden &
+    removed) over one card list, and the popup.
+  - `src/pages/ops/flatmate/useFlatmateQueue.js` - fans out to every source a tab covers and merges
+    them into one list keyed by post id (a badge claim keys on its room/group id), so one flat is
+    one card with every reason it is waiting.
+  - `src/pages/ops/flatmate/FlatmateQueueCard.jsx` - the card: type, headline, reason chips, Review.
+  - `src/pages/ops/flatmate/FlatmateReviewModal.jsx` + `review-modal/` - the popup. `PostDetails`
+    (photos, free text, details, host), `BadgeSection` (verification axis), `DecisionSection`
+    (publication axis, including "Looks fine" for a re-check).
+  - `src/pages/ops/flatmate/board.jsx` - `Tabs`, `QueueState`, `Block`, `fmtDate`.
   - `src/services/flatmateService.js` -> `providers/http/flatmateProvider.js` ->
     `flatmateModerationMapper.js`.
-- **Server:** `FlatmateModerationController` / `FlatmateModerationService`.
+- **Server:** `FlatmateModerationController` / `FlatmateModerationService`; the popup's read is
+  `GET /admin/flatmates/{id}` (`FlatmateModerationDetails`).
 
 ---
 
@@ -72,7 +78,7 @@ is designed against:
 | Moderation | may the city see this? | `mod_status` | Moderation |
 
 Approving a verification **does not publish the post**, and publishing a post **grants no badge**.
-Both directions are asserted in `ops/live-flatmate-moderation.spec.js`, because a desk that quietly
+Both directions are asserted in `ops/flatmate-moderation.spec.js`, because a desk that quietly
 did either would look correct on every screenshot.
 
 A group application adds a third column that is not this desk's at all: `status`
@@ -106,12 +112,11 @@ Kinds: `post` / `room` / `group`, one board at a time - three tables, and a merg
 to load every pending row to sort it, or report a `totalElements` that is true of one table and
 false of the screen.
 
-States: Pending, **Published** (`approved`), Flagged, Removed, **Live (pre-D72)**.
+States: Pending, **Published** (`approved`), Flagged, Removed, **Live** (self-published).
 
-- `live` gets a tab but **no button**. Every row written under the old "visible the instant it is
-  written" rule still carries it; those posts were published under a policy their authors could not
-  have known would change, and pulling that backlog into a queue retroactively would punish people
-  for our decision.
+- `live` means the author published it themselves: owner tier, or a post with no flat. A live row
+  that nobody has looked at yet, or that was edited since, shows on Pending as a re-check; the
+  re-check strip's **Looks fine** stamps it `approved`.
 - `rejected` is **absent deliberately**. The shared vocabulary has it and the server would accept
   it, but on this axis it means exactly what `removed` means, and two words for "not published" is
   an invitation for a desk to use them inconsistently and then be unable to report on either.
@@ -143,7 +148,8 @@ verification:  pending --approve--> approved (badge granted)
 moderation:    pending --Publish--> approved (public)
                pending --Flag--> flagged
                pending --Remove(note)--> removed
-               live ----------------------> (no transition; pre-D72 backlog)
+               live --Looks fine--> approved   (re-check: new post / edited)
+               live --Flag/Remove--> flagged/removed
 
 application:   mod_status live --Clear/Flag/Remove--> approved/flagged/removed
                status pending --(owner, elsewhere)--> accepted/declined
@@ -152,18 +158,16 @@ application:   mod_status live --Clear/Flag/Remove--> approved/flagged/removed
 ---
 
 ## 8. Edge cases, validation & error states
-- **Offline / mock mode:** the page renders a panel saying it needs the live API, rather than an
+- **The API is unreachable:** the page renders a panel saying it needs the live API, rather than an
   empty queue. An empty queue and a disconnected queue look identical, and one of them means "the
   backlog is clear".
 - **A decided row leaves its tab.** Every assertion about the *result* of a decision has to follow
   the row to where it went - that is queue behaviour, not a bug.
 - **`Badge` is a translation layer.** `pending` renders as **Under Review**. Consult
   `components/ui/Badge.jsx` before asserting a status word anywhere near this desk.
-- **Paging:** all three boards page server-side, 25 rows at a time, with a `Previous` / `Next`
-  control and a live `1-25 of 137` readout. The pager hides itself when one page holds everything,
-  so the seeded desk looks exactly as it did before. Changing tab, board or moderation state resets
-  to page 1 - a page number is meaningless against a different result set - and deciding the last
-  row on a page steps back rather than leaving the operator on an empty page they cannot explain.
+- **Size:** each tab reads up to 100 rows per source (the API's page ceiling). Past that the count
+  line says the list is partial, rather than showing a short queue as if it were complete. Any
+  source failing fails the tab: a queue missing a third of its rows would read as "nothing to do".
 
 ---
 
@@ -187,21 +191,20 @@ contract does not name:
 | `POST /flatmates/groups/{id}/apply` | hangs off the **group**, because the group is what is being committed |
 | `GET /me/group-applications` | the owner's inbox |
 | `PATCH /me/group-applications/{id}` | the owner's verdict, deliberately a different path from the admin one so no request is ambiguous about which column it writes |
-| `GET /me/flatmate-groups` | `FlatmateGroupFeedDto` carries no host identity, so "is this group mine?" had no answer in live mode |
+| `GET /me/flatmate-groups` | the caller's own groups as a `FlatmateGroupCard` (seats, moderation state, member count), which carries no host identity, so "is this group mine?" has an answer in live mode |
 
-This is an **intentional extension**, not drift. Recorded here and in
-[`../../migration/README.md`](../../migration/README.md).
+This is an **intentional extension**, not drift.
 
 ---
 
 ## 11. Test coverage
-- `e2e/tests/ops/live-flatmate-moderation.spec.js` - 7 tests, all three boards plus the retired
-  `/admin/flatmates` route, live.
+- `e2e/tests/ops/flatmate-moderation.spec.js` - 9 tests: the three-tab layout, every decision taken
+  through the popup, plus the retired `/admin/flatmates` route, live.
 - `e2e/tests/ops/flatmate-review.spec.js` - 1 test: the offline panel, which is the only claim that
-  can only be checked in mock mode. The three consumer-facing verification cues moved to
-  `e2e/tests/consumer/flatmates/live-review-status.spec.js`, where each label is earned through a
+  has to be checked with the API unreachable. The three consumer-facing verification cues moved to
+  `e2e/tests/consumer/flatmates/review-status.spec.js`, where each label is earned through a
   real Ops decision rather than seeded.
-- `e2e/tests/consumer/flatmates/live-group-apply.spec.js` - 2 tests, the consumer loop that fills
+- `e2e/tests/consumer/flatmates/group-apply.spec.js` - 2 tests, the consumer loop that fills
   the third board.
 - `backend/src/test/java/com/draazy/api/engagement/flatmate/FlatmateApplicationEndpointsTest.java` -
   13 tests over the apply / inbox / decide rules.

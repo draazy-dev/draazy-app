@@ -1,28 +1,19 @@
 package com.draazy.api.documents.agreement;
 
+import jakarta.persistence.LockModeType;
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface RentAgreementRepository extends JpaRepository<RentAgreement, UUID> {
 
-    /**
-     * Every agreement the caller is a <em>party</em> to — theirs as the landlord who filed it, and
-     * theirs as the tenant it was filed against.
-     *
-     * <p>The two sides are matched on different columns because they are stored differently: the
-     * owner is a user id (the filer is always a registered account), while the tenant is only ever
-     * a mobile number, because an owner can record an agreement before the tenant has signed up.
-     * That asymmetry is why this cannot be a single {@code findByPartyId}.
-     *
-     * <p>{@code mobile} is compared against the stored canonical ten digits, so callers must pass
-     * a {@code MobileMask.normalise}d value. A null or blank mobile matches nothing rather than
-     * everything — the {@code and ... is not null} guard is load-bearing, since a bare
-     * {@code tenantMobile = null} in SQL is never true but a blank string would match any row
-     * whose tenant column was also blank.
-     */
+    /** The two sides match on different columns: owner is a user id, tenant only ever a mobile. Pass a
+     * {@code MobileMask.normalise}d value; the {@code is not null} guard stops blanks matching blanks. */
     @Query("""
             select a from RentAgreement a
             where a.ownerId = :ownerId
@@ -30,4 +21,45 @@ public interface RentAgreementRepository extends JpaRepository<RentAgreement, UU
             order by a.createdAt desc
             """)
     List<RentAgreement> findForParty(@Param("ownerId") UUID ownerId, @Param("mobile") String mobile);
+
+    List<RentAgreement> findByServiceRequestIdOrderByCreatedAtAsc(UUID serviceRequestId);
+
+    /** Filed outside a paid request, so no service request carries them and the overlap check would miss them. */
+    @Query("""
+            select a from RentAgreement a
+            where a.propertyId = :propertyId
+              and a.serviceRequestId is null
+              and a.status in ('e-sign-pending', 'registered', 'active')
+            order by a.createdAt asc
+            """)
+    List<RentAgreement> findFiledOnListing(@Param("propertyId") UUID propertyId);
+
+    /** Two checkers deciding one row at once must not both pass the ladder and let the last write win. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from RentAgreement a where a.id = :id")
+    Optional<RentAgreement> lockById(@Param("id") UUID id);
+
+    /** Sole evidence for a badge granted with no human in the loop: a new archive column on {@code RentAgreement}
+     * must be excluded here. Matches the licensee only, on paid requests a second staff member verified. */
+    @Query("""
+            select count(a) > 0 from RentAgreement a
+            where a.propertyId = :propertyId
+              and :mobile is not null and a.tenantMobile = :mobile
+              and a.status in ('registered', 'active')
+              and a.serviceRequestId is not null
+              and a.finalDocumentId is not null
+              and a.verifiedBy is not null
+            """)
+    boolean hasRegisteredTenancy(@Param("propertyId") UUID propertyId, @Param("mobile") String mobile);
+
+    /** Terms ending within the window and not yet reminded; the end is the term's last day, as {@code endDate()}. */
+    @Query(value = """
+            select * from rent_agreements
+            where status in ('registered', 'active')
+              and start_date is not null and duration_months is not null
+              and renewal_reminded_at is null
+              and (start_date + duration_months * interval '1 month')::date - 1 between :from and :to
+            order by created_at
+            """, nativeQuery = true)
+    List<RentAgreement> findEndingBetween(@Param("from") LocalDate from, @Param("to") LocalDate to);
 }

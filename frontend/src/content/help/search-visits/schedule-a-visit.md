@@ -5,18 +5,23 @@ category: search-visits
 audience: tenant
 order: 4
 featured: true
-updated: 2026-07-29
-summary: How to book a visit, what to check when you are there, and what to do if the owner does not turn up.
+updated: 2026-10-13
+summary: How to book a site visit, what to check when you are there, and what to do if the owner does not turn up.
 tags: [visit, viewing, checklist]
 ---
 
 ## Booking
 
-From any property page, tap **Schedule visit**, pick a date and a time slot, and confirm. The owner is notified immediately and confirms or proposes an alternative.
+From any property page, tap **Schedule a Visit**. Visits are in person only. Choose a date and a time, add an optional note, and tap **Confirm Visit**. You need to be signed in, and the owner sees the name on your profile. Dates are forward-only; you cannot book yesterday.
 
-You will get a reminder the evening before and an hour ahead. Manage all bookings under **Dashboard → Visits**.
+The owner is notified and has to confirm the slot. Until they do, your visit reads **Awaiting confirmation**. Track everything under **Dashboard → Visits**.
 
-You can hold up to **three** unconfirmed visits at a time. Cancel the ones you no longer want — no-shows affect how owners treat later requests from your account.
+A visit uses one owner contact from the same allowance as a contact request. It is free if you have already contacted that owner about the listing, or already booked a visit there. Cancelling before the owner confirms gives the contact back; once they confirm, it stays used, as an approved contact request does. A visit the owner has not answered keeps holding a contact until you cancel it. You can only have **one live request per property**; if you already have one, manage or move that visit from your dashboard instead of sending a duplicate.
+
+If either side reschedules, the visit goes back to awaiting confirmation so both sides re-agree on the new slot. Cancel anything you no longer want; owners see your history.
+
+> [!NOTE]
+> A visit the owner marks as completed is what unlocks your **Visited** review on that listing. Reviews are gated on a visit the owner confirmed actually happened, which is why a booked-but-unconfirmed visit does not unlock one.
 
 ## Before you travel
 
@@ -55,7 +60,7 @@ You can hold up to **three** unconfirmed visits at a time. Cancel the ones you n
 
 ## If the owner does not show up
 
-Report the no-show from the visit card in your dashboard. Repeated no-shows lead to the listing being suspended, and you get priority support to find alternatives in the same locality.
+Only the owner can mark a confirmed visit as a no-show; you can only cancel. If the owner does not turn up, or marks you a no-show when you were there, raise it with [Support](/support) with the listing and the slot.
 
 ## Related
 

@@ -1,46 +1,41 @@
-/* ---------- default form state ---------- */
 export const initialForm = {
-  deal: 'buy',
+  deal: '',
   propertyType: '',
   commercialType: '',
-  // Smart defaults — Pune's most common configuration, pre-filled to reduce
-  // friction (endowed-progress). All remain editable.
-  bhk: '2',
-  // PG / Hostel occupancy — a PG usually offers several (single … dormitory), so
-  // this is a multi-select array. Each selected type carries its own rent below.
-  sharing: [],
-  // Per-occupancy monthly rent, keyed by sharing type (e.g. { single: '12000' }).
-  // The headline monthlyRent is derived as the cheapest of these (starting price).
-  sharingRents: {},
-  // PG / Hostel: who the PG is for, and whether meals are provided. Sensible
-  // defaults (open to anyone, no meals) keep the flow quick but editable.
-  pgGender: 'any',
-  pgMeals: 'none',
-  bathrooms: '2',
+  bhk: '',
+  bathrooms: '',
   balconies: '1',
   carpetArea: '',
   builtUp: '',
-  // house types (independent / villa)
+  superBuiltUp: '',
   plotArea: '',
   floorsInHouse: '',
-  // flatmate home type — a room share can be a flat OR an independent house /
-  // villa / row house. propertyType drives the physical fields; homeTypeLabel is
-  // the exact label shown on the room card. gatedCommunity applies to houses.
   homeTypeLabel: 'Flat',
   gatedCommunity: false,
-  // flatmate washroom — is the offered room's bathroom private (attached) or a
-  // shared/common one? A top question for room seekers.
   attachedBath: '',
-  // commercial specifics
+  occupants: '',
+  noticePeriodDays: '',
+  lockInMonths: '',
+  maintenanceBilling: '',
+  electricityBilling: '',
   washrooms: '',
   shellType: '',
   parkingSpaces: '',
-  powerBackup: false,
   pantry: false,
   camCharges: '',
   suitableFor: [],
   fixtures: [],
-  // land specifics (open plot / farm land)
+  fitOutMonths: '',
+  escalationPct: '',
+  tenancyStatus: '',
+  inPlaceRent: '',
+  leaseExpiry: '',
+  seatCount: '',
+  frontage: '',
+  floorLoad: '',
+  clearHeight: '',
+  sanctionedPower: '',
+  dockCount: '',
   areaUnit: 'sqft',
   plotLength: '',
   plotWidth: '',
@@ -49,47 +44,54 @@ export const initialForm = {
   cornerPlot: false,
   boundaryWall: false,
   plotZone: '',
-  naSanctioned: false,
+  /* A boolean could not tell "still agricultural" from "never asked", and had no way at all to
+   * say deemed-NA. */
+  naStatus: '',
   waterSource: '',
   electricity: false,
   roadAccess: false,
-  satbara: false,
+  otherRights: '',
+  buyerEligibility: '',
   floor: '',
   totalFloors: '',
   facing: '',
+  overlooking: '',
   age: '',
   furnishing: 'unfurnished',
   furniture: [],
   locality: '',
+  localitySlug: '',
   flatNumber: '',
   tower: '',
   society: '',
-  // Society ENTITY binding (societies.js / community-minted). Empty when the
-  // lister typed a name without picking/creating a society (legacy-safe).
+  // Google-resolved society row; empty when none was picked.
   societyId: '',
+  // Frontend-only: the owner said the building is not on Google Maps. Never sent to the API.
+  societyNotOnMaps: false,
   street: '',
   landmark: '',
   pincode: '',
-  // Property identity (duplicate prevention + ownership verification). The
-  // electricity consumer number is unique per metered unit and works for rent
-  // and buy alike, so it doubles as the strongest dedup key and the fast-track
-  // to the Verified Owner badge. pmcPropertyId (tax-receipt PTIN) is a secondary
-  // strong key. Both are optional and never shown to buyers.
+  // The electricity consumer number is unique per metered unit, so it is both the strongest dedup
+  // key and the fast-track to Verified Owner. Optional, and never shown to buyers.
   electricityConsumerNo: '',
-  pmcPropertyId: '',
   propLat: 18.5590,
   propLng: 73.7760,
+  pinPlaced: false,
   price: '',
   priceNegotiable: false,
   transactionType: '',
-  possession: 'ready',
+  /* Unanswered: this is the field the Ready-to-Move / Under-Construction facet is built from, so a pre-selected
+     default would make the required check unfailable and publish a claim as the owner's own. */
+  construction: '',
   ownership: '',
   monthlyMaintenance: '',
   reraId: '',
-  loanAvailable: true,
+  loanAvailable: '',
   monthlyRent: '',
   deposit: '',
-  rentMaintMode: 'included',
+  // Unstated. Defaulting to 'included' printed "Maintenance: Included" on the detail page of every
+  // rental whose owner never touched the control, beside the figures they did give.
+  rentMaintMode: '',
   rentMaintenance: '',
   availableFrom: '',
   preferredTenants: [],
@@ -100,19 +102,21 @@ export const initialForm = {
   agreementDuration: '11',
   lockIn: '0',
   noticePeriod: '1',
+  bestTimeToCall: 'anytime',
+  title: '',
   description: '',
+  youtubeId: '',
   amenities: [],
-  // flatmate
   roomType: '',
   rentShare: '',
   lookingFor: 'any',
   lifestyle: [],
   note: '',
-  // flatmate host eligibility — who is listing this room. 'owner' lists their own
-  // flat room-by-room; 'tenant' is a sitting flatmate seeking a replacement and
-  // self-attests a registered agreement (+ optional owner mobile for Ops consent).
+  // Who is listing the room: an 'owner' lists their own flat, a 'tenant' is a sitting flatmate
+  // seeking a replacement and self-attests a registered agreement for Ops consent.
   hostRole: 'owner',
   agreementDeclared: false,
   agreementDoc: null,
   ownerConsentMobile: '',
+  ownerConsent: false,
 };

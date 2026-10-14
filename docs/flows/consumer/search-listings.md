@@ -19,7 +19,7 @@
 - **URL params (all round-trip through the address bar):**
   `deal` (`rent`|`buy`), `ptype`/`type` (csv type keys, legacy alias), `ctype` (commercial
   subtypes), `loc`/`locality` (locality slugs), `soc` (society slugs), `bhk`, `furn`, `amen`,
-  `v` (verification flags), `sharing`, `room`, `tenants`, `landuse`, `constr`, `avail`, `availfrom`,
+  `v` (verification flags), `room`, `tenants`, `landuse`, `constr`, `avail`, `availfrom`,
   `pets`, `budget`, `rent`, `area`, `age`, `floor`, `near`/`nearlabel`/`nearr`/`nearmode`,
   `q` (text), `sort`, `view` (`grid`|`list`|`map`), `property` (open card).
 - **Triggers:** hero search, home category tiles, locality/society pages, `alerts`-reason sign-in
@@ -35,7 +35,7 @@
   `alertCriteria.js`, `format.js`, `geo.js`.
   The search vocabulary itself lives **outside the page**, in `src/lib/listings/`
   (`filterState.js`, `filterRelevance.js`, `facetQuery.js`, `facetMatch.js`, `facetRank.js`,
-  `enrichRent.js`) because the mock provider has to speak it too and a service must not import
+  `enrichRent.js`) because a service must not import
   from a page directory.
 - **Mobile filter FAB:** filtering is the most-repeated action in the search journey, but the
   controls bar is pinned to the top of the page - the hardest place to reach one-handed. A `lg:hidden`
@@ -79,16 +79,15 @@
   network happened to finish last.
 
 ### Deal resolution
-- Explicit `?deal=rent|buy` always wins. Otherwise share-only signals (types `flatmates`/`pg`, or
-  `?sharing=`) default to **rent**; everything else defaults to **buy**. Switching deal resets to
-  that deal's default filter set (`INITIAL(deal)`), sort `relevance`, page 1 (the two journeys have
-  different filter shapes).
+- Explicit `?deal=rent|buy` always wins. Otherwise a share-only signal (type `flatmates`) defaults
+  to **rent**; everything else defaults to **buy**. Switching deal resets to that deal's default
+  filter set (`INITIAL(deal)`), sort `relevance`, page 1 (the two journeys have different filter
+  shapes).
 
 ### The filter vocabulary (`toFacetQuery` in `lib/listings/facetQuery.js`)
 The filter state is translated once into a wire query and answered by `ListingFacets` +
-`PropertySpecs` server-side. Mock mode answers the **same query** through `matchesFacetQuery`
-(`lib/listings/facetMatch.js`), so the mock is a fake of the endpoint rather than a second
-implementation of the page - which is what let the two modes drift in the first place.
+`PropertySpecs` server-side. The vocabulary is defined in one place and the page never re-implements
+it, which is what stops the controls and the query from drifting apart.
 
 Axes, and the column each resolves to:
 1. **Base:** `deal` + `status = 'approved'` (the approved floor is the provider's, mirroring the
@@ -96,19 +95,19 @@ Axes, and the column each resolves to:
 2. **Text (`q`, from `?q=`/`?locality=`):** `title`, `locality`, `localitySlug`.
 3. **Price:** `minPrice`/`maxPrice` - top-level params, *not* members of `ListingFacets`. A thumb
    parked at the default ceiling means "and above", so high-value stock is not hidden.
-4. **Type:** an **OR across two columns**, not an `IN` on one. `pg`/`flatmates` resolve against
+4. **Type:** an **OR across two columns**, not an `IN` on one. `flatmates` resolves against
    `share_type` (V100); every other chip resolves against `property_type_key` (V98) **and**
-   requires `share_type IS NULL`, so a PG posted as "Flat" no longer appears under the Flat chip.
-   PG and Shared Room are two different products - a PG rents a bed at a stated occupancy, a shared
-   room is one person's room in someone else's flat - and each carries its own sub-filter (PG
-   occupancy `single..dorm`; flatmate room type `single|shared`). Both narrow honestly here, against
-   disjoint sets. What this page **cannot** claim for shared rooms is completeness: `/flatmates`
-   also carries flatmate *requests*, which are people rather than listings; that gap is disclosed by
-   the cross-sell card rather than by silently widening the search.
+   requires `share_type IS NULL`, so a shared room posted as "Flat" no longer appears under the
+   Flat chip. Shared Room is its own product - one person's room in someone else's flat, not a
+   whole home - and carries its own sub-filter (flatmate room type `single|shared`), so the two
+   narrow honestly against disjoint sets. What this page **cannot** claim for shared rooms is
+   completeness: `/flatmates` also carries flatmate *requests*, which are people rather than
+   listings; that gap is disclosed by the cross-sell card rather than by silently widening the
+   search.
 5. **Commercial subtype:** `commercial_use_key` (V99).
-6. **Sharing (PG occupancy)**, **room type**, **land use**, **BHK** (`3plus` -> `>=3`, `5` -> `>=5`,
-   `0` -> RK/studio), **furnishing**, **localities** (`locality_slug`), **societies**
-   (`society_slug`; an unbound listing matches no society filter rather than a hashed guess - D19).
+6. **Room type**, **land use**, **BHK** (`3plus` -> `>=3`, `5` -> `>=5`, `0` -> RK/studio),
+   **furnishing**, **localities** (`locality_slug`), **societies** (`society_slug`; an unbound
+   listing matches no society filter rather than a hashed guess - D19).
 7. **Area**, **amenities** (must contain ALL selected - an AND, unlike every other multi-select),
    **verification flags** (`ownerVerified`, `ownershipVerified`, `rera`, `societyVerified`,
    `conveyanceDone`). Ownership verification **lapses**: the facet, the count and the badge all
@@ -116,16 +115,27 @@ Axes, and the column each resolves to:
    filter rather than keeping a badge it no longer earns.
 8. **Construction / availability**, **age**, **floor**, **pets**, **tenant preference**,
    **availability window** (`now`/`15`/`30`, cumulative).
-9. **Near-a-place:** `nearLat`/`nearLng`/`nearRadiusKm`; radius is `nearRadius` km, or
-   `nearRadius * 0.4` km when `nearMode === 'min'` (minutes-to-km heuristic).
+9. **Security deposit:** `minDeposit`/`maxDeposit`, rent-side only - a sale has no deposit to
+   narrow on, so the client never sends the pair on `deal=buy` (the server does not gate it, and
+   would answer such a request with every sale listing, all of them unstated).
+10. **Near-a-place:** `nearLat`/`nearLng`/`nearRadiusKm`; radius is `nearRadius` km, or
+    `nearRadius * 0.4` km when `nearMode === 'min'` (minutes-to-km heuristic).
+11. **By id (`ids`):** not a filter control. Up to 16 slugs or UUIDs, so a strip of known listings
+    (recently viewed, the dashboard feed) is one public read rather than one detail read per card —
+    `listPropertiesByIds`. The approved floor still applies, so a listing that went off-market drops
+    out instead of 404ing a card.
 - **Relevance-gated filters:** each optional filter is wrapped in `rel(section)`
   (`sectionVisible`), so a filter hidden as irrelevant for the current property types never narrows
   results.
 
 **Where the browser and the server disagreed, the server wins** - these are behaviour changes, not
 implementation details:
-- An **unstated** value is excluded from a narrowed range rather than coerced to zero. An unknown
-  age used to read as "brand new".
+- A **range facet admits the listings that state nothing** on the column it narrows - area, age,
+  floor and deposit - and reports how many in `unstatedElements`, rather than deleting them the way
+  a bare `cb.ge` on a NULL column would. Most of the catalogue states no age or floor, and most
+  rentals state no deposit, so excluding them hides the majority the moment a thumb moves. Still
+  not a coalesce: unstated is disclosed as unstated, never read as zero the way an unknown age once
+  read as "brand new".
 - **"Under Construction" excludes unstated possession**, because SQL `IN` never matches NULL.
 - A **tenant filter excludes listings that state no preference**, the same way the pets and move-in
   filters always have. Ticking "family" asks for owners who said yes to families, and an owner who
@@ -141,8 +151,8 @@ implementation details:
 
 ### Sorting
 - `relevance` (default), `price-low`, `price-high`, `newest`. Only the two price orders travel as a
-  `sort` param; `relevance` and `newest` are **rankings**, and an explicit sort disables ranking
-  server-side (`PropertySort.hasExplicitSort`).
+  `sort` param; `relevance` is a ranking, while `newest` is plain `created_at desc, id desc`.
+  An explicit sort disables relevance ranking server-side (`PropertySort.hasExplicitSort`).
 - **Relevance score** = featured (+1000) + ownerVerified (+250) + ownershipVerified (+200) +
   RERA (+80) + freshness weight (`active` 200 / `aging` 120 / `stale` 40 / `dormant` 0) +
   `computeQualityScore(p)` (photos/description/amenities completeness). Ties break on newest.
@@ -150,8 +160,6 @@ implementation details:
   The +200 is earned by **live** ownership verification, the same reading the facet, the
   `verifiedElements` count and the badge on the card use - a lapsed verification stops promoting a
   listing at the moment it stops showing the badge.
-- **Paid placement applies to the two rankings only, never to an explicit price sort.** Ranking a
-  promoted listing above one the buyer asked to see first is deception rather than advertising.
 
 ### Empty-state recovery (near vs locality contradiction)
 - If `near` + `localities` are both set and the primary result is empty, the page issues a **second
@@ -183,7 +191,20 @@ implementation details:
   (`buildAlertRecord`) and `addSavedSearch(...)`; a typed query is parsed first so the label and
   criteria agree.
 - **Smart search (`parseSmartQuery`):** parses a free-text box into a filter set + deal, applies it,
-  and toasts the parsed parts.
+  and toasts what it understood. Reads BHK, 1 RK / studio, property type, locality (incl. `near X`),
+  furnishing, amenities, pets, ready / under-construction, and money in every phrasing
+  the box gets — `under 80 lakh`, `50-80 lakh`, `above 1 cr`, and a bare `25k`.
+- **It merges, it does not reset.** The parse clones the filters already on screen and adds to them,
+  so a typed phrase refines the search the user has been building. Only a change of deal resets,
+  exactly as the Rent/Buy toggle does.
+- **The deal can be inferred from the amount.** With no `rent`/`buy` word, an amount above the rent
+  slider's ceiling is a sale price and switches to Buy; anything at or below it is a rent. Clamping
+  instead would land on the slider default and filter nothing at all. A figure trailed by a land
+  unit (`1000 sqft`, `2 acre`) is a size and is never read as money.
+- **Unparsed words become `?q=`.** A society, project or landmark is exactly what a shopper
+  types and none is a facet, so the remainder is forwarded to the free-text match (§ 9.2) rather
+  than dropped. It renders as the first active chip, which is the only control that removes it. A
+  facet the other journey's panel does not offer goes back to the remainder for the same reason.
 
 ### Locality demand telemetry (`recordSignal`)
 - **Keyed on the slug, not the display name.** The server joins to `localities` on the slug and
@@ -254,11 +275,23 @@ Data issues a separate `COUNT` query for the page total and neither is valid the
 
 ### 9.2 Two text searches, never one with a flag
 
-`publicTextSearch` matches title and locality. `adminTextSearch` adds the owner's name, the owner's
-mobile and the listing id. They are separate methods for the same reason `adminSearch` is separate:
-what a flag would buy an attacker is `?q=98234` against a widened public search answering "which
-landlords' numbers start 98234, and exactly what do they own", from an endpoint needing no login.
-Listing pages mask the mobile precisely so that cannot be assembled.
+`publicTextSearch` matches title, locality, society and property type - the four things a name typed
+into the search box can be, and each already printed on the card the query returns. The term is
+matched **word by word**, every word required in one of those four columns: it arrives from smart
+search as the words it could not turn into a facet, so it is routinely a builder and a project split
+across two columns, and society is on the row only as its `name-builder-locality` slug - nobody
+types it in that order. The term is bounded at 120 characters, words are capped at six and `%`/`_`
+are escaped, so on a route needing no login a pasted paragraph cannot become a predicate per word
+and `?q=%` cannot return the whole catalogue while reading as a narrowing. A letter-only word of five
+or more letters that no live listing matches exactly falls back to `pg_trgm` `word_similarity` ≥ 0.5
+over title, locality or society, so "koregoan" finds Koregaon Park while "balewadi" never widens to
+Kalewadi. Numbers, mobiles and shorter words stay exact, which keeps the public search from becoming
+a fuzzy owner lookup. `adminTextSearch` adds
+the owner's name,
+the owner's mobile and the listing id. They are separate methods for the same reason `adminSearch` is
+separate: what a flag would buy an attacker is `?q=98234` against a widened public search answering
+"which landlords' numbers start 98234, and exactly what do they own", from an endpoint needing no
+login. Listing pages mask the mobile precisely so that cannot be assembled.
 
 Mobile is the one key a desk always has, because the caller is on the phone; name alone is not,
 since Indian names are transliterated inconsistently enough that "Rajesh"/"Rajeshh" is an ordinary
@@ -276,16 +309,12 @@ goes around it because Postgres renders a uuid as lowercase hex already. The pat
 explicit join: `owner_id` is `NOT NULL`, so the implicit inner join cannot drop a row from either
 the page or its count, and the two `get`s share one join.
 
-### 9.3 Ranking: `boostedFirst`, `relevanceFirst`, and the tie-break
+### 9.3 Ranking: `relevanceFirst`, `newestOnly`, and the tie-break
 
-Both ranking specifications **filter nothing** - they return a `null` predicate and contribute only
-an `ORDER BY`, so a boost or a good score buys position, never visibility. Both are applied only
-when the caller expressed no order: a buyer who sorts by price low-to-high gets price low-to-high,
-because silently pinning paid listings above a sort the buyer chose is a lie about what the control
-does.
-
-Promotion is computed as `boosted_until > now` rather than read as a flag, so an elapsed window
-stops promoting the moment it elapses and correctness never depends on a sweeper having run.
+Ranking specifications **filter nothing** - they return a `null` predicate and contribute only
+an `ORDER BY`, so a good score buys position, never visibility. Relevance applies only
+when the caller expressed no order: a buyer who sorts by price low-to-high gets price low-to-high.
+`newestOnly` is deliberately plain `created_at desc, id desc`.
 
 `relevanceFirst`'s score, term for term:
 
@@ -324,27 +353,30 @@ it deterministically.
   caller gets the entire catalogue back presented as the answer to their filter. An empty page is
   legible; a full one silently is not the search that was requested. The amenities loop needs this
   guard most, because an empty loop body adds no predicate at all.
-- **Amenities AND, occupancy/tenants OR.** Ticking "lift" and "parking" states two requirements,
+- **Amenities AND, tenant types OR.** Ticking "lift" and "parking" states two requirements,
   not two alternatives, and returning a listing with one of them wastes the visit that finds out.
-  PG sharing and tenant types OR, because one building genuinely offers several and a seeker who
-  will take a double or a triple has asked one question.
+  Tenant types OR, because one listing genuinely accepts several and a seeker who will take either
+  has asked one question.
 - **Stated policy only.** A listing that stated no tenant policy matches no tenant chip. "Unknown"
   is not a value a filter can match: answering a `family` tick with owners who said nothing is the
   same fabrication as defaulting the field to a guess. `pets` and `availableFrom` read silence the
-  same way, and so does `possession` - an unrecorded possession is not a promise. An unstated age
-  is excluded from an age search rather than read as zero (`cb.ge` on a null column is already
-  false; it is stated so nobody "fixes" it into a coalesce and floats every silent listing to the
-  top of a brand-new-homes search).
+  same way, and so does `possession` - an unrecorded possession is not a promise. **This is a rule
+  about token facets, and the range facets deliberately do the opposite** (see `unstatedFiltered`):
+  a tenant chip is a claim the owner either made or did not, while a silent `age_years` or
+  `deposit` is a gap in the data on a column most of the catalogue never fills, so excluding it
+  deletes the majority rather than answering the question. Ranges therefore admit the silent rows
+  and disclose the count. Neither rule is a coalesce - nothing is ever read as zero, which would
+  float every silent listing to the top of a brand-new-homes search.
 - **Trust flags only ever narrow.** `false` means "I did not ask", not "show me the unverified
   ones" - there is no surface that searches for absent trust.
 - **BHK is a union with an open top chip.** "3+" is a bound, not a value; rendering it as equality
   hides every 4BHK from a buyer who asked for three or more.
 - **Type chips need two columns.** `property_type_key` says what kind of building a listing is,
-  which is not quite what the chips ask: a PG posted with a `property_type` of "Flat" keys as
-  `flat`, so reading the key alone puts PG buildings and shared rooms into a Flat search.
-  `pg` and `flatmates` resolve against `share_type`; every other chip resolves against the type key
-  *and* the absence of a share type. Chips OR, so `?types=flat,pg` means whole flats plus PGs, not
-  the empty intersection ANDing the two columns would give. The commercial sub-filter needs its own
+  which is not quite what the chips ask: a shared room posted with a `property_type` of "Flat" keys
+  as `flat`, so reading the key alone puts shared rooms into a Flat search. `flatmates` resolves
+  against `share_type`; every other chip resolves against the type key *and* the absence of a share
+  type. Chips OR, so `?types=flat,flatmates` means whole flats plus shared rooms, not the empty
+  intersection ANDing the two columns would give. The commercial sub-filter needs its own
   `commercial_use_key`, because every commercial label collapses to `commercial` in the type key.
 - **`inLowerValues` lowercases the values, never the column.** `property_type_key` already holds a
   lowercase canonical vocabulary, so `lower(property_type_key)` buys no extra matches and costs the
@@ -368,6 +400,23 @@ it deterministically.
   *both* sides of the tri-state.
 - **Filtering happens in the database**, not client-side: a predicate the database cannot see cannot
   participate in `ORDER BY` or `LIMIT`, so a client-side filter pages the wrong set.
+
+- **A separate record from `PropertySearchQuery`.** That query is shared with the moderation search,
+  where "pets allowed" or "within 3km of Baner Chowk" mean nothing. Folding these in would have grown
+  the shape both callers must satisfy past thirty positional components, where one transposed
+  argument is a filter silently searching the wrong column. Kept apart, the moderation call site
+  passes `ListingFacets.NONE` and does not change.
+- **Plural names (`bhks`, `furnishings`) are deliberate.** `PropertySearchQuery` already publishes a
+  single-valued `bhk` on the same endpoint; two parameters of one name and different arity is worse
+  than ambiguous, since Spring binds the scalar first and `?bhk=2,3` becomes an equality against the
+  literal string.
+- **`availableFrom` is cumulative** and judged on the stored date: `15` means `available_on <= today+15`
+  (IST), so `30` also matches `now` and `15`; an undated listing matches no bucket. A tenant who can wait a month
+  can also take a flat free today. An unknown bucket resolves to a token no row can hold rather than
+  to a wildcard, so a bad request cannot read as the whole catalogue.
+- **The near-radius is clamped, not rejected** (50 km). The radius sizes a bounding box, and an
+  unbounded one spans the planet — a full-table scan anyone can request on an anonymous endpoint.
+  Fifty kilometres already reaches past every locality in the catalogue.
 
 ### 9.5 `ownershipLive` and `anyVerified`
 
@@ -427,17 +476,14 @@ meaning in an aggregate.
 
 `PropertyService.searchWithTotals` hands the ranked branch an **unsorted** pageable on purpose,
 because a `Pageable` sort overrides a specification's `ORDER BY` and the default `createdAt DESC`
-would silently discard the ranking; `boostedFirst`/`relevanceFirst` carry that tiebreaker
-themselves. The `PageImpl` is built with that same executed pageable, not the sanitised one, or a
+would silently discard the ranking; `relevanceFirst` carries that tiebreaker itself. The `PageImpl` is built with that same executed pageable, not the sanitised one, or a
 client reading `sort` off the response would be told about an order that was overridden.
 
-`rank` is deliberately not part of Spring's `sort`: `relevance` and `newest` are not column orders,
-they are rankings, and `PropertySort` exists to refuse anything that is not a whitelisted column.
-Passing them through `sort` would either widen that whitelist or be silently dropped. `newestOnly`
-means promoted-first then most recent with no merit ranking, because "newest" and "best match" are
-the two orders that both carry paid placement and only one may be reordered by a quality score - a
-buyer who asked for the newest listings and got the best-scoring ones has been shown something other
-than what the control says.
+`rank` is deliberately not part of Spring's `sort`: `relevance` is not a column order, and
+`PropertySort` exists to refuse anything that is not a whitelisted column. Passing it through `sort`
+would either widen that whitelist or be silently dropped. `newestOnly` means most recent with no
+merit ranking, because a buyer who asked for the newest listings and got the best-scoring ones has
+been shown something other than what the control says.
 
 The listings-page facets bind as a `ListingFacets` object rather than twenty-seven more
 `@RequestParam` declarations: a method with forty parameters is one where a mistyped name binds
@@ -447,17 +493,30 @@ nothing and the filter silently does not apply.
 
 `GET /properties/{id}` is public, so `principal` is null for an anonymous reader and a null viewer
 always masks the owner's mobile. The gate verdict comes from the `ContactGate` port, which the
-contacts feature implements. `GET /properties/trust-stats` is public and counted by the database:
-derived in the browser from whichever listings were already loaded, each figure would be a statement
-about the current page dressed up as a statement about the catalogue - worst for the distinct-owner
-figure, where two pages of the same owner's flats count as two verified owners. An unknown locality
-slug answers zeroes rather than 404, because this is a headline about a slice and an empty slice is
-a real slice.
+contacts feature implements. The `trustStats` section of `GET /bootstrap` is public and counted by the
+database over the whole live catalogue: derived in the browser from whichever listings were already
+loaded, each figure would be a statement about the current page dressed up as a statement about the
+catalogue - worst for the distinct-owner figure, where two pages of the same owner's flats count as
+two verified owners. The home category tiles read the neighbouring `counts` section the same way.
 
 The archive/restore `PATCH`es hide private fields **even from the owner**: the owner reads their own
 meter number from `GET /me/listings/{id}`, and branching visibility on whether the caller happens to
 be the owner would put a second copy of that decision here to drift out of step with
 `MeListingsController`.
+
+**Who may read a non-approved listing.** A missing, archived or unapproved row is a 404; sold or
+rented stays reachable so a held link opens the badged page. Two exceptions, both matching assumptions
+the client already makes:
+
+- **The owner.** The detail page shows everyone else an "under review" interstitial, a branch that was
+  unreachable while the server 404'd its own author — the dashboard's View button was dead for exactly
+  the first hours an owner most wants it.
+- **A checker.** The admin console offers *Open public page* on every verification-queue row, and it
+  404'd on precisely the listings it exists for. `staff` is resolved by the caller from the
+  `properties:read` *grant* rather than the bare role, so a revoked grant closes this door too.
+
+Archived stays a 404 for both: taken down is gone, not private, and the moderation search already
+reaches taken-down rows without pretending they are published.
 
 ## The property provider (`providers/http/propertyProvider.js`)
 
@@ -517,9 +576,9 @@ own, which is what makes the approved-and-unarchived floor, the paging and the c
 ones every other surface gets; without the floor, an owner's page would show their own rejected and
 archived rows to a stranger.
 
-`trustStats` does no client-side arithmetic and has no fallback: an unknown locality answers zeroes
-rather than 404, so there is no not-found case to translate, and a genuine failure should surface
-rather than be papered over with a plausible-looking number.
+`trustStats` does no client-side arithmetic and has no fallback: it is a section of `GET /bootstrap`,
+so there is no not-found case to translate, and a genuine failure should surface rather than be
+papered over with a plausible-looking number.
 
 `countProperties` gets an exact match count at any catalogue size with no new endpoint: ask for the
 smallest possible page and read `totalElements`, which the server computes over the full result set.
@@ -636,11 +695,8 @@ restore the status the listing held before, so a `pending` listing that is flagg
 reaches `approved` without ever passing the verification queue. That is the server's documented
 behaviour, passed through rather than simulated.
 
-`setPipelineStage` drops the listing the route answers with, for the reason above. The server sorts
-the value onto the right column: a hand-back milestone lands in `handback_milestone` and pins
-`pipeline_stage` at `docs_submitted`; an acquisition stage lands in `pipeline_stage` and clears the
-milestone. Anything outside the eight is a 400, which includes `under_review` and `live` — those are
-`status`, not stages.
+The Pipeline board has no write: its columns are the server-derived `progress.step`
+(`docs/flows/admin/property-verification.md` §7).
 
 The featured strip is server-curated and its endpoint takes no limit, so the cap is applied
 client-side purely to keep the seam signature meaningful.

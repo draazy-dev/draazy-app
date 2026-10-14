@@ -1,56 +1,11 @@
-import { useState } from 'react';
 import { ArrowDown, TrendingUp } from 'lucide-react';
 import { fmtINR, fmtNum, classNames } from '../../../lib/format.js';
-import DateRangePills from '../../../components/ui/DateRangePills.jsx';
-import DealPills from '../../../components/ui/DealPills.jsx';
 
-function FunnelView({ enquiries, visits, deals, funnelTime, setFunnelTime }) {
-  const [funnelDeal, setFunnelDeal] = useState('');
-
-  const cutoff = funnelTime ? Date.now() - Number(funnelTime) * 86400000 : 0;
-  const inRange = (dateStr) => !cutoff || new Date(dateStr).getTime() >= cutoff;
-  // `kind` used to be an alternative here, so that the deal pills could filter enquiries too. It
-  // never existed on a contact request — the mock invented `contact | chat | call` — so the clause
-  // matched nothing on live data and matched noise on mock data. Deals have a deal type; enquiries
-  // do not, and the pills now simply do not narrow them.
-  const matchDeal = (item) => !funnelDeal || item.deal === funnelDeal;
-
-  const enqCount = enquiries.filter((e) => inRange(e.at)).length;
-  const visitCount = visits.filter((v) => inRange(v.slot || v.when)).length;
-  const dealsCompleted = deals.filter((d) => d.status === 'closed' && inRange(d.at) && matchDeal(d));
-  const dealCount = dealsCompleted.length;
-  const dealGMV = dealsCompleted.reduce((sum, d) => sum + (d.value || 0), 0);
-
+function FunnelView({ funnel }) {
+  const { enquiries: enqCount, visits: visitCount, dealsClosed: dealCount, gmv: dealGMV, localities: localityRows } = funnel;
   const enqToVisit = enqCount > 0 ? Math.round((visitCount / enqCount) * 100) : 0;
   const visitToDeal = visitCount > 0 ? Math.round((dealCount / visitCount) * 100) : 0;
   const enqToDeal = enqCount > 0 ? Math.round((dealCount / enqCount) * 100) : 0;
-
-  // Locality breakdown.
-  //
-  // This used to read the locality out of the listing *title*, by splitting on the word " in ". That
-  // worked on seeded titles shaped "2 BHK in Kothrud" and produced "Unknown" for every real listing,
-  // which is most of them — so the table below was a ranking of one bucket. Rows now carry the
-  // locality the listing is actually filed under; the title split stays only as a fallback for mock
-  // rows that have no locality field at all.
-  const localityOf = (r) => r.locality || (r.listing || '').split(' in ')[1] || 'Unknown';
-  const localityMap = {};
-  enquiries.filter((e) => inRange(e.at)).forEach((e) => {
-    const loc = localityOf(e);
-    if (!localityMap[loc]) localityMap[loc] = { locality: loc, enquiries: 0, visits: 0, deals: 0, gmv: 0 };
-    localityMap[loc].enquiries++;
-  });
-  visits.filter((v) => inRange(v.slot || v.when)).forEach((v) => {
-    const loc = localityOf(v);
-    if (!localityMap[loc]) localityMap[loc] = { locality: loc, enquiries: 0, visits: 0, deals: 0, gmv: 0 };
-    localityMap[loc].visits++;
-  });
-  dealsCompleted.forEach((d) => {
-    const loc = localityOf(d);
-    if (!localityMap[loc]) localityMap[loc] = { locality: loc, enquiries: 0, visits: 0, deals: 0, gmv: 0 };
-    localityMap[loc].deals++;
-    localityMap[loc].gmv += d.value || 0;
-  });
-  const localityRows = Object.values(localityMap).sort((a, b) => b.enquiries - a.enquiries).slice(0, 10);
 
   const stages = [
     { label: 'Enquiries', count: enqCount, pct: 100, color: 'bg-indigo-500' },
@@ -60,13 +15,6 @@ function FunnelView({ enquiries, visits, deals, funnelTime, setFunnelTime }) {
 
   return (
     <div className="space-y-6">
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <DealPills value={funnelDeal} onChange={setFunnelDeal} />
-        <DateRangePills value={funnelTime} onChange={setFunnelTime} />
-        <span className="text-xs text-gray-500 ml-auto">Conversion funnel: Enquiry → Visit → Deal</span>
-      </div>
-
       {/* KPI cards */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">

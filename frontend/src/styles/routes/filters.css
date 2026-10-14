@@ -1,5 +1,5 @@
-/* Shared filter-sheet chrome (Tier 1), imported by BOTH /listings and /flatmates so the two
-   search surfaces read as one filter. Listings-only rules belong in routes/listings.css. */
+/* Shared chrome (Tier 1) for the filter sheet and result tiles, imported by BOTH /listings and
+   /flatmates so the two search surfaces read as one. Listings-only rules belong in routes/listings.css. */
 
 /* --- DualRange ------------------------------------------------------------ */
 
@@ -21,7 +21,7 @@
   right: 0;
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgb(var(--dz-c-white) / 0.12);
 }
 
 .rng-fill {
@@ -43,6 +43,18 @@
   appearance: none;
   background: transparent;
   pointer-events: none;
+  touch-action: pan-y;
+}
+
+.rng-thumb-hit {
+  position: absolute;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  touch-action: none;
+  cursor: pointer;
 }
 
 .rng input[type=range]::-webkit-slider-thumb {
@@ -52,14 +64,28 @@
   height: 16px;
   border-radius: 50%;
   background: var(--teal-2);
-  border: 2px solid #0f0d1a;
-  box-shadow: 0 0 0 1px var(--teal-2);
+  border: 0;
+  box-shadow: 0 2px 6px rgb(var(--dz-c-teal-500) / 0.45);
   cursor: pointer;
-  transition: transform 0.15s;
+  transition: transform 0.15s ease;
 }
 
-.rng input[type=range]::-webkit-slider-thumb:hover {
-  transform: scale(1.18);
+@media (hover: hover) and (pointer: fine) {
+  .rng-val:hover {
+    text-decoration-color: rgb(var(--dz-c-teal-300));
+  }
+
+  .rng input[type=range]::-webkit-slider-thumb:hover {
+    transform: scale(1.18);
+  }
+
+  .rng input[type=range]::-moz-range-thumb:hover {
+    transform: scale(1.18);
+  }
+}
+
+.rng input[type=range]::-webkit-slider-thumb:active {
+  transform: scale(1.08);
 }
 
 .rng input[type=range]::-moz-range-thumb {
@@ -68,42 +94,44 @@
   height: 16px;
   border-radius: 50%;
   background: var(--teal-2);
-  border: 2px solid #0f0d1a;
+  border: 0;
+  box-shadow: 0 2px 6px rgb(var(--dz-c-teal-500) / 0.45);
   cursor: pointer;
+  transition: transform 0.15s ease;
 }
 
-/* A 16px thumb is a mouse-sized target, and a price range is one of the most-dragged controls in
-   the funnel. Coarse only: 20px knob (smaller stops reading as grabbable), 28px strip unchanged. */
+.rng input[type=range]::-moz-range-thumb:active {
+  transform: scale(1.08);
+}
+
 @media (pointer: coarse) {
   .rng-wrap {
-    padding: 0 15px;
+    padding: 0 22px;
   }
 
   .rng {
-    height: 32px;
+    height: 44px;
   }
 
   .rng-track {
-    top: 14px;
+    top: 20px;
   }
 
   .rng input[type=range] {
-    top: 2px;
-    height: 28px;
+    top: 0;
+    height: 44px;
   }
 
   .rng input[type=range]::-webkit-slider-thumb {
-    width: 20px;
-    height: 20px;
+    width: 28px;
+    height: 28px;
   }
 
   .rng input[type=range]::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
+    width: 28px;
+    height: 28px;
   }
 
-  /* The two value labels are buttons: tapping one swaps in a text input, the only way to type an
-     exact budget on a phone. Extend the target, not the box, so they stay quiet numbers. */
   .rng-val {
     position: relative;
   }
@@ -129,7 +157,7 @@
   position: relative;
   padding-left: 26px;
   cursor: pointer;
-  color: #94a3b8;
+  color: rgb(var(--dz-c-slate-400));
   transition: color 0.2s;
   font-size: 13px;
 }
@@ -142,7 +170,7 @@
   transform: translateY(-50%);
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid rgb(var(--dz-c-white) / calc(0.15 * var(--dz-line-boost)));
   border-radius: 4px;
   transition: all 0.2s;
 }
@@ -155,13 +183,13 @@
   transform: translateY(-50%) rotate(45deg) scale(0);
   width: 5px;
   height: 10px;
-  border: solid #0f0d1a;
+  border: solid rgb(var(--dz-c-ink));
   border-width: 0 2px 2px 0;
   transition: transform 0.2s;
 }
 
 .custom-cb:checked+label {
-  color: #fff;
+  color: rgb(var(--dz-c-white));
 }
 
 .custom-cb:checked+label::before {
@@ -173,8 +201,15 @@
   transform: translateY(-55%) rotate(45deg) scale(1);
 }
 
-.filter-group .grid .custom-cb+label {
-  white-space: nowrap;
+/* A two-up cell is ~114px on the desktop sidebar, so long labels wrap; the box tracks the first line. */
+.filter-group .grid :is(.custom-cb, .custom-radio)+label {
+  display: inline-block;
+  line-height: 18px;
+}
+
+.filter-group .grid :is(.custom-cb, .custom-radio)+label::before,
+.filter-group .grid :is(.custom-cb, .custom-radio)+label::after {
+  top: 9px;
 }
 
 .custom-radio {
@@ -185,7 +220,7 @@
   position: relative;
   padding-left: 26px;
   cursor: pointer;
-  color: #94a3b8;
+  color: rgb(var(--dz-c-slate-400));
   transition: color 0.2s;
   font-size: 13px;
 }
@@ -198,7 +233,7 @@
   transform: translateY(-50%);
   width: 18px;
   height: 18px;
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid rgb(var(--dz-c-white) / calc(0.15 * var(--dz-line-boost)));
   border-radius: 50%;
   transition: all 0.2s;
 }
@@ -211,13 +246,13 @@
   transform: translateY(-50%) scale(0);
   width: 8px;
   height: 8px;
-  background: #0f0d1a;
+  background: rgb(var(--dz-c-ink));
   border-radius: 50%;
   transition: transform 0.2s;
 }
 
 .custom-radio:checked+label {
-  color: #fff;
+  color: rgb(var(--dz-c-white));
 }
 
 .custom-radio:checked+label::before {
@@ -236,11 +271,19 @@
   user-select: none;
 }
 
+/* The header is the only way to collapse a section, and its content — a 16px icon beside 14px
+   text — leaves a line box barely 20px tall, well under a fingertip. */
+@media (pointer: coarse) {
+  .fg-header {
+    min-height: 44px;
+  }
+}
+
 .fg-summary {
   margin-left: auto;
   font-size: 11px;
   font-weight: 500;
-  color: #64748b;
+  color: rgb(var(--dz-c-slate-500));
   max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -249,13 +292,13 @@
 }
 
 .fg-summary.active {
-  color: #5eead4;
+  color: rgb(var(--dz-c-teal-300));
 }
 
 .fg-chev {
   width: 16px;
   height: 16px;
-  color: #94a3b8;
+  color: rgb(var(--dz-c-slate-400));
   transition: transform 0.3s ease;
   flex-shrink: 0;
   margin-left: 6px;
@@ -295,7 +338,7 @@
 .sf-filter-sheet .filter-group+.filter-group {
   margin-top: 14px;
   padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid rgb(var(--dz-c-white) / calc(0.05 * var(--dz-line-boost)));
 }
 
 /* --- Pager ---------------------------------------------------------------- */
@@ -315,8 +358,8 @@
 }
 
 .page-btn:hover {
-  background: rgba(79, 70, 229, 0.2);
-  color: #fff;
+  background: rgb(var(--dz-c-indigo-600) / 0.2);
+  color: rgb(var(--dz-c-white));
 }
 
 /* Every pager button sits beside another fingertip target, and landing on "3" when you meant "4"
@@ -330,5 +373,5 @@
 
 .page-btn.active {
   background: var(--brand-gradient);
-  color: #fff;
+  color: rgb(var(--dz-c-pure-white));
 }

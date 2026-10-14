@@ -2,30 +2,27 @@ import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { APIProvider, Map, AdvancedMarker, InfoWindow } from '@vis.gl/react-google-maps';
 import Icon from '../../../components/Icon.jsx';
-import { LOCALITY_COORDS } from './constants.js';
-import { inr, initials, avatarGrad, perHead, seatsLeft, allVerified, moveInLabel, FLATMATE_IMG } from './helpers.js';
+import { useLocalityCoords } from './useLocalityCoords.js';
+import { inr, seekerBudget, initials, avatarGrad, perHead, seatsLeft, allVerified, moveInLabel, roomTitle, seekerTitle, FLATMATE_IMG } from './helpers.js';
 import { TAB_MOVE_IN } from './model.js';
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID } from '../../../lib/mapsConfig.js';
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme } from '../../../lib/mapsConfig.js';
 import { getActiveCityGeo } from '../../../lib/geoConfig.js';
 import MapUnavailable from '../../../components/property/MapUnavailable.jsx';
 
 const MAX_ROWS = 3;
-const IW_OFFSET = [0, -22]; // stable identity so vis.gl doesn't re-run setOptions each render
+const IW_OFFSET = [0, -22];
 
+// stable identity so vis.gl doesn't re-run setOptions each render
 const PREFIX = { group: 'g', room: 'r', seeker: 's' };
 
-// Per-kind view model so one row renderer serves seekers, rooms and groups. A map
-// cluster is a mixed feed just like the list, so this dispatches on the record's
-// own `kind` rather than on the active tab.
+// A map cluster is a mixed feed just like the list, so this dispatches on the
+// record's own `kind` rather than on the active tab.
 function rowModel(item, t) {
   if (item.kind === 'room') {
     return {
-      prefix: 'r', title: item.society, verified: !!item.verified,
+      prefix: 'r', title: roomTitle(item), verified: !!item.verified,
       meta: inr(item.budget) + t('flatmates.perMonth') + ' · ' + (item.roomType || item.flatType || t('flatmates.roomFallback')),
-      // Same chain `helpers.js:227` and `RoomCard` use. `item.img` alone is `undefined` on every
-      // server-backed room — `toRoomViewModel` emits `photos` — so the thumb fell through to the
-      // avatar and a room's photo never reached the map bubble.
-      thumb: item.img || item.photos?.[0] || FLATMATE_IMG, avatarText: null, avatarGrad: 'from-teal-500 to-indigo-500',
+      thumb: item.img || item.cover || FLATMATE_IMG, avatarText: null, avatarGrad: 'from-teal-500 to-indigo-500',
     };
   }
   if (item.kind === 'group') {
@@ -37,8 +34,8 @@ function rowModel(item, t) {
     };
   }
   return {
-    prefix: 's', title: item.name, verified: !!item.verified,
-    meta: inr(item.budget) + t('flatmates.perMonth') + ' · ' + moveInLabel(item.moveIn),
+    prefix: 's', title: seekerTitle(item), verified: !!item.verified,
+    meta: seekerBudget(item) + t('flatmates.perMonth') + ' · ' + moveInLabel(item.moveIn),
     thumb: null, avatarText: initials(item.name), avatarGrad: avatarGrad(item.gender),
   };
 }
@@ -51,17 +48,22 @@ function PostRow({ item, saved, onSave, onInterest, onRoomInterest, onJoin, inte
   const interested = interestedFor(item);
 
   let action;
+  const accepted = interested?.status === 'accepted';
   if (item.kind === 'room') {
-    action = interested
-      ? <button className="dz-sp-cta is-done" disabled><Icon name="check-check" /> {t('flatmates.sent')}</button>
-      : <button className="dz-sp-cta" onClick={() => onRoomInterest(item)}><Icon name="hand-heart" /> {t('flatmates.message')}</button>;
+    action = accepted
+      ? <button className="dz-sp-cta" onClick={() => goToPosting(m.prefix, item.id, locality)}><Icon name="message-circle" /> {t('flatmates.messageOwner')}</button>
+      : interested
+        ? <button className="dz-sp-cta is-done" disabled><Icon name="check-check" /> {t('flatmates.sent')}</button>
+        : <button className="dz-sp-cta" onClick={() => onRoomInterest(item)}><Icon name="hand-heart" /> {t('flatmates.message')}</button>;
   } else if (item.kind === 'group') {
     const full = seatsLeft(item) <= 0;
-    action = full
-      ? <button className="dz-sp-cta is-off" disabled><Icon name="lock" /> {t('flatmates.full')}</button>
-      : interested
-        ? <button className="dz-sp-cta is-done" disabled><Icon name="check-check" /> {item.policy === 'any' ? t('flatmates.joined') : t('flatmates.sent')}</button>
-        : <button className="dz-sp-cta" onClick={() => onJoin(item)}><Icon name={item.policy === 'any' ? 'user-plus' : 'user-check'} /> {item.policy === 'any' ? t('flatmates.join') : t('flatmates.request')}</button>;
+    action = accepted
+      ? <button className="dz-sp-cta is-done" disabled><Icon name="check-check" /> {t('flatmates.joined')}</button>
+      : full
+        ? <button className="dz-sp-cta is-off" disabled><Icon name="lock" /> {t('flatmates.full')}</button>
+        : interested
+          ? <button className="dz-sp-cta is-done" disabled><Icon name="check-check" /> {item.policy === 'any' ? t('flatmates.joined') : t('flatmates.sent')}</button>
+          : <button className="dz-sp-cta" onClick={() => onJoin(item)}><Icon name={item.policy === 'any' ? 'user-plus' : 'user-check'} /> {item.policy === 'any' ? t('flatmates.join') : t('flatmates.request')}</button>;
   } else {
     action = interested
       ? <button className="dz-sp-cta is-done" disabled><Icon name="check-check" /> {t('flatmates.interested')}</button>
@@ -82,17 +84,14 @@ function PostRow({ item, saved, onSave, onInterest, onRoomInterest, onJoin, inte
       </button>
       <div className="dz-sp-rowact">
         {action}
-        <button type="button" className={'dz-sp-save' + (isSaved ? ' is-saved' : '')} aria-pressed={isSaved} aria-label={isSaved ? t('flatmates.saved') : t('flatmates.save')} onClick={() => onSave(saveKey)}><Icon name="bookmark" /></button>
+        <button type="button" className={'dz-sp-save' + (isSaved ? ' is-saved' : '')} aria-pressed={isSaved} aria-label={isSaved ? t('flatmates.saved') : t('flatmates.save')} onClick={() => onSave(saveKey)}><Icon name="heart" /></button>
       </div>
     </div>
   );
 }
 
-// Frame the map to the localities that actually have posts: fit their bounds
-// (with a little padding) when there are several, else center on the single
-// area, else fall back to a Pune-wide view.
-function framing(items) {
-  const pts = Object.keys(items).map((l) => LOCALITY_COORDS[l]).filter(Boolean);
+function framing(items, localityCoords) {
+  const pts = Object.keys(items).map((l) => localityCoords[l]).filter(Boolean);
   if (pts.length >= 2) {
     const lats = pts.map((p) => p[0]);
     const lngs = pts.map((p) => p[1]);
@@ -110,16 +109,17 @@ function framing(items) {
 
 function FlatmateMap({ items, tab, kindWord, onInterest, onRoomInterest, onJoin, onSave, saved, interestedFor, goToPosting }) {
   const { t } = useTranslation();
+  const localityCoords = useLocalityCoords(Object.keys(items));
   const [openLoc, setOpenLoc] = useState(null);
   // kindWord is 'homes' on the Move-in tab and 'flatmates' on Team up — the two
   // tabs are the only sources, so there is no third case to handle.
   const hereKey = kindWord === 'homes' ? 'homesHere' : 'flatmatesHere';
   const prefix = tab === TAB_MOVE_IN ? 'r' : 's';
   const openList = openLoc && items[openLoc] ? items[openLoc] : null;
-  const openPos = openLoc ? LOCALITY_COORDS[openLoc] : null;
+  const openPos = openLoc ? localityCoords[openLoc] : null;
   // Stable identity so vis.gl doesn't re-run setOptions on every render (same
   // reason IW_OFFSET is hoisted) — framing() builds a fresh bounds/center object.
-  const frame = useMemo(() => framing(items), [items]);
+  const frame = useMemo(() => framing(items, localityCoords), [items, localityCoords]);
   if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={{ height: 460 }} />;
   return (
     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
@@ -127,8 +127,10 @@ function FlatmateMap({ items, tab, kindWord, onInterest, onRoomInterest, onJoin,
         <Map
           {...frame}
           mapId={GOOGLE_MAPS_MAP_ID}
-          colorScheme="DARK"
-          gestureHandling="greedy"
+          colorScheme={mapColorScheme()}
+          /* Not greedy: this map is 460px inside a scrolling page, so a greedy map would
+           * swallow every one-finger drag. */
+          gestureHandling="cooperative"
           clickableIcons={false}
           mapTypeControl={false}
           streetViewControl={false}
@@ -136,7 +138,7 @@ function FlatmateMap({ items, tab, kindWord, onInterest, onRoomInterest, onJoin,
           style={{ width: '100%', height: '100%' }}
         >
           {Object.keys(items).map((l) => {
-            const pos = LOCALITY_COORDS[l];
+            const pos = localityCoords[l];
             if (!pos) return null;
             return (
               <AdvancedMarker

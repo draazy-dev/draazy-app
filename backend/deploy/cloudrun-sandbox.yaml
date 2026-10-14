@@ -9,27 +9,27 @@ metadata:
     cloud.googleapis.com/location: asia-south1
   annotations:
     # Cloudflare Pages Functions reach this from the public internet, so internal-only would 403.
-    # It is also why the rate limiter is only advisory — docs/DEPLOY.md §4.
+    # OriginGateFilter is what closes the door instead: only the Function knows ORIGIN_SHARED_SECRET.
     run.googleapis.com/ingress: all
 
 spec:
   template:
     metadata:
       annotations:
-        # Free tier: an idle sandbox costs nothing, at the price of a JVM cold start. Raising this
-        # to 1 is the single largest cost trigger on the platform.
-        autoscaling.knative.dev/minScale: '0'
+        # Warm is not running: CPU is still throttled to ~0 between requests, so this alone does
+        # NOT make the eight @Scheduled sweeps fire.
+        autoscaling.knative.dev/minScale: '1'
 
         # 4 × Hikari's 5 connections = 20, which the free-tier Supavisor pooler absorbs; the default
         # 100 gives 500 and Postgres starts refusing. Also the runaway-cost stop.
         autoscaling.knative.dev/maxScale: '4'
 
-        # Extra CPU for the classload and component-scan window only, billed just for those seconds
-        # — the cheapest cold-start win available on a scale-to-zero service.
+        # Still earns its place under minScale 1: every deploy boots a fresh container, and
+        # instances 2..4 start cold under a spike.
         run.googleapis.com/startup-cpu-boost: 'true'
 
-        # CPU only while a request is in flight, which silently stops the eight @Scheduled sweeps
-        # ever firing. Accepted on sandbox, fatal for production — docs/DEPLOY.md §5 and §7.
+        # Stops the eight @Scheduled sweeps ever firing; 'false' needs ShedLock first and switches
+        # to instance-based billing (~6× the bill) — docs/DEPLOY.md §5 and §7.
         run.googleapis.com/cpu-throttling: 'true'
 
     spec:
@@ -41,9 +41,9 @@ spec:
       # its timeout and surface as slow 500s, where 40 lets Cloud Run scale out.
       containerConcurrency: 40
 
-      # Past any legitimate request (13MB multipart on a slow uplink) but short enough that a hung
-      # one releases its database connection well before the platform default of five minutes.
-      timeoutSeconds: 120
+      # The messages SSE stream is one request that lives up to MessageEventHub.STREAM_TIMEOUT_MS
+      # (5 min); a shorter platform timeout would cut it mid-stream and force a reconnect.
+      timeoutSeconds: 3600
 
       containers:
         - image: ${IMAGE}
@@ -57,8 +57,8 @@ spec:
           resources:
             limits:
               cpu: '1'
-              # 1Gi, not 512Mi: -XX:MaxRAMPercentage=75 leaves only 128Mi of non-heap at 512Mi and
-              # the container is OOM-killed during startup, after the health check begins waiting.
+              # Measured peak is ~650 MB under 40 concurrent requests; MaxRAMPercentage=70 leaves
+              # ~300 Mi for non-heap, which must fit or startup is OOM-killed — docs/DEPLOY.md §5.
               memory: 1Gi
 
           env:
@@ -67,26 +67,46 @@ spec:
             - name: SPRING_PROFILES_ACTIVE
               value: sandbox
 
-            # The SPA origin, not the *.run.app URL: /api is same-origin behind the Pages Function,
-            # which is what lets the session cookie keep its __Host- prefix (docs/DEPLOY.md §1).
+            # The SPA origins (sandbox and draazy.com share one Pages deployment), not the *.run.app URL:
+            # /api is same-origin behind the Pages Function, so the cookie keeps __Host- (docs/DEPLOY.md §1).
             - name: WEB_ORIGINS
-              value: https://sandbox.draazy.com
+              value: https://sandbox.draazy.com,https://draazy.com
             - name: API_PUBLIC_ORIGIN
               value: https://sandbox.draazy.com
+            # Base of links read off-site (staff invites, outreach); defaults to draazy.com.
+            - name: APP_BASE_URL
+              value: https://sandbox.draazy.com
 
-            # `none` collapses every anonymous caller into one rate-limit bucket, which is still
-            # safer than trusting Cloudflare's shared egress IPs — docs/DEPLOY.md §4.
+            # Blank = off. A new RECOVER nonce resets the configured admin — docs/DEPLOY.md §3.
+            - name: BOOTSTRAP_ADMIN_EMAIL
+              value: "${BOOTSTRAP_ADMIN_EMAIL}"
+            - name: BOOTSTRAP_ADMIN_MOBILE
+              value: "${BOOTSTRAP_ADMIN_MOBILE}"
+            - name: BOOTSTRAP_ADMIN_RECOVER
+              value: "${BOOTSTRAP_ADMIN_RECOVER}"
+
+            # `none` is correct here: the origin gate trusts only the first X-Forwarded-For hop the edge
+            # proxy wrote and rate-limits anonymous callers on it, so visitors do not share a bucket.
             - name: INTERNAL_PROXIES
               value: none
 
+            # Must equal the Pages secret of the same name, or every proxied call 403s here.
+            - name: ORIGIN_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-origin-shared-secret
+                  key: latest
+
             # Identifiers, not passwords, but readable by any project viewer once set as plain env.
-            # DB_URL is the transaction pooler; FLYWAY_DB_URL must be the session one — docs/DEPLOY.md §2.
+            # DB_URL is the transaction pooler. The migration job, not this service, uses the Flyway inputs.
             - name: DB_URL
               value: ${DB_URL}
-            - name: FLYWAY_DB_URL
-              value: ${FLYWAY_DB_URL}
+            # DB_USER is the DML-only runtime role. FLYWAY_DB_USER is read only by DatabasePrivilegeCheck,
+            # to compare against it (docs/DEPLOY.md §2.1).
             - name: DB_USER
               value: ${DB_USER}
+            - name: FLYWAY_DB_USER
+              value: ${FLYWAY_DB_USER}
 
             # `latest` so a rotation lands on the next revision without editing this file; the cost
             # is that redeploying an old image rolls back code but never secrets.
@@ -105,18 +125,44 @@ spec:
                 secretKeyRef:
                   name: draazy-sandbox-referral-signal-salt
                   key: latest
-            # A blank value makes every forged webhook signature valid, so it is required even with
-            # CASHFREE_ENABLED off.
+            # Keyed HMAC behind identity_hash; bound undefaulted so the boot fails without it.
+            # Set-once: rotating it orphans every existing hash.
+            - name: IDENTITY_HASH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-identity-hash-secret
+                  key: latest
+            # AES-256 for staff authenticator secrets. Set-once: rotating it forces every staff
+            # account to re-enrol (admin "Reset 2FA").
+            - name: STAFF_TOTP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-staff-totp-key
+                  key: latest
+            # AES-256 for PAN/Aadhaar at rest; each value stores the key id.
+            # A new key needs a new id and the old pair in IDENTITY_RETIRED_KEYS.
+            - name: IDENTITY_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-identity-encryption-key
+                  key: latest
+            - name: IDENTITY_ENCRYPTION_KEY_ID
+              value: "s1"
+            # Cashfree signs with x-client-secret, so this reads the SAME entry as CASHFREE_SECRET_KEY
+            # below: two entries holding one credential drift invisibly the moment either is rotated.
             - name: CASHFREE_WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: draazy-sandbox-cashfree-webhook-secret
+                  name: draazy-sandbox-cashfree-secret-key
                   key: latest
 
-            # Wired but off; flipping to 'true' with real keys is the whole change. The two secrets
-            # must EXIST first — a secretKeyRef to a missing secret is a hard boot error.
+            # Both secrets must hold real TEST_/cfsk_ values: a placeholder is non-blank, so the
+            # service boots normally and every order creation 401s instead.
+
+            # Cloning for prod: CASHFREE_BASE_URL=https://api.cashfree.com (default is sandbox)
+            # and VITE_CASHFREE_MODE=production.
             - name: CASHFREE_ENABLED
-              value: 'false'
+              value: 'true'
             - name: CASHFREE_APP_ID
               valueFrom:
                 secretKeyRef:
@@ -128,15 +174,78 @@ spec:
                   name: draazy-sandbox-cashfree-secret-key
                   key: latest
 
+            # Sent per-order, because the dashboard holds one endpoint across every environment. The
+            # SPA origin as with WEB_ORIGINS, and `/api` because the context path moves this route.
+            - name: CASHFREE_NOTIFY_URL
+              value: https://sandbox.draazy.com/api/webhooks/cashfree/payment
+
+            # Staff invite and password-reset emails. From-address defaults to noreply@draazy.com,
+            # whose domain must show DKIM and CNAME Verified in ZeptoMail or every send is refused.
+            - name: ZEPTOMAIL_ENABLED
+              value: 'true'
+            - name: ZEPTOMAIL_FROM_NAME
+              value: Draazy Sandbox
+            - name: ZEPTOMAIL_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-zeptomail-api-key
+                  key: latest
+
+            # `R2FileStorage` refuses to start unless all six are non-blank, and a secretKeyRef to a
+            # missing secret is a hard boot error — so a gap here crash-loops rather than fails late.
+            - name: STORAGE_ENABLED
+              value: 'true'
+            - name: R2_ENDPOINT
+              value: ${R2_ENDPOINT}
+            # Private holds identity captures a reviewer reads through a signed URL; public holds
+            # listing photos. Distinct buckets, because the public one is served to anyone.
+            - name: R2_BUCKET_PRIVATE
+              value: ${R2_BUCKET_PRIVATE}
+            - name: R2_BUCKET_PUBLIC
+              value: ${R2_BUCKET_PUBLIC}
+            - name: R2_PUBLIC_BASE_URL
+              value: ${R2_PUBLIC_BASE_URL}
+            - name: R2_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-r2-access-key-id
+                  key: latest
+            - name: R2_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-r2-secret-access-key
+                  key: latest
+
+            # Server-side Place Details key, separate from the browser's referrer-restricted one. Blank
+            # would wire the dev lookup that trusts the client, so the secret must exist before deploy.
+            - name: GOOGLE_PLACES_SERVER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-google-places-server-key
+                  key: latest
+
+            # Web push. The pair must be created (and the runtime account granted access) before deploy;
+            # both are secrets only so the manifest needs no extra substitution variable.
+            - name: PUSH_VAPID_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-push-vapid-private-key
+                  key: latest
+            - name: PUSH_VAPID_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: draazy-sandbox-push-vapid-public-key
+                  key: latest
+
           # HTTP, not TCP: a TCP probe passes the moment Tomcat binds, before the context is ready.
-          # 30 × 5s of grace covers a cold JVM that also has a slow Flyway migration to apply.
+          # 60 × 5s covers a cold JVM on a throttled CPU.
           startupProbe:
             httpGet:
               path: /api/actuator/health/readiness
             initialDelaySeconds: 10
             timeoutSeconds: 5
             periodSeconds: 5
-            failureThreshold: 30
+            failureThreshold: 60
 
           # The `liveness` group deliberately excludes the database indicator — restarting the
           # container is no part of the remedy for Supabase being down.

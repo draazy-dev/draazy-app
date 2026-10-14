@@ -1,8 +1,6 @@
 /* Draazy — HRA Rent Receipt generator for Dashboard Documents tab.
    Port of the static app's rent-receipt.js using jsPDF ESM. */
 
-import { jsPDF } from 'jspdf';
-
 const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 export function numToWordsIndian(n) {
@@ -96,10 +94,11 @@ function monthRange(fromStr, toStr) {
 }
 
 /* Generate & download HRA rent receipts PDF for a range of months. */
-export function generateRentReceipts({ tenant, landlord, address, rent, pan, fromMonth, toMonth, mode }) {
+export async function generateRentReceipts({ tenant, landlord, address, rent, pan, fromMonth, toMonth, mode }) {
   const months = monthRange(fromMonth, toMonth);
   if (!months.length) return { ok: false, error: 'Invalid month range' };
 
+  const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const perPage = 2, boxH = 124, top = 16, gap = 14;
 

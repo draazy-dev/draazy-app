@@ -3,16 +3,14 @@ package com.draazy.api.engagement.flatmate;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
-import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.Notifier;
-import com.draazy.api.identity.user.User;
-import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.AuthPrincipal;
+import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -20,104 +18,48 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * A formed flatmate group applying to an owner's whole-flat rent listing.
- *
- * <p><strong>This is the other half of {@link FlatmateGroupApplication}.</strong> The row, its
- * table, its two check constraints, its {@code decide} method and the admin moderation board all
- * existed already — but nothing on the API ever created one, and nothing ever called
- * {@code decide}. The admin board was therefore a correct, guarded, paged read over a table that
- * could not acquire a row. This service is the missing supply.
- *
- * <p><strong>Why this is not {@link FlatmateRequest}.</strong> A request is one person asking one
- * host for one seat in a flat that already has occupants. An application is a whole group asking an
- * owner for a whole flat. Both ends differ and so does the direction, which is why the two have
- * separate tables, separate routes and separate services rather than a {@code kind} column that
- * every query would then have to remember to filter on.
- *
- * <p><strong>The owner's axis only.</strong> Everything here writes {@code status} and never
- * {@code modStatus} — the mirror of {@link FlatmateModerationService#moderateApplication}, which
- * writes {@code modStatus} and never {@code status}. "The owner said no" and "we took this down"
- * are different facts; the entity enforces the split by exposing two methods that cannot reach each
- * other's field, and the two services keep it visible at the call site.
- *
- * <p><strong>{@link #myGroups} lives here rather than with the rest of the group writes</strong>
- * because it exists for this flow: it is the query that answers "which of my groups could apply to
- * this flat", and its caller renders the apply button from the {@code seatsOpen} and
- * {@code propertyId} that the public feed projection drops. {@code FlatmateSupplyService} is one of
- * the six services grandfathered over the split trigger, so new behaviour goes to the use-case that
- * needs it rather than onto the pile.
- */
+/** Group applications are not requests: a host binds the whole group to a listing. */
 @Service
 public class FlatmateApplicationService {
+
+    private static final String CLOSED_TO_GROUPS =
+            "This flat has already been given to a group and is closed to new group applications.";
 
     private final FlatmateGroupApplicationRepository applications;
     private final FlatmateGroupRepository groups;
     private final PropertyRepository properties;
     private final GroupApplicationHydrator hydrator;
-    private final FlatmateMapper mapper;
-    private final UserRepository users;
     private final Notifier notifier;
-    private final AuditService audit;
-    /** The Ops verdict behind a group's tier badge, batched once per window. */
-    private final FlatmateReviewStatuses reviewStatuses;
+    private final RateLimitLock locks;
 
     public FlatmateApplicationService(FlatmateGroupApplicationRepository applications,
             FlatmateGroupRepository groups, PropertyRepository properties,
-            GroupApplicationHydrator hydrator, FlatmateMapper mapper, UserRepository users,
-            Notifier notifier, AuditService audit, FlatmateReviewStatuses reviewStatuses) {
+            GroupApplicationHydrator hydrator, Notifier notifier,
+            RateLimitLock locks) {
         this.applications = applications;
         this.groups = groups;
         this.properties = properties;
         this.hydrator = hydrator;
-        this.mapper = mapper;
-        this.users = users;
         this.notifier = notifier;
-        this.audit = audit;
-        this.reviewStatuses = reviewStatuses;
+        this.locks = locks;
     }
 
-    /**
-     * {@code GET /me/flatmate-groups} — the groups this caller started.
-     *
-     * <p>Full {@link FlatmateGroupDto}, not the feed's card projection: the caller is the host, so
-     * there is nothing on the row they are not entitled to, and the surfaces that need this need
-     * the fields the card drops — {@code seatsOpen} and {@code propertyId} to decide whether a
-     * group can apply to a flat, {@code modStatus} to explain why it is not showing publicly yet.
-     *
-     * <p>Includes groups still awaiting moderation, deliberately. Hiding them would show a host an
-     * empty list minutes after they created a group, which reads as data loss rather than as a
-     * queue.
-     */
+    /** Host view: the card draws the moderation state and the seats; the edit form reads the one group it opens. */
     @Transactional(readOnly = true)
-    public Page<FlatmateGroupDto> myGroups(AuthPrincipal caller, Pageable pageable) {
-        // The caller's own view of their own rows: name and number both present, because it is
-        // their number on a request they authenticated. One lookup for the whole page.
-        User me = users.findById(caller.userId()).orElse(null);
-        String name = me == null ? null : me.getName();
-        String mobile = me == null ? null : me.getMobile();
-        Page<FlatmateGroup> page = groups.findMine(caller.userId(), pageable);
-        /* The Ops verdict per row, batched for the window. A host needs this more than a stranger
-           does: it is what tells them their agreement is still being looked at rather than that
-           their badge silently failed to appear. Per-row it would be one query per group. */
-        Map<UUID, String> verdicts = reviewStatuses.forGroups(page.getContent());
-        return page.map(g -> mapper.toDto(g,
-                new FlatmateMapper.PartyView(name, mobile, verdicts.get(g.getId()))));
+    public Page<FlatmateGroupCard> myGroups(AuthPrincipal caller, Pageable pageable) {
+        return groups.findMine(caller.userId(), pageable).map(FlatmateApplicationService::card);
     }
 
-    /**
-     * {@code POST /flatmates/groups/{id}/apply} — commit a group to a listing.
-     *
-     * <p><strong>Host-only, deliberately.</strong> An application binds every member of the group
-     * to a flat and a rent; a member who joined yesterday must not be able to sign the other three
-     * up for it. This also matches what the row stores — {@code applicant_id} is documented as the
-     * group's host — so any other rule would make that column a lie.
-     *
-     * <p>The listing must be publicly visible <em>and</em> a rental. Applying to a pending listing
-     * would put the group in a queue behind a moderation decision they cannot see, and applying to
-     * a sale listing is a category error: {@code price} means the whole consideration there, so the
-     * per-head figure the group is shown would be off by two orders of magnitude.
-     */
+    private static FlatmateGroupCard card(FlatmateGroup group) {
+        List<String> localities = group.isHunting() && !group.getLocalities().isEmpty()
+                ? List.copyOf(group.getLocalities())
+                : group.getLocality() == null ? List.of() : List.of(group.getLocality());
+        return new FlatmateGroupCard(group.getId(), group.getTitle(), group.getLocality(), localities,
+                group.getRent(), group.getSeatsTotal(), group.openSeats(), group.getMembers().size(),
+                group.getPropertyId(), group.getModStatus(), group.getCreatedAt());
+    }
+
+    /** Host-only: applying binds every group member to a flat and rent. */
     @Transactional
     public GroupApplicationDto apply(AuthPrincipal caller, UUID groupId, UUID listingId) {
         FlatmateGroup group = groups.findById(groupId)
@@ -142,9 +84,14 @@ public class FlatmateApplicationService {
         if (listing.getOwner() != null && listing.getOwner().getId().equals(caller.userId())) {
             throw new BadRequestException("This is your own listing.");
         }
+        locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION, listingId.toString());
         if (applications.existsByListingIdAndGroupId(listingId, groupId)) {
             throw new ConflictException(
                     "Your group has already applied to this flat — the owner has it.");
+        }
+        if (applications.existsByListingIdAndStatusAndModStatusIn(listingId,
+                FlatmateVocabulary.STATUS_ACCEPTED, FlatmateVocabulary.MOD_PUBLIC)) {
+            throw new ConflictException(CLOSED_TO_GROUPS);
         }
 
         FlatmateGroupApplication saved = applications.saveAndFlush(
@@ -156,23 +103,11 @@ public class FlatmateApplicationService {
                     group.getTitle() + " would like to rent " + listing.getTitle() + ".",
                     "/dashboard");
         }
-        audit.record(caller, "flatmate.groupApplication.create", "flatmateGroupApplication",
-                saved.getId().toString(), "listingId", listingId.toString());
 
         return hydrator.hydrateOne(saved);
     }
 
-    /**
-     * {@code GET /me/group-applications} — the owner inbox, newest first, paged.
-     *
-     * <p>Scoped by the caller's listing ids rather than by an {@code owner_id} column, because the
-     * row has no owner: ownership is a fact about the listing and can change. An owner with no
-     * listings short-circuits to an empty page rather than issuing an {@code in ()} query.
-     *
-     * <p>Moderation-removed applications are excluded here and only here. An admin taking down a
-     * spam application must not thereby decline it on the owner's behalf, so {@code status} is left
-     * alone and this predicate is the only thing keeping the row off the screen.
-     */
+    /** Scope by owned listing ids because the application row has no owner column. */
     @Transactional(readOnly = true)
     public Page<GroupApplicationDto> inbox(AuthPrincipal caller, Pageable pageable) {
         List<UUID> listingIds = properties.findIdsByOwnerId(caller.userId());
@@ -186,18 +121,7 @@ public class FlatmateApplicationService {
                 page.getTotalElements());
     }
 
-    /**
-     * {@code PATCH /me/group-applications/{id}} — the owner accepts or declines.
-     *
-     * <p>Scoped by looking the application up and then checking the caller owns its listing, which
-     * is why a stranger's application id produces a 404 rather than a 403: an id that resolves for
-     * one caller and refuses for another is an existence oracle, and the contract's own
-     * owner-scoped finders take the same line.
-     *
-     * <p>A decided application cannot be re-decided. The check constraint pairs {@code decided_at}
-     * with the status, so a second write would move the timestamp and quietly rewrite when the
-     * owner made up their mind.
-     */
+    /** Stranger ids return 404, not 403, so application ids do not become existence oracles. */
     @Transactional
     public GroupApplicationDto decide(AuthPrincipal caller, UUID applicationId, String status) {
         String verdict = FlatmateVocabulary.require(
@@ -210,25 +134,59 @@ public class FlatmateApplicationService {
                 .filter(p -> p.getOwner() != null && p.getOwner().getId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Group application"));
 
+        locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION,
+                listing.getId().toString());
+        if (verdict.equals(application.getStatus())) {
+            return hydrator.hydrateOne(application);
+        }
         if (!FlatmateVocabulary.STATUS_PENDING.equals(application.getStatus())) {
             throw new ConflictException("You have already answered this application.");
         }
 
-        application.decide(verdict);
-        applications.saveAndFlush(application);
+        boolean accepting = FlatmateVocabulary.STATUS_ACCEPTED.equals(verdict);
+        if (accepting && applications.existsByListingIdAndStatusAndModStatusInAndIdNot(listing.getId(),
+                FlatmateVocabulary.STATUS_ACCEPTED, FlatmateVocabulary.MOD_PUBLIC, application.getId())) {
+            throw new ConflictException(CLOSED_TO_GROUPS);
+        }
 
+        if (applications.updateDecisionIfPending(application.getId(),
+                FlatmateVocabulary.STATUS_PENDING, verdict, Instant.now()) == 0) {
+            FlatmateGroupApplication current = applications.findById(application.getId())
+                    .orElseThrow(() -> NotFoundException.of("Group application"));
+            if (verdict.equals(current.getStatus())) {
+                return hydrator.hydrateOne(current);
+            }
+            throw new ConflictException("You have already answered this application.");
+        }
+        FlatmateGroupApplication decided = applications.findById(application.getId())
+                .orElseThrow(() -> NotFoundException.of("Group application"));
+
+        notifyVerdict(listing, decided, verdict);
+
+        if (accepting) {
+            declineOtherPending(listing, decided.getId());
+        }
+        return hydrator.hydrateOne(decided);
+    }
+
+    private void declineOtherPending(Property listing, UUID acceptedId) {
+        for (FlatmateGroupApplication other : applications.findByListingIdAndStatus(
+                listing.getId(), FlatmateVocabulary.STATUS_PENDING)) {
+            if (!other.getId().equals(acceptedId) && applications.updateDecisionIfPending(other.getId(),
+                    FlatmateVocabulary.STATUS_PENDING, "declined", Instant.now()) == 1) {
+                notifyVerdict(listing, other, "declined");
+            }
+        }
+    }
+
+    private void notifyVerdict(Property listing, FlatmateGroupApplication application, String verdict) {
+        boolean accepted = FlatmateVocabulary.STATUS_ACCEPTED.equals(verdict);
         notifier.notify(application.getApplicantId(), "flatmate.groupApplication." + verdict,
-                "accepted".equals(verdict)
-                        ? "Your group's application was accepted"
+                accepted ? "Your group's application was accepted"
                         : "Your group's application was declined",
-                "accepted".equals(verdict)
-                        ? "The owner of " + listing.getTitle() + " accepted your group. "
+                accepted ? "The owner of " + listing.getTitle() + " accepted your group. "
                                 + "They will be in touch to arrange the paperwork."
                         : "The owner of " + listing.getTitle() + " declined your group.",
-                "/flatmates");
-        audit.record(caller, "flatmate.groupApplication." + verdict, "flatmateGroupApplication",
-                application.getId().toString(), "status", verdict);
-
-        return hydrator.hydrateOne(application);
+                FlatmateLinks.of("group", application.getGroupId()));
     }
 }

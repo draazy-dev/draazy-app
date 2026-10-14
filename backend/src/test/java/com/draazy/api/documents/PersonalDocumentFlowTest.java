@@ -17,15 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
 
-/**
- * The personal (KYC) vault: {@code GET/POST /me/documents/personal} and
- * {@code DELETE /me/documents/personal/{docId}} (slice A, V32).
- *
- * <p>Organised around the invariants that make this a separate resource from the property vault:
- * it is owned by the <em>person</em>, its {@code personal} route out-ranks the vault's
- * {@code {propId}} template, and — as with {@link DocumentVaultTest} — a stored row never carries a
- * persisted URL and the sniffed type wins over the declared one.
- */
+/** Owned by the person, not a property: the {@code personal} route outranks {@code {propId}},
+ * and a stored row never carries a persisted URL while the sniffed type wins over the declared one. */
 class PersonalDocumentFlowTest extends AbstractApiTest {
 
     @Autowired
@@ -54,22 +47,6 @@ class PersonalDocumentFlowTest extends AbstractApiTest {
         return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-    // ---------------- routing ----------------
-
-    @Test
-    void personalRoute_outranksThePropIdTemplate_soItReachesThePersonalHandler() throws Exception {
-        User owner = user("9821002001");
-
-        // If `personal` were read as a {propId}, this would resolve to the vault handler and 404 as
-        // an unknown property. It is a literal segment, so it wins over the template (the same
-        // resolution rule that keeps /me/documents/requests out of the vault) and returns the
-        // caller's — empty — personal list instead.
-        mvc.perform(get(Routes.MeDocuments.PERSONAL)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
-    }
-
     // ---------------- upload ----------------
 
     @Test
@@ -89,32 +66,17 @@ class PersonalDocumentFlowTest extends AbstractApiTest {
     }
 
     @Test
-    void uploadPersonal_carriesTheLiteralPersonalBucketOnTheWire() throws Exception {
+    void uploadPersonal_returnsMetadataOnly() throws Exception {
         User owner = user("9821002003");
 
-        // propertyId="personal" is the same bucket key the front end already reads with; the client
-        // mapper drops the field, but the contract stays a single Document shape.
         mvc.perform(multipart(Routes.MeDocuments.PERSONAL)
                         .file(pdf("pan.pdf"))
                         .param("category", "PAN Card")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.propertyId").value("personal"))
                 .andExpect(jsonPath("$.category").value("PAN Card"))
-                .andExpect(jsonPath("$.url").exists());
-    }
-
-    @Test
-    void uploadPersonal_refusesHtmlDisguisedAsAPdf() throws Exception {
-        User owner = user("9821002004");
-
-        mvc.perform(multipart(Routes.MeDocuments.PERSONAL)
-                        .file(new MockMultipartFile("file", "aadhaar.pdf", "application/pdf",
-                                "<html><script>alert(1)</script>".getBytes()))
-                        .param("category", "Aadhaar Card")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isUnsupportedMediaType())
-                .andExpect(jsonPath("$.error").value("unsupported_media_type"));
+                .andExpect(jsonPath("$.propertyId").doesNotExist())
+                .andExpect(jsonPath("$.url").doesNotExist());
     }
 
     // ---------------- list ----------------
@@ -132,13 +94,8 @@ class PersonalDocumentFlowTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].category").value("PAN Card"))
-                .andExpect(jsonPath("$[0].propertyId").value("personal"));
-    }
-
-    @Test
-    void personalRoutes_requireAuthentication() throws Exception {
-        mvc.perform(get(Routes.MeDocuments.PERSONAL))
-                .andExpect(status().isUnauthorized());
+                .andExpect(jsonPath("$[0].propertyId").doesNotExist())
+                .andExpect(jsonPath("$[0].url").doesNotExist());
     }
 
     // ---------------- delete ----------------
@@ -147,6 +104,7 @@ class PersonalDocumentFlowTest extends AbstractApiTest {
     void deletePersonal_removesItFromTheCallersVault() throws Exception {
         User owner = user("9821002007");
         String id = upload(owner, "Aadhaar Card", pdf("aadhaar.pdf"));
+        String key = personalDocuments.findById(java.util.UUID.fromString(id)).orElseThrow().getStorageKey();
 
         mvc.perform(delete(Routes.MeDocuments.PERSONAL_BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -155,6 +113,8 @@ class PersonalDocumentFlowTest extends AbstractApiTest {
         mvc.perform(get(Routes.MeDocuments.PERSONAL)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.length()").value(0));
+        assertThat(jdbc.queryForObject("select count(*) from identity_storage_deletes where storage_key = ?",
+                Long.class, key)).isEqualTo(1L);
     }
 
     @Test

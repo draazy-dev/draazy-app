@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -17,33 +18,17 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletResponse;
 
-/**
- * V77 — the four moderation actions {@code /admin/users} has always offered and the server has
- * never backed.
- *
- * <h2>What was actually wrong</h2>
- *
- * <p>The console shipped five row actions against a server that implemented two. Archive and restore
- * were real; suspend, the verified badge and the review flag were written into the browser's own
- * copy of the database, so they worked perfectly for one operator at one machine until they
- * reloaded. Converting the page onto the live API is what forced the question, and the answer taken
- * was to build the capability rather than record its loss.
- *
- * <h2>The assertion that matters most</h2>
- *
- * <p>{@link #aSuspendedAccountCannotSignIn()}. Writing {@code status = 'suspended'} is the easy half
- * and, on its own, the dangerous one: the column has existed since V2 and {@code AuthService} has
- * never read it, so a suspend button that only wrote it would have produced a badge. The moderator
- * would see the account marked as stopped, close the case, and the person would carry on signing in.
- * Every other test here is about a field; that one is about whether the feature exists.
- */
+// Suspend, verified badge and review-flag actions. Load-bearing: aSuspendedAccountCannotSignIn —
+// writing status='suspended' without AuthService reading it would only produce a badge.
 @DisplayName("V77 — suspend, badge and flag")
 class UserModerationEndpointTest extends AbstractApiTest {
 
@@ -53,16 +38,13 @@ class UserModerationEndpointTest extends AbstractApiTest {
     @PersistenceContext
     EntityManager em;
 
-    /** See {@code StaffAccountApprovalTest} for why raw-SQL assertions need this. */
+    /** The service and this test share one transaction, but raw SQL cannot see unflushed entities. */
     private void flushSoRawSqlCanSeeIt() {
         em.flush();
     }
 
-    /**
-     * Audit rows are written {@code REQUIRES_NEW}, so they commit and outlive the class-level
-     * rollback. Left behind they would accumulate across runs and, worse, be visible to the
-     * entity-id filter test below, which counts.
-     */
+    // Audit rows are REQUIRES_NEW so they outlive class rollback; leaving them would poison the
+    // entity-id filter test below, which counts.
     @AfterEach
     void clearCommittedAuditRows() {
         jdbc.update("DELETE FROM audit_log WHERE action LIKE 'user.%'");
@@ -79,11 +61,13 @@ class UserModerationEndpointTest extends AbstractApiTest {
         return person("9877000001", Roles.Wire.ADMIN);
     }
 
+    private User admin(String mobile) {
+        return person(mobile, Roles.Wire.ADMIN);
+    }
+
     private String path(String route, User target) {
         return route.replace("{id}", target.getId().toString());
     }
-
-    // ---------------------------------------------------------------- suspension
 
     @Test
     @DisplayName("suspend marks the account without removing it from the directory")
@@ -97,10 +81,8 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .content("{\"reason\":\"listings look fake\"}"))
                 .andExpect(status().isOk());
 
-        // flush before clear, not clear alone: the route ran inside this test's transaction, so the
-        // status change is still only in the persistence context. Detaching without flushing throws
-        // the write away and the assertion reports "active" — a failure that looks like the feature
-        // not working.
+        // Flush before clear: the route ran inside this test's transaction, so detaching without
+        // flushing throws the status write away and reports "active".
         flushSoRawSqlCanSeeIt();
         em.clear();
         User reloaded = users.findById(target.getId()).orElseThrow();
@@ -111,10 +93,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .isFalse();
     }
 
-    /**
-     * The one that makes the button real. Sign in successfully, get suspended, and find the same
-     * sign-in refused — the credential is unchanged, so nothing but the suspension can explain it.
-     */
     @Test
     @DisplayName("a suspended account cannot sign in")
     void aSuspendedAccountCannotSignIn() throws Exception {
@@ -131,10 +109,15 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .content("{\"reason\":\"under review\"}"))
                 .andExpect(status().isOk());
 
-        assertThat(otpLogin(target.getMobile()))
+        MockHttpServletResponse refused = otpLoginResponse(target.getMobile());
+        assertThat(refused.getStatus())
                 .as("403 after the OTP is verified, so the refusal tells them nothing they did "
                         + "not already know")
                 .isEqualTo(403);
+        assertThat(refused.getContentAsString())
+                .as("its own code, so the client does not mistake it for a bot-defence refusal")
+                .contains("\"error\":\"account_suspended\"")
+                .contains("Contact support");
     }
 
     @Test
@@ -160,6 +143,31 @@ class UserModerationEndpointTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("manager suspension actions notify every administrator")
+    void managerSuspensionActionsNotifyAdministrator() throws Exception {
+        User owner = admin("9877000050");
+        User coAdmin = admin("9877000053");
+        User actor = person("9877000051", Roles.Wire.MANAGER);
+        User target = person("9877000052", Roles.Wire.STAFF);
+
+        mvc.perform(patch(path(Routes.Users.SUSPEND, target))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"manager check\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(patch(path(Routes.Users.REACTIVATE, target))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
+                .andExpect(status().isOk());
+
+        for (User admin : List.of(owner, coAdmin)) {
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM notifications
+                    WHERE user_id = ?::uuid AND type = 'team.manager-action'
+                    """, Integer.class, admin.getId())).isEqualTo(2);
+        }
+    }
+
+    @Test
     @DisplayName("you cannot suspend yourself")
     void selfSuspensionIsRefused() throws Exception {
         User actor = admin();
@@ -172,12 +180,8 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.message").value("You cannot suspend your own account"));
     }
 
-    /**
-     * Reactivate deliberately refuses an archived account rather than quietly promoting it, because
-     * the archived-to-active path has a guard this route does not (the live-email collision) and the
-     * halfway state — {@code archived = true, status = 'active'} — is a row that is invisible to the
-     * directory and claims to be fine.
-     */
+    // Reactivate refuses an archived account (rather than silently promoting) because the
+    // archived-to-active path has a live-email collision guard this route does not.
     @Test
     @DisplayName("reactivate refuses an archived account and points at restore")
     void reactivateIsNotRestore() throws Exception {
@@ -193,12 +197,26 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .value("This account is archived, not suspended. Restore it first."));
     }
 
-    // -------------------------------------------------------------------- badge
+    @Test
+    @DisplayName("the list row carries only the row's columns")
+    void listRowCarriesOnlyRowColumns() throws Exception {
+        User actor = admin("9877000031");
+        person("9877000032", Roles.Wire.OWNER);
+
+        mvc.perform(get(Routes.Users.BASE).param("q", "9877000032").param("counts", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].mobile").value("98XXXXX032"))
+                .andExpect(jsonPath("$.content[0].badgePending").doesNotExist())
+                .andExpect(jsonPath("$.content[0].email").doesNotExist())
+                .andExpect(jsonPath("$.content[0].lastActive").doesNotExist())
+                .andExpect(jsonPath("$.counts.badgePending").doesNotExist());
+    }
 
     @Test
-    @DisplayName("an administrator can vouch for someone the DigiLocker funnel cannot reach")
-    void badgeCanBeGrantedByHand() throws Exception {
-        User actor = admin();
+    @DisplayName("an admin grants the badge in one step, and it is audited")
+    void adminGrantsBadgeInOneStep() throws Exception {
+        User actor = admin("9877000001");
         User target = person("9877000006", Roles.Wire.OWNER);
 
         mvc.perform(patch(path(Routes.Users.BADGE, target))
@@ -207,15 +225,71 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.verified").value(true))
-                .andExpect(jsonPath("$.aadhaarVerified")
-                        .value(false));
+                .andExpect(jsonPath("$.badgeSource").value("manual"));
 
         flushSoRawSqlCanSeeIt();
         em.clear();
-        assertThat(users.findById(target.getId()).orElseThrow().isAadhaarVerified())
-                .as("a hand-granted badge stays distinguishable from an earned one, and that is "
-                        + "what saves a column: verified && !aadhaarVerified is the whole signal")
-                .isFalse();
+        assertThat(users.findById(target.getId()).orElseThrow().isVerified()).isTrue();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM audit_log
+                WHERE action = 'user.badge' AND entity_id = ?
+                """, Integer.class, target.getId().toString())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a manager grants the badge too")
+    void managerGrantsBadge() throws Exception {
+        User manager = person("9877000029", Roles.Wire.MANAGER);
+        User target = person("9877000030", Roles.Wire.OWNER);
+
+        mvc.perform(patch(path(Routes.Users.BADGE, target))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(manager))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true));
+    }
+
+    @Test
+    @DisplayName("nobody can badge their own account")
+    void badgeSelfGrantIsRefused() throws Exception {
+        User actor = admin("9877000024");
+
+        mvc.perform(patch(path(Routes.Users.BADGE, actor))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("a manual badge grant is refused when the user is already verified")
+    void badgeGrantAlreadyVerifiedIsRefused() throws Exception {
+        User actor = admin("9877000027");
+        User target = person("9877000028", Roles.Wire.OWNER);
+        target.setVerified(true);
+        users.saveAndFlush(target);
+
+        mvc.perform(patch(path(Routes.Users.BADGE, target))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"granted\":true,\"reason\":\"documents checked in person\"}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("a padded badge grant reason is measured after trimming")
+    void badgeGrantReasonIsTrimValidated() throws Exception {
+        User actor = admin("9877000044");
+        User target = person("9877000045", Roles.Wire.OWNER);
+
+        mvc.perform(patch(path(Routes.Users.BADGE, target))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"granted\":true,\"reason\":\"          x          \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value("reason must be 10 to 300 characters after trimming"));
     }
 
     @Test
@@ -234,18 +308,19 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.verified").value(false));
     }
 
-    /**
-     * The refusal is not deference to the funnel. It is that the withdrawal would be unrecoverable:
-     * the verification handler returns early on an already-verified record, so nothing — not a
-     * replay, not a re-run — would put the badge back.
-     */
     @Test
-    @DisplayName("an Aadhaar-earned badge cannot be withdrawn here")
-    void aadhaarBadgeIsNotWithdrawable() throws Exception {
+    @DisplayName("a badge earned through identity verification cannot be withdrawn here")
+    void earnedBadgeIsNotWithdrawable() throws Exception {
         User actor = admin();
         User target = person("9877000008", Roles.Wire.OWNER);
-        jdbc.update("UPDATE users SET verified = true, aadhaar_verified = true WHERE id = ?",
-                target.getId());
+        jdbc.update("UPDATE users SET verified = true WHERE id = ?", target.getId());
+        jdbc.update("""
+                insert into identity_verifications
+                       (user_id, status, doc_type, doc_last4, holder_name, holder_dob, identity_hash,
+                        consent_at, submitted_at, attempt_count, attempt_window_start, decided_at)
+                values (?, 'verified', 'pan', 'D123', 'Earned Badge', date '1985-03-03', ?,
+                        now(), now(), 1, now(), now())
+                """, target.getId(), "hmac-" + target.getId());
         em.clear();
 
         mvc.perform(patch(path(Routes.Users.BADGE, target))
@@ -272,8 +347,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .content("{\"reason\":\"nothing in particular\"}"))
                 .andExpect(status().isUnprocessableEntity());
     }
-
-    // --------------------------------------------------------------------- flag
 
     @Test
     @DisplayName("a flag carries what was noticed, and clearing it forgets")
@@ -315,11 +388,8 @@ class UserModerationEndpointTest extends AbstractApiTest {
         assertThat(users.findById(target.getId()).orElseThrow().isFlagged()).isFalse();
     }
 
-    /**
-     * The flag is a note between moderators <em>about</em> the account holder, so the one route that
-     * serves them their own profile must not carry it. Boxed on the record for exactly this: a
-     * primitive would put {@code "flagged": false} here and invite a client to render it.
-     */
+    // The flag is a note between moderators about the holder, so the /me route must not carry it;
+    // boxed on the record so an omitted value does not render as false.
     @Test
     @DisplayName("the review flag never appears on the account holder's own profile")
     void ownProfileDoesNotCarryTheFlag() throws Exception {
@@ -338,8 +408,6 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.flagged").doesNotExist())
                 .andExpect(jsonPath("$.flagReason").doesNotExist());
     }
-
-    // ------------------------------------------------------------------ filters
 
     @Test
     @DisplayName("the directory can be filtered by status and by flag")
@@ -362,25 +430,51 @@ class UserModerationEndpointTest extends AbstractApiTest {
         flushSoRawSqlCanSeeIt();
 
         mvc.perform(get(Routes.Users.BASE).param("status", UserStatuses.SUSPENDED)
-                        .param("q", "9877000")
+                        .param("q", "V77 probe 9877000")
                         .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(suspended.getId().toString()));
 
         mvc.perform(get(Routes.Users.BASE).param("flagged", "true")
-                        .param("q", "9877000")
+                        .param("q", "V77 probe 9877000")
                         .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(flagged.getId().toString()));
     }
 
-    /**
-     * An unknown status matches nothing, which is indistinguishable from a legitimately empty
-     * filter — so a console with a typo in a dropdown would look like a working screen reporting an
-     * empty platform, and the bug would be found by a user rather than by the request.
-     */
+    @Test
+    @DisplayName("counts=true tallies the whole filtered set, whatever tab or page was asked for")
+    void countsCoverTheWholeSet() throws Exception {
+        User actor = admin("9877100001");
+        User suspended = person("9877100002", Roles.Wire.OWNER);
+        User archived = person("9877100003", Roles.Wire.BUYER);
+        person("9877100004", Roles.Wire.BUYER);
+        mvc.perform(patch(path(Routes.Users.SUSPEND, suspended))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"under review\"}"))
+                .andExpect(status().isOk());
+        flushSoRawSqlCanSeeIt();
+        jdbc.update("update users set archived = true where id = ?", archived.getId());
+
+        mvc.perform(get(Routes.Users.BASE).param("counts", "true").param("q", "V77 probe 98771000")
+                        .param("customers", "true").param("size", "1")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.counts.all").value(2))
+                .andExpect(jsonPath("$.counts.active").value(1))
+                .andExpect(jsonPath("$.counts.suspended").value(1))
+                .andExpect(jsonPath("$.counts.archived").value(1));
+
+        mvc.perform(get(Routes.Users.BASE).param("q", "V77 probe 98771000")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.counts").doesNotExist());
+    }
+
     @Test
     @DisplayName("an unknown status is refused rather than answered with an empty page")
     void unknownStatusIsRefused() throws Exception {
@@ -389,11 +483,51 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    /**
-     * Without this filter the audit log is browsable only by time, which serves the daily review and
-     * is useless for a case. It is also what lets the badge and flag routes get away with storing no
-     * provenance of their own.
-     */
+    // Without this filter the audit log is browsable only by time, useless for a case — and it is
+    // what lets the badge and flag routes store no provenance of their own.
+    @Test
+    @DisplayName("admin edit cannot change a verified user's name")
+    void adminNameChangeIsLockedForVerifiedUsers() throws Exception {
+        User actor = admin("9877000049");
+        User target = person("9877000050", Roles.Wire.OWNER);
+        target.setVerified(true);
+        users.saveAndFlush(target);
+
+        mvc.perform(patch(path(Routes.Users.BY_ID, target))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Renamed Owner\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("NAME_LOCKED_WHILE_VERIFIED"));
+
+        em.clear();
+        assertThat(users.findById(target.getId()).orElseThrow().getName())
+                .isEqualTo("V77 probe 9877000050");
+    }
+
+    @Test
+    @DisplayName("admin name changes audit the previous value")
+    void adminNameChangeAuditsPreviousName() throws Exception {
+        User actor = admin("9877000051");
+        User target = person("9877000052", Roles.Wire.OWNER);
+
+        mvc.perform(patch(path(Routes.Users.BY_ID, target))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(actor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Renamed Owner\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Renamed Owner"))
+                .andExpect(jsonPath("$.mobile").value(MobileMask.mask(target.getMobile())))
+                .andExpect(jsonPath("$.email").doesNotExist());
+
+        String metadata = jdbc.queryForObject("""
+                SELECT metadata::text FROM audit_log
+                WHERE action = 'user.update' AND entity_id = ?
+                ORDER BY at DESC LIMIT 1
+                """, String.class, target.getId().toString());
+        assertThat(metadata).contains("\"previousName\": \"V77 probe 9877000052\"");
+    }
+
     @Test
     @DisplayName("the audit log can answer what has happened to one person")
     void auditLogFiltersByEntityId() throws Exception {
@@ -422,12 +556,8 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].entityId").value(target.getId().toString()));
     }
 
-    // ----------------------------------------------------------------- timeline
-
-    /**
-     * The account line is the one entry every user has, so it is the honest smoke test: a brand-new
-     * account with no activity must still come back with exactly one event, not an empty list.
-     */
+    // The account line is the one entry every user has, so a brand-new account must still come
+    // back with exactly one event rather than an empty list.
     @Test
     @DisplayName("a new account's timeline is its creation and nothing else")
     void timelineAlwaysHasTheAccountLine() throws Exception {
@@ -443,12 +573,8 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].entityId").value(target.getId().toString()));
     }
 
-    /**
-     * The union is the whole point of the endpoint, so it has to be shown crossing at least one
-     * module boundary. A moderation action is the cheapest second source to produce — it needs no
-     * fixture beyond a route this class already exercises — and it also pins the audit join, which
-     * is the one arm of the union keyed on a text column rather than a uuid.
-     */
+    // Cross at least one module boundary; a moderation action is the cheapest second source and
+    // pins the audit join — the one arm of the union keyed on text rather than uuid.
     @Test
     @DisplayName("the timeline unions moderation actions with the account line")
     void timelineIncludesModerationActions() throws Exception {
@@ -465,16 +591,14 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
-                // newest first, and the flag was raised after the account was made
+
                 .andExpect(jsonPath("$[0].kind").value("moderation"))
                 .andExpect(jsonPath("$[0].label").value("user.flag"))
                 .andExpect(jsonPath("$[1].kind").value("account"));
     }
 
-    /**
-     * An empty timeline is a normal answer for a new account, so a mistyped id must not render as
-     * "this person has done nothing" — see {@code UserModerationService#timeline}.
-     */
+    // An empty timeline is a normal answer for a new account, so a mistyped id must not render as
+    // "this person has done nothing" — see UserModerationService#timeline.
     @Test
     @DisplayName("an unknown id is 404, not an empty timeline")
     void timelineRefusesAnUnknownId() throws Exception {
@@ -484,11 +608,8 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
     }
 
-    /**
-     * Admin-only despite being a {@code users:read} route, because one arm of the union is the audit
-     * log and {@code audit:read} is admin-only. Staff reaching this would get moderation history
-     * they are refused at {@code GET /admin/audit-log} — the same data through an unlocked door.
-     */
+    // Admin-only despite users:read, because one arm of the union is the audit log (admin-only) —
+    // staff reaching this would get moderation history through an unlocked door.
     @Test
     @DisplayName("staff cannot read a timeline either")
     void timelineIsAdminOnly() throws Exception {
@@ -500,8 +621,7 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
-    // ------------------------------------------------------------------- guards
-
+    // guards
     @Test
     @DisplayName("staff cannot reach any of the four")
     void staffAreRefused() throws Exception {
@@ -513,24 +633,17 @@ class UserModerationEndpointTest extends AbstractApiTest {
             mvc.perform(patch(path(route, target))
                             .header(HttpHeaders.AUTHORIZATION, bearer(staff))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"reason\":\"x\",\"granted\":true,\"flagged\":true}"))
+                            .content("{\"reason\":\"staff must not act\",\"granted\":true,\"flagged\":true}"))
                     .andExpect(status().isForbidden());
         }
     }
 
-    // ------------------------------------------------------------------ helpers
-
-    /**
-     * Drive a real mobile-OTP sign-in and return the status of the verify step. Lifted from
-     * {@code StaffAccountApprovalTest}: the dispatched code is only ever logged, so the stored hash
-     * is replaced with the hash of a code this test chooses, which is narrower than parsing the mock
-     * sender's log line.
-     */
     private int otpLogin(String mobile) throws Exception {
-        // The send cooldown is keyed on the newest otp_codes row for this number, so a test that
-        // signs the same person in twice — which is exactly what "worked before, refused after"
-        // requires — would get 429 on the second send. Clearing the rows resets the throttle and
-        // nothing else about the flow under test.
+        return otpLoginResponse(mobile).getStatus();
+    }
+
+    private MockHttpServletResponse otpLoginResponse(String mobile) throws Exception {
+
         flushSoRawSqlCanSeeIt();
         jdbc.update("DELETE FROM otp_codes WHERE mobile = ?", mobile);
         em.clear();
@@ -544,13 +657,12 @@ class UserModerationEndpointTest extends AbstractApiTest {
                 WHERE id = (SELECT id FROM otp_codes WHERE mobile = ?
                             ORDER BY created_at DESC LIMIT 1)""",
                 sha256Hex("424242"), mobile);
-        // Detach, or the rewrite above is invisible to the code under test — see the note on the
-        // same helper in StaffAccountApprovalTest.
+
         em.clear();
         return mvc.perform(post(Routes.Auth.LOGIN)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"mobile\":\"%s\",\"otp\":\"424242\"}".formatted(mobile)))
-                .andReturn().getResponse().getStatus();
+                .andReturn().getResponse();
     }
 
     private static String sha256Hex(String value) throws Exception {

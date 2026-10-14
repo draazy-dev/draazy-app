@@ -1,57 +1,49 @@
 export const AMEN_ICON = {
   gym: 'sparkles', pool: 'sparkles', lift: 'building', parking: 'car-front', security: 'shield-check',
   power: 'landmark', garden: 'trees', club: 'users', play: 'paw-print',
+  'Modular Kitchen': 'utensils', AC: 'air-vent', Wardrobe: 'shirt', 'Piped Gas': 'flame',
+  'Water Purifier': 'droplets', Geyser: 'shower-head', TV: 'tv', Refrigerator: 'refrigerator', Sofa: 'sofa',
+  Bed: 'bed-double', 'Kitchen Trolley': 'cooking-pot', 'Washing Machine': 'washing-machine', Microwave: 'microwave',
+  'Dining Table': 'utensils', Fans: 'fan', Curtains: 'blinds', 'Light Fittings': 'lamp', Chimney: 'flame',
 };
 export const AMEN_LABEL = {
   gym: 'Gymnasium', pool: 'Swimming Pool', lift: 'Lift', parking: 'Covered Parking', security: '24x7 Security',
   power: 'Power Backup', garden: 'Landscaped Garden', club: 'Clubhouse', play: "Kids' Play Area",
 };
 
-/**
- * When the owner says the home frees up, as a reader sees it.
- *
- * Both the Key Details rows (`useProperty`) and the Rent Details panel used to read `p.available`,
- * which is on no view model — the field is `availableFrom` (propertyMapper.js:366). The read was
- * `undefined` for every listing and the `||` behind it did all the work, so every rental on the
- * site announced "Immediately", whichever bucket its owner had picked.
- *
- * It is a **bucket, not a date**: `Property.java:263` stores `now` | `15` | `30` under a CHECK
- * constraint, deliberately, because "a date on a listing nobody edits is wrong within a fortnight
- * and wrong in the direction that wastes a tenant's visit". The wire value is a token to translate,
- * never something to hand to a date formatter — that would print the literal `now` on the tile.
- * (The flatmate module has its own `availableFrom` and that one *is* a `LocalDate`. Two fields,
- * one name, two types, two modules.)
- *
- * `null` is the API's "unstated", which stays unsaid rather than becoming a guess in either
- * direction. An unrecognised token does the same and says so once, rather than leaking the token.
- *
- * Note the *write* seam is still open: the wizard collects an ISO date (`submit.js:270` writes
- * `available`, validated as required) and `forTheWire` sends no `availableFrom` at all, so outside
- * the seed this reads null for every owner-posted listing and the tile shows the dash. A date
- * picker is the wrong control for a `now|15|30` bucket, which is why nothing maps — filed in
- * tasks/todo.md. Fixing the read first is still right: it stopped the page asserting "Immediately"
- * about homes nobody had said that of.
- */
-const AVAILABLE_FROM_KEY = { now: 'immediately', 15: 'within15Days', 30: 'within30Days' };
-// Bounded, because the docblock's own collision hazard — a flatmate `availableFrom`, which is a
-// real LocalDate — would otherwise mint one permanent entry per distinct date.
-const WARN_CAP = 20;
-const warnedBuckets = new Set();
-export function availableLabel(tr, value) {
-  if (!value) return '\u2014';
-  if (!Object.hasOwn(AVAILABLE_FROM_KEY, value)) {
-    if (!warnedBuckets.has(value) && warnedBuckets.size < WARN_CAP) {
-      warnedBuckets.add(value);
-      console.warn(`[property] unmapped availableFrom bucket "${value}" — add it to AVAILABLE_FROM_KEY`);
-    }
-    return '\u2014';
-  }
-  return tr('property.' + AVAILABLE_FROM_KEY[value]);
+import { availabilityLabel } from '../../../lib/availability.js';
+
+const AVAILABLE_DATE = new Intl.DateTimeFormat('en-IN', { month: 'short', year: 'numeric' });
+
+function isoDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || '').trim());
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return date.getFullYear() === Number(match[1])
+    && date.getMonth() === Number(match[2]) - 1
+    && date.getDate() === Number(match[3])
+    ? date
+    : null;
 }
 
-/* Classifies a listing into a broad category so the detail page can show only the
-   fields that make sense: apartments/villas get BHK + floor + furnishing, land/plots
-   get plot zone + title, commercial gets no bedroom/bathroom fields. */
+function today() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function dateLabel(tr, value, readyKey) {
+  const date = isoDate(value);
+  if (!date) return '';
+  if (date <= today()) return tr('property.' + readyKey);
+  return tr('property.availableFromDate', { date: AVAILABLE_DATE.format(date) });
+}
+
+export function possessionDateLabel(tr, value) {
+  return dateLabel(tr, value, 'readyToMove');
+}
+
+export const availableLabel = (tr, p) => availabilityLabel(tr, p, { detail: true }) || '\u2014';
+
 const LAND_MATCHES = ['plot', 'land', 'farm'];
 const COMMERCIAL_MATCHES = ['office', 'shop', 'showroom', 'retail', 'mall', 'warehouse', 'godown', 'industrial', 'factory', 'co-working', 'coworking', 'commercial'];
 export function propertyKind(p) {
@@ -61,41 +53,7 @@ export function propertyKind(p) {
   return 'residential';
 }
 
-/* Maps a listing to a schematic floor-plan asset that reflects its type + BHK
-   (assets generated by scripts/gen-floorplans.mjs into public/floorplans).
-   Returns null for land, which never renders a floor-plan section. Used as the
-   fallback so listings without an explicit `floorPlan` field still get a plan
-   that matches their type instead of a single shared stock image. */
-const COMMERCIAL_PLAN = {
-  office: 'office', shop: 'shop', showroom: 'shop', retail: 'retail', mall: 'retail',
-  warehouse: 'warehouse', godown: 'warehouse', industrial: 'industrial', factory: 'industrial',
-  'co-working': 'coworking', coworking: 'coworking',
-};
-export function floorPlanFor(p) {
-  const kind = propertyKind(p);
-  if (kind === 'land') return null;
-  const t = String(p?.type || '').toLowerCase();
-  if (kind === 'commercial') {
-    const match = Object.keys(COMMERCIAL_PLAN).find((k) => t.includes(k));
-    return `/floorplans/${match ? COMMERCIAL_PLAN[match] : 'office'}.svg`;
-  }
-  const beds = Number(p?.bhkNum) || 0;
-  if (t.includes('studio') || beds === 0) return '/floorplans/studio.svg';
-  let variant = 'flat';
-  if (t.includes('villa')) variant = 'villa';
-  else if (t.includes('penthouse')) variant = 'penthouse';
-  else if (t.includes('row')) variant = 'rowhouse';
-  if (variant === 'flat') return `/floorplans/${Math.min(4, Math.max(1, beds))}bhk.svg`;
-  return `/floorplans/${variant}-${Math.min(4, Math.max(2, beds))}.svg`;
-}
-
-/* Per-listing Key-Details values, as stated by the owner.
-   These read `p.form.*` for listings created through "Post a property" and the corresponding
-   server column otherwise. They used to fall back to a stable id-derived value, on the
-   reasoning that the original HTML page "always shows Floor, Facing and Age" — but always
-   showing a value and always *knowing* one are different things, and the fallback made an
-   unstated attribute indistinguishable from a stated one. They now return '' and the tile
-   renders "Not specified". */
+/* No id-derived fallback: it makes an unstated attribute indistinguishable from a stated one. */
 import { ageOptions } from '../list-property/constants.js';
 function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'];
@@ -107,24 +65,12 @@ const SHORT_AGE = {
   '1-5': '1–5 yrs', '5-10': '5–10 yrs', '10-15': '10–15 yrs', '15+': '15+ yrs',
 };
 
-/* The three functions below each used to end in a hash of the listing id, so a detail page
-   always stated a floor, a facing direction and an age, whether or not the owner had ever
-   supplied one. `facing` in particular was invented for effectively every live listing (three
-   of fifty-nine rows carry the column) and printed twice — a Key Details tile and a top-four
-   highlight pill — with no indication it was a guess. Facing is Vastu-weighted in this market
-   and moves offers; "3rd of 14" likewise reads as surveyed fact.
-
-   All three now return '' when nothing was stated. PropertyTabs renders an empty tile value as
-   "Not specified", which is the honest answer and the one the tile guard was written for. The
-   highlight pill needed a guard of its own — see useProperty.js, where an empty facing produced
-   a pill reading " Facing" and consumed one of only four highlight slots. */
 export function deriveFloor(p) {
   const raw = p.form?.floor || (p.floor ? String(p.floor) : '');
   if (!raw) return '';
   const total = p.form?.totalFloors || p.totalFloors;
-  // `Number('N/A')` is NaN and `ordinal(NaN)` renders the literal "NaNth". Admin post-on-behalf
-  // is known to emit non-numeric floor strings, so anything unparseable is passed through as
-  // typed rather than decorated with an ordinal suffix it cannot have.
+  // `ordinal(NaN)` renders the literal "NaNth", and admin post-on-behalf emits non-numeric floor
+  // strings, so anything unparseable passes through as typed.
   const n = Number(raw);
   const label = raw === 'Ground' ? 'Ground' : (Number.isFinite(n) ? ordinal(n) : String(raw));
   return total ? `${label} of ${total}` : label;
@@ -132,6 +78,11 @@ export function deriveFloor(p) {
 export function deriveFacing(p) {
   if (p.facing) return p.facing;
   if (p.form?.facing) return p.form.facing;
+  return '';
+}
+export function deriveOverlooking(p) {
+  if (p.overlooking) return p.overlooking;
+  if (p.form?.overlooking) return p.form.overlooking;
   return '';
 }
 export function deriveAge(p) {

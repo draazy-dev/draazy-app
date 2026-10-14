@@ -1,29 +1,26 @@
 {
   "site": {
     "name": "Draazy",
-    "legalName": "Draazy Realty Pvt. Ltd.",
+    "legalName": "Draazy Technologies",
     "city": "Pune",
     "tagline": "Pune's most trusted zero-brokerage platform",
-    "supportEmail": "hello@draazy.com",
-    "supportPhone": "+91 98765 43210",
-    "whatsapp": "+91 98765 43210",
-    "supportHours": "Mon–Sat, 9:00 AM – 7:00 PM",
-    "address": "Draazy, 4th Floor, Trade Tower, Baner Road, Pune 411045",
-    "gst": "27ABCDE1234F1Z5",
+    "supportEmail": "support@draazy.com",
+    "supportPhone": "+91 8728-8728-95",
+    "whatsapp": "+91 8728-8728-95",
+    "supportHours": "9 AM – 8 PM, Mon–Sat",
+    "address": "",
     "social": {
-      "instagram": "https://instagram.com/draazy",
-      "facebook": "https://facebook.com/draazy",
-      "linkedin": "https://linkedin.com/company/draazy",
-      "twitter": "https://x.com/draazy"
+      "facebook": "https://www.facebook.com/profile.php?id=61594205514968",
+      "instagram": "https://www.instagram.com/draazyapp.homes",
+      "twitter": "https://x.com/draazyapp",
+      "linkedin": "http://www.linkedin.com/in/draazy-app-4a3195435",
+      "youtube": "https://www.youtube.com/@draazy-x1u"
     }
   },
   "fees": {
-    "ownerPlanYearly": 999,
-    "ownerProYearly": 2499,
-    "rentAgreementPlatform": 500,
-    "seekerPlusTopup": 199,
-    "featuredListing": 999,
-    "gstPercent": 18
+    "listingPass": 999,
+    "contactPack": 199,
+    "rentAgreementPlatform": 499
   },
   "movePack": {
     "enabled": false,
@@ -37,7 +34,6 @@
     }
   },
   "flags": {
-    "societySaaS": false,
     "newProjectListings": true,
     "videoListings": false,
     "mapSearch": true,
@@ -47,7 +43,6 @@
     "emiCalculator": true,
     "reviewsEnabled": true,
     "zeroBrokerage": true,
-    "paidFeaturedListings": true,
     "subscriptionPlans": true,
     "kycBadgeEnabled": true,
     "ownerPhonePrivacy": true,
@@ -94,7 +89,6 @@
       "models": true
     },
     "properties": {
-      "bulkOps": true,
       "csvExport": true,
       "commsLog": true,
       "qualityScore": true
@@ -119,9 +113,7 @@
     "content": {
       "enabled": true,
       "cityDemand": true,
-      "banners": true,
       "faqs": true,
-      "announcements": true,
       "reviews": true
     },
     "reports": {

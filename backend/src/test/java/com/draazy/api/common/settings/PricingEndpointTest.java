@@ -15,24 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * Contract + behaviour proof for {@code GET /pricing}.
- *
- * <p><strong>What this replaces.</strong> Every price the product quotes lived in {@code
- * FEE_DEFAULTS}, a constant in the browser bundle, with a local-storage copy layered over it. The
- * back office could edit the platform's prices, the write was real, and no visitor ever saw the
- * result: changing a price took a deployment, and the number a caller was quoted depended on which
- * machine they were sitting at. The assertions here are aimed at exactly that: that the route
- * answers without a token, that it carries every price the client needs so none has to be kept in
- * the bundle as a fallback, and that a figure an admin writes is the figure an anonymous visitor
- * subsequently reads.
- *
- * <p>The last two tests are about the thing a public projection of a settings block gets wrong. The
- * same document holds the free contact allowance, the referral bonus and the referral auto-qualify
- * threshold — and that last one is the line past which a referral goes to the fraud desk, which is
- * the one number on the platform that must not be published. They are written as absences, because
- * the mistake they catch is somebody widening this into "the public settings endpoint".
- */
+/** Round trips are admin write then anonymous read; other fee-block keys (fraud threshold) are never published. */
 class PricingEndpointTest extends AbstractApiTest {
 
     @Autowired UserRepository users;
@@ -45,109 +28,88 @@ class PricingEndpointTest extends AbstractApiTest {
         return "Bearer " + jwtService.issueAccessToken(users.saveAndFlush(u));
     }
 
-    /**
-     * Reachable with no Authorization header.
-     *
-     * <p>The route-constant/security-matcher agreement check. A route mapped in the controller but
-     * missed in {@code SecurityConfig} would 401 here, and the symptom in the browser would be a
-     * plans page that silently fell back to its bundled constants — indistinguishable from the
-     * endpoint working, right up until somebody changed a price.
-     */
+    /** Anonymous: a route missed in {@code SecurityConfig} would 401 and plans would use bundled constants. */
     @Test
     void anonymousCallersGetThePriceList() throws Exception {
-        mvc.perform(get(Routes.Pricing.BASE))
+        mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownerProYearly").value(2499))
-                .andExpect(jsonPath("$.gstPercent").value(18));
+                .andExpect(jsonPath("$.pricing.listingPass").value(999));
     }
 
-    /**
-     * All seven keys are present.
-     *
-     * <p>Every one of them, because a client that has to fall back to a bundled default for even a
-     * single price is a client that still has a price in its bundle — which is the defect this
-     * route exists to remove, merely six-sevenths smaller.
-     *
-     * <p>Asserted key by key with {@code exists()} rather than by counting or by value, because the
-     * defaults in {@link PlatformSettings} deliberately equal the seed row: a route that never
-     * managed to read the row at all would answer with exactly the right numbers anyway, so no
-     * assertion about a value can tell the two apart. {@code exists()} catches the key going
-     * missing from the response shape; {@link #aPriceAnAdminChangesIsThePriceAnAnonymousVisitorIsQuoted()}
-     * below is what proves the row is genuinely being read, by changing it and watching the answer
-     * move.
-     */
+    /** Checked per key with {@code exists()}: defaults equal the seed row, so a value check proves no read. */
     @Test
     void everyPriceTheClientNeedsIsPublished() throws Exception {
-        mvc.perform(get(Routes.Pricing.BASE))
+        mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownerPlanYearly").exists())
-                .andExpect(jsonPath("$.ownerProYearly").exists())
-                .andExpect(jsonPath("$.rentAgreementPlatform").exists())
-                .andExpect(jsonPath("$.seekerPlusTopup").exists())
-                .andExpect(jsonPath("$.featuredListing").exists())
-                .andExpect(jsonPath("$.gstPercent").exists());
+                .andExpect(jsonPath("$.pricing.listingPass").exists())
+                .andExpect(jsonPath("$.pricing.contactPack").exists())
+                .andExpect(jsonPath("$.pricing.rentAgreementPlatform").exists())
+                .andExpect(jsonPath("$.pricing.ownerProYearly").doesNotExist());
     }
 
-    /**
-     * A repricing done in the back office is what a visitor with no account is quoted.
-     *
-     * <p>The reason the route was built, asserted end to end. It is also the only test here that
-     * can tell a real read from a controller that returns the same seven numbers as literals: the
-     * seeded values and the hard-coded ones would agree on every other assertion in this class.
-     *
-     * <p>The untouched sibling in the same block is checked in the same breath, because the
-     * settings write is a deep merge (S60) — under replace semantics a panel that repriced one plan
-     * would silently delete the six figures it was not currently showing.
-     */
+    /** Only test that tells a real row read from literals; the untouched sibling proves the write deep-merges. */
     @Test
     void aPriceAnAdminChangesIsThePriceAnAnonymousVisitorIsQuoted() throws Exception {
         mvc.perform(put(Routes.Admin.SETTINGS)
                         .header(HttpHeaders.AUTHORIZATION, adminToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"fees\":{\"ownerProYearly\":5499,\"seekerPlusTopup\":349}}"))
+                        .content("{\"fees\":{\"listingPass\":1499,\"contactPack\":349}}"))
                 .andExpect(status().isOk());
 
-        mvc.perform(get(Routes.Pricing.BASE))
+        mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.ownerProYearly").value(5499))
-                .andExpect(jsonPath("$.seekerPlusTopup").value(349))
-                .andExpect(jsonPath("$.featuredListing").value(999));
+                .andExpect(jsonPath("$.pricing.listingPass").value(1499))
+                .andExpect(jsonPath("$.pricing.contactPack").value(349))
+                .andExpect(jsonPath("$.pricing.rentAgreementPlatform").value(499));
     }
 
-    /**
-     * The fraud threshold and the contact allowances share a settings block with the prices and do
-     * not leave the building.
-     *
-     * <p>{@code referralQualifyPerMonth} is how many referrals one account may have qualify
-     * automatically in a month before the rest go to a human. Publishing it tells the one reader
-     * who most wants to know precisely where to stop, and it would be published by any response
-     * shaped as "the fees block" rather than as seven named prices.
-     */
+    /** The fraud threshold and contact allowances share the prices block but must never be published. */
     @Test
     void theRestOfTheFeesBlockIsNotPublished() throws Exception {
-        mvc.perform(get(Routes.Pricing.BASE))
+        mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.referralQualifyPerMonth").doesNotExist())
-                .andExpect(jsonPath("$.referralContactBonus").doesNotExist())
-                .andExpect(jsonPath("$.freeContactLimit").doesNotExist());
+                .andExpect(jsonPath("$.pricing.referralQualifyPerMonth").doesNotExist())
+                .andExpect(jsonPath("$.pricing.referralContactBonus").doesNotExist())
+                .andExpect(jsonPath("$.pricing.freeContactLimit").doesNotExist())
+                .andExpect(jsonPath("$.pricing.referral.velocityPerDay").doesNotExist())
+                .andExpect(jsonPath("$.pricing.referral.signalRetentionDays").doesNotExist());
     }
 
-    /**
-     * None of the neighbouring settings blocks appear either.
-     *
-     * <p>The same guard {@code /move-pack} and {@code /flags} carry, for the same reason: the fee
-     * table, the permission map and the back-office toggles live in the same document, the whole
-     * argument for a public route is that this one projection is not sensitive while its neighbours
-     * are, and the way that argument gets lost is one convenient widening at a time.
-     */
     @Test
-    void noOtherSettingsBlockLeaks() throws Exception {
-        mvc.perform(get(Routes.Pricing.BASE))
+    void theReferralNumbersAreAdminSettingsPublishedForTheClient() throws Exception {
+        mvc.perform(put(Routes.Admin.SETTINGS)
+                        .header(HttpHeaders.AUTHORIZATION, adminToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"fees\":{\"referralSeekerBonusContacts\":8,"
+                                + "\"referralOwnerFeaturedDays\":21,\"featuredDays\":10}}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions").doesNotExist())
-                .andExpect(jsonPath("$.adminFlags").doesNotExist())
-                .andExpect(jsonPath("$.geo").doesNotExist())
-                .andExpect(jsonPath("$.movePack").doesNotExist())
-                .andExpect(jsonPath("$.site").doesNotExist());
+                .andExpect(jsonPath("$.pricing.referral.contactBonus").value(15))
+                .andExpect(jsonPath("$.pricing.referral.seekerBonusContacts").value(8))
+                .andExpect(jsonPath("$.pricing.referral.ownerFeaturedDays").value(21))
+                .andExpect(jsonPath("$.pricing.referral.ownerRewardAgreements").value(1))
+                .andExpect(jsonPath("$.pricing.referral.featuredDays").value(10))
+                .andExpect(jsonPath("$.pricing.referral.qualifyPerMonth").value(10))
+                .andExpect(jsonPath("$.pricing.referral.qualifyPerYear").value(50))
+                .andExpect(jsonPath("$.pricing.referral.holdDays").value(7))
+                .andExpect(jsonPath("$.pricing.referral.clawbackDays").value(30))
+                .andExpect(jsonPath("$.pricing.referral.signupWindowHours").value(24));
+    }
+
+    @Test
+    void anOutOfBoundsReferralNumberIsRefused() throws Exception {
+        String admin = adminToken();
+        for (String bad : new String[] {"\"referralHoldDays\":0", "\"referralQualifyPerMonth\":-1",
+                "\"referralOwnerFeaturedDays\":365", "\"featuredDays\":0",
+                "\"referralSignalRetentionDays\":\"x\"", "\"referralSignalRetentionDays\":181",
+                "\"referralSignalRetentionDays\":29"}) {
+            mvc.perform(put(Routes.Admin.SETTINGS)
+                            .header(HttpHeaders.AUTHORIZATION, admin)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"fees\":{" + bad + "}}"))
+                    .andExpect(status().is4xxClientError());
+        }
     }
 }

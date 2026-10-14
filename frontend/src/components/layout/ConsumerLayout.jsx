@@ -1,4 +1,4 @@
-import { Link, Outlet, useLocation } from 'react-router';
+import { Outlet, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Navbar from './Navbar.jsx';
 import BottomNav from './BottomNav.jsx';
@@ -14,17 +14,17 @@ import { AppFlagsProvider, useAppFlags } from '../../context/AppFlagsContext.jsx
 import { PricingProvider } from '../../context/PricingContext.jsx';
 import { PostChooserProvider } from '../../context/PostChooserContext.jsx';
 import { chromeFor } from '../../lib/chrome.js';
+import { isInternal as isInternalUser } from '../../lib/auth.js';
 
 /* Full-screen block for consumer pages while maintenance mode is on. */
 function MaintenanceOverlay() {
   const { t } = useTranslation();
   return (
-    <div className="fixed inset-0 z-[99999] flex items-center justify-center text-center p-6" style={{ background: '#0f0d1a', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center text-center p-6" style={{ background: 'rgb(var(--dz-c-ink))', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <div style={{ maxWidth: 440 }}>
         <div className="text-5xl mb-2">🛠️</div>
         <h1 className="text-2xl font-extrabold mb-2.5 gradient-text">{t('chrome.maintenanceTitle')}</h1>
-        <p className="text-gray-400 leading-relaxed mb-5">{t('chrome.maintenanceBody')}</p>
-        <Link to="/staff-login" className="text-teal-300 text-sm font-semibold hover:text-teal-200">{t('chrome.staffSignIn')}</Link>
+        <p className="text-gray-400 leading-relaxed">{t('chrome.maintenanceBody')}</p>
       </div>
     </div>
   );
@@ -37,8 +37,10 @@ function ConsumerLayoutContent() {
 
   // The banner rides along rather than being left behind the early return: maintenance and a dead
   // uplink look identical, and it sits above the overlay because the overlay tops everything else.
-  const isInternal = user && (user.role === 'admin' || user.role === 'staff');
-  if (flags.maintenanceMode === true && !isInternal) {
+  const isInternal = isInternalUser(user);
+  // Staff reach their sign-in by direct URL only, so it must stay open while consumers are locked out.
+  const staffDoor = /^\/staff-(login|invite)/.test(pathname);
+  if (flags.maintenanceMode === true && !isInternal && !staffDoor) {
     return (
       <>
         <ConnectivityBanner zClass="z-[100000]" />

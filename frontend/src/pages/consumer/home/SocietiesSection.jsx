@@ -1,59 +1,36 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
-import { listSocietiesWithListings } from '../../../services/societyService.js';
+import { topSocieties } from '../../../services/societyService.js';
+import { useNearViewport } from '../../../lib/useNearViewport.js';
 
 const titleCase = (slug) => String(slug || '').replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-/**
- * How early to start fetching, in pixels of scroll ahead of the rail: far enough that the request
- * is in flight before the strip is legible, close enough that a hero-only visit never pays for it.
- */
+/** Fetch far enough ahead that the request is in flight before the strip is legible,
+ * yet a hero-only visit never pays for it. */
 const PREFETCH_MARGIN = '400px';
 
 /** Placeholder keys, one per card the rail shows, so the reserved row is the shape of the answer. */
 const SKELETONS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
-/**
- * Home discovery entry point for the Society Hub: the strongest few societies, with everything else
- * routed to /societies. Mirrors the "Explore by property type" strip so the two rows read alike.
- */
 export default function SocietiesSection() {
   const navigate = useNavigate();
   /* `null` is "not asked yet, or still in flight", a different fact from an empty catalogue — and
      the scroll gate means the visitor is looking at the section through that window. */
   const [societies, setSocieties] = useState(null);
   const rootRef = useRef(null);
-  const [inView, setInView] = useState(false);
+  const inView = useNearViewport(rootRef, PREFETCH_MARGIN);
   const scrollRef = useRef(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
   const [fadeLeft, setFadeLeft] = useState(false);
   const [fadeRight, setFadeRight] = useState(false);
 
-  /* Nothing is requested until the rail is nearly on screen, so this never competes with the hero
-     for the entry route's connections. Without `IntersectionObserver`, fetch immediately. */
-  useEffect(() => {
-    const el = rootRef.current;
-    if (!el) return undefined;
-    if (typeof IntersectionObserver !== 'function') { setInView(true); return undefined; }
-    const io = new IntersectionObserver((entries) => {
-      if (entries.some((e) => e.isIntersecting)) {
-        setInView(true);
-        io.disconnect();
-      }
-    }, { rootMargin: PREFETCH_MARGIN });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-
-  /* From the seam, never from `data/societies.js`: a bundled society the server has dropped would
-     link to a dead hub. `hasListings=true` narrows it to one page — see the flow doc, § 9.4. */
   useEffect(() => {
     if (!inView) return undefined;
     let alive = true;
-    listSocietiesWithListings()
-      .then(({ rows }) => { if (alive) setSocieties(rows); })
+    topSocieties()
+      .then((rows) => { if (alive) setSocieties(rows); })
       .catch((err) => {
         /* An empty strip, not a broken page: nothing else depends on this rail. Logged rather than
            swallowed, so a catalogue outage is diagnosable. */
@@ -63,23 +40,10 @@ export default function SocietiesSection() {
     return () => { alive = false; };
   }, [inView]);
 
-  const top = useMemo(() => (societies || [])
-    .map((soc) => {
-      /* `source`, not `tier` — the vocabulary the directory uses, so an ops-confirmed society is
-         badged on what it is now rather than on what it was minted with. */
-      const community = soc.source === 'community';
-      const verified = !!soc.verifiedAt || (!community && !!(soc.registration && soc.conveyance));
-      return {
-        slug: soc.slug, name: soc.name, localitySlug: soc.localitySlug || '',
-        /* The server's count: summed over the merge family and correct for listings this screen
-           never sees. The "New" branch is unreachable here, kept because the card is generic. */
-        verified, homes: soc.listingCount,
-      };
-    })
-    /* No rating tie-break between `homes` and `name`: adding one is a product decision about what
-       "strongest" means, and an arbitrary sort key reads as intentional. */
-    .sort((a, b) => (Number(b.verified) - Number(a.verified)) || (b.homes - a.homes) || a.name.localeCompare(b.name))
-    .slice(0, 8), [societies]);
+  // The server ranks: most homes (summed over the merge family) first, ties by name.
+  const top = useMemo(() => (societies || []).map((soc) => ({
+    slug: soc.slug, name: soc.name, localitySlug: soc.localitySlug || '', homes: soc.listingCount,
+  })), [societies]);
 
   // Arrows track whether there is more to scroll; the fades track whether a card is actually
   // clipped by that edge. Same mechanics as the property-type strip.
@@ -194,9 +158,8 @@ export default function SocietiesSection() {
                     <Icon name="building-2" className="w-6 h-6 text-brand-teal-3" />
                   </div>
                   <div className="text-left min-w-0">
-                    <p className="font-semibold text-sm text-white leading-tight flex items-center gap-1.5">
+                    <p className="font-semibold text-sm text-white leading-tight">
                       <span className="truncate">{s.name}</span>
-                      {s.verified ? <Icon name="badge-check" className="w-3.5 h-3.5 text-brand-teal-3 shrink-0" /> : null}
                     </p>
                     <p className="text-xs mt-0.5 text-brand-teal-3 truncate">
                       {loc ? `${loc} · ` : ''}{homesTxt}

@@ -16,60 +16,56 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/**
- * Spring Data access for {@link Property}: {@link JpaSpecificationExecutor} for the faceted public
- * search, {@link EntityGraph} finders against N+1. Rationale: docs/system/data-model.md.
- */
 public interface PropertyRepository
         extends JpaRepository<Property, UUID>, JpaSpecificationExecutor<Property>,
         PropertySearchFragment {
 
-    /** By-id with the owner eagerly attached, for the public detail projection. */
     @Override
     @EntityGraph(attributePaths = "owner")
     Optional<Property> findById(UUID id);
 
-    /** By-slug with the owner attached — the contract path param accepts a slug or id. */
+    @Override
+    @EntityGraph(attributePaths = "owner")
+    List<Property> findAllById(Iterable<UUID> ids);
+
     @EntityGraph(attributePaths = "owner")
     Optional<Property> findBySlug(String slug);
 
-    /**
-     * Does a direct link resolve for an anonymous caller? Pass {@link PropertyStatus#DIRECTLY_REACHABLE};
-     * {@code existsById} would make a public endpoint an existence oracle (docs/system/data-model.md).
-     */
     boolean existsByIdAndArchivedFalseAndStatusIn(UUID id, Collection<String> statuses);
 
     /** Owner-scoped single fetch by id (returns empty for another owner's row → 404, never a leak). */
     @EntityGraph(attributePaths = "owner")
     Optional<Property> findByIdAndOwner_Id(UUID id, UUID ownerId);
 
-    /** Owner-scoped single fetch by slug. */
     @EntityGraph(attributePaths = "owner")
     Optional<Property> findBySlugAndOwner_Id(String slug, UUID ownerId);
 
-    /**
-     * Load a listing for an ops write against its verification state under a row lock (check-then-act).
-     * <strong>Lock order: {@code properties} then {@code referrals}, never the reverse.</strong>
-     */
+    /** Whether the listing was out of the live state at any point before {@code to}: a gap that opened at or after
+     * {@code from}, or that was still open at {@code graceEnd}. */
+    @Query(value = """
+            select exists (select 1 from property_live_gaps g
+                           where g.property_id = :propertyId and g.left_live_at < :to
+                             and (g.left_live_at >= :from or g.returned_live_at is null
+                                  or g.returned_live_at > :graceEnd))""", nativeQuery = true)
+    boolean wasNotLiveBetween(@Param("propertyId") UUID propertyId, @Param("from") Instant from,
+            @Param("graceEnd") Instant graceEnd, @Param("to") Instant to);
+
+    /** Load a listing for an ops write against its verification state under a row lock (check-then-act).
+     * Lock order: {@code properties} then {@code referrals}, never the reverse. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Property p where p.id = :id")
     Optional<Property> findForVerificationDecision(@Param("id") UUID id);
 
-    /** The caller's own listings (all statuses incl. archived), owner-scoped; hits idx_properties_owner. */
     @EntityGraph(attributePaths = "owner")
     Page<Property> findByOwner_Id(UUID ownerId, Pageable pageable);
 
-    /**
-     * Just the ids of an owner's listings - the key set contacts needs, since {@code contact_requests}
-     * has no {@code owner_id}. A projection: an index-only read against {@code idx_properties_owner}.
-     */
+    /** Just the ids of an owner's listings - the key set contacts needs, since {@code contact_requests}
+     * has no {@code owner_id}. A projection: an index-only read against {@code idx_properties_owner}. */
     @Query("select p.id from Property p where p.owner.id = :ownerId")
     List<UUID> findIdsByOwnerId(@Param("ownerId") UUID ownerId);
 
-    /**
-     * Listings by <em>other</em> owners that look like the same unit: two OR'd signals, each a plain
-     * {@code =} so a null arm matches nothing. No society arm, no {@code ORDER BY}: data-model.md.
-     */
+    /** Listings by other owners that look like the same unit: two OR'd signals, each a plain
+     * {@code =} so a null arm matches nothing. No society arm, no {@code ORDER BY}: data-model.md. */
     @Query("""
             select p from Property p
             where p.owner.id <> :ownerId
@@ -88,10 +84,8 @@ public interface PropertyRepository
             @Param("localitySlug") String localitySlug,
             Pageable pageable);
 
-    /**
-     * The same question turned around: this owner's own near-duplicates. Every clause matches
-     * {@link #findDuplicateCandidates} except the owner comparison, and the two must not diverge.
-     */
+    /** The same question turned around: this owner's own near-duplicates. Every clause matches
+     * {@link #findDuplicateCandidates} except the owner comparison, and the two must not diverge. */
     @Query("""
             select p from Property p
             where p.owner.id = :ownerId
@@ -110,10 +104,8 @@ public interface PropertyRepository
             @Param("localitySlug") String localitySlug,
             Pageable pageable);
 
-    /**
-     * Recently created listings carrying a duplicate signal - the catch-up sweep for siblings the
-     * create-time probe could not see. <strong>Oldest first is load-bearing</strong>: data-model.md.
-     */
+    /** Recently created listings carrying a duplicate signal - the catch-up sweep for siblings the
+     * create-time probe could not see. Oldest first is load-bearing: data-model.md. */
     @Query("""
             select p from Property p
             where p.createdAt >= :since
@@ -129,10 +121,8 @@ public interface PropertyRepository
             @Param("statuses") Collection<String> statuses,
             Pageable pageable);
 
-    /**
-     * Every listing carrying a duplicate signal - the ops desk's clustering read. <strong>A full page
-     * must be treated as truncation</strong>, since clustering is pairwise: data-model.md.
-     */
+    /** Every listing carrying a duplicate signal - the ops desk's clustering read. A full page
+     * must be treated as truncation, since clustering is pairwise: data-model.md. */
     @Query("""
             select p from Property p
             where p.archived = false
@@ -146,47 +136,50 @@ public interface PropertyRepository
             @Param("statuses") Collection<String> statuses,
             Pageable pageable);
 
-    /**
-     * Stamp {@code owner_verified} onto <em>every</em> listing an owner holds: the badge belongs to
-     * the owner, not to a listing's lifecycle. {@code clearAutomatically} is load-bearing.
-     */
+    /** Stamp {@code owner_verified} onto every listing an owner holds: the badge belongs to
+     * the owner, not to a listing's lifecycle. {@code clearAutomatically} is load-bearing. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Property p set p.ownerVerified = true where p.owner.id = :ownerId and p.ownerVerified = false")
     int markOwnerVerified(@Param("ownerId") UUID ownerId);
 
-    /**
-     * Withdraw the denormalised owner badge from every listing this owner holds - the exact mirror of
-     * {@link #markOwnerVerified}, and diverging them would leave one direction subtly wrong.
-     */
+    /** Withdraw the denormalised owner badge from every listing this owner holds - the exact mirror of
+     * {@link #markOwnerVerified}, and diverging them would leave one direction subtly wrong. */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update Property p set p.ownerVerified = false where p.owner.id = :ownerId and p.ownerVerified = true")
     int markOwnerUnverified(@Param("ownerId") UUID ownerId);
 
-    /**
-     * Featured-first live listings for the homepage strip; the {@link Pageable} caps the result
-     * because the contract endpoint takes no limit. Summary projection, so no owner graph.
-     */
-    List<Property> findByStatusAndArchivedFalseOrderByFeaturedDescCreatedAtDesc(
-            String status, Pageable limit);
+    // Native on purpose: featured_days is not mapped, so an entity flush can never overwrite it.
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update properties set featured_days = :days where id = :id", nativeQuery = true)
+    int setFeaturedDays(@Param("id") UUID id, @Param("days") Integer days);
 
-    /**
-     * Live listings for one society, newest first — the {@code homes} array on the society hub.
-     * Summary projection, so no owner graph and no contact data.
-     */
+    /** Featured-first live listings for the homepage strip; the {@link Pageable} caps the result
+     * because the contract endpoint takes no limit. Summary projection, so no owner graph. */
+    List<Property> findByStatusAndArchivedFalseAndOwner_StatusNotOrderByFeaturedDescCreatedAtDesc(
+            String status, String ownerStatus, Pageable limit);
+
+    /** Live listings for one society, newest first — the {@code homes} array on the society hub.
+     * Summary projection, so no owner graph and no contact data. */
     List<Property> findBySocietyIdAndStatusAndArchivedFalseOrderByCreatedAtDesc(
             UUID societyId, String status, Pageable limit);
 
-    /**
-     * The same over a society and everything merged into it: a merge moves nothing, so the survivor's
-     * hub finds those listings only by asking for the whole family (docs/flows/consumer/societies.md).
-     */
-    List<Property> findBySocietyIdInAndStatusAndArchivedFalseOrderByCreatedAtDesc(
-            Collection<UUID> societyIds, String status, Pageable limit);
+    /** The same over a society and everything merged into it: a merge moves nothing, so the survivor's
+     * hub finds those listings only by asking for the whole family (docs/flows/consumer/societies.md). */
+    List<Property> findBySocietyIdInAndStatusAndArchivedFalseAndOwner_StatusNotOrderByCreatedAtDesc(
+            Collection<UUID> societyIds, String status, String ownerStatus, Pageable limit);
 
-    /**
-     * Live-listing counts grouped by locality slug. Computed, never {@code localities.listing_count},
-     * which counts every property while every surface showing it means the live ones.
-     */
+    default long countVisibleMatching(PropertySearchQuery filters, ListingFacets facets,
+            Instant baseline) {
+        var match = PropertySpecs.publicSearch(filters, facets);
+        if (baseline != null) {
+            match = match.and((root, query, cb) ->
+                    cb.greaterThan(root.get("createdAt"), baseline));
+        }
+        return count(match);
+    }
+
+    /** Live-listing counts grouped by locality slug. Computed, never {@code localities.listing_count},
+     * which counts every property while every surface showing it means the live ones. */
     @Query("""
             select p.localitySlug, count(p)
             from Property p
@@ -194,68 +187,119 @@ public interface PropertyRepository
             group by p.localitySlug""")
     List<Object[]> countLiveByLocalitySlug(@Param("status") String status);
 
-    /** Live-listing counts grouped by society id. See {@link #countLiveByLocalitySlug}. */
+    /** One grouped pass over live listings: counts, then the flat samples behind the rent and rate
+     * averages. Rows are [slug, live, rentFlats, avgRent, saleFlatsWithArea, avgRate, fromPrice]. */
+    @Query(nativeQuery = true, value = """
+            select p.locality_slug,
+                   count(*),
+                   count(*) filter (where p.deal = 'rent' and p.property_type_key = 'flat'),
+                   avg(p.price) filter (where p.deal = 'rent' and p.property_type_key = 'flat'),
+                   count(*) filter (where p.deal = 'buy' and p.property_type_key = 'flat'
+                                      and p.area > 0 and coalesce(lower(p.area_unit), 'sqft') = 'sqft'),
+                   avg(p.price / p.area) filter (where p.deal = 'buy' and p.property_type_key = 'flat'
+                                      and p.area > 0 and coalesce(lower(p.area_unit), 'sqft') = 'sqft'),
+                   min(p.price)
+            from properties p
+            where p.status = :status and p.archived = false and p.locality_slug is not null
+              and (cast(:slug as text) is null or p.locality_slug = cast(:slug as text))
+              and not exists (select 1 from users u where u.id = p.owner_id and u.status = 'suspended')
+            group by p.locality_slug""")
+    List<Object[]> liveLocalityStats(@Param("status") String status, @Param("slug") String slug);
+
     @Query("""
             select p.societyId, count(p)
             from Property p
-            where p.status = :status and p.archived = false and p.societyId is not null
+            where p.status = :status and p.archived = false and p.societyId in :societyIds
+              and p.owner.status <> 'suspended'
             group by p.societyId""")
-    List<Object[]> countLiveBySocietyId(@Param("status") String status);
+    List<Object[]> countLiveBySocietyId(@Param("status") String status,
+            @Param("societyIds") Collection<UUID> societyIds);
 
-    /** Live-listing counts grouped by city name. See {@link #countLiveByLocalitySlug}. */
+    /** Rows are [live, forSale, forRent, avgSaleRatePerArea, avgRent] over the given societies. */
+    @Query(nativeQuery = true, value = """
+            select count(*),
+                   count(*) filter (where p.deal = 'buy'),
+                   count(*) filter (where p.deal = 'rent'),
+                   avg(p.price / p.area) filter (where p.deal = 'buy' and p.area > 0),
+                   avg(p.price) filter (where p.deal = 'rent')
+            from properties p
+            where p.status = :status and p.archived = false and p.society_id in (:societyIds)
+              and not exists (select 1 from users u where u.id = p.owner_id and u.status = 'suspended')""")
+    List<Object[]> societyHomeStats(@Param("status") String status,
+            @Param("societyIds") Collection<UUID> societyIds);
+
     @Query("""
             select lower(p.city), count(p)
             from Property p
-            where p.status = :status and p.archived = false
+            where p.status = :status and p.archived = false and p.owner.status <> 'suspended'
             group by lower(p.city)""")
     List<Object[]> countLiveByCity(@Param("status") String status);
 
-    /**
-     * Live-listing count for a single locality: the grouped queries above aggregate the whole
-     * catalogue, which is work proportional to the catalogue rather than to the answer.
-     */
-    long countByLocalitySlugAndStatusAndArchivedFalse(String localitySlug, String status);
-
-    /** Live-listing count for a single society. See {@link #countByLocalitySlugAndStatusAndArchivedFalse}. */
-    long countBySocietyIdAndStatusAndArchivedFalse(UUID societyId, String status);
-
-    /**
-     * Listings the resolver could not place - the curation queue, and the exact complement of
-     * {@link #countLiveByLocalitySlug}: a null slug is invisible to every locality-keyed read.
-     */
-    @Query("""
-            select p from Property p
-            where p.localitySlug is null and p.archived = false and p.status in :statuses
-            order by p.createdAt asc""")
-    List<Property> findAwaitingLocality(@Param("statuses") Collection<String> statuses,
-            Pageable limit);
-
-    /** How many listings {@link #findAwaitingLocality} would return uncapped, for honest truncation. */
-    @Query("""
-            select count(p) from Property p
-            where p.localitySlug is null and p.archived = false and p.status in :statuses""")
-    long countAwaitingLocality(@Param("statuses") Collection<String> statuses);
-
-    /**
-     * How many listings this owner currently has live. Counted, never {@code users.listings_count},
-     * which tallies every row ever posted (docs/system/data-model.md).
-     */
+    /** How many listings this owner currently has live. Counted, never {@code users.listings_count},
+     * which tallies every row ever posted (docs/system/data-model.md). */
     long countByOwnerIdAndStatusAndArchivedFalse(UUID ownerId, String status);
 
-    /**
-     * How many of this owner's listings occupy a freemium slot - deliberately not
-     * {@link #countByOwnerIdAndStatusAndArchivedFalse}; see {@link PropertyStatus#OCCUPIES_LISTING_SLOT}.
-     */
-    @Query("""
-            select count(p) from Property p
-            where p.owner.id = :ownerId and p.archived = false and p.status in :statuses""")
-    long countOccupyingListingSlots(@Param("ownerId") UUID ownerId,
-            @Param("statuses") Collection<String> statuses);
+    /** The listing-pass predicate for a row aliased {@code p}: an unexpired, entitling pass is bound to it. */
+    String ACTIVE_PASS_SQL = """
+            exists (select 1 from subscriptions s join plans pl on pl.id = s.plan_id
+                    where s.property_id = p.id and pl.kind = 'listing-pass'
+                      and s.status in ('active', 'past-due') and s.renews_at > :now)""";
 
-    /**
-     * The three homepage trust numbers in one statement so they cannot straddle a moderation write;
-     * the ownership clause spells out the lapse rule and {@code verifiedOwners} counts people.
-     */
+    /** How many of this owner's live listings (see {@link PropertyStatus#OCCUPIES_LISTING_SLOT}) no
+     * active listing pass covers, leaving out {@code excludeId}; the free tier's ceiling counts these. */
+    @Query(nativeQuery = true, value = """
+            select count(*) from properties p
+            where p.owner_id = :ownerId and not p.archived and p.status in (:statuses)
+              and p.id <> :excludeId
+              and not\s""" + ACTIVE_PASS_SQL)
+    long countLiveUncovered(@Param("ownerId") UUID ownerId,
+            @Param("statuses") Collection<String> statuses, @Param("excludeId") UUID excludeId,
+            @Param("now") Instant now);
+
+    default long countLiveUncovered(UUID ownerId, Instant now) {
+        return countLiveUncovered(ownerId, PropertyStatus.OCCUPIES_LISTING_SLOT, new UUID(0, 0), now);
+    }
+
+    /** The ids behind {@link #countLiveUncovered}, oldest listing first. */
+    @Query(nativeQuery = true, value = """
+            select p.id from properties p
+            where p.owner_id = :ownerId and not p.archived and p.status in (:statuses)
+              and not\s""" + ACTIVE_PASS_SQL + """
+
+            order by p.created_at, p.id""")
+    List<UUID> findLiveUncoveredIds(@Param("ownerId") UUID ownerId,
+            @Param("statuses") Collection<String> statuses, @Param("now") Instant now);
+
+    /** A pass covers a listing only while it is live; sold, rented and archived listings forfeit it, and
+     * an order still waiting for payment is cancelled so its checkout cannot complete. */
+    default void endListingPasses(UUID propertyId) {
+        cancelUnpaidPassOrders(propertyId);
+        expireListingPasses(propertyId);
+    }
+
+    @Modifying(flushAutomatically = true)
+    @Query(nativeQuery = true, value = """
+            update subscriptions set status = 'expired', version = version + 1
+            where property_id = :propertyId and status in ('active', 'past-due')
+              and plan_id in (select id from plans where kind = 'listing-pass')""")
+    int expireListingPasses(@Param("propertyId") UUID propertyId);
+
+    @Modifying(flushAutomatically = true)
+    @Query(nativeQuery = true, value = """
+            update subscriptions set status = 'cancelled', idempotency_key = null, version = version + 1
+            where property_id = :propertyId and status = 'pending'
+              and plan_id in (select id from plans where kind = 'listing-pass')""")
+    int cancelUnpaidPassOrders(@Param("propertyId") UUID propertyId);
+
+    @Query(nativeQuery = true, value = """
+            select exists (select 1 from properties p where p.id = :propertyId and\s""" + ACTIVE_PASS_SQL + ")")
+    boolean hasActivePass(@Param("propertyId") UUID propertyId, @Param("now") Instant now);
+
+    @Query("select count(p) from Property p where p.owner.id = :ownerId and p.createdAt > :since")
+    long countPostedSince(@Param("ownerId") UUID ownerId, @Param("since") java.time.Instant since);
+
+    /** The three homepage trust numbers in one statement so they cannot straddle a moderation write;
+     * the ownership clause spells out the lapse rule and {@code verifiedOwners} counts people. */
     @Query("""
             select new com.draazy.api.catalog.property.TrustTally(
                 count(p),
@@ -268,22 +312,19 @@ public interface PropertyRepository
             from Property p
             where p.status = :status
               and p.archived = false
-              and (:all = true or p.localitySlug = :slug)""")
+              and p.owner.status <> 'suspended'""")
     TrustTally tallyTrust(
             @Param("status") String status,
-            @Param("now") Instant now,
-            @Param("all") boolean all,
-            @Param("slug") String slug);
+            @Param("now") Instant now);
 
-    /**
-     * Count live listings matching a saved search's facets; the alert sweep and the saved-search list
-     * share one query so the two readings cannot drift. {@code unbounded} drops the recency predicate.
-     */
+    /** Count live listings matching a saved search's facets; the alert sweep and the saved-search list
+     * share one query so the two readings cannot drift. {@code unbounded} drops the recency predicate. */
     @Query("""
             select count(p)
             from Property p
             where p.status = :status
               and p.archived = false
+              and p.owner.status <> 'suspended'
               and (:unbounded = true
                    or (p.createdAt is not null and p.createdAt > :baseline))
               and (:deal is null or lower(p.deal) = :deal)

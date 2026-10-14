@@ -13,8 +13,31 @@ code); where the spec is silent, this doc governs.
   path, verb, request/response shape, status code, `x-roles`, and `security` block.
 - Never invent a divergent shape. If the spec is wrong, silent, or self-contradictory: **stop, flag it,
   amend the spec (with rationale), then implement.** Record the decision in `tasks/todo.md`.
-- The React frontend consumes these shapes through a provider seam; a byte-compatible response is what
-  lets `VITE_API_MODE=mock→http` flip with zero component changes. Treat wire compatibility as a test.
+- The React frontend consumes these shapes through a provider seam, and every mapper behind it is
+  written against the spec rather than against an observed response. Treat wire compatibility as a test.
+
+### 1.1 How `SpecCoverageTest` enforces it
+
+- **Both directions of the equality are enforced.** Served-but-undeclared is a surface nobody
+  reviewed — it is how an endpoint ships without an `x-roles` line ever being considered.
+  Declared-but-unserved is a published promise that 404s, and a client author has no reason to
+  suspect the document over their own code. Enforcing only one direction just moves where the drift
+  accumulates. Declared-but-unserved is held as an exact set, not a ratchet: such an operation is
+  either the next thing to build or it should come out of the contract.
+- **`IMPLEMENTED_FLOOR` is a running sum of what each slice added, not the live count.** It is a
+  floor, not a target — it catches a slice that silently unmaps something while adding new work. An
+  author raises it by exactly what their own slice added; the arithmetic catching up to the live
+  count is the next author's to do. Raising it to a number that includes somebody else's in-flight
+  work makes the ratchet fail on any branch without that work. Never lower it to make a build pass,
+  except when operations are deliberately withdrawn from the contract and the tree.
+- **Paths are compared with parameter names erased** — `/{id}` and `/{propId}` are the same route to
+  a router and differ only in spelling.
+- **`@LocalOnly` controllers are exempt, keyed on the marker annotation and not on the `@Profile`
+  expression behind it.** Their routes answer 404 everywhere that matters, so declaring them would
+  publish the exact rot the declared-but-unserved rule exists to catch. Reading the profile
+  expression instead meant the exemption silently stopped applying the moment that expression
+  changed. A controller enabled by some other profile still reaches production under it and must be
+  declared like anything else.
 
 ## 2. URIs, verbs, versioning
 
@@ -98,7 +121,7 @@ mandating it would break existing callers and turn a safety feature into an outa
   exception carries its contract `error` code. Security-filter failures (pre-dispatch 401/403) are
   rendered by `RestAuthEntryPoint` / `RestAccessDeniedHandler` to the identical envelope.
 - Error codes come from **`common.error.ErrorCodes`**, never inline literals. They are API surface —
-  the React client branches on them (e.g. `aadhaar_required` drives the verification prompt), so a
+  the React client branches on them (e.g. `verification_required` drives the verification prompt), so a
   code is `snake_case` and **stable**: renaming one is a breaking change, not a refactor. The two
   auth messages that both the filter chain and the advice must emit byte-identically live in
   `ErrorCodes.Messages` for the same reason.
@@ -128,7 +151,8 @@ code actually work here?**
 |---|---|---|
 | `account_archived` | 401 | An ordinary 401 on the OTP route is about the code, so the answer is another code. This one is terminal — every fresh code verifies and lands here again, sending the user round that loop until their send budget is gone. |
 | `signups_closed` | 403 | Terminal in the same way, and equally not about the code. A plain 403 is answered by signing in as somebody permitted, which is precisely the move these refusals do not accept. |
-| `verification_required` | 403 | The *only* legitimate verification-driven 403 on the contact path (ADR-019, badge-not-gate). A missing L2 badge never blocks anything else, so the client can safely treat this code — and only this code — as "offer the Aadhaar prompt". |
+| `account_suspended` | 403 | Terminal too, and sharing `forbidden` with the bot-defence refusal on `POST /auth/login` would tell a suspended user to reload the page. The message names the remedy for the audience: support for consumers, an administrator for staff. |
+| `verification_required` | 403 | The *only* legitimate verification-driven 403 on the contact path (ADR-019, badge-not-gate). A missing L2 badge never blocks anything else, so the client can safely treat this code — and only this code — as "offer the identity-verification prompt". |
 | `review_not_eligible` | 422 | No permission fixes it, only going to see the flat does. A review is worth reading only if the person writing it went there. |
 | `contact_quota_exhausted` | 422 | Not 403: signing in again does not conjure contacts. Not 429: a 429 promises the request succeeds if you wait, and this quota is a lifetime total. What fixes it is subscribing or referring. |
 | `listing_quota_exhausted` | 422 | Same reasoning, except this quota is not a lifetime total — taking a listing down frees the slot. Still not a 429: nothing expires on its own. |
@@ -136,7 +160,8 @@ code actually work here?**
 | `maintenance_mode` | 503 | Not 403 (clients answer a 403 by offering to sign in, which does not end a window) and not `rate_limited` (nothing the caller did caused it). The distinct code is what lets a client say "back shortly". |
 | `precondition_failed` | 412 | Not `conflict`: the caller asked to be stopped if the resource had moved, so the recovery is re-read and re-apply rather than reconsider the request. |
 | `already_reviewed` | 409 | One voice, one review — a rating average one account can move fifty times is not an average of anything. Paired with a UNIQUE index, not only a service check, so the answer holds under concurrent submits. |
-| `aadhaar_already_registered` | 409 | One Aadhaar, one badge (ADR-009b). Fires only inside the opt-in KYC flow; it never blocks posting or contact. |
+| `identity_already_registered` | 409 | One document, one badge (ADR-009b), enforced by the UNIQUE `identity_hash` at approval. Fires only inside the opt-in badge flow; it never blocks posting or contact. |
+| `owner_consent_self` | 400 | The owner-consent OTP asked for at the caller's own number. The client shows a specific message instead of quoting server text; retrying with the same number cannot work. |
 
 Two codes are raised from more than one place and **must stay identical across both**, or a client
 learns two names for one refusal: `payload_too_large` (our own check *and* the servlet container's
@@ -175,7 +200,8 @@ vault's byte-sniffing check *and* Spring refusing a `Content-Type` the endpoint 
   500. 409 is the honest reply, and a client retrying the same idempotent request gets the stored
   result because by then the winner has committed. Logged at `warn` with the cause, because a
   not-null or foreign-key violation from a genuine bug also reaches here and must not disappear
-  behind a tidy 409.
+  behind a tidy 409. The one exception is SQLState `22021` (a NUL in a text value, which Postgres
+  cannot store): that is bad input, so it answers 400 and logs at `debug`.
 - **`OptimisticLockingFailureException` → 409, with different advice.** There the database refused a
   write that was never valid; here it refused one that was valid when the caller loaded the row and
   stopped being valid while they were editing it. The caller did nothing wrong and has not lost their
@@ -194,15 +220,14 @@ vault's byte-sniffing check *and* Spring refusing a `Content-Type` the endpoint 
 ### 4.4 Platform settings accessors always answer
 
 `common.settings.PlatformSettings` gives each settings value a named accessor with its fallback and
-bounds beside it, instead of `settings.get("fees").get("gstPercent")`. Every accessor has a
+bounds beside it, instead of `settings.get("fees").get("listingPass")`. Every accessor has a
 defaulted, in-range answer, because this class sits in the path of taking money and the alternative
 to a default is a 500 on the pay button because somebody mistyped a config value in the back office.
 
-- **Price fallbacks must match what a healthy install answers** and what `GET /pricing` publishes. A
+- **Price fallbacks must match what a healthy install answers** and what `GET /bootstrap` (`pricing`) publishes. A
   default that differed would let a broken config row quietly *change* the price rather than merely
   fail to be read.
-- **Every ceiling catches a typo, not an attack.** `MAX_PERCENT = 100` stops a fat-fingered `200`
-  billing a member twice what they were quoted. `MAX_PRICE = 100000` catches a trailing zero — a lakh
+- **Every ceiling catches a typo, not an attack.** `MAX_PRICE = 100000` catches a trailing zero — a lakh
   is two orders of magnitude past anything sold to an individual. `MAX_CONTACT_GRANT = 1000` matters
   most on the referral bonus, where a mistyped extra zero is not one wrong grant but an unbounded
   one, multiplied by however many referrals somebody can generate; past a thousand the number means
@@ -215,9 +240,8 @@ to a default is a 500 on the pay button because somebody mistyped a config value
   fraud desk — so setting it too low costs review time, not honest referrers their reward. It is
   configuration rather than a constant because a fraud threshold has to be movable on the day it is
   wrong: a deployment change, not a release.
-- **Prices are whole rupees** because they are catalogue prices an operator types into a box, not
-  amounts computed from a percentage; `gstPercent` is the one percentage and is `BigDecimal` for that
-  reason. Named one accessor at a time rather than returned as a map, which would put the field names
+- **Prices are whole rupees** because they are catalogue prices an operator types into a box.
+  Named one accessor at a time rather than returned as a map, which would put the field names
   back in the caller's string literals.
 - **`rentAgreementPlatform` is the platform's share only.** Stamp duty and registration are the
   state's, computed per agreement and collected on top, which is why `platform_fees` carries them.
@@ -231,8 +255,11 @@ not be frozen out of its first member or lock its own operators out. `maintenanc
 and the same default would strand a fresh or malformed install behind the maintenance page with no
 way in to fix it.
 
-Both `signupsEnabled` and `staffLoginEnabled` are **server-enforced, not merely published on
-`GET /flags`**. `signupsEnabled` decides whether a row is written and `POST /auth/login` provisions
+`GET /bootstrap` (`flags`) publishes only the keys the consumer app reads
+(`AppFlagsController.PUBLIC`); `staffLoginEnabled` and any unknown key stay in `/admin/settings`.
+A flag added to the consumer UI must be added to that set, or the client reads it as absent (on).
+
+Both `signupsEnabled` and `staffLoginEnabled` are **server-enforced**. `signupsEnabled` decides whether a row is written and `POST /auth/login` provisions
 on first verified sign-in, so a client-only guard would leave the only account-creating consumer path
 wide open while the back office reported onboarding shut. `staffLoginEnabled` is reached for during
 an incident, and an attacker posts to the endpoint rather than clicking the button — and it binds
@@ -246,11 +273,11 @@ would let the `REQUIRES_NEW` write it guards commit on its own connection and th
 request — minting the very account the flag exists to prevent, orphaned, behind a 500 nobody reads as
 a bypass. A non-boolean is treated as undecided rather than coerced, because it is not a value.
 
-**`GET /flags` is public and deliberately one block wide.** It serves `settings.flags` and nothing
+**`GET /bootstrap` (`flags`) is public and deliberately one block wide.** It serves `settings.flags` and nothing
 else — not `adminFlags`, not `fees`, not `permissions` — because those toggles gate what an anonymous
 visitor sees while the same document holds the fee table and the permission map. Publishing a flag
-there is **not** enforcing it: `kycBadgeEnabled` and `boostEnabled` are render-only and the actions
-behind them have their own guards. Non-boolean values are dropped rather than forwarded, since the
+there is **not** enforcing it: `kycBadgeEnabled` is render-only and the actions behind it have their
+own guards. Non-boolean values are dropped rather than forwarded, since the
 contract types the map as booleans and a `"false"` string would read as *enabled* either way. A
 missing or unparseable row answers `{}` rather than failing, because every consumer is a page render
 and the alternative is a blank site because somebody mistyped a config value.
@@ -265,6 +292,10 @@ and the alternative is a blank site because somebody mistyped a config value.
   default is 2000, so this is not optional — and it must be duplicated in
   `src/test/resources/application.properties`, which *shadows* the main file rather than merging with
   it. Without the duplicate, tests "prove" a cap the test run doesn't have.
+- `page` is capped at **10,000** by `common.web.PageBoundsConfig` (400 above it): Spring caps neither the
+  page number nor the `page × size` offset, which overflows an int and would 500.
+- A published sort validates with `Pageables.allowSort` (unknown field → 400); a fixed order strips the
+  client's with `Pageables.unsorted`. `AuthorizationCoverageTest` probes every paged GET with both.
 
 ### 5.1 Which collections get paged
 
@@ -277,7 +308,7 @@ with **one user's own activity**, or when it is fixed reference data.
 | One user's own actions | array | `/me/deals`, `/me/offers`, `/me/visit-requests` |
 | **Inbound demand** — rows written by *other* users against the caller | `PageEnvelope` | `/messages`, `/me/saved` |
 | **Time** — rows accrue on a schedule and are never culled | `PageEnvelope` | `/me/finances/{propId}/transactions` |
-| Fixed reference / CMS data | array | `/fees`, `/cities`, `/localities`, `/plans`, `/faqs` |
+| Fixed reference / CMS data | array | `/fees`, `/localities`, `/faqs`, and the `cities` / `plans` sections of `/bootstrap` |
 
 The middle rows are the ones that get confused. A landlord has eight offers, not eighty thousand,
 so paging `/me/offers` buys nothing and costs a `count(*)` on every read. But a *ledger* under `/me/`
@@ -349,9 +380,9 @@ of the wire.
   server-side from signed claims — **never** trust client-supplied identity/role fields.
 - Enforce `x-roles` with `@PreAuthorize("hasRole(Roles.X)")`; `/me/**`-style reads are scoped by the
   principal id, so a caller can only touch their own rows.
-- Trust ladder (ADR-019): **mobile-OTP L1 is the floor** to participate; the Aadhaar/Verified badge (L2)
+- Trust ladder (ADR-019): **mobile-OTP L1 is the floor** to participate; the reviewed Verified badge (L2)
   is a **signal, never a hard gate**. Don't `403` on missing L2.
-- Passwordless consumers (OTP); staff/admin use BCrypt email+password. Refresh tokens rotate with
+- Passwordless consumers (OTP); back-office users use BCrypt email+password. Refresh tokens rotate with
   reuse-detection; logout revokes the refresh family (stateless access tokens expire naturally).
 - The refresh token travels **only** as an `HttpOnly; Secure; SameSite=Lax; Path=/` cookie
   (`__Host-draazy_rt`; the bare name over plain-HTTP dev, where a browser rejects the prefix) — it
@@ -417,6 +448,35 @@ Rules:
   `Roles` is not a candidate at any size: its upper-case authority form is interpolated into
   `@PreAuthorize`, which requires a compile-time `String` constant.
 
+### 7.2 Route URIs are constants in `common.web.Routes`
+
+Every HTTP route the application serves has exactly one constant in `common.web.Routes`, and both
+the controller mapping and the `SecurityConfig` matcher are declared from it.
+
+**Why.** A route string is duplicated across two files that must agree or the app is *insecure*: the
+controller that declares it, and the security chain that decides whether it is public. A typo in the
+chain fails neither the build nor a happy-path test — it silently leaves a public endpoint
+authenticated (an outage), or leaves a matcher too broad and exposes a route that should be guarded.
+One constant on both sides makes that class of drift impossible.
+
+Rules:
+
+- **Absolute paths only.** Each constant is the full path from the API root, and controllers declare
+  mappings at method level with no class-level `@RequestMapping` prefix. A class-level base plus
+  relative constants would force every route to exist twice — relative for the controller, composed
+  absolute for the security chain — reintroducing the drift the class removes.
+- **Compile-time constants**, so they are legal inside annotations and composable with `+` (see
+  `Properties#BY_ID`). Paths are relative to the `/api` servlet context prefix, which is applied by
+  configuration and never repeated in a constant.
+- **Only routes this application serves.** Framework paths (Swagger UI, actuator, static assets) are
+  referenced once, as literals, in the security chain — they have no controller to drift from.
+- **Security-chain matchers are single-segment (`*`) unless a deeper route is meant to be public.**
+  A `**` sweeps every future deeper route into the public allowlist before anyone has decided it
+  should be. Where a deeper read *is* public (e.g. a listing's rooms), it gets its own explicit
+  allowlist entry — being a read on a public resource does not make it public by inheritance.
+- **An exact path outranks a template one**, so a literal sibling of a `{id}` route (`/properties/
+  featured` beside `/properties/{id}`) can never be read as an id.
+
 ## 8. DTOs, mapping & the entity↔wire boundary
 
 - DTOs are Java `record`s. **Never serialize a JPA entity** — map to a response record at the edge,
@@ -455,6 +515,20 @@ Rules:
 > `useIncrementalCompilation` is also disabled so a bad class can never be carried forward.
 > If you ever see those errors again, check that `-DbuildDirName=target-cli` is in effect.
 > See `tasks/lessons.md`.
+
+### 8.2 Every response carries only what its screen draws
+
+- **One slim record per use** (`PropertyCard`, `SocietyCard`, `SelfResponse`, `SavedKey`), never
+  `@JsonIgnore` on a shared fat record. Lists ship card/row records; detail fields stay on `/{id}`.
+- **Never on the wire unless rendered**, and then in the least form (masked, rounded, label not id):
+  other people's UUIDs, mobile/email, document numbers, payment/order/gateway refs, internal
+  status/flag/reviewer/assignee/notes, unused timestamps, storage URLs with user UUIDs, exact lat/lng
+  where only a locality is drawn, ip/user-agent.
+- **Counts are server-side** (`/summary`, `counts=true`, `/keys`, `?ids=`), never a `size=500` download.
+  A read only a tab/modal needs fires when it opens.
+- **Caller-independent public reads** go in `PublicReadCacheFilter.PATHS` (weak ETag → gzip + `304`).
+- **Guards:** `SpecSchemaParityTest` (record ↔ schema), a backend `doesNotExist()` test for removed
+  fields, and an e2e payload spec in the style of `consumer/home/home-payload.spec.js`.
 
 ## 9. Provider seams
 
@@ -552,11 +626,11 @@ first loops the client forever.
   the table is deliberately open (`geo` is read by the client and never appears in `AdminSettings`).
   Back-office access is decided by role, team and the `permissions` allow-list.
 - **Non-boolean `flags.*`.** Every reader treats a non-boolean as undecided (`AppFlagsController`
-  drops it from `GET /flags`; `PlatformSettings.flag` returns its absent-means-ON default), so
+  drops it from `GET /bootstrap` (`flags`); `PlatformSettings.flag` returns its absent-means-ON default), so
   `{"flags":{"signupsEnabled":"false"}}` would be stored, audited as a change, echoed back and
   enforced as *on*. Refused rather than coerced: guessing is unrecoverable in the direction that
   silently opens something.
-- **`geo.cities.*.live`.** City launch state is a column on `cities` served by `GET /cities`,
+- **`geo.cities.*.live`.** City launch state is a column on `cities` served by `GET /bootstrap` (`cities`),
   because a value deciding what a logged-out visitor sees cannot have an administrator-only reader.
   It is nested rather than in the top-level deny set because `geo` is very much supported - it still
   carries `enforceCityLimit`, the map centre and bounds, and the blacklist.

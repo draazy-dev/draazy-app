@@ -1,121 +1,40 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router';
-import { Check, ChevronLeft, ChevronRight, Eye, EyeOff, Hand, Minus, RefreshCw, ShieldAlert } from 'lucide-react';
+import { Hand, RefreshCw } from 'lucide-react';
 import {
-  listServiceRequestQueue, readServiceRequestChecklist, readServiceRequestIdentities,
-  takeServiceRequest,
+  addServiceRequestMessage, cancelServiceRequestAsOps, getServiceRequest, getServiceRequestQueueSummary,
+  readServiceRequestChecklist, shareServiceRequestDraft,
+  takeServiceRequest, uploadServiceRequestFinalDoc, checkServiceRequestDraft,
 } from '../../services/serviceRequestService.js';
-import { classNames, fmtINR, fmtNum } from '../../lib/format.js';
+import { classNames, fmtINR } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
-import { useAuth } from '../../context/AuthContext.jsx';
+import { DESK_BY_VALUE } from '../../lib/adminModules.js';
+import { useTabParam } from '../../lib/useTabParam.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
-import Table from '../../components/ui/Table.jsx';
 import Badge from '../../components/ui/Badge.jsx';
-import Select from '../../components/ui/Select.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
+import InternalNote, { saveNoteIfAny } from '../../components/ui/InternalNote.jsx';
+import {
+  BTN, CHIP, CHIP_TONE, Cell, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
+} from '../../components/admin/WorkQueue.jsx';
+import AdminServices from '../admin/AdminServices.jsx';
+import useDeskTickets from '../admin/useDeskTickets.js';
+import AgeTone from './service-queue/AgeTone.jsx';
+import CancelDialog from './service-queue/CancelDialog.jsx';
+import MessageThread from './service-queue/MessageThread.jsx';
+import DocumentChecklist from './service-queue/DocumentChecklist.jsx';
+import ServiceDocuments from './service-queue/ServiceDocuments.jsx';
+import StaffWorkflowActions from './service-queue/StaffWorkflowActions.jsx';
+import DraftSecondCheck from './service-queue/DraftSecondCheck.jsx';
+import PartyIdentities from './service-queue/PartyIdentities.jsx';
+import { OverdueToggle, stageTabs, useQueue } from './service-queue/deskQueue.jsx';
 import { fmtAgo } from './service-queue/helpers.js';
 
-/**
- * The drafting desk (D173) — the ops half of the identity-disclosure design (D151).
- *
- * `GET /service-requests/{id}/identities` refuses everyone but the request's assignee, audits both
- * outcomes, and had a full test suite and no caller. This is the caller.
- *
- * **It replaced `OpsServiceQueue` rather than sitting beside it.** That screen — and the five
- * one-line team wrappers over it (`/ops/legal`, `/ops/rent-agreement`, `/ops/interior`,
- * `/ops/packers`, `/ops/valuation`) — read a browser-local demo workflow, with ids that existed
- * only in the operator's own browser. Once consumers filed through the seam those five desks went
- * blind: the work landed in Postgres and the desks were still reading the browser. They could not
- * simply be pointed at the seam either, because two of their five steps are states the contract
- * refused by name — see the `docs_review` / `registration` discussion in `ServiceRequestStatus`.
- * So the old URLs now redirect here with `?type=` set, and this screen does exactly the three things
- * the server lets a desk do without a document-upload surface: read the queue, take a matter, and
- * read the numbers for the matter it has taken. It does
- * not pretend to share drafts or upload registered copies, because those are multipart uploads to a
- * vault whose signed URLs do not resolve in dev — the old desk only appeared to, into `localStorage`.
- *
- * ## What makes the reveal safe, and the four rules that come with it
- *
- * The route's guarantee is "only the assigned operator, and every access recorded". None of that
- * survives a careless client, so:
- *
- *   1. **The numbers live in component state and nowhere else.** No `localStorage`, no context, no
- *      module-level cache. Closing the panel or moving to another matter clears them, because a
- *      time-boxed disclosure that outlives the view is not time-boxed.
- *   2. **Never a list column.** The queue is a page of many matters; the numbers are one matter at
- *      a time or nothing, which is why the contract gave them their own route keyed on a single id.
- *   3. **Never in the URL.** A query string is history, a referer header and a shoulder-surfable
- *      address bar. The open request's id is not a route param here for the same reason the reveal
- *      is a button rather than an auto-load: the read is an act, and it is audited as one. (`?type=`
- *      is in the URL and does not breach this: a desk name is not a disclosure.)
- *   4. **Never logged.** No `console` call in this file touches the result.
- *
- * **A refusal is rendered, not swallowed.** The server's two sentences say *why* — nobody holds
- * this matter, or somebody else does — and they are the difference between "take it" and "go and
- * ask the person who has it". An empty list in their place would tell the desk the customer never
- * supplied numbers it is in fact being denied.
- *
- * **Taking a matter is the whole access-control story.** There is no "assign to somebody else":
- * moving to `assigned` takes the request for the caller, which costs two visible moves when
- * somebody else holds it and writes a timeline entry the customer can read plus an audit row. The
- * button says so, because a control the operator does not know they crossed is not accountability.
- *
- * ## `details` is never dumped
- *
- * `ServiceRequest.details` is free-form `jsonb` the customer's form filled, and the rent-agreement
- * wizard puts a whole redacted form snapshot in `_state` — which keeps identity numbers out but
- * keeps *mobile numbers* in. Rendering the object verbatim would put an owner's raw mobile on an
- * ops screen by accident, so the summary reads a short allow-list of named scalar fields and
- * ignores everything else. New keys are invisible here until someone adds them on purpose, which is
- * the safe direction for a field nobody controls the shape of.
- */
-
 const PAGE_SIZE = 20;
+const TABS = stageTabs('request');
+const TAB_KEYS = TABS.map((t) => t.key);
 
-const TYPE_OPTS = [
-  { value: '', label: 'All desks' },
-  { value: 'rental', label: 'Rent Agreement' },
-  { value: 'legal', label: 'Property & Legal' },
-  { value: 'interior', label: 'Interior & Renovation' },
-  { value: 'packers', label: 'Packers & Movers' },
-  { value: 'valuation', label: 'Property Valuation' },
-];
-
-/* `ServiceRequestStatus` in full, in transition order — this filter is sent as `?status=`, and the
-   server is the only thing that defines these. `awaiting-payment` (a paid desk before the payment
-   lands) and `changes-requested` (the customer sent a shared draft back) are both real states a
-   matter sits in and both were missing here, so a desk filtering for them saw an empty queue. */
-const STATUS_OPTS = [
-  { value: '', label: 'All statuses' },
-  { value: 'awaiting-payment', label: 'Awaiting payment' },
-  { value: 'new', label: 'New' },
-  { value: 'assigned', label: 'Assigned' },
-  { value: 'in-progress', label: 'In progress' },
-  { value: 'draft-shared', label: 'Draft shared' },
-  { value: 'changes-requested', label: 'Changes requested' },
-  { value: 'approved', label: 'Approved' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'cancelled', label: 'Cancelled' },
-];
-
-/**
- * The only `details` keys this screen will render, and what to call them.
- *
- * An allow-list rather than a deny-list: `details` is whatever a form put there, so anything not
- * named here is skipped — including `_state`, the wizard's full form snapshot, which carries the
- * parties' mobile numbers.
- *
- * ## Live only, on purpose (D184)
- *
- * The status filter sends `?status=` in the server's vocabulary. The former browser workflow used
- * the stepper's (`docs_review`, …), so most filters matched nothing and a desk looked idle when it
- * was not. A translation table was rejected — a mapping that exists only to make a demo look right
- * is a second vocabulary to keep in sync. The browser workflow is gone instead.
- *
- * That leaves one vocabulary, `ServiceRequestStatus`, and `STATUS_OPTS` below is all nine of
- * its values rather than the seven that happened to be reachable through the demo flow.
- */
+/** Allow-list details so free-form `_state` snapshots cannot leak mobile or identity fields. */
 const DETAIL_FIELDS = [
   ['property', 'Property'],
   ['location', 'Location'],
@@ -151,72 +70,64 @@ function detailRows(details) {
     .map(([key, label, fmt]) => [label, fmt === 'inr' ? fmtINR(d[key]) : String(d[key])]);
 }
 
-/** The one-line summary the queue row shows. Same allow-list, first hit wins. */
-const summaryOf = (r) => {
-  const rows = detailRows(r.details);
-  return rows.length ? rows[0][1] : '—';
-};
+const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 
-const PARTY_LABEL = { owner: 'Owner', tenant: 'Tenant' };
-
-export default function OpsDraftingDesk() {
+/** One service desk's queue (legal, interior, packers, valuation). Rent agreements have their own
+ *  case view in `rent-agreement/`; home loans are tickets on `AdminServices`. */
+export default function OpsDraftingDesk({ desk }) {
   const { toast } = useToast();
-  /* `?type=` is the desk selector, and it lives in the URL rather than in state alone so that the
-     five retired team desks (`/ops/legal`, `/ops/packers`, …) can redirect here and still land an
-     operator on their own work. Unrecognised values are dropped rather than sent — the server
-     would reject them, and a filter nobody chose is worse than no filter. */
-  const [params, setParams] = useSearchParams();
+  const [tab, setTab] = useTabParam(TAB_KEYS, 'pickup');
+  const [q, setQ] = useState('');
+  const [overdue, setOverdue] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageTab, setPageTab] = useState(tab);
+  if (pageTab !== tab) {
+    setPageTab(tab);
+    setPage(1);
+  }
 
-  /* Those five routes were behind `TeamRoute`, which bounced a Rental staffer off `/ops/legal`
-     with a reason. The server never relied on it — `ServiceDeskAuthority.deskFilterFor` scopes a
-     staff caller to their own desk and ignores a `team` they do not own (D44) — so dropping the
-     guard widens nothing. It would, though, leave a staffer able to *pick* another desk and get an
-     empty table back, which is the one thing this screen exists to avoid: an empty queue and a
-     forbidden queue must not look alike. So staff get their own desk and nothing else to choose;
-     admins, who really can see every desk, keep the full list. */
-  const { team, role } = useAuth();
-  /* A team with no request type of its own (loans) falls through to the full list rather than an
-     empty picker; the server scopes it to nothing either way, so this only affects what is on
-     screen while that is true. */
-  const myDesk = TYPE_OPTS.filter((o) => o.value === team);
-  const typeOpts = role === 'admin' || myDesk.length === 0 ? TYPE_OPTS : myDesk;
-  const urlType = params.get('type') || '';
-  const fallback = typeOpts.length === 1 ? typeOpts[0].value : '';
-  const type = typeOpts.some((o) => o.value === urlType) ? urlType : fallback;
-  const [status, setStatus] = useState('');
-  const [page, setPage] = useState(0);
-  const [state, setState] = useState(() => ({ status: 'loading', items: [], total: 0 }));
-  const [nonce, setNonce] = useState(0);
+  // `null` on failure, so a tab count is omitted rather than reading "0".
+  const [summary, setSummary] = useState(null);
+  const tickets = useDeskTickets(summary?.openTickets);
+  const summarySeq = useRef(0);
+  const loadSummary = useCallback(() => {
+    const seq = ++summarySeq.current;
+    const settle = (value) => { if (seq === summarySeq.current) setSummary(value); };
+    getServiceRequestQueueSummary(desk).then(settle, () => settle(null));
+  }, [desk]);
+  useEffect(() => { loadSummary(); }, [loadSummary]);
+  const [reloadToken, setReloadToken] = useState(0);
+  const reload = () => { loadSummary(); setReloadToken((n) => n + 1); };
 
+  const active = TABS.find((t) => t.key === tab);
+  const queue = useQueue({
+    type: desk, ...active.query, overdue: overdue || undefined, q: q.trim() || undefined, page: page - 1, size: PAGE_SIZE,
+  }, reloadToken);
+  const rows = queue.page?.items || [];
+  const total = queue.page?.total ?? 0;
+  const paging = { page, pageCount: Math.ceil(total / PAGE_SIZE), total, size: PAGE_SIZE, onPage: setPage, stale: queue.stale };
+
+  const [target, setTarget] = useState(null);
   const [detail, setDetail] = useState(null);
-  /* The disclosure itself. Component state, cleared whenever the panel closes or the matter
-     changes — see rule 1 in the header. `refusal` holds the server's own sentence. */
-  const [identities, setIdentities] = useState(null);
-  const [identityStatus, setIdentityStatus] = useState('idle');
-  const [refusal, setRefusal] = useState('');
-  /* The document checklist (D120). Unlike the identity reveal this needs no gesture and no gate:
-     it carries no personal data — the names of the papers a request asks for, and whether each has
-     arrived — so it loads with the matter. `null` is "not read yet", never "nothing filed". */
+  const [detailFailed, setDetailFailed] = useState(false);
   const [checklist, setChecklist] = useState(null);
   const [checklistStatus, setChecklistStatus] = useState('idle');
+  const [internalNote, setInternalNote] = useState('');
+  const [cancelTarget, setCancelTarget] = useState(null);
   const busy = useRef(false);
 
-  const load = useCallback(() => {
+  const targetId = target?.id || null;
+  useEffect(() => {
+    if (!targetId) return undefined;
     let live = true;
-    setState((s) => ({ ...s, status: 'loading' }));
-    listServiceRequestQueue({ type: type || undefined, status: status || undefined, page, size: PAGE_SIZE })
-      .then((res) => { if (live) setState({ status: 'ready', items: res.items, total: res.total }); })
-      // Never `[]`: an unread queue that renders as an empty one is how a desk goes home early.
-      .catch(() => { if (live) setState({ status: 'error', items: [], total: 0 }); })
-      .finally(() => {});
+    setDetail(null);
+    setDetailFailed(false);
+    getServiceRequest(targetId)
+      .then((res) => { if (live) { if (res) setDetail(res); else setDetailFailed(true); } })
+      .catch(() => { if (live) setDetailFailed(true); });
     return () => { live = false; };
-  }, [type, status, page]);
+  }, [targetId]);
 
-  useEffect(load, [load, nonce]);
-
-  /* Keyed on the id rather than the object: `take` replaces `detail` with the server's updated copy,
-     and re-fetching the paperwork because somebody claimed the matter would be a request for an
-     answer that cannot have changed. */
   const detailId = detail?.id || null;
   useEffect(() => {
     if (!detailId) return undefined;
@@ -232,18 +143,28 @@ export default function OpsDraftingDesk() {
   }, [detailId]);
 
   const closeDetail = () => {
+    setTarget(null);
     setDetail(null);
-    setIdentities(null);
-    setIdentityStatus('idle');
-    setRefusal('');
+    setInternalNote('');
   };
 
   const openDetail = (row) => {
-    // Clear before showing the next matter, so a reveal can never be read against the wrong request.
-    setIdentities(null);
-    setIdentityStatus('idle');
-    setRefusal('');
-    setDetail(row);
+    setInternalNote('');
+    setTarget(row);
+  };
+
+  // The open request is held as an object, so a change that moves it to another tab leaves the modal put.
+  const applyUpdate = (updated) => {
+    if (!updated) return;
+    setDetail((d) => (d?.id === updated.id ? updated : d));
+    reload();
+  };
+
+  const fileInternalNote = async (action) => {
+    if (!detail) return;
+    const result = await saveNoteIfAny('service_request', detail.id, internalNote, action);
+    if (result.error) toast('The request changed, but the internal note was not saved.', 'error');
+    if (result.written) setInternalNote('');
   };
 
   const take = async () => {
@@ -251,164 +172,164 @@ export default function OpsDraftingDesk() {
     busy.current = true;
     try {
       const updated = await takeServiceRequest(detail.id);
-      if (updated) {
-        setDetail(updated);
-        setState((s) => ({ ...s, items: s.items.map((r) => (r.id === updated.id ? updated : r)) }));
-      }
-      // Taking a matter invalidates a refusal that was about not holding it.
-      setRefusal('');
+      applyUpdate(updated);
       toast('This request is now yours. The customer can see the change.', 'success');
     } catch (err) {
-      // A 409 here is the transition table talking (there is no `assigned → assigned` edge), and it
-      // says what move is needed. Show it rather than a generic failure.
+      // A 409 names either the colleague holding the matter or the move the transition table needs.
       toast(err?.message || 'That request could not be taken.', 'error');
     } finally {
       busy.current = false;
     }
   };
 
-  const reveal = async () => {
-    if (!detail || identityStatus === 'loading') return;
-    setIdentityStatus('loading');
-    setRefusal('');
+  const shareDraft = async (payload) => {
     try {
-      setIdentities(await readServiceRequestIdentities(detail.id));
-      setIdentityStatus('ready');
+      const updated = await shareServiceRequestDraft(detail.id, payload);
+      applyUpdate(updated);
+      await fileInternalNote('Draft shared');
+      toast(updated?.draftCheck?.status === 'pending'
+        ? 'The draft is waiting for a colleague to check it before the customer sees it.'
+        : 'The draft was shared with the customer.', 'success');
     } catch (err) {
-      setIdentities(null);
-      setIdentityStatus('refused');
-      setRefusal(err?.message || 'These numbers are visible only to the person working the matter.');
+      toast(err?.message || 'The draft could not be shared.', 'error');
+      throw err;
     }
   };
 
-  const hide = () => {
-    setIdentities(null);
-    setIdentityStatus('idle');
-    setRefusal('');
+  const uploadFinal = async (file, registration) => {
+    try {
+      const updated = await uploadServiceRequestFinalDoc(detail.id, file, registration);
+      applyUpdate(updated);
+      await fileInternalNote('Registered copy uploaded');
+      toast('The registered copy was uploaded.', 'success');
+    } catch (err) {
+      toast(err?.message || 'The registered copy could not be uploaded.', 'error');
+      throw err;
+    }
   };
 
-  const totalPages = Math.max(1, Math.ceil(state.total / PAGE_SIZE));
-  const from = state.total === 0 ? 0 : page * PAGE_SIZE + 1;
-  const to = Math.min((page + 1) * PAGE_SIZE, state.total);
+  const decideDraftCheck = async (decision, note) => {
+    try {
+      const updated = await checkServiceRequestDraft(detail.id, decision, note);
+      applyUpdate(updated);
+      toast(decision === 'release' ? 'Draft released to the customer.' : 'Draft sent back to the holder.', 'success');
+    } catch (err) {
+      toast(err?.message || 'The draft check could not be saved.', 'error');
+      throw err;
+    }
+  };
 
-  const columns = [
-    {
-      key: 'id',
-      header: 'Request',
-      render: (r) => (
-        <div className="min-w-0">
-          <div className="truncate font-semibold">{r.service}</div>
-          <div className="text-xs text-gray-400">{r.id}</div>
-        </div>
-      ),
-    },
-    { key: 'summary', header: 'Summary', render: (r) => <span className="text-gray-300">{summaryOf(r)}</span> },
-    { key: 'status', header: 'Status', render: (r) => <Badge status={r.status} /> },
-    { key: 'assignedTo', header: 'Held by', render: (r) => r.assignedTo || <span className="text-gray-500">Nobody</span> },
-    { key: 'amount', header: 'Charged', render: (r) => (r.amount ? fmtINR(r.amount) : <span className="text-gray-500">Free desk</span>) },
-    { key: 'createdAt', header: 'Opened', render: (r) => fmtAgo(r.createdAt) || '—' },
-  ];
+  const docUnavailable = () => toast('This document cannot be previewed in local development. Download or open it in the deployed environment.', 'info');
 
-  const card = (r) => (
-    <button type="button" onClick={() => openDetail(r)} className="dz-card block w-full p-3.5 text-left">
-      <div className="flex items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="truncate font-semibold">{r.service}</div>
-          <div className="mt-0.5 truncate text-xs text-gray-400">{r.id} · {summaryOf(r)}</div>
-        </div>
-        <div className="shrink-0"><Badge status={r.status} /></div>
-      </div>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-400">
-        <span>{r.assignedTo || 'Nobody'}</span>
-        <span className="text-gray-600">·</span>
-        <span>{fmtAgo(r.createdAt)}</span>
-      </div>
-    </button>
-  );
+  const sendMessage = async (text) => {
+    try {
+      applyUpdate(await addServiceRequestMessage(detail.id, text));
+    } catch (err) {
+      toast(err?.message || 'The message could not be sent.', 'error');
+      throw err;
+    }
+  };
+
+  const cancel = async (reason) => {
+    try {
+      const updated = await cancelServiceRequestAsOps(detail.id, reason);
+      applyUpdate(updated);
+      await fileInternalNote('Cancelled');
+      toast('The request was cancelled and the customer was notified.', 'success');
+    } catch (err) {
+      toast(err?.message || 'The request could not be cancelled.', 'error');
+      throw err;
+    }
+  };
+
+  const holder = (r) => (r.assignedToMe ? 'You' : r.assignedTo || 'Nobody');
 
   return (
     <div>
       <PageHeader
-        title="Drafting desk"
-        subtitle="The live service-request queue, and the parties' identity numbers for a matter you hold."
+        title={DESK_BY_VALUE[desk]?.label || 'Service requests'}
+        subtitle="Live requests for this desk."
         actions={
-          <button onClick={() => setNonce((n) => n + 1)} className="dz-btn dz-btn-ghost">
+          <button type="button" onClick={reload} className="dz-btn dz-btn-ghost">
             <RefreshCw className="h-4 w-4" /> Refresh
           </button>
         }
       />
 
-      {/* An `offline` state stood here, for the case where `serviceRequest` was left out of the
-          domain allow-list: the seeded browser workflow spoke the stepper's statuses, not the
-          server's, so filtering it would have returned nothing and an empty desk is
-          indistinguishable from a finished one. There is no allow-list and no seeded workflow now,
-          so the desk always reads the server and reports what it says. */}
+      <QueueTabs
+        label="Request queues"
+        active={tickets?.on ? 'tickets' : tab}
+        onChange={(key) => (key === 'tickets' ? tickets.show() : setTab(key))}
+        tabs={[
+          ...TABS.map((t) => ({ key: t.key, label: t.label, count: summary ? t.count(summary) : null })),
+          ...(tickets ? [tickets.tab] : []),
+        ]}
+      />
 
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <Select
-          value={type}
-          onChange={(v) => {
-            /* `replace` so the browser Back button leaves the desk instead of walking the
-               operator back through every filter they tried. */
-            setParams(v ? { type: v } : {}, { replace: true });
-            setPage(0);
-          }}
-          options={typeOpts}
-          className="sm:w-56"
-          ariaLabel="Filter by desk"
-        />
-        <Select value={status} onChange={(v) => { setStatus(v); setPage(0); }} options={STATUS_OPTS} className="sm:w-48" ariaLabel="Filter by status" />
-        {state.status === 'ready' ? (
-          <span className="text-xs text-gray-400 sm:ml-auto">
-            {state.total ? `Showing ${fmtNum(from)}–${fmtNum(to)} of ${fmtNum(state.total)}` : 'Nothing in this view'}
-          </span>
-        ) : null}
-      </div>
+      {tickets?.on ? <AdminServices desk={desk} embedded /> : (
+        <QueuePanel
+          active={tab}
+          toolbar={(
+            <>
+              <SearchBox value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder="Name, mobile or request id" label="Search name, mobile or request id" className="w-full sm:w-72" />
+              <OverdueToggle on={overdue} count={summary?.overdue} onToggle={() => { setOverdue((v) => !v); setPage(1); }} />
+              <div className="ml-auto"><PageNav {...paging} /></div>
+            </>
+          )}
+          footer={paging.pageCount > 1 ? <PageNav {...paging} /> : null}
+        >
+          <div aria-busy={queue.stale || undefined} className={queue.stale ? 'pointer-events-none select-none opacity-50' : undefined}>
+            {queue.failed && !queue.stale ? (
+              <div className="flex flex-col items-center gap-3 p-8 text-center">
+                <p className="text-sm text-gray-300">
+                  We could not read the request queue. This is not an empty queue — nothing was loaded.
+                </p>
+                <button type="button" onClick={reload} className="dz-btn dz-btn-primary">
+                  <RefreshCw className="h-4 w-4" /> Try again
+                </button>
+              </div>
+            ) : queue.page == null ? <Loading label="Loading the request queue…" /> : (
+              <RowList isEmpty={!rows.length} empty={q.trim() || overdue ? 'No requests match these filters.' : active.empty}>
+                {rows.map((r) => (
+                  <RowCard
+                    key={r.id}
+                    id={r.id}
+                    title={r.service}
+                    badges={<><Badge status={r.status} />{r.assignedToMe ? <span className={classNames(CHIP, CHIP_TONE.teal)}>Yours</span> : null}</>}
+                    meta={<><span>{detailRows(r.details)[0]?.[1] || '—'}</span><Dot /><AgeTone request={r} /></>}
+                    facts={(
+                      <FactRow label="Held by">
+                        <Cell className={r.assignedTo ? undefined : 'text-gray-500'}>{holder(r)}</Cell>
+                        <Cell>{r.amount ? `${fmtINR(r.amount)} charged` : 'Free desk'}</Cell>
+                      </FactRow>
+                    )}
+                    primary={(
+                      <button type="button" onClick={() => openDetail(r)} className={r.assignedTo && !r.assignedToMe ? BTN.ghost : BTN.primary}>
+                        Open
+                      </button>
+                    )}
+                  />
+                ))}
+              </RowList>
+            )}
+          </div>
+        </QueuePanel>
+      )}
 
-      {state.status === 'loading' ? <Loading label="Loading the request queue…" /> : null}
-
-      {state.status === 'error' ? (
-        <div className="dz-card flex flex-col items-center gap-3 p-8 text-center">
-          <p className="text-sm text-gray-300">
-            We could not read the request queue. This is not an empty queue — nothing was loaded.
-          </p>
-          <button onClick={() => setNonce((n) => n + 1)} className="dz-btn dz-btn-primary">
-            <RefreshCw className="h-4 w-4" /> Try again
-          </button>
-        </div>
-      ) : null}
-
-      {state.status === 'ready' ? (
-        <>
-          <Table
-            columns={columns}
-            rows={state.items}
-            onRowClick={openDetail}
-            label="requests"
-            empty="No service requests match these filters."
-            mobileCard={card}
-          />
-          {totalPages > 1 ? (
-            <div className="mt-4 flex items-center justify-end gap-2 text-sm">
-              <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="dz-btn dz-btn-ghost disabled:opacity-40">
-                <ChevronLeft className="h-4 w-4" /> Previous
-              </button>
-              <span className="text-gray-400">Page {page + 1} of {totalPages}</span>
-              <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="dz-btn dz-btn-ghost disabled:opacity-40">
-                Next <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          ) : null}
-        </>
-      ) : null}
-
-      <Modal open={!!detail} onClose={closeDetail} title={detail ? `${detail.service} · ${detail.id}` : ''} size="lg">
-        {detail ? (
+      <Modal open={!!target} onClose={closeDetail} title={target ? `${target.service} · ${target.id}` : ''} size="lg">
+        {!detail ? (
+          detailFailed
+            ? <p role="alert" className="p-4 text-sm text-gray-300">This request could not be opened. Close it and try again.</p>
+            : <Loading label="Opening the request…" />
+        ) : (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge status={detail.status} />
               <span className="text-gray-400">Held by {detail.assignedTo || 'nobody'}</span>
               {detail.amount ? (<><span className="text-gray-600">·</span><span className="text-gray-400">{fmtINR(detail.amount)}</span></>) : null}
+              <button type="button" onClick={take} className="dz-btn dz-btn-ghost ml-auto">
+                <Hand className="h-4 w-4" /> Take this request
+              </button>
             </div>
 
             <dl className="grid grid-cols-1 gap-x-4 gap-y-1 text-sm sm:grid-cols-2">
@@ -424,127 +345,45 @@ export default function OpsDraftingDesk() {
               )}
             </dl>
 
-            {/* The paperwork this request asks for. Read-only by design: the server folds this from
-                the request's own vault documents at read time (D120), so there is no item state to
-                tick and no way for this panel to disagree with what was actually filed. The only
-                thing that moves an item is an upload. */}
+            {/* Read-only by design: the server folds this checklist from service metadata. */}
+            <DocumentChecklist
+              request={detail}
+              checklist={checklist}
+              status={checklistStatus}
+              onChange={setChecklist}
+              onError={(message) => toast(message, 'error')}
+            >
+              <ServiceDocuments requestId={detail.id} documents={detail.docs} onUnavailable={docUnavailable} />
+            </DocumentChecklist>
+
+            {detail.draftCheck?.status === 'pending' ? (
+              <DraftSecondCheck request={detail} onDecide={decideDraftCheck} />
+            ) : null}
+
+            <StaffWorkflowActions request={detail} onShareDraft={shareDraft} onUploadFinal={uploadFinal} />
+
+            <MessageThread messages={detail.messages} onSend={sendMessage} />
+
             <div className="rounded-2xl border border-white/10 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold">Documents</h4>
-                {checklistStatus === 'ready' ? (
-                  <span className="text-sm text-gray-400">{fmtNum(checklist.ready)} of {fmtNum(checklist.total)} received</span>
+                <h4 className="text-sm font-semibold">Internal notes</h4>
+                {detail.status !== 'cancelled' && detail.status !== 'completed' ? (
+                  <button type="button" onClick={() => setCancelTarget(detail)} className="dz-btn dz-btn-ghost text-rose-200">
+                    Cancel request
+                  </button>
                 ) : null}
               </div>
-
-              {checklistStatus === 'loading' ? (
-                <p className="mt-3 text-sm text-gray-500">Checking what has been filed…</p>
-              ) : null}
-
-              {checklistStatus === 'error' ? (
-                <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  {/* Deliberately not "no documents": we do not know that, and saying it would send
-                      somebody chasing paperwork the customer has already sent. */}
-                  <span>The document list could not be read, so this is not a list of what is missing. Try again before asking the customer for anything.</span>
-                </div>
-              ) : null}
-
-              {checklistStatus === 'ready' ? (
-                <ul className="mt-3 space-y-1.5">
-                  {checklist.items.map((it) => (
-                    <li key={it.id} className="flex items-center gap-2 border-b border-white/5 py-1 text-sm last:border-0">
-                      {it.done ? (
-                        <Check className="h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
-                      ) : (
-                        <Minus className="h-4 w-4 shrink-0 text-gray-600" aria-hidden="true" />
-                      )}
-                      <span className={classNames('flex-1', it.done ? 'text-gray-200' : 'text-gray-500')}>{it.name}</span>
-                      {/* The state is on the row, but a screen reader should not have to infer it
-                          from an icon that is hidden from it. */}
-                      <span className="sr-only">{it.done ? 'received' : 'not received'}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-
-              {checklistStatus === 'ready' && checklist.ready < checklist.total ? (
-                <p className="mt-3 text-xs text-gray-400">
-                  Missing items are the customer&rsquo;s to upload — there is nothing to mark here.
-                </p>
-              ) : null}
+              <InternalNote
+                entityType="service_request"
+                entityId={detail.id}
+                value={internalNote}
+                onChange={setInternalNote}
+                showHistory
+                className="[&>button]:min-h-[44px]"
+              />
             </div>
 
-            <div className="rounded-2xl border border-white/10 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h4 className="text-sm font-semibold">Parties&rsquo; identity numbers</h4>
-                <div className="flex items-center gap-2">
-                  <button onClick={take} className="dz-btn dz-btn-ghost">
-                    <Hand className="h-4 w-4" /> Take this request
-                  </button>
-                  {identityStatus === 'ready' ? (
-                    <button onClick={hide} className="dz-btn dz-btn-ghost">
-                      <EyeOff className="h-4 w-4" /> Hide
-                    </button>
-                  ) : (
-                    <button onClick={reveal} disabled={identityStatus === 'loading'} className="dz-btn dz-btn-primary disabled:opacity-40">
-                      <Eye className="h-4 w-4" /> {identityStatus === 'loading' ? 'Checking…' : 'Reveal'}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <p className="mt-2 text-xs text-gray-400">
-                Only the person holding this matter can read these, and every attempt — allowed or
-                refused — is recorded against your name. They are discarded when the request is
-                completed or cancelled.
-              </p>
-
-              {identityStatus === 'refused' ? (
-                <div className="mt-3 flex items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-                  <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>{refusal}</span>
-                </div>
-              ) : null}
-
-              {identityStatus === 'ready' ? (
-                identities.length === 0 ? (
-                  <p className="mt-3 text-sm text-gray-500">
-                    Nothing was recorded against this request. Ask the customer to add the parties&rsquo;
-                    details before drafting.
-                  </p>
-                ) : (
-                  <ul className="mt-3 space-y-2">
-                    {identities.map((p) => (
-                      <li key={`${p.partyRole}-${p.partyIndex}`} className="rounded-xl border border-white/5 bg-white/5 p-3 text-sm">
-                        <div className="flex flex-wrap items-baseline gap-x-2">
-                          <span className="font-semibold">{p.partyName || `${PARTY_LABEL[p.partyRole] || 'Party'} ${p.partyIndex + 1}`}</span>
-                          <span className="text-xs uppercase tracking-wide text-gray-500">{PARTY_LABEL[p.partyRole] || p.partyRole}</span>
-                        </div>
-                        {/* A blank number means two different things, and the reader has to be able
-                            to tell them apart — the customer left it empty, or the matter closed and
-                            it was discarded. `purged` is what distinguishes them. */}
-                        {p.purged ? (
-                          <div className="mt-1 text-xs text-gray-500">
-                            Recorded, and since discarded — this request has closed.
-                          </div>
-                        ) : (
-                          <dl className="mt-1 grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                            <div className="flex justify-between gap-2 py-0.5">
-                              <dt className="text-gray-400">PAN</dt>
-                              <dd className={classNames('font-mono', p.pan ? '' : 'text-gray-500')}>{p.pan || 'not supplied'}</dd>
-                            </div>
-                            <div className="flex justify-between gap-2 py-0.5">
-                              <dt className="text-gray-400">Aadhaar</dt>
-                              <dd className={classNames('font-mono', p.aadhaar ? '' : 'text-gray-500')}>{p.aadhaar || 'not supplied'}</dd>
-                            </div>
-                          </dl>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                )
-              ) : null}
-            </div>
+            <PartyIdentities key={`${detail.id}:${detail.assignedTo || ''}`} requestId={detail.id} />
 
             {(detail.timeline || []).length ? (
               <div>
@@ -560,8 +399,9 @@ export default function OpsDraftingDesk() {
               </div>
             ) : null}
           </div>
-        ) : null}
+        )}
       </Modal>
+      <CancelDialog key={cancelTarget?.id || 'closed'} request={cancelTarget} onClose={() => setCancelTarget(null)} onConfirm={cancel} />
     </div>
   );
 }

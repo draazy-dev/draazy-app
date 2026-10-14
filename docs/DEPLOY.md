@@ -25,7 +25,7 @@ Two arrangements satisfy that:
 
 | Shape | `WEB_ORIGINS` | `API_PUBLIC_ORIGIN` |
 |---|---|---|
-| **Path proxy** (chosen) — one origin, `/api/*` proxied to the backend | `https://sandbox.draazy.com` | `https://sandbox.draazy.com` |
+| **Path proxy** (chosen) — one origin, `/api/*` proxied to the backend | `https://sandbox.draazy.com,https://draazy.com` (both hosts serve the same Pages deployment) | `https://sandbox.draazy.com` |
 | Sibling subdomains — cross-origin but same-site | `https://www.draazy.com` | `https://api.draazy.com` |
 
 A UI served from its own registrable domain — `*.netlify.app`, `*.pages.dev`, `*.vercel.app`, all
@@ -49,8 +49,11 @@ lands the browser on the backend's origin and loses the cookie exactly as descri
 did proxy such a rule, which is why `scripts/gen-redirects.mjs` existed and why it was deleted
 rather than carried over — kept, it would have produced a deploy that looked configured and was not.
 
-Pages resolves Functions before static assets and before `_redirects`, so the SPA fallback in
-`frontend/public/_redirects` cannot shadow `/api`. The `/api` prefix is forwarded verbatim because
+Pages resolves Functions before static assets and before `_redirects`, so the SPA rewrites cannot
+shadow `/api`. `_redirects` is generated at build time by `frontend/scripts/vite-plugin-spa-fallback.mjs`:
+one rewrite per `App.jsx` route to the shell (prerendered pages rewrite to themselves first), which ships as `dist/404.html` so unknown paths answer a
+real 404. A `/*` rewrite cannot be used: Pages ignores `/* /index.html`, and any other `/*` target
+would be matched before the asset lookup and serve `/assets/*.js` as HTML. The `/api` prefix is forwarded verbatim because
 the backend runs with `server.servlet.context-path=/api`. The Function's own configuration is a
 single Pages environment variable, `API_ORIGIN` (scheme + host of the Cloud Run service, no path);
 unset, it answers 502 rather than falling through — a fall-through would return the HTML shell with
@@ -77,15 +80,16 @@ You need **two** connection strings, and this is the part that costs a day if it
 | `DB_URL` | Supavisor pooler, **transaction** mode | `6543` | Cloud Run scales to zero and back; every cold start would otherwise open fresh backends against a free-tier connection ceiling measured in dozens |
 | `FLYWAY_DB_URL` | Supavisor pooler, **session** mode | `5432` | Flyway locks concurrent deploys out with `pg_advisory_lock`, which is *session*-scoped. Transaction pooling moves the session between statements, so the lock is taken on one backend and released against another — Flyway's own docs call PgBouncer transaction mode unsupported |
 
-Both take the same `postgres.<project-ref>` username, so `DB_USER` / `DB_PASSWORD` cover both;
-`application-prod.properties` and `application-sandbox.properties` bind them to `spring.flyway.user`
-and `spring.flyway.password` explicitly because Spring Boot's dedicated Flyway DataSource does not
-inherit them from `spring.datasource` when `spring.flyway.url` is set. If you use the *direct* connection
-for migrations instead (username `postgres`, and IPv4 is a paid add-on on new projects), supply
-`SPRING_FLYWAY_USER` and `SPRING_FLYWAY_PASSWORD` as plain environment variables to override them.
+Flyway and the running app log in as different roles. `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` are the
+schema owner `postgres.<project-ref>`, and `DB_USER` / `DB_PASSWORD` are the DML-only runtime role
+(§2.1). Only the migration job (§2.1) reads the Flyway pair. Spring Boot's dedicated Flyway DataSource
+does not inherit credentials from `spring.datasource` when `spring.flyway.url` is set, which is why both
+pairs are bound explicitly. If
+you use the *direct* connection for migrations instead (username `postgres`, and IPv4 is a paid add-on
+on new projects), point `FLYWAY_DB_URL` / `FLYWAY_DB_USER` at it.
 
 Getting `FLYWAY_DB_URL` wrong does not fail cleanly. The migration hangs holding a lock nobody owns,
-the container never passes readiness, and nothing in the log names Flyway.
+the job runs until its 15-minute timeout, and nothing in the log names Flyway.
 
 Append `?sslmode=require` to both. `application-prod.properties` already pins
 `prepareThreshold=0` (the transaction pooler cannot keep server-side prepared statements alive; the
@@ -108,6 +112,48 @@ divergence, so hardening prod without hardening sandbox fails the build.
 
 All four tiers are in [`system/profiles.md`](./system/profiles.md).
 
+### 2.1 Database roles, and the order to switch them
+
+Supabase leaves two holes that the app never needs: the Data API serves `public` to `anon` and
+`authenticated` with full grants, and `postgres` (the owner of every table) is a single credential for
+both migrations and every request. Close them in this order, per project. Each step deploys green on
+its own, so the rollout can stop at any point.
+
+1. Run [`backend/deploy/sql/supabase-revoke-data-api.sql`](../backend/deploy/sql/supabase-revoke-data-api.sql)
+   and switch the Data API off (Project Settings → Data API). Both verify queries must return no rows.
+2. Copy today's values into the new Flyway inputs: `SANDBOX_FLYWAY_DB_USER` = the current
+   `SANDBOX_DB_USER`, and secret `draazy-sandbox-flyway-db-password` = the current
+   `draazy-sandbox-db-password`. Deploy. Nothing changes yet.
+3. Run [`backend/deploy/sql/app-runtime-role.sql`](../backend/deploy/sql/app-runtime-role.sql), set
+   the password with `\password draazy_app`, and check the verify output.
+4. Point `SANDBOX_DB_USER` at `draazy_app.<project-ref>` and add the new password as a version of
+   `draazy-sandbox-db-password`. Deploy. `DatabasePrivilegeCheck` refuses to boot if the runtime role can
+   still run DDL.
+
+Rollback for step 4: point `SANDBOX_DB_USER` back at `postgres.<project-ref>`, re-add the old password
+version, and redeploy.
+
+Migrations never run in the serving container. The deployed profiles set `spring.flyway.enabled=false`,
+and `deploy.yml` first runs the Cloud Run Job
+[`cloudrun-migrate-sandbox.yaml`](../backend/deploy/cloudrun-migrate-sandbox.yaml) to completion. The
+job runs the same image with `--migrate-only`, which boots Flyway alone and exits. It runs as
+`draazy-migrator-sandbox`, the only identity granted `draazy-sandbox-flyway-db-password`. The runtime
+account gets per-secret grants that leave that secret out, so code execution in the app can no longer
+reach the owner role. A failed job stops the deploy before the service is replaced. Migrations still
+apply while the previous revision serves, so each one must stay compatible with the code before it.
+
+Moving an existing project over takes two steps. The order matters, because any revision built before
+this change still reads the Flyway password as the runtime account:
+
+1. Re-run `bootstrap-project.sh`. It creates the migrator and grants every secret individually, then
+   deploy.
+2. Once a revision from this change is serving, drop the old project-wide grant:
+   `gcloud projects remove-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:draazy-api-sandbox@$PROJECT_ID.iam.gserviceaccount.com" --role=roles/secretmanager.secretAccessor --condition=None`.
+   Rolling back past this change afterwards needs that grant restored first, or the old revision cannot
+   start.
+
+Run locally with `java -jar app.jar --migrate-only` and the three `FLYWAY_*` variables set.
+
 ---
 
 ## 3. Environment
@@ -119,14 +165,44 @@ a committed JWT secret, `trusted-proxies=none`). That is the design, not an inco
 | Variable | Notes |
 |---|---|
 | `DB_URL` | transaction pooler, `:6543`, `sslmode=require` |
-| `DB_USER` / `DB_PASSWORD` | `postgres.<project-ref>` |
+| `DB_USER` / `DB_PASSWORD` | runtime role `draazy_app.<project-ref>` (§2.1) |
+| `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` | schema owner `postgres.<project-ref>`, migration job only; the service reads just the user name, for `DatabasePrivilegeCheck` |
 | `FLYWAY_DB_URL` | session pooler, `:5432` — see §2 |
 | `JWT_SECRET` | HS256, ≥ 32 bytes, generated per environment |
-| `REFERRAL_SIGNAL_SALT` | any long random string; **never** shared with dev. Rotating it is safe — stored digests simply stop matching, and they are discarded after 90 days anyway |
-| `CASHFREE_WEBHOOK_SECRET` | a blank value makes every forged signature valid |
+| `REFERRAL_SIGNAL_SALT` | any long random string; **never** shared with dev. Rotating it is safe — stored digests simply stop matching, and they are discarded after 180 days anyway |
+| `IDENTITY_HASH_SECRET` | any long random string; **never** shared with dev. Keys the one-way digest of verified ID-document numbers used for "one document = one badge". Rotating it makes every existing badge's digest stop matching new submissions, so rotate only with a re-verification plan |
+| `IDENTITY_ENCRYPTION_KEY` / `IDENTITY_ENCRYPTION_KEY_ID` | base64 of 32 random bytes (`openssl rand -base64 32`) and a short id (`[a-z0-9-]`, e.g. `2026a`); **never** shared with dev. AES-256-GCM for PAN/Aadhaar in `service_request_identities` (D283). To rotate, issue a new key and id, and set `IDENTITY_RETIRED_KEYS=oldId:oldKey` so existing rows still decrypt. Losing a key makes its rows unreadable |
+| `STAFF_TOTP_KEY` | base64 of 32 random bytes (`openssl rand -base64 32`); **never** shared with dev. AES-256-GCM for staff and admin authenticator (TOTP) secrets in `staff_credentials`. There is no retired-key list: rotating it makes every enrolled authenticator unreadable, so each account must be reset (admin **Reset 2FA**) and re-enrol |
+| `CASHFREE_WEBHOOK_SECRET` | Cashfree signs callbacks with `x-client-secret` and issues no separate webhook secret, so this **is** `CASHFREE_SECRET_KEY`. `cloudrun-sandbox.yaml` therefore points both at one Secret Manager entry: two entries holding one credential drift the moment either is rotated alone, and a drifted-but-non-blank value passes every startup check and rejects every callback. A blank value makes every forged signature valid |
 | `WEB_ORIGINS` | see §1 |
 | `API_PUBLIC_ORIGIN` | see §1 |
 | `INTERNAL_PROXIES` | see §4 |
+| `ORIGIN_SHARED_SECRET` | see §4; ≥ 32 characters, and the **same** value as the Pages secret of that name. `none` turns the gate off, which is right only for an instance nothing proxies |
+
+Optional first-admin bootstrap variables:
+
+| Variable | Notes |
+|---|---|
+| `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_MOBILE` | When no live admin exists, startup creates that admin and logs a one-hour `/staff-invite#...` link |
+| `BOOTSTRAP_ADMIN_NAME` | Defaults to `Administrator` |
+| `BOOTSTRAP_ADMIN_RECOVER` | Break-glass nonce. Set a fresh random value and redeploy to reset the configured admin's 2FA, revoke sessions and log a fresh one-hour invite. If no admin holds the email, it adopts the live admin with the configured mobile and **no** email — how the seeded sandbox admin (`9000000000`) gets one |
+
+The sandbox deploy reads them from the `sandbox` GitHub environment: **secrets**
+`SANDBOX_BOOTSTRAP_ADMIN_EMAIL` and `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` (vars would print in the public
+run log), and **variable** `SANDBOX_BOOTSTRAP_ADMIN_RECOVER`; blank = off. Set them there, not with
+`gcloud run services update` — `services replace` wipes it.
+`APP_BASE_URL` must be the SPA origin, or the logged link points at `draazy.com`.
+
+First deploy:
+1. Set `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_MOBILE` and optionally `BOOTSTRAP_ADMIN_NAME`.
+2. Deploy, then open the `[ADMIN BOOTSTRAP]` link from the API logs within 1 hour and set the password.
+3. Sign in at `/staff-login`, scan the QR code and save the recovery codes.
+
+Break glass: set `BOOTSTRAP_ADMIN_RECOVER` to a new random value and redeploy; open the new logged
+link within 1 hour, then sign in and re-enrol the authenticator.
+
+Staff/manager invites need no SMS or email sender. The Team screen returns the one-time link to the
+creator, who shares it privately; manager-created staff invites also notify the administrator in-app.
 
 `SPRING_PROFILES_ACTIVE=prod` is baked into the image (`backend/Dockerfile`) rather than left to the
 deploy, because Spring does not complain about an absent profile — a deploy that forgot it would
@@ -140,15 +216,13 @@ could not be signed into at all. `draazy.otp.sandbox-code` pins every code to on
 typed into the six-box OTP field like any other. It is **`000000`, hardcoded** in
 `application-sandbox.properties` — the same code the e2e profile uses. Nothing to provision.
 
-**Understand what this opens before you put anything real in that environment.** The demo seed
-creates one `admin` and fifteen `staff` accounts, their mobiles are committed in
-`R__zz_DML_dev_demo_data.sql`, and mobile-OTP login resolves a user by mobile without ever consulting
-`password_hash`. There is also no network control in front of it: `cloudrun-sandbox.yaml` sets
-`ingress: all` because Cloudflare Pages Functions reach the service from the public internet, so it
-cannot be narrowed to IAM or internal-only without breaking the site.
+**Understand what this opens before you put anything real in that environment.** Any consumer
+account in the sandbox can be signed into by anyone who knows its mobile. The back office is not
+covered by it: staff and admin accounts sign in only with email, password and an authenticator code
+(`POST /auth/staff-login`), and `/auth/login` refuses them even after a correct code. Use the
+single-admin bootstrap below for the first back-office login.
 
-So the sandbox back office is open to anyone who finds the URL and types the obvious code. That is an
-acceptable trade for disposable demo inventory and a deliberate one — it is not a gap to be reported.
+That trade is acceptable for disposable demo inventory and is deliberate, not a gap to be reported.
 It stops being acceptable the moment the sandbox database holds anything you would not publish; at
 that point make the code a generated per-deploy secret in Secret Manager.
 
@@ -164,13 +238,171 @@ One deploy consequence: the Dockerfile bakes in `SPRING_PROFILES_ACTIVE=prod`, s
 has to override it to `sandbox` — and to `sandbox` alone. Left at `prod`, or set to `prod,sandbox`,
 the boot fails on this key, which is the intended way to discover the mistake.
 
-Optional, all off by default: `STORAGE_ENABLED` + `R2_*` (photo and document upload — without them
-`R2FileStorage` is not wired and uploads throw), `CASHFREE_ENABLED` + `CASHFREE_APP_ID` /
-`CASHFREE_SECRET_KEY` (KYC), `APP_BASE_URL`, `RATELIMIT_STORE`.
+Optional, all off by default in `application.properties`: `STORAGE_ENABLED` + `R2_*` (photo and
+document upload — without them `R2FileStorage` is not wired and uploads throw), `CASHFREE_ENABLED` +
+`CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` (payments and KYC), `CASHFREE_NOTIFY_URL` (blank falls back
+to the endpoint registered in the Cashfree dashboard, which holds one address across every
+environment — so each deployment sets its own), `APP_BASE_URL`, `RATELIMIT_STORE`. Sandbox turns the
+first two families on in `cloudrun-sandbox.yaml`; "off by default" describes the base file, not that
+deployment.
 
 ---
 
-## 4. `INTERNAL_PROXIES` — the value that has no safe guess
+### 3.2 The public photo bucket must send `Access-Control-Allow-Origin`
+
+A listing photo is not only rendered. The create-listing wizard draws each one to a `<canvas>` to
+compute a perceptual hash, which the duplicate probe compares across owners, and reading pixels back
+from a canvas that has drawn a cross-origin image throws unless that image arrived with CORS headers.
+
+The failure is silent by construction: the client degrades to no hashes, the listing posts normally,
+and the only symptom is that duplicate listings sharing photographs stop being flagged. Nothing in
+the repository can assert it — the URL is R2's, the header is bucket configuration, and the dev
+stand-in is same-origin (`DevObjectStore.publicUrl`), so no test will ever go red if the rule is
+missing. It is written down because that is the only control available.
+
+The same bucket should sit behind a **proxied custom domain**, not `r2.dev`, which Cloudflare does
+not cache. On that domain the `.w480.jpg`/`.w960.jpg` card copies are edge-cached by default, but
+originals have no file extension, so add one free Cache Rule (Caching → Cache Rules): hostname equals
+the photo domain and URI path starts with `/photos/` → *Eligible for cache*, edge TTL *Use cache-control
+header*. Every object already carries `Cache-Control: public, max-age=31536000, immutable`.
+
+### 3.3 Identity verification
+
+Identity verification is a reviewed trust badge, not a synchronous unlock. Applicant endpoints live in
+`backend/src/main/java/com/draazy/api/identity/verification/IdentityVerificationController.java`;
+the browser flow is `frontend/src/pages/consumer/VerifyIdentity.jsx`.
+
+| Area | Deployment requirement | Missing / wrong symptom |
+|---|---|---|
+| Camera | HTTPS origin; `Permissions-Policy: camera=(self)` in `frontend/public/_headers` | `getUserMedia` is absent or throws `NotAllowedError` / `SecurityError`; the screen shows the camera failure copy |
+| iOS camera | `playsInline` on the `<video>` and camera start behind the user pressing the start button (`VerifyIdentityScreens.jsx`, `VerifyIdentity.jsx`) | Safari opens native fullscreen video or refuses playback/capture until another gesture |
+| Face WASM | CSP `script-src 'wasm-unsafe-eval'` in both `frontend/public/_headers` and `frontend/index.html` | MediaPipe WASM compile fails; the selfie step loses its liveness guidance |
+| Self-hosted assets | `/models/*` immutable cache rule in `_headers` | First visit is slower; repeat visits may re-fetch the model instead of using the pinned copy |
+
+**Face model supply chain.**
+
+| Asset | Source in repo | Package / license |
+|---|---|---|
+| MediaPipe Face Landmarker | `frontend/src/lib/identity-verification/face.js` loads `/models/face_landmarker.task`; file at `frontend/public/models/face_landmarker.task` | `@mediapipe/tasks-vision` `1.0.1`, Apache-2.0 in `frontend/node_modules/@mediapipe/tasks-vision/package.json`; model card publishes Apache-2.0, verify against the model card at release |
+
+Face checks run in the browser. Only the captured front/back/selfie images are uploaded,
+to the private R2 bucket (`SANDBOX_R2_BUCKET_PRIVATE`, §5). The identity badge stores document
+number HMACs and last-4 values only (`IdentityHasher.java`, `IdentityVerificationService.java`);
+the raw document number is not stored by this badge flow.
+
+Consent is stored with a notice version (`IdentityVerificationService.CONSENT_NOTICE_VERSION`,
+currently `2026-09`) and the notice language (`en`, `hi`, `mr`). Treat this as DPDP Act 2023
+notice/consent evidence, not a legal-compliance claim.
+
+**Image retention and purge.**
+
+| Case | Rule |
+|---|---|
+| Approved / rejected / revoked | Images purge after `draazy.identity.image-retention-days` from `decidedAt`; default `7` days |
+| Pending too long | The `identity-pending-expiry` job (10:00 IST) rejects pending cases older than `draazy.identity.pending-ttl`; default `P14D`; it purges images immediately and sends the ordinary rejected decision |
+| Resubmission / withdrawal / erasure | Existing identity files are queued and purged immediately in the transaction path |
+| Storage delete failure | `identity_storage_deletes` keeps the key; the nightly `identity-delete-retry` job tries each due key once, up to 2,000 a night, least-tried first so a stuck key never blocks newer ones |
+
+These are `JobRunner` jobs (§5) and inherit the Cloud Run CPU-throttling caveat there; an always-on
+host (DigitalOcean, ADR-021) runs them as scheduled.
+
+**WhatsApp identity decision template.**
+
+The template sender is
+`backend/src/main/java/com/draazy/api/provider/whatsapp/WhatsAppDecisionMessenger.java`; the property
+binding is `WhatsAppProperties.java` and `application.properties` lines 111-124.
+
+| Setting | Value |
+|---|---|
+| Meta category | `UTILITY` |
+| Template body | One body component parameter: `{{1}}` text, carrying the full decision line |
+| Suggested body text | `{{1}}` |
+| Language | `WHATSAPP_IDENTITY_TEMPLATE_LANG`, default `en_US` |
+| Template name | `WHATSAPP_IDENTITY_TEMPLATE_NAME`; blank means in-app only |
+| Shared WhatsApp credentials | `WHATSAPP_ENABLED`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_BASE_URL`, `WHATSAPP_API_VERSION` |
+
+Lines the backend sends:
+
+| Decision | `{{1}}` value |
+|---|---|
+| Rejected by a reviewer / stale pending | `Your Draazy identity verification could not be completed. Open the app to see the reason and retake your photos.` |
+| Revoked | `Your Draazy verified badge was withdrawn. Open the app to see the reason and submit again.` |
+
+Approvals and the automatic check's rejects send no WhatsApp (in-app only). If `WHATSAPP_ENABLED=false`, `LoggingDecisionMessenger` logs a mock send. If WhatsApp is enabled but
+the identity template name or language is blank, `WhatsAppDecisionMessenger` logs and skips only the
+WhatsApp leg. Vendor failures are logged and swallowed; the decision is already committed and visible
+in-app. Meta business verification and approved templates remain the gate before useful WhatsApp
+delivery; see ADR-020 notes in §7.
+
+**WhatsApp waiting-on-you digest template.** Sent by the `waiting-digest` job (10:00 IST, daily; it inherits the
+Cloud Run CPU-throttling caveat in §5) through the same `WhatsAppDecisionMessenger`. Rules are in
+[`notifications.md`](./system/notifications.md#waiting-on-you-digest--utility-template).
+
+| Setting | Value |
+|---|---|
+| Meta category | `UTILITY`; **needs Meta approval before the name is set** |
+| Suggested body text | `You have {{1}} waiting for your reply on Draazy. Open the app to respond.` with `{{1}}` = `1 request` / `N requests` |
+| Template name | `WHATSAPP_DIGEST_TEMPLATE_NAME`; blank means no digest is sent |
+| Language | `WHATSAPP_DIGEST_TEMPLATE_LANG`, default `en_US` |
+| Off switch | `draazy.jobs.waiting-digest.enabled=false` |
+
+**Web push (VAPID).** `WebPushSender` is wired when `PUSH_VAPID_PRIVATE_KEY` is set; without it
+`LoggingPushSender` only logs. Generate a pair once with `npx web-push generate-vapid-keys` (base64url).
+
+| Setting | Value |
+|---|---|
+| `PUSH_VAPID_PRIVATE_KEY` | Secret. Boot fails if it is set without the public key or is not a P-256 key |
+| `PUSH_VAPID_PUBLIC_KEY` | The matching public key |
+| `PUSH_VAPID_SUBJECT` | Contact the push services may use; `mailto:` or https. Default `mailto:noreply@draazy.com` |
+| `VITE_VAPID_PUBLIC_KEY` | Frontend build-time variable carrying the **same public key**, so browsers subscribe to it |
+
+On Cloud Run both keys are Secret Manager references (`draazy-sandbox-push-vapid-private-key` and
+`draazy-sandbox-push-vapid-public-key` in `backend/deploy/cloudrun-sandbox.yaml`); create the secrets and grant the
+runtime service account access before deploy, or the revision will not start. Rotating the pair invalidates every stored subscription: they are removed as the push
+service answers 404/410 or they re-subscribe.
+
+**Email (Zoho ZeptoMail via CPaaS).** Sender: `provider/zeptomail/ZeptoMailEmailSender.java`. Today it
+only emails staff invite and password-reset links (`StaffInviteMailer`) to the account's own address;
+the admin's copy-link dialog is unchanged and stays the fallback.
+
+| Setting | Value |
+|---|---|
+| `ZEPTOMAIL_ENABLED` | `true` to send; off logs `[MOCK EMAIL]` with recipient domain + subject |
+| `ZEPTOMAIL_API_KEY` | The agent's **Send Mail token** (CPaaS → Agents → agent → SMTP/API). Secret; with or without the `Zoho-enczapikey ` prefix |
+| `ZEPTOMAIL_FROM_ADDRESS` | Default `noreply@draazy.com`; must be on a domain whose DKIM **and** CNAME show Verified |
+| `ZEPTOMAIL_FROM_NAME` | Default `Draazy` |
+| `ZEPTOMAIL_BASE_URL` | Default `https://cpaas.zoho.in` (India DC; the account lives on `cpaas.zoho.in`) |
+
+Sandbox has it on in `cloudrun-sandbox.yaml`, reading the key from Secret Manager entry
+`draazy-sandbox-zeptomail-api-key` with from-name `Draazy Sandbox`; the secret must exist before deploy.
+The boot fails if the flag is on and the key or from-address is blank. Send failures log
+`ZeptoMail send to ***@domain failed: <status> code=TM_xxxx SERR_xxx`; `SERR_157` is a bad token.
+
+**Provider call log (`/admin/integrations`, admin only).** Every ZeptoMail, WhatsApp and Cashfree
+call, and every Cashfree webhook, writes one `provider_call` row (`provider/ProviderCalls.java`):
+outcome, masked recipient, order id or subject, an error code and the latency. Message bodies, OTPs,
+links and keys are never stored. The page shows 24h/7d health per provider and a log searchable by
+full email, mobile or order id. Rows are written off the request thread and purged after 30 days;
+nothing to configure. Delivery and bounce receipts still live in each vendor's console.
+
+**Server-chosen selfie pose.** `POST /me/verification/identity/challenge` issues a signed 15-minute
+challenge with pose `left`, `right` or `smile` (`LivenessCheck.java`). If a challenge token is
+submitted, the review queue exposes `livenessChallenge`, and `IdentityReviewService` refuses approval
+until staff confirms the selfie shows that pose. The browser's local face verdict remains advisory.
+
+Hardware checks live in
+[`flows/consumer/contact-gate-leads.md`](./flows/consumer/contact-gate-leads.md#9-identity-verification-hardware-checklist).
+
+**Post-deploy checks.**
+
+| Check | Expected result |
+|---|---|
+| Submit one real identity verification using the R2 private bucket | `POST /me/verification/identity` returns `202`; review queue loads front/back/selfie images via signed URLs |
+| Approve the case | User gains the verified badge; owner listings receive the verified owner stamp |
+| Purge path | Files disappear under the retention rules above; failed deletes remain in `identity_storage_deletes` until retried |
+| Reject the case (reviewer) | The decision message arrives with the exact line in the table above; an approval sends none |
+
+## 4. `INTERNAL_PROXIES` and the origin gate
 
 `WriteRateLimitFilter` keys anonymous callers on the client address, and `POST /page-views` is
 `permitAll` and fires on ordinary browsing — so the 120-writes-per-60s budget is consumed by
@@ -202,22 +434,63 @@ Cloudflare out instead collapses all anonymous traffic into the single Cloudflar
 Neither option is safe on its own.
 
 The exit is to make the origin able to tell *this* proxy apart from any other Cloudflare tenant.
-Three ways, in ascending order of work:
+Three ways were weighed:
 
-1. **Shared secret.** The Function sends `X-Proxy-Auth: ${ORIGIN_SHARED_SECRET}`; a filter ordered
-   ahead of `WriteRateLimitFilter` rejects anything without it, constant-time compared. Roughly
-   forty lines plus one more entry in the deploy contract. Also makes the Cloud Run URL leaking
-   stop mattering.
-2. **Restricted ingress**, so the service is unreachable except through the proxy — which is the
-   assumption every trusted-proxy scheme silently makes.
-3. **Cloudflare Authenticated Origin Pulls** (mTLS), verified at the origin. Strongest, no secret to
-   rotate, most setup, and awkward to exercise locally.
+1. **Shared secret** — chosen (2026-09-27). Free, and it also makes a leaked Cloud Run URL stop
+   mattering.
+2. **Restricted ingress** — needs a Google external HTTPS load balancer in front of Cloud Run,
+   roughly $18/month before Cloud Armor. Not free, so not for the sandbox.
+3. **Cloudflare Authenticated Origin Pulls** (mTLS) — Cloud Run cannot verify a client certificate,
+   so there is nothing at the origin to check it with.
 
-**Decision deferred** (2026-09-02). Until one is in place, treat the anonymous rate limiter as
-advisory rather than enforcing, and do not open the sandbox to untrusted traffic.
+### How the gate works
 
-Whatever the choice, set `INTERNAL_PROXIES` **last**, against the `X-Forwarded-For` a real deployed
-request actually produces rather than a published range taken on faith.
+The Function sends `X-Proxy-Auth: <ORIGIN_SHARED_SECRET>`, overwriting anything the client sent.
+`OriginGateFilter` runs ahead of the JWT filter, the rate limiter and bot defence, and answers
+**403** to any request whose header does not match (constant-time compare). The only exemptions are
+`GET`/`HEAD` on the three health paths, `/api/actuator/health`, `/health/liveness` and
+`/health/readiness`, because Cloud Run's probes and the backend job's smoke test reach the container
+directly. Writes to those paths are gated too: they would otherwise reach the write rate limiter
+without the secret, charged to whatever address the caller put in `X-Forwarded-For`.
+
+Both halves must hold the same value:
+
+| Where | How |
+|---|---|
+| Backend | Secret Manager entry `draazy-sandbox-origin-shared-secret`, mounted by `cloudrun-sandbox.yaml` |
+| Pages Function | `npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=<project>` |
+
+Generate it once, e.g. `openssl rand -base64 48`. The backend refuses to boot on a blank value or on
+one shorter than 32 characters; the Function answers 502 `api_proxy_misconfigured` when its copy is
+unset. A **mismatch** fails differently: every `/api` call 403s while `/api/actuator/health` stays
+green, so the frontend job's smoke test passes. Check a real route after changing either side.
+
+**Rotation** has a short outage window: add the new Secret Manager version and Pages secret, then run
+the deploy with `target: both`. Calls 403 between the backend going live and the Pages publish.
+
+### `INTERNAL_PROXIES`, now that the gate is on
+
+`none` is still the committed value, so all anonymous traffic still shares one bucket. With the gate
+on, the chain Tomcat sees is `<client>, <Cloudflare egress>` from a Google front-end peer, and only
+the Function can have written the left-most entry of any request that reaches an address-sensitive
+filter (the ungated health reads are never counted). So a pattern matching every hop — `.*` —
+resolves the real client and cannot be forged. **Never set it while `ORIGIN_SHARED_SECRET` is `none`**: without
+the gate that same value lets any caller choose their own address.
+
+Set it **last**, after confirming the gate is live (a direct `curl` of the `*.run.app` URL for any
+non-health route must answer 403) and checking the `X-Forwarded-For` a real proxied request produces.
+
+### Free Cloudflare edge controls
+
+These only protect traffic that goes through Cloudflare, which is why the gate had to come first. On
+the `draazy.com` zone, free plan:
+
+- **Managed WAF ruleset** (free tier) — on.
+- **One rate-limiting rule** — e.g. `/api/auth/*` POST, per IP, to back up the OTP counters.
+- **Custom WAF rules** (5 on the free plan) — e.g. block `/api/docs*` and `/api/swagger-ui*` on sandbox.
+- **Turnstile** is already wired (`TurnstileBotDefence`).
+- **Bot Fight Mode: leave off.** On the free plan it cannot be skipped per path, so it can challenge
+  the Cashfree webhook at `/api/webhooks/cashfree/payment` and payments stop confirming without an error.
 
 ---
 
@@ -232,15 +505,16 @@ by the backend job — the `${…}` tokens are the only per-environment inputs a
 deliberate literal, reviewable here rather than guessed at deploy time. `replace` makes that file the
 whole truth: anything a console click added out of band is removed on the next deploy.
 
-Five settings in it encode consequences that are invisible from the console:
+Six settings in it encode consequences that are invisible from the console:
 
 | Setting | Value | Why not the default |
 |---|---|---|
+| `autoscaling.knative.dev/minScale` | `1` | The only setting here that costs money whether or not anyone uses the service: one instance held warm is ~₹1,300/month at `1Gi` (₹42/day on the Sep 2026 bill), billed at the *idle* rate because `cpu-throttling` stays on. Bought to remove the JVM boot plus Spring context refresh from the first request after an idle period, and from every redeploy cutover. The trap is reading it as "the backend is now running": CPU is still throttled to ~0 between requests, so the `@Scheduled` sweeps remain frozen. It satisfies one of ADR-011 Option C's two preconditions; the advisory-lock job runs (no ShedLock needed) and `cpu-throttling: 'false'` are the other half, and that half is the 6× bill. |
 | `autoscaling.knative.dev/maxScale` | `4` | Each instance opens up to 5 Postgres connections (`spring.datasource.hikari.maximum-pool-size`), so the ceiling multiplies straight into Supabase's budget: 4 × 5 = 20, which the free-tier pooler absorbs. At the default of 100 the same arithmetic gives 500 and the database refuses connections under a spike — arriving as scattered 500s on unrelated endpoints, never as anything naming the pool. It is also the runaway-cost stop: a crawler cannot cost more than four instances' compute. |
 | `containerConcurrency` | `40` | Tomcat accepts 200 by default and then parks 195 of them on Hikari until its 30-second connection timeout expires, which surfaces as slow 500s rather than honest backpressure. Forty keeps the queue short enough that Cloud Run scales out instead. |
-| `timeoutSeconds` | `120` | Well past any normal request; short enough that a hung one releases its database connection rather than holding it for the platform default of five minutes. The only legitimate slow request is a 13 MB multipart upload (`spring.servlet.multipart.max-request-size`) over a slow mobile uplink. |
-| `resources.limits.memory` | `1Gi` | The Dockerfile sets `-XX:MaxRAMPercentage=75.0`, so this is a 768 Mi heap with ~256 Mi for metaspace, thread stacks and code cache — which Spring Boot 4 plus Hibernate genuinely uses. At 512 Mi the same percentage leaves 128 Mi of non-heap and the container is OOM-killed during startup, after the health check has already begun waiting. |
-| `startupProbe` | HTTP, `30 × 5s` | A TCP probe passes the moment Tomcat binds, so Cloud Run would route traffic to a context that is not finished refreshing. The path carries `/api` because `server.servlet.context-path` moves the actuator too. 150 seconds of grace is for the deploy that carries a slow migration — exactly when a tight probe would roll back a good release. `livenessProbe` watches the `liveness` group, which deliberately excludes the database indicator: restarting the container is no part of the remedy for Supabase being down. |
+| `timeoutSeconds` | `3600` | The Cloud Run maximum. The messages SSE stream (`MessageEventHub`) is a single long request, so any shorter timeout cuts it mid-stream and reconnects every client on that period (it did at `120`); the hub's own 5-minute stream timeout and 25-second heartbeat bound it instead. The other slow request is a 13 MB multipart upload (`spring.servlet.multipart.max-request-size`) over a slow mobile uplink. A hung ordinary request now holds its thread for longer than the old `120`. |
+| `resources.limits.memory` | `1Gi` | The Dockerfile sets `-XX:MaxRAMPercentage=70.0`, so this is a ~717 Mi heap with ~300 Mi for metaspace, code cache and thread stacks. Measured under these limits: 40 concurrent requests peak at ~650 MB resident, and the live heap after GC is ~130 MB. The migration job uses the same size; applying every migration plus the seed peaked at ~560 MB. At 512 Mi the non-heap no longer fits and the container is OOM-killed during startup. With `minScale: 1` each extra GiB is billed around the clock. |
+| `startupProbe` | HTTP, `60 × 5s` | A TCP probe passes the moment Tomcat binds, so Cloud Run would route traffic to a context that is not finished refreshing. The path carries `/api` because `server.servlet.context-path` moves the actuator too. Migrations run in the job before this revision starts (§2.1), so the 300 seconds of grace now only covers a cold JVM on a throttled CPU. A warm deploy is ready in about 45 s. `livenessProbe` watches the `liveness` group, which deliberately excludes the database indicator: restarting the container is no part of the remedy for Supabase being down. |
 
 `SPRING_PROFILES_ACTIVE=sandbox` is set on the service, overriding the `prod` baked into the image.
 `application-sandbox.properties` is standalone rather than a delta — its own datasource, secrets,
@@ -257,9 +531,10 @@ without editing the file — and so a bad rotation reaches it the same way. The 
 knowing: the SHA-tagged image makes *redeploy a known tag* a complete rollback for **code** and not
 for **secrets**. Yesterday's image still picks up today's `latest` `JWT_SECRET`, which invalidates
 every issued token. The two Cashfree secrets are referenced unconditionally and must **exist** before
-the first deploy even though `CASHFREE_ENABLED` is `false` — a `secretKeyRef` to a missing secret is a
-hard error, not an empty string. Create them with a placeholder; `CashfreeClient` is not instantiated
-while the flag is off, so it never reads them.
+the first deploy — a `secretKeyRef` to a missing secret is a hard error, not an empty string. Sandbox
+now runs with `CASHFREE_ENABLED=true`, so they must hold the real `TEST_` / `cfsk_` values rather than
+a placeholder: a placeholder is non-blank, so the service boots normally and every order creation 401s.
+There is deliberately no `cashfree-webhook-secret` entry — see the table in §3.1.
 
 ```bash
 PROJECT_ID=draazy-sandbox          # your project
@@ -278,12 +553,23 @@ gcloud artifacts repositories create draazy --repository-format=docker --locatio
 gcloud iam service-accounts create "$SERVICE" --display-name="Draazy API (sandbox) runtime"
 RUNTIME="$SERVICE@$PROJECT_ID.iam.gserviceaccount.com"
 
-# Four secrets, one active version each — inside Secret Manager's free allowance of six.
-for s in db-password jwt-secret referral-signal-salt cashfree-webhook-secret; do
+# Every secret `cloudrun-sandbox.yaml` names with a secretKeyRef. Miss one and `services replace`
+# is a hard boot error, so create them all even where the feature behind them is off — an unused
+# placeholder version costs nothing. Ten is past Secret Manager's free six; the overage is cents.
+for s in db-password jwt-secret referral-signal-salt identity-hash-secret staff-totp-key \
+         cashfree-app-id cashfree-secret-key \
+         r2-access-key-id r2-secret-access-key origin-shared-secret; do
   gcloud secrets create "draazy-sandbox-$s" --replication-policy=automatic
   gcloud secrets add-iam-policy-binding "draazy-sandbox-$s" \
     --member="serviceAccount:$RUNTIME" --role=roles/secretmanager.secretAccessor
 done
+
+# The schema-owner password goes to the migration job's identity only, never the runtime (§2.1).
+gcloud iam service-accounts create draazy-migrator-sandbox --display-name="Draazy schema migrations"
+gcloud secrets create draazy-sandbox-flyway-db-password --replication-policy=automatic
+gcloud secrets add-iam-policy-binding draazy-sandbox-flyway-db-password \
+  --member="serviceAccount:draazy-migrator-sandbox@$PROJECT_ID.iam.gserviceaccount.com" \
+  --role=roles/secretmanager.secretAccessor
 ```
 
 Then add each value — **piped, never as an argument**, because a command line lands in shell history
@@ -297,8 +583,13 @@ printf '%s' "$THE_VALUE" | gcloud secrets versions add draazy-sandbox-jwt-secret
 `openssl rand -base64 48`. `REFERRAL_SIGNAL_SALT` is any long random string and must never be the dev
 one. An unsalted or publicly-salted digest of an IPv4 address is reversed by enumerating 2^32 values,
 which turns a fraud signal into a stored address — so prod carries no default, though the base file
-does for local runs. `CASHFREE_WEBHOOK_SECRET` is required even though `CASHFREE_ENABLED` is off,
-because a blank value makes every forged signature valid.
+does for local runs. `CASHFREE_WEBHOOK_SECRET` needs no entry of its own: it reads
+`draazy-sandbox-cashfree-secret-key`, because that is the key Cashfree signs callbacks with. Note
+what that means for the blast radius — that one entry now carries order-creation and refund
+authority as well as signing, so grant it accordingly. `IDENTITY_HASH_SECRET` is the one secret
+here that is **set-once rather than rotatable**: it keys the digest that makes one document grant one
+badge, so a new value silently turns every existing holder into a stranger the uniqueness check has
+never seen.
 
 ### The deploy identity
 
@@ -355,7 +646,19 @@ file** — `shred -u key.json`. Also on that environment:
 | variable | `GCP_PROJECT_ID` | the project id |
 | secret | `SANDBOX_DB_URL` | transaction pooler, `:6543` (§2) |
 | secret | `SANDBOX_FLYWAY_DB_URL` | session pooler, `:5432` (§2) |
-| secret | `SANDBOX_DB_USER` | `postgres.<project-ref>` |
+| secret | `SANDBOX_DB_USER` | `draazy_app.<project-ref>` (§2.1) |
+| secret | `SANDBOX_FLYWAY_DB_USER` | `postgres.<project-ref>` |
+| variable | `SANDBOX_R2_ENDPOINT` | `https://<accountId>.r2.cloudflarestorage.com` |
+| variable | `SANDBOX_R2_BUCKET_PRIVATE` | bucket for identity captures, never public |
+| variable | `SANDBOX_R2_BUCKET_PUBLIC` | bucket for listing photos |
+| variable | `SANDBOX_R2_PUBLIC_BASE_URL` | public read origin for the public bucket |
+
+The four R2 entries are variables, not secrets: they are identifiers, and the key pair that actually
+opens the bucket lives in Secret Manager. With `STORAGE_ENABLED=true` the workflow requires all four
+to be non-blank, because a blank one reaches the container empty and `R2FileStorage`'s all-six
+constructor check refuses to boot — a crash loop rather than a bad upload. Leaving one out of the
+`envsubst` list would be worse: the literal `${R2_ENDPOINT}` is non-blank, so that check would pass
+and the loud refusal would become a quiet failure on the first upload.
 
 The connection strings are repository secrets rather than variables for one reason only: **this
 repository is public, and they name the Supabase project.** That is about not committing them, not
@@ -433,20 +736,52 @@ backwards without a warning. Read the checks on the commit before dispatching; t
 and the environment branch policy are the only things between the form and a live
 `gcloud run services replace`.
 
-### What the eight `@Scheduled` sweeps do here — nothing
+### 5.2 Moving to a new GCP project or account
 
-Cloud Run allocates CPU **only while a request is in flight**. Between requests the JVM's scheduler
-thread is frozen, so `fixedDelay` timers do not advance; an instance that never accumulates five
-minutes of *CPU* time never reaches its first tick, and every sweep in the codebase uses a five
-minute `initialDelay`. Nothing logs the non-execution.
+Project ids are globally unique and never reused, so a move is a new project, not a rename. Supabase,
+R2 and Cloudflare are separate vendors and stay as they are; only the GCP half is rebuilt.
 
-On the sandbox this is accepted. It cannot ship to production: subscriptions keep entitling after
-they lapse, abandoned checkouts never clear, and `page_views` grows unpruned against a 500 MB
-database. The intended fix is already designed —
-`docs/system/platform-architecture.md` §5.6 specifies Cloud Scheduler calling an OIDC-authenticated
-job runner — and was simply never built; the code reached for `@Scheduled` instead. Always-on CPU
-would also work and costs roughly USD 10–25/month, because it takes the service off the request-billed
-free tier entirely.
+```bash
+gcloud auth login                     # once per account; keep the old one logged in too
+PROJECT_ID=<new-id> OLD_PROJECT_ID=<old-id> OLD_ACCOUNT=<old-email> bash backend/deploy/bootstrap-project.sh
+```
+
+`OLD_PROJECT_ID` copies every secret instead of prompting. **That is mandatory while the database is
+kept**: `identity-hash-secret`, `identity-encryption-key` and `staff-totp-key` are set-once, and fresh
+values orphan every stored hash, make stored PAN/Aadhaar unreadable and force all staff to re-enrol 2FA.
+API keys created *in* the old project (`google-places-server-key`, the browser Maps key and Map ID)
+die with it — recreate them in the new project and add a new secret version before deleting the old one.
+
+Then set the three variables the script prints on the `sandbox` environment, dispatch the backend
+deploy, point Pages `API_ORIGIN` at the new `*.run.app` URL, and only then delete the old project —
+`minScale: 1` keeps billing it until you do.
+
+### Scheduled jobs
+
+`com.draazy.api.jobs.JobRunner` runs every background job in four cron groups, all in IST. Each job
+runs in its own try, so one failure is logged and the rest of the group carries on; the group's
+advisory lock (`JobRunScheduler`) keeps it on one instance.
+
+| Group | Cron property (default) | Jobs |
+|---|---|---|
+| Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates` |
+| Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs) |
+| Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
+| Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `waiting-digest` |
+
+Switches: `draazy.jobs.enabled=false` turns off all of them (the test suite does), and
+`draazy.jobs.<name>.enabled=false` (env `DRAAZY_JOBS_<NAME>_ENABLED`) turns off one. Daily jobs that
+read a capped page (200–500 rows) repeat until a page comes back empty, up to ten pages a run.
+
+`spring.task.scheduling.pool.size=2` is a connection budget, not a throughput setting. A group run holds
+one connection for its lock transaction and the work checks out a second. With
+`spring.datasource.hikari.maximum-pool-size=5`, two concurrent runs take four and leave one for HTTP. More
+threads let a long nightly run overlap the 15-minute and hourly ticks and starve requests. Raise both
+together. A run that finds both threads busy starts late; it isn't skipped.
+
+**On Cloud Run they do nothing.** CPU is allocated only while a request is in flight, so the
+scheduler thread is frozen between requests and no cron fires. Nothing logs the non-execution. On
+the sandbox this is accepted; production runs on an always-on host (ADR-021).
 
 ---
 
@@ -473,7 +808,8 @@ free tier entirely.
 
    `API_ORIGIN` stays configured **on the project**, not in the workflow. Direct uploads do not
    touch project environment variables, so it survives every deploy — and it names the Cloud Run
-   service, which is infrastructure rather than build input.
+   service, which is infrastructure rather than build input. `ORIGIN_SHARED_SECRET` (§4) lives
+   there too, as a secret.
 3. **R2 keys**, then one photo upload end-to-end. R2 is cross-origin from the SPA and must supply
    `Access-Control-Allow-Origin` itself, or browser-side perceptual hashing fails on the canvas read.
 4. **Deploy pipeline.** `.github/workflows/deploy.yml` — **manual only.** Actions → Deploy (sandbox)
@@ -530,14 +866,9 @@ free tier entirely.
   budget for each one. On WhatsApp that is worse than a bill — sends to non-WhatsApp numbers drag
   the sending number's quality rating down, which cuts the daily messaging limit and takes sign-in
   itself offline days later.
-- **The eight `@Scheduled` sweeps do not run on Cloud Run.** CPU throttling freezes the scheduler
-  thread between requests, so no timer advances — see §5. Accepted on the sandbox, fatal for
-  production. This is a **drift from ADR-011**, which chose Cloud Scheduler → `/internal/jobs/run`
-  and explicitly deferred native `@Scheduled` until `min-instances=1` *and* ShedLock; the code took
-  the mechanism without either precondition. `platform-architecture.md` §4.3 / ADR-021 costs the
-  alternative that removes the problem instead of working around it.
-- **The frontend still seeds its mock store** into every visitor's `localStorage` from `main.jsx`,
-  including on a fully-live build.
+- **Scheduled jobs do not run on Cloud Run.** CPU throttling freezes the scheduler thread between
+  requests — see §5. Accepted on the sandbox; production needs an always-on host (ADR-021). Each run
+  takes a Postgres advisory lock per job, so more than one instance is safe and no ShedLock is needed.
 - **Backups.** Supabase's free tier has limited backups and no PITR. A scheduled logical dump to R2
   is the stopgap until Pro is justified.
 - **The anonymous rate limiter is bypassable until §4 is decided.** Not a boot failure and not
@@ -548,3 +879,46 @@ free tier entirely.
   means baking the Supabase CA into the image and adding `sslrootcert`; `FLYWAY_DB_URL` needs the
   same, in the URL itself, because Flyway builds its own DataSource and the Hikari property does not
   reach it.
+
+---
+
+## 8. Logs, errors and alerts on DigitalOcean — $0
+
+Nothing here costs money; non-critical logs are not worth paying to keep.
+
+| Signal | Where it lives | Retention |
+|---|---|---|
+| Runtime logs (ECS JSON on stdout, every line carries `traceId`) | App Platform → Runtime Logs, `doctl apps logs <app> --type run --follow` | live only — DO keeps none |
+| Build / deploy logs | App Platform → Activity | 90 days (DO) |
+| Every backend `ERROR` and every sandbox/prod UI crash, deduplicated, PII-scrubbed | `error_event` → Admin ▸ Error log | 30 days after first seen |
+| Outbound provider calls (ZeptoMail, WhatsApp, Cashfree), with `trace_id` | `provider_call` → Admin ▸ Settings call log | 30 days |
+| Critical/high privileged actions | `audit_log` → Admin ▸ Audit trail | 365 days (CERT-In 180 d, DPDP Rule 6 one year) |
+
+**Finding a bug.** A user quotes the reference on the error screen, or an API error body carries
+`traceId`. Search it in Admin ▸ Error log; the same id is on the runtime-log lines and on
+`provider_call.trace_id`. Scheduled-job errors carry `job-<Class.method>-<id>`.
+
+**Do not enable log forwarding.** OpenSearch and Datadog are paid; Better Stack's free plan keeps
+3 days, which adds nothing the error table does not already hold for 30.
+
+**Free alert policies** — add to the app spec (`alerts` at app level, the rest under the service):
+
+```yaml
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+services:
+  - name: api
+    alerts:
+      - { rule: RESTART_COUNT, operator: GREATER_THAN, value: 2, window: TEN_MINUTES }
+      - { rule: MEM_UTILIZATION, operator: GREATER_THAN, value: 85, window: FIVE_MINUTES }
+      - { rule: CPU_UTILIZATION, operator: GREATER_THAN, value: 85, window: TEN_MINUTES }
+    health_check:
+      http_path: /api/actuator/health/liveness
+```
+
+**One free Uptime check** (DO credits one per month): HTTPS `GET https://draazy.com/api/actuator/health`,
+alerts on downtime and SSL expiry to the owner's email. A second check is $1/month — not needed.
+
+**Scaling out is safe for the jobs.** Every cron-scheduled run takes a Postgres advisory lock keyed
+on the job name and skips if another instance holds it, so two instances never run the same job group.

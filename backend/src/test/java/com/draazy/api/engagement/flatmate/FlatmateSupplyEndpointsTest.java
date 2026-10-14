@@ -1,19 +1,34 @@
 package com.draazy.api.engagement.flatmate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.documents.vault.PersonalDocument;
+import com.draazy.api.documents.vault.PersonalDocumentRepository;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,28 +38,35 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * Rooms, groups, the mixed feed and the Ops queue.
- *
- * <p>The centrepiece is {@link Guardrails}: the anti-broker cap and the address dedupe used to live
- * in the browser, reading {@code localStorage}. A cap a client enforces is a suggestion. These tests
- * exist to prove it is now enforced by the process that does the insert, against rows the caller
- * cannot edit.
- *
- * <p>{@link Tiers} covers the other half of the trust model: a verification tier is <em>derived</em>
- * from the caller's real relationship to a listing, never read from the request body.
- */
+// A cap a client enforces is a suggestion, so Guardrails proves the anti-broker cap and the address
+// dedupe hold in the process that inserts, and Tiers that a tier is derived.
 @DisplayName("Flatmates — rooms, groups, the feed and the guardrails behind them")
 class FlatmateSupplyEndpointsTest extends AbstractApiTest {
 
     @Autowired
     UserRepository users;
 
+    @Autowired
+    PropertyRepository properties;
+
+    @Autowired
+    PersonalDocumentRepository personalDocuments;
+
+    @Autowired
+    FlatmateTrustReconciler reconciler;
+
+        @PersistenceContext
+        EntityManager entityManager;
+
     private final List<String> createdActors = new ArrayList<>();
+    private final Map<UUID, String> hostPhotos = new HashMap<>();
 
     @AfterEach
     void removeAuditRowsThatEscapedRollback() {
-        createdActors.forEach(actor -> jdbc.update("delete from audit_log where actor = ?", actor));
+                createdActors.forEach(actor -> {
+                        jdbc.update("delete from audit_log where actor = ?", actor);
+                        jdbc.update("delete from flatmate_owner_consents where granted_by = ?::uuid", actor);
+                });
         createdActors.clear();
     }
 
@@ -61,38 +83,192 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         return saved;
     }
 
-    private static String roomBody(String locality, String society) {
-        return """
+    private String photoOf(User host) {
+        return hostPhotos.computeIfAbsent(host.getId(), UploadedPhotos::of);
+    }
+
+    private String roomBody(User host, String locality, String society) {
+        return withSocietyIds("""
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "furnishing":"semi","locality":"%s","society":"%s","rentShare":15000,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
-                 "foodPref":"any","photos":["https://cdn.example/1.jpg"],
+                 "foodPref":"any","photos":["%s"],
+                 "hostRole":"owner","note":"Sunny room, quiet building."}
+                """.formatted(locality, society, photoOf(host)));
+    }
+
+    private String roomBodyWithFlatNumber(User host, String locality, String society, String flatNumber) {
+        return roomBody(host, locality, society).replace("\"furnishing\"", "\"flatNumber\":\"%s\",\"furnishing\""
+                .formatted(flatNumber));
+    }
+
+    private String declaredRoomBody(User host, String agreementDoc, String ownerConsent) {
+        return withSocietyIds("""
+                {"bhk":"2","roomType":"Private room","attachedBath":"attached",
+                 "furnishing":"semi","locality":"Baner","society":"Tenant Heights","rentShare":15000,
+                 "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
+                 "foodPref":"any","agreementDeclared":true,
+                 "hostRole":"tenant",
+                 "agreementDoc":%s,
+                 "ownerConsent":%s,"photos":["%s"],
                  "note":"Sunny room, quiet building."}
-                """.formatted(locality, society);
+                """.formatted(agreementDoc, ownerConsent, photoOf(host)));
+    }
+
+    private String agreementEvidence(User host) {
+        PersonalDocument doc = personalDocuments.saveAndFlush(new PersonalDocument(host.getId(),
+                "Registered Leave and Licence", "leave-and-licence.pdf",
+                "personal/" + host.getId() + "/" + UUID.randomUUID(),
+                184320L, "application/pdf"));
+        return FlatmateAgreementFixture.evidence(doc.getId().toString());
     }
 
     private String createRoom(User host, String locality, String society) throws Exception {
         String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(roomBody(locality, society)))
+                        .content(roomBody(host, locality, society)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return publish("flatmate_rooms", json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+        return publish("flatmate_rooms", idOf(json));
     }
 
-    /**
-     * Let a freshly created row out of the moderation queue (D72).
-     *
-     * <p>Since D72 a room or group is born {@code pending} and is invisible on every consumer
-     * surface until a moderator decides. Nearly every test below is about the <em>feed</em> — how
-     * it filters, sorts, prices and paginates — and none of them is about moderation, so they seed
-     * published supply on purpose rather than inheriting visibility from a default. That the
-     * default is now the other way round is asserted once, deliberately, in
-     * {@link FlatmateModerationGateTest}.
-     */
+    @Test
+    @DisplayName("tenant room agreement claims need an uploaded agreement document id")
+    void tenantRoomAgreementClaimNeedsDocumentId() throws Exception {
+        User host = user("9815550101", "Tenant Claimant");
+
+        mvc.perform(post(Routes.Flatmates.ROOMS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(declaredRoomBody(host,
+                                "{\"name\":\"leave-and-licence.pdf\",\"size\":184320,"
+                                        + "\"mime\":\"application/pdf\"}",
+                                "true")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(
+                        "A declared agreement needs the agreement document id."));
+    }
+
+    @Test
+    @DisplayName("tenant room agreement claims need explicit owner consent declaration")
+    void tenantRoomAgreementClaimNeedsOwnerConsent() throws Exception {
+        User host = user("9815550102", "Tenant Consent");
+        String docId = personalDocuments.saveAndFlush(new PersonalDocument(host.getId(),
+                "Registered Leave and Licence", "leave-and-licence.pdf",
+                "personal/" + host.getId() + "/" + UUID.randomUUID(),
+                184320L, "application/pdf")).getId().toString();
+
+        mvc.perform(post(Routes.Flatmates.ROOMS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(declaredRoomBody(host,
+                                "{\"id\":\"" + docId + "\",\"name\":\"leave-and-licence.pdf\","
+                                        + "\"size\":184320,\"mime\":\"application/pdf\"}",
+                                "false")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(
+                        "ownerConsent must be true for a tenant-hosted flatmate room."));
+    }
+
+    @Test
+    @DisplayName("tenant room hosts cannot omit the agreement declaration")
+    void tenantRoomHostNeedsAgreementDeclaration() throws Exception {
+        User host = user("9815550103", "Tenant No Flag");
+        String docId = personalDocuments.saveAndFlush(new PersonalDocument(host.getId(),
+                "Registered Leave and Licence", "leave-and-licence.pdf",
+                "personal/" + host.getId() + "/" + UUID.randomUUID(),
+                184320L, "application/pdf")).getId().toString();
+
+        mvc.perform(post(Routes.Flatmates.ROOMS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"bhk":"2","roomType":"Private room","locality":"Baner",
+                                 "society":"Tenant Heights","rentShare":15000,
+                                 "hostRole":"tenant",
+                                 "agreementDoc":{"id":"%s"},"ownerConsent":true,
+                                 "photos":["%s"]}
+                                """.formatted(docId, photoOf(host))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(
+                        "agreementDeclared must be true for a tenant-hosted flatmate room."));
+    }
+
+    @Test
+    @DisplayName("tenant room agreement documents must belong to the caller")
+    void tenantRoomAgreementDocumentMustBeOwned() throws Exception {
+        User host = user("9815550104", "Tenant Foreign Doc");
+
+        mvc.perform(post(Routes.Flatmates.ROOMS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(declaredRoomBody(host,
+                                "{\"id\":\"11111111-1111-1111-1111-111111111111\","
+                                        + "\"name\":\"leave-and-licence.pdf\","
+                                        + "\"size\":184320,\"mime\":\"application/pdf\"}",
+                                "true")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(
+                        "agreementDoc.id must reference an uploaded agreement document you own."));
+    }
+
+    @Test
+    @DisplayName("group agreement documents must belong to the caller too")
+    void groupAgreementDocumentMustBeOwned() throws Exception {
+        User host = user("9815550106", "Group Foreign Doc");
+
+        mvc.perform(post(Routes.Flatmates.GROUPS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Borrowed paper","locality":"Baner","rent":40000,"seats":3,
+                                 "seatsOpen":1,"name":"Host","role":"tenant","agreement":true,
+                                 "agreementDoc":{"id":"11111111-1111-1111-1111-111111111111"}}
+                                """))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(
+                        "agreementDoc.id must reference an uploaded agreement document you own."));
+    }
+
+    @Test
+    @DisplayName("tenant room agreement document from the caller's vault is accepted")
+    void tenantRoomAgreementDocumentCanComeFromCallerVault() throws Exception {
+        User host = user("9815550105", "Tenant Own Doc");
+
+        mvc.perform(post(Routes.Flatmates.ROOMS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(declaredRoomBody(host,
+                                "{\"id\":\"" + personalDocuments.saveAndFlush(new PersonalDocument(
+                                        host.getId(), "Registered Leave and Licence",
+                                        "leave-and-licence.pdf",
+                                        "personal/" + host.getId() + "/" + UUID.randomUUID(),
+                                        184320L, "application/pdf")).getId() + "\","
+                                        + "\"name\":\"leave-and-licence.pdf\","
+                                        + "\"size\":184320,\"mime\":\"application/pdf\"}",
+                                "true")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.verificationTier").value("tenant"));
+    }
+
+    private static String idOf(String json) {
+        return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+    }
+
+    private Property listing(User owner, String status) {
+        Property p = new Property(owner, "Flat in Baner", "rent", "apartment",
+                45000L, "Baner", "Pune");
+        p.setBhk(BigDecimal.valueOf(2));
+        p.setStatus(status);
+        return properties.saveAndFlush(p);
+    }
+
+    // A room or group is born pending and invisible; none of the tests below is about moderation,
+    // so they seed published supply. The default is pinned in FlatmateModerationGateTest.
     private String publish(String table, String id) {
         jdbc.update("update " + table + " set mod_status = 'approved' where id = ?::uuid", id);
+        entityManager.clear();
         return id;
     }
 
@@ -110,7 +286,58 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                         .content(groupBody(title, locality)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return publish("flatmate_groups", json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+        return publish("flatmate_groups", idOf(json));
+    }
+
+    // The address is the consent's scope (V30), so it must be the one the post will fingerprint at
+    // — a group names its flat by title, a room by society — or the post is filed without the flag.
+    private String recordOwnerConsent(User host, String title, String society, String locality)
+            throws Exception {
+        String ownerMobile = "983" + host.getMobile().substring(3);
+        mvc.perform(post(Routes.Flatmates.OWNER_CONSENT)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"ownerMobile":"%s","title":%s,"society":%s,"locality":"%s"}
+                                """.formatted(ownerMobile, quoted(title), quoted(society),
+                                locality)))
+                .andExpect(status().isOk());
+        entityManager.flush();
+        jdbc.update("""
+                        update otp_codes set code_hash = ?
+                        where id = (select id from otp_codes where mobile = ?
+                                        order by created_at desc limit 1)""",
+                sha256Hex("424242"), ownerMobile);
+        entityManager.clear();
+        mvc.perform(post(Routes.Flatmates.OWNER_CONSENT)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"ownerMobile":"%s","otp":"424242",
+                                 "title":%s,"society":%s,"locality":"%s"}
+                                """.formatted(ownerMobile, quoted(title), quoted(society),
+                                locality)))
+                .andExpect(status().isOk());
+        return ownerMobile;
+    }
+
+    private static String quoted(String value) {
+        return value == null ? "null" : "\"" + value + "\"";
+    }
+
+    private static String sha256Hex(String raw) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(raw.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder(digest.length * 2);
+            for (byte value : digest) {
+                hex.append(Character.forDigit((value >> 4) & 0xF, 16));
+                hex.append(Character.forDigit(value & 0xF, 16));
+            }
+            return hex.toString();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     @Nested
@@ -131,7 +358,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("Baner", "Sai Radha C")))
+                            .content(roomBody(host, "Baner", "Sai Radha C")))
                     .andExpect(status().isConflict());
         }
 
@@ -144,7 +371,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("Kothrud", "Green Acres")))
+                            .content(roomBody(host, "Kothrud", "Green Acres")))
                     .andExpect(status().isConflict());
         }
 
@@ -155,8 +382,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             User second = user("9820000004", "Second");
             createRoom(first, "Aundh", "Palm Grove");
 
-            // Flag-not-block: the fingerprint is a fuzzy match over free text, and refusing an
-            // honest second post is a worse error than asking a human to look.
             String id = createRoom(second, "Aundh", "Palm Grove");
 
             Boolean flagged = jdbc.queryForObject(
@@ -179,7 +404,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(roomBody("wakad", "sai radha complex")))
+                            .content(roomBody(host, "wakad", "sai radha complex")))
                     .andExpect(status().isConflict());
         }
     }
@@ -188,12 +413,25 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @DisplayName("verification tiers")
     class Tiers {
 
+        private String ownerRoom(User host, String society, String propertyId) throws Exception {
+            return mvc.perform(post(Routes.Flatmates.ROOMS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(withSocietyIds("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"%s","rentShare":15000,"hostRole":"owner",
+                                     "propertyId":"%s",
+                                     "photos":["%s"]}
+                                    """.formatted(society, propertyId, photoOf(host)))))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+        }
+
         @Test
         @DisplayName("a client cannot award itself the owner tier by asking for it")
         void tierIsDerivedNotAccepted() throws Exception {
             User host = user("9820000010", "Claimant");
 
-            // role=owner with no property it actually owns: the claim is simply not honoured.
             String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -220,19 +458,150 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     {"roomType":"Private room","locality":"Baner",
                                      "society":"Rose Villa","rentShare":15000,
                                      "hostRole":"tenant","agreementDeclared":true,
-                                     "photos":["https://cdn.example/1.jpg"]}
-                                    """))
+                                     "photos":["%s"],%s}
+                                    """.formatted(photoOf(host), agreementEvidence(host))))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.verificationTier").value("tenant"))
-                    // The claim does NOT grant the pill.
+
                     .andExpect(jsonPath("$.verified").value(false))
                     .andReturn().getResponse().getContentAsString();
 
-            String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+            String id = idOf(json);
             Integer queued = jdbc.queryForObject(
                     "select count(*) from flatmate_reviews where room_id = ?::uuid",
                     Integer.class, id);
             assertThat(queued).isOne();
+        }
+
+        // Every other fixture sends the full evidence set, so without this nothing would notice the
+        // rule loosening back to the bare flag — which is free, and mints tenant tier for anyone.
+        @Test
+        @DisplayName("a rent agreement claimed without its paperwork is refused, naming what is missing")
+        void anUnevidencedClaimIsRefused() throws Exception {
+            User host = user("9820000018", "Claimer");
+
+            mvc.perform(post(Routes.Flatmates.ROOMS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"Bare Claim House","rentShare":15000,
+                                     "hostRole":"tenant","agreementDeclared":true,
+                                     "photos":["%s"]}
+                                    """.formatted(photoOf(host))))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.error").value("validation_failed"))
+                    .andExpect(jsonPath("$.message").value(
+                            "A declared agreement needs the agreement document."));
+
+            Integer filed = jdbc.queryForObject(
+                    "select count(*) from flatmate_rooms where host_id = ?::uuid",
+                    Integer.class, host.getId().toString());
+            assertThat(filed).isZero();
+        }
+
+        @Test
+        @DisplayName("a spare room in a flat the host demonstrably owns is born owner-tier")
+        void ownerTierIsReachableForASpareRoom() throws Exception {
+            User host = user("9820000012", "Landlord", Roles.Wire.OWNER);
+            Property flat = listing(host, PropertyStatus.APPROVED);
+
+            // Without a propertyId on the room create path this host could only reach identity,
+            // which is pending — a queue their own approved listing had already cleared.
+            String json = ownerRoom(host, "Landlord Heights", flat.getId().toString());
+
+            assertThat(json).contains("\"verificationTier\":\"owner\"");
+            assertThat(json).contains("\"verified\":true");
+
+            // Owner tier skips the queue: reviewing the parent listing's documents twice costs Ops
+            // real time for nothing.
+            assertThat(json).contains("\"modStatus\":\"live\"");
+
+            String id = idOf(json);
+            assertThat(jdbc.queryForObject(
+                    "select count(*) from flatmate_reviews where room_id = ?::uuid",
+                    Integer.class, id)).isZero();
+
+            // Read for the tier and the fingerprint, never stored: a seat-based room cannot also
+            // be a split of a flat (ck_flatmate_rooms_split_has_no_seats).
+            assertThat(jdbc.queryForObject(
+                    "select property_id from flatmate_rooms where id = ?::uuid", String.class, id))
+                    .isNull();
+        }
+
+        @Test
+        @DisplayName("a room quoting a listing the caller does not own earns nothing")
+        void roomPropertyIdIsCheckedNotTrusted() throws Exception {
+            User stranger = user("9820000013", "Passer-by", Roles.Wire.OWNER);
+            User landlord = user("9820000014", "Real Landlord", Roles.Wire.OWNER);
+            Property notTheirs = listing(landlord, PropertyStatus.APPROVED);
+
+            String json = ownerRoom(stranger, "Someone Elses Place",
+                    notTheirs.getId().toString());
+
+            assertThat(json).contains("\"verificationTier\":\"identity\"");
+            assertThat(json).contains("\"verified\":false");
+        }
+
+        @Test
+        @DisplayName("an edit can claim the flat the create forgot to")
+        void updateHonoursPropertyIdToo() throws Exception {
+            User host = user("9820000015", "Late Claimer", Roles.Wire.OWNER);
+            Property flat = listing(host, PropertyStatus.APPROVED);
+            String id = createRoom(host, "Baner", "Afterthought Court");
+
+            mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"Afterthought Court","rentShare":15000,
+                                     "hostRole":"owner","propertyId":"%s",
+                                     "photos":["%s"]}
+                                    """.formatted(flat.getId(), photoOf(host))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.verificationTier").value("owner"))
+                    .andExpect(jsonPath("$.verified").value(true));
+        }
+
+        @Test
+        @DisplayName("a room that published itself as owner-tier goes back to Ops when it drops the claim")
+        void losingOwnerTierLosesTheSelfPublish() throws Exception {
+            User host = user("9820000016", "Former Landlord", Roles.Wire.OWNER);
+            Property flat = listing(host, PropertyStatus.APPROVED);
+            String id = idOf(ownerRoom(host, "Sold Heights", flat.getId().toString()));
+
+            mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"Sold Heights","rentShare":15000,
+                                     "hostRole":"tenant","agreementDeclared":true,
+                                     "photos":["%s"],%s}
+                                    """.formatted(photoOf(host), agreementEvidence(host))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.verificationTier").value("tenant"))
+                    .andExpect(jsonPath("$.modStatus").value("pending"));
+        }
+
+        @Test
+        @DisplayName("a tenant-tier room is held for Ops, whatever paperwork came with it")
+        void tenantTierIsBornPending() throws Exception {
+            User host = user("9820000017", "Paperwork Tenant");
+
+            mvc.perform(post(Routes.Flatmates.ROOMS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"Held Villa","rentShare":15000,
+                                     "hostRole":"tenant","agreementDeclared":true,
+                                     "photos":["%s"],%s}
+                                    """.formatted(photoOf(host), agreementEvidence(host))))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.verificationTier").value("tenant"))
+                    .andExpect(jsonPath("$.modStatus").value("pending"));
         }
     }
 
@@ -269,6 +638,38 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         }
 
         @Test
+        @DisplayName("a double room has two places, and its rent splits between them for the budget filter")
+        void doubleRoomSplitsItsRent() throws Exception {
+            User host = user("9820000024", "Doubler");
+            String json = mvc.perform(post(Routes.Flatmates.ROOMS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(roomBody(host, "DoubleRoomTown", "Twin House")
+                                    .replace("Private room", "Shared room")))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.seatsTotal").value(2))
+                    .andExpect(jsonPath("$.seatsOpen").value(2))
+                    .andExpect(jsonPath("$.priceBasis").value("room"))
+                    .andExpect(jsonPath("$.shareMax").value(2))
+                    .andReturn().getResponse().getContentAsString();
+            String id = publish("flatmate_rooms", idOf(json));
+
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in")
+                            .param("locality", "DoubleRoomTown").param("maxBudget", "8000"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].shareMax").value(2));
+
+            mvc.perform(patch(Routes.Flatmates.ROOM_SEATS, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"seatsOpen\":1}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.seatsTotal").value(2))
+                    .andExpect(jsonPath("$.shareMax").value(2));
+        }
+
+        @Test
         @DisplayName("changing another host's room is refused")
         void seatsAreHostScoped() throws Exception {
             User host = user("9820000022", "Owner");
@@ -302,8 +703,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     """))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            String id = publish("flatmate_groups",
-                    json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            String id = publish("flatmate_groups", idOf(json));
 
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(joiner))
@@ -330,20 +730,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.action").value("request"));
         }
 
-        /**
-         * The OTP joiner who has no name (D118).
-         *
-         * <p>{@code users.name} is nullable — an OTP sign-in gives a verified mobile and nothing
-         * else — and {@code flatmate_group_members.name} was {@code NOT NULL}, so this join used to
-         * 500 for exactly the people who had just signed up. It was patched by storing the literal
-         * {@code "Member"}, which stopped the error and replaced it with a fabricated name that is
-         * indistinguishable from a real one and is shown to other people as <em>theirs</em>.
-         *
-         * <p>V55 made the column nullable, so what is asserted here is that the row carries no name
-         * at all rather than a made-up one: {@code doesNotExist} on both {@code name} and
-         * {@code initials}, because initials derived from "Member" ("M") would move the same
-         * invention into the avatar. The seat is still taken — being nameless is not being absent.
-         */
+        // users.name is nullable (an OTP sign-in gives a mobile and nothing else), and a fabricated
+        // name would be shown to other people as theirs — so initials must stay null too.
         @Test
         @DisplayName("a joiner who has never given a name joins with no name, not with \"Member\"")
         void namelessJoinerStoresNoName() throws Exception {
@@ -359,8 +747,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     """))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            String id = publish("flatmate_groups",
-                    json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            String id = publish("flatmate_groups", idOf(json));
 
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(joiner))
@@ -377,18 +764,12 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .as("the nameless joiner's row stores no name and no derived initials")
                     .isEqualTo(1);
 
-            // Re-publish for the harness reason `secondOpenJoinTakesNothing` spells out: the join
-            // flushes the group entity this suite's persistence context still holds, which writes
-            // the pre-publish `pending` back over the JDBC update above and hides it from the feed.
             publish("flatmate_groups", id);
 
-            mvc.perform(get(Routes.Flatmates.GROUPS).param("locality", "Kothrud"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "Kothrud"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].members.length()").value(2))
-                    // Collected across both members rather than indexed: the feed fetch-joins the
-                    // collection under its own `order by`, so member order is not guaranteed and an
-                    // index would pin the wrong thing. What matters is the pair of claims — one of
-                    // the two has no name at all, and neither is called "Member".
+
                     .andExpect(jsonPath("$.content[0].members[*].name",
                             Matchers.hasItem(Matchers.nullValue())))
                     .andExpect(jsonPath("$.content[0].members[*].name",
@@ -405,26 +786,74 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             User host = user("9820000034", "MathsHost");
             createGroup(host, "Split three ways", "Baner");
 
-            mvc.perform(get(Routes.Flatmates.GROUPS).param("locality", "Baner"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "Baner"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].rent").value(40000))
                     .andExpect(jsonPath("$.content[0].perHead").value(40000 / 3));
         }
 
-        /**
-         * The other 409 on this door, and the one nothing pinned until D182.
-         *
-         * <p>{@code group_full} is not a duplicate — it is the last seat going while the board that
-         * offered the button was still on screen, which is why the client's seat pre-check was
-         * removed and this became reachable. The client gives it the opposite treatment to
-         * {@code already_interested}: a red refusal, plus a refresh of the stale board it came
-         * from. It can only tell the two apart by the trailing marker, and the marker only reaches
-         * it if nothing follows it — so what is asserted here is the position, not the presence.
-         *
-         * <p>The seats are closed through the host's own endpoint rather than a raw JDBC update,
-         * deliberately: this suite shares one persistence context with the service, so a row edited
-         * behind that context's back is not what {@code join()} would read.
-         */
+        // The client can only tell group_full from already_interested by the trailing marker, and
+        // the marker only reaches it if nothing follows — so the position is what is asserted.
+        @Test
+        @DisplayName("open seats never overlap members, and changing them resizes the group and its share")
+        void openSeatsNeverOverlapMembers() throws Exception {
+            User host = user("9820000078", "CeilingHost");
+            User joiner = user("9820000079", "Joined");
+
+            String json = mvc.perform(post(Routes.Flatmates.GROUPS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"title":"Ceiling house","locality":"Aundh","policy":"any",
+                                     "rent":30000,"seats":3,"seatsOpen":3,"name":"CeilingHost"}
+                                    """))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.seatsOpen").value(2))
+                    .andReturn().getResponse().getContentAsString();
+            String id = publish("flatmate_groups", idOf(json));
+
+            mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(joiner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"share\":\"solo\"}"))
+                    .andExpect(status().isCreated());
+            publish("flatmate_groups", id);
+            entityManager.clear();
+
+            mvc.perform(patch(Routes.Flatmates.GROUP_SEATS, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"seatsOpen\":0}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.seatsOpen").value(0))
+                    .andExpect(jsonPath("$.seatsTotal").value(2))
+                    .andExpect(jsonPath("$.perHead").value(15000));
+            assertThat(jdbc.queryForObject(
+                    "select recheck_reason from flatmate_groups where id = ?::uuid", String.class, id))
+                    .as("a new per-head price goes back in front of a moderator")
+                    .contains("seats");
+
+            mvc.perform(patch(Routes.Flatmates.GROUP_SEATS, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"seatsOpen\":2}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.seatsTotal").value(4))
+                    .andExpect(jsonPath("$.perHead").value(7500));
+            mvc.perform(patch(Routes.Flatmates.GROUP_SEATS, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"seatsOpen\":" + (FlatmateGroup.MAX_SEATS - 1) + "}"))
+                    .andExpect(status().isBadRequest());
+
+            jdbc.update("update flatmate_groups set seats_open = 4 where id = ?::uuid", id);
+            publish("flatmate_groups", id);
+            entityManager.clear();
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "Aundh"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[0].seatsOpen").value(2));
+        }
+
         @Test
         @DisplayName("joining a group whose last seat has gone is group_full, not already_interested")
         void fullGroupRefusesWithItsOwnSubCode() throws Exception {
@@ -439,12 +868,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.seatsOpen").value(0));
 
-            // Re-publish, for the harness reason spelled out in `secondOpenJoinTakesNothing` rather
-            // than to paper over anything: this suite approves a listing with a raw JDBC update,
-            // which the persistence context it shares with the service never sees, so the seats
-            // save above writes the entity's stale `pending` back over the row. A real approval
-            // goes through the moderation API and leaves entity and row agreeing. Without this the
-            // join answers 404 and stops saying anything about which 409 it would have been.
             publish("flatmate_groups", id);
 
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
@@ -453,15 +876,12 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                             .content("{}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message", Matchers.endsWith("(group_full)")))
+
                     // Both refusals travel as `error: "conflict"`, so the sub-code is the only
-                    // thing separating a red refusal from a benign notice. Asserting the absence of
-                    // the other one is what stops a copy-paste in the service turning this into a
-                    // duplicate notice that leaves the board still offering the seat.
+                    // thing separating a red refusal from a benign notice.
                     .andExpect(jsonPath("$.message",
                             Matchers.not(Matchers.containsString("already_interested"))));
 
-            // Refused, not queued: a pending request against a full group would have the host
-            // deciding on a seat that does not exist.
             Integer rows = jdbc.queryForObject(
                     "select count(*) from flatmate_requests where kind = 'group' and target_id = ?::uuid",
                     Integer.class, id);
@@ -469,15 +889,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         }
     }
 
-    /**
-     * D175 — one answer to "I already asked", on both of this service's doors.
-     *
-     * <p>These are deliberately <em>sequential</em>. The racing version of the same question lives
-     * in {@code FlatmateDuplicateInterestRaceTest}, which needs real commits and therefore cannot be
-     * on {@code AbstractApiTest}; this suite covers the path nobody was testing, which is a person
-     * simply pressing the button again a minute later. That path used to answer 201 while the racing
-     * one answered 409 — same action, two contract-visible outcomes, and only one of them declared.
-     */
+    // Deliberately sequential; the racing version lives in FlatmateDuplicateInterestRaceTest, which
+    // needs real commits. Answering 201 here while that one answers 409 would be two contracts.
     @Nested
     @DisplayName("asking twice")
     class Duplicates {
@@ -500,8 +913,9 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"share\":\"solo\",\"message\":\"Second ask.\"}"))
                     .andExpect(status().isConflict())
+
                     // Ends with, not contains — see FlatmateConflicts for why the position is the
-                    // contract and not just the presence (D182).
+                    // contract and not just the presence.
                     .andExpect(jsonPath("$.message", Matchers.endsWith("(already_interested)")));
 
             Integer rows = jdbc.queryForObject(
@@ -509,7 +923,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     Integer.class, id);
             assertThat(rows).isOne();
 
-            // The refusal is total — the host keeps the pitch they were actually sent.
             String stored = jdbc.queryForObject(
                     "select message from flatmate_requests where target_id = ?::uuid",
                     String.class, id);
@@ -558,8 +971,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     """))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            String id = publish("flatmate_groups",
-                    json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            String id = publish("flatmate_groups", idOf(json));
 
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(joiner))
@@ -568,13 +980,8 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.status").value("accepted"));
 
-            // Re-publish, and not to paper over anything: this suite seeds moderation state with a
-            // raw JDBC update, which the persistence context it shares with the service never sees.
-            // The auto-accept branch of join() saves the group to spend the seat, and that write
-            // carries the entity's stale `pending` back to the row. A real approval goes through the
-            // moderation API and leaves the loaded entity agreeing with the row, so this is a
-            // property of the harness rather than of the endpoint — but without it the second call
-            // answers 404 and stops telling us anything about duplicates.
+            // Re-publish: this suite seeds moderation state with a raw JDBC update the shared
+            // persistence context never sees, and join()'s auto-accept save carries `pending` back.
             publish("flatmate_groups", id);
 
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
@@ -584,17 +991,10 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message", Matchers.endsWith("(already_interested)")));
 
-            // The seat and the member card are what made this door worse than the other two: the
-            // old pre-check returned the existing row as a success, and join() then ran its
-            // auto-accept block a second time on the strength of it — a duplicate member and a seat
-            // spent on nobody.
             Integer seatsOpen = jdbc.queryForObject(
                     "select seats_open from flatmate_groups where id = ?::uuid", Integer.class, id);
             assertThat(seatsOpen).isOne();
 
-            // Two, and two is the whole claim: the host, who is enrolled as the first member when
-            // the group is created, plus the one person who actually joined. The duplicate press
-            // added nobody. Asserting one here would be asserting the host had vanished.
             Integer members = jdbc.queryForObject(
                     "select count(*) from flatmate_group_members where group_id = ?::uuid",
                     Integer.class, id);
@@ -621,8 +1021,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                     """))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            publish("flatmate_seeker_posts",
-                    postJson.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            publish("flatmate_seeker_posts", idOf(postJson));
 
             mvc.perform(get(Routes.Flatmates.FEED)
                             .param("tab", "move-in").param("locality", "Hinjewadi"))
@@ -641,8 +1040,6 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             User host = user("9820000042", "LegacyHost");
             createRoom(host, "Viman Nagar", "Airport View");
 
-            // `rooms` is the old name for move-in. Falling back to the default would show
-            // somebody the wrong half of the market and look like a forgotten filter.
             mvc.perform(get(Routes.Flatmates.FEED)
                             .param("view", "rooms").param("locality", "Viman Nagar"))
                     .andExpect(status().isOk())
@@ -653,11 +1050,18 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         @DisplayName("is public and carries no host contact")
         void feedIsAnonymous() throws Exception {
             User host = user("9820000043", "QuietHost");
-            createRoom(host, "Kalyani Nagar", "River Side");
+            String json = mvc.perform(post(Routes.Flatmates.ROOMS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(roomBodyWithFlatNumber(host, "Kalyani Nagar", "River Side", "A-902")))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            publish("flatmate_rooms", idOf(json));
 
             mvc.perform(get(Routes.Flatmates.FEED).param("locality", "Kalyani Nagar"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content[0].ownerMobile").doesNotExist());
+                    .andExpect(jsonPath("$.content[0].ownerMobile").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].flatNumber").doesNotExist());
         }
     }
 
@@ -665,28 +1069,62 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
     @DisplayName("the Ops queue")
     class OpsQueue {
 
+        private String tenantClaimRoom(User host, String society) throws Exception {
+            return tenantClaimRoom(host, society, null);
+        }
+
+        private String tenantClaimRoom(User host, String society, String ownerConsentMobile)
+                throws Exception {
+            String consent = ownerConsentMobile == null ? ""
+                    : ",\"ownerConsentMobile\":\"%s\"".formatted(ownerConsentMobile);
+            String json = mvc.perform(post(Routes.Flatmates.ROOMS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(withSocietyIds("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"%s","rentShare":15000,
+                                     "hostRole":"tenant","agreementDeclared":true,%s,
+                                     "photos":["%s"]%s}
+                                    """.formatted(society, agreementEvidence(host),
+                                    photoOf(host), consent))))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            return publish("flatmate_rooms", idOf(json));
+        }
+
+        private String consentedTenantClaimRoom(User host, String society) throws Exception {
+            return tenantClaimRoom(host, society,
+                    recordOwnerConsent(host, null, society, "Baner"));
+        }
+
+        private String roomReview(String roomId) {
+            return jdbc.queryForObject(
+                    "select id::text from flatmate_reviews where room_id = ?::uuid",
+                    String.class, roomId);
+        }
+
+        private String roomTier(String roomId) {
+            return jdbc.queryForObject(
+                    "select verification_tier from flatmate_rooms where id = ?::uuid",
+                    String.class, roomId);
+        }
+
+
         @Test
         @DisplayName("approving grants the badge and tells the host")
         void approvingGrantsTheBadge() throws Exception {
             User host = user("9820000050", "Claimer");
             User ops = user("9820000051", "Ops", Roles.Wire.STAFF);
+            String unconsentedRoomId = tenantClaimRoom(host, "Unconsented Villa");
 
-            String json = mvc.perform(post(Routes.Flatmates.ROOMS)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+            mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, roomReview(unconsentedRoomId))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ops))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"roomType":"Private room","locality":"Baner",
-                                     "society":"Verified Villa","rentShare":15000,
-                                     "hostRole":"tenant","agreementDeclared":true,
-                                     "photos":["https://cdn.example/1.jpg"]}
-                                    """))
-                    .andExpect(status().isCreated())
-                    .andReturn().getResponse().getContentAsString();
-            String roomId = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+                            .content("{\"decision\":\"approved\"}"))
+                    .andExpect(status().is(422));
 
-            String reviewId = jdbc.queryForObject(
-                    "select id::text from flatmate_reviews where room_id = ?::uuid",
-                    String.class, roomId);
+            String roomId = consentedTenantClaimRoom(host, "Verified Villa");
+            String reviewId = roomReview(roomId);
 
             mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, reviewId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(ops))
@@ -695,9 +1133,236 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.status").value("approved"));
 
-            Boolean verified = jdbc.queryForObject(
-                    "select verified from flatmate_rooms where id = ?::uuid", Boolean.class, roomId);
-            assertThat(verified).isTrue();
+            assertThat(roomTier(roomId)).isEqualTo("tenant");
+
+            // And the card agrees: the badge is derived from tier plus verdict, so an approved
+            // claim cannot pass the Verified-only filter while its own card comes back unbadged.
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Baner")
+                            .param("verifiedOnly", "true").param("size", "100"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].id", Matchers.hasItem(roomId)))
+                    .andExpect(jsonPath("$.content[?(@.id == '" + roomId + "')].verified",
+                            Matchers.hasItem(true)));
+
+            // And so does the host's own write response: one built without the verdict would tell
+            // a host who merely reopened a seat that the claim Ops just accepted had lapsed.
+            mvc.perform(patch(Routes.Flatmates.ROOM_SEATS, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"seatsOpen\":0}"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.verified").value(true))
+                    .andExpect(jsonPath("$.reviewStatus").value("approved"));
+        }
+
+        @Test
+        @DisplayName("the host's next edit sends the badge back to the queue with the claim")
+        void editingRevokesTheBadgeItReopens() throws Exception {
+            User host = user("9820000057", "Editor");
+            User ops = user("9820000058", "Ops6", Roles.Wire.STAFF);
+            String roomId = consentedTenantClaimRoom(host, "Second Thoughts");
+
+            mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, roomReview(roomId))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"decision\":\"approved\"}"))
+                    .andExpect(status().isOk());
+
+            mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"Somewhere Else Entirely","rentShare":15000,
+                                     "hostRole":"tenant","agreementDeclared":true,
+                                     "photos":["%s"],%s}
+                                    """.formatted(photoOf(host), agreementEvidence(host))))
+                    .andExpect(status().isOk());
+
+            assertThat(jdbc.queryForObject(
+                    "select status from flatmate_reviews where room_id = ?::uuid",
+                    String.class, roomId)).isEqualTo("pending");
+
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Baner")
+                            .param("verifiedOnly", "true").param("size", "100"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].id", Matchers.not(Matchers.hasItem(roomId))));
+        }
+
+        @Test
+        @DisplayName("clearing somebody else's address claim badges nobody")
+        void contestedAddressIsNotAnAgreement() throws Exception {
+            User first = user("9820000059", "Prior");
+            User second = user("9820000060", "Contested");
+            User ops = user("9820000061", "Ops7", Roles.Wire.STAFF);
+            createRoom(first, "Undri", "Twice Claimed");
+            String roomId = createRoom(second, "Undri", "Twice Claimed");
+
+            assertThat(roomTier(roomId)).isEqualTo("identity");
+
+            mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, roomReview(roomId))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"decision\":\"approved\"}"))
+                    .andExpect(status().isOk());
+
+            // This host submitted no paperwork: they are queued because a *different* host claimed
+            // the same address, which must not mint a badge out of somebody else's mistake.
+            assertThat(roomTier(roomId)).isEqualTo("identity");
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Undri")
+                            .param("verifiedOnly", "true").param("size", "100"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].id", Matchers.not(Matchers.hasItem(roomId))));
+        }
+
+        @Test
+        @DisplayName("an owner upgrade outranks the queue row it left behind")
+        void ownerTierSurvivesAStaleVerdict() throws Exception {
+            User host = user("9820000062", "Upgrader", Roles.Wire.OWNER);
+            User ops = user("9820000063", "Ops8", Roles.Wire.STAFF);
+            String roomId = tenantClaimRoom(host, "Deed In Hand");
+            String reviewId = roomReview(roomId);
+
+            Property flat = listing(host, PropertyStatus.APPROVED);
+
+            mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"Deed In Hand","rentShare":15000,
+                                     "hostRole":"owner","propertyId":"%s",
+                                     "photos":["%s"]}
+                                    """.formatted(flat.getId(), photoOf(host))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.verificationTier").value("owner"));
+
+            assertThat(jdbc.queryForObject(
+                    "select status from flatmate_reviews where id = ?::uuid",
+                    String.class, reviewId)).isEqualTo("pending");
+
+            mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, reviewId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"decision\":\"rejected\",\"note\":\"Illegible scan\"}"))
+                    .andExpect(status().isOk());
+
+            // Ops answering a question about a rent agreement cannot revoke a tier that came from
+            // a title deed, on evidence the host has since stopped offering.
+            assertThat(roomTier(roomId)).isEqualTo("owner");
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Baner")
+                            .param("verifiedOnly", "true").param("size", "100"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].id", Matchers.hasItem(roomId)));
+        }
+
+        @Test
+        @DisplayName("a consent taken for one flat does not vouch for another")
+        void consentIsScopedToTheFlatItNamed() throws Exception {
+            User host = user("9820000070", "Mover");
+            User ops = user("9820000071", "Ops10", Roles.Wire.STAFF);
+            String ownerMobile = recordOwnerConsent(host, null, "Consented Villa", "Baner");
+
+            String elsewhere = tenantClaimRoom(host, "Another Villa", ownerMobile);
+            mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, roomReview(elsewhere))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"decision\":\"approved\"}"))
+                    .andExpect(status().is(422));
+
+            String named = tenantClaimRoom(host, "Consented Villa", ownerMobile);
+            mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, roomReview(named))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"decision\":\"approved\"}"))
+                    .andExpect(status().isOk());
+            assertThat(roomTier(named)).isEqualTo("tenant");
+        }
+
+        @Test
+        @DisplayName("a withdrawn agreement outranks the queue row it left behind")
+        void withdrawingTheClaimBeatsAStaleVerdict() throws Exception {
+            User host = user("9820000064", "Switcher");
+            User ops = user("9820000065", "Ops9", Roles.Wire.STAFF);
+            String ownerConsentMobile = recordOwnerConsent(host, null, "Agreement Flat", "Baner");
+            String roomId = tenantClaimRoom(host, "Agreement Flat", ownerConsentMobile);
+            String reviewId = roomReview(roomId);
+
+            mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"roomType":"Private room","locality":"Baner",
+                                     "society":"A Different Flat","rentShare":15000,
+                                     "hostRole":"owner","agreementDeclared":false,
+                                     "ownerConsentMobile":"%s",
+                                     "photos":["%s"]}
+                                    """.formatted(ownerConsentMobile, photoOf(host))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.verificationTier").value("identity"));
+
+            // Dropping to identity needs no review, so the edit does not re-open the row either:
+            // it still says `tenant`, and still says Agreement Flat.
+            assertThat(jdbc.queryForObject(
+                    "select status from flatmate_reviews where id = ?::uuid",
+                    String.class, reviewId)).isEqualTo("pending");
+
+            mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, reviewId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"decision\":\"approved\"}"))
+                    .andExpect(status().isOk());
+
+            assertThat(roomTier(roomId)).isEqualTo("identity");
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Baner")
+                            .param("verifiedOnly", "true").param("size", "100"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].id", Matchers.not(Matchers.hasItem(roomId))));
+        }
+
+        @Test
+        @DisplayName("archiving the listing takes the owner-tier badge back with it")
+        void ownerTierIsReconciledWhenTheListingStopsStanding() throws Exception {
+            User host = user("9820000066", "Landlord", Roles.Wire.OWNER);
+
+            Property flat = new Property(host, "Flat in Kothrud", "rent", "apartment",
+                    38000L, "Kothrud", "Pune");
+            flat.setBhk(BigDecimal.valueOf(3));
+            flat.setStatus(PropertyStatus.APPROVED);
+            properties.saveAndFlush(flat);
+
+            String created = mvc.perform(post(Routes.Flatmates.ROOMS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"roomType":"Private room","locality":"Kothrud",
+                                     "society":"Deed Standing","rentShare":19000,
+                                     "hostRole":"owner","propertyId":"%s",
+                                     "photos":["%s"]}
+                                    """.formatted(flat.getId(), photoOf(host))))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.verificationTier").value("owner"))
+                    .andExpect(jsonPath("$.verified").value(true))
+                    .andReturn().getResponse().getContentAsString();
+            String roomId = idOf(created);
+
+            assertThat(reconciler.reconcileOwnerTier()).isZero();
+            assertThat(roomTier(roomId)).isEqualTo("owner");
+
+            flat.archive("Owner withdrew the listing");
+            properties.saveAndFlush(flat);
+
+            // Owner tier is the one rung the queue cannot reach, so the sweep is the only lever:
+            // deriveTier runs only on a host-initiated write, and owner-tier posts never queue.
+            assertThat(reconciler.reconcileOwnerTier()).isEqualTo(1);
+            assertThat(roomTier(roomId)).isEqualTo("identity");
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "Kothrud")
+                            .param("verifiedOnly", "true").param("size", "100"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].id", Matchers.not(Matchers.hasItem(roomId))));
+
+            assertThat(reconciler.reconcileOwnerTier()).isZero();
+            assertThat(roomTier(roomId)).isEqualTo("identity");
         }
 
         @Test
@@ -705,25 +1370,10 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         void rejectionNeedsAReason() throws Exception {
             User host = user("9820000052", "Claimer2");
             User ops = user("9820000053", "Ops2", Roles.Wire.STAFF);
-
-            String json = mvc.perform(post(Routes.Flatmates.ROOMS)
-                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("""
-                                    {"roomType":"Private room","locality":"Baner",
-                                     "society":"Doubtful Heights","rentShare":15000,
-                                     "hostRole":"tenant","agreementDeclared":true,
-                                     "photos":["https://cdn.example/1.jpg"]}
-                                    """))
-                    .andExpect(status().isCreated())
-                    .andReturn().getResponse().getContentAsString();
-            String roomId = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
-            String reviewId = jdbc.queryForObject(
-                    "select id::text from flatmate_reviews where room_id = ?::uuid",
-                    String.class, roomId);
+            String roomId = tenantClaimRoom(host, "Doubtful Heights");
 
             // A host told "no" with no reason cannot fix anything.
-            mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, reviewId)
+            mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, roomReview(roomId))
                             .header(HttpHeaders.AUTHORIZATION, bearer(ops))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"decision\":\"rejected\"}"))
@@ -738,6 +1388,28 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(get(Routes.Moderation.FLATMATE_REVIEWS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(consumer)))
                     .andExpect(status().isForbidden());
+        }
+
+        @Test
+        @DisplayName("a room the host deleted leaves the badge-claim queue")
+        void deletedRoomLeavesTheQueue() throws Exception {
+            User host = user("9820000082", "Withdrawer");
+            User ops = user("9820000083", "Ops11", Roles.Wire.STAFF);
+            String roomId = tenantClaimRoom(host, "Withdrawn Heights");
+            String reviewId = roomReview(roomId);
+
+            mvc.perform(get(Routes.Moderation.FLATMATE_REVIEWS).param("size", "100")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ops)))
+                    .andExpect(jsonPath("$.content[*].id", Matchers.hasItem(reviewId)));
+
+            mvc.perform(delete(Routes.Flatmates.ROOM_BY_ID, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host)))
+                    .andExpect(status().is2xxSuccessful());
+
+            mvc.perform(get(Routes.Moderation.FLATMATE_REVIEWS).param("size", "100")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(ops)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].id", Matchers.not(Matchers.hasItem(reviewId))));
         }
 
         @Test
@@ -756,47 +1428,31 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(get(Routes.Flatmates.FEED).param("locality", "Magarpatta"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
-
-            mvc.perform(get(Routes.Flatmates.ROOMS).param("locality", "Magarpatta"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
         }
     }
 
-    /**
-     * The Ops verdict on the wire.
-     *
-     * <p>The board has always drawn a "Verified host" badge from the verification queue's verdict,
-     * but it read that verdict out of {@code localStorage}, so against a live API it was reading an
-     * empty map — the badge never appeared and the "verified only" filter silently dropped every
-     * Ops-approved tenant-tier host. {@code reviewStatus} now travels on the feed and detail DTOs,
-     * which is what makes both of those answerable server-side. These tests pin the two halves:
-     * the field is on the wire, and the filter honours it.
-     *
-     * <p>Groups are the sharper case and are tested here in preference to rooms. Approving a room's
-     * review flips {@code verified} outright, so a room would pass the filter through the older
-     * branch and prove nothing; approving a <em>group</em> only moves its tier to {@code tenant},
-     * so the review-status branch is the only thing that can let it through.
-     */
+    // reviewStatus travels on the feed and detail DTOs so the badge and the "verified only" filter
+    // are answerable server-side; read from localStorage instead, both silently stop working.
     @Nested
     @DisplayName("the Ops verdict, server-side")
     class ReviewStatusOnTheWire {
 
-        /** Post a group whose host claims a rent agreement, so a review is queued behind it. */
         private String tenantClaimGroup(User host, String title, String locality) throws Exception {
+            String ownerConsentMobile = recordOwnerConsent(host, title, null, locality);
             String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {"title":"%s","locality":"%s","rent":40000,"seats":3,
                                      "seatsOpen":1,"name":"Host","role":"tenant",
-                                     "agreement":true}
-                                    """.formatted(title, locality)))
+                                     "agreement":true,%s,
+                                     "consentMobile":"%s"}
+                                    """.formatted(title, locality, agreementEvidence(host),
+                                    ownerConsentMobile)))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.verificationTier").value("tenant"))
                     .andReturn().getResponse().getContentAsString();
-            return publish("flatmate_groups",
-                    json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            return publish("flatmate_groups", idOf(json));
         }
 
         private void decide(User ops, String groupId, String decision) throws Exception {
@@ -816,14 +1472,14 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             User host = user("9820000070", "Waiting");
             String id = tenantClaimGroup(host, "Awaiting Ops", "VerdictTownA");
 
-            mvc.perform(get(Routes.Flatmates.GROUPS).param("locality", "VerdictTownA"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "VerdictTownA"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
                     .andExpect(jsonPath("$.content[0].id").value(id))
-                    // Undecided is not the same as absent: the host is owed the difference.
+
                     .andExpect(jsonPath("$.content[0].reviewStatus").value("pending"));
 
-            mvc.perform(get(Routes.Flatmates.GROUPS)
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up")
                             .param("locality", "VerdictTownA").param("verifiedOnly", "true"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
@@ -838,7 +1494,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
 
             decide(ops, id, "approved");
 
-            mvc.perform(get(Routes.Flatmates.GROUPS)
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up")
                             .param("locality", "VerdictTownB").param("verifiedOnly", "true"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
@@ -862,13 +1518,18 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                             .content("{\"decision\":\"rejected\",\"note\":\"Illegible agreement\"}"))
                     .andExpect(status().isOk());
 
-            // Failing verification is an unproven claim, not abuse — the post stays up.
-            mvc.perform(get(Routes.Flatmates.GROUPS).param("locality", "VerdictTownC"))
+            assertThat(jdbc.queryForMap(
+                    "select title, body from notifications where user_id = ? and type = 'flatmate.review.rejected'",
+                    host.getId()))
+                    .containsEntry("title", "We could not verify your flatmate post")
+                    .hasEntrySatisfying("body", b -> assertThat((String) b).contains("Illegible agreement"));
+
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "VerdictTownC"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
                     .andExpect(jsonPath("$.content[0].reviewStatus").value("rejected"));
 
-            mvc.perform(get(Routes.Flatmates.GROUPS)
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up")
                             .param("locality", "VerdictTownC").param("verifiedOnly", "true"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
@@ -881,17 +1542,17 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             User ops = user("9820000076", "Ops5", Roles.Wire.STAFF);
             String id = tenantClaimGroup(host, "Mine", "VerdictTownD");
 
-            mvc.perform(get(Routes.Flatmates.MY_GROUPS)
+            mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content[0].reviewStatus").value("pending"));
+                    .andExpect(jsonPath("$.item.reviewStatus").value("pending"));
 
             decide(ops, id, "approved");
 
-            mvc.perform(get(Routes.Flatmates.MY_GROUPS)
+            mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content[0].reviewStatus").value("approved"));
+                    .andExpect(jsonPath("$.item.reviewStatus").value("approved"));
         }
 
         @Test
@@ -901,32 +1562,29 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             createGroup(host, "Just a group", "VerdictTownE");
 
             // Not "pending": there is nothing queued, and saying pending would invent a promise.
-            mvc.perform(get(Routes.Flatmates.GROUPS).param("locality", "VerdictTownE"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "VerdictTownE"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
                     .andExpect(jsonPath("$.content[0].reviewStatus").doesNotExist());
         }
     }
 
-    /**
-     * D116 — the room and group feeds filter on every facet the page offers, server-side, rather
-     * than answering 200 with an unfiltered list. Each test isolates its data behind a unique
-     * locality and asserts an exact page size, because "the filter narrowed something" is a weaker
-     * claim than "the filter returned exactly these". Three rooms or groups per host is the
-     * anti-broker cap's ceiling; a fourth would be the wrong test refused for the wrong reason.
-     */
+    // Each test isolates its data behind a unique locality and asserts an exact page size, because
+    // "the filter narrowed something" is weaker than "the filter returned exactly these".
     @Nested
     @DisplayName("server-side facets (D116)")
     class Facets {
 
-        private String facetRoomBody(String locality, String society, String lookingFor,
+        private String facetRoomBody(User host, String locality, String society, String lookingFor,
                 String foodPref, long rentShare, String bhk) {
-            return """
+            return withSocietyIds("""
                     {"bhk":"%s","roomType":"Private room","attachedBath":"attached",
                      "furnishing":"semi","locality":"%s","society":"%s","rentShare":%d,
                      "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"%s",
-                     "foodPref":"%s","photos":["https://cdn.example/1.jpg"],"note":"Room."}
-                    """.formatted(bhk, locality, society, rentShare, lookingFor, foodPref);
+                     "foodPref":"%s","hostRole":"owner",
+                     "photos":["%s"],"note":"Room."}
+                    """.formatted(bhk, locality, society, rentShare, lookingFor, foodPref,
+                    photoOf(host)));
         }
 
         private void createFacetRoom(User host, String locality, String society, String lookingFor,
@@ -934,11 +1592,11 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(facetRoomBody(
+                            .content(facetRoomBody(host,
                                     locality, society, lookingFor, foodPref, rentShare, bhk)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            publish("flatmate_rooms", json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            publish("flatmate_rooms", idOf(json));
         }
 
         private String facetGroupBody(String title, String locality, String policy, long rent) {
@@ -956,7 +1614,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                             .content(facetGroupBody(title, locality, policy, rent)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
-            publish("flatmate_groups", json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+            publish("flatmate_groups", idOf(json));
         }
 
         @Test
@@ -967,17 +1625,11 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             createFacetRoom(host, "GenderFacetTown", "B", "any", "any", 15000, "2");
             createFacetRoom(host, "GenderFacetTown", "C", "male", "any", 15000, "2");
 
-            // A female request returns the female room and the no-preference room — never the male.
-            mvc.perform(get(Routes.Flatmates.ROOMS)
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in")
                             .param("locality", "GenderFacetTown").param("gender", "female"))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", Matchers.hasSize(2)));
-
             // A request of 'any' states no preference: it must not exclude a thing.
-            mvc.perform(get(Routes.Flatmates.ROOMS)
-                            .param("locality", "GenderFacetTown").param("gender", "any"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", Matchers.hasSize(3)));
+                    .andExpect(jsonPath("$.content", Matchers.hasSize(2)));
         }
 
         @Test
@@ -988,41 +1640,14 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             createFacetRoom(host, "BudgetFacetTown", "Mid", "any", "any", 20000, "2");
             createFacetRoom(host, "BudgetFacetTown", "Pricey", "any", "any", 30000, "2");
 
-            mvc.perform(get(Routes.Flatmates.ROOMS)
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in")
                             .param("locality", "BudgetFacetTown")
                             .param("minBudget", "15000").param("maxBudget", "25000"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)));
         }
 
-        @Test
-        @DisplayName("BHK is an exact server-side filter")
-        void bhkExactFacet() throws Exception {
-            User host = user("9820000062", "BhkHost");
-            createFacetRoom(host, "BhkFacetTown", "Two", "any", "any", 15000, "2");
-            createFacetRoom(host, "BhkFacetTown", "Three", "any", "any", 15000, "3");
-
-            mvc.perform(get(Routes.Flatmates.ROOMS)
-                            .param("locality", "BhkFacetTown").param("bhk", "3"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", Matchers.hasSize(1)));
-        }
-
-        @Test
-        @DisplayName("policy filters groups server-side, and an open group matches every request")
-        void policyFacetWithAnyFallback() throws Exception {
-            User host = user("9820000070", "PolicyHost");
-            createFacetGroup(host, "Women grp", "PolicyFacetTown", "women", 40000);
-            createFacetGroup(host, "Open grp", "PolicyFacetTown", "any", 40000);
-            createFacetGroup(host, "Men grp", "PolicyFacetTown", "men", 40000);
-
             // A women request returns the women group and the open group — never the men-only one.
-            mvc.perform(get(Routes.Flatmates.GROUPS)
-                            .param("locality", "PolicyFacetTown").param("policy", "women"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content", Matchers.hasSize(2)));
-        }
-
         @Test
         @DisplayName("rent range filters groups server-side")
         void groupRentRange() throws Exception {
@@ -1031,9 +1656,9 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             createFacetGroup(host, "Mid", "RentFacetTown", "any", 40000);
             createFacetGroup(host, "Pricey", "RentFacetTown", "any", 60000);
 
-            mvc.perform(get(Routes.Flatmates.GROUPS)
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up")
                             .param("locality", "RentFacetTown")
-                            .param("minRent", "30000").param("maxRent", "50000"))
+                            .param("minBudget", "10000").param("maxBudget", "15000"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)));
         }

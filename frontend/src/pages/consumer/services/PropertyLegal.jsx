@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import ServiceLanding from '../../../components/ServiceLanding.jsx';
+import { SUPPORT_PHONE } from '../../../lib/supportContact.js';
 import LegalCostCalc from './LegalCostCalc.jsx';
 import Icon from '../../../components/Icon.jsx';
 
@@ -45,13 +46,13 @@ export default function PropertyLegal() {
 
   return (
     <ServiceLanding
-      team="legal"
+      desk="legal"
       flowType="legal"
       draftKey="dzDraft:property-legal"
       trackerTitle={t('services.legal.trackerTitle')}
-      heroGradient="linear-gradient(140deg,#0a1022 0%,#111a33 50%,#1a2445 100%)"
+      heroGradient="linear-gradient(140deg,rgb(var(--dz-c-slate-950)) 0%,rgb(var(--dz-c-slate-900)) 50%,rgb(var(--dz-c-indigo-950)) 100%)"
       heroImage="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=1600&q=80"
-      heroOverlay="linear-gradient(140deg,rgba(10,16,34,.93) 0%,rgba(17,26,51,.88) 50%,rgba(26,36,69,.9) 100%)"
+      heroOverlay="linear-gradient(140deg,rgb(var(--dz-c-slate-950) / .93) 0%,rgb(var(--dz-c-slate-900) / .88) 50%,rgb(var(--dz-c-indigo-950) / .9) 100%)"
 
       badge={t('services.legal.badge')}
       badgeIcon="scale"
@@ -72,7 +73,7 @@ export default function PropertyLegal() {
           { name: 'note', label: t('services.legal.fNote'), type: 'textarea', full: true, placeholder: t('services.legal.fNotePlaceholder') },
         ],
       }}
-      stats={[['8K+', t('services.legal.stat.deedsRegistered')], ['30-yr', t('services.legal.stat.titleSearch')], ['100%', t('services.legal.stat.verifiedAdvocates')], [t('services.legal.stat.fixedValue'), t('services.legal.stat.transparentFees')]]}
+      stats={[['7%', t('services.legal.stat.stampDuty')], ['30-yr', t('services.legal.stat.titleSearch')], ['24 hrs', t('services.legal.stat.callback')], [t('services.legal.stat.fixedValue'), t('services.legal.stat.fees')]]}
       services={[
         [t('services.legal.service.0.name'), 'file-signature', t('services.legal.service.0.desc')],
         [t('services.legal.service.1.name'), 'search-check', t('services.legal.service.1.desc')],
@@ -95,7 +96,7 @@ export default function PropertyLegal() {
         [t('services.legal.faq.3.q'), t('services.legal.faq.3.a')],
         [t('services.legal.faq.4.q'), t('services.legal.faq.4.a')],
       ]}
-      cta={{ title: t('services.legal.ctaTitle'), sub: t('services.legal.ctaSub'), primary: t('services.legal.ctaPrimary'), icon: 'scale', phone: '1800 200 0000' }}
+      cta={{ title: t('services.legal.ctaTitle'), sub: t('services.legal.ctaSub'), primary: t('services.legal.ctaPrimary'), icon: 'scale', phone: SUPPORT_PHONE }}
     />
   );
 }

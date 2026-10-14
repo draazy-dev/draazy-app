@@ -4,28 +4,25 @@ slug: tenant-profiles
 category: owner-tools
 audience: owner
 order: 2
-updated: 2026-07-26
-summary: What is in a tenant profile, how much of it is verified, and where the line is on tenant preferences.
+updated: 2026-10-10
+summary: What is in a tenant profile, what is verified, and where the line is on tenant preferences.
 tags: [tenant, screening, profile, owner]
 ---
 
-Every enquiry carries the tenant's profile. It is the closest thing to screening you get before a call.
+Tenants build a profile of their own — name, occupation, monthly income, who will live there, move-in date, a previous landlord reference and a short intro — and Draazy scores it from what they have filled in. It is the closest thing to screening a tenant can offer you, but you do not get all of it.
 
-## What the profile contains
+## What you see
 
-| Field | Verified by us? |
+| What | Verified by us? |
 | --- | --- |
 | Name | No — self-declared |
-| Mobile number | **Yes** — OTP |
-| Government ID | Yes, if the tenant completed KYC |
-| Occupation & employer | No |
-| Household composition | No |
-| Move-in date | No |
-| Pets | No |
-| Previous tenancy | No |
+| Mobile number | **Yes** — OTP at sign-up (shown on a number request once you accept it) |
+| **Serious Buyer** / **Verified tenant** tick | **Yes** — the tenant completed ID verification, checked by our team |
+
+The tick appears on number requests, and beside the tenant's name on offers and close-the-deal requests. A tenant's occupation, income, household and previous landlord answers are **not** shown in your Requests inbox, and none of them is verified — ask for them yourself.
 
 > [!NOTE]
-> A verified number and completed KYC tell you the person is real and traceable. Everything else is self-declared — verify it yourself before signing.
+> The tick tells you the person is real and traceable. It does not tell you their job, income or household are as described — verify those before signing.
 
 ## Sensible verification before signing
 
@@ -47,7 +44,7 @@ The distinction is whether the condition relates to how the property is used or 
 
 ## Police verification
 
-Tenant police verification is mandatory in Maharashtra. Submit Form for Tenant Verification at the local police station or online through the Maharashtra Police portal, within 15 days of the tenancy starting. It is the owner's obligation, not the tenant's.
+Tenant police verification is mandatory in Maharashtra. Submit Form for Tenant Verification at the local police station or online through the Maharashtra Police portal, within 15 days of the tenancy starting. It is the owner's obligation, not the tenant's. If you use the [rent agreement service](/help/a/rent-agreement-service), the tenant step collects the details the form needs, and after registration the tracker links to the Pune City and Pimpri-Chinchwad police portals. Draazy does not file it for you.
 
 ## Related
 

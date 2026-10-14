@@ -1,11 +1,11 @@
 /* Contextual auth intent + shared post-auth destination: why a gate sent the user here, so the
    copy matches the action. Resolves to i18n keys, never copy — docs/flows/consumer/auth.md. */
 
-/** Reason keys, in the order inferReason tries them. Copy lives in auth.json. */
+/** Reason keys. `inferReason` below tries a subset, in its own order. Copy lives in auth.json. */
 export const AUTH_REASONS = [
   'save', 'contact', 'alerts', 'schedule', 'checkout', 'services', 'invite',
-  'saved', 'notifications', 'messages', 'community', 'listproperty', 'dashboard',
-  'default',
+  'saved', 'notifications', 'messages', 'community', 'society', 'listproperty', 'dashboard',
+  'review', 'offer', 'docs', 'photos', 'verify', 'default',
 ];
 
 // Map a `next` path to a reason key. Order matters (most specific first).
@@ -19,7 +19,7 @@ function inferReason(next) {
   if (p.startsWith('/saved')) return 'saved';
   if (p.startsWith('/notifications')) return 'notifications';
   if (p.startsWith('/messages')) return 'messages';
-  if (p.startsWith('/society')) return 'community';
+  if (p.startsWith('/society')) return 'society';
   if (p.startsWith('/list-property')) return 'listproperty';
   if (p.startsWith('/dashboard')) return 'dashboard';
   return null;
@@ -38,11 +38,12 @@ export function resolveAuthIntent(params) {
   };
 }
 
-/**
- * The one place deciding whether a `?next=` is in this app and is worth landing on; `null` for
- * "not ours". The four rejections and why origin needs three: docs/flows/consumer/auth.md
- */
-const AUTH_SCREENS = ['/signin', '/signup', '/staff-login'];
+/** Decides whether a `?next=` is in-app and worth landing on,
+ * else null. Rejection rationale: docs/flows/consumer/auth.md */
+const AUTH_SCREENS = ['/signin', '/signup', '/staff-login', '/staff-invite'];
+// A host this app can never legitimately be served from, so any payload the URL parser resolves
+// away from it has named an origin of its own and is not ours.
+const SENTINEL_ORIGIN = 'https://draazy.invalid';
 const isSingleSafePath = (path) =>
   path.startsWith('/')
   && !path.startsWith('//')
@@ -60,13 +61,19 @@ export function safeInAppPath(raw) {
       if (decoded === path) break;
       path = decoded;
     }
-    path = new URL(path, 'https://draazy.invalid').pathname;
+    /* Check the parser's verdict on the ORIGIN: `/%09/evil.example`
+       parses to pathname '/' and passes path checks. / */
+    const parsed = new URL(path, SENTINEL_ORIGIN);
+    if (parsed.origin !== SENTINEL_ORIGIN) return null;
+    path = parsed.pathname;
   } catch {
     return null;
   }
   if (!isSingleSafePath(path)) return null;
   path = path.replace(/\/+$/, '').toLowerCase() || '/';
   if (AUTH_SCREENS.includes(path)) return null;
+  /* Return the RAW value: normalizing drops the query and lowercases the path. Safe since the checks above
+     resolved it rather than pattern-matching. */
   return next;
 }
 
@@ -74,4 +81,13 @@ export function safeInAppPath(raw) {
 // users in two different places. `fallback` is validated too — docs/flows/consumer/auth.md.
 export function postAuthDest(params, fallback = '/dashboard') {
   return safeInAppPath(params.get('next')) || safeInAppPath(fallback) || '/dashboard';
+}
+
+/** The reason a gate will actually be answered with, which is not always the one it asked for. */
+export const gateReason = (reason) => (AUTH_REASONS.includes(reason) ? reason : 'default');
+
+/** `next` defaults to the originating page and is always validated, so it can't become an off-site redirect. */
+export function signInPath(reason, next) {
+  const dest = safeInAppPath(next ?? window.location.pathname + window.location.search);
+  return `/signin?reason=${gateReason(reason)}${dest ? `&next=${encodeURIComponent(dest)}` : ''}`;
 }

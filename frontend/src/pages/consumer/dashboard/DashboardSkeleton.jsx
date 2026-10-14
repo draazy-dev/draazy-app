@@ -1,28 +1,10 @@
-/* Loading placeholder for the /dashboard route chunk.
- *
- * The route is code-split, so between the click and the chunk arriving something
- * has to hold the page open. The app-wide fallback is a centred spinner inside a
- * `min-h-[60vh]` box — a height the dashboard never has. When the chunk lands,
- * the greeting, the section switcher and the panel all appear at once and shove
- * the page down: a late reflow, which is the failure mode that destabilised the
- * document assertions previously (a click resolves against coordinates the
- * spinner occupied, not the control that has just moved into them).
- *
- * The blocks are read off the real components rather than guessed:
- *   - greeting     Dashboard.jsx      — `text-2xl sm:text-3xl` heading + a `text-sm` line
- *   - section row  MobileNav.jsx      — `lg:hidden mb-5`, trigger is `min-h-[52px] rounded-2xl glass-card`
- *   - sidebar      DashboardSidebar   — `hidden lg:block`, `glass-card rounded-2xl p-4`, 260px column
- *   - wrapper      Dashboard.jsx      — `pt-6 lg:pt-8 pb-20 min-h-[100dvh]`, `max-w-7xl`
- *
- * `.skeleton` carries the shimmer and both reduced-motion opt-outs (the OS media
- * query and the in-app Settings toggle), so nothing extra is needed here.
- */
+/* The route is code-split, and the app-wide `min-h-[60vh]` spinner is a height the dashboard never has — the chunk
+   landing shoves the page down mid-click. */
 export default function DashboardSkeleton() {
   return (
     <div
+      /* One live region for the whole route. */
       className="pt-6 lg:pt-8 pb-20 min-h-[100dvh]"
-      /* One live region for the whole route. Announced once on arrival; putting
-         role=status on each block instead would read out a dozen empty nodes. */
       role="status"
       aria-live="polite"
       aria-label="Loading dashboard"
@@ -34,9 +16,8 @@ export default function DashboardSkeleton() {
           <div className="h-8 sm:h-9 w-56 skeleton rounded" />
           <div className="h-4 w-64 skeleton rounded mt-2" />
         </div>
+        {/* Mobile section switcher. */}
 
-        {/* Mobile section switcher. Desktop shows the sidebar instead, so this
-            block must disappear at the same breakpoint the real one does. */}
         <div className="lg:hidden mb-5">
           <div className="h-[52px] w-full skeleton rounded-2xl" />
         </div>
@@ -57,13 +38,8 @@ export default function DashboardSkeleton() {
               </div>
             </div>
           </aside>
+          {/* Which panel is unknown until the chunk resolves, so this is the shared floor every tab starts with. */}
 
-          {/* Panel. Which panel is unknown until the chunk resolves, so this is
-              the shared floor every tab starts with: a heading and stacked cards,
-              at roughly the height the shortest of them occupies. Erring short is
-              deliberate — content growing downwards past the fold moves nothing
-              the reader is looking at, whereas an over-tall placeholder collapsing
-              pulls the whole page up. */}
           <section className="space-y-4">
             <div className="h-6 w-40 skeleton rounded" />
             <div className="h-40 skeleton rounded-2xl" />
@@ -71,6 +47,19 @@ export default function DashboardSkeleton() {
           </section>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function DashboardOverviewSkeleton() {
+  return (
+    <div className="space-y-5 sm:space-y-6" role="status" aria-label="Loading dashboard overview" data-testid="dashboard-overview-skeleton">
+      <div className="h-24 skeleton rounded-2xl" />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        {[0, 1, 2, 3].map((i) => <div key={i} className="min-h-[88px] skeleton rounded-2xl" />)}
+      </div>
+      <div className="h-28 skeleton rounded-2xl" />
+      <div className="h-40 skeleton rounded-2xl" />
     </div>
   );
 }

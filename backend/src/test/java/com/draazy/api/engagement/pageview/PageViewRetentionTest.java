@@ -9,21 +9,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/**
- * The ninety-day promise on raw page views, exercised at a cutoff the test chooses.
- *
- * <p>Retention is a claim made to data subjects, not a housekeeping detail: {@code page_views}
- * carries a session id and sometimes a user id, and the reason keeping it is defensible at all is
- * that it does not accumulate indefinitely. A sweep that silently deletes nothing is the failure
- * mode with no symptom — the console keeps working, because it reads the aggregates.
- *
- * <p>Rolls back with {@code AbstractApiTest}'s transaction, so {@code draazy_test} stays empty.
- *
- * <p>Erasure is <em>not</em> tested here. Nulling {@code user_id} is proved end to end by
- * {@code ErasureCoverageTest}, which reads the rows back instead of trusting the reported count —
- * a distinction that matters, because a sweep neutered to {@code set user_id = user_id} still
- * reports the same number of rows updated.
- */
+// page_views holds session and sometimes user ids, so the 30-day window is a promise to data subjects, and a sweep
+// deleting nothing has no symptom. Erasure is proved by ErasureCoverageTest, which reads rows back, not counts.
 @DisplayName("Page view retention")
 class PageViewRetentionTest extends AbstractApiTest {
 
@@ -35,9 +22,7 @@ class PageViewRetentionTest extends AbstractApiTest {
         Instant now = Instant.now();
         Instant cutoff = now.minus(PageViewRetention.RETENTION);
 
-        // Asserted against the real constant rather than a literal 90 retyped here: a test that
-        // hard-codes the window goes on passing after somebody changes the policy, which makes it
-        // worse than no test at all.
+        // Uses the real constant, not a retyped literal, so the test cannot outlive a policy change.
         view("sess-old", cutoff.minus(Duration.ofDays(1)));
         view("sess-edge", cutoff.plusSeconds(60));
         view("sess-new", now.minus(Duration.ofDays(1)));

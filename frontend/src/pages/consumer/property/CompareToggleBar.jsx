@@ -4,28 +4,30 @@ import Icon from '../../../components/Icon.jsx';
 import { useCompare } from '../../../context/CompareContext.jsx';
 import { useSaved } from '../../../context/SavedContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
+import { useAuth } from '../../../context/AuthContext.jsx';
+import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { shareOrCopy } from '../../../lib/share.js';
+import { usePrefetchReferralCode } from '../../../lib/usePrefetchReferralCode.js';
 
-/**
- * `saved`/`setSaved` used to be threaded in from the property page. They are gone: the shortlist is
- * one shared set now, so lifting this component's copy of it through props would just be a second
- * source of the same truth, free to disagree with the heart on the card behind it.
- */
+// The shortlist is one shared set, so threading `saved`/`setSaved` in from the property page would
+// be a second source of the same truth, free to disagree with the heart on the card behind it.
 export function CompareToggleBar({ p }) {
+  usePrefetchReferralCode();
   const { t } = useTranslation();
   const { has, toggle, count } = useCompare();
   const savedList = useSaved();
+  const { isIn } = useAuth();
+  const sendToSignIn = useSignInGate();
   const saved = savedList.has(p.id);
   const { toast } = useToast();
   const inCompare = has(p.id);
-  const handleSave = () => savedList.toggle(p.id, p.uuid);
+  const handleSave = () => {
+    if (!isIn) { sendToSignIn('save'); return; }
+    savedList.toggle(p.id, p.uuid);
+  };
 
-  // Share the listing, falling back to a clipboard copy where the OS share sheet
-  // doesn't exist (desktop, and any browser without navigator.share). The cancel
-  // path — dismissing the sheet rejects with AbortError — used to fall into the
-  // clipboard catch and raise "Couldn't copy link" for something that worked
-  // exactly as intended. That logic now lives in lib/share.js so every surface
-  // treats a cancel the same way.
+  // Cancelling the OS share sheet rejects with AbortError and must not raise "Couldn't copy link"
+  // for something that worked as intended — that logic lives in lib/share.js for every surface.
   const share = async () => {
     const status = await shareOrCopy({ title: p.title || 'Draazy listing' });
     if (status === 'copied') toast(t('property.shareCopied'), 'success');

@@ -11,135 +11,154 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
-import com.draazy.api.security.BackOfficePermissions;
+import com.draazy.api.security.BackOfficeFunctions;
 import com.draazy.api.security.Roles;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * Read and replace one back-office account's permission document (tech debt D192/D13).
- *
- * <p>This is the half {@code V61} said did not exist: "no team-member management endpoint of any
- * kind — the Team &amp; Access console writes to browser storage". A document nothing can write is
- * as useless as one nothing reads, and a document the <em>browser</em> writes is the allow-list the
- * client opts out of, so both halves ship together or neither does.
- *
- * <h2>The four refusals, and why each is a refusal rather than a shrug</h2>
- *
- * <ol>
- *   <li><strong>A name the catalogue does not contain.</strong> 422. {@link AccountPermissions}
- *       would drop it harmlessly, so storing it would be safe — and that is exactly the problem it
- *       would cause. {@code settings.customRoles} was safe for its whole life too, right up until
- *       somebody wired it and it began granting what had accumulated in it while an operator was
- *       told it did something. An administrator who ticks {@code properties:verify} because their
- *       console still offers it must be told the server does not enforce it, not quietly obeyed.</li>
- *   <li><strong>A name this account's role can never hold.</strong> 422. The intersection would drop
- *       it, so this is the same argument one rung down: a stored {@code settings:write} on a staff
- *       account is a line in an access-control document that reads like a grant and is not one.</li>
- *   <li><strong>A target who is not staff or admin.</strong> 422. A buyer has no back-office
- *       baseline to narrow, so a document for one could only ever be read as an attempt to grant.
- *       Refusing here means the table never holds a row whose only possible reading is the wrong
- *       one.</li>
- *   <li><strong>The caller editing their own document.</strong> 403, and this one is operational
- *       rather than philosophical. Writing this document requires {@code users:write}; an
- *       administrator who removes {@code users:write} from themselves has removed the ability to put
- *       it back, and the repair is a database edit during whatever incident prompted the change.
- *       Two administrators can still scope each other, which is the maker-checker shape this
- *       surface should have had anyway.</li>
- * </ol>
- *
- * <p><strong>Every write is audited</strong>, with the resulting document in the context. The audit
- * row is the only record of what an account's access used to be — the table itself keeps just the
- * current document, deliberately, since a history table for a control this small would be more
- * machinery than the question deserves and {@code audit_log} already answers "who changed what".
- */
+/** Replaces one account's permission document; each write is audited since the table keeps only the current one.
+ * Self-edit is refused: dropping {@code users:write} would lock the caller out. */
 @Service
 public class BackOfficeAccessService {
+
+    private static final String DESK_PREFIX = BackOfficeFunctions.desk("");
 
     private final UserRepository users;
     private final BackOfficeGrantRepository grants;
     private final AccountPermissions accountPermissions;
     private final ObjectMapper objectMapper;
     private final AuditService audit;
-    private final AdministratorGuard administrators;
+    private final AdminActionNotifier adminNotifications;
 
     public BackOfficeAccessService(UserRepository users, BackOfficeGrantRepository grants,
             AccountPermissions accountPermissions, ObjectMapper objectMapper, AuditService audit,
-            AdministratorGuard administrators) {
+            AdminActionNotifier adminNotifications) {
         this.users = users;
         this.grants = grants;
         this.accountPermissions = accountPermissions;
         this.objectMapper = objectMapper;
         this.audit = audit;
-        this.administrators = administrators;
+        this.adminNotifications = adminNotifications;
     }
 
-    /** Everything the server enforces, in render order. Static data; no account is involved. */
-    public List<BackOfficePermissions.Permission> catalogue() {
-        return BackOfficePermissions.CATALOGUE;
+
+    public List<BackOfficeFunctions.Function> functionCatalogue() {
+        return BackOfficeFunctions.CATALOGUE;
     }
 
     /** {@code GET /users/{id}/permissions}. */
     @Transactional(readOnly = true)
-    public BackOfficeAccessResponse read(String id) {
+    public BackOfficeAccessResponse read(AuthPrincipal actor, String id) {
         User target = load(id);
+        if (!actor.userId().equals(target.getId())) {
+            refuseManagerOnNonStaff(actor, target);
+        }
         Optional<BackOfficeGrant> stored = grants.findById(target.getId());
+        List<String> storedFunctions = stored.map(grant -> parseStored(grant.getPermissions())).orElse(List.of());
+        List<String> functions = functionsOf(target, stored.orElse(null));
         return new BackOfficeAccessResponse(
                 target.getId().toString(),
                 target.getRole(),
                 stored.isPresent(),
-                stored.map(grant -> parseStored(grant.getPermissions())).orElse(List.of()),
-                List.copyOf(accountPermissions.effectiveFor(target.getRole(), target.getId())));
+                functions,
+                storedFunctions,
+                List.copyOf(accountPermissions.effectiveFor(target.getRole(), target.getId())),
+                List.copyOf(accountPermissions.desksFor(target.getRole(), target.getId())));
     }
 
-    /**
-     * {@code PUT /users/{id}/permissions} — replace the document wholesale.
-     *
-     * <p>Wholesale rather than incremental because the caller is describing the access this account
-     * should have. A merge could not express "take this away", which is the operation the feature
-     * exists for.
-     *
-     * @param requested the atoms to store; an empty list is legal and means "no guarded back-office
-     *                  route", which is a different statement from having no document at all
-     */
+    /** Filled on the same terms as {@link #read}: an administrator reads any non-administrator,
+     * a manager only staff and itself. */
+    @Transactional(readOnly = true)
+    public List<TeamMemberResponse> roster(AuthPrincipal actor) {
+        List<User> accounts = users.findBackOfficeAccounts();
+        Map<UUID, BackOfficeGrant> stored = grants.findAllById(accounts.stream()
+                        .filter(account -> !Roles.Wire.ADMIN.equals(account.getRole()))
+                        .map(User::getId).toList())
+                .stream().collect(Collectors.toMap(BackOfficeGrant::getUserId, Function.identity()));
+        return accounts.stream().map(account -> new TeamMemberResponse(
+                account.getId().toString(), account.getName(), account.getMobile(),
+                account.getEmail(), account.getRole(), account.getStatus(), account.isArchived(),
+                account.getCreatedAt(),
+                readable(actor, account) ? functionsOf(account, stored.get(account.getId())) : List.of()))
+                .toList();
+    }
+
+    /** The picker's view of {@link #roster}: active accounts only, and nothing but a name and the desks they work. */
+    @Transactional(readOnly = true)
+    public List<TeamAssignee> assignees(AuthPrincipal actor) {
+        return roster(actor).stream()
+                .filter(member -> "active".equals(member.status()))
+                .map(member -> new TeamAssignee(member.id(), member.name(), member.functions().stream()
+                        .filter(f -> f.startsWith(DESK_PREFIX))
+                        .map(f -> f.substring(DESK_PREFIX.length()))
+                        .toList()))
+                .toList();
+    }
+
+    private static boolean readable(AuthPrincipal actor, User target) {
+        if (Roles.Wire.ADMIN.equals(target.getRole())) {
+            return false;
+        }
+        return !Roles.Wire.MANAGER.equals(actor.role())
+                || actor.userId().equals(target.getId())
+                || Roles.Wire.STAFF.equals(target.getRole());
+    }
+
+    private List<String> functionsOf(User target, BackOfficeGrant stored) {
+        return stored != null
+                ? parseStored(stored.getPermissions())
+                : List.copyOf(BackOfficeFunctions.defaultForRole(target.getRole()));
+    }
+
+    /** Wholesale as a merge cannot express "take this away"; an empty list is legal and means dashboard only. */
     @Transactional
     public BackOfficeAccessResponse replace(AuthPrincipal actor, String id,
             List<String> requested) {
         User target = load(id);
         if (actor.userId().equals(target.getId())) {
             throw new ForbiddenException(
-                    "An administrator cannot edit their own back-office permissions");
+                    "You cannot edit your own back-office permissions");
         }
-        if (!Roles.Wire.STAFF.equals(target.getRole()) && !Roles.Wire.ADMIN.equals(target.getRole())) {
+        if (!Roles.isBackOffice(target.getRole())) {
             throw new ValidationException(
-                    "Only staff and admin accounts have back-office permissions to narrow");
+                    "Only back-office accounts have permissions to narrow");
         }
-        Set<String> ceiling = BackOfficePermissions.baselineFor(target.getRole());
+        refuseManagerOnNonStaff(actor, target);
+        if (Roles.Wire.ADMIN.equals(target.getRole())) {
+            throw new ValidationException("The administrator always holds full access");
+        }
+        Set<String> ceiling = BackOfficeFunctions.assignableForRole(target.getRole());
+        Set<String> actorCeiling = Roles.Wire.MANAGER.equals(actor.role())
+                ? accountPermissions.functionsFor(actor.role(), actor.userId())
+                : null;
+        // A manager may keep or remove what an administrator granted; only additions are capped.
+        Set<String> held = accountPermissions.functionsFor(target.getRole(), target.getId());
         Set<String> names = new LinkedHashSet<>();
         for (String name : requested == null ? List.<String>of() : requested) {
-            if (!BackOfficePermissions.isKnown(name)) {
+            if (!BackOfficeFunctions.isKnown(name)) {
                 throw new ValidationException(
-                        "Not a permission this server enforces: " + name);
+                        "Not a back-office function this server enforces: " + name);
             }
             if (!ceiling.contains(name)) {
                 throw new ValidationException(
                         "A " + target.getRole() + " account can never hold " + name);
             }
+            if (actorCeiling != null && !actorCeiling.contains(name) && !held.contains(name)) {
+                throw new ForbiddenException("Managers can only grant functions they hold");
+            }
             names.add(name);
         }
-
-        // The last-administrator floor (D200). Checked after validation and before the write, so a
-        // refusal leaves the stored document exactly as it was and the caller can resend. Narrowing
-        // is the quiet half of a back-office lockout: unlike an archive it leaves an account that
-        // still reads `admin` on every screen and can no longer hand access back to anybody.
-        administrators.refuseIfNarrowingRemovesLastAdministrator(target, names);
 
         String document = objectMapper.writeValueAsString(names);
         BackOfficeGrant grant = grants.findById(target.getId()).orElse(null);
@@ -151,18 +170,11 @@ public class BackOfficeAccessService {
         grants.save(grant);
         audit.record(actor, "user.permissions.replace", "user", target.getId().toString(),
                 "permissions", document);
-        return read(id);
+        adminNotifications.managerAction(actor, "Updated staff permissions", target);
+        return read(actor, id);
     }
 
-    /**
-     * The stored names as a list, or an empty list if the row is unreadable.
-     *
-     * <p>The screen showing an administrator a corrupt document as "nothing stored" is a lie the
-     * effective set immediately corrects: {@link AccountPermissions} denies everything for that row,
-     * so the response's {@code effective} is empty too — and empty-effective with a
-     * {@code scoped: true} flag is a state the console can only reach this way. Throwing instead
-     * would take the repair screen down along with the row it exists to repair.
-     */
+    /** Unreadable rows give an empty list so the repair screen survives the row it repairs. */
     private List<String> parseStored(String raw) {
         try {
             JsonNode document = objectMapper.readTree(raw);
@@ -185,5 +197,11 @@ public class BackOfficeAccessService {
         return Ids.parseUuid(id)
                 .flatMap(users::findById)
                 .orElseThrow(() -> NotFoundException.of("User"));
+    }
+
+    private static void refuseManagerOnNonStaff(AuthPrincipal actor, User target) {
+        if (Roles.Wire.MANAGER.equals(actor.role()) && !Roles.Wire.STAFF.equals(target.getRole())) {
+            throw new ForbiddenException("Managers can only manage staff accounts");
+        }
     }
 }

@@ -1,11 +1,12 @@
 import { Link } from 'react-router';
 import LegalPage from '../../components/LegalPage.jsx';
+import { SUPPORT_PHONE } from '../../lib/supportContact.js';
 
 export default function Privacy() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="1 July 2026" current="privacy">
+    <LegalPage title="Privacy Policy" lastUpdated="10 October 2026" current="privacy">
       <p>
-        Draazy Technologies Private Limited ("<strong>Draazy</strong>", "we", "us", or "our") operates the website
+        Draazy Technologies ("<strong>Draazy</strong>", "we", "us", or "our") operates the website
         draazy.com and associated mobile applications. This Privacy Policy explains how we collect, use, disclose, and
         safeguard your personal information when you use our platform.
       </p>
@@ -25,19 +26,18 @@ export default function Privacy() {
         <li>Device type, operating system, browser, IP address, and approximate geolocation.</li>
         <li>Pages visited, search queries, time spent, and interaction events (clicks, scrolls).</li>
         <li>
-          <strong>Referral fraud signals</strong> — when you create a referral code or sign up using someone else's, we
-          record a salted one-way hash of your IP address and browser User-Agent. We never store the raw values, and the
+          <strong>Referral fraud signals</strong> — when you open your referral code or sign up using someone else's, we
+          record a salted one-way hash of your IP address and browser User-Agent, plus a random device identifier kept on your device. We never store the raw IP or User-Agent, and the
           hashes are used for one purpose only: to tell whether a referral and its reward came from the same person or
-          device. They are erased 90 days after they are recorded.
+          device. They are erased within 180 days of being recorded.
         </li>
         <li>Cookies and similar tracking technologies (see Section 6).</li>
       </ul>
 
       <h3>1.3 Information from third parties</h3>
       <ul>
-        <li>Identity verification partners (Aadhaar-based eKYC, PAN verification) for owner accounts.</li>
+        <li>Identity documents and selfies you submit for verification, reviewed by our own team — no third-party eKYC provider sees them. The images are deleted 7 days after the review decision.</li>
         <li>Credit bureaus and lending partners when you apply for a home loan through us.</li>
-        <li>Social login providers (Google) if you sign in via third-party authentication.</li>
       </ul>
 
       <h2>2. How we use your information</h2>
@@ -57,14 +57,16 @@ export default function Privacy() {
         <li><strong>With other users</strong> — your name and verified status are visible on your listings. Contact details are shared only when you expressly initiate or accept a connection request.</li>
         <li><strong>With service partners</strong> — when you submit a service request (e.g., home loan eligibility check), we share the minimum details needed to fulfil your request with the selected partner(s).</li>
         <li><strong>With payment processors</strong> — to process transactions securely.</li>
+        <li><strong>With our analytics provider (PostHog)</strong> — only if you accept analytics cookies: pseudonymous usage events and session replays with all text, inputs and images masked. We never send your name, phone or email.</li>
         <li><strong>For legal compliance</strong> — when required by law, court order, or government authority.</li>
         <li><strong>Business transfers</strong> — in the event of a merger, acquisition, or asset sale, your data may be transferred to the successor entity.</li>
       </ul>
 
       <h2>4. Data retention</h2>
       <p>
-        We retain your personal data for as long as your account is active or as needed to provide services. After account
-        deletion, we anonymise or delete your data within 90 days, except where retention is required by law (e.g., financial
+        We retain your personal data for as long as your account is active or as needed to provide services. Erasure is a
+        reviewed request: if our team approves it, the account is archived and your personal data is deleted or replaced
+        with pseudonyms, except where retention is required by law (e.g., financial
         records under the Income Tax Act — 8 years; RERA transaction records — 5 years after project completion).
       </p>
 
@@ -101,9 +103,9 @@ export default function Privacy() {
       </ul>
       <p>
         You may withdraw consent for any optional processing at any time — withdrawing is as easy as giving it.
-        To exercise these rights, email <a href="mailto:privacy@draazy.com">privacy@draazy.com</a> or open the{' '}
+        To exercise these rights, email <a href="mailto:support@draazy.com">support@draazy.com</a> or open the{' '}
         <Link to="/dashboard#profile">Privacy &amp; Account</Link> section under Dashboard → Profile, where you can
-        download or permanently delete your data. Where a registered Consent Manager is available, you may also use it
+        download your data or request its erasure. Where a registered Consent Manager is available, you may also use it
         to review and manage your consents. We acknowledge requests within 72 hours and resolve them within the
         timelines prescribed under the DPDPA, 2023 and its rules.
       </p>
@@ -127,20 +129,17 @@ export default function Privacy() {
         Consumer Protection (E-Commerce) Rules, 2020, and the DPDPA, 2023, our company and grievance-officer details are:
       </p>
       <p>
-        <strong>Legal entity:</strong> Draazy Technologies Private Limited<br />
-        <strong>CIN:</strong> U72900PN2024PTC000000<br />
-        <strong>GSTIN:</strong> 27ABCDE1234F1Z5<br />
-        <strong>Registered office:</strong> 201, Business Bay, Baner Road, Pune 411045, Maharashtra, India
+        <strong>Legal entity:</strong> Draazy Technologies
       </p>
       <p>
-        <strong>Grievance Officer:</strong> Mr. Rohan Deshpande<br />
+        <strong>Grievance Officer:</strong> Grievance Officer, Draazy Technologies<br />
         <strong>Email:</strong> <a href="mailto:grievance@draazy.com">grievance@draazy.com</a><br />
-        <strong>Phone:</strong> +91 98765 43210 (Mon–Sat, 9 AM – 6 PM)<br />
+        <strong>Phone:</strong> {SUPPORT_PHONE} (9 AM – 8 PM, Mon–Sat)<br />
         <strong>Acknowledgement:</strong> within 24 hours; grievances resolved within 15 days as required by law.
       </p>
       <p>
-        <strong>Data Protection / Nodal Officer:</strong> Ms. Ananya Kulkarni<br />
-        <strong>Email:</strong> <a href="mailto:dpo@draazy.com">dpo@draazy.com</a>
+        <strong>Data Protection / Nodal Officer:</strong> Nodal Officer, Draazy Technologies<br />
+        <strong>Email:</strong> <a href="mailto:grievance@draazy.com">grievance@draazy.com</a>
       </p>
       <p>
         If your grievance is not resolved to your satisfaction, you may escalate to the{' '}

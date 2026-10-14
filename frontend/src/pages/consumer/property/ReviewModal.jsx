@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { StarInput } from './StarInput.jsx';
 import { RV_CATS } from './ReviewsSection.jsx';
+import useScrollLock from '../../../hooks/useScrollLock.js';
 
 // No `user` prop: the author's display name is the server's answer, taken from the authenticated
 // caller, not something the form carries. It was only ever needed to stamp the review locally.
@@ -13,28 +15,21 @@ export function ReviewModal({ onClose, onSubmit }) {
   const [text, setText] = useState('');
   const [recommend, setRecommend] = useState(null);
 
+  useScrollLock();
   useEffect(() => {
-    document.body.style.overflow = 'hidden';
     const onKey = (e) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
-    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+    return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   const submit = () => {
     if (!rating) return;
-    /**
-     * Only what the author actually supplied.
-     *
-     * This used to also send `id`, `user`, `at` and `context: 'visit'`. All four are the server's
-     * to decide, and `context` is the one that mattered: it is the "Visited" / "Verified resident"
-     * badge, and sending it as a literal made every review self-certifying. The contract has no
-     * such field on `ReviewCreate` for exactly that reason, so it was ignored live and believed on
-     * mocks — the worst possible split, because the demo is where the badge got its credibility.
-     */
+    /* Only what the author actually supplied: `id`, `user`, `at` and `context` are the server's to
+       decide — `context` is the "Visited" badge, so a client sending it certifies its own review. */
     onSubmit({ rating, categories: cats, text: text.trim(), recommend });
   };
 
-  return (
+  return createPortal(
     <div className="dz-modal-backdrop" role="dialog" aria-modal="true" aria-label={t('property.rateProperty')} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="dz-modal">
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -74,6 +69,7 @@ export function ReviewModal({ onClose, onSubmit }) {
           <button type="button" onClick={submit} disabled={!rating} className={'btn-teal w-full flex items-center justify-center gap-2 py-3 ' + (!rating ? 'opacity-50 cursor-not-allowed' : '')}><Icon name="check" className="w-4 h-4" /> {t('property.submitReview')}</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

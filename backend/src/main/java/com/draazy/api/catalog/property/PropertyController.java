@@ -5,12 +5,18 @@ import com.draazy.api.catalog.listing.ReasonRequest;
 import com.draazy.api.common.trust.ContactGate;
 import com.draazy.api.common.trust.BackOfficeVisibility;
 import com.draazy.api.common.trust.ContactVisibility;
+import com.draazy.api.common.trust.FlagReasonVisibility;
 import com.draazy.api.common.trust.OutreachCounts;
 import com.draazy.api.common.trust.PrivateFieldVisibility;
 import com.draazy.api.common.web.PageResponse;
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
+import com.draazy.api.security.BackOfficePermissions;
 import com.draazy.api.security.CurrentUser;
+import com.draazy.api.security.Roles;
+import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
@@ -23,10 +29,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * The public catalogue surface at {@code /properties} plus the authenticated archive/restore actions,
- * which are authorized in the service. Thin by design: bind, delegate, map to contract records.
- */
 @RestController
 public class PropertyController {
 
@@ -34,21 +36,21 @@ public class PropertyController {
     private final ListingArchiveService archiveService;
     private final PropertyMapper propertyMapper;
     private final ContactGate contactGate;
-    private final ListingCounts listingCounts;
+    private final AccountPermissions permissions;
+    private final SimilarListings similarListings;
 
     public PropertyController(PropertyService propertyService, ListingArchiveService archiveService,
-            PropertyMapper propertyMapper, ContactGate contactGate, ListingCounts listingCounts) {
+            PropertyMapper propertyMapper, ContactGate contactGate, AccountPermissions permissions,
+            SimilarListings similarListings) {
+        this.similarListings = similarListings;
         this.propertyService = propertyService;
         this.archiveService = archiveService;
         this.propertyMapper = propertyMapper;
         this.contactGate = contactGate;
-        this.listingCounts = listingCounts;
+        this.permissions = permissions;
     }
 
-    /**
-     * {@code GET /properties} - faceted public search; the visibility floor is enforced in the service.
-     * Facet binding and why {@code rank} is not a {@code sort}: search-listings.md section 9.7.
-     */
+    /** Facet binding and why {@code rank} is not a {@code sort}: search-listings.md section 9.7. */
     @GetMapping(Routes.Properties.BASE)
     public PropertySearchResponse<PropertySummary> search(
             @RequestParam(required = false) String deal,
@@ -59,7 +61,7 @@ public class PropertyController {
             @RequestParam(required = false) Long maxPrice,
             @RequestParam(required = false) String furnishing,
             @RequestParam(required = false) String possession,
-            @RequestParam(required = false) String q,
+            @RequestParam(required = false) @Size(max = 120) String q,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String owner,
             @RequestParam(required = false) String rank,
@@ -69,61 +71,80 @@ public class PropertyController {
                 deal, type, locality, bhk, minPrice, maxPrice, furnishing, possession, q, status,
                 owner);
         PropertyService.SearchResult result =
-                propertyService.searchWithTotals(filters, facets, pageable, "newest".equals(rank));
+                propertyService.searchWithTotals(filters, facets, pageable, PropertySort.rank(rank));
         return PropertySearchResponse.of(
-                PageResponse.of(result.page(), propertyMapper::toSummary), result.verifiedTotal());
+                PageResponse.of(result.page(), propertyMapper::toSummary), result.verifiedTotal(),
+                result.unstatedTotal());
     }
 
-    /** {@code GET /properties/featured} — featured-first live listings for the homepage strip. */
     @GetMapping(Routes.Properties.FEATURED)
-    public List<PropertySummary> featured() {
-        return propertyService.featured().stream().map(propertyMapper::toSummary).toList();
+    public List<PropertyCard> featured() {
+        return propertyService.featured().stream().map(propertyMapper::toCard).toList();
     }
 
-    /**
-     * {@code GET /properties/trust-stats} - the verified share of the live catalogue, counted by the
-     * database rather than the browser: docs/flows/consumer/search-listings.md section 9.8.
-     */
-    @GetMapping(Routes.Properties.TRUST_STATS)
-    public TrustStatsResponse trustStats(@RequestParam(required = false) String locality) {
-        return listingCounts.trustStats(locality);
+    /** Cards for the recently-viewed rails; ids that are not publicly live drop out. */
+    @GetMapping(Routes.Properties.CARDS)
+    public List<PropertyCard> cards(
+            @RequestParam @Size(max = PropertyService.CARDS_CAP) List<String> ids) {
+        return propertyService.publicByIds(ids).stream().map(propertyMapper::toCard).toList();
     }
 
-    /**
-     * {@code GET /properties/{id}} - single listing detail by slug-or-id; {@code 404} when missing or
-     * not publicly visible. The route is public, so a {@code null} viewer always masks the contact.
-     */
+    @GetMapping(Routes.Properties.SEARCH_INDEX)
+    public List<SearchIndexEntry> searchIndex() {
+        return propertyService.newestLive().stream().map(propertyMapper::toIndexEntry).toList();
+    }
+
+    @GetMapping(Routes.Properties.COMPARE)
+    public List<PropertyCompare> compare(@RequestParam @Size(max = 4) List<String> ids) {
+        return propertyService.publicByIds(ids).stream().map(propertyMapper::toCompare).toList();
+    }
+
+    @GetMapping(Routes.Properties.REELS)
+    public List<PropertyReel> reels(@ModelAttribute ListingFacets facets) {
+        return propertyService.newestReels(facets).stream().map(propertyMapper::toReel).toList();
+    }
+
+    @GetMapping(Routes.Properties.SIMILAR)
+    public List<SimilarListing> similar(@RequestParam @Size(max = 20) String deal,
+            @RequestParam(required = false) String locality, @RequestParam(required = false) BigDecimal bhk,
+            @RequestParam(required = false) Long price, @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng, @RequestParam(required = false) String exclude) {
+        return similarListings.near(new SimilarListings.Query(deal, locality, bhk, price, lat, lng, exclude)).stream()
+                .map(r -> propertyMapper.toSimilar(r.property(), r.km())).toList();
+    }
+
+    /** {@code 404} unless publicly visible (owner and checker excepted); a {@code null} viewer masks contact. */
     @GetMapping(Routes.Properties.BY_ID)
     public PropertyResponse get(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
-        Property property = propertyService.getPublic(id);
         UUID viewerId = principal != null ? principal.userId() : null;
+        Property property = propertyService.getPublic(id, viewerId, mayPreview(principal));
         UUID ownerId = property.getOwner() != null ? property.getOwner().getId() : null;
         return propertyMapper.toResponse(property,
                 contactGate.visibilityFor(viewerId, property.getId(), ownerId),
-                BackOfficeVisibility.HIDDEN, OutreachCounts.NONE, PrivateFieldVisibility.HIDDEN);
+                BackOfficeVisibility.HIDDEN, OutreachCounts.NONE, PrivateFieldVisibility.HIDDEN,
+                mayPreview(principal) ? FlagReasonVisibility.VISIBLE : FlagReasonVisibility.HIDDEN);
     }
 
-    /**
-     * {@code PATCH /properties/{id}/archive} - soft-delete a listing (owner or staff/admin). Contact
-     * masked and private fields hidden even from the owner: search-listings.md section 9.8.
-     */
+    /** The grant and not the bare role: a moderator whose {@code properties:read} was revoked loses this door too. */
+    private boolean mayPreview(AuthPrincipal principal) {
+        return principal != null
+                && Roles.isBackOffice(principal.role())
+                && permissions.granted(principal, BackOfficePermissions.PROPERTIES_READ);
+    }
+
     @PatchMapping(Routes.Properties.ARCHIVE)
     public PropertyResponse archive(@CurrentUser AuthPrincipal principal, @PathVariable String id,
             @RequestBody(required = false) ReasonRequest body) {
         String reason = body != null ? body.reason() : null;
         return propertyMapper.toResponse(
                 archiveService.archive(principal, id, reason), ContactVisibility.MASKED,
-                BackOfficeVisibility.HIDDEN, OutreachCounts.NONE, PrivateFieldVisibility.HIDDEN);
+                BackOfficeVisibility.HIDDEN, OutreachCounts.NONE, PrivateFieldVisibility.VISIBLE);
     }
 
-    /**
-     * {@code PATCH /properties/{id}/restore} — un-archive a listing (owner or staff/admin); status is
-     * reset to {@code pending} for re-moderation. Masked contact, as for archive.
-     */
     @PatchMapping(Routes.Properties.RESTORE)
     public PropertyResponse restore(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return propertyMapper.toResponse(
                 archiveService.restore(principal, id), ContactVisibility.MASKED,
-                BackOfficeVisibility.HIDDEN, OutreachCounts.NONE, PrivateFieldVisibility.HIDDEN);
+                BackOfficeVisibility.HIDDEN, OutreachCounts.NONE, PrivateFieldVisibility.VISIBLE);
     }
 }

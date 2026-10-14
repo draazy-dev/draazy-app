@@ -1,45 +1,28 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import OtpBoxes from './OtpBoxes.jsx';
 import { useOtpFlow } from './useOtpFlow.js';
+import { classifyOtpVerifyError } from '../../lib/otpVerifyError.js';
 import { requestOwnerConsent } from '../../services/flatmateService.js';
-import { fmtPhone } from '../../lib/contact.js';
+import useScrollLock from '../../hooks/useScrollLock.js';
+/* Owner-consent OTP ping. */
 
-/* Owner-consent OTP ping. A sitting tenant listing a replacement flatmate can't
-   produce ownership docs, so instead the flat's OWNER confirms — via an OTP sent
-   to the owner's phone — that they're aware of the replacement search.
-
-   Both calls go to `POST /flatmates/owner-consent` through the seam: once without an
-   `otp` to dispatch the code, once with it to record the consent. `onVerified()` then
-   flips the form's cue.
-
-   This used to run `useOtpFlow()` against its simulated dispatch and write
-   `setOwnerConsent()` straight to localStorage, so the http provider's consent call had
-   never once executed. The tenant did the whole OTP round-trip with their landlord and
-   the server learnt nothing: `ownerConsent` is deliberately not client-settable, so the
-   flag the form put on the create payload was dropped at the door, the "Owner-consented"
-   chip never rendered, and the Ops review entry said consent was absent. The consent is
-   keyed on (owner mobile, tenant) rather than on a group, which is what lets it be taken
-   here — before the group being written exists.
-
-   Mirrors AadhaarVerifyModal but the number belongs to the owner, not the current user,
-   so it's shown read-only and never editable. */
-export default function OwnerConsentModal({ ownerMobile, onClose, onVerified }) {
+export default function OwnerConsentModal({ ownerMobile, title, locality, onClose, onVerified }) {
+  /* The surrounding copy is English, but `otp.sendError` is a translatable message by contract. */
+  const { t } = useTranslation();
   const owner = String(ownerMobile || '').replace(/\D/g, '').slice(0, 10);
   const [verifying, setVerifying] = useState(false);
+  /* The address rides on the SEND too, not just the record. */
   const [failed, setFailed] = useState(null);
-  const otp = useOtpFlow((mobile) => requestOwnerConsent({ ownerMobile: mobile }));
+  const otp = useOtpFlow((mobile) => requestOwnerConsent({ ownerMobile: mobile, title, locality }));
 
+  useScrollLock();
   useEffect(() => {
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     const onKey = (e) => e.key === 'Escape' && onClose();
     document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
-    };
+    return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   const submit = async (e) => {
@@ -50,14 +33,19 @@ export default function OwnerConsentModal({ ownerMobile, onClose, onVerified }) 
     setVerifying(true);
     try {
       // A wrong code answers 401 and a spent attempt cap 429, so the only way to reach
-      // `onVerified` is for the owner to have actually acted. The old timeout reached it
-      // unconditionally, which is what made the whole modal theatre.
-      const { consentRecorded } = await requestOwnerConsent({ ownerMobile: owner, otp: otp.otp });
-      if (!consentRecorded) throw new Error('consent not recorded');
+      // `onVerified` is for the owner to have actually acted.
+      const { consentRecorded } = await requestOwnerConsent({
+        ownerMobile: owner, otp: otp.otp, title, locality,
+      });
+      if (!consentRecorded) {
+        setFailed(t('common.somethingWentWrong'));
+        return;
+      }
       onVerified?.();
       onClose();
     } catch (err) {
-      setFailed(err?.body?.message || 'That code did not match. Ask the owner to read it out again.');
+      const { messageKey, count } = classifyOtpVerifyError(err);
+      setFailed(t(messageKey, { count }));
       otp.setOtpError(true);
     } finally {
       setVerifying(false);
@@ -79,14 +67,10 @@ export default function OwnerConsentModal({ ownerMobile, onClose, onVerified }) 
             <div className="w-10 h-10 rounded-xl bg-teal-500/15 flex items-center justify-center"><Icon name="badge-check" className="w-5 h-5 text-teal-400" /></div>
             <div>
               <h3 className="text-lg font-bold text-white">Confirm the owner's consent</h3>
-              <p className="text-xs text-slate-400 mt-0.5">We'll text the flat owner a code to confirm they're aware you're seeking a replacement.</p>
+              <p className="text-xs text-slate-400 mt-0.5">We'll text the owner a code.</p>
             </div>
           </div>
           <button onClick={onClose} className="dz-modal-x" aria-label="Close"><Icon name="x" className="w-5 h-5" /></button>
-        </div>
-
-        <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 text-[11px] text-slate-400 mb-4 flex items-start gap-2">
-          <Icon name="lock" className="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-teal-400" /> Consent keeps replacement listings honest — the owner is never charged and their number is never shown to seekers.
         </div>
 
         <form onSubmit={submit} className="space-y-4">
@@ -97,24 +81,22 @@ export default function OwnerConsentModal({ ownerMobile, onClose, onVerified }) 
               <span className="text-sm text-white font-medium tracking-wide flex-1">{owner}</span>
               <span className="inline-flex items-center gap-1 text-[11px] text-teal-300"><Icon name="badge-check" className="w-3.5 h-3.5" /> Owner</span>
             </div>
-            <p className="text-slate-500 text-xs mt-2">The consent OTP is sent to the owner at {fmtPhone(owner)}.</p>
             {otp.sendError && (
-              <p className="text-red-400 text-xs mt-2">
-                {otp.sendError?.body?.message || 'Could not send the OTP to that number.'}
-              </p>
+              <p className="text-red-400 text-xs mt-2">{t(otp.sendError.messageKey, { count: otp.sendError.count })}</p>
             )}
           </div>
 
           {otp.otpSent && (
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1 text-center">Enter the owner's OTP</label>
-              <p className="text-xs text-slate-500 mb-4 text-center">Ask the owner for the 6-digit code we sent to <span className="text-teal-400 font-medium">+91 {owner}</span></p>
+              <label className="block text-xs font-medium text-slate-400 mb-4 text-center">Enter the code the owner received</label>
               <OtpBoxes value={otp.otp} onChange={(v) => { otp.setOtp(v); otp.setOtpError(false); }} error={otp.otpError} />
               {otp.otpError && !failed && <p className="text-red-400 text-xs text-center mt-2">Please enter the complete 6-digit OTP</p>}
               {failed && <p className="text-red-400 text-xs text-center mt-2">{failed}</p>}
               <div className="flex items-center justify-center gap-2 text-sm mt-4">
+                {/* The number, explicitly: `resend` forwards its argument to the dispatch, so a bare handler
+                   reference would post React's click event as `ownerMobile`. */}
                 <span className="text-slate-500">Owner didn't get it?</span>
-                <button type="button" onClick={otp.resend} disabled={!otp.canResend} className="text-teal-400 hover:text-teal-300 font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <button type="button" onClick={() => otp.resend(owner)} disabled={!otp.canResend} className="text-teal-400 hover:text-teal-300 font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                   {otp.canResend ? 'Resend OTP' : `Resend in ${otp.seconds}s`}
                 </button>
               </div>

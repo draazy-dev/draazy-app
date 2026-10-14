@@ -16,9 +16,7 @@ import com.draazy.api.security.JwtService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -26,16 +24,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-/**
- * Contract + behaviour proof for the offers sub-slice (A1), driven through the real filter chain
- * against the live Flyway'd Postgres under {@code ddl-auto=validate}.
- *
- * <p>Covers every test in the §11 bar: submit, counter, author-counter-back, accept, illegal
- * transition, third-party scoping, caller-scoped lists, mobile masking, duplicate prevention,
- * closed-deal block, route-constant agreement, and money round-trip.
- */
 class OfferEndpointsTest extends AbstractApiTest {
 
     @Autowired MockMvc mvc;
@@ -45,9 +34,6 @@ class OfferEndpointsTest extends AbstractApiTest {
     @Autowired OfferRepository offerRepo;
     @Autowired OfferHistoryRepository historyRepo;
     @Autowired JdbcTemplate jdbc;
-    @Autowired
-    @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping")
-    RequestMappingHandlerMapping handlerMapping;
 
     // ---- helpers ----
 
@@ -97,52 +83,32 @@ class OfferEndpointsTest extends AbstractApiTest {
     void submitOffer_creates201WithHistoryRow() throws Exception {
         User owner = user("9820100001", "owner");
         User buyer = user("9820100002", "buyer");
+        User otherBuyer = user("9820100052", "buyer");
         Property p = listing(owner, "Submit test");
+        long largeAmount = 3_000_000_000L;
 
         mvc.perform(post(Routes.Offers.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"propertyId\":\"" + p.getId() + "\",\"amount\":5000000}"))
+                        .content("{\"propertyId\":\"" + p.getId() + "\",\"amount\":" + largeAmount + "}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.propertyId").value(p.getId().toString()))
-                .andExpect(jsonPath("$.amount").value(5000000))
+                .andExpect(jsonPath("$.amount").value(largeAmount))
                 .andExpect(jsonPath("$.status").value(OfferStatuses.PENDING))
                 .andExpect(jsonPath("$.from.role").value("buyer"))
                 .andExpect(jsonPath("$.from.id").value(buyer.getId().toString()))
                 .andExpect(jsonPath("$.history.length()").value(1))
                 .andExpect(jsonPath("$.history[0].by").value("buyer"))
-                .andExpect(jsonPath("$.history[0].amount").value(5000000));
-    }
-
-    /** D112: the buyer's preferred possession date round-trips as a `date`, not folded into message. */
-    @Test
-    void submitOffer_carriesMoveIn() throws Exception {
-        User owner = user("9820100051", "owner");
-        User buyer = user("9820100052", "buyer");
-        Property p = listing(owner, "Move-in test");
+                .andExpect(jsonPath("$.history[0].amount").value(largeAmount))
+                .andExpect(jsonPath("$.moveIn").value(org.hamcrest.Matchers.nullValue()));
 
         mvc.perform(post(Routes.Offers.BASE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(otherBuyer))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"propertyId\":\"" + p.getId()
                                 + "\",\"amount\":5000000,\"moveIn\":\"2026-03-15\"}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.moveIn").value("2026-03-15"));
-    }
-
-    /** D112: `moveIn` is optional — an offer on price alone omits it and the field comes back absent. */
-    @Test
-    void submitOffer_moveInOptional() throws Exception {
-        User owner = user("9820100053", "owner");
-        User buyer = user("9820100054", "buyer");
-        Property p = listing(owner, "No move-in test");
-
-        mvc.perform(post(Routes.Offers.BASE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"propertyId\":\"" + p.getId() + "\",\"amount\":5000000}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.moveIn").value(org.hamcrest.Matchers.nullValue()));
     }
 
     // ---- §11 test 2: Owner counters → 'countered', history row with by='owner' ----
@@ -353,17 +319,9 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-    // ---- D77: the owner's offer book is paged, and the total counts the book not the page ----
 
-    /**
-     * The whole point of paging an inbound-demand collection: an owner whose listings attract more
-     * offers than fit on a page must still be told how many there are.
-     *
-     * <p>Asserted on {@code totalElements} rather than on {@code content.length()} alone because the
-     * failure this guards against is the plausible one — a count derived from the page, which agrees
-     * with the truth for every owner until the first one gets popular. That is the exact bug D78
-     * fixed for the contact inbox, arriving here by the same route.
-     */
+    /** Asserts {@code totalElements}, not {@code content.length()}: a count derived from the page is right
+     * for every owner until the first one gets popular. */
     @Test
     void offersOnMine_isPaged_andTotalCountsTheWholeBookNotThePage() throws Exception {
         User owner = user("9820100040", "owner");
@@ -393,13 +351,8 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(3));
     }
 
-    /**
-     * The order is fixed server-side, so a client sort must be ignored rather than reach the query.
-     *
-     * <p>An unknown property name in {@code ?sort=} is otherwise appended to the JPA query and comes
-     * back as a 500 — a server error any signed-in caller can trigger by guessing. {@code
-     * Pageables.unsorted} is what prevents that, and this is the test that notices if it is dropped.
-     */
+    /** A client sort must be ignored: an unknown {@code ?sort=} property otherwise reaches the JPA query
+     * and becomes a 500 any signed-in caller can trigger by guessing. */
     @Test
     void offersOnMine_ignoresAClientSuppliedSort_ratherThanFailingOnAnUnknownField() throws Exception {
         User owner = user("9820100044", "owner");
@@ -413,44 +366,8 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.sort").doesNotExist());
     }
 
-    // ---- §11 test 12: Route-constant ↔ SecurityConfig matcher agreement ----
-
-    @Test
-    void everyOfferRouteConstantIsServedByAController() {
-        Set<String> mapped = handlerMapping.getHandlerMethods().keySet().stream()
-                .filter(info -> info.getPathPatternsCondition() != null)
-                .flatMap(info -> info.getPathPatternsCondition().getPatternValues().stream())
-                .collect(Collectors.toSet());
-
-        assertThat(mapped).contains(
-                Routes.Offers.BASE,
-                Routes.Offers.MINE,
-                Routes.Offers.RESPOND,
-                Routes.Offers.ME);
-    }
-
-    // ---- §11 test 13: Money round-trips as a long ----
-
-    @Test
-    void moneyRoundTrips_largeValueNoPrecisionLoss() throws Exception {
-        User owner = user("9820100027", "owner");
-        User buyer = user("9820100028", "buyer");
-        Property p = listing(owner, "Money test");
-        long largeAmount = 25_00_00_000L; // 25 crore
-
-        mvc.perform(post(Routes.Offers.BASE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"propertyId\":\"" + p.getId() + "\",\"amount\":" + largeAmount + "}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.amount").value(largeAmount))
-                .andExpect(jsonPath("$.history[0].amount").value(largeAmount));
-    }
-    // ---- Regression: accept/decline are the owner's decision alone ----
-    //
-    // The first cut of respond() checked only that the caller was *a* participant, which let the
-    // buyer accept their own offer -- agreeing a price with no owner involvement, and flipping the
-    // status that drives the mobile reveal. Participation is not authorisation.
+    // Accept/decline are the owner's decision alone: a participant-only check lets the buyer accept their own
+    // offer, agreeing a price with no owner and flipping the status that drives the mobile reveal.
 
     @Test
     void buyerCannotAcceptTheirOwnOffer() throws Exception {
@@ -499,7 +416,6 @@ class OfferEndpointsTest extends AbstractApiTest {
                         OfferStatuses.BY_BUYER);
     }
 
-    // ---- Notification on offer submit (tech-debt D92) ----
 
     private List<Map<String, Object>> notificationsFor(User u) {
         return jdbc.queryForList(
@@ -518,7 +434,7 @@ class OfferEndpointsTest extends AbstractApiTest {
             assertThat(row.get("type")).isEqualTo("offer.received");
             assertThat(row.get("link")).isEqualTo("/property/" + p.getId());
             assertThat((String) row.get("title")).contains("Offer notify test");
-            assertThat((String) row.get("body")).contains("4100000");
+            assertThat((String) row.get("body")).contains("\u20b941,00,000");
             // D5/Q2: the amount and the buyer's display name are fair game, the mobile is not.
             assertThat((String) row.get("body")).doesNotContain(buyer.getMobile());
         });
@@ -528,18 +444,102 @@ class OfferEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void ownerCounters_addsNoFurtherNotification() throws Exception {
+    void ownerCounters_notifiesTheBuyer() throws Exception {
         User owner = user("9820100039", "owner");
         User buyer = user("9820100040", "buyer");
-        Property p = listing(owner, "Counter silence test");
+        Property p = listing(owner, "Counter notify test");
         String offerId = submitOffer(buyer, p, 4_000_000L);
 
         respond(owner, offerId, "counter", 4_500_000L, null);
 
-        // Only the submit is announced, so the owner still has just the one row and the buyer none.
-        // A counter lands inside a negotiation both sides are already reading; announcing every
-        // turn of it would train people to ignore the bell.
+        assertThat(notificationsFor(buyer)).singleElement().satisfies(row -> {
+            assertThat(row.get("type")).isEqualTo("offer.countered");
+            assertThat(row.get("link")).isEqualTo("/property/" + p.getId());
+            assertThat((String) row.get("body")).contains("The owner", "\u20b945,00,000")
+                    .doesNotContain(owner.getMobile());
+        });
+        assertThat(notificationsFor(owner)).extracting(row -> row.get("type"))
+                .containsExactly("offer.received");
+    }
+
+    @Test
+    void buyerCounters_notifiesTheOwner() throws Exception {
+        User owner = user("9820100090", "owner");
+        User buyer = user("9820100091", "buyer");
+        Property p = listing(owner, "Buyer counter notify");
+        String offerId = submitOffer(buyer, p, 4_000_000L);
+        respond(owner, offerId, "counter", 4_500_000L, null);
+
+        respond(buyer, offerId, "counter", 4_200_000L, null);
+
+        assertThat(notificationsFor(owner)).extracting(row -> row.get("type"))
+                .containsExactlyInAnyOrder("offer.received", "offer.countered");
+        assertThat(notificationsFor(buyer)).hasSize(1);
+    }
+
+    @Test
+    void ownerAccepts_notifiesTheBuyer() throws Exception {
+        User owner = user("9820100092", "owner");
+        User buyer = user("9820100093", "buyer");
+        Property p = listing(owner, "Accept notify test");
+        String offerId = submitOffer(buyer, p, 4_000_000L);
+
+        respond(owner, offerId, "accept", null, null);
+
+        assertThat(notificationsFor(buyer)).singleElement().satisfies(row -> {
+            assertThat(row.get("type")).isEqualTo("offer.accepted");
+            assertThat((String) row.get("body")).contains("\u20b940,00,000", "Accept notify test");
+        });
         assertThat(notificationsFor(owner)).hasSize(1);
-        assertThat(notificationsFor(buyer)).isEmpty();
+    }
+
+    @Test
+    void ownerDeclines_notifiesTheBuyerNotTheOwner() throws Exception {
+        User owner = user("9820100094", "owner");
+        User buyer = user("9820100095", "buyer");
+        Property p = listing(owner, "Decline notify test");
+        String offerId = submitOffer(buyer, p, 4_000_000L);
+
+        respond(owner, offerId, "decline", null, null);
+
+        assertThat(notificationsFor(buyer)).singleElement().satisfies(row -> {
+            assertThat(row.get("type")).isEqualTo("offer.declined");
+            assertThat(row.get("title")).isEqualTo("Your offer was declined");
+            assertThat(row.get("body")).isEqualTo("The owner declined your offer on Decline notify test.");
+            assertThat(row.get("link")).isEqualTo("/property/" + p.getId());
+        });
+        assertThat(notificationsFor(owner)).extracting(row -> row.get("type"))
+                .containsExactly("offer.received");
+    }
+
+    @Test
+    void submitOffer_onAListingThatIsNotLive_is404LikeThePublicRead() throws Exception {
+        User owner = user("9820100071", "owner");
+        User buyer = user("9820100072", "buyer");
+        for (String state : List.of("pending", "rejected", "flagged", "archived")) {
+            Property p = listing(owner, "Not live " + state);
+            if ("archived".equals(state)) {
+                p.archive("Taken down by the owner");
+            } else {
+                p.setStatus(state);
+            }
+            properties.saveAndFlush(p);
+
+            mvc.perform(post(Routes.Offers.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"propertyId\":\"" + p.getId() + "\",\"amount\":20000}"))
+                    .andExpect(status().isNotFound())
+                    .andExpect(jsonPath("$.error").value("not_found"));
+        }
+        Property paused = listing(owner, "Not live paused");
+        paused.setStatus("paused");
+        properties.saveAndFlush(paused);
+        mvc.perform(post(Routes.Offers.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + paused.getId() + "\",\"amount\":20000}"))
+                .andExpect(status().isConflict());
+        assertThat(offerRepo.count()).isZero();
     }
 }

@@ -5,54 +5,57 @@ category: payments
 audience: owner
 order: 1
 featured: true
-updated: 2026-07-24
-summary: What each owner plan includes, who genuinely needs one, and who does not.
-tags: [plans, pricing, featured, owner]
+updated: 2026-10-13
+summary: What costs money, what is free, and how listing slots and contact allowances work.
+tags: [plans, pricing, owner, contacts, referral]
 ---
 
-**You do not need a plan to list a property or to receive enquiries.** Plans buy visibility, not access. See the current pricing on the [Plans page](/plans).
+**You do not need to pay to list a property or to receive enquiries.** Draazy is broker-free and only three things cost money, none of which renews by itself. See current prices on the [Plans page](/plans).
 
-## What is free forever
+## What is free
 
-- Posting a listing
-- Verification
-- Receiving and replying to unlimited enquiries
-- Site-visit scheduling
-- Tenant profiles on every enquiry
+- One live listing at a time
+- Verification, and the badges it earns
+- Receiving and replying to enquiries — owners are never charged to answer
+- Featured placement for a limited time after your listing's ownership is verified (the [Plans page](/plans) shows how long)
+- Free flatmate posts
+- Site-visit scheduling and tenant profiles attached to every enquiry
+- 15 owner contacts, if you are the one searching — use them within 30 days of the first
 
-## What plans add
+## What costs money
 
-| Feature | What it does |
-| --- | --- |
-| Featured placement | Your listing appears above organic results in its locality |
-| Boost | A time-boxed surge in placement, useful in the first 72 hours |
-| Photo shoot | A professional shoots the property |
-| Relationship manager | A person who screens enquiries and coordinates visits for you |
-| Priority verification | Same-day rather than same-week |
+| Item | Price | What you get |
+| --- | --- | --- |
+| Listing Pass | ₹999 | One extra live listing for 60 days, tied to that listing |
+| Contact Pack | ₹199 | 15 owner contacts, valid 30 days; packs stack |
+| Rent agreement | ₹499 + government charges | A first agreement or a renewal |
 
-## Who a plan is worth it for
+## If you list more than one property
 
-**Probably worth it:**
+Posting is never blocked. A second live rent or sale listing is approved but stays paused until you either buy a Listing Pass for it or pause your other listing. Going live again on the free slot is free whenever it fits.
 
-- Your listing has been up 3+ weeks with under five enquiries and the price is already right
-- You are in a high-supply locality where dozens of similar units compete
-- The property is vacant and every week costs you a month's rent in the aggregate
-- You do not have time to handle enquiries yourself
+## If you are searching, not listing
 
-**Probably not worth it:**
+The free account includes 15 owner contacts, usable within 30 days of your first. If a serious search in a competitive locality spends them, buy a **Contact Pack**. See [Contacting owners](/help/a/contacting-owners) for how the quota is counted.
 
-- The listing is under two weeks old — give organic reach a chance first
-- You have fewer than five photos, or no verified badge. Fix those first; they are free and they matter more
-- Your price is above comparables. Paid placement in front of the wrong price just buys you more people leaving
+## Earning allowance instead of buying it
 
-> [!IMPORTANT]
-> Featured placement increases *views*. It does not fix a listing problem. If your photos, price or verification are weak, a plan amplifies a listing that people are already choosing not to enquire on.
+Referring a friend who is looking for a home adds owner contacts for free, and referring an owner earns a free rent agreement (it waives Draazy's service fee at checkout; government charges still apply). Your code is on the [Refer a friend](/refer) page. Referrals are checked for fraud, so a reward appears once the referral qualifies, not the moment someone signs up. See [Referrals and rewards](/help/a/referrals-and-rewards).
 
 ## Billing
 
-Plans are prepaid for the term. Invoices are under **Dashboard → Billing** and emailed if you have an email on file. Auto-renewal is **off** by default.
+Passes and packs are prepaid for the term and never renew. Every payment is under **Dashboard → Plan & Billing**.
+
+## Money-back protection
+
+- **Listing Pass:** no enquiries in the first 7 live days? Full refund, once every 12 months.
+- **Contact Pack:** unused? Refund within 7 days.
+- **Contacts:** if an owner declines or does not reply in 7 days, the contact comes back to you automatically.
+
+Ask for a refund from **Plan & Billing**; the windows shown there are the live ones. See [Invoices, refunds and receipts](/help/a/invoices-and-refunds).
 
 ## Related
 
 - [Invoices, refunds and receipts](/help/a/invoices-and-refunds)
 - [Pricing your property](/help/a/price-your-property)
+- [Contacting owners](/help/a/contacting-owners)

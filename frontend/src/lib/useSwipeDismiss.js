@@ -16,13 +16,12 @@ const SLOP = 4;
 
 /* Controls that interpret a drag themselves: a range thumb *is* a drag handle, so a pointerdown on
    one is never "dismiss". Matched on the target so the gesture never arms rather than racing. */
-const DRAG_HANDLES = 'input[type="range"]';
+const DRAG_HANDLES = 'input[type="range"], .rng-thumb-hit';
 
-/**
- * Drag-to-dismiss for the app's mobile overlays (`'y'` bottom sheet, `'x'` side drawer). Pointer
- * capture waits for the first qualifying *move*: on pointerdown it would break every button inside.
- */
-export default function useSwipeDismiss(onDismiss, { axis = 'y' } = {}) {
+/* Pointer capture waits for the first qualifying *move*: on pointerdown it would break every button
+   inside. `query` is the width at which the caller is actually an overlay — the map detail panel
+   stays a sheet up to 767px and passes its own, or its grabber would be decoration in between. */
+export default function useSwipeDismiss(onDismiss, { axis = 'y', query = MOBILE, allowScrollableTop = false, scrollableSelector = '.filter-scroll' } = {}) {
   const drag = useRef(null);
 
   const distance = useCallback((e) => (axis === 'y'
@@ -30,16 +29,25 @@ export default function useSwipeDismiss(onDismiss, { axis = 'y' } = {}) {
     : drag.current.x - e.clientX), [axis]);
 
   const onPointerDown = useCallback((e) => {
-    if (!window.matchMedia(MOBILE).matches) return;
+    if (!window.matchMedia(query).matches) return;
     if (e.target?.closest?.(DRAG_HANDLES)) return;
-    if (axis === 'y' && e.clientY - e.currentTarget.getBoundingClientRect().top > HANDLE_ZONE) return;
-    drag.current = { x: e.clientX, y: e.clientY, active: false };
-  }, [axis]);
+    let fromScrollableTop = false;
+    if (axis === 'y' && e.clientY - e.currentTarget.getBoundingClientRect().top > HANDLE_ZONE) {
+      const scrollable = e.target?.closest?.(scrollableSelector);
+      if (!allowScrollableTop || !scrollable || scrollable.scrollTop > 0) return;
+      fromScrollableTop = true;
+    }
+    drag.current = { x: e.clientX, y: e.clientY, active: false, fromScrollableTop };
+  }, [allowScrollableTop, axis, query, scrollableSelector]);
 
   const onPointerMove = useCallback((e) => {
     if (!drag.current) return;
     const d = distance(e);
     if (!drag.current.active) {
+      if (drag.current.fromScrollableTop && d < -SLOP) {
+        drag.current = null;
+        return;
+      }
       if (d < SLOP) return;
       drag.current.active = true;
       e.currentTarget.setPointerCapture?.(e.pointerId);

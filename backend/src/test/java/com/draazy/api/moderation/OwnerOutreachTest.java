@@ -25,21 +25,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * {@code /properties/{id}/outreach} — chasing the owner of a listing.
- *
- * <p><strong>What shipped without a server.</strong> The console's Follow-up tab called
- * {@code sendOwnerReminder}, which incremented a number in the browser's own copy of the data and
- * produced no message at all. Its WhatsApp panel called {@code sendWhatsappTemplate}, which did open
- * a real chat — but recorded nothing, so two staff members chasing the same owner on the same
- * morning had no way to discover each other.
- *
- * <p><strong>Why every row says {@code prepared}.</strong> The send is WhatsApp click-to-chat: the
- * server renders the text, the staff member's own WhatsApp opens with it typed out, and they press
- * send. That is a real mechanism — no Business Solution Provider, no vendor, no Meta template
- * approval — but one this server cannot witness. Writing {@code sent} would be the platform
- * asserting delivery in the very table meant to be the evidence for it.
- */
 @DisplayName("D216 — chasing a listing's owner")
 class OwnerOutreachTest extends AbstractApiTest {
 
@@ -48,12 +33,12 @@ class OwnerOutreachTest extends AbstractApiTest {
     @Autowired
     PropertyRepository properties;
 
-    /** Read rather than hard-coded, so the test asserts the wiring and not a second copy of it. */
     @Value("${draazy.app.base-url}")
     String baseUrl;
 
     @AfterEach
     void clearAudit() {
+
         // AuditService commits in its own transaction, so its rows outlive this test's rollback.
         jdbc.update("delete from audit_log where action = 'property.outreach'");
         jdbc.update("delete from outbound_message where body like '%Outreach flat%'");
@@ -78,6 +63,15 @@ class OwnerOutreachTest extends AbstractApiTest {
         return properties.saveAndFlush(p);
     }
 
+    private void saleFlat(User owner, String slug, long price) {
+        Property sale = new Property(owner, "Outreach sale", "buy", "apartment", price, "Kothrud", "Pune");
+        sale.setArea(new BigDecimal("1000"));
+        sale.setPriceUnit("total");
+        sale.setLocalitySlug(slug);
+        sale.setStatus(PropertyStatus.APPROVED);
+        properties.saveAndFlush(sale);
+    }
+
     private String chase(User staff, Property p, String templateId, int expected) throws Exception {
         return mvc.perform(post("/properties/" + p.getId() + "/outreach")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
@@ -89,15 +83,7 @@ class OwnerOutreachTest extends AbstractApiTest {
                 .getContentAsString();
     }
 
-    /**
-     * The owner's name, the listing's title and the staff member's name are substituted from the
-     * database rather than from anything the caller sent.
-     *
-     * <p>The caller supplies a template id and nothing else, on purpose. A request that carried the
-     * message body would let any staff account send arbitrary text to a member of the public in the
-     * platform's name, which is a different and much larger power than picking from an approved
-     * library.
-     */
+    // Caller supplies a template id only.
     @Test
     @DisplayName("the message is rendered server-side from the listing, its owner and the sender")
     void rendersFromTheDatabase() throws Exception {
@@ -112,20 +98,7 @@ class OwnerOutreachTest extends AbstractApiTest {
         assertThat(body).doesNotContain("{owner_name}").doesNotContain("{staff_name}");
     }
 
-    /**
-     * A placeholder with no value is left standing as literal text rather than blanked.
-     *
-     * <p>{@code wa-pricing} asks for {@code market_rate}, which the mock answered with the string
-     * "9,500" for every locality in Pune. Carrying an invented figure across would mean quoting it
-     * to an owner deciding what to charge, so the key resolves to nothing — and the failure is loud,
-     * in the preview the staff member reads before pressing send, instead of a silently truncated
-     * sentence nobody notices.
-     *
-     * <p>This listing has no {@code localitySlug} at all, which is the harder of the two ways to
-     * arrive here: {@code LocalityResolver} declined to bind it to any row, so there is nothing to
-     * ask for a rate. The sibling below covers the softer way — a locality that exists and has
-     * simply not published one.
-     */
+    // Unresolved keys stay literal so staff see the template failure.
     @Test
     @DisplayName("an unresolved placeholder survives as literal text, where a human will see it")
     void unresolvedPlaceholdersAreVisible() throws Exception {
@@ -139,68 +112,62 @@ class OwnerOutreachTest extends AbstractApiTest {
         assertThat(body).contains("Sunita Rao");
     }
 
-    /**
-     * A locality that exists but has published no rate leaves the key standing too.
-     *
-     * <p>The distinction matters because the two cases look identical in the message and are not
-     * identical in the data: an unbound listing is a curation problem, and a bound listing with no
-     * rate is a coverage problem. Both correctly refuse to invent a number. 15 of the 155 seeded
-     * localities carry {@code rate_per_sqft}; {@code akurdi} is one of the 140 that do not.
-     */
     @Test
-    @DisplayName("a locality with no published rate leaves the key standing rather than guessing")
+    @DisplayName("a locality with fewer than three live sale listings leaves the key standing rather than guessing")
     void unratedLocalityLeavesTheKeyStanding() throws Exception {
         User owner = user("9853000009", "owner", "Nikhil Jadhav");
         User staff = user("9853000010", "staff", "Rhea Desk");
         Property p = listing(owner, true, staff.getId().toString());
         p.setLocalitySlug("akurdi");
         properties.saveAndFlush(p);
+        saleFlat(owner, "akurdi", 10_000_000L);
+        saleFlat(owner, "akurdi", 11_000_000L);
 
         String body = JsonPath.read(chase(staff, p, "wa-pricing", 200), "$.body");
 
         assertThat(body).contains("{market_rate}");
     }
 
-    /**
-     * When the locality has published a rate, the owner is quoted that one.
-     *
-     * <p>The same figure {@code GET /localities/{slug}} already shows buyers. That is the whole
-     * argument for wiring it: the alternative to quoting the owner the number their buyers see is
-     * either inventing one (what the mock did) or keeping it from them (what the server did until
-     * now), and a pricing chaser that cannot name a price is not a pricing chaser.
-     *
-     * <p>{@code 11200} is {@code kothrud}'s seeded {@code rate_per_sqft}. Hard-coded on purpose: if
-     * the seed moves, this test should say so rather than quietly re-derive whatever it finds and
-     * assert that it equals itself.
-     */
     @Test
-    @DisplayName("a locality with a published rate is quoted, not guessed at")
+    @DisplayName("the rate is the average asking rate per sq ft of the locality's live sale flats")
     void publishedRateIsQuoted() throws Exception {
         User owner = user("9853000011", "owner", "Anjali More");
         User staff = user("9853000012", "staff", "Kabir Desk");
         Property p = listing(owner, true, staff.getId().toString());
         p.setLocalitySlug("kothrud");
         properties.saveAndFlush(p);
+        saleFlat(owner, "kothrud", 10_000_000L);
+        saleFlat(owner, "kothrud", 11_000_000L);
+        saleFlat(owner, "kothrud", 12_000_000L);
 
         String body = JsonPath.read(chase(staff, p, "wa-pricing", 200), "$.body");
 
-        assertThat(body).contains("11200").doesNotContain("{market_rate}");
+        assertThat(body).contains("\u20b911,000/sqft").contains("\u20b927,000").doesNotContain("{market_rate}");
     }
 
-    /**
-     * The link an owner is asked to tap points at <em>this</em> deployment.
-     *
-     * <p>Three templates wrote the URL out by hand as {@code draazy.com/property/{listing_id}}.
-     * Nothing failed: the message rendered, the handoff link opened, and the sentence read
-     * correctly — while every chaser sent from a staging box asked an owner to confirm availability
-     * on production, against a listing id that only exists here. The owner taps it, sees a 404 or,
-     * worse, somebody else's flat, and the platform has just told them their listing is gone.
-     *
-     * <p>Asserted against the configured base URL rather than a literal, and paired with the
-     * negative: a template that reverted to the hard-coded host would still contain a plausible
-     * link, so "contains a URL" is not the assertion. {@code draazy.com} deliberately does not
-     * appear in the test configuration for this reason — see {@code application.properties}.
-     */
+    @Test
+    @DisplayName("every served template renders with nothing left in braces when the listing has full context")
+    void everyTemplateResolves() throws Exception {
+        User owner = user("9853000019", "owner", "Vikas Patil");
+        User staff = user("9853000020", "staff", "Sweep Desk");
+        Property p = listing(owner, true, staff.getId().toString());
+        p.setLocalitySlug("kothrud");
+        properties.saveAndFlush(p);
+        saleFlat(owner, "kothrud", 10_000_000L);
+        saleFlat(owner, "kothrud", 11_000_000L);
+        saleFlat(owner, "kothrud", 12_000_000L);
+
+        List<String> ids = JsonPath.read(mvc.perform(get("/admin/message-templates")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "$[*].id");
+
+        assertThat(ids).isNotEmpty();
+        for (String template : ids) {
+            String body = JsonPath.read(chase(staff, p, template, 200), "$.body");
+            assertThat(body).describedAs(template).doesNotContainPattern("\\{[a-z_]+\\}");
+        }
+    }
+
     @Test
     @DisplayName("the listing link points at the deployment that sent it, not at production")
     void theListingLinkIsBuiltFromTheConfiguredBaseUrl() throws Exception {
@@ -221,13 +188,6 @@ class OwnerOutreachTest extends AbstractApiTest {
         }
     }
 
-    /**
-     * The handoff link is a real {@code wa.me} URL addressed to the owner's actual number, carrying
-     * the rendered message.
-     *
-     * <p>This is where the send happens, so a link to the wrong number is not a cosmetic bug — it is
-     * a message about somebody's flat arriving on a stranger's phone.
-     */
     @Test
     @DisplayName("the handoff link addresses the owner's own number and carries the message")
     void handoffLinkIsAddressedToTheOwner() throws Exception {
@@ -244,14 +204,7 @@ class OwnerOutreachTest extends AbstractApiTest {
                 .isEqualTo(body);
     }
 
-    /**
-     * Every chaser is recorded, and the log is what the next colleague reads before picking up the
-     * phone.
-     *
-     * <p>Asserted through the read endpoint rather than the table, because a ledger nobody can query
-     * is not a ledger. The status assertion is deliberate: this platform knows a message was
-     * composed and handed to a human, and must not claim more.
-     */
+    // Asserted through the read endpoint because a ledger nobody can query is not a ledger.
     @Test
     @DisplayName("chasers accumulate in a log the next colleague can read, marked prepared")
     void chasersAreRecorded() throws Exception {
@@ -260,26 +213,18 @@ class OwnerOutreachTest extends AbstractApiTest {
         Property p = listing(owner, true, staff.getId().toString());
 
         chase(staff, p, "wa-photos", 200);
-        chase(staff, p, "wa-aadhaar", 200);
+        chase(staff, p, "wa-identity", 200);
 
         mvc.perform(get("/properties/" + p.getId() + "/outreach")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].templateId").value("wa-aadhaar"))
+                .andExpect(jsonPath("$[0].templateId").value("wa-identity"))
                 .andExpect(jsonPath("$[0].status").value("prepared"))
                 .andExpect(jsonPath("$[1].templateId").value("wa-photos"));
     }
 
-    /**
-     * The count on a pipeline card comes from the messages themselves.
-     *
-     * <p>D215 shipped {@code reminderCount} hard-coded to zero with a contract note promising it
-     * would become a count over outbound messages rather than a column — precisely so it could not
-     * drift from the messages actually sent. This is that promise being kept, and the reason it is
-     * asserted through the moderation queue is that the queue is the one read where the number is
-     * computed for a whole page at once.
-     */
+    // Count from outbound messages, not a stored column that can drift.
     @Test
     @DisplayName("reminderCount is counted from the ledger, not stored beside the listing")
     void reminderCountComesFromTheLedger() throws Exception {
@@ -300,11 +245,6 @@ class OwnerOutreachTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].adminPipeline.reminderCount").value(3));
     }
 
-    /**
-     * A template id the library does not know is refused rather than sent as literal text.
-     *
-     * <p>The alternative — silently sending the id — would put "wa-onbaord" on an owner's phone.
-     */
     @Test
     @DisplayName("an unknown template is refused")
     void unknownTemplatesAreRefused() throws Exception {
@@ -315,13 +255,37 @@ class OwnerOutreachTest extends AbstractApiTest {
         chase(staff, p, "wa-does-not-exist", 400);
     }
 
-    /**
-     * Buyers cannot chase owners.
-     *
-     * <p>The guard is {@code postOnBehalf:write} rather than {@code properties:write} because this
-     * puts a message on a member of the public's personal phone in the platform's name — the same
-     * power, pointed at the same people, as creating a listing under their number.
-     */
+    // This messages a private phone in the platform's name,
+    // so it needs the post-on-behalf grant.
+    @Test
+    @DisplayName("verification reason templates render through the outreach endpoint")
+    void reasonTemplatesRender() throws Exception {
+        User owner = user("9853000017", "owner", "Maya Kulkarni");
+        User staff = user("9853000018", "staff", "Nora Desk");
+        Property p = listing(owner, true, staff.getId().toString());
+
+        for (String template : List.of(
+                "reason_photos_not_real",
+                "reason_duplicate",
+                "reason_broker",
+                "reason_wrong_details",
+                "reason_locality_unclear",
+                "reason_document_unreadable",
+                "reason_name_mismatch")) {
+            String body = JsonPath.read(chase(staff, p, template, 200), "$.body");
+
+            assertThat(body)
+                    .describedAs(template)
+                    .contains("Maya Kulkarni")
+                    .contains("Outreach flat")
+                    .contains("Draazy Team");
+            assertThat(body)
+                    .describedAs(template)
+                    .doesNotContain("{owner_name}")
+                    .doesNotContain("{title}");
+        }
+    }
+
     @Test
     @DisplayName("a buyer cannot send outreach")
     void buyersCannotChase() throws Exception {
@@ -342,8 +306,8 @@ class OwnerOutreachTest extends AbstractApiTest {
         mvc.perform(get("/admin/message-templates")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.id == 'wa-aadhaar')].name").value("Aadhaar verification"))
-                .andExpect(jsonPath("$[?(@.id == 'wa-aadhaar')].body").value(
+                .andExpect(jsonPath("$[?(@.id == 'wa-identity')].name").value("Identity verification"))
+                .andExpect(jsonPath("$[?(@.id == 'wa-identity')].body").value(
                         org.hamcrest.Matchers.hasItem(org.hamcrest.Matchers.containsString("{owner_name}"))));
     }
 }

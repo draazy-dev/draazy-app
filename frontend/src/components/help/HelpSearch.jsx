@@ -3,17 +3,8 @@ import { Link, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { excerptFor } from '../../lib/help.js';
-import { useHelpSearch, useHelpPath } from '../../lib/useHelp.js';
-
-/* Search box for the help centre.
- *
- * Two modes:
- *   - `variant="hero"`  large, centred, used on the landing page
- *   - `variant="bar"`   compact, used in the sticky docs header
- *
- * Suggestions appear inline below the field. Enter goes to the full results
- * page so a query is always shareable as a URL, which a dropdown-only search
- * cannot offer. */
+import { useHelpSearch } from '../../lib/useHelp.js';
+/* Enter goes to the full results page rather than staying in the dropdown, so a query is always shareable as a URL. */
 
 export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
   const { t } = useTranslation();
@@ -23,7 +14,6 @@ export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
   const wrapRef = useRef(null);
   const inputRef = useRef(null);
   const navigate = useNavigate();
-  const hp = useHelpPath();
 
   const results = useHelpSearch(query, 6);
 
@@ -34,9 +24,9 @@ export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
-
   // "/" focuses search from anywhere in the help centre, the convention every
   // docs site uses. Ignored while the user is typing in another field.
+
   useEffect(() => {
     const onKey = (e) => {
       if (e.key !== '/' || e.metaKey || e.ctrlKey) return;
@@ -52,7 +42,7 @@ export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
   const go = (slug) => {
     setOpen(false);
     setQuery('');
-    navigate(hp(`/help/a/${slug}`));
+    navigate(`/help/a/${slug}`);
   };
 
   const submit = (e) => {
@@ -61,7 +51,7 @@ export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
     const q = query.trim();
     if (q.length >= 2) {
       setOpen(false);
-      navigate(hp(`/help/search?q=${encodeURIComponent(q)}`));
+      navigate(`/help/search?q=${encodeURIComponent(q)}`);
     }
   };
 
@@ -114,7 +104,7 @@ export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
         <div
           id="help-search-suggestions"
           role="listbox"
-          className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-white/10 bg-[#15122a] shadow-2xl shadow-black/50"
+          className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-xl border border-white/10 bg-ink-card shadow-2xl shadow-black/50"
         >
           {results.length === 0 ? (
             <p className="px-4 py-5 text-sm text-gray-500">
@@ -125,7 +115,7 @@ export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
             </p>
           ) : (
             <>
-              <ul className="max-h-[22rem] overflow-y-auto py-1">
+              <ul className="max-h-[22rem] overflow-y-auto overscroll-contain py-1">
                 {results.map(({ article }, i) => (
                   <li key={article.slug}>
                     <button
@@ -145,8 +135,8 @@ export default function HelpSearch({ variant = 'bar', initialQuery = '' }) {
               </ul>
               <button
                 type="button"
-                onClick={() => { setOpen(false); navigate(hp(`/help/search?q=${encodeURIComponent(query.trim())}`)); }}
-                className="block w-full border-t border-white/5 px-4 py-2.5 text-left text-xs font-semibold text-teal-400 hover:bg-white/[0.04]"
+                onClick={() => { setOpen(false); navigate(`/help/search?q=${encodeURIComponent(query.trim())}`); }}
+                className="tap-target flex w-full items-center border-t border-white/5 px-4 py-2.5 text-left text-xs font-semibold text-teal-400 hover:bg-white/[0.04]"
               >
                 {t('help.seeAllResults', { query: query.trim() })}
               </button>

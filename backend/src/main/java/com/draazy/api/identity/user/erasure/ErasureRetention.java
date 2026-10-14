@@ -4,27 +4,22 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/**
- * What erasure deletes, what it keeps, and on whose authority. The statutory reasoning that decided
- * each category: docs/system/legal-entity-and-compliance.md §11.
- */
+/** What erasure deletes, what it keeps, and on whose authority. Statutory reasoning per category:
+ * docs/system/legal-entity-and-compliance.md §11. */
 public final class ErasureRetention {
 
     private ErasureRetention() {
     }
 
-    /**
-     * Categories deliberately kept, and the law that requires keeping them. Written into
-     * {@code erasure_requests.retained} at execution; ordered so two stored documents diff cleanly.
-     */
+    /** Written into {@code erasure_requests.retained} at execution; ordered so two stored documents
+     * diff cleanly. */
     public static Map<String, String> retainedWithReasons() {
         Map<String, String> reasons = new LinkedHashMap<>();
 
         reasons.put("payments_and_invoices",
                 "Books of account. Income-tax Act 1961 s.44AA with Rule 6F requires books and "
                         + "vouchers to be kept for six years from the end of the relevant assessment "
-                        + "year; CGST Act 2017 s.36 requires seventy-two months from the due date of "
-                        + "the annual return; Companies Act 2013 s.128(5) requires eight years. A "
+                        + "year; Companies Act 2013 s.128(5) requires eight years. A "
                         + "receipt with the payer erased is not a book of account, it is an "
                         + "unattributed credit -- so the identifying fields are the part the statute "
                         + "is actually asking for.");
@@ -61,8 +56,9 @@ public final class ErasureRetention {
                         + "identified by their staff id -- the subject appears as an entity id, not "
                         + "as a name or a number. Erasing it would remove the proof that moderation "
                         + "and erasure themselves were carried out properly, including the proof of "
-                        + "this erasure. It is also the only table on the platform that is "
-                        + "append-only by design.");
+                        + "this erasure. Kept 365 days, then purged: security and accountability "
+                        + "log retention (CERT-In 180 days, DPDP Rule 6 one year). Within that "
+                        + "window it is append-only by design.");
 
         reasons.put("abuse_reports",
                 "Safety record. A report *about* the subject is another user's statement and the "
@@ -91,25 +87,27 @@ public final class ErasureRetention {
         return reasons;
     }
 
-    /**
-     * Personal data this sweep does not reach, disclosed to the subject alongside the retentions.
-     * Derived from the schema by {@code ErasureCoverageTest}, which fails the build on any omission.
-     */
+    /** Personal data this sweep does not reach, disclosed to the subject alongside the retentions.
+     * Derived from the schema by {@code ErasureCoverageTest}, which fails the build on any omission. */
     public static List<String> knownGaps() {
         return List.of(
                 "referrals — referrer_mobile and referred_mobile are stored numbers, not references,"
                         + " so they survive pseudonymisation of the users row. The same rows also"
-                        + " hold two salted digests of the address and browser the referral was"
+                        + " hold three salted digests of the address, browser and device the referral was"
                         + " redeemed from, used only to detect referral fraud; those are cleared"
-                        + " automatically ninety days after the referral, whether or not erasure is"
-                        + " ever requested.",
-                "referral_codes — the referrer's half of the same two salted fraud digests, captured"
-                        + " when their code was minted. Cleared automatically ninety days after"
-                        + " capture. The code itself stays: it is not personal data, and it is what"
+                        + " automatically after the retention window the platform sets (180 days by default),"
+                        + " whether or not erasure is ever requested.",
+                "refund_requests.device_id_hash / instrument_hash and subscriptions.payment_instrument_hash — salted"
+                        + " digests of the browser and payment instrument behind a refund, kept so a refund that is only"
+                        + " allowed once a year cannot be repeated from a second account. A digest, not an identifier;"
+                        + " the rows are reached by user id only after pseudonymisation.",
+                "referral_codes — the referrer's half of the same salted fraud digests, refreshed"
+                        + " whenever they open the referral screen. Cleared automatically after the same"
+                        + " window. The code itself stays: it is not personal data, and it is what"
                         + " every link already shared points at.",
                 "flatmate_group_members.name — a NOT NULL denormalised copy of users.name, written"
                         + " at join time.",
-                "society_leads / tickets / service_requests — contact_name and mobile captured at"
+                "tickets / service_requests — contact_name and mobile captured at"
                         + " intake, some of it before an account existed, so it is not always"
                         + " reachable from a user id at all.",
                 "deal_parties.name / deal_parties.mobile — denormalised party contact on a record"
@@ -127,14 +125,12 @@ public final class ErasureRetention {
                 "managed_properties.tenant_name — a third party's name typed in by an owner. Erasing"
                         + " the owner does not touch it, and the tenant it names has no account here"
                         + " to erase from.",
-                "flatmate_groups.owner_consent_mobile / flatmate_owner_consents.owner_mobile — the"
-                        + " flat owner's number, captured as evidence of their consent to a flatmate"
-                        + " group. The consent record keys on the number itself.",
+                "flatmate_groups.owner_consent_mobile / flatmate_rooms.owner_consent_mobile / "
+                        + "flatmate_owner_consents.owner_mobile — the flat owner's number, captured"
+                        + " as evidence of their consent to a flatmate post. The consent record keys"
+                        + " on the number itself.",
                 "flatmate_seeker_posts — name, age and occupation are stored on the post rather than"
                         + " read through user_id, so the post keeps describing its author after the"
-                        + " users row stops naming anybody.",
-                "personal_documents — the subject's own uploaded KYC papers. Neither the row nor the"
-                        + " stored object is reached by this sweep, which makes it the largest of"
-                        + " these gaps by volume of personal data.");
+                        + " users row stops naming anybody.");
     }
 }

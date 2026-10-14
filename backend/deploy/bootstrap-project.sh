@@ -8,8 +8,13 @@ set -euo pipefail
 # ---------------------------------------------------------------------------------------------
 # Configuration. PROJECT_ID and GITHUB_REPO are the only two that change between projects.
 # ---------------------------------------------------------------------------------------------
-PROJECT_ID="${PROJECT_ID:-draazy-sandbox}"
+PROJECT_ID="${PROJECT_ID:?Set PROJECT_ID to the target GCP project id}"
 GITHUB_REPO="${GITHUB_REPO:-yatishpatil101/Learning}"
+
+# Moving accounts: each secret's latest value is copied from here instead of prompting. The set-once
+# keys must carry over, or data already in the database becomes unreadable — docs/DEPLOY.md §5.2.
+OLD_PROJECT_ID="${OLD_PROJECT_ID:-}"
+OLD_ACCOUNT="${OLD_ACCOUNT:-}"
 
 # Must match `env.REGION` and `env.AR_REPOSITORY` in deploy.yml. They are duplicated rather
 # than read from the workflow because parsing YAML in bash to save one edit is a worse trade.
@@ -18,6 +23,7 @@ AR_REPOSITORY="${AR_REPOSITORY:-draazy}"
 SERVICE="${SERVICE:-draazy-api-sandbox}"
 
 RUNTIME_SA="draazy-api-sandbox"
+MIGRATOR_SA="draazy-migrator-sandbox"
 DEPLOYER_SA="github-deployer"
 WIF_POOL="github-actions"
 WIF_PROVIDER="github"
@@ -27,6 +33,7 @@ WIF_PROVIDER="github"
 GITHUB_ENVIRONMENT="${GITHUB_ENVIRONMENT:-sandbox}"
 
 RUNTIME="${RUNTIME_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
+MIGRATOR="${MIGRATOR_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 DEPLOYER="${DEPLOYER_SA}@${PROJECT_ID}.iam.gserviceaccount.com"
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
@@ -103,9 +110,10 @@ gcloud artifacts repositories set-cleanup-policies "$AR_REPOSITORY" \
 # ---------------------------------------------------------------------------------------------
 say "Service accounts"
 # ---------------------------------------------------------------------------------------------
-# Two identities, deliberately: only the runtime one may read secrets. Cloud Run checks the runtime
-# identity's grant when it starts the container, so secretAccessor on the deployer buys nothing.
-for pair in "$RUNTIME_SA:Draazy API runtime" "$DEPLOYER_SA:GitHub Actions deployer"; do
+# Three identities, deliberately: secrets are granted one by one (below), and only the migrator can read
+# the schema-owner password. The deployer reads none — Cloud Run checks the identity it starts as.
+for pair in "$RUNTIME_SA:Draazy API runtime" "$MIGRATOR_SA:Draazy schema migrations" \
+            "$DEPLOYER_SA:GitHub Actions deployer"; do
   sa_id="${pair%%:*}"
   sa_desc="${pair#*:}"
   if ! gcloud iam service-accounts describe "${sa_id}@${PROJECT_ID}.iam.gserviceaccount.com" >/dev/null 2>&1; then
@@ -113,14 +121,12 @@ for pair in "$RUNTIME_SA:Draazy API runtime" "$DEPLOYER_SA:GitHub Actions deploy
   fi
 done
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$RUNTIME" --role=roles/secretmanager.secretAccessor \
-  --condition=None --quiet >/dev/null
-
-# Scoped to the runtime service account, NOT the project: at project level serviceAccountUser confers
+# Scoped to each account, NOT the project: at project level serviceAccountUser confers
 # actAs on the default Compute Engine account, which carries Editor — docs/DEPLOY.md §5.
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME" \
-  --member="serviceAccount:$DEPLOYER" --role=roles/iam.serviceAccountUser --quiet >/dev/null
+for sa in "$RUNTIME" "$MIGRATOR"; do
+  gcloud iam service-accounts add-iam-policy-binding "$sa" \
+    --member="serviceAccount:$DEPLOYER" --role=roles/iam.serviceAccountUser --quiet >/dev/null
+done
 
 gcloud artifacts repositories add-iam-policy-binding "$AR_REPOSITORY" --location="$REGION" \
   --member="serviceAccount:$DEPLOYER" --role=roles/artifactregistry.writer --quiet >/dev/null
@@ -195,16 +201,25 @@ gcloud iam service-accounts add-iam-policy-binding "$DEPLOYER" \
 
 # ---------------------------------------------------------------------------------------------
 say "Secret Manager"
-# ---------------------------------------------------------------------------------------------
-# All six must exist before the first `services replace`: cloudrun-sandbox.yaml holds a secretKeyRef
-# to each. `printf '%s'`, or a trailing newline joins the value and reads later as a bad password.
+# All sixteen must exist before the first `services replace`; use printf '%s', as a trailing newline
+# joins the value and reads later as a bad password.
 SECRETS=(
-  "draazy-sandbox-db-password:Supabase database password"
+  "draazy-sandbox-db-password:Supabase password for DB_USER (the draazy_app runtime role; postgres until docs/DEPLOY.md §2.1 is done)"
+  "draazy-sandbox-flyway-db-password:Supabase postgres password, for Flyway only"
   "draazy-sandbox-jwt-secret:JWT signing key (openssl rand -base64 48)"
   "draazy-sandbox-referral-signal-salt:Referral signal salt (openssl rand -base64 32)"
-  "draazy-sandbox-cashfree-webhook-secret:Cashfree webhook secret (any placeholder while disabled)"
-  "draazy-sandbox-cashfree-app-id:Cashfree app id (any placeholder while disabled)"
-  "draazy-sandbox-cashfree-secret-key:Cashfree secret key (any placeholder while disabled)"
+  "draazy-sandbox-identity-hash-secret:KYC identity_hash HMAC key (openssl rand -base64 32) — set once, rotating orphans every stored hash"
+  "draazy-sandbox-origin-shared-secret:Pages-to-Cloud-Run proxy secret (openssl rand -base64 48) — also set as Pages secret ORIGIN_SHARED_SECRET, byte for byte"
+  "draazy-sandbox-staff-totp-key:Staff authenticator key (openssl rand -base64 32) — set once, rotating forces every staff 2FA re-enrolment"
+  "draazy-sandbox-identity-encryption-key:PAN/Aadhaar encryption key (openssl rand -base64 32) — set once, losing it makes stored numbers unreadable"
+  "draazy-sandbox-cashfree-app-id:Cashfree sandbox App ID (TEST…) — no placeholder, sandbox deploys with payments on"
+  "draazy-sandbox-cashfree-secret-key:Cashfree sandbox Secret Key (cfsk_…) — also the webhook signing key, so a placeholder 401s every order and breaks the HMAC"
+  "draazy-sandbox-r2-access-key-id:R2 access key id, from a token scoped to the two sandbox buckets"
+  "draazy-sandbox-r2-secret-access-key:R2 secret access key (shown once at token creation)"
+  "draazy-sandbox-google-places-server-key:Google Places API (New) server key, restricted to that API"
+  "draazy-sandbox-zeptomail-api-key:ZeptoMail Send Mail token (CPaaS → Agents → agent → SMTP/API)"
+  "draazy-sandbox-push-vapid-private-key:Web push VAPID private key (npx web-push generate-vapid-keys)"
+  "draazy-sandbox-push-vapid-public-key:Web push VAPID public key (same pair; also repo var VITE_VAPID_PUBLIC_KEY)"
 )
 
 for entry in "${SECRETS[@]}"; do
@@ -215,16 +230,29 @@ for entry in "${SECRETS[@]}"; do
     gcloud secrets create "$name" --replication-policy=automatic --quiet
   fi
 
-  # Only prompts when the secret has no version, so a re-run neither asks for six values again nor
+  reader="$RUNTIME"
+  if [ "$name" = "draazy-sandbox-flyway-db-password" ]; then reader="$MIGRATOR"; fi
+  gcloud secrets add-iam-policy-binding "$name" \
+    --member="serviceAccount:$reader" --role=roles/secretmanager.secretAccessor --quiet >/dev/null
+
+  # Only prompts when the secret has no version, so a re-run neither asks for every value again nor
   # adds a redundant version — every version counts against the free tier's six.
   if gcloud secrets versions list "$name" --limit=1 --format='value(name)' 2>/dev/null | grep -q .; then
     echo "  $name — already has a version, skipping"
     continue
   fi
 
-  printf '  %s\n    %s: ' "$name" "$desc"
-  read -rs value
-  printf '\n'
+  value=""
+  if [ -n "$OLD_PROJECT_ID" ]; then
+    value="$(gcloud secrets versions access latest --secret="$name" --project="$OLD_PROJECT_ID" \
+      ${OLD_ACCOUNT:+--account="$OLD_ACCOUNT"} 2>/dev/null || true)"
+    if [ -n "$value" ]; then echo "  $name — copied from $OLD_PROJECT_ID"; fi
+  fi
+  if [ -z "$value" ]; then
+    printf '  %s\n    %s: ' "$name" "$desc"
+    read -rs value
+    printf '\n'
+  fi
   [ -n "$value" ] || { echo "Empty value refused — the container would start and fail on first use." >&2; exit 1; }
   printf '%s' "$value" | gcloud secrets versions add "$name" --data-file=- --quiet >/dev/null
   unset value
@@ -251,7 +279,8 @@ cat <<EOF
   Secrets (carry over unchanged from the previous project — Supabase is a separate vendor):
     SANDBOX_DB_URL         transaction pooler, port 6543
     SANDBOX_FLYWAY_DB_URL  session pooler, port 5432
-    SANDBOX_DB_USER        postgres.<project-ref>
+    SANDBOX_DB_USER        draazy_app.<project-ref>  (postgres.<project-ref> until DEPLOY.md §2.1)
+    SANDBOX_FLYWAY_DB_USER postgres.<project-ref>
 
   If GCP_SA_KEY is still present from the key-based setup, DELETE IT — it is now unused, and an
   unused permanent credential is strictly worse than no credential. Then delete the key itself:
@@ -260,5 +289,11 @@ cat <<EOF
   After the first deploy, repoint Cloudflare Pages at the new service or the site 502s:
     gcloud run services describe ${SERVICE} --region ${REGION} --format='value(status.url)'
   Pages > draazy > Settings > Environment variables > API_ORIGIN
+  and give Pages the same proxy secret, or every /api call 502s (unset) or 403s (different):
+    gcloud secrets versions access latest --secret=draazy-sandbox-origin-shared-secret | npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=draazy
+
+  Optional, for the first back-office login (docs/DEPLOY.md §3):
+    secrets  SANDBOX_BOOTSTRAP_ADMIN_EMAIL, SANDBOX_BOOTSTRAP_ADMIN_MOBILE
+    variable SANDBOX_BOOTSTRAP_ADMIN_RECOVER
 
 EOF

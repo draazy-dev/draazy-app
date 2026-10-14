@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.web.PageResponse;
+import com.draazy.api.common.web.Pageables;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.BackOfficePermissions;
@@ -9,6 +10,8 @@ import com.draazy.api.security.Roles;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -23,21 +26,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * The Ops and admin side of the flatmates market (contract tag {@code Moderation}).
- *
- * <p>Every route here is staff/admin, matching the contract's {@code x-roles}. The two axes are kept
- * on separate routes deliberately — see {@link FlatmateModerationService} for why verification and
- * moderation must not collapse into one another.
- *
- * <p><strong>Per-account atoms narrow the same routes again</strong> (tech debt D192/D13):
- * {@code flatmates:read} for the four queues, {@code flatmates:write} for the four decisions. The
- * split is the one that matters on a queue somebody is being trained on — watching the work is not
- * the same permission as doing it. Both are {@code and}-ed onto {@link #STAFF_OR_ADMIN}, so neither
- * can admit a caller the role guard refused.
- */
+/** Staff/admin side of the flatmates market. Verification and moderation stay on separate routes —
+ * see {@link FlatmateModerationService} for why they must not collapse into one another. */
 @RestController
 public class FlatmateModerationController {
+
+    private static final Set<String> SORTABLE = Set.of("createdAt");
 
     private static final String STAFF_OR_ADMIN =
             "hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "')";
@@ -47,28 +41,27 @@ public class FlatmateModerationController {
             STAFF_OR_ADMIN + " and " + BackOfficePermissions.REQUIRE_FLATMATES_WRITE;
 
     private final FlatmateModerationService service;
+    private final FlatmateModerationDetails details;
+    private final FlatmateModeratorEditService editor;
 
-    public FlatmateModerationController(FlatmateModerationService service) {
+    public FlatmateModerationController(FlatmateModerationService service,
+            FlatmateModerationDetails details, FlatmateModeratorEditService editor) {
         this.service = service;
+        this.details = details;
+        this.editor = editor;
     }
 
-    /**
-     * {@code GET /admin/flatmate-reviews} (contract {@code listFlatmateReviews}) — paged.
-     *
-     * <p>Was a bare array, and was the wrong one: it read every row of a platform-wide table with
-     * no scoping and no cap, while every other admin queue in the API pages. See
-     * {@link FlatmateModerationService#queue}.
-     */
+    /** {@code GET /admin/flatmate-reviews} (contract {@code listFlatmateReviews}) — paged, because
+     * this is a platform-wide table with no scoping. */
     @GetMapping(Routes.Moderation.FLATMATE_REVIEWS)
     @PreAuthorize(FLATMATES_READ)
-    public PageResponse<FlatmateReviewDto> queue(@RequestParam(required = false) String status,
+    public PageResponse<FlatmateReviewRow> queue(@RequestParam(required = false) String status,
             @RequestParam(required = false) Boolean flagged,
             @PageableDefault(size = 20, sort = "createdAt",
                     direction = Sort.Direction.ASC) Pageable pageable) {
-        return PageResponse.of(service.queue(status, flagged, pageable), dto -> dto);
+        return PageResponse.of(service.queue(status, flagged, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
     }
 
-    /** {@code PATCH /admin/flatmate-reviews/{id}} (contract {@code decideFlatmateReview}). */
     @PatchMapping(Routes.Moderation.FLATMATE_REVIEW_BY_ID)
     @PreAuthorize(FLATMATES_WRITE)
     public FlatmateReviewDto decide(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
@@ -76,30 +69,39 @@ public class FlatmateModerationController {
         return service.decideReview(principal, id, body.decision(), body.note());
     }
 
-    /**
-     * {@code GET /admin/flatmates/moderation} — the queue D72 created.
-     *
-     * <p>Oldest first by default: a moderation queue served newest-first starves the person who has
-     * been waiting longest, which is the one outcome that turns "we moderate posts" into "we lose
-     * posts".
-     */
     @GetMapping(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
     @PreAuthorize(FLATMATES_READ)
-    public PageResponse<FlatmateModerationQueueDto> moderationQueue(
-            @RequestParam(defaultValue = "post") String kind,
-            @RequestParam(required = false) String modStatus,
+    public PageResponse<FlatmateModerationRow> moderationQueue(
+            @RequestParam(defaultValue = "post") List<String> kind,
+            @RequestParam(required = false) List<String> modStatus,
             @PageableDefault(size = 20, sort = "createdAt",
                     direction = Sort.Direction.ASC) Pageable pageable) {
-        return PageResponse.of(service.moderationQueue(kind, modStatus, pageable), dto -> dto);
+        return PageResponse.of(service.moderationQueue(kind, modStatus, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
     }
 
-    /**
-     * {@code PATCH /admin/flatmates/{id}/moderation} (contract {@code moderateFlatmatePost}).
-     *
-     * <p>200 with no body: the contract declares no response schema, and the client already knows
-     * what it set. Echoing the post back would invite a client to re-render a row it should be
-     * refetching from the queue it is working through.
-     */
+    /** What the desk's tab labels show: the true size of each tab, not of the window downloaded. */
+    @GetMapping(Routes.Moderation.FLATMATE_MODERATION_SUMMARY)
+    @PreAuthorize(FLATMATES_READ)
+    public FlatmateModerationSummary moderationSummary() {
+        return service.moderationSummary();
+    }
+
+    @GetMapping(Routes.Moderation.FLATMATE_MODERATION_DETAIL)
+    @PreAuthorize(FLATMATES_READ)
+    public FlatmateModerationDetailDto detail(@PathVariable UUID id) {
+        return details.find(id);
+    }
+
+    @PatchMapping(Routes.Moderation.FLATMATE_MODERATION_DETAIL)
+    @PreAuthorize(FLATMATES_WRITE)
+    public FlatmateModerationDetailDto edit(@CurrentUser AuthPrincipal principal,
+            @PathVariable UUID id, @Valid @RequestBody FlatmateModeratorEdit body) {
+        editor.edit(principal, id, body);
+        return details.find(id);
+    }
+
+    /** {@code PATCH /admin/flatmates/{id}/moderation}. 200 with no body: the contract declares no
+     * response schema, and a client should refetch the queue rather than re-render a row. */
     @PatchMapping(Routes.Moderation.FLATMATE_MODERATION)
     @PreAuthorize(FLATMATES_WRITE)
     @ResponseStatus(HttpStatus.OK)
@@ -108,11 +110,8 @@ public class FlatmateModerationController {
         service.moderate(principal, id, body.modStatus(), body.note());
     }
 
-    /**
-     * Contract schema {@code DecisionRequest} as this queue uses it: {@code approved} or
-     * {@code rejected}, with a reason that is mandatory on a rejection (checked in the service, and
-     * again by the database).
-     */
+    /** Contract schema {@code DecisionRequest}: {@code approved} or {@code rejected}, with a reason
+     * mandatory on a rejection (checked in the service, and again by the database). */
     public record DecisionRequest(@NotBlank String decision, @Size(max = 600) String note) {
     }
 
@@ -120,20 +119,16 @@ public class FlatmateModerationController {
     public record ModerationRequest(@NotBlank String modStatus, @Size(max = 600) String note) {
     }
 
-    /** {@code GET /admin/group-applications} (contract {@code listGroupApplications}) — paged. */
     @GetMapping(Routes.Moderation.GROUP_APPLICATIONS)
     @PreAuthorize(FLATMATES_READ)
     public PageResponse<GroupApplicationDto> applications(
-            @PageableDefault(size = 20) Pageable pageable) {
-        return PageResponse.of(service.applications(pageable), dto -> dto);
+            @RequestParam(required = false) List<String> modStatus,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return PageResponse.of(service.applications(modStatus, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
     }
 
-    /**
-     * {@code PATCH /admin/group-applications/{id}} (contract {@code decideGroupApplication}).
-     *
-     * <p>Named "decide" by the contract, but it writes the <em>moderation</em> axis only — the
-     * owner's accept/decline is theirs alone. See {@link FlatmateModerationService}.
-     */
+    /** Named "decide" by the contract, but it writes the moderation axis only — the owner's
+     * accept/decline is theirs alone. See {@link FlatmateModerationService}. */
     @PatchMapping(Routes.Moderation.GROUP_APPLICATION_BY_ID)
     @PreAuthorize(FLATMATES_WRITE)
     public GroupApplicationDto moderateApplication(@CurrentUser AuthPrincipal principal,

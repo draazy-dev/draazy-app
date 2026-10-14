@@ -1,223 +1,187 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import {
-  Check, CheckCircle, ExternalLink, FileCheck2, FileText,
-  Info, MapPin, MessagesSquare,
-  Send, X, XCircle, History, ArrowRight, AlertTriangle, TrendingDown,
+  CheckCircle, ExternalLink, FileCheck2, HelpCircle, MapPin, Pencil,
+  Send, XCircle, History, ArrowRight, AlertTriangle, TrendingDown, User,
 } from 'lucide-react';
 import {
-  startPropertyReview, getPropertyReview, markPropertyReviewRead,
+  startPropertyReview,
   setPropertyReviewChecklistItem, addPropertyReviewMessage, decidePropertyReview,
+  requestPropertyReviewOverride, approvePropertyReviewOverride,
 } from '../../../services/propertyReviewService.js';
-import { clearFlag, setListingStatus } from '../../../services/propertyService.js';
-import { chaseOwner, listOutreachTemplates, listOwnerOutreach } from '../../../services/outreachService.js';
+import { setListingStatus } from '../../../services/propertyService.js';
+import { chaseOwner, listOutreachTemplates, listOwnerOutreach, markOutreachSent } from '../../../services/outreachService.js';
 import { interpolateOutreachTemplate } from '../../../lib/outreachTemplate.js';
 import { fmtINR, classNames } from '../../../lib/format.js';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
-import { useAdminFlags } from '../../../context/AdminFlagsContext.jsx';
 import Modal from '../../../components/ui/Modal.jsx';
+import LoadError from '../../../components/LoadError.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
+import QualityScoreBadge from '../../../components/ui/QualityScoreBadge.jsx';
 import InternalNote, { saveNoteIfAny } from '../../../components/ui/InternalNote.jsx';
 import { listNotes } from '../../../services/noteService.js';
-import { dealLabel, perSqftLabel, liveHref, fmtAgo, detailKvs } from './constants.js';
-import { iconBtn } from './review-modal/styles.js';
+import { dealLabel, perSqftLabel, liveHref, fmtAgo, detailKvs, statusLabel } from './constants.js';
+import {
+  REVIEW_REASONS, ownerMessagePreview, reasonTemplateHints, signalLabel, signalsForChecklistItem,
+} from './reviewReasons.js';
 import WhatsappTemplates from './review-modal/WhatsappTemplates.jsx';
 import CommunicationLog from './review-modal/CommunicationLog.jsx';
+import OwnershipEvidencePanel from './review-modal/OwnershipEvidencePanel.jsx';
+import BadgeRequestBanner from './review-modal/BadgeRequestBanner.jsx';
+import { OWNERSHIP_REVIEW_ITEM, seeksOwnershipBadge } from '../../../lib/recheckFields.js';
+import { SubmittedPhotos, SubmittedDescription, SubmittedLocation } from './review-modal/SubmittedContent.jsx';
 
-/**
- * These routes bind `{id}` as a UUID. `propertyMapper` sets a listing's `id` to `slug || id` and
- * keeps the real key on `uuid`, so the obvious `review.id` is the wrong argument for exactly the
- * listings that have a slug — i.e. the live ones. The failure reads as "no case file", not as a bad
- * id, which is why it is worth a named helper rather than an inline `||` at six call sites.
- */
+// Verification routes require UUIDs; the display id may be a public slug.
 const pid = (listing) => listing?.uuid || listing?.id;
 
-export default function PropertyReviewModal({ review, setReview, onRefresh }) {
+// The server names the edited fields but keeps no before/after; the mock store's `reReview` carries both.
+const editedFields = (listing) => (listing.recheckPending
+  ? String(listing.recheckReason || '').split(/,\s*/).filter((f) => f && f !== OWNERSHIP_REVIEW_ITEM)
+  : []);
+const ownerEdited = (listing) => Boolean(listing.reReview) || editedFields(listing).length > 0;
+
+const openingSection = (listing) => {
+  if (ownerEdited(listing)) return 'changes';
+  return seeksOwnershipBadge(listing) && listing.status === 'approved' ? 'badge' : 'overview';
+};
+
+export default function PropertyReviewModal({ review, setReview, onRefresh, onEdit }) {
   const { toast } = useToast();
-  const { optionEnabled } = useAdminFlags();
   const { user } = useAuth();
   const [thread, setThread] = useState(null);
-  /* Raw ledger rows, not timeline entries. The template library that names them loads on its own
-     schedule, so mapping here would race it; the timeline is derived at render instead. */
+  const [threadError, setThreadError] = useState(null);
+  const [threadReload, setThreadReload] = useState(0);
+  // Derive timeline labels at render because templates and ledger rows load independently.
   const [outreach, setOutreach] = useState([]);
-  /* The other half of the communication timeline (D29): what the desk wrote to itself about this
-     listing, as opposed to what it wrote to the owner. */
   const [notes, setNotes] = useState([]);
   const [commsOpen, setCommsOpen] = useState(false);
-  /* Was a lazy `useState(() => getWhatsappTemplates())` reading a module-level array. The library is
-     a staff-only fetch now, so it starts empty and arrives; the panel is a disclosure the operator
-     has to open, so an empty first paint costs nothing. */
+  const [commsLoadedFor, setCommsLoadedFor] = useState(null);
   const [waTemplates, setWaTemplates] = useState([]);
+  const templatesRequested = useRef(false);
+  const openCall = useRef(null);
   const [waOpen, setWaOpen] = useState(false);
   const [waPreview, setWaPreview] = useState(null);
-  const [rejectMode, setRejectMode] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
+  const [decisionMode, setDecisionMode] = useState(null);
+  const [reasonCode, setReasonCode] = useState('');
+  const [reasonNote, setReasonNote] = useState('');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [secondApprovalNeeded, setSecondApprovalNeeded] = useState(false);
   const [msg, setMsg] = useState('');
   const [internalNote, setInternalNote] = useState('');
-  /* Every write below is a round trip now, so the decision buttons need a guard as well as a
-     `disabled` attribute: the flag only takes effect on the next render, and a double-click lands
-     inside that gap. Approving twice would be harmless; rejecting twice posts the reason to the
-     owner's thread twice. */
+  // Decisions stay disabled while their server write is pending.
   const [busy, setBusy] = useState(false);
+  // The live answer from the badge panel, which outruns the `review` snapshot after a grant or decline.
+  const [badgeCase, setBadgeCase] = useState(null);
+  const [section, setSection] = useState('overview');
+  const [sectionFor, setSectionFor] = useState(null);
+  const [badgeSeenFor, setBadgeSeenFor] = useState(null);
+  const reviewKey = review ? pid(review) : null;
+  if (sectionFor !== reviewKey) {
+    setSectionFor(reviewKey);
+    if (review) setSection(openingSection(review));
+  } else if (section === 'badge' && badgeSeenFor !== reviewKey) {
+    setBadgeSeenFor(reviewKey);
+  }
 
-  /*
-   * Load the case file when the modal opens.
-   *
-   * `cancelled` rather than a `mountedRef`: under StrictMode the effect mounts, tears down and
-   * re-mounts, and a ref that is only cleared in cleanup stays cleared — every `setThread` after an
-   * await would then be silently dropped and the modal would render its null branch forever. A
-   * per-run local is also the correct scope for the other race here, which is the operator opening
-   * a second listing before the first one's fetch lands.
-   *
-   * `startPropertyReview` rather than get-then-create: it is idempotent server-side, so one call
-   * replaces the mock's `ensureReview` + `getReview` pair and cannot race a second operator opening
-   * the same listing. The read-receipt's 204 carries no body, so the case file used for render is
-   * the one from before it — nothing here draws the read flag, and the parent list is refreshed by
-   * `onRefresh` on close.
-   */
+  // `openCall` shares one open write across StrictMode's second effect pass; per-run cancellation covers
+  // listing switches. Idempotent open avoids a get-then-create race; `markRead` folds the read receipt in.
   useEffect(() => {
-    if (!review) return undefined;
+    if (!review) {
+      openCall.current = null;
+      return undefined;
+    }
     let cancelled = false;
     const listing = review;
+    const callKey = `${reviewKey}:${threadReload}`;
+    if (openCall.current?.key !== callKey) {
+      openCall.current = { key: callKey, promise: startPropertyReview(pid(listing), { markRead: true }) };
+    }
+    const { promise } = openCall.current;
     (async () => {
       try {
-        const caseFile = await startPropertyReview(pid(listing));
-        await markPropertyReviewRead(pid(listing));
+        const caseFile = await promise;
         if (cancelled) return;
+        setThreadError(null);
         setThread(caseFile);
       } catch (err) {
         if (cancelled) return;
         toast(err?.message || 'Could not open the verification case file', 'error');
         setThread(null);
+        setThreadError(err);
       }
     })();
     setOutreach([]);
     setNotes([]);
-    if (optionEnabled('properties.commsLog')) {
-      /* Separate from the case-file fetch above on purpose: this is a collapsed disclosure panel,
-         and a chaser history that fails to load must not take the checklist and the decision
-         buttons down with it. Failing to an empty timeline is also the honest rendering — the panel
-         says "no communication history yet", which is what the operator can safely act on. */
-      (async () => {
-        try {
-          const rows = await listOwnerOutreach(pid(listing));
-          if (!cancelled) setOutreach(rows);
-        } catch {
-          if (!cancelled) setOutreach([]);
-        }
-      })();
-      /* The second half of the same timeline (D29). Notes and chasers answer the same question —
-         what has already been done about this listing — and reading them in two separate panels
-         makes the operator interleave them by eye. Fetched separately from the outreach ledger
-         because they are separate routes with separate failure modes, and a note history that is
-         briefly missing must not blank the chasers that did load. */
-      (async () => {
-        try {
-          const rows = await listNotes('listing', listing.id);
-          if (!cancelled) setNotes(rows);
-        } catch {
-          if (!cancelled) setNotes([]);
-        }
-      })();
-    }
+    setCommsLoadedFor(null);
     setCommsOpen(false);
-    setRejectMode(false);
-    setRejectReason('');
+    setDecisionMode(null);
+    setReasonCode('');
+    setReasonNote('');
+    setOverrideReason('');
+    setSecondApprovalNeeded(false);
     setMsg('');
     setInternalNote('');
     setWaOpen(false);
     setWaPreview(null);
     setBusy(false);
-    /* Opening this modal used to write `pipelineStage = 'under_review'` when the listing was at
-       `listed` or `docs_submitted`. That was the two pipeline vocabularies colliding in one column:
-       the guard read the server's stages, arriving through `propertyMapper`'s
-       `adminPipeline.pipelineStage`, and then wrote a value the server's enum did not contain, so
-       it could only ever land in localStorage — pointed at `POST /properties/{id}/pipeline` it
-       would have been a 400.
-
-       D27 resolved it by finding that `under_review` was never a stage at all. A listing is under
-       review exactly when its status is `pending`, which is already true before this modal opens
-       and stays true whether or not anyone opens it; the board derives that column from `status`
-       rather than storing it. So the write recorded nothing, and removing it loses nothing — what
-       it was standing in for is a *reviewer* claim, and that is what `startPropertyReview` (called
-       just above) already records, against a person and a time. */
+    // Under review is derived from pending status; opening a case must not rewrite pipeline stages.
     return () => {
       cancelled = true;
       setThread(null);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [review]);
+  }, [reviewKey, threadReload]);
 
-  /*
-   * The template library, once per mount rather than once per listing.
-   *
-   * It is the same ten rows for every listing on the screen, so keying this on `review` would refetch
-   * them each time the operator opened a different case file. Failing quietly is deliberate: this is
-   * a disclosure panel further down a modal whose actual job is the checklist and the decision
-   * buttons, and a toast about WhatsApp copy fired on open would interrupt that work every time.
-   * The panel renders its own empty state instead, at the point somebody is looking for it.
-   */
+  // The timeline fetches only once opened; notes and chasers load independently so one failure cannot erase both.
   useEffect(() => {
+    if (!reviewKey || !commsOpen || commsLoadedFor === reviewKey) return undefined;
     let cancelled = false;
+    const listing = review;
+    Promise.all([
+      listOwnerOutreach(pid(listing)).then((rows) => { if (!cancelled) setOutreach(rows); }, () => { if (!cancelled) setOutreach([]); }),
+      listNotes('listing', listing.id).then((rows) => { if (!cancelled) setNotes(rows); }, () => { if (!cancelled) setNotes([]); }),
+    ]).then(() => { if (!cancelled) setCommsLoadedFor(reviewKey); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviewKey, commsOpen, commsLoadedFor]);
+
+  // The shared template library is listing-independent; it is needed only by the template picker and the log's labels.
+  useEffect(() => {
+    if (!(waOpen || commsOpen) || templatesRequested.current) return;
+    templatesRequested.current = true;
     (async () => {
       try {
-        const templates = await listOutreachTemplates('whatsapp');
-        if (!cancelled) setWaTemplates(templates);
+        setWaTemplates(await listOutreachTemplates('whatsapp'));
       } catch {
-        if (!cancelled) setWaTemplates([]);
+        setWaTemplates([]);
+        templatesRequested.current = false;
       }
     })();
-    return () => { cancelled = true; };
-  }, []);
+  }, [waOpen, commsOpen]);
 
-  /*
-   * The communication timeline, which is now one category of event instead of seven.
-   *
-   * The mock's `getOwnerCommsLog` returned a timeline of which two entries were records and five
-   * were reconstructions: "Claim link sent" was `claimLinkSent === true` rendered at
-   * `createdAt + 1 hour`, "Photos uploaded" was a boolean at `createdAt + 1.5 days`, "Listing
-   * approved" at `createdAt + 3 days`. No such times were ever observed. They were arithmetic on
-   * the creation date, printed as history, on the screen an operator uses to decide whether this
-   * owner has been left alone long enough to chase again.
-   *
-   * That is worse than an empty panel, because it looks like evidence. What the server actually
-   * keeps is the outbound-message ledger, so that is what this renders, and the rest is gone rather
-   * than reimplemented against `adminPipeline`'s booleans -- which would recreate the same
-   * fabrication one layer down. The gap is real and recorded: there is no per-listing event history
-   * behind the pipeline stage, only its current value.
-   *
-   * `by` is deliberately absent. The ledger's `preparedById` is a user id, and a uuid printed under
-   * a message answers "who chased this owner" with a string nobody can read; the audit log, which
-   * resolves actors, is admin-only by design and this modal is a staff screen.
-   *
-   * `action` says *written*, never *sent*. Every row's status is `prepared` because what ships is
-   * click-to-chat: the server composed the text and a staff member's own WhatsApp opened with it
-   * typed out. Whether they pressed send is not a fact this platform holds.
-   *
-   * ## The `note` rows (D29)
-   *
-   * `CommunicationLog` has had an indigo style keyed `note` since it was written, with nothing
-   * producing one — the notes existed, in this browser's localStorage, invisible to the panel and
-   * to every other operator. Now that they are rows, they belong on this timeline: "rejected the
-   * photos, owner says they will re-shoot" is the same kind of fact as "chaser written", and the
-   * order between the two is the whole story.
-   *
-   * These carry a real `by`, unlike the outreach rows: the notes route resolves the author to a
-   * display name server-side, which is exactly what the outreach ledger cannot do.
-   *
-   * Sorted newest first across both sources, and rows with no timestamp are dropped rather than
-   * sorted as epoch zero, which would file them below everything as though they were the oldest
-   * events on the case.
-   */
+  useEffect(() => {
+    if (!waOpen || waPreview || !reasonCode || !waTemplates.length) return;
+    const hints = reasonTemplateHints(reasonCode);
+    const exactId = `reason_${reasonCode}`;
+    const match = waTemplates.find((tpl) => tpl.id === exactId) || waTemplates.find((tpl) => {
+      const haystack = `${tpl.id} ${tpl.name} ${tpl.category}`.toLowerCase();
+      return hints.some((hint) => haystack.includes(hint.toLowerCase()));
+    });
+    if (match) setWaPreview(match);
+  }, [waOpen, waPreview, reasonCode, waTemplates]);
+
+  // Only timestamped server records belong here; a chaser reads "sent" only once staff attest it.
+  // Outreach actor UUIDs stay absent: resolving them requires an admin-only audit surface.
   const commsLog = useMemo(() => {
     const chasers = outreach.map((row) => ({
       id: row.id,
       type: 'outreach',
-      action: `Chaser written \u2014 ${waTemplates.find((t) => t.id === row.templateId)?.name || row.templateId || 'WhatsApp'}`,
+      action: `${row.status === 'sent' ? 'Sent' : 'Chaser written'} \u2014 ${waTemplates.find((t) => t.id === row.templateId)?.name || row.templateId || 'WhatsApp'}`,
       detail: row.body,
       by: null,
       at: row.preparedAt,
+      markable: row.status === 'prepared',
     }));
     const written = notes.map((n) => ({
       id: n.id,
@@ -232,19 +196,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh }) {
       .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   }, [outreach, waTemplates, notes]);
 
-  /**
-   * Tick or untick one checklist line.
-   *
-   * Addressed by its text, which is the only key the wire has: the rows are seeded server-side from
-   * a fixed per-deal list and the column is not updatable. The mock's `d_index2`-style ids were
-   * local inventions and are gone.
-   *
-   * The response is the whole case file, so there is no follow-up read — and the two-state tick is
-   * the whole control now. `rejected` had no column behind it and no reader: what an approval
-   * actually consults is whether every line is ticked, and a rejected document and an un-inspected
-   * one both fail that test. The reason a document was refused belongs in the owner's thread, where
-   * they can read it, not in a pill only the desk can see.
-   */
+  // Checklist text is the server key; refusal reasons belong in the owner's thread, not a third state.
   const setChecklistItem = async (item, pass) => {
     try {
       setThread(await setPropertyReviewChecklistItem(pid(review), item, pass));
@@ -253,49 +205,69 @@ export default function PropertyReviewModal({ review, setReview, onRefresh }) {
     }
   };
 
-  const reviewSend = async () => {
+  const checklistComplete = Boolean(thread?.checklist?.length) && thread.checklist.every((line) => line.pass);
+
+  const reloadCase = async () => {
+    const caseFile = await startPropertyReview(pid(review));
+    setThread(caseFile);
+    await onRefresh?.();
+    return caseFile;
+  };
+
+  const handleDecisionError = async (err, fallback) => {
+    if (err?.code === 'stale_decision') {
+      toast('Someone else already decided this — refreshed', 'error');
+      try { await reloadCase(); } catch { onRefresh?.(); }
+      return;
+    }
+    if (err?.code === 'second_approver_required' || err?.code === 'override_request_pending') {
+      setSecondApprovalNeeded(true);
+      try { await reloadCase(); } catch { onRefresh?.(); }
+      toast(err?.code === 'override_request_pending'
+        ? 'Second approval is already pending — refreshed'
+        : 'This listing needs second approval before it can go live', 'error');
+      return;
+    }
+    if (err?.code === 'override_request_decided' || err?.code === 'override_not_required') {
+      try { await reloadCase(); } catch { onRefresh?.(); }
+      toast(err?.code === 'override_request_decided'
+        ? 'This second approval was already decided — refreshed'
+        : 'Second approval is no longer required — refreshed', 'error');
+      return;
+    }
+    toast(err?.message || fallback, 'error');
+  };
+
+  const reviewSend = async (clarificationRequested = false) => {
     const v = msg.trim();
     if (!v) return;
     try {
-      const caseFile = await addPropertyReviewMessage(pid(review), v);
+      const caseFile = await addPropertyReviewMessage(pid(review), v, clarificationRequested);
       setMsg('');
       setThread(caseFile);
-      toast('Message sent to owner');
+      toast(clarificationRequested
+        ? 'Needs info sent \u2014 returned to the owner'
+        : 'Message sent to owner');
+      if (clarificationRequested) {
+        setReview((current) => current ? { ...current, status: 'needs_info' } : current);
+        onRefresh();
+      }
     } catch (err) {
       toast(err?.message || 'Could not send the message', 'error');
     }
   };
 
-  /*
-   * Approve, or reject with a reason.
-   *
-   * One call each. The desk used to pair `decideReview` with `setListingStatus`, because the mock's
-   * case file and the mock's listing were two unrelated records; the server writes the case file,
-   * `properties.status` and the owner-facing thread message in one transaction. Adding the second
-   * call back would write the same field twice, and the second write is the one that can silently
-   * disagree when it fails.
-   *
-   * The approval guard counts unticked lines rather than trusting the case status — a case is
-   * `pending` until it is decided regardless of how much of the checklist has been worked through.
-   */
+  // A decision atomically updates the case, listing status and owner message, so do not pair it with a
+  // separate status write. The server refuses an approval while any checklist line is still open.
   const reviewApprove = async () => {
     if (busy) return;
-    const unchecked = (thread?.checklist || []).filter((c) => !c.pass);
-    if (unchecked.length && !window.confirm(`${unchecked.length} checklist item(s) are not ticked yet. Approve and publish anyway?`)) return;
+    if (!checklistComplete) {
+      toast('Tick every check before approving', 'error');
+      return;
+    }
     setBusy(true);
     try {
-      await decidePropertyReview(pid(review), 'approve');
-      // No `setPipelineStage(review.id, 'live')` here. The decision above sets the status to
-      // `approved` in the same transaction that writes the case file and the owner's thread
-      // message, and the board's Live column reads `status` — so the listing has already moved.
-      // The old line wrote the same fact a second time, unawaited, into a column the server would
-      // have rejected the value for.
-      // clearFlag, not updateListingFields({ flagReason: '' }). The latter is the owner's own PATCH
-      // route, so from an admin screen it 404s on somebody else's listing -- and its mapper
-      // whitelists a fixed key set that does not include flagReason, so the body serialised to {}
-      // and the failure was invisible. Neither half was awaited, so the rejection escaped the try
-      // while the toast below still said "approved".
-      await clearFlag(review.id);
+      await decidePropertyReview(pid(review), 'approve', { expectedStatus: review.status });
       const noted = await saveNoteIfAny('listing', review.id, internalNote, 'Approved');
       handleClose();
       toast(noted.error
@@ -303,51 +275,79 @@ export default function PropertyReviewModal({ review, setReview, onRefresh }) {
         : 'Approved & published \u2014 owner notified', noted.error ? 'error' : 'success');
       onRefresh();
     } catch (err) {
-      toast(err?.message || 'Could not approve this listing', 'error');
+      await handleDecisionError(err, 'Could not approve this listing');
     } finally {
       setBusy(false);
     }
   };
 
-  const reviewReject = async () => {
+  const submitDecision = async () => {
     if (busy) return;
-    if (!rejectMode) { setRejectMode(true); return; }
-    const reason = rejectReason.trim();
-    if (!reason) { toast('Add a clear reason before rejecting', 'error'); return; }
+    if (!decisionMode) return;
+    if (!reasonCode) { toast('Choose a reason code', 'error'); return; }
+    if (reasonCode === 'other' && !reasonNote.trim()) { toast('Add a note for Other', 'error'); return; }
     setBusy(true);
     try {
-      await decidePropertyReview(pid(review), 'reject', reason);
-      const noted = await saveNoteIfAny('listing', review.id, internalNote, 'Rejected');
+      await decidePropertyReview(pid(review), decisionMode, {
+        reasonCode,
+        note: reasonNote.trim() || undefined,
+        expectedStatus: review.status,
+      });
+      const noted = await saveNoteIfAny('listing', review.id, internalNote,
+        decisionMode === 'reject' ? 'Rejected' : 'Needs info');
       handleClose();
-      toast(noted.error
-        ? 'Property rejected \u2014 but the internal note could not be saved'
-        : 'Property rejected \u2014 owner notified', 'error');
+      const label = decisionMode === 'reject' ? 'Property not approved' : 'Needs info sent';
+      toast(noted.error ? `${label} — but the internal note could not be saved` : `${label} — owner notified`,
+        decisionMode === 'reject' || noted.error ? 'error' : 'success');
       onRefresh();
     } catch (err) {
-      toast(err?.message || 'Could not reject this listing', 'error');
+      await handleDecisionError(err, `Could not ${decisionMode === 'reject' ? 'reject' : 'request info for'} this listing`);
     } finally {
       setBusy(false);
     }
   };
 
-  const handleClose = () => { setReview(null); setThread(null); };
+  const requestOverride = async () => {
+    if (busy || !overrideReason.trim()) return;
+    setBusy(true);
+    try {
+      setThread(await requestPropertyReviewOverride(pid(review), overrideReason.trim()));
+      setOverrideReason('');
+      toast(thread?.status === 'rejected' ? 'Reopen requested' : 'Second approval requested', 'success');
+      onRefresh();
+    } catch (err) {
+      await handleDecisionError(err, thread?.status === 'rejected' ? 'Could not request reopen' : 'Could not request second approval');
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  /* P0 -- sign off on owner edits made to a live listing. The listing was never pulled down; this is
-     the moderator saying "looked, still fine", which is exactly what a stays-live re-check asks for.
+  const approveOverride = async () => {
+    const requestId = thread?.overrideRequest?.id;
+    if (busy || !requestId) return;
+    setBusy(true);
+    try {
+      setThread(await approvePropertyReviewOverride(pid(review), requestId));
+      toast(thread?.status === 'rejected' ? 'Reopen approved' : 'Second approval recorded', 'success');
+      onRefresh();
+    } catch (err) {
+      await handleDecisionError(err, thread?.status === 'rejected' ? 'Could not approve reopen' : 'Could not approve as second reviewer');
+    } finally {
+      setBusy(false);
+    }
+  };
 
-     Re-approving an already-approved listing is how that is expressed: PropertyModerationService
-     .setStatus clears the re-check and notifies the owner in one transaction. It used to be two
-     browser writes instead -- updateListingFields({ reReview, materialEditFlag }) against the owner's
-     own PATCH route with keys the mapper drops, and a hand-composed "your edits were approved"
-     message posted straight into the thread. The first was a silent no-op; the second put owner-
-     facing copy back in the browser, which is the thing D218 moved to the server, and could post
-     twice on a double-click. */
+  const handleClose = () => { setReview(null); setThread(null); setThreadError(null); };
+
+  // Re-approval clears the re-check and notifies the owner atomically without taking the listing down.
   const approveEdits = async () => {
     if (busy) return;
     setBusy(true);
     try {
       await setListingStatus(review.id, 'approved', 'Owner edits reviewed');
-      setThread(await getPropertyReview(pid(review)));
+      /* Close rather than refetch: the re-review panel renders from `review`, the parent's row, so refreshing
+         only the case file left the modal announcing an edit it had cleared, over a button that now 409s. */
+      handleClose();
       toast('Owner edits approved \u2014 re-review cleared', 'success');
       onRefresh();
     } catch (err) {
@@ -357,32 +357,8 @@ export default function PropertyReviewModal({ review, setReview, onRefresh }) {
     }
   };
 
-  /*
-   * The preview, built to match what the server will actually render.
-   *
-   * This used to be a third private copy of the substitution rule with its own variable table, and
-   * it disagreed with the other two on every value that mattered:
-   *
-   *   staff_name    was the literal string 'You', so the preview read "- You, Draazy" while the
-   *                 owner received the sender's real name. The one word in the message that says
-   *                 who is contacting them was the one word the preview got wrong.
-   *   claim_link    pointed at /claim/{id}, a route this application has never had. The server
-   *                 resolves it to the sign-in page, because the account is provisioned against the
-   *                 owner's own mobile and signing in is the claim.
-   *   market_rate   was hard-coded '9,500' for every locality in Pune. The server now supplies the
-   *                 listing's own locality rate from localities.rate_per_sqft, and supplies nothing
-   *                 where that locality has no published rate -- in which case the key renders
-   *                 literally, visibly unfinished to the person about to press send, rather than
-   *                 invisibly invented to the owner reading it.
-   *   listing_id    was `listing.id`, which propertyMapper sets to `slug || id`. Every live listing
-   *                 has a slug, so the preview showed a slug where the message carries a UUID.
-   *
-   * The rule itself now comes from lib/outreachTemplate.js, which is the same function the mock
-   * provider uses. The values below are the client's best reconstruction of OwnerOutreachService
-   * .variables -- a preview cannot be authoritative, since the server reads the owner's name from
-   * the user row rather than from the listing card, but it can at least be built from the same keys
-   * in the same shape, so a divergence is a diff rather than a redesign.
-   */
+  // Match the server's template vocabulary without inventing unavailable locality rates.
+  // The server's prepared message is authoritative; this listing-based preview is only guidance.
   const previewVariables = (listing) => ({
     owner_name: listing.owner || 'there',
     owner_mobile: listing.ownerMobile || '',
@@ -391,24 +367,11 @@ export default function PropertyReviewModal({ review, setReview, onRefresh }) {
     price: String(listing.price ?? ''),
     listing_id: pid(listing),
     staff_name: user?.name || 'Draazy',
-    claim_link: `${window.location.origin}/signin`,
+    claim_link: `${window.location.origin}/signin?claim=${pid(listing)}`,
   });
 
-  /*
-   * Compose the chaser, record it, and hand off to WhatsApp.
-   *
-   * `window.open` runs first, synchronously, inside the click. Opening it after the await would put
-   * the call outside the gesture that authorised it and every popup blocker in the market would
-   * eat the tab -- leaving a ledger row saying this owner was chased and no message anywhere.
-   *
-   * The order is deliberate the other way too: the tab is opened blank and only navigated once the
-   * server has accepted. If the POST is refused -- no owner mobile (409), a retired template (400),
-   * or an account without `postOnBehalf:write` (403) -- the operator gets the reason and an empty
-   * tab, rather than a pre-filled message the platform has no record of.
-   *
-   * The toast says "written", not "sent". Nothing here can know the staff member pressed send in
-   * the WhatsApp tab, and the ledger this feeds is only useful while it means one thing.
-   */
+  /* `window.open` runs first and synchronously so the tab stays inside the authorising gesture, then is
+     navigated only once the server accepts — a refusal leaves an empty tab, not an unrecorded message. */
   const handleSendWaTemplate = async () => {
     if (busy || !waPreview) return;
     setBusy(true);
@@ -416,19 +379,15 @@ export default function PropertyReviewModal({ review, setReview, onRefresh }) {
     try {
       const prepared = await chaseOwner(pid(review), waPreview.id);
       if (handoff) handoff.location = prepared.handoffLink;
-      toast('Chaser written \u2014 finish sending it in WhatsApp', 'success');
+      toast('Chaser written \u2014 send it in WhatsApp, then mark it sent in the log', 'success');
       setWaOpen(false);
       setWaPreview(null);
-      /* Re-read rather than push `prepared` onto the local list: the ledger is the server's, and a
-         locally appended row would be this screen's own account of what happened next to the real
-         one. Same reason nothing here keeps a reminder count. */
-      if (optionEnabled('properties.commsLog')) {
-        try {
-          setOutreach(await listOwnerOutreach(pid(review)));
-        } catch {
-          /* The chaser was written; a failed refresh of the panel below it is not worth a second
-             toast contradicting the first. */
-        }
+      // Re-read the server ledger rather than manufacturing a local history entry.
+      try {
+        setOutreach(await listOwnerOutreach(pid(review)));
+      } catch {
+        /* The chaser was written; a failed refresh of the panel below it is not worth a second
+           toast contradicting the first. */
       }
       onRefresh();
     } catch (err) {
@@ -439,233 +398,411 @@ export default function PropertyReviewModal({ review, setReview, onRefresh }) {
     }
   };
 
-  /*
-   * The document viewer is gone with the mock.
-   *
-   * It rendered a placeholder that said so in as many words — "Simulated preview for the prototype.
-   * In production the owner's uploaded file renders here" — over a record that has never held a
-   * file: there is no upload surface, no storage, and no column. What the case file actually holds
-   * is a reviewer's checklist, and one of its six buy-side lines is "Listing photos match the
-   * property", which is not a document at all. Its per-document note went with it; the thread is
-   * where a note the owner has to act on belongs, and `InternalNote` is where a private one does.
-   */
+  const markChaserSent = async (messageId) => {
+    try {
+      const entry = await markOutreachSent(pid(review), messageId);
+      setOutreach((rows) => rows.map((row) => (row.id === entry.id ? entry : row)));
+      onRefresh();
+    } catch (err) {
+      toast(err?.message || 'Could not mark this chaser as sent', 'error');
+    }
+  };
 
-  if (!review || !thread) return null;
+  if (!review) return null;
+  if (!thread) {
+    return threadError ? (
+      <Modal open onClose={handleClose} title="Verify property" size="lg">
+        <LoadError
+          message="Could not open the verification case file."
+          error={threadError}
+          onRetry={() => setThreadReload((n) => n + 1)}
+          className="rounded-2xl border border-white/10 bg-white/[0.04] p-5"
+        />
+      </Modal>
+    ) : null;
+  }
+  const noPhotos = !review.image && !(Array.isArray(review.gallery) && review.gallery.filter(Boolean).length);
+  const caseRejected = thread.status === 'rejected';
+  const liveBadgeCase = badgeCase?.id === pid(review) ? badgeCase : null;
+  const badgeRequestedAt = liveBadgeCase ? liveBadgeCase.requestedAt : review.ownershipRequestedAt;
+  const seeksBadge = liveBadgeCase ? Boolean(liveBadgeCase.requestedAt && !liveBadgeCase.verified) : seeksOwnershipBadge(review);
+  const trackBadgeCase = (verification) => setBadgeCase({ id: pid(review), requestedAt: verification.requestedAt, verified: verification.verified });
+  const overrideCopy = caseRejected ? {
+    requestHeading: 'Request reopen',
+    requestPlaceholder: 'Why should this final reject be reopened?',
+    pending: 'Awaiting second reviewer to reopen',
+    approve: 'Approve reopen as second reviewer',
+    label: 'Reopen requested:',
+  } : {
+    requestHeading: 'Request second approval',
+    requestPlaceholder: 'Why should this hard signal be overridden?',
+    pending: 'Awaiting second approver',
+    approve: 'Approve as second reviewer',
+    label: 'Second approval requested:',
+  };
+
+  const sections = [
+    ['overview', 'Overview'],
+    ['details', 'Details'],
+    ownerEdited(review) ? ['changes', 'Changes'] : null,
+    ['badge', 'Verified badge'],
+    ['messages', thread.messages.length ? `Messages (${thread.messages.length})` : 'Messages'],
+  ].filter(Boolean);
+  const activeSection = sections.some(([key]) => key === section) ? section : 'overview';
 
   return (
-    <>
-      <Modal
-        open
-        onClose={handleClose}
-        title="Verify property"
-        size="lg"
-        footer={
-          <>
-            {review.status === 'approved' ? (
-              <Link to={liveHref(review)} target="_blank" rel="noopener noreferrer" className="dz-btn dz-btn-ghost mr-auto">
-                <ExternalLink className="h-4 w-4" /> Open live listing
-              </Link>
-            ) : (
-              <span className="mr-auto text-xs text-gray-500 italic">Not yet published</span>
-            )}
-            <button onClick={handleClose} className="dz-btn dz-btn-ghost">Close</button>
-            <button onClick={reviewReject} disabled={busy} className="dz-btn dz-btn-danger">
-              <XCircle className="h-4 w-4" /> {rejectMode ? 'Confirm rejection' : 'Reject\u2026'}
-            </button>
-            <button onClick={reviewApprove} disabled={busy} className="dz-btn dz-btn-success">
-              <CheckCircle className="h-4 w-4" /> Approve &amp; publish
-            </button>
-          </>
-        }
-      >
-        <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
-          {/* Hero */}
-          <div className="flex flex-wrap items-start justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-br from-teal-500/10 to-indigo-500/10 p-4">
+    <Modal
+      open
+      onClose={handleClose}
+      title="Verify property"
+      size="xl"
+      footer={
+        <>
+          {review.status === 'approved' ? (
+            <Link to={liveHref(review)} target="_blank" rel="noopener noreferrer" className="dz-btn dz-btn-ghost mr-auto">
+              <ExternalLink className="h-4 w-4" /> Open live listing
+            </Link>
+          ) : (
+            <span className="mr-auto text-xs text-gray-500 italic">Not yet published</span>
+          )}
+          {onEdit ? <button type="button" onClick={() => onEdit(review)} className="dz-btn dz-btn-ghost"><Pencil className="h-4 w-4" /> Edit details</button> : null}
+          <button onClick={handleClose} className="dz-btn dz-btn-ghost">Close</button>
+        </>
+      }
+    >
+      <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-6 lg:space-y-0">
+        <div className="min-w-0 space-y-4 lg:flex lg:max-h-[calc(100dvh-15rem)] lg:flex-col">
+          <div data-testid="review-summary" className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="text-lg font-extrabold text-white">{review.title}</div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge status={review.status} />
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <Badge status={review.status}>{statusLabel(review.status)}</Badge>
                 <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-gray-300">{dealLabel(review.deal)}</span>
                 {review.featured ? <span className="rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-0.5 text-xs text-teal-300">{'\u2605'} Featured</span> : null}
-                {review.real ? <span className="rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-0.5 text-xs text-teal-300">Live user post</span> : null}
-                {review.reReview ? <span className="rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-0.5 text-xs text-amber-300 inline-flex items-center gap-1"><History className="h-3 w-3" /> Owner edited</span> : null}
-                {review.priceReduced ? <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-0.5 text-xs text-emerald-300 inline-flex items-center gap-1"><TrendingDown className="h-3 w-3" /> Price reduced</span> : null}
+                {ownerEdited(review) ? <span className="inline-flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-500/15 px-2.5 py-0.5 text-xs text-amber-300"><History className="h-3 w-3" /> Owner edited</span> : null}
+                {review.priceReduced ? <span className="inline-flex items-center gap-1 rounded-full border border-emerald-400/30 bg-emerald-500/15 px-2.5 py-0.5 text-xs text-emerald-300"><TrendingDown className="h-3 w-3" /> Price reduced</span> : null}
+                <QualityScoreBadge listing={review} />
               </div>
-              <div className="mt-2 flex items-center gap-1 text-sm text-gray-300">
-                <MapPin className="h-3.5 w-3.5" /> {review.locality} {'\u00B7'} {review.bhk || '\u2014'} {'\u00B7'} {review.type}
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-300">
+                <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {review.locality} {'\u00B7'} {review.bhk || '\u2014'} {'\u00B7'} {review.type}</span>
+                {review.owner ? (
+                  <span className="inline-flex items-center gap-1">
+                    <User className="h-3.5 w-3.5" /> {review.owner}
+                    {review.ownerMobile ? <a href={`tel:${review.ownerMobile}`} className="ml-1 text-brand-teal hover:underline">{review.ownerMobile}</a> : null}
+                  </span>
+                ) : null}
               </div>
             </div>
             <div className="text-right">
               <div className="text-2xl font-extrabold text-teal-300">{fmtINR(review.price)}</div>
-              <div className="mt-1 text-xs text-gray-400">{perSqftLabel(review)}</div>
+              <div className="mt-0.5 text-xs text-gray-400">{perSqftLabel(review)}</div>
             </div>
           </div>
 
-          {/* Details */}
-          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-200">
-              <Info className="h-4 w-4 text-brand-teal" /> Property details
+          {seeksBadge ? <BadgeRequestBanner propertyId={pid(review)} requestedAt={badgeRequestedAt} onDeclined={() => { handleClose(); onRefresh(); }} /> : null}
+          {noPhotos ? (
+            <div className="flex items-start gap-2 rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm font-semibold text-rose-100">
+              <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-rose-300" />
+              <span>This listing has no photos — reject or request photos.</span>
             </div>
-            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-white/10 sm:grid-cols-3">
-              {detailKvs(review).map(([k, v, full]) => (
-                <div key={k} className={classNames('bg-ink-2 p-3', full && 'col-span-2 sm:col-span-3')}>
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{k}</div>
-                  <div className="mt-0.5 break-words text-sm font-semibold text-gray-100">{v}</div>
-                </div>
-              ))}
-            </div>
+          ) : null}
+
+          <div role="tablist" aria-label="Listing sections" className="flex gap-1 overflow-x-auto border-b border-white/10 no-scrollbar">
+            {sections.map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                id={`review-tab-${key}`}
+                aria-controls="review-panel"
+                aria-selected={activeSection === key}
+                data-testid={`review-section-${key}`}
+                onClick={() => setSection(key)}
+                className={classNames('relative -mb-px inline-flex min-h-[40px] flex-shrink-0 items-center gap-1.5 border-b-2 px-3 text-sm font-semibold transition-colors', activeSection === key
+                  ? 'border-brand-teal text-white'
+                  : 'border-transparent text-gray-400 hover:text-gray-200')}
+              >
+                {label}
+                {key === 'badge' && seeksBadge ? <><span className="h-2 w-2 rounded-full bg-amber-400" aria-hidden="true" /><span className="sr-only">(owner requested)</span></> : null}
+              </button>
+            ))}
           </div>
 
-          {/* Owner-edit re-review diff (P0) — only when a live listing was edited */}
-          {review.reReview && (
-            <div className="rounded-2xl border border-amber-400/25 bg-amber-500/[0.05] p-4">
-              <div className="mb-3 flex items-center gap-2 text-sm font-bold text-amber-200">
-                <History className="h-4 w-4" /> Owner edited this live listing
-                {review.materialEditFlag ? (
-                  <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-rose-400/30 bg-rose-500/15 px-2 py-0.5 text-[11px] font-semibold text-rose-300">
-                    <AlertTriangle className="h-3 w-3" /> Needs a closer look
-                  </span>
-                ) : null}
-              </div>
-              <p className="mb-3 text-xs text-gray-400">
-                The listing stayed live. Review the changes below and approve to clear the re-check.
-                {review.reReview.identityChanged ? ' The owner changed a core identity field (type/locality).' : ''}
-              </p>
-              <div className="space-y-1.5">
-                {review.reReview.fields.map((f) => (
-                  <div key={f.label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm">
-                    <div className="min-w-0">
-                      <div className="text-[11px] uppercase tracking-wide text-gray-500">{f.label}</div>
-                      <div className="truncate text-gray-400 line-through">{f.from}</div>
+          <div id="review-panel" role="tabpanel" aria-labelledby={`review-tab-${activeSection}`} className="space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
+            {activeSection === 'overview' ? (
+              <>
+                <SubmittedPhotos listing={review} />
+                <SubmittedDescription listing={review} />
+              </>
+            ) : null}
+
+            {activeSection === 'details' ? (
+              <>
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-white/10 sm:grid-cols-3">
+                  {detailKvs(review).map(([k, v, full]) => (
+                    <div key={k} className={classNames('bg-ink-2 p-3', full && 'col-span-2 sm:col-span-3')}>
+                      <div className="text-[11px] text-gray-500">{k}</div>
+                      <div className="mt-0.5 break-words text-sm font-semibold text-gray-100">{v === '' || v == null ? <span className="font-normal text-gray-500">{'\u2014'}</span> : v}</div>
                     </div>
-                    <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
-                    <div className="min-w-0 text-right">
-                      <div className="text-[11px] uppercase tracking-wide text-gray-500">Now</div>
-                      <div className="truncate font-semibold text-gray-100">{f.to}</div>
+                  ))}
+                </div>
+                <SubmittedLocation listing={review} />
+              </>
+            ) : null}
+
+            {activeSection === 'changes' ? (
+              <div className="rounded-2xl border border-amber-400/25 bg-amber-500/[0.05] p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-bold text-amber-200">
+                  <History className="h-4 w-4" /> Owner edited this live listing
+                  {review.materialEditFlag ? (
+                    <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-rose-400/30 bg-rose-500/15 px-2 py-0.5 text-[11px] font-semibold text-rose-300">
+                      <AlertTriangle className="h-3 w-3" /> Needs a closer look
+                    </span>
+                  ) : null}
+                </div>
+                <p className="mb-3 text-xs text-gray-400">
+                  The listing stayed live. Review the changes below and approve to clear the re-check.
+                  {review.reReview?.identityChanged ? ' The owner changed a core identity field (type/locality).' : ''}
+                </p>
+                {review.reReview ? null : (
+                  <div className="flex flex-wrap gap-1.5" data-testid="changed-fields">
+                    {editedFields(review).map((f) => (
+                      <span key={f} className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-100">{f}</span>
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  {(review.reReview?.fields || []).map((f) => (
+                    <div key={f.label} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 rounded-lg bg-white/[0.03] px-3 py-2 text-sm">
+                      <div className="min-w-0">
+                        <div className="text-[11px] uppercase tracking-wide text-gray-500">{f.label}</div>
+                        <div className="truncate text-gray-400 line-through">{f.from}</div>
+                      </div>
+                      <ArrowRight className="h-3.5 w-3.5 flex-shrink-0 text-gray-500" />
+                      <div className="min-w-0 text-right">
+                        <div className="text-[11px] uppercase tracking-wide text-gray-500">Now</div>
+                        <div className="truncate font-semibold text-gray-100">{f.to}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={approveEdits} disabled={busy} className="dz-btn dz-btn-success mt-3">
+                  <CheckCircle className="h-4 w-4" /> Approve edits
+                </button>
+              </div>
+            ) : null}
+
+            {/* Mounted on first visit and kept, so a half-filled evidence form survives a look at another tab. */}
+            {activeSection === 'badge' || badgeSeenFor === reviewKey ? (
+              <div hidden={activeSection !== 'badge'}>
+                <OwnershipEvidencePanel propertyId={pid(review)} listing={review} onRefresh={onRefresh} onVerification={trackBadgeCase} />
+              </div>
+            ) : null}
+
+            {activeSection === 'messages' ? (
+              <div className="space-y-4">
+                <div className="overflow-hidden rounded-xl border border-white/10 focus-within:border-brand-teal/60">
+                  <div className="flex max-h-72 min-h-[96px] flex-col gap-2 overflow-y-auto bg-black/20 p-3">
+                    {thread.messages.length ? (
+                      thread.messages.map((m) => {
+                        /* An internal message must not be laid out as part of a conversation the owner is party to:
+                           read as an ordinary bubble, a moderator assumes the owner was told. */
+                        if (m.internal) {
+                          return (
+                            <div key={m.id} className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
+                              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-300">
+                                <AlertTriangle className="h-3.5 w-3.5" /> Staff only {'\u00B7'} not shown to the owner
+                              </div>
+                              <div className="whitespace-pre-wrap">{m.body}</div>
+                              <div className="mt-1 text-[11px] text-amber-200/70">{fmtAgo(m.at)}</div>
+                            </div>
+                          );
+                        }
+                        const me = m.from === 'ops';
+                        return (
+                          <div key={m.id} className={classNames('flex', me && 'justify-end')}>
+                            <div className={classNames('max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm', me ? 'rounded-br-sm bg-teal-500/20 text-teal-50' : 'rounded-bl-sm bg-white/[0.07] text-gray-100')}>
+                              {m.body}
+                              <div className="mt-1 text-[11px] text-gray-400">{me ? 'You (Draazy)' : review.owner} {'\u00B7'} {fmtAgo(m.at)}</div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="m-auto text-center text-sm text-gray-500">No messages yet. Ask the owner anything before deciding.</p>
+                    )}
+                  </div>
+                  <div className="border-t border-white/10 bg-white/[0.02] px-3 py-2.5">
+                    <textarea
+                      value={msg}
+                      onChange={(e) => setMsg(e.target.value)}
+                      onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') reviewSend(false); }}
+                      rows={2}
+                      aria-label="Message to the owner"
+                      placeholder={'Share a note, or ask for a clarification to hand the listing back for correction\u2026'}
+                      className="block w-full resize-none bg-transparent text-sm leading-relaxed text-white outline-none placeholder:text-gray-500"
+                    />
+                    <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
+                      <span className="mr-auto hidden text-[11px] text-gray-500 sm:inline">Ctrl + Enter to send</span>
+                      {/* The server refuses a hand-back once the listing is published, so the button only shows
+                          while it awaits us. A staff-posted listing is refused too, but not visible here. */}
+                      <button
+                        type="button"
+                        onClick={() => reviewSend(true)}
+                        disabled={!(review.status === 'pending' || thread.status === 'in_review')}
+                        title={review.status === 'pending' || thread.status === 'in_review'
+                          ? 'Hands the listing back to the owner to correct'
+                          : 'Only a listing still awaiting review can be handed back'}
+                        className="dz-btn dz-btn-ghost dz-btn-sm"
+                      >
+                        <HelpCircle className="h-3.5 w-3.5" /> Ask for clarification
+                      </button>
+                      <button type="button" onClick={() => reviewSend(false)} className="dz-btn dz-btn-primary dz-btn-sm">
+                        <Send className="h-3.5 w-3.5" /> Send
+                      </button>
                     </div>
                   </div>
-                ))}
+                </div>
+
+                <div className="divide-y divide-white/10 rounded-xl border border-white/10">
+                  {review.ownerMobile && (
+                    <WhatsappTemplates
+                      review={review}
+                      waOpen={waOpen}
+                      setWaOpen={setWaOpen}
+                      waTemplates={waTemplates}
+                      waPreview={waPreview}
+                      setWaPreview={setWaPreview}
+                      waPreviewText={waPreview ? interpolateOutreachTemplate(waPreview.body, previewVariables(review)) : ''}
+                      busy={busy}
+                      handleSendWaTemplate={handleSendWaTemplate}
+                    />
+                  )}
+                  <CommunicationLog
+                    commsOpen={commsOpen}
+                    setCommsOpen={setCommsOpen}
+                    commsLog={commsLog}
+                    loaded={commsLoadedFor === reviewKey}
+                    onMarkSent={markChaserSent}
+                  />
+                </div>
               </div>
-              <button onClick={approveEdits} className="dz-btn dz-btn-success mt-3">
-                <CheckCircle className="h-4 w-4" /> Approve edits
-              </button>
-            </div>
-          )}
+            ) : null}
+          </div>
+        </div>
+
+        <aside aria-label="Decision" className="space-y-4 lg:max-h-[calc(100dvh-15rem)] lg:overflow-y-auto lg:pr-1">
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-200">
-              <FileCheck2 className="h-4 w-4 text-brand-teal" /> Verification checklist
+              <FileCheck2 className="h-4 w-4 text-brand-teal" /> <span id="review-checklist-title">Verification checklist</span>
               <span className="ml-auto text-xs font-semibold text-gray-400">
                 {thread.checklist.filter((c) => c.pass).length} / {thread.checklist.length} checked
               </span>
             </div>
-            <div className="space-y-1">
+            <div className="space-y-2" role="group" aria-labelledby="review-checklist-title">
               {thread.checklist.map((c) => (
-                <div key={c.item} className="flex flex-col gap-2 border-t border-white/10 py-2.5 first:border-t-0 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
-                  <div className="flex min-w-0 items-center gap-2.5">
-                    <FileText className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                    <span className="truncate text-sm font-semibold text-gray-100">{c.item}</span>
-                  </div>
-                  <div className="flex flex-shrink-0 items-center gap-1.5 pl-[26px] sm:pl-0">
-                    {/* One toggle, not a verified/rejected pair. The two buttons wrote three states
-                        into a boolean column; what an approval reads is "is every line ticked", so
-                        `rejected` and "not looked at yet" were always the same answer. */}
-                    <button
-                      onClick={() => setChecklistItem(c.item, !c.pass)}
-                      aria-pressed={c.pass}
-                      title={c.pass ? 'Checked \u2014 click to undo' : 'Mark as checked'}
-                      className={classNames(iconBtn, c.pass
-                        ? 'border-emerald-400/30 bg-emerald-500/15 text-emerald-300'
-                        : 'border-white/10 text-gray-400 hover:bg-white/5')}
-                    >
-                      {c.pass ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
-                      <span className="sr-only">{c.item}</span>
-                    </button>
-                  </div>
-                </div>
+                <label key={c.item} className={classNames('flex min-h-[44px] cursor-pointer flex-wrap items-center gap-2.5 rounded-xl border px-3 py-2 transition-colors', c.pass
+                  ? 'border-emerald-400/30 bg-emerald-500/10'
+                  : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.05]')}>
+                  <input
+                    type="checkbox"
+                    checked={c.pass}
+                    onChange={(e) => setChecklistItem(c.item, e.target.checked)}
+                    className="h-5 w-5 flex-shrink-0 cursor-pointer accent-emerald-500"
+                  />
+                  <span className={classNames('text-sm font-semibold', c.pass ? 'text-emerald-100' : 'text-gray-100')}>{c.item}</span>
+                  {signalsForChecklistItem(thread.signals || review.signals, c.item).map((item) => (
+                    <span key={`${c.item}:${item.code}`} className={classNames('rounded-full border px-2 py-0.5 text-[11px] font-semibold', item.severity === 'hard'
+                      ? 'border-rose-400/40 bg-rose-500/15 text-rose-200'
+                      : 'border-white/10 bg-white/5 text-gray-300')} title={item.detail || signalLabel(item.code)}>
+                      {signalLabel(item.code)}
+                    </span>
+                  ))}
+                </label>
               ))}
             </div>
           </div>
 
-          {/* Messaging */}
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
             <div className="mb-3 flex items-center gap-2 text-sm font-bold text-gray-200">
-              <MessagesSquare className="h-4 w-4 text-brand-teal" /> Communicate with the owner
+              <CheckCircle className="h-4 w-4 text-brand-teal" /> Decision
             </div>
-            <div className="flex max-h-60 flex-col gap-2 overflow-y-auto rounded-xl border border-white/10 bg-ink p-2">
-              {thread.messages.length ? (
-                thread.messages.map((m) => {
-                  /* An internal message is one the owner cannot see -- the server filters it out of
-                     their copy entirely -- so it must not be laid out as part of a conversation the
-                     heading above says the owner is party to. Left as an ordinary ops bubble
-                     labelled "You (Draazy)", a moderator reads the duplicate-probe finding and
-                     reasonably concludes the owner has already been told. That misreading is the
-                     same disclosure the filter exists to prevent, one step later. */
-                  if (m.internal) {
-                    return (
-                      <div key={m.id} className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-50">
-                        <div className="mb-1 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-300">
-                          <AlertTriangle className="h-3.5 w-3.5" /> Staff only {'\u00B7'} not shown to the owner
-                        </div>
-                        <div className="whitespace-pre-wrap">{m.body}</div>
-                        <div className="mt-1 text-[11px] text-amber-200/70">{fmtAgo(m.at)}</div>
-                      </div>
-                    );
-                  }
-                  const me = m.from === 'ops';
-                  return (
-                    <div key={m.id} className={classNames('flex', me && 'justify-end')}>
-                      <div className={classNames('max-w-[80%] whitespace-pre-wrap rounded-xl border px-3 py-2 text-sm', me ? 'border-teal-400/30 bg-teal-500/15 text-teal-50' : 'border-white/10 bg-white/5 text-gray-100')}>
-                        {m.body}
-                        <div className="mt-1 text-[11px] text-gray-400">{me ? 'You (Draazy)' : review.owner} {'\u00B7'} {fmtAgo(m.at)}</div>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="py-3 text-center text-sm text-gray-400">No messages yet. Ask the owner for any clarification before deciding.</div>
-              )}
-            </div>
-            <div className="mt-2.5 flex items-stretch gap-2">
-              <textarea value={msg} onChange={(e) => setMsg(e.target.value)} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') reviewSend(); }} rows={2} placeholder={'Ask for a clarification or share a note for the owner\u2026'} className="dz-input flex-1 resize-none" />
-              <button onClick={reviewSend} title="Send" className="dz-btn dz-btn-primary"><Send className="h-4 w-4" /></button>
-            </div>
+            {caseRejected ? (
+              <p className="text-sm text-gray-300">This listing was not approved. Reopening it needs a second reviewer.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <button onClick={reviewApprove} disabled={busy || !checklistComplete} title={checklistComplete ? 'Approve this listing' : 'Tick every check'} className="dz-btn dz-btn-success min-h-[44px] disabled:opacity-50">
+                  <CheckCircle className="h-4 w-4" /> Approve
+                </button>
+                <button onClick={() => { setDecisionMode('needs_info'); setReasonCode(''); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-ghost min-h-[44px]">
+                  <HelpCircle className="h-4 w-4" /> Needs info
+                </button>
+                <button onClick={() => { setDecisionMode('reject'); setReasonCode(''); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-danger min-h-[44px]">
+                  <XCircle className="h-4 w-4" /> Reject
+                </button>
+                {!checklistComplete ? <span className="self-center text-xs font-semibold text-amber-300">Tick every check</span> : null}
+              </div>
+            )}
+            {decisionMode && !caseRejected ? (
+              <div className="mt-4 rounded-xl border border-white/10 bg-ink/60 p-3">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Reason</span>
+                  {decisionMode === 'reject' ? <span className="text-xs font-semibold text-rose-300">Final — the owner can't resubmit</span> : null}
+                </div>
+                <div className="flex flex-wrap gap-2" role="group" aria-label="Reason">
+                  {REVIEW_REASONS.map((reason) => (
+                    <button key={reason.code} type="button" aria-pressed={reasonCode === reason.code} onClick={() => setReasonCode(reason.code)}
+                      className={classNames('rounded-full border px-3 py-1.5 text-xs font-semibold transition', reasonCode === reason.code
+                        ? 'border-brand-teal bg-brand-teal text-ink'
+                        : 'border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/20')}>
+                      {reason.label}
+                    </button>
+                  ))}
+                </div>
+                <label className="mt-3 block text-sm">
+                  <span className="mb-1 block text-gray-300">Note {reasonCode === 'other' ? <span className="text-rose-300">*</span> : <span className="text-gray-500">(optional)</span>}</span>
+                  <textarea value={reasonNote} onChange={(e) => setReasonNote(e.target.value)} rows={2} className="dz-input resize-none" placeholder="One clear fix for the owner…" />
+                </label>
+                {reasonCode ? (
+                  <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                    <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-gray-500">Owner message preview</div>
+                    <div className="whitespace-pre-wrap text-sm text-gray-300">{ownerMessagePreview(decisionMode, reasonCode, reasonNote)}</div>
+                  </div>
+                ) : null}
+                <div className="mt-3 flex justify-end gap-2">
+                  <button type="button" onClick={() => setDecisionMode(null)} className="dz-btn dz-btn-ghost">Cancel</button>
+                  <button type="button" onClick={submitDecision} disabled={busy || !reasonCode || (reasonCode === 'other' && !reasonNote.trim())} className={classNames('dz-btn', decisionMode === 'reject' ? 'dz-btn-danger' : 'dz-btn-primary')}>
+                    {decisionMode === 'reject' ? 'Reject final' : 'Send needs info'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {(caseRejected || secondApprovalNeeded || thread.overrideRequest) ? (
+              <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
+                {thread.overrideRequest?.requestedBy && String(thread.overrideRequest.requestedBy) === String(user?.id) ? (
+                  <p className="font-semibold">{overrideCopy.pending}</p>
+                ) : thread.overrideRequest ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-semibold">{overrideCopy.label}</span>
+                    <span>{thread.overrideRequest.reason}</span>
+                    <button type="button" onClick={approveOverride} disabled={busy} className="dz-btn dz-btn-primary dz-btn-sm">{overrideCopy.approve}</button>
+                  </div>
+                ) : (
+                  <>
+                    <label className="block">
+                      <span className="mb-1 block font-semibold">{overrideCopy.requestHeading}</span>
+                      <textarea value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} rows={2} className="dz-input resize-none" placeholder={overrideCopy.requestPlaceholder} />
+                    </label>
+                    <button type="button" onClick={requestOverride} disabled={busy || !overrideReason.trim()} className="dz-btn dz-btn-primary mt-2">{overrideCopy.requestHeading}</button>
+                  </>
+                )}
+              </div>
+            ) : null}
           </div>
 
-          {/* WhatsApp Templates */}
-          {review.ownerMobile && (
-            <WhatsappTemplates
-              review={review}
-              waOpen={waOpen}
-              setWaOpen={setWaOpen}
-              waTemplates={waTemplates}
-              waPreview={waPreview}
-              setWaPreview={setWaPreview}
-              waPreviewText={waPreview ? interpolateOutreachTemplate(waPreview.body, previewVariables(review)) : ''}
-              busy={busy}
-              handleSendWaTemplate={handleSendWaTemplate}
-            />
-          )}
-
-          {/* Communication Log */}
-          {optionEnabled('properties.commsLog') && (
-            <CommunicationLog
-              commsOpen={commsOpen}
-              setCommsOpen={setCommsOpen}
-              commsLog={commsLog}
-            />
-          )}
-
-          {/* Reject reason */}
-          {rejectMode ? (
-            <div className="rounded-2xl border border-rose-400/30 bg-white/[0.03] p-4">
-              <label className="mb-1 block text-sm text-gray-300">Reason for rejection (sent to the owner)</label>
-              <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={3} placeholder={'Be specific: which document or detail is missing/invalid and what the owner should fix\u2026'} className="dz-input resize-none" />
-            </div>
-          ) : null}
-
           <InternalNote entityType="listing" entityId={review.id} value={internalNote} onChange={setInternalNote} showHistory />
-        </div>
-      </Modal>
-    </>
+        </aside>
+      </div>
+    </Modal>
   );
 }

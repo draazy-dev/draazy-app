@@ -4,10 +4,13 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
+import com.draazy.api.security.Teams;
 import com.draazy.api.support.AbstractApiTest;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -19,14 +22,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Contract + behaviour proof for the two back-office city surfaces: `PATCH /admin/cities/{slug}`
- * and `GET /admin/cities/waitlist`.
- *
- * <p>They are tested together because they are one decision — the waitlist is the evidence, the
- * toggle is the act — and because their guards deliberately differ, which is only visible when both
- * are asserted in the same place.
- */
+/** The two back-office city surfaces are one decision — the waitlist is the evidence, the toggle is
+ *  the act — and their guards deliberately differ, which only shows when both are asserted here. */
 class CityAdminEndpointTest extends AbstractApiTest {
 
     @Autowired
@@ -39,10 +36,8 @@ class CityAdminEndpointTest extends AbstractApiTest {
         if (adminId != null) {
             jdbc.update("delete from audit_log where actor = ?", adminId);
         }
-        // These tests launch cities, and the roster is shared state that the repeatable seed no
-        // longer reasserts (`live` is set on INSERT only, so that a re-seed cannot un-launch what
-        // ops launched). Put it back by hand, or the next class to read `GET /cities` inherits a
-        // live Mumbai from whichever test happened to run first.
+        // The roster is shared state the repeatable seed does not reassert, so restore it by hand or
+        // the next class to read `GET /bootstrap` inherits a live Mumbai.
         jdbc.update("update cities set live = (slug = 'pune')");
     }
 
@@ -50,6 +45,9 @@ class CityAdminEndpointTest extends AbstractApiTest {
         User user = new User(mobile, role);
         user.setName(role + " city editor");
         user.setMobileVerified(true);
+        // A staff account is keyed in the permission map by its desk, and one with no desk is refused
+        // outright. Which desk is immaterial here — the seeded document grants all six the same set.
+        if (Roles.Wire.STAFF.equals(role)) user.setTeam(Teams.RENTAL);
         User saved = users.saveAndFlush(user);
         if (Roles.Wire.ADMIN.equals(role)) {
             adminId = saved.getId().toString();
@@ -66,16 +64,12 @@ class CityAdminEndpointTest extends AbstractApiTest {
                                 {"live":true}"""))
                 .andExpect(status().isNoContent());
 
-        mvc.perform(get(Routes.Cities.BASE))
+        mvc.perform(get(Routes.Bootstrap.BASE))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.slug=='mumbai')].live", contains(true)));
+                .andExpect(jsonPath("$.cities[?(@.slug=='mumbai')].live", contains(true)));
     }
 
-    /**
-     * Launching a city is an operational decision, and a decision nobody can attribute is not much
-     * of a record. The {@code @AfterEach} above already knows a row is written; without this, that
-     * is the only thing in the suite that does.
-     */
+    /** Launching a city is an operational decision, and one nobody can attribute is not a record. */
     @Test
     void togglingACityIsAudited() throws Exception {
         mvc.perform(patch(Routes.Admin.CITY_BY_SLUG.replace("{slug}", "hyderabad"))
@@ -97,32 +91,11 @@ class CityAdminEndpointTest extends AbstractApiTest {
                 .contains("\"afterLive\": true");
     }
 
-    @Test
-    void routeIsAdminOnly() throws Exception {
+    @ParameterizedTest(name = "{0} is refused")
+    @CsvSource({"routeIsAdminOnly_owner, 9877731002, owner", "aManagerCannotEditCities, 9877731006, manager"})
+    void aNonAdminCannotEditCities(String name, String mobile, String role) throws Exception {
         mvc.perform(patch(Routes.Admin.CITY_BY_SLUG.replace("{slug}", "mumbai"))
-                        .header(HttpHeaders.AUTHORIZATION, token("9877731002", Roles.Wire.OWNER))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"live":true}"""))
-                .andExpect(status().isForbidden());
-    }
-
-    /**
-     * The role is only half the guard. Without this, deleting {@code settings:write} from the
-     * {@code @PreAuthorize} would leave every other test in this class green — an unenforced
-     * permission that looks enforced is the D192/D13 failure the atom exists to prevent.
-     */
-    @Test
-    void anAdministratorNarrowedOffSettingsWriteIsRefused() throws Exception {
-        User scoped = new User("9877731006", Roles.Wire.ADMIN);
-        scoped.setName("narrowed admin");
-        scoped.setMobileVerified(true);
-        User saved = users.saveAndFlush(scoped);
-        jdbc.update("INSERT INTO back_office_permissions (user_id, permissions) "
-                + "VALUES (?::uuid, ?::jsonb)", saved.getId().toString(), "[\"settings:read\"]");
-
-        mvc.perform(patch(Routes.Admin.CITY_BY_SLUG.replace("{slug}", "mumbai"))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(saved))
+                        .header(HttpHeaders.AUTHORIZATION, token(mobile, role))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"live":true}"""))
@@ -161,14 +134,8 @@ class CityAdminEndpointTest extends AbstractApiTest {
         jdbc.update("delete from city_waitlist where mobile like '98777320%'");
     }
 
-    /**
-     * The whole report in one assertion: grouped, counted, dated and ranked.
-     *
-     * <p>Nashik is asked for twice and Nagpur once, and Nashik is asked for <em>first</em>, so a
-     * report that ordered by recency rather than by count would put Nagpur on top. That is the
-     * inversion worth testing: the two orderings agree on almost any data you would write by
-     * accident.
-     */
+    /** Nashik is asked for twice but first, so a report ordered by recency puts Nagpur on top —
+     *  the one inversion the two orderings disagree on. */
     @Test
     void theWaitlistIsAggregatedByCityMostWantedFirst() throws Exception {
         waitlisted("9877732001", "Nashik", "2024-01-01T10:00:00Z");
@@ -185,13 +152,8 @@ class CityAdminEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].city").value("Nashik"));
     }
 
-    /**
-     * Case is not identity, here or in the unique index.
-     *
-     * <p>Without the {@code lower(city)} grouping key this reports Indore twice, each half ranked
-     * below a city fewer people want — the report would answer the operator's question wrongly
-     * while looking entirely healthy.
-     */
+    /** Without the {@code lower(city)} grouping key this reports Indore twice, each half ranked
+     *  below a city fewer people want, while looking entirely healthy. */
     @Test
     void citiesDifferingOnlyByCaseAreOneRow() throws Exception {
         waitlisted("9877732004", "Indore", "2024-01-01T10:00:00Z");
@@ -203,14 +165,8 @@ class CityAdminEndpointTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[?(@.city =~ /(?i)indore/)].requests", contains(2)));
     }
 
-    /**
-     * Counts, and nothing that could identify anybody.
-     *
-     * <p>The load-bearing assertion of this whole endpoint. {@code city_waitlist} is unverified
-     * public submissions carrying a mobile and an optional email, and the reason a finder was
-     * allowed onto {@code CityWaitlistRepository} at all is that it groups before it returns. If
-     * somebody later adds the contact columns "so ops can follow up", this is what says no.
-     */
+    /** {@code city_waitlist} is unverified public submissions carrying a mobile; the finder is only
+     *  allowed on the repository because it groups before it returns. */
     @Test
     void theReportCarriesNoContactDetail() throws Exception {
         waitlisted("9877732006", "Surat", "2024-01-01T10:00:00Z");

@@ -1,32 +1,18 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { unreadCount as fetchUnreadCount } from '../services/conversationService.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { openMessageStream, unreadCount as fetchUnreadCount } from '../services/conversationService.js';
+import { getAppFlags } from '../services/settingsService.js';
 import { useAuth } from './AuthContext.jsx';
 
-/**
- * The chat attention count for the navbar badge, held once for the whole app.
- *
- * ## Why this replaced `useChatUnread`
- *
- * `lib/chat.js` exposed `useChatUnread()`, a `useSyncExternalStore` hook over localStorage — a
- * synchronous read the navbar could call inline during render. Against the API the same question is
- * a network call, and a network call cannot happen during render. So the count becomes state,
- * fetched once and refreshed on demand. Identical shape to `NotificationContext` and `SavedContext`,
- * for identical reasons.
- *
- * That hook (and the store-change event behind it) has since been **deleted** rather than left
- * unused: it answered the same question from the mock store, which is empty in http mode, so
- * leaving it in place meant a one-line import could silently zero the badge.
- *
- * ## Signed out
- *
- * The inbox is caller-scoped and the API 401s without a session, so this holds zero rather than
- * reading an anonymous store. No badge is the right thing for a signed-out user either way.
- */
+/* The chat badge count, held once for the whole app because the answer is a network call and a
+   network call cannot happen during render. Signed out holds zero: the inbox 401s without a session. */
 const ConversationContext = createContext(null);
 
 export function ConversationProvider({ children }) {
   const { isIn } = useAuth();
   const [unread, setUnread] = useState(0);
+  const [streamConnected, setStreamConnected] = useState(false);
+  const [messagingEnabled, setMessagingEnabled] = useState(true);
+  const subscribers = useRef(new Set());
 
   const refresh = useCallback(async () => {
     if (!isIn) {
@@ -57,24 +43,95 @@ export function ConversationProvider({ children }) {
     return () => { alive = false; };
   }, [isIn]);
 
-  /**
-   * The mock provider writes through `lib/chat.js`, which broadcasts `dz-convs-change` on every
-   * save. The navbar used to subscribe to that itself; the listener lives here now so the mock keeps
-   * its live-update behaviour without the navbar knowing which provider is active. The http provider
-   * never emits it and does not need to — its writes go through `refresh`.
-   */
+  /* Re-reads when another tab writes, focus returns, or the network comes back. Focus and
+     visibilitychange fire together on a tab switch, so one read answers both. */
   useEffect(() => {
     if (!isIn) return undefined;
-    const onChange = () => { refresh(); };
-    window.addEventListener('dz-convs-change', onChange);
+    let last = 0;
+    const onChange = () => {
+      if (document.hidden || Date.now() - last < 1000) return;
+      last = Date.now();
+      refresh();
+    };
     window.addEventListener('storage', onChange);
+    window.addEventListener('focus', onChange);
+    window.addEventListener('online', onChange);
+    document.addEventListener('visibilitychange', onChange);
     return () => {
-      window.removeEventListener('dz-convs-change', onChange);
       window.removeEventListener('storage', onChange);
+      window.removeEventListener('focus', onChange);
+      window.removeEventListener('online', onChange);
+      document.removeEventListener('visibilitychange', onChange);
     };
   }, [isIn, refresh]);
 
-  const value = useMemo(() => ({ unread, refresh }), [unread, refresh]);
+  useEffect(() => {
+    let alive = true;
+    const sync = () => getAppFlags()
+      .then((flags) => { if (alive) setMessagingEnabled(flags?.inAppMessaging !== false); })
+      .catch(() => { if (alive) setMessagingEnabled(true); });
+    sync();
+    window.addEventListener('draazy-settings-change', sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      alive = false;
+      window.removeEventListener('draazy-settings-change', sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
+  const subscribe = useCallback((fn) => {
+    subscribers.current.add(fn);
+    return () => subscribers.current.delete(fn);
+  }, []);
+
+  useEffect(() => {
+    if (!isIn || !messagingEnabled) {
+      setStreamConnected(false);
+      return undefined;
+    }
+    let stopped = false;
+    let retry = 1000;
+    let controller = null;
+    let timer = null;
+    const start = () => {
+      if (stopped || document.hidden) return;
+      controller = new AbortController();
+      openMessageStream({
+        signal: controller.signal,
+        onOpen: () => {
+          retry = 1000;
+          setStreamConnected(true);
+        },
+        onEvent: (event) => {
+          if (event.type === 'message') refresh();
+          subscribers.current.forEach((fn) => fn(event));
+        },
+      }).catch((err) => {
+        if (err?.name !== 'AbortError') setStreamConnected(false);
+      }).finally(() => {
+        controller = null;
+        if (stopped) return;
+        setStreamConnected(false);
+        timer = window.setTimeout(start, retry);
+        retry = Math.min(retry * 2, 30000);
+      });
+    };
+    const visible = () => {
+      if (document.hidden) return;
+      if (!controller) start();
+    };
+    start();
+    document.addEventListener('visibilitychange', visible);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+      controller?.abort();
+      document.removeEventListener('visibilitychange', visible);
+    };
+  }, [isIn, messagingEnabled, refresh]);
+
+  const value = useMemo(() => ({ unread, refresh, subscribe, streamConnected }), [unread, refresh, subscribe, streamConnected]);
   return <ConversationContext.Provider value={value}>{children}</ConversationContext.Provider>;
 }
 

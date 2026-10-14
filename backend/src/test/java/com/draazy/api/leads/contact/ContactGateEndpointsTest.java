@@ -8,12 +8,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.billing.plan.TestPlanGrants;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -26,14 +29,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-/**
- * Contract + behaviour proof for the contacts + contact-gate slice, driven through the real filter
- * chain against the live Flyway'd Postgres.
- *
- * <p>Organised around the invariants rather than the endpoints, because the invariants are what a
- * regression would break: badge-not-gate (ADR-019), reveal-only-on-owner-or-approved, strict
- * owner-scoping, and request idempotency.
- */
+// Contract + behaviour proof for the contacts + contact-gate slice, organised around invariants:
+// badge-not-gate (ADR-019), reveal-only-on-owner-or-approved, owner-scoping, and request idempotency.
 class ContactGateEndpointsTest extends AbstractApiTest {
 
     @Autowired
@@ -42,6 +39,10 @@ class ContactGateEndpointsTest extends AbstractApiTest {
     PropertyRepository properties;
     @Autowired
     ContactRequestRepository contactRequests;
+    @Autowired
+    jakarta.persistence.EntityManager em;
+    @Autowired
+    TestPlanGrants grants;
     @Autowired
     @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping")
     RequestMappingHandlerMapping handlerMapping;
@@ -61,7 +62,7 @@ class ContactGateEndpointsTest extends AbstractApiTest {
 
     private User badgedBuyer(String mobile) {
         User u = user(mobile, "buyer");
-        u.setAadhaarVerified(true);
+        u.setVerified(true);
         return users.saveAndFlush(u);
     }
 
@@ -81,7 +82,7 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 .content("{\"propertyId\":\"" + p.getId() + "\"}"));
     }
 
-    /** The id of the single request in an owner's inbox — the {@code reqId} path token. */
+    // The id of the single request in an owner's inbox — the {@code reqId} path token.
     private String requestId(User owner) throws Exception {
         String json = mvc.perform(get(Routes.MeContactRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -89,14 +90,16 @@ class ContactGateEndpointsTest extends AbstractApiTest {
         return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-    // ---------------- GET /contacts/status ----------------
-
+    // Badge-not-gate (ADR-019): unverified callers must succeed against an ordinary owner; the badge
+    // bites only when the owner opts in.
     @Test
     void myContactRequests_isEmptyForAnOwnerWithNoListings_ratherThanEveryonesInbox() throws Exception {
         User busyOwner = user("9820000090", "owner");
         User idleOwner = user("9820000091", "owner");
         ask(user("9820000092", "buyer"), listing(busyOwner, "Busy owner flat"));
 
+        // The buyer's number stays masked to the owner too: the inbox never emits a raw contact
+        // number, so the revealed `contact` object is absent.
         mvc.perform(get(Routes.MeContactRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(idleOwner)))
                 .andExpect(status().isOk())
@@ -159,11 +162,6 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.status").value(ContactStatuses.APPROVED));
     }
 
-    /**
-     * Approving a request notifies the buyer — the positive outcome they were waiting on, and until
-     * tech-debt D92 one nothing announced. The notification points at the listing where the number
-     * is now visible, and nobody is told about their own decision.
-     */
     @Test
     void approvingAContactRequest_notifiesTheBuyer_andNotTheOwner() throws Exception {
         User owner = user("9820000200", "owner");
@@ -181,15 +179,33 @@ class ContactGateEndpointsTest extends AbstractApiTest {
         assertThat(notes).hasSize(1);
         assertThat(notes.getFirst().get("type")).isEqualTo("contact.approved");
         assertThat(notes.getFirst().get("link")).isEqualTo("/property/" + p.getId());
-        assertThat(notificationsFor(owner)).isEmpty();
+        assertThat(notes.getFirst().get("body").toString())
+                .contains("see their number unless they keep it hidden")
+                .doesNotContain(owner.getMobile());
+        assertThat(notificationsFor(owner)).extracting(row -> row.get("type"))
+                .containsExactly("contact.received");
     }
 
-    /**
-     * A decline is a terminal "no", not news to push at the buyer — so it stays silent by design.
-     * Recorded as a test so the silence is a decision the suite defends, not an omission.
-     */
     @Test
-    void decliningAContactRequest_notifiesNobody() throws Exception {
+    void askingForContact_notifiesTheOwnerOnce_withoutTheBuyersNumber() throws Exception {
+        User owner = user("9820000210", "owner");
+        User buyer = user("9820000211", "buyer");
+        Property p = listing(owner, "Notify on ask");
+
+        ask(buyer, p);
+        ask(buyer, p);
+
+        assertThat(notificationsFor(owner)).singleElement().satisfies(row -> {
+            assertThat(row.get("type")).isEqualTo("contact.received");
+            assertThat(row.get("link")).isEqualTo("/dashboard#leads");
+            assertThat(row.get("body").toString()).contains("Notify on ask")
+                    .doesNotContain(buyer.getMobile());
+        });
+        assertThat(notificationsFor(buyer)).isEmpty();
+    }
+
+    @Test
+    void decliningAContactRequest_tellsTheSeekerTheirContactIsBack() throws Exception {
         User owner = user("9820000202", "owner");
         User buyer = user("9820000203", "buyer");
         Property p = listing(owner, "Silent decline");
@@ -201,16 +217,17 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                         .content("{\"status\":\"declined\"}"))
                 .andExpect(status().isOk());
 
-        assertThat(notificationsFor(buyer)).isEmpty();
+        assertThat(notificationsFor(buyer)).singleElement().satisfies(row -> {
+            assertThat(row.get("type")).isEqualTo("contact.returned");
+            assertThat(row.get("link")).isEqualTo("/property/" + p.getId());
+        });
     }
 
-    /** Read straight from the table: the notification is a side effect, not part of any response. */
     private List<Map<String, Object>> notificationsFor(User user) {
         return jdbc.queryForList(
                 "select type, title, body, link from notifications where user_id = ?", user.getId());
     }
 
-    /** Mock-shape parity: exactly the four keys {@code frontend/src/lib/contact.js} reads. */
     @Test
     void contactStatus_shapeMatchesTheFrontendMock() throws Exception {
         User owner = user("9820000005", "owner");
@@ -224,8 +241,6 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.verificationRequired").exists())
                 .andExpect(jsonPath("$.ownerHidesNumber").exists());
     }
-
-    // ---------------- POST /contacts/request ----------------
 
     @Test
     void requestContact_createsOnePendingRow_andIsIdempotent() throws Exception {
@@ -248,6 +263,59 @@ class ContactGateEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void anExpiredPendingRequest_readsAsExpired_andAskingAgainRenewsTheSameRow() throws Exception {
+        User owner = user("9820000096", "owner");
+        User buyer = user("9820000097", "buyer");
+        Property p = listing(owner, "Renewable");
+        ask(buyer, p);
+        jdbc.update("update contact_requests set created_at = now() - interval '31 days' where property_id = ?", p.getId());
+                em.clear();
+
+                mvc.perform(get(Routes.Contacts.STATUS).param("propertyId", p.getId().toString())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(ContactStatuses.EXPIRED));
+
+        mvc.perform(post(Routes.Contacts.REQUEST).header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + p.getId() + "\",\"message\":\"Still keen\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(ContactStatuses.PENDING));
+
+        assertThat(contactRequests.findByPropertyIdInOrderByCreatedAtDesc(List.of(p.getId()),
+                Pageable.unpaged())).hasSize(1).allSatisfy(row -> {
+                    assertThat(row.getMessage()).isEqualTo("Still keen");
+                    assertThat(row.getCreatedAt()).isAfter(java.time.Instant.now().minusSeconds(60));
+                });
+    }
+
+    @Test
+    void renewingALapsedRequest_isANewSpendThatStartsTheWindowAgain() throws Exception {
+        User owner = user("9820000098", "owner");
+        User buyer = user("9820000099", "buyer");
+        Property p = listing(owner, "Renewed late");
+        ask(buyer, p);
+        jdbc.update("update contact_requests set created_at = now() - interval '31 days',"
+                + " first_requested_at = now() - interval '31 days' where property_id = ?", p.getId());
+        grants.grantPack(buyer.getId(), Instant.now().minus(10, ChronoUnit.DAYS),
+                Instant.now().plus(20, ChronoUnit.DAYS));
+        em.clear();
+
+        mvc.perform(post(Routes.Contacts.REQUEST).header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + p.getId() + "\",\"message\":\"Still keen\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contacts.remaining").value(29))
+                .andExpect(jsonPath("$.contacts.used").value(1));
+        assertThat(contactRequests.findByPropertyIdInOrderByCreatedAtDesc(List.of(p.getId()),
+                Pageable.unpaged())).allSatisfy(row ->
+                assertThat(row.getFirstRequestedAt()).isAfter(Instant.now().minus(1, ChronoUnit.HOURS)));
+    }
+
+    @Test
     void requestContact_onOwnListing_returnsOwner_andWritesNoRow() throws Exception {
         User owner = user("9820000008", "owner");
         Property p = listing(owner, "Self request");
@@ -262,18 +330,13 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 Pageable.unpaged())).isEmpty();
     }
 
-    /**
-     * The badge-not-gate proof (ADR-019). An unverified caller must succeed against an ordinary owner;
-     * the badge bites only when the owner has explicitly opted in. If this test ever needs a badge to
-     * pass, the trust model has silently become a wall.
-     */
     @Test
     void requestContact_succeedsForUnverifiedCaller_whenOwnerHasNotOptedIn() throws Exception {
         User owner = user("9820000009", "owner");
         User unverified = user("9820000010", "buyer");
         Property p = listing(owner, "Badge not gate");
 
-        assertThat(unverified.isAadhaarVerified()).isFalse();
+        assertThat(unverified.isVerified()).isFalse();
         mvc.perform(post(Routes.Contacts.REQUEST)
                         .header(HttpHeaders.AUTHORIZATION, bearer(unverified))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -298,8 +361,6 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.error").value("verification_required"));
 
-        // Same owner, same listing: a badged caller sails through, proving the 403 is the owner's
-        // opt-in and not a blanket verification requirement.
         mvc.perform(post(Routes.Contacts.REQUEST).header(HttpHeaders.AUTHORIZATION, bearer(badged))
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk())
@@ -317,8 +378,6 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isUnauthorized());
         mvc.perform(get(Routes.MeContactRequests.BASE)).andExpect(status().isUnauthorized());
     }
-
-    // ---------------- /me/contact-requests ----------------
 
     @Test
     void myContactRequests_areOwnerScoped_maskTheRequester_andHideContactUntilApproved()
@@ -388,26 +447,21 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    // ---------------- the payoff: masked, and stays masked (D5 global policy) ----------------
-
     @Test
-    void ownerMobileStaysMaskedEvenAfterApproval_onPropertyDetail() throws Exception {
+    void approvedBuyerSeesOwnerMobileWhenOwnerAllowsIt_onPropertyDetail() throws Exception {
         User owner = user("9829876543", "owner");
         User buyer = user("9820000023", "buyer");
         Property p = listing(owner, "Reveal");
         String detail = "/properties/" + p.getId();
 
-        // Anonymous, and signed-in-but-unrequested: masked.
         mvc.perform(get(detail)).andExpect(jsonPath("$.owner.mobile").value("98XXXXX543"));
         mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(jsonPath("$.owner.mobile").value("98XXXXX543"));
 
-        // Pending is not approval.
         ask(buyer, p);
         mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(jsonPath("$.owner.mobile").value("98XXXXX543"));
 
-        // The owner always sees their own number.
         mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.owner.mobile").value("9829876543"));
 
@@ -417,19 +471,36 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                         .content("{\"status\":\"approved\"}"))
                 .andExpect(status().isOk());
 
-        // D5 (global policy): approval unlocks the in-app conversation, not the digits — the owner's
-        // number stays masked to the approved buyer and to everyone else.
         mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
-                .andExpect(jsonPath("$.owner.mobile").value("98XXXXX543"));
+                .andExpect(jsonPath("$.owner.mobile").value("9829876543"));
         mvc.perform(get(detail)).andExpect(jsonPath("$.owner.mobile").value("98XXXXX543"));
 
-        // ...and symmetrically the buyer's number stays masked to the owner: the inbox never emits a
-        // raw contact number, so the revealed `contact` object is absent and only the masked
-        // `requester` remains.
         mvc.perform(get(Routes.MeContactRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(jsonPath("$.content[0].contact").doesNotExist())
+                .andExpect(jsonPath("$.content[0].contact.mobile").value("9820000023"))
                 .andExpect(jsonPath("$.content[0].requester.mobile").value("98XXXXX023"));
+    }
+
+    @Test
+    void approvedBuyerStillSeesMaskWhenOwnerHidesNumber() throws Exception {
+        User owner = user("9829876545", "owner");
+        owner.setHideNumber(true);
+        users.saveAndFlush(owner);
+        User buyer = user("9820000025", "buyer");
+        Property p = listing(owner, "Hidden");
+        ask(buyer, p);
+
+        mvc.perform(patch(Routes.MeContactRequests.BASE + "/" + requestId(owner))
+                .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"approved\"}"));
+
+        mvc.perform(get(Routes.Contacts.STATUS).param("propertyId", p.getId().toString())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.ownerHidesNumber").value(true));
+        mvc.perform(get("/properties/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.owner.mobile").value("98XXXXX545"));
     }
 
     @Test
@@ -448,13 +519,6 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.owner.mobile").value("98XXXXX544"));
     }
 
-    // ---------------- api-standards.md §2.1 route-constant agreement ----------------
-
-    /**
-     * Guards the invariant {@code Routes} exists for: the constants the security chain binds must be
-     * the constants the controllers actually serve. A typo in either file compiles, passes every happy
-     * path, and quietly leaves a route unguarded — this is the only thing that catches it.
-     */
     @Test
     void everySliceRouteConstantIsServedByAController() {
         Set<String> mapped = handlerMapping.getHandlerMethods().keySet().stream()
@@ -467,7 +531,7 @@ class ContactGateEndpointsTest extends AbstractApiTest {
                 Routes.Contacts.REQUEST,
                 Routes.MeContactRequests.BASE,
                 Routes.MeContactRequests.BY_ID,
-                Routes.Verification.AADHAAR,
-                Routes.Webhooks.CASHFREE_DIGILOCKER);
+                Routes.Verification.IDENTITY,
+                Routes.Moderation.IDENTITY_REVIEWS);
     }
 }

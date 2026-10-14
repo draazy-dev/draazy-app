@@ -1,26 +1,30 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
-import { Archive, ExternalLink, Flag, MapPin, Save, X, XCircle } from 'lucide-react';
+import { Archive, ExternalLink, Flag, MapPin, Save, XCircle } from 'lucide-react';
 import { classNames } from '../../../lib/format.js';
 import { fmtINR } from '../../../lib/format.js';
 import Modal from '../../../components/ui/Modal.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
 import Select from '../../../components/ui/Select.jsx';
+import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import InternalNote from '../../../components/ui/InternalNote.jsx';
-import { EDIT_DEAL_OPTS, EDIT_STATUS_OPTS, dealLabel, perSqftLabel, liveHref, detailKvs, fmtAgo } from './constants.js';
+import { EDIT_DEAL_OPTS, EDIT_STATUS_OPTS, dealLabel, perSqftLabel, liveHref, detailKvs, fmtAgo, statusLabel } from './constants.js';
+import { REVIEW_REASONS, ownerMessagePreview } from './reviewReasons.js';
 
-/* ─── Edit Modal ─── */
-export function PropertyEditModal({ edit, setEdit, onSubmit }) {
+export function PropertyEditModal({ edit, setEdit, onClose, onSubmit, saving, canSetStatus }) {
+  const [picking, setPicking] = useState(false);
   if (!edit) return null;
+  const rejected = edit._ref?.status === 'rejected';
   return (
     <Modal
       open={!!edit}
-      onClose={() => setEdit(null)}
+      onClose={onClose}
       title="Edit listing"
       size="lg"
       footer={
         <>
-          <button onClick={() => setEdit(null)} className="dz-btn dz-btn-ghost">Cancel</button>
-          <button onClick={onSubmit} className="dz-btn dz-btn-primary"><Save className="h-4 w-4" /> Save changes</button>
+          <button type="button" onClick={onClose} disabled={saving} className="dz-btn dz-btn-ghost">Cancel</button>
+          <button type="button" onClick={onSubmit} disabled={saving || picking} className="dz-btn dz-btn-primary disabled:opacity-40"><Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save changes'}</button>
         </>
       }
     >
@@ -40,35 +44,46 @@ export function PropertyEditModal({ edit, setEdit, onSubmit }) {
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-gray-300">Configuration (BHK)</span>
-            {/* Numeric, like Price and Area beside it. Free text let a moderator type "Studio" or
-                "3 BHK" into a field the contract stores as an integer — a box that can express
-                something the server cannot is how a silently-discarded edit starts. Blank is the
-                catalogue's way of saying the unit has no bedroom count (plot, studio). */}
+            {/* Numeric like Price and Area; free text published values the listing form never offers. */}
             <input type="number" min="0" step="1" value={edit.bhk} onChange={(e) => setEdit({ ...edit, bhk: e.target.value })} className="dz-input" />
           </label>
           <label className="block text-sm">
             <span className="mb-1 block text-gray-300">Property type</span>
             <input value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value })} className="dz-input" />
           </label>
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span className="mb-1 block text-gray-300">Locality <span className="text-rose-400">*</span></span>
-            <input value={edit.locality} onChange={(e) => setEdit({ ...edit, locality: e.target.value })} className="dz-input" />
-          </label>
+            <LocalitySelect
+              value={edit.locality}
+              onChange={(v) => setEdit({ ...edit, locality: v, localitySlug: '' })}
+              onSelect={(sel) => setEdit({ ...edit, locality: sel.name, localitySlug: sel.slug || '' })}
+              onBusyChange={setPicking}
+              placeholder="Select locality"
+              ariaLabel="Locality"
+              className="w-full"
+            />
+          </div>
           <label className="block text-sm">
             <span className="mb-1 block text-gray-300">Deal</span>
             <Select value={edit.deal} onChange={(v) => setEdit({ ...edit, deal: v })} options={EDIT_DEAL_OPTS} ariaLabel="Deal" />
           </label>
         </div>
-        <label className="block text-sm">
-          <span className="mb-1 block text-gray-300">Status</span>
-          <Select value={edit.status} onChange={(v) => setEdit({ ...edit, status: v })} options={EDIT_STATUS_OPTS} ariaLabel="Status" />
-        </label>
+        {canSetStatus ? (
+          <label className="block text-sm">
+            <span className="mb-1 block text-gray-300">Status</span>
+            {rejected ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-300">
+                {statusLabel(edit.status)} — use Request reopen in the review panel to reverse a final rejection.
+              </div>
+            ) : (
+              <Select value={edit.status} onChange={(v) => setEdit({ ...edit, status: v })} options={EDIT_STATUS_OPTS} ariaLabel="Status" />
+            )}
+          </label>
+        ) : null}
       </div>
     </Modal>
   );
 }
-
-/* ─── Flag Modal ─── */
 export function PropertyFlagModal({ flagFor, setFlagFor, flagReason, setFlagReason, internalNote, setInternalNote, onSubmit }) {
   return (
     <Modal
@@ -92,7 +107,6 @@ export function PropertyFlagModal({ flagFor, setFlagFor, flagReason, setFlagReas
   );
 }
 
-/* ─── Archive Modal ─── */
 export function PropertyArchiveModal({ archiveFor, setArchiveFor, archiveReason, setArchiveReason, internalNote, setInternalNote, onSubmit }) {
   return (
     <Modal
@@ -116,7 +130,6 @@ export function PropertyArchiveModal({ archiveFor, setArchiveFor, archiveReason,
   );
 }
 
-/* ─── View Modal ─── */
 export function PropertyViewModal({ view, setView }) {
   return (
     <Modal
@@ -141,7 +154,7 @@ export function PropertyViewModal({ view, setView }) {
             <div className="min-w-0">
               <div className="text-lg font-extrabold text-white">{view.title}</div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <Badge status={view.status} />
+                <Badge status={view.status}>{statusLabel(view.status)}</Badge>
                 <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-gray-300">{dealLabel(view.deal)}</span>
                 {view.featured ? <span className="rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-0.5 text-xs text-teal-300">{'\u2605'} Featured</span> : null}
                 {view.real ? <span className="rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-0.5 text-xs text-teal-300">Live user post</span> : null}
@@ -169,13 +182,34 @@ export function PropertyViewModal({ view, setView }) {
   );
 }
 
-/* ─── Re-check Reject Modal ───
-   The failure branch of the stays-live re-check queue (Q14). Its own modal rather than a reuse of
-   the bulk one because the moderator needs the two facts the queue is about — which fields changed
-   and how long ago — in front of them while they type the reason, and because the copy has to say
-   out loud that the listing has been live the whole time. Same status transition as every other
-   take-down: `setListingStatus(id, 'rejected', reason)`. */
-export function PropertyRecheckRejectModal({ target, setTarget, reason, setReason, onSubmit }) {
+function ReasonPicker({ decision = 'reject', reasonCode, setReasonCode, note, setNote }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {REVIEW_REASONS.map((reason) => (
+          <button key={reason.code} type="button" onClick={() => setReasonCode(reason.code)}
+            className={classNames('rounded-full border px-3 py-1.5 text-xs font-semibold transition', reasonCode === reason.code
+              ? 'border-brand-teal bg-brand-teal text-ink'
+              : 'border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/20')}>
+            {reason.label}
+          </button>
+        ))}
+      </div>
+      <label className="block text-sm">
+        <span className="mb-1 block text-gray-300">Note {reasonCode === 'other' ? <span className="text-rose-300">*</span> : <span className="text-gray-500">(optional)</span>}</span>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} placeholder={'One clear fix for the owner…'} className="dz-input resize-none" />
+      </label>
+      {reasonCode ? (
+        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-gray-500">Owner message preview</div>
+          <div className="whitespace-pre-wrap text-sm text-gray-300">{ownerMessagePreview(decision, reasonCode, note)}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function PropertyRecheckRejectModal({ target, setTarget, reasonCode, setReasonCode, note, setNote, onSubmit }) {
   return (
     <Modal
       open={!!target}
@@ -196,35 +230,9 @@ export function PropertyRecheckRejectModal({ target, setTarget, reason, setReaso
             {target.recheckRequestedAt ? <> ({fmtAgo(target.recheckRequestedAt)})</> : null}. Rejecting removes it
             from search now and sends the reason below to the owner.
           </p>
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Reason for rejection</span>
-            <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} placeholder={'Be specific so the owner knows what to fix\u2026'} className="dz-input resize-none" aria-label="Reason for rejection" />
-          </label>
+          <ReasonPicker reasonCode={reasonCode} setReasonCode={setReasonCode} note={note} setNote={setNote} />
         </>
       ) : null}
-    </Modal>
-  );
-}
-
-/* ─── Bulk Reject Modal ─── */
-export function PropertyBulkRejectModal({ open, onClose, count, bulkReason, setBulkReason, onSubmit }) {
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={`Reject ${count} listing(s)`}
-      footer={
-        <>
-          <button onClick={onClose} className="dz-btn dz-btn-ghost">Cancel</button>
-          <button onClick={onSubmit} className="dz-btn dz-btn-danger"><XCircle className="h-4 w-4" /> Reject all</button>
-        </>
-      }
-    >
-      <p className="mb-3 text-sm text-gray-400">Rejecting {count} listing(s). The reason below is sent to every owner.</p>
-      <label className="block text-sm">
-        <span className="mb-1 block text-gray-300">Reason for rejection</span>
-        <textarea value={bulkReason} onChange={(e) => setBulkReason(e.target.value)} rows={3} placeholder={'Be specific so owners know what to fix\u2026'} className="dz-input resize-none" />
-      </label>
     </Modal>
   );
 }

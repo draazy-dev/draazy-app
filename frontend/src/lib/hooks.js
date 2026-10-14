@@ -1,6 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
-/* Shared form helpers: inline validation, mobile input, and draft autosave. */
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Marks EVERY failing field red, scrolls to + focuses the first via `data-err`, and returns the
 // first message for a single toast.
@@ -30,7 +28,6 @@ export function useFieldErrors(formRef) {
     setErrors(next);
     if (!firstName) return true;
     if (toast) toast(firstMsg, 'error');
-    // Scroll to + focus the first invalid field on the next frame.
     if (typeof window !== 'undefined') {
       window.requestAnimationFrame(() => {
         const root = (formRef && formRef.current) || document;
@@ -50,7 +47,6 @@ export function useFieldErrors(formRef) {
   return { errors, check, clear, clearAll, cx, has: (n) => !!errors[n], msg: (n) => errors[n] || '' };
 }
 
-// ---- useValidation: mark required fields, return whether all pass ----
 export function useValidation() {
   const [errors, setErrors] = useState({});
 
@@ -74,7 +70,6 @@ export function useValidation() {
   return { errors, validate, clearField, clearAll, hasError: (n) => !!errors[n] };
 }
 
-// ---- useMobileInput: 10-digit Indian mobile, +91, strips non-digits ----
 const IN_PATTERN = /^[6-9]\d{9}$/;
 export function useMobileInput(initial = '') {
   const [value, setRaw] = useState(() => String(initial).replace(/\D/g, '').slice(0, 10));
@@ -86,7 +81,6 @@ export function useMobileInput(initial = '') {
 
 export const isValidMobile = (v) => IN_PATTERN.test(String(v || '').replace(/\D/g, ''));
 
-// ---- useAutosave: persist a form-state object to localStorage (debounced) ----
 export function useAutosave(key, initialState, { debounce = 400 } = {}) {
   const [restored, setRestored] = useState(false);
   const [state, setState] = useState(() => {
@@ -138,8 +132,8 @@ export function useAutosave(key, initialState, { debounce = 400 } = {}) {
   return { state, setState, update, clear, restored };
 }
 
-// ---- useFormDraft: autosave/restore an EXTERNAL form-state object ----
-// Keys are `dzDraft:*`. Snapshot-keyed debounce and `flush()`: docs/system/cross-cutting.md
+// Keys are `dzDraft:*`. Snapshot-keyed debounce, `flush()` and the rule that changing a form's
+// field shape means RENAMING its key: docs/system/cross-cutting.md
 function draftHasContent(obj, ignore) {
   return Object.keys(obj || {}).some((k) => {
     if (ignore && ignore.includes(k)) return false;
@@ -150,6 +144,15 @@ function draftHasContent(obj, ignore) {
     if (typeof v === 'boolean') return v;
     return v != null && v !== '';
   });
+}
+
+// Drop keys that must never reach disk — a verified-consent flag, an eligibility choice, a server
+// id. Distinct from `ignore`, whose named fields are still saved and still restored.
+function omitKeys(obj, omit) {
+  if (!omit || !omit.length) return obj;
+  const out = {};
+  for (const k in obj) if (!omit.includes(k)) out[k] = obj[k];
+  return out;
 }
 
 function flashDraftSaved() {
@@ -172,48 +175,60 @@ function flashDraftSaved() {
   s._t = setTimeout(() => { s.classList.remove('is-on'); }, 1400);
 }
 
-export function useFormDraft(key, form, setForm, { debounce = 400, ignore = ['name', 'mobile'], enabled = true } = {}) {
+export function useFormDraft(key, form, setForm, { debounce = 400, ignore = ['name', 'mobile'], omit = [], enabled = true, onRestore = null } = {}) {
   const [restored, setRestored] = useState(false);
   const firstRun = useRef(true);
   const cleared = useRef(false);
+  const skipSnapshot = useRef(null);
   const timer = useRef(null);
+  const onRestoreRef = useRef(onRestore);
+  const restoredKey = useRef(null);
 
-  // Restore once on mount. Only fields the user actually filled override the
-  // form's defaults — empty draft values must not wipe smart defaults.
+  useEffect(() => { onRestoreRef.current = onRestore; }, [onRestore]);
+
+  // Restore once per key, as soon as the draft is enabled. Only fields the user actually filled
+  // override the form's defaults — empty draft values must not wipe smart defaults.
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || restoredKey.current === key) return;
+    restoredKey.current = key;
     try {
-      const saved = JSON.parse(localStorage.getItem(key));
-      if (saved && typeof saved === 'object' && draftHasContent(saved, ignore)) {
+      const parsed = JSON.parse(localStorage.getItem(key));
+      // Drafts written before a field joined `omit` still hold it on disk.
+      const saved = parsed && typeof parsed === 'object' ? omitKeys(parsed, omit) : null;
+      if (saved && draftHasContent(saved, ignore)) {
         const nonEmptyFields = {};
         for (const k in saved) {
           const v = saved[k];
           const isEmpty = v == null || v === '' || (Array.isArray(v) && v.length === 0);
           if (!isEmpty) nonEmptyFields[k] = v;
         }
-        setForm((f) => ({ ...f, ...nonEmptyFields }));
+        const restoredFields = onRestoreRef.current ? onRestoreRef.current(nonEmptyFields) : nonEmptyFields;
+        if (restoredFields && typeof restoredFields === 'object') {
+          setForm((f) => ({ ...f, ...restoredFields }));
+        }
         setRestored(true);
       }
     } catch {
       /* ignore malformed draft */
     }
-    // key identity read once; setForm is stable
+    // setForm is stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, enabled]);
 
-  /* Serialise during render and debounce on the RESULT: every caller rebuilds `form` each render,
-     so keying on its identity would re-arm the timer forever and never write the draft. */
-  const snapshot = enabled ? JSON.stringify(form) : null;
+  /* Debounce the serialised result; `form` identity changes every render and would starve writes. */
+  const snapshot = enabled ? JSON.stringify(omitKeys(form, omit)) : null;
 
-  // Debounced save on form change.
   useEffect(() => {
     if (!enabled) return undefined;
     if (firstRun.current) { firstRun.current = false; return undefined; }
     if (cleared.current) return undefined;
+    if (skipSnapshot.current === snapshot) { skipSnapshot.current = null; return undefined; }
     clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       try {
-        if (draftHasContent(form, ignore)) { localStorage.setItem(key, snapshot); flashDraftSaved(); }
+        // Judge the snapshot, not the form: a draft whose only content sits in an omitted field
+        // would otherwise be written empty and then announce "Draft saved" over nothing.
+        if (draftHasContent(omitKeys(form, omit), ignore)) { localStorage.setItem(key, snapshot); flashDraftSaved(); }
         else localStorage.removeItem(key);
       } catch {
         /* quota — non-blocking */
@@ -225,18 +240,26 @@ export function useFormDraft(key, form, setForm, { debounce = 400, ignore = ['na
   }, [key, snapshot, debounce, enabled]);
 
   const clear = useCallback(() => {
+    clearTimeout(timer.current);
     cleared.current = true;
     try { localStorage.removeItem(key); } catch { /* ignore */ }
     setRestored(false);
   }, [key]);
 
-  /* Write the draft NOW: any gate that navigates away must call this, or the unmount cleanup
-     cancels the pending debounced write and loses whatever was typed last. */
+  const discard = useCallback(() => {
+    clearTimeout(timer.current);
+    cleared.current = false;
+    skipSnapshot.current = snapshot;
+    try { localStorage.removeItem(key); } catch { /* ignore */ }
+    setRestored(false);
+  }, [key, snapshot]);
+
+  /* Navigation gates must call this before unmount cleanup cancels the pending debounced write. */
   const flush = () => {
     if (!enabled || cleared.current) return;
     clearTimeout(timer.current);
     try {
-      if (draftHasContent(form, ignore)) localStorage.setItem(key, snapshot);
+      if (draftHasContent(omitKeys(form, omit), ignore)) localStorage.setItem(key, snapshot);
       else localStorage.removeItem(key);
     } catch { /* quota — same non-blocking posture as the debounced save */ }
   };
@@ -246,5 +269,5 @@ export function useFormDraft(key, form, setForm, { debounce = 400, ignore = ['na
     if (typeof window !== 'undefined') window.location.reload();
   }, [clear]);
 
-  return { restored, clear, flush, startFresh };
+  return { restored, clear, discard, flush, startFresh };
 }

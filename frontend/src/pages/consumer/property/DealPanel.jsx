@@ -6,6 +6,8 @@ import Icon from '../../../components/Icon.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
 import FieldError from '../../../components/ui/FieldError.jsx';
 import { digits } from '../../../lib/contact.js';
+import { isoToDisplay } from '../../../lib/format.js';
+import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import {
   getDeal, dealStatusForBuyer, reserveDeal, reopenDeal, listParties,
@@ -17,36 +19,15 @@ import { tenantsVerified } from '../../../services/rentService.js';
 
 const fmtOffer = (n) => '₹' + (Number(n) || 0).toLocaleString('en-IN');
 
-/**
- * The transaction panel on a property page: deal state, the offer negotiation, and the
- * maker/checker finalization.
- *
- * ## Why this became async
- *
- * Every read here used to be a synchronous localStorage lookup keyed by the *owner's* mobile, which
- * meant any visitor could read any owner's offer book by naming them. The API is caller-scoped
- * instead, so the panel now loads what the caller is actually entitled to see and holds it in
- * state. `reload()` re-reads after every mutation rather than patching state optimistically — these
- * are money decisions, and a panel that shows an accepted offer the server rejected is worse than
- * one that takes a moment to catch up.
- *
- * ## What the owner sees versus the buyer
- *
- * The two roles read different endpoints, not different slices of one response. The owner gets
- * `/me/deals/{propId}`, `/me/offers` and `/me/finalization-requests`; the buyer gets
- * `/offers/mine` and `/finalization/{propId}/status`. The deal's state itself now rides on the
- * property payload — see `dealStatusForBuyer(p)`, which reads the listing's mirrored `dealStatus`
- * (D110) — so a buyer sees the `reserved`/`closed` chrome too: an under-offer banner that still
- * allows offers, and a sold/rented banner that hides the offer and finalize controls entirely.
- */
+/* `reload` re-reads after each mutation rather than patching optimistically, because a panel showing an
+   accepted offer the server rejected is worse than one that takes a moment to catch up. */
 export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   const { t } = useTranslation();
+  const sendToSignIn = useSignInGate();
   const { user } = useAuth();
   const owner = String(p.ownerMobile || '');
-  /* The deal routes parse their path parameter with `Ids.parseUuid` and 404 on anything else, so
-     they need the **UUID** — not the seam's `p.id`, which is the listing's slug (`p5015`) because
-     the property routes accept slug-or-id and a slug makes a prettier URL. `p.uuid` is the same
-     row's real key; the fallback covers mock listings, which have no separate uuid. */
+  /* The deal routes parse their path parameter with `Ids.parseUuid` and 404 on anything else, so they need the
+     **UUID**. */
   const propId = String(p.uuid || p.id || '');
   const isRent = p.deal === 'rent';
   const dealKind = isRent ? 'rent' : 'sell';
@@ -55,47 +36,20 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   const [offerErr, setOfferErr] = useState(false);
   const [offerMoveIn, setOfferMoveIn] = useState('');
 
-  /* Whose panel this is, decided from the session rather than from storage: the answer chooses
-     between two different sets of endpoints below, so it has to be the same answer the rest of the
-     page and the API are working from — a mobile left behind in localStorage by a signed-out
-     session is not that.
-
-     Both guards earn their place. `!!mine` is what stops an absent mobile from *claiming*
-     ownership: `digits(undefined)` is the empty string and so is `digits('')`, so without it every
-     listing that names no owner would equal a visitor whose number we do not have. The reverse
-     error is not possible here and needs no guard against the context's `loading` flag: the cached
-     session is read synchronously when the provider mounts, so a signed-in visitor's mobile is
-     already present on the first render and there is no window in which this reads "not yours"
-     about a listing that is. Blocking the panel on `loading` would therefore buy nothing and cost
-     every viewer a render of empty chrome. */
+  /* Read from the session, because the answer picks between two sets of endpoints and must match what the API is
+     working from. */
   const mine = digits(user?.mobile);
   const isOwner = isIn && !!mine && mine === digits(owner);
 
-  /* Everything the panel renders, loaded per role. Starts in the open state so a slow load shows
-     the live controls rather than a "sold" banner it has no evidence for.
-
-     `verified` is the fallback set of buyer mobiles carrying the Verified Tenant badge, for seams
-     whose rows do not state it themselves. It starts EMPTY rather than open, unlike `status`: a
-     badge is a trust claim, so the safe default is not to make it. See `isVerifiedTenant` below. */
+  /* `verified` starts EMPTY instead, unlike `status`: a badge is a trust claim, so the safe
+   * default is not to make it. */
   const [state, setState] = useState({
     status: 'active', parties: [], offers: [], myOffer: null, myFinalize: null, pending: [],
     verified: new Set(),
   });
 
-  /**
-   * Does this buyer carry the Verified Tenant badge?
-   *
-   * Takes the **row**, not a mobile, and prefers the row's own `buyerVerified` — the flag the
-   * server puts on the party (D114). That is the only source that can answer in live mode: a
-   * buyer's number leaves the server masked (`98XXXXX210`, D5) until the owner approves contact,
-   * masking is not reversible, and so the number the panel holds can never equal the one the badge
-   * is stored against. Keying the badge on it meant asking a question whose answer was fixed at
-   * "no" before it was asked — correct-looking in the mock, where the numbers are real, and
-   * silently wrong against the API.
-   *
-   * `state.verified` remains as the fallback for the mock seam, whose rows carry no such flag. It
-   * is a set of *unmasked* mobiles, so it is only ever consulted where a real number exists.
-   */
+  /* Prefers the row's own `buyerVerified`, the only source that can answer live: a buyer's mobile leaves the server
+     irreversibly masked, so it can never equal the number the badge is stored against. */
   const isVerifiedTenant = (row) => {
     if (row?.buyerVerified === true) return true;
     const d = digits(row?.buyerMobile || '').slice(-10);
@@ -116,20 +70,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       const ownOffers = (offers || []).filter((o) => String(o.propId) === propId);
       const pending = (requests || []).filter((r) => String(r.propId) === propId);
 
-      /* The fallback badge lookup, for seams whose rows do not carry `buyerVerified` themselves
-         (D114). One request for the whole panel, not one per row: both lists are about the same
-         small set of buyers, so they are asked together and the provider collapses repeats.
-
-         Against the live API this now returns nothing useful and is not meant to — every mobile
-         here is masked (`98XXXXX210`, the shape a buyer's number has until the owner approves
-         contact) and the provider drops masked entries rather than ask about five digits. The live
-         answer arrives on the rows instead. This stays for the mock seam, whose rows hold real
-         numbers and no flag.
-
-         An empty set on failure is the intended answer, not a swallowed error: absence renders no
-         badge, so the worst case is a verified buyer who does not get their tick. The reverse — a
-         trust signal nobody earned, on the screen where an owner decides who gets their flat — is
-         what must not be possible. */
+      /* Fallback badge lookup for seams whose rows do not carry `buyerVerified`; one request for the whole panel. */
       const verified = await tenantsVerified([
         ...ownOffers.map((o) => o.buyerMobile),
         ...pending.map((r) => r.buyerMobile),
@@ -149,11 +90,8 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     const [status, mine, fin] = await Promise.all([
       dealStatusForBuyer(p).catch(() => 'active'),
       isIn ? myOffers().catch(() => []) : Promise.resolve([]),
-      // Only asked once the buyer has engaged. `GET /finalization/{propId}/status` answers **404**
-      // when nothing is pending — which is the ordinary state of every listing — so asking on every
-      // property page view would put a 404 in the console for each one. It is also a question whose
-      // answer cannot change the screen for a cold buyer: the finalize card is gated on
-      // `contactApproved` anyway, and a request can only exist if that gate was open.
+      // Asked only once the buyer has engaged: the endpoint 404s when nothing is pending, which is
+      // the ordinary state of every listing, and the finalize card is gated on `contactApproved`.
       isIn && contactApproved ? finalizationStatus(propId).catch(() => null) : Promise.resolve(null),
     ]);
     setState({
@@ -168,13 +106,13 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     });
   }, [propId, isOwner, isIn, contactApproved]);
 
-  useEffect(() => { let alive = true; reload().catch(() => { if (alive) { /* keep the open state */ } }); return () => { alive = false; }; }, [reload]);
+  useEffect(() => { reload().catch(() => {}); }, [reload]);
 
   const closed = state.status === 'closed';
   const reserved = state.status === 'reserved';
   const dealWord = isRent ? t('property.rentedOutWord') : t('property.soldWord');
 
-  /** Every mutation funnels through here: surface the server's refusal, never a false success. */
+  /* Every mutation funnels through here: surface the server's refusal, never a false success. */
   const run = async (fn, okMsg, tone = 'success') => {
     try {
       await fn();
@@ -186,11 +124,10 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   };
 
   const doFinalize = () => {
-    if (!isIn) { toast(t('property.signInFinalize'), 'info'); return; }
+    if (!isIn) { sendToSignIn('offer'); return; }
     if (isOwner) {
-      // Closing needs an agreed price and the counterparty's real mobile, both of which this panel
-      // never collected. The dashboard's finalize modal does, so the owner is sent there rather
-      // than handed a button that can only fail validation.
+      // Closing needs an agreed price and the counterparty's real mobile, neither of which this
+      // panel collects; the dashboard's finalize modal does.
       toast(t('property.finalizeInDashboard'), 'info');
       return;
     }
@@ -206,7 +143,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   const decline = (id) => run(() => declineFinalization(id), t('property.requestDeclinedActive'), 'info');
   const reopen = () => run(() => reopenDeal(propId), t('property.listingReopened'));
   const markUO = () => {
-    if (!isIn) { toast(t('property.signInUpdateDeal'), 'info'); return; }
+    if (!isIn) { sendToSignIn('offer'); return; }
     run(() => reserveDeal(propId), t('property.markedUnderOffer'));
   };
 
@@ -235,23 +172,13 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     run(() => respondOffer(id, action, null, { isOwner: true, propId }),
       action === 'accept' ? t('property.offerAccepted') : t('property.offerDeclined'));
   };
-  /**
-   * The buyer agreeing to the owner's counter.
-   *
-   * This used to call `respondOffer(..., 'accept')`, which the server refuses with 403: accept and
-   * decline are the owner's decision alone, or a buyer could mark a price as agreed with no owner
-   * involvement and unmask a mobile through the status-driven contact reveal.
-   *
-   * Countering at the owner's own number is the honest equivalent and the one response a buyer is
-   * allowed. It says "yes, that price" in the only vocabulary the negotiation has, and it leaves the
-   * owner as the party who closes — which is what maker/checker means here.
-   */
+  /* The buyer agreeing to the owner's counter. */
   const agreeToCounter = (offer) => run(
     () => respondOffer(offer.id, 'counter', offer.amount, { isOwner: false, propId }),
     t('property.agreedAwaitingOwner'),
   );
   const openOffer = () => {
-    if (!isIn) { toast(t('property.signInOffer'), 'info'); return; }
+    if (!isIn) { sendToSignIn('offer'); return; }
     setOfferAmt(state.myOffer ? String(state.myOffer.amount || '') : '');
     setOfferOpen(true);
   };
@@ -259,13 +186,12 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   const cardCls = 'glass-strong rounded-2xl p-5';
 
   const renderFinalize = () => {
-    // A closed sale is terminal for a buyer (D110): the top banner already says sold/rented, so the
-    // finalize card — which offers closing services and a reopen the buyer cannot use — is hidden.
-    // The owner keeps it to reopen or reach the closing services.
+    // A closed sale is terminal for a buyer: the top banner already says sold/rented, and the card
+    // offers closing services and a reopen only the owner can use.
     if (closed && !isOwner) return null;
     if (closed) {
       return (
-        <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgba(16,185,129,.06)' }}>
+        <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgb(var(--dz-c-emerald-500) / .06)' }}>
           <div className="flex items-center gap-2 mb-1.5"><Icon name="badge-check" className="w-5 h-5 text-emerald-400" /><h3 className="text-white font-bold text-sm">{t('property.dealFinalizedTitle')}</h3></div>
           <p className="text-slate-400 text-xs mb-3">{t('property.markedWord', { word: dealWord })}{isOwner ? '' : t('property.closedForEnquiries')}</p>
           <div className="flex gap-2">
@@ -279,7 +205,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       if (isOwner) {
         const parties = state.parties;
         return (
-          <div className={cardCls + ' border border-amber-500/20'} style={{ background: 'rgba(245,158,11,.06)' }}>
+          <div className={cardCls + ' border border-amber-500/20'} style={{ background: 'rgb(var(--dz-c-amber-500) / .06)' }}>
             <div className="flex items-center gap-2 mb-1.5"><Icon name="handshake" className="w-5 h-5 text-amber-400" /><h3 className="text-white font-bold text-sm">{t('property.underOffer')}</h3></div>
             <p className="text-slate-400 text-xs mb-3">{parties.length ? t('property.finalizingParties', { count: parties.length }) : ''}{t('property.underOfferTokenNote')}</p>
             <div className="flex gap-2">
@@ -291,7 +217,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       }
       const stR = isIn ? (state.myFinalize ? state.myFinalize.status : 'none') : 'none';
       return (
-        <div className={cardCls + ' border border-amber-500/20'} style={{ background: 'rgba(245,158,11,.06)' }}>
+        <div className={cardCls + ' border border-amber-500/20'} style={{ background: 'rgb(var(--dz-c-amber-500) / .06)' }}>
           <div className="flex items-center gap-2 mb-1.5"><Icon name="handshake" className="w-5 h-5 text-amber-400" /><h3 className="text-white font-bold text-sm">{t('property.underOfferRegisterTitle')}</h3></div>
           <p className="text-slate-400 text-xs mb-3">{stR === 'pending' ? t('property.interestRegistered') : t('property.someoneFinalizing')}</p>
           {stR === 'pending'
@@ -304,7 +230,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       const pend = state.pending;
       if (pend.length) {
         return (
-          <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgba(16,185,129,.06)' }}>
+          <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgb(var(--dz-c-emerald-500) / .06)' }}>
             <div className="flex items-center gap-2 mb-1.5"><Icon name="user-check" className="w-5 h-5 text-amber-400" /><h3 className="text-white font-bold text-sm">{t('property.finalizeRequests', { count: pend.length })}</h3></div>
             <p className="text-slate-400 text-xs mb-3">{isRent ? t('property.finalizeAskedTenant', { count: pend.length }) : t('property.finalizeAskedBuyer', { count: pend.length })}</p>
             {pend.map((r) => (
@@ -321,7 +247,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
         );
       }
       return (
-        <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgba(16,185,129,.06)' }}>
+        <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgb(var(--dz-c-emerald-500) / .06)' }}>
           <div className="flex items-center gap-2 mb-1.5"><Icon name="handshake" className="w-5 h-5 text-emerald-400" /><h3 className="text-white font-bold text-sm">{t('property.closedDealQ')}</h3></div>
           <p className="text-slate-400 text-xs mb-3">{t('property.closedDealBodyPre')}<b className="text-amber-300">{t('property.underOffer')}</b>{t('property.closedDealBodyPost')}</p>
           <button type="button" onClick={doFinalize} className="btn-teal w-full flex items-center justify-center gap-2 py-2.5 px-4 text-sm"><Icon name="badge-check" className="w-4 h-4" /> {t('property.finalizeDeal')}</button>
@@ -332,7 +258,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     const st = isIn ? (state.myFinalize ? state.myFinalize.status : 'none') : 'none';
     if (st === 'pending') {
       return (
-        <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgba(16,185,129,.06)' }}>
+        <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgb(var(--dz-c-emerald-500) / .06)' }}>
           <div className="flex items-center gap-2 mb-1.5"><Icon name="hourglass" className="w-5 h-5 text-amber-400" /><h3 className="text-white font-bold text-sm">{t('property.finalizeRequested')}</h3></div>
           <p className="text-slate-400 text-xs mb-3">{t('property.waitingOwnerConfirm')}</p>
           <button type="button" onClick={cancelReq} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-white/10 text-slate-300 text-xs font-medium hover:bg-white/5"><Icon name="x" className="w-3.5 h-3.5" /> {t('property.withdrawRequest')}</button>
@@ -340,16 +266,11 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       );
     }
     const declined = st === 'declined';
-    // Finalising is an end-of-deal step. Don't lead a cold buyer with it — only surface
-    // once they've engaged (contact approved) or already tried (a declined request).
-    //
-    // `declined` is reachable against the API (D111): `/finalization/{propId}/status` returns the
-    // caller's most recent request whatever its status, so a turned-down request reads `declined`
-    // rather than the same blank state as never having asked. The copy below is the only place that
-    // explains a refusal and offers to ask again.
+    // Finalising is an end-of-deal step, so don't lead a cold buyer with it: surface only once they
+    // have engaged (contact approved) or already tried and were turned down.
     if (!declined && !contactApproved) return null;
     return (
-      <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgba(16,185,129,.06)' }}>
+      <div className={cardCls + ' border border-emerald-500/20'} style={{ background: 'rgb(var(--dz-c-emerald-500) / .06)' }}>
         <div className="flex items-center gap-2 mb-1.5"><Icon name="handshake" className="w-5 h-5 text-emerald-400" /><h3 className="text-white font-bold text-sm">{t('property.closingDealQ')}</h3></div>
         <p className="text-slate-400 text-xs mb-3">{declined ? t('property.ownerNotConfirmed') : t('property.agreedSendRequest')}</p>
         <button type="button" onClick={doFinalize} className="btn-teal w-full flex items-center justify-center gap-2 py-2.5 px-4 text-sm"><Icon name="badge-check" className="w-4 h-4" /> {t('property.requestToFinalize')}</button>
@@ -384,7 +305,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
                         : <span className="text-slate-300">{t('property.statusPending')}</span>}
                     </span>
                   </div>
-                  <p className="text-slate-500 text-[11px] mt-0.5">{o.buyerName || t('property.buyerFallback')}{isVerifiedTenant(o) ? <span style={{ color: '#6ee7b7', fontWeight: 600 }}> · ✓ {t('property.verifiedTenant')}</span> : null}{o.moveIn ? t('property.moveInPrefix', { date: o.moveIn }) : ''}</p>
+                  <p className="text-slate-500 text-[11px] mt-0.5">{o.buyerName || t('property.buyerFallback')}{isVerifiedTenant(o) ? <span style={{ color: 'rgb(var(--dz-c-emerald-300))', fontWeight: 600 }}> · ✓ {t('property.verifiedTenant')}</span> : null}{o.moveIn ? t('property.moveInPrefix', { date: isoToDisplay(o.moveIn) || o.moveIn }) : ''}</p>
                   {o.status !== 'accepted' ? (
                     <div className="flex gap-1.5 mt-2">
                       <button onClick={() => ownerOfferAct(o.id, 'accept')} className="btn-teal text-[11px] px-2.5 py-1 rounded-lg shadow-none">{t('property.accept')}</button>
@@ -434,7 +355,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   return (
     <>
       {closed ? (
-        <div className="rounded-2xl px-5 py-4 flex items-center gap-3 border border-rose-500/25" style={{ background: 'rgba(244,63,94,.08)' }}>
+        <div className="rounded-2xl px-5 py-4 flex items-center gap-3 border border-rose-500/25" style={{ background: 'rgb(var(--dz-c-rose-500) / .08)' }}>
           <div className="w-10 h-10 rounded-xl bg-rose-500/15 flex items-center justify-center flex-shrink-0"><Icon name="lock" className="w-5 h-5 text-rose-300" /></div>
           <div>
             <p className="text-white font-semibold text-sm">{isOwner ? t('property.youFinalizedDeal') : t('property.noLongerAvailable')}</p>
@@ -442,7 +363,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
           </div>
         </div>
       ) : reserved ? (
-        <div className="rounded-2xl px-5 py-4 flex items-center gap-3 border border-amber-500/30" style={{ background: 'rgba(245,158,11,.08)' }}>
+        <div className="rounded-2xl px-5 py-4 flex items-center gap-3 border border-amber-500/30" style={{ background: 'rgb(var(--dz-c-amber-500) / .08)' }}>
           <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center flex-shrink-0"><Icon name="handshake" className="w-5 h-5 text-amber-300" /></div>
           <div>
             <p className="text-white font-semibold text-sm">{isOwner ? t('property.yourPropertyUnderOffer') : t('property.thisPropertyUnderOffer')}</p>
@@ -454,7 +375,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       {renderOffers()}
 
       {offerOpen ? createPortal(
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,.6)', backdropFilter: 'blur(4px)' }} onClick={() => setOfferOpen(false)}>
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{ background: 'rgb(var(--dz-c-black) / .6)', backdropFilter: 'blur(4px)' }} onClick={() => setOfferOpen(false)}>
           <div className="glass-strong rounded-2xl p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-bold text-white mb-1">{state.myOffer ? t('property.updateYourOffer') : t('property.makeOffer')}</h3>
             <p className="text-slate-400 text-xs mb-3">{t('property.offerModalSub')}</p>

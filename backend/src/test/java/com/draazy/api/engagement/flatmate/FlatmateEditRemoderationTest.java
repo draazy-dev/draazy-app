@@ -1,0 +1,668 @@
+package com.draazy.api.engagement.flatmate;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.draazy.api.common.web.Routes;
+import com.draazy.api.documents.vault.PersonalDocument;
+import com.draazy.api.documents.vault.PersonalDocumentRepository;
+import com.draazy.api.identity.user.User;
+import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.security.Roles;
+import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.UploadedPhotos;
+import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Pattern;
+import org.hamcrest.Matchers;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+
+/** Every supply fixture declares an agreement: at identity tier the ladder returns {@code pending}
+ *  for any edit whatever {@link FlatmateEditRules} says, so such a fixture asserts nothing. */
+@DisplayName("Flatmate edits — re-moderated for what changed (D4, D5)")
+class FlatmateEditRemoderationTest extends AbstractApiTest {
+
+    @Autowired
+    UserRepository users;
+
+    @Autowired
+    PersonalDocumentRepository personalDocuments;
+
+    @Autowired
+    EntityManager entityManager;
+
+    private static final Pattern FIXTURE_PHOTO = Pattern.compile("https://cdn\\.example/[^\"]+");
+
+    private final List<String> createdActors = new ArrayList<>();
+    private final Map<String, String> uploads = new HashMap<>();
+
+    @AfterEach
+    void removeAuditRowsThatEscapedRollback() {
+        createdActors.forEach(actor -> jdbc.update("delete from audit_log where actor = ?", actor));
+        createdActors.clear();
+    }
+
+    private User user(String mobile, String name, String role) {
+        User u = new User(mobile, role);
+        u.setName(name);
+        u.setMobileVerified(true);
+        User saved = users.saveAndFlush(u);
+        createdActors.add(saved.getId().toString());
+        return saved;
+    }
+
+    private User host(String mobile, String name) {
+        return user(mobile, name, Roles.Wire.BUYER);
+    }
+
+    private User admin(String mobile) {
+        return user(mobile, "Mod", Roles.Wire.ADMIN);
+    }
+
+    private static String idIn(String json) {
+        return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+    }
+
+    /** A tenant-tier room: agreement declared, so it is on the board from the first write. */
+    private static String roomBody(String locality, String society, String roomType, int rent,
+            String photo, String note) {
+        return """
+                {"bhk":"2","roomType":"%s","attachedBath":"attached","furnishing":"semi",
+                 "locality":"%s","society":"%s","rentShare":%d,"deposit":30000,
+                 "availableFrom":"2026-09-01","lookingFor":"any","foodPref":"any",
+                 "agreementDeclared":true,"photos":["%s"],"note":"%s",%s}
+                """.formatted(roomType, locality, society, rent, photo, note,
+                FlatmateAgreementFixture.EVIDENCE);
+    }
+
+    private String withUploads(User owner, String body) {
+        return FIXTURE_PHOTO.matcher(body).replaceAll(m -> uploads.computeIfAbsent(
+                owner.getId() + m.group(), k -> UploadedPhotos.of(owner.getId())));
+    }
+
+    private String ownedEvidence(User owner, String body) {
+        PersonalDocument doc = personalDocuments.saveAndFlush(new PersonalDocument(owner.getId(),
+                "Registered Leave and Licence", "leave-and-licence.pdf",
+                "personal/" + owner.getId() + "/" + UUID.randomUUID(), 184320L, "application/pdf"));
+        return withUploads(owner,
+                body.replace("\"id\":\"agr-doc-1\"", "\"id\":\"" + doc.getId() + "\""));
+    }
+
+    // New supply waits in the queue; every test below starts from an already-public post.
+    private String approved(String table, String id) {
+        jdbc.update("update " + table + " set mod_status = 'approved' where id = ?::uuid", id);
+        entityManager.clear();
+        return id;
+    }
+
+    private String createRoom(User owner, String body) throws Exception {
+        String json = mvc.perform(post(Routes.Flatmates.ROOMS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ownedEvidence(owner, body)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.modStatus").value("pending"))
+                .andReturn().getResponse().getContentAsString();
+        return approved("flatmate_rooms", idIn(json));
+    }
+
+    private void editRoom(User owner, String id, String body) throws Exception {
+        mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ownedEvidence(owner, body)))
+                .andExpect(status().isOk());
+    }
+
+    /** What the {@code recheck} board says about one row, or an empty page. */
+    private org.springframework.test.web.servlet.ResultActions recheckBoard(User mod, String kind)
+            throws Exception {
+        return mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
+                        .param("kind", kind)
+                        .param("modStatus", "recheck")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(mod)))
+                .andExpect(status().isOk());
+    }
+
+    @Nested
+    @DisplayName("foundation — the post stops being the one that was approved")
+    class Foundation {
+
+        @Test
+        @DisplayName("moving a room to another locality takes it off the board")
+        void relocatingSendsItBack() throws Exception {
+            User owner = host("9812000001", "Relocator");
+            String id = createRoom(owner,
+                    roomBody("EditTownA", "Alpha Heights", "Private room", 15000,
+                            "https://cdn.example/a1.jpg", "Sunny room."));
+
+            editRoom(owner, id,
+                    roomBody("EditTownZ", "Alpha Heights", "Private room", 15000,
+                            "https://cdn.example/a1.jpg", "Sunny room."));
+
+            // The locality also feeds the duplicate-address fingerprint, so nothing about it is
+            // cosmetic.
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownZ"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
+
+            mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
+                            .param("kind", "room")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(admin("9812000002"))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].modStatus",
+                            Matchers.contains("pending")));
+        }
+
+        @Test
+        @DisplayName("and it is not also filed as a re-check — the two are exclusive")
+        void foundationDoesNotDoubleFile() throws Exception {
+            User owner = host("9812000003", "Doubler");
+            String id = createRoom(owner,
+                    roomBody("EditTownB", "Beta Court", "Private room", 15000,
+                            "https://cdn.example/b1.jpg", "Sunny room."));
+
+            // Both a foundation field and a re-checked one, in one PATCH.
+            editRoom(owner, id,
+                    roomBody("EditTownY", "Beta Court", "Private room", 21000,
+                            "https://cdn.example/b2.jpg", "Rewritten."));
+
+            // A row waiting in the queue is not also a work item on a second board: the moderator's
+            // second read would be about an invisible post.
+            recheckBoard(admin("9812000004"), "room")
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')]", Matchers.hasSize(0)));
+        }
+    }
+
+    @Nested
+    @DisplayName("stays live, re-checked — the evidence moved, the offer did not")
+    class StaysLiveRechecked {
+
+        @Test
+        @DisplayName("swapping every photo leaves the room up and raises a work item")
+        void photoSwapIsRechecked() throws Exception {
+            User owner = host("9812000010", "Swapper");
+            String id = createRoom(owner,
+                    roomBody("EditTownC", "Gamma Towers", "Private room", 15000,
+                            "https://cdn.example/c1.jpg", "Sunny room."));
+
+            editRoom(owner, id,
+                    roomBody("EditTownC", "Gamma Towers", "Private room", 15000,
+                            "https://cdn.example/c-swapped.jpg", "Sunny room."));
+
+            // Still up: taking a room dark for a day whenever its pictures change teaches hosts not
+            // to change them, and a stale gallery is its own harm.
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownC"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", Matchers.hasSize(1)));
+
+            recheckBoard(admin("9812000011"), "room")
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
+                            Matchers.contains("photos")))
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].photoCount",
+                            Matchers.contains(1)))
+                    .andExpect(jsonPath("$.content[0].photos").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("a second edit adds its field without moving the host's place in the queue")
+        void reasonsAccumulateAndTheStampHolds() throws Exception {
+            User owner = host("9812000012", "Repeater");
+            User mod = admin("9812000013");
+            String id = createRoom(owner,
+                    roomBody("EditTownD", "Delta Nest", "Private room", 15000,
+                            "https://cdn.example/d1.jpg", "Sunny room."));
+
+            editRoom(owner, id,
+                    roomBody("EditTownD", "Delta Nest", "Private room", 15000,
+                            "https://cdn.example/d2.jpg", "Sunny room."));
+            String firstStamp = recheckBoard(mod, "room").andReturn().getResponse()
+                    .getContentAsString();
+
+            editRoom(owner, id,
+                    roomBody("EditTownD", "Delta Nest", "Private room", 19000,
+                            "https://cdn.example/d2.jpg", "Sunny room."));
+
+            recheckBoard(mod, "room")
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
+                            Matchers.contains("photos, rent")))
+                    // The stamp is the SLA: re-stamping on every edit would let a host who re-crops
+                    // a photo daily walk their own row back down the queue forever.
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckRequestedAt",
+                            Matchers.contains(stampOf(firstStamp, id))));
+        }
+
+        @Test
+        @DisplayName("deciding it clears the work item, so the backlog shrinks")
+        void moderatingClearsTheRecheck() throws Exception {
+            User owner = host("9812000014", "Cleared");
+            User mod = admin("9812000015");
+            String id = createRoom(owner,
+                    roomBody("EditTownE", "Epsilon Row", "Private room", 15000,
+                            "https://cdn.example/e1.jpg", "Sunny room."));
+
+            editRoom(owner, id,
+                    roomBody("EditTownE", "Epsilon Row", "Private room", 15000,
+                            "https://cdn.example/e2.jpg", "Sunny room."));
+
+            mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", id))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(mod))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"modStatus\":\"approved\"}"))
+                    .andExpect(status().isOk());
+
+            recheckBoard(mod, "room")
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')]", Matchers.hasSize(0)));
+        }
+    }
+
+    @Nested
+    @DisplayName("silent — a bounded facet moved and nobody needs to know")
+    class Silent {
+
+        @Test
+        @DisplayName("changing the food preference raises nothing")
+        void chipListFacetsAreSilent() throws Exception {
+            User owner = host("9812000020", "Quiet");
+            String id = createRoom(owner,
+                    roomBody("EditTownF", "Zeta Villa", "Private room", 15000,
+                            "https://cdn.example/f1.jpg", "Sunny room."));
+
+            mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ownedEvidence(owner, """
+                                    {"bhk":"2","roomType":"Private room","attachedBath":"attached",
+                                     "furnishing":"semi","locality":"EditTownF","society":"Zeta Villa",
+                                     "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
+                                     "lookingFor":"any","foodPref":"veg","agreementDeclared":true,
+                                     "photos":["https://cdn.example/f1.jpg"],"note":"Sunny room.",%s}
+                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                    .andExpect(status().isOk());
+
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownF"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", Matchers.hasSize(1)));
+
+            // The gate exists because the *unbounded* strings are where abuse lands; a value the UI
+            // only offers as one of three chips cannot carry a phone number.
+            recheckBoard(admin("9812000021"), "room")
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')]", Matchers.hasSize(0)));
+        }
+    }
+
+    @Nested
+    @DisplayName("an edit may lower visibility, never raise it")
+    class Takedowns {
+
+        /** Hide the room by moderator verdict, then have the host re-save an unchanged body. */
+        private void hideThenResave(String verdict, String locality, String society, User owner,
+                User mod, String id) throws Exception {
+            mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", id))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(mod))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"modStatus\":\"" + verdict + "\"}"))
+                    .andExpect(status().isOk());
+
+            editRoom(owner, id, roomBody(locality, society, "Private room", 15000,
+                    "https://cdn.example/k1.jpg", "Sunny room."));
+
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", locality))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
+            mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
+                            .param("kind", "room").param("modStatus", "pending")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(mod)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')]",
+                            Matchers.hasSize(1)));
+        }
+
+        // The ladder sees the tier, not a verdict; the rule is "was it public" so a `flagged` room isn't sent
+        // back `live` on the host's next save.
+        @ParameterizedTest(name = "{0}")
+        @CsvSource({
+                "removed, 9812000026, 9812000027, EditTownK, Lambda Lodge",
+                "flagged, 9812000028, 9812000029, EditTownL, Mu Manor"})
+        @DisplayName("re-saving an unchanged body does not undo a moderator verdict")
+        void anEditCannotUndoAVerdict(String verdict, String ownerMobile, String modMobile,
+                String locality, String society) throws Exception {
+            User owner = host(ownerMobile, "Persistent");
+            User mod = admin(modMobile);
+            String id = createRoom(owner, roomBody(locality, society, "Private room",
+                    15000, "https://cdn.example/k1.jpg", "Sunny room."));
+
+            hideThenResave(verdict, locality, society, owner, mod, id);
+        }
+
+        @Test
+        @DisplayName("declaring an agreement mid-edit does not publish an unreviewed post")
+        void aTierBumpCannotPublishAPendingPost() throws Exception {
+            User owner = host("9812000031", "Selfpromoter");
+            User mod = admin("9812000032");
+            String body = """
+                    {"bhk":"2","roomType":"Private room","attachedBath":"attached",
+                     "furnishing":"semi","locality":"EditTownM","society":"Nu Nest",
+                     "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
+                     "lookingFor":"any","foodPref":"any","hostRole":"%s","agreementDeclared":%s,%s
+                     "photos":["https://cdn.example/m1.jpg"],"note":"Sunny room."}
+                    """;
+            // No agreement, so the ladder leaves it at identity tier: pending, never reviewed.
+            String id = idIn(mvc.perform(post(Routes.Flatmates.ROOMS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(withUploads(owner, body.formatted("owner", "false", ""))))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.modStatus").value("pending"))
+                    .andReturn().getResponse().getContentAsString());
+
+            // A declared agreement silently moves the tier, so edit must not let a pending
+            // post walk itself onto the feed without real evidence.
+            editRoom(owner, id, body.formatted("tenant", "true", FlatmateAgreementFixture.EVIDENCE + ","));
+
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownM"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
+            mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
+                            .param("kind", "room").param("modStatus", "pending")
+                            .header(HttpHeaders.AUTHORIZATION, bearer(mod)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')]",
+                            Matchers.hasSize(1)));
+        }
+
+        @Test
+        @DisplayName("moving only the map pin re-checks the room without hiding it")
+        void movingThePinIsRechecked() throws Exception {
+            User owner = host("9812000033", "Pinmover");
+            String id = createRoom(owner, roomBody("EditTownN", "Xi Court", "Private room",
+                    15000, "https://cdn.example/n1.jpg", "Sunny room."));
+
+            /* The locality text is what a moderator cross-checks, so a room whose coordinates move
+               across the city reads as unchanged. Not prose, so the first cut let it through. */
+            mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ownedEvidence(owner, """
+                                    {"bhk":"2","roomType":"Private room","attachedBath":"attached",
+                                     "furnishing":"semi","locality":"EditTownN","society":"Xi Court",
+                                     "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
+                                     "lookingFor":"any","foodPref":"any","agreementDeclared":true,
+                                     "lat":18.5362,"lng":73.8939,
+                                     "photos":["https://cdn.example/n1.jpg"],"note":"Sunny room.",%s}
+                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                    .andExpect(status().isOk());
+
+            recheckBoard(admin("9812000034"), "room")
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
+                            Matchers.contains("map pin")));
+        }
+    }
+
+    @Nested
+    @DisplayName("a group keeps its default locality without being taken down for it")
+    class Groups {
+
+        private String createGroup(User owner, String title, String locality, int rent)
+                throws Exception {
+            return approved("flatmate_groups", idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ownedEvidence(owner, """
+                                    {"title":"%s","locality":"%s","policy":"any","rent":%d,
+                                     "seats":3,"seatsOpen":1,"name":"Host","tags":[],
+                                     "agreement":true,"note":"Chill flat.",%s}
+                                    """.formatted(title, locality, rent,
+                                    FlatmateAgreementFixture.EVIDENCE))))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.modStatus").value("pending"))
+                    .andReturn().getResponse().getContentAsString()));
+        }
+
+        @Test
+        @DisplayName("an edit that keeps the locality re-checks the title, and stays up")
+        void unchangedLocalityIsNotARelocation() throws Exception {
+            User owner = host("9812000030", "Grouper");
+            String id = createGroup(owner, "Three of us", "EditTownP", 40000);
+
+            mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ownedEvidence(owner, """
+                                    {"title":"Four of us now","locality":"EditTownP","policy":"any",
+                                     "rent":40000,"seats":3,"seatsOpen":1,"name":"Host","tags":[],
+                                     "agreement":true,"note":"Chill flat.",%s}
+                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                    .andExpect(status().isOk());
+
+            recheckBoard(admin("9812000031"), "group")
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
+                            Matchers.contains("title")));
+        }
+
+        @Test
+        @DisplayName("a blank locality is refused rather than defaulted to a locality nobody named")
+        void blankLocalityIsRefused() throws Exception {
+            User owner = host("9812000032", "Grouper");
+
+            mvc.perform(post(Routes.Flatmates.GROUPS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"title":"Three of us","locality":"","policy":"any","rent":40000,
+                                     "seats":3,"seatsOpen":1,"name":"Host","tags":[],
+                                     "agreement":true,"note":"Chill flat."}
+                                    """))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.fields[*].field", Matchers.hasItem("locality")));
+        }
+    }
+
+    @Nested
+    @DisplayName("a seeker post — nothing but prose, so nothing is foundation (D4)")
+    class SeekerPosts {
+
+        private String createPost(User author, String name, String note) throws Exception {
+            return idIn(mvc.perform(post(Routes.Flatmates.POSTS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(author))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"name":"%s","gender":"any","age":27,"occupation":"Analyst",
+                                     "budget":18000,"localities":["EditTownG"],
+                                     "moveIn":"2026-09-01","flatPref":"any","roomPref":"private",
+                                     "tags":[],"note":"%s"}
+                                    """.formatted(name, note)))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString());
+        }
+
+        @Test
+        @DisplayName("rewriting the note on a published post reaches the desk")
+        void aNewNoteIsRechecked() throws Exception {
+            User author = host("9812000040", "Writer");
+            User mod = admin("9812000041");
+            String id = createPost(author, "Writer", "Quiet analyst, non-smoker.");
+
+            mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", id))
+                            .header(HttpHeaders.AUTHORIZATION, bearer(mod))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"modStatus\":\"approved\"}"))
+                    .andExpect(status().isOk());
+
+            mvc.perform(patch(Routes.Flatmates.POST_BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(author))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"name":"Writer","gender":"any","age":27,
+                                     "occupation":"Analyst","budget":18000,
+                                     "localities":["EditTownG"],"moveIn":"2026-09-01",
+                                     "flatPref":"any","roomPref":"private","tags":[],
+                                     "note":"Now near the metro, flexible on dates."}
+                                    """))
+                    .andExpect(status().isOk());
+
+            // Without a moderation hook on the write path a new note goes straight onto a
+            // published post, and the free text is the entire reason the desk exists.
+            recheckBoard(mod, "post")
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
+                            Matchers.contains("note")))
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].freeText",
+                            Matchers.contains(Matchers.containsString("metro"))));
+        }
+    }
+
+    @Nested
+    @DisplayName("a moderator's correction is audited and stays live")
+    class ModeratorEdit {
+
+        private org.springframework.test.web.servlet.ResultActions edit(User mod, String id,
+                String body) throws Exception {
+            return mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION_DETAIL, id)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(mod))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(body));
+        }
+
+        @Test
+        @DisplayName("a room's core fields change without a re-check")
+        void roomCorrectionStaysLive() throws Exception {
+            String id = createRoom(host("9812000060", "Roomer"),
+                    roomBody("EditTownM", "Mu Place", "Private room", 15000,
+                            "https://cdn.example/m1.jpg", "Sunny room."));
+            jdbc.update("update flatmate_rooms set society = 'Mu Place', address_fingerprint = 'addr:mu place|edittownm'"
+                    + " where id = ?::uuid", id);
+            entityManager.clear();
+            User mod = admin("9812000061");
+
+            edit(mod, id, """
+                    {"title":"Sunny room near the park","note":"Corrected note.","rent":14500,
+                     "deposit":29000,"localities":["EditTownN"],"moveIn":"2026-10-01"}
+                    """)
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.room.title").value("Sunny room near the park"))
+                    .andExpect(jsonPath("$.room.note").value("Corrected note."))
+                    .andExpect(jsonPath("$.room.budget").value(14500))
+                    .andExpect(jsonPath("$.room.deposit").value(29000))
+                    .andExpect(jsonPath("$.room.locality").value("EditTownN"))
+                    .andExpect(jsonPath("$.room.availableFrom").value("2026-10-01"))
+                    .andExpect(jsonPath("$.room.modStatus").value("approved"));
+
+            recheckBoard(mod, "room")
+                    .andExpect(jsonPath("$.content[?(@.id == '" + id + "')]", Matchers.hasSize(0)));
+            assertThat(jdbc.queryForObject(
+                    "select count(*) from audit_log where action = 'flatmate.adminUpdate' and entity_id = ?",
+                    Integer.class, id)).isEqualTo(1);
+            assertThat(fingerprint("flatmate_rooms", id)).isEqualTo("addr:mu place|edittownn");
+        }
+
+        @Test
+        @DisplayName("a seeker post takes a budget and localities, but has no deposit")
+        void seekerPostCorrection() throws Exception {
+            String id = idIn(mvc.perform(post(Routes.Flatmates.POSTS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host("9812000062", "Seeker")))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"name":"Seeker","gender":"any","budget":18000,
+                                     "localities":["EditTownG"],"moveIn":"2026-09-01",
+                                     "flatPref":"any","roomPref":"private","tags":[],"note":"Hi"}
+                                    """))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString());
+            User mod = admin("9812000063");
+
+            edit(mod, id, "{\"rent\":20000,\"localities\":[\"EditTownG\",\"EditTownH\"],\"moveIn\":\"2026-11-01\"}")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.post.budget").value(20000))
+                    .andExpect(jsonPath("$.post.localities", Matchers.contains("EditTownG", "EditTownH")))
+                    .andExpect(jsonPath("$.post.moveIn").value("2026-11-01"));
+            edit(mod, id, "{\"deposit\":10000}").andExpect(status().isUnprocessableEntity());
+        }
+
+        @Test
+        @DisplayName("a settled group's rent changes; a move-in date it does not have is refused")
+        void groupCorrection() throws Exception {
+            User owner = host("9812000064", "Grouper");
+            String id = approved("flatmate_groups", idIn(mvc.perform(post(Routes.Flatmates.GROUPS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(ownedEvidence(owner, """
+                                    {"title":"Three of us","locality":"EditTownQ","policy":"any",
+                                     "rent":40000,"seats":3,"seatsOpen":1,"name":"Host","tags":[],
+                                     "agreement":true,"note":"Chill flat.",%s}
+                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString()));
+            User mod = admin("9812000065");
+
+            edit(mod, id, "{\"title\":\"Three of us in Baner\",\"rent\":42000}")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.group.title").value("Three of us in Baner"))
+                    .andExpect(jsonPath("$.group.rent").value(42000))
+                    .andExpect(jsonPath("$.group.modStatus").value("approved"));
+            assertThat(fingerprint("flatmate_groups", id)).isEqualTo("addr:three of us in baner|edittownq");
+            edit(mod, id, "{\"moveIn\":\"2026-11-01\"}").andExpect(status().isUnprocessableEntity());
+            edit(mod, id, "{\"localities\":[]}").andExpect(status().isUnprocessableEntity());
+        }
+
+        private String fingerprint(String table, String id) {
+            return jdbc.queryForObject("select address_fingerprint from " + table + " where id = ?::uuid",
+                    String.class, id);
+        }
+
+        @Test
+        @DisplayName("the post's own author cannot use the desk's route")
+        void authorIsRefused() throws Exception {
+            User owner = host("9812000066", "Roomer");
+            String id = createRoom(owner, roomBody("EditTownR", "Rho Place", "Private room", 15000,
+                    "https://cdn.example/r1.jpg", "Sunny room."));
+
+            edit(owner, id, "{\"rent\":1}").andExpect(status().isForbidden());
+        }
+    }
+
+    @Nested
+    @DisplayName("the verification desk shows the host's number in the popup, not on every card")
+    class HostMobile {
+
+        @Test
+        @DisplayName("a tenant-tier host's number leaves the server in full, from the detail only")
+        void theDetailShowsTheMobile() throws Exception {
+            String id = createRoom(host("9812000050", "Documented"),
+                    roomBody("EditTownH", "Theta Place", "Private room", 15000,
+                            "https://cdn.example/h1.jpg", "Sunny room."));
+            User desk = admin("9812000051");
+
+            mvc.perform(get(Routes.Moderation.FLATMATE_REVIEWS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].hostMobile").doesNotExist());
+
+            mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.review.hostMobile").value("9812000050"));
+        }
+    }
+
+    /** The `recheckRequestedAt` this board reported for one row, read back out of its own JSON. */
+    private static String stampOf(String queueJson, String id) {
+        String afterId = queueJson.substring(queueJson.indexOf("\"id\":\"" + id + "\""));
+        return afterId.replaceAll("(?s).*?\"recheckRequestedAt\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+    }
+}

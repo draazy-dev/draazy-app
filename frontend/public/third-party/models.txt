@@ -1,0 +1,37 @@
+Machine-learning model redistributed with this application
+
+The file below runs entirely in the visitor's browser during identity
+verification. The selfie is never sent to the model's original host — the file
+is served from this origin precisely so that no third party learns who started
+a verification, and so the Content-Security-Policy does not have to name an
+outside connect-src host. See frontend/src/lib/identity-verification/face.js.
+
+It is not committed: unreviewable binary in every clone, for bytes that never
+change. `frontend/scripts/fetch-models.mjs` downloads it from the URL below,
+checks it against the sha256 recorded here, and only then writes it.
+`prebuild` and `predev` run it, so `npm run build` and `npm run dev` — and
+therefore CI, the deploy job and Playwright — provision it with no manual step.
+A verified copy is cached in node_modules/.cache/models, so a repeat build is a
+hash check rather than a download.
+
+------------------------------------------------------------------------------
+/models/face_landmarker.task
+
+  MediaPipe Face Landmarker, float16 revision 1.
+  Copyright The MediaPipe Authors.
+  Licensed under the Apache License, Version 2.0 — see Apache-2.0.txt.
+
+  Obtained from:
+    https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+  Upstream project:
+    https://github.com/google-ai-edge/mediapipe
+  sha256: 64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff
+
+  Unmodified. Pinned to revision 1 rather than tracking "latest", so the model
+  deciding whether a selfie shows a live face cannot change without a commit.
+
+------------------------------------------------------------------------------
+
+To replace the model, drop a compatible file at the same path and rebuild;
+nothing in the application verifies their contents. Re-run the checksums above
+after any deliberate update so a silent swap remains detectable.

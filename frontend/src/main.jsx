@@ -1,7 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
-import { APIProvider } from '@vis.gl/react-google-maps';
 import App from './App.jsx';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { AuthProvider } from './context/AuthContext.jsx';
@@ -10,57 +9,42 @@ import { CompareProvider } from './context/CompareContext.jsx';
 import { SavedProvider } from './context/SavedContext.jsx';
 import { FollowProvider } from './context/FollowContext.jsx';
 import { SavedSearchProvider } from './context/SavedSearchContext.jsx';
-import { PlanProvider } from './context/PlanContext.jsx';
 import { VerificationProvider } from './context/VerificationContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { ConversationProvider } from './context/ConversationContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
-import { GOOGLE_MAPS_API_KEY } from './lib/mapsConfig.js';
+import { installMapsLoader } from './lib/mapsConfig.js';
+import { installGlobalErrorHandlers } from './lib/errorReporter.js';
 import { initPmf } from './lib/pmf.js';
+import { initProductAnalytics } from './lib/productAnalytics.js';
 import { loadGeoPolicy } from './lib/geoConfig.js';
+import { readAccessToken } from './lib/auth.js';
+import { primeMeBootstrap } from './services/meBootstrapService.js';
 import './i18n';
-// Ahead of index.css so the @font-face declarations land before anything sets
-// font-family. A JS import rather than a CSS `@import`, per the repo convention:
-// postcss.config.js loads only tailwindcss + autoprefixer, so the JS graph is the
-// one mechanism guaranteed to bundle this correctly.
+// Ahead of index.css so @font-face lands before anything sets font-family. A JS import because
+// postcss.config.js loads only tailwind + autoprefixer, so the JS graph is the reliable bundler.
 import './styles/fonts.css';
 import './styles/index.css';
-// Tier 0 — shared across routes, so they load globally right after index.css
-// rather than from any one route chunk. Both were hoisted out of index.css,
-// where they sat under route-named headings ("Property page" / "Owner page")
-// despite being used app-wide; extracting those routes would have deleted them
-// from every other route.
+// Tier 0 — used app-wide, so they load globally right after index.css rather than
+// being trapped inside whichever route chunk happened to import them.
 import './styles/components/buttons.css';
 import './styles/components/surfaces.css';
-// Global rather than imported by DateField/TimeField. Those are lazy route
-// components, so a component-level import only ships `.dz-cal` inside their
-// chunk — and the mobile bottom-sheet rules then do not exist for anything that
-// renders picker markup without pulling the component in. That regressed
-// `mobile/phase3.spec.js`, which measures `.dz-cal` on a route with no date
-// field: the element came back position:static with no rule matching at all.
+// Global, not imported by DateField/TimeField: those are lazy, so a component-level import would
+// leave `.dz-cal` unstyled anywhere picker markup renders without pulling the component in.
 import './styles/components/date-time-fields.css';
-// The custom <Select>/<MultiSelect>/<Menu> dropdown skin (.dz-dropdown), used by
-// six shared UI components across every route. It sat under the "Listings page"
-// heading in index.css purely because that's the prototype it was ported from.
+// The shared <Select>/<MultiSelect>/<Menu> dropdown skin (.dz-dropdown), used on every route.
 import './styles/components/dropdown.css';
+// Last: its island `color` rule must follow preflight's `button, a { color: inherit }`.
+import './styles/theme.css';
 
 // Boot the temporary PMF-test overlay (GA4). No-op unless VITE_PMF_MODE=on.
 initPmf();
+initProductAnalytics();
+installGlobalErrorHandlers();
+installMapsLoader();
 
-// Bootstrap the Google Maps JS API once, app-wide, so every locality/area search
-// box (the hero, the Listings filter, and every LocalitySelect) can use Places on
-// any page — not just the pages that render a map. The library's loader is a
-// module-level singleton, so the inner <APIProvider>s on the map pages (same key)
-// simply reuse this one. When no key is configured we skip the provider entirely
-// and every consumer fails soft to its static registry (no regression).
-const withMaps = (node) =>
-  GOOGLE_MAPS_API_KEY ? <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>{node}</APIProvider> : node;
-
-// Prevent the browser from restoring a stale scroll position on refresh. With
-// this SPA's async content + reveal animations, "auto" restoration lands the
-// page partially scrolled instead of at the top. Scoped to reloads so genuine
-// back/forward navigation still restores its scroll position. Set before React
-// renders so it beats the browser's deferred restore (no scroll flash).
+// "auto" restoration lands this SPA part-scrolled once async content and reveals run. Scoped to
+// reloads so back/forward still restores, and set before React renders to beat the deferred restore.
 if ('scrollRestoration' in history) {
   const navEntry = performance.getEntriesByType?.('navigation')?.[0];
   if (navEntry?.type === 'reload') history.scrollRestoration = 'manual';
@@ -68,13 +52,7 @@ if ('scrollRestoration' in history) {
 
 const app = (
   <StrictMode>
-    {/* The backstop, and only the backstop. The boundary that matters day to day is the one inside
-        each layout, around the route outlet — it keeps the navbar and the bottom nav alive so a
-        broken page is an inconvenience rather than a dead end. This one exists for the cases that
-        boundary cannot see: a provider that throws while initialising, or the chrome itself. There
-        is nothing left to preserve at that point, so its fallback offers a reload and a link home
-        rather than pretending a re-render will help. No `resetKey`: outside the router there is no
-        navigation to reset on. */}
+    {/* The boundary that matters day to day is the one inside each layout, around the route outlet. */}
     <ErrorBoundary scope="app">
     <BrowserRouter>
       <AuthProvider>
@@ -83,31 +61,22 @@ const app = (
               clears on sign-out by watching that context. */}
           <SavedProvider>
             <SavedSearchProvider>
-              {/* Same reasoning again: five surfaces ask which societies the caller follows, and
-                  the finder and the directory ask once per rendered row. Held here so that is one
-                  request rather than one per card (D227). */}
+              {/* One follow-state request here prevents per-card requests. */}
               <FollowProvider>
-              {/* Also caller-scoped, and read during render rather than awaited: the paywall, the
-                  Feature action and the pricing card all ask which plan is held while drawing.
-                  Holding it here makes that one request instead of one per asker. */}
-              <PlanProvider>
-              {/* Also caller-scoped and read during render: the opt-in Aadhaar badge decides which
-                  trust ribbon or nudge to draw across the profile, dashboard and contact flows.
-                  Held here so that is one request, not one per asker. */}
+              {/* One verification request feeds badges across profile, dashboard and contact flows. */}
               <VerificationProvider>
-              {/* Same reasoning: the inbox is caller-scoped, so the unread count loads on sign-in
-                  and zeroes on sign-out rather than reading an anonymous store. */}
-              <NotificationProvider>
-                <ConversationProvider>
+              {/* The inbox is caller-scoped, so unread counts load on sign-in and zero on sign-out.
+                  Conversations sit outside: the bell's count rides the chat stream they open. */}
+              <ConversationProvider>
+                <NotificationProvider>
                   <CompareProvider>
                     <ToastProvider>
-                      {withMaps(<App />)}
+                      <App />
                     </ToastProvider>
                   </CompareProvider>
-                </ConversationProvider>
-              </NotificationProvider>
+                </NotificationProvider>
+              </ConversationProvider>
               </VerificationProvider>
-              </PlanProvider>
               </FollowProvider>
             </SavedSearchProvider>
           </SavedProvider>
@@ -118,10 +87,10 @@ const app = (
   </StrictMode>
 );
 
-/* The ready marker now means the live-only application has rendered; it is no longer a promise
-  that a browser database has been seeded. `loadGeoPolicy` remains asynchronous by design: its
+/* The ready marker means the application has rendered. `loadGeoPolicy` stays asynchronous: its
   synchronous readers use built-ins until it arrives, so first paint does not wait on configuration. */
 document.documentElement.dataset.dzBoot = 'ready';
 loadGeoPolicy();
 window.addEventListener('draazy-settings-change', loadGeoPolicy);
+if (readAccessToken()) primeMeBootstrap();
 createRoot(document.getElementById('root')).render(app);

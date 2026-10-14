@@ -2,9 +2,8 @@
 
 How to run the full stack on one machine.
 
-**The backend is not optional.** `services/config.js` resolves every domain to the live API — there
-is no mock provider left, and no environment variable that can route a domain anywhere else. The
-per-domain `VITE_API_DOMAINS` switch this page used to document is gone; setting it does nothing.
+**The backend is not optional.** `services/config.js` resolves every domain to the live API, and no
+environment variable can route a domain anywhere else.
 Run both halves, or the catalogue renders empty.
 
 This page covers the first tier only. For how `local` relates to `local,e2e`, `sandbox` and
@@ -42,32 +41,35 @@ regenerate it (tech-debt D81, now closed).
 The rules, in the order they bite:
 
 1. **Never edit a migration that has been applied anywhere.** Flyway records a checksum per file. A
-   one-character edit to an applied `V__` script means every existing database refuses to boot with
+   one-character edit to an applied versioned script means every existing database refuses to boot with
    `Migration checksum mismatch`. This is not theoretical — it is exactly what happened on
    2026-08-04, and repairing it was impossible because the database was also twenty versions behind.
-2. **New change → new script.** `V15__…`, `V16__…`. Never renumber, never reuse. Note Flyway strips
-   leading zeros, so `V01` and `V1` are the *same* version and collide — keep the two-digit form.
+2. **New change → new script, named `<yy>.<mm>.<seq>__<description>.sql`** — e.g.
+   `26.11.01__DDL_add_x.sql`, then `26.11.02__…`; the sequence restarts at `01` each month. There is
+   no `V` prefix (`spring.flyway.sql-migration-prefix` is empty). Never renumber, never reuse, and keep
+   every part two digits: Flyway compares versions numerically, so `26.10.1` and `26.10.01` collide.
 3. **Never truncate or drop the schema to get out of trouble.** If a migration is wrong, write the
    next one that corrects it.
 4. **`R__` (repeatable) is for content, not structure** — the two seeds. They re-run whenever their
-   checksum changes and always after every `V__`, which is what makes editing the demo catalogue a
-   one-file change rather than a new migration.
+   checksum changes and always after every versioned script, which is what makes editing the demo
+   catalogue a one-file change rather than a new migration.
 
-The flatten this section used to reserve for later **has now happened**. On 2026-09-01 the 127-file
-`V1..V128` chain was consolidated into 14 domain-grouped files (`V01__DDL_foundation.sql` …
-`V14__DDL_analytics.sql`), and the filename convention gained a `DDL`/`DML` tag. Both preconditions
-held: every environment was rebuilt from empty, and it was done as a deliberate reset rather than an
-edit-in-place, which is rule 1 again.
+The chain has been flattened twice. On 2026-09-01 the 127-file `V1..V128` chain became 14
+domain-grouped files. On 2026-10-13 the `V01..V129` chain (15 domain files plus 110 deltas, and the
+pending society-community drop) was folded into the 14 files `26.10.01__DDL_foundation.sql` …
+`26.10.14__DDL_flatmate_search.sql`, and the naming moved to `<yy>.<mm>.<seq>__`. Both times every
+environment was rebuilt from empty, which is rule 1 again.
 
 Equivalence was proved rather than assumed — the old chain and the new one were each replayed into a
-scratch database and compared on columns, constraints, indexes, triggers, comments and routines
-(1,253 / 509 / 344 / 76 / 471 / 38, identical on every axis). The 197 `ALTER TABLE`s are folded into
-the `CREATE TABLE`s, objects the chain created and later dropped are simply never created, and the
-backfill DML is gone: every statement of it repaired rows that only exist in an already-populated
-database, so none of it can fire on a fresh one.
+scratch database and their `pg_dump --schema-only` and seeded reference data compared: identical
+except five `trg_set_updated_at` triggers the old chain never installed on tables it created late
+(`identity_verifications`, `conversation_user_state`, `property_verification_override_requests`,
+`service_request_draft_approvals`, `service_request_draft_checks`). Every `ALTER TABLE` is folded into its `CREATE TABLE` (columns in the same physical
+order), objects the chain created and later dropped are never created, and the backfill DML is gone:
+every statement of it repaired rows that only exist in an already-populated database.
 
 What this does **not** change: rule 1 still binds. The 14 files are applied everywhere now, so they
-are as frozen as the 127 were. A future squash is possible on the same two preconditions.
+are as frozen as the old chain was. A future squash is possible on the same precondition.
 
 Two build-time guards, because both mistakes above are invisible in review:
 
@@ -81,6 +83,11 @@ Two build-time guards, because both mistakes above are invisible in review:
 conversations, visits and contact requests that make the local app look like a product. Read its
 header before changing it; it records three traps that cost real time (seed ordering, `ON CONFLICT`
 scope, and one row that violated a constraint added after the data was created).
+
+`db/seed-local/R__zz_DML_dev_kyc_desk.sql` fills the KYC desk (`/ops/kyc-review`) with 21 cases, one per
+review state (overdue, claimed by others, QA sample, your own approval, rejected, revoked). Only
+`application-local.properties` lists `db/seed-local`; the e2e profile replaces the list, so the lanes
+never see it. `DevKycSeedImages` draws the placeholder document images on boot.
 
 It is wired in `application-local.properties` as `spring.flyway.locations=classpath:db/migration,classpath:db/seed`,
 so **naming the `local` profile is what asks for it**. It used to sit in the base file and be excluded
@@ -176,7 +183,7 @@ so nothing here proves this JVM is a developer's machine.
 
 **Why a variable and not a line in a file.** The `local` profile turns on three things that are
 holes anywhere real: an OTP sender that prints the code to the log, a file store that writes KYC
-documents to local disk, and `POST /me/verification/aadhaar/simulate`, which hands the caller the
+documents to local disk, and `POST /me/verification/identity/simulate`, which hands the caller the
 Verified badge that owners use to decide who may contact them. Everything that gated them was a
 string in a file — and files are the thing deployments copy. A container that terminates its own
 TLS (so it configures no proxy) and picks up `SPRING_PROFILES_ACTIVE=local` from an environment file
@@ -228,7 +235,8 @@ falling back to a well-known local value. It adds one more, `INTERNAL_PROXIES`, 
 regex matching the load balancer's addresses — the write rate limiter keys anonymous callers on the
 client address, so a deploy that leaves this unanswered would put the whole internet in one bucket.
 Locally the base file answers `none`, which is correct for a directly exposed app; the boot refuses
-to start rather than guess.
+to start rather than guess. `ORIGIN_SHARED_SECRET` works the same way: locally the base file answers
+`none` (no proxy, no gate), and a deploy must supply the secret its edge proxy sends.
 
 Confirm Flyway actually ran — a healthy boot logs:
 
@@ -237,10 +245,10 @@ o.f.core.internal.command.DbValidate : Successfully validated 17 migrations
 c.draazy.api.DraazyApiApplication : Started DraazyApiApplication
 ```
 
-That count is 14 versioned `V__DDL_*` files plus the two `R__DML_*` reference seeds, and on the
-`local`/`e2e` profiles a third repeatable from `db/seed`. On a database that is already at v14 the
-line reads *validated*; on an empty one you get `Migrating schema "public" to version "14 - DDL
-analytics"` followed by `Successfully applied 17 migrations`.
+That count is the 14 versioned `26.10.*__DDL_*` files plus the two `R__DML_*` reference seeds, and on the
+`local`/`e2e` profiles the repeatables from `db/seed` and friends. On a database that is already at
+26.10.14 the line reads *validated*; on an empty one you get `Migrating schema "public" to version
+"26.10.14 - DDL flatmate search"` followed by `Successfully applied N migrations`.
 
 If Flyway logs *nothing at all*, the `spring-boot-flyway` autoconfiguration module is missing from
 `pom.xml`. Under Spring Boot 4, `flyway-core` alone is not enough.
@@ -282,6 +290,20 @@ Common failures, all of which surface as a 500 with the Graph error code in the 
 `131030` = recipient is not on the test number's allow-list; `132001` = no template by that
 name/language; `133010` = the token's phone number is not registered.
 
+#### Sending a real email locally (optional)
+
+```powershell
+$env:ZEPTOMAIL_ENABLED  = 'true'
+$env:ZEPTOMAIL_API_KEY  = '<agent Send Mail token>'
+```
+
+Then create a staff account (or reissue an invite) at `/admin/team` with an inbox you own. With the flag
+off the backend logs `[MOCK EMAIL] to=***@domain subject=...` and never the link.
+
+On the corporate network the send logs `PKIX path building failed`: TLS is intercepted and Zulu's
+`cacerts` lacks the corporate root. Start the JVM with `-Djavax.net.ssl.trustStoreType=Windows-ROOT`
+so it trusts the Windows certificate store, the same one `curl.exe` uses. Production is unaffected.
+
 ## 3. Frontend
 
 ```powershell
@@ -291,8 +313,8 @@ npm run dev          # http://localhost:5173
 ```
 
 **The backend must be running** — see §2. Every domain resolves to the live API, so a frontend
-started on its own serves the shell and then fails every request. There is no mock fallback to mask
-it, which is the point: for as long as the switch existed, "which backend am I actually talking
+started on its own serves the shell and then fails every request. Nothing masks that, which is the
+point: for as long as a per-domain switch existed, "which backend am I actually talking
 to?" was a question about a build, and a green run was only evidence about one side of it.
 `services/config.js` records what was removed and why.
 
@@ -330,28 +352,14 @@ page's `connect-src 'self'` CSP — which surfaces only as a generic "login fail
 
 > The proxy used to strip `/api` before forwarding, because the backend served `/auth/login`. That
 > made the prefix a dev-only fiction that worked here and 404'd the moment `VITE_API_BASE` named a
-> real host. Anything that calls the backend **directly** — `curl`, the parity harnesses, a REST
-> client — must therefore include `/api` itself: `http://localhost:8080/api/properties`. Swagger UI
+> real host. Anything that calls the backend **directly** — `curl`, a REST client, a test helper —
+> must therefore include `/api` itself: `http://localhost:8080/api/properties`. Swagger UI
 > is at `/api/docs` and health at `/api/actuator/health`.
 
 ## 4. Verifying the integration
 
-All three require the backend running. Only the first is automated.
-
-```powershell
-# Mock and live auth providers return the same shapes for every field the UI relies on.
-cd frontend
-node scripts\contract-parity.mjs --otp-log <path-to-backend-console-log>
-```
-
-It reads the OTP straight from the backend console log, so redirect it to a file:
-
-```powershell
-mvn spring-boot:run -Dspring-boot.run.profiles=local 2>&1 | Tee-Object -FilePath $env:TEMP\boot.log
-```
-
-Two things `contract-parity.mjs` does **not** cover, and which no automated check currently does
-either — verify them by hand against a live backend before trusting a release:
+The automated coverage is `mvn verify` and the Playwright suite (§5). Two things neither covers —
+verify them by hand against a live backend before trusting a release:
 
 1. **Session survives a reload, and a 401 triggers one silent refresh rather than a logout.** Log in,
    hard-reload, then let the access token expire and make a request.
@@ -363,41 +371,13 @@ two checks. Both files were zero bytes and had never contained anything — runn
 verified nothing, which is worse than having no instruction at all. They were deleted and the checks
 written out here instead (tech-debt D75).
 
-### What the parity harnesses leave behind
-
-There are eighteen `scripts/*-parity.mjs`. **They run against your real dev backend, so they write
-to `draazy`** — there is no way around that: the harness drives the *real* http provider over
-HTTP, and the backend, not the harness, chooses the database. Pointing a harness at a throwaway
-database would mean pointing the whole backend at one.
-
-Every one of them signs in, so every run mints a `users` row on a throwaway `987xxxxxxxx` mobile.
-That is invisible and harmless. What was neither was `review-parity.mjs`: it posts a genuine
-locality review, **reviews are public**, and so until 2026-08-09 each run left another "Parity probe
-review." rendering on `/locality/aundh` for anyone browsing the dev site. Four of them had
-accumulated, and the first live-reviews e2e asserted against them believing they were seed data
-(tech-debt D100).
-
-`review-parity.mjs` now removes its own row, and the contract is worth knowing before you read a
-failure from it:
-
-- It deletes **by the id the create returned**, straight through `psql` — never a
-  `LIKE 'Parity probe%'` sweep, which on a shared database would delete a concurrent run's row.
-- **Cleanup runs even when the assertions fail**, so a contract break does not also cost a public row.
-- **If cleanup fails, the run exits non-zero and prints the surviving id plus the `DELETE` to run by
-  hand.** A `PASS` therefore means both "the shapes agree" and "the row is gone"; a failure
-  mentioning a review id is asking you to remove it, not merely reporting drift.
-- Knobs, all defaulted to the values above so you normally pass none: `--db <uri>`
-  (or `$PARITY_DB_URL`), `--psql <path>` (or `$PARITY_PSQL`; falls back to `psql` on PATH then
-  `C:\Program Files\PostgreSQL\13\bin\psql.exe`), and `--keep` to leave the row deliberately —
-  which says loudly that it did. **Pass `--keep` last**: these scripts read argv in `--flag value`
-  pairs, so a valueless flag in the middle swallows the next argument.
-
-`--db` must name the database the **backend** is using. Point it elsewhere and the delete matches
-nothing, which the harness reports as a failure rather than a clean run.
-
-`conversation-parity.mjs` is often assumed to litter the same way. It does not: its staged chats
-live in `localStorage`, which under Node is an in-memory stub, so they never leave the process. Its
-only database footprint is the login row.
+> The same reasoning retired the `scripts/*-parity.mjs` harnesses. They drove the real http provider
+> against the real dev backend, so they wrote to `draazy` and could not be pointed at a throwaway
+> database without pointing the whole backend at one — and `review-parity.mjs` posted a **public**
+> locality review on every run, four of which accumulated on `/locality/aundh` before the first
+> live-reviews e2e began asserting against them as though they were seed data (tech-debt D100).
+> A check that dirties the database it verifies is a check that has to be cleaned up after. The
+> Playwright live lanes cover the same contracts and own their fixtures.
 
 ## 5. Tests
 

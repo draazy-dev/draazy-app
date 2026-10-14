@@ -5,9 +5,11 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.CurrentUser;
 import jakarta.validation.Valid;
-import java.util.UUID;
+import java.util.List;
 import java.util.function.Function;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,59 +20,74 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * {@code /societies} - the public society directory and hub, caller-aware so a signed-in reader gets
- * {@code followedByMe} while an anonymous one gets {@code false} (docs/flows/consumer/societies.md 9.6).
- */
+/** Reads are caller-independent; whether the caller follows a society is {@code /me/societies/following}. */
 @RestController
 public class SocietyController {
 
+    private static final int TOP_RAIL = 8;
+
     private final SocietyService societyService;
     private final SocietyMintService mintService;
+    private final SocietyResolveService resolveService;
 
-    public SocietyController(SocietyService societyService, SocietyMintService mintService) {
+    public SocietyController(SocietyService societyService, SocietyMintService mintService,
+            SocietyResolveService resolveService) {
         this.societyService = societyService;
         this.mintService = mintService;
+        this.resolveService = resolveService;
     }
 
-    /**
-     * {@code GET /societies} - paged directory; {@code sort} is clamped to {@link SocietySort}'s
-     * whitelist and {@code hasListings=true} narrows to societies with a live listing.
-     */
+    /** {@code sort} is clamped to {@link SocietySort}'s whitelist;
+     *  {@code hasListings=true} narrows to societies with a live listing. */
     @GetMapping(Routes.Societies.BASE)
     public PageResponse<SocietyResponse> browse(
-            @CurrentUser AuthPrincipal principal,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String locality,
             @RequestParam(required = false) Boolean hasListings,
             @PageableDefault(size = 20) Pageable pageable) {
         return PageResponse.of(
-                societyService.browse(q, locality, hasListings, pageable, viewerId(principal)),
+                societyService.browse(q, locality, hasListings, pageable),
                 Function.identity());
+    }
+
+    /** {@code GET /societies/top}: caller-independent, so it is cached like the other public reference reads. */
+    @GetMapping(Routes.Societies.TOP)
+    public List<SocietyCard> top() {
+        return societyService.browse(null, null, true,
+                        PageRequest.of(0, TOP_RAIL, Sort.by(SocietySort.HOMES)))
+                .map(s -> new SocietyCard(s.slug(), s.name(), s.localitySlug(), s.listingCount()))
+                .getContent();
     }
 
     /** {@code GET /societies/{slug}} — one society hub; 404 if no such society. */
     @GetMapping(Routes.Societies.BY_SLUG)
-    public SocietyDetailResponse get(@CurrentUser AuthPrincipal principal,
-            @PathVariable String slug) {
-        return societyService.get(slug, viewerId(principal));
+    public SocietyDetailResponse get(@PathVariable String slug) {
+        return societyService.get(slug);
     }
 
-    /**
-     * {@code POST /societies} - add a society the catalogue lacks. <strong>201 for a new row, 200
-     * when the name already matches one</strong>, so the screen can tell the two apart (societies.md 9.6).
-     */
+    /** {@code GET /societies/{slug}/brief}: name, specs and rating for a listing page or a search chip. */
+    @GetMapping(Routes.Societies.BRIEF)
+    public SocietyBrief brief(@PathVariable String slug) {
+        return societyService.brief(slug);
+    }
+
+    /** The place's society, or similar ones within 250 m; anonymous-readable like the directory. */
+    @GetMapping(Routes.Societies.RESOLVE)
+    public SocietyResolveResponse resolve(
+            @RequestParam String placeId,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng) {
+        return resolveService.resolve(placeId, name, lat, lng);
+    }
+
+    /** 201 for a new row, 200 when the place already has one, so the screen can tell them apart. */
     @PostMapping(Routes.Societies.BASE)
     public ResponseEntity<SocietyResponse> mint(@CurrentUser AuthPrincipal principal,
             @Valid @RequestBody SocietyMintRequest request) {
-        SocietyMintService.MintedSociety result = mintService.mint(request, principal.userId());
+        SocietyMintService.MintedSociety result = mintService.mint(request, principal);
         return ResponseEntity
                 .status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
                 .body(result.society());
-    }
-
-    /** Null for an anonymous reader — which is a legitimate state here, not a failure. */
-    private static UUID viewerId(AuthPrincipal principal) {
-        return principal != null ? principal.userId() : null;
     }
 }

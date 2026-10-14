@@ -28,7 +28,7 @@ com.draazy.api
 │  ├─ user/                            #   aggregate: profile + /me
 │  │   MeController, User, UserRepository, UserService,
 │  │   UserResponse, UserUpdate
-│  └─ verification/                    #   aggregate: Aadhaar/KYC badge (ADR-019)
+│  └─ verification/                    #   aggregate: identity badge (ADR-019)
 │      IdentityVerification, IdentityVerificationRepository
 │
 ├─ <catalog|listing|leads|rentals|documents|services|billing|engagement|moderation|admin>/
@@ -74,19 +74,20 @@ feature context ──▶ security ──▶ common       feature context ──
 | 0 | `content`, `identity` | shared kernel only |
 | 1 | `catalog` | layer 0 |
 | 2 | `documents`, `leads`, `engagement`, `billing` | layers 0–1 |
-| 3 | `finance`, `services` | layers 0–2 |
+| 3 | `finance`, `services`, `bootstrap` | layers 0–2 |
 | 4 | `deals` | layers 0–3 |
 | 5 | `moderation` | layers 0–4 |
+| top | `jobs` | every context: it schedules their work, and nothing imports it |
 
 Contexts sharing a rank never import one another; only the strict ordering is enforced.
 
 `billing` sits at 2 and `finance` at 3 because the payment callback `finance` already owns is what
-activates a paid subscription or boost — so the arrow is `finance → billing`. Ranking `billing`
+activates a paid subscription ? so the arrow is `finance ? billing`. Ranking `billing`
 higher would make that legitimate call a violation and invite someone to "fix" it by having
 `billing` reach back into `finance`.
 
 That callback lives in **`finance.payment`** (`PaymentWebhookController`, `POST /webhooks/cashfree/payment`),
-settling subscriptions, boosts and service requests. It used to sit in `common.payments`, where it
+settling subscriptions, service requests and amendments. It used to sit in `common.payments`, where it
 broke this section outright: the shared kernel may never import a feature, and a webhook that
 activates a subscription necessarily does. `ArchitectureBoundaryTest` names it. Moving it down into
 the context that already owned the arrow was the smaller change — the alternative was an event bus
@@ -149,17 +150,17 @@ spec collapse into these 11.
 
 | # | Bounded context | Core responsibility | Package | Flyway group (logical schema) | Roadmap phase |
 |---|-----------------|---------------------|---------|-------------------------------|---------------|
-| 1 | Identity & Access | Auth (OTP + staff password), profile, sessions, RBAC, Aadhaar gate | `identity` (`.auth/.user/.verification`) | `V02__DDL_identity_access` | **auth+users — SHIPPED** |
-| 2 | Catalog & Search | Public listing discovery, filters, map, localities, cities, fees | `catalog` | `V03__DDL_catalog_geo`, `V04__DDL_catalog_listings` | properties/search |
-| 3 | Listings | Owner listing lifecycle, offers, visits, deals | `listing` | `V04__DDL_catalog_listings`, `V06__DDL_deals_offers` | properties → deals |
-| 5 | Leads & Contact | Contact requests (gated), enquiries, deal finalization | `leads` | `V05__DDL_leads_conversations` | contacts/gate → visits |
-| 6 | Rentals & Payments | Owner finance ledger, tenancies, tenant profiles, the tenant's self-declared rental | `rentals` | `V10__DDL_tenancy_finance` | finance/rent |
-| 7 | Documents | Property documents, access requests, secure share links | `documents` | `V08__DDL_documents_vault` | finance/rent |
-| 8 | Services & Support | Service requests/workflows, support tickets, rent agreements, owner KYC | `services` | `V07__DDL_service_requests` | services/tickets |
-| 9 | Billing & Growth | Plans/subscriptions, boosts, paid services, referrals | `billing` | `V11__DDL_engagement_billing` | services → CMS |
-| 10 | Engagement | Saved searches/alerts, reviews, flatmates, notifications | `engagement` | `V11__DDL_engagement_billing`, `V13__DDL_flatmates` | content/CMS |
+| 1 | Identity & Access | Auth (OTP + staff password), profile, sessions, RBAC, identity badge | `identity` (`.auth/.user/.verification`) | `26.10.02__DDL_identity_access` | **auth+users — SHIPPED** |
+| 2 | Catalog & Search | Public listing discovery, filters, map, localities, cities, fees | `catalog` | `26.10.03__DDL_catalog_geo`, `26.10.04__DDL_catalog_listings` | properties/search |
+| 3 | Listings | Owner listing lifecycle, offers, visits, deals | `listing` | `26.10.04__DDL_catalog_listings`, `26.10.06__DDL_deals_offers` | properties → deals |
+| 5 | Leads & Contact | Contact requests (gated), enquiries, deal finalization | `leads` | `26.10.05__DDL_leads_conversations` | contacts/gate → visits |
+| 6 | Rentals & Payments | Owner finance ledger, tenancies, tenant profiles, the tenant's self-declared rental | `rentals` | `26.10.09__DDL_tenancy_finance` | finance/rent |
+| 7 | Documents | Property documents, access requests, secure share links | `documents` | `26.10.08__DDL_documents_vault` | finance/rent |
+| 8 | Services & Support | Service requests/workflows, support tickets, rent agreements, owner KYC | `services` | `26.10.07__DDL_service_requests` | services/tickets |
+| 9 | Billing & Growth | Plans/subscriptions, paid services, referrals | `billing` | `26.10.10__DDL_engagement_billing` | services ? CMS |
+| 10 | Engagement | Saved searches/alerts, reviews, flatmates, notifications | `engagement` | `26.10.10__DDL_engagement_billing`, `26.10.12__DDL_flatmates` | content/CMS |
 | 4 | Moderation | Listing review, user/KYC verification, reports, staff management | `moderation` | `V02`/`V04` (review of users+listings) | admin/analytics |
-| 11 | Admin & Analytics | KPIs, analytics, platform settings, audit log, CMS admin, society leads | `admin` | `V01__DDL_foundation`, `V12__DDL_cms_content`, `V14__DDL_analytics` | admin/analytics |
+| 11 | Admin & Analytics | KPIs, analytics, platform settings, audit log, CMS admin | `admin` | `26.10.01__DDL_foundation`, `26.10.11__DDL_cms_content`, `26.10.13__DDL_analytics` | admin/analytics |
 
 The "Flyway group" column names the consolidated domain file that now declares each context's
 tables. It is deliberately a whole-file citation and not a line number: the chain was squashed from

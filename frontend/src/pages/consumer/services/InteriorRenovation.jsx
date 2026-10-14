@@ -1,18 +1,20 @@
 import NativeSelect from '../../../components/ui/NativeSelect.jsx';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
-import { localityNames } from '../../../data/localities.js';
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams, useNavigate, useLocation } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import { ServiceBreadcrumbs } from '../../../components/Breadcrumbs.jsx';
 import MobileField from '../../../components/MobileField.jsx';
 import { useScrollReveal } from '../../../lib/useScrollReveal.js';
+import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import ServiceTracker from '../../../components/ServiceTracker.jsx';
 import { createServiceRequest as createFlowRequest } from '../../../services/serviceRequestService.js';
 import AutosaveBanner from '../../../components/AutosaveBanner.jsx';
 import FieldError from '../../../components/ui/FieldError.jsx';
+import { SUPPORT_PHONE, SUPPORT_TEL } from '../../../lib/supportContact.js';
 import { useFormDraft, useFieldErrors } from '../../../lib/hooks.js';
 import { srcSetFor, CARD_SIZES } from '../../../lib/imgSrcSet.js';
 
@@ -32,15 +34,15 @@ const STYLES = [['Modern', '1600585154340-be6161a56a0c'], ['Scandinavian', '1493
 const PROJECTS = [['3 BHK in Baner', '1600596542815-ffad4c1539a9'], ['2 BHK in Wakad', '1522708323590-d24dbb6b0267'], ['Villa in Kothrud', '1600210492493-0946911123ea'], ['Studio in Hinjawadi', '1540518614846-7eded433c457'], ['4 BHK in Kalyani Nagar', '1600047509807-ba8f99d2cdde'], ['2 BHK in Viman Nagar', '1560448204-e02f11c3d0e2']];
 const PACKAGES = [
   ['Essentials', '1,499', 'Smart, budget-friendly interiors for first homes.', ['Modular kitchen + wardrobes', 'Laminate finishes', 'Essential false ceiling & lighting', '5-year warranty'], false],
-  ['Premium', '1,999', 'Our most popular, balanced design & quality.', ['Full home interiors', 'Acrylic / membrane finishes', 'Designer ceilings & lighting', 'Custom storage solutions', '10-year warranty'], true],
-  ['Luxe', '2,999', 'Bespoke, high-end materials and detailing.', ['Bespoke turnkey interiors', 'Premium veneer / lacquered glass', 'Imported hardware & appliances', 'Dedicated design lead', '10-year warranty'], false],
+  ['Premium', '1,999', 'Our most popular, balanced design & quality.', ['Full home interiors', 'Acrylic / membrane finishes', 'Designer ceilings & lighting', 'Custom storage solutions', 'Itemised quote before work starts'], true],
+  ['Luxe', '2,999', 'Bespoke, high-end materials and detailing.', ['Bespoke turnkey interiors', 'Premium veneer / lacquered glass', 'Imported hardware & appliances', 'Dedicated design lead', 'Itemised quote before work starts'], false],
 ];
-const STEPS = [['Consultation', 'calendar-heart', 'Share your space, style and budget with our designer — free.'], ['3D Design', 'box', 'Get a photorealistic 3D design and a transparent, itemised quote.'], ['Production', 'hammer', 'Vetted partners manufacture and execute with quality checks.'], ['Move In', 'key-round', 'On-time handover with a 10-year warranty. Welcome home!']];
+const STEPS = [['Consultation', 'calendar-heart', 'Share your space, style and budget with our designer — free.'], ['3D Design', 'box', 'Get a photorealistic 3D design and a transparent, itemised quote.'], ['Production', 'hammer', 'Vetted partners manufacture and execute with quality checks.'], ['Move In', 'key-round', 'Handover after a final quality check. Welcome home!']];
 const TRUST = [['10-Year Warranty', 'shield-check', 'Comprehensive warranty on modular work and materials, in writing.'], ['45-Day Move-in', 'timer', 'On-time delivery guarantee for standard full-home projects.'], ['Transparent Pricing', 'badge-indian-rupee', 'Itemised quotes with no hidden charges — pay in easy milestones.'], ['Dedicated Designer', 'user-round', 'One designer + project manager from concept to handover.']];
 const FAQ = [
   ['How long does a full home interior take?', 'A standard 2–3 BHK is typically designed, manufactured and installed in about 45 days from design sign-off, depending on scope and site readiness.'],
   ['Is the 3D design really free?', 'Yes — the consultation and 3D design concept are free. You only pay once you approve the design and quote and decide to proceed.'],
-  ['What does the 10-year warranty cover?', 'It covers modular cabinetry, hardware and workmanship against manufacturing defects, as detailed in your written warranty card.'],
+  ['Is there a warranty?', 'Warranty terms depend on the partner and the materials you choose, and are written into your quote before you sign. Ask your designer for them at the consultation.'],
   ['Can you work on an under-construction or occupied home?', 'Both. We plan around possession and, for occupied homes, sequence work room-by-room to minimise disruption.'],
   ['How is pricing calculated?', 'Pricing is itemised by scope and finishes (indicative per-sq.ft. packages above). Your final, transparent quote is shared after the consultation and measurements.'],
 ];
@@ -49,8 +51,7 @@ export default function InteriorRenovation() {
   const { t: tr } = useTranslation();
   const rootRef = useScrollReveal();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const sendToSignIn = useSignInGate();
   const { user, isIn } = useAuth();
   const { toast } = useToast();
   const [lightbox, setLightbox] = useState(null);
@@ -60,7 +61,7 @@ export default function InteriorRenovation() {
   const formRef = useRef(null);
   const [form, setForm] = useState({ name: isIn ? user?.name || '' : '', mobile: isIn ? user?.mobile || '' : '', scope: '', config: '2 BHK', status: 'Ready to move', budget: 'Under ₹3 Lakh', location: '' });
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-  const draft = useFormDraft('dzDraft:interior-renovation', form, setForm, { ignore: ['name', 'mobile', 'config', 'status', 'budget'] });
+  const draft = useFormDraft('dzDraft:interior-renovation', form, setForm, { ignore: ['config', 'status', 'budget'], omit: ['name', 'mobile'] });
   const err = useFieldErrors(formRef);
 
   // Prefill scope from URL (?scope=kitchen)
@@ -82,7 +83,7 @@ export default function InteriorRenovation() {
   const submit = (e) => {
     e.preventDefault();
     // Public page; book the free consult only after sign-in (draft is restored on return).
-    if (!isIn) { navigate(`/signin?reason=services&next=${encodeURIComponent(location.pathname + location.search)}`); return; }
+    if (!isIn) { sendToSignIn('services'); return; }
     const ok = err.check([
       { name: 'name', ok: !!form.name.trim(), msg: tr('services.interior.errName') },
       { name: 'mobile', ok: /^[6-9]\d{9}$/.test((form.mobile || '').replace(/\D/g, '')), msg: tr('services.interior.errMobile') },
@@ -129,11 +130,12 @@ export default function InteriorRenovation() {
     <div ref={rootRef}>
       <div>
         {/* Hero */}
-        <section className="relative overflow-hidden">
+        <section className="theme-dark relative overflow-hidden">
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1600&q=80')" }} />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(120deg,rgba(15,13,26,.96) 0%,rgba(15,13,26,.82) 45%,rgba(13,148,136,.45) 100%)' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(120deg,rgb(var(--dz-c-ink) / .96) 0%,rgb(var(--dz-c-ink) / .82) 45%,rgb(var(--dz-c-teal-600) / .45) 100%)' }} />
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
             <div className="max-w-2xl reveal">
+              <ServiceBreadcrumbs k="interior" />
               <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs text-teal-200 font-medium mb-5"><Icon name="sparkles" className="w-3.5 h-3.5" /> {tr('services.interior.heroBadge')}</span>
               <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-[1.05]">{tr('services.interior.heroTitle1')}<br /><span className="gradient-text">{tr('services.interior.heroTitleAccent')}</span></h1>
               <p className="text-gray-200 text-base sm:text-lg mt-5 max-w-xl">{tr('services.interior.heroSubtitle')}</p>
@@ -148,7 +150,7 @@ export default function InteriorRenovation() {
         {/* Stats */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-10">
           <div className="glass-card rounded-2xl p-6 grid grid-cols-2 lg:grid-cols-4 gap-6 reveal">
-            {[['2,500+', 'homesDesigned'], ['45', 'daysToMoveIn'], ['10 yr', 'warranty'], ['4.8★', 'customerRating']].map(([v, slug]) => <div key={slug} className="text-center"><p className="text-3xl font-extrabold gradient-text">{v}</p><p className="text-gray-500 text-xs mt-1">{tr('services.interior.stat.' + slug)}</p></div>)}
+            {[['Free', 'design'], ['Itemised', 'quote'], ['Agreed', 'handover'], ['Written', 'warranty']].map(([v, slug]) => <div key={slug} className="text-center"><p className="text-3xl font-extrabold gradient-text">{v}</p><p className="text-gray-500 text-xs mt-1">{tr('services.interior.stat.' + slug)}</p></div>)}
           </div>
         </section>
 
@@ -170,9 +172,9 @@ export default function InteriorRenovation() {
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.stylesTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.interior.stylesSub')}</p></div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {STYLES.map(([t, id], i) => (
-              <div key={t} className="zoom tile rounded-2xl relative h-40 sm:h-44" onClick={() => setLightbox(IMG(id, 1400))}>
+              <div key={t} className="zoom tile theme-dark rounded-2xl relative h-40 sm:h-44" onClick={() => setLightbox(IMG(id, 1400))}>
                 <img src={IMG(id)} srcSet={srcSetFor(IMG(id))} sizes={CARD_SIZES} alt={tr('services.interior.style.' + i)} className="w-full h-full object-cover" loading="lazy" />
-                <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,transparent 45%,rgba(8,7,16,.85) 100%)' }} />
+                <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,transparent 45%,rgb(var(--dz-c-ink) / .85) 100%)' }} />
                 <span className="absolute bottom-3 left-3 text-white font-semibold text-sm">{tr('services.interior.style.' + i)}</span>
               </div>
             ))}
@@ -197,9 +199,9 @@ export default function InteriorRenovation() {
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.projectsTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.interior.projectsSub')}</p></div>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             {PROJECTS.map(([t, id], i) => (
-              <div key={t} className="zoom tile rounded-2xl relative h-48 sm:h-60 group" onClick={() => setLightbox(IMG(id, 1400))}>
+              <div key={t} className="zoom tile theme-dark rounded-2xl relative h-48 sm:h-60 group" onClick={() => setLightbox(IMG(id, 1400))}>
                 <img src={IMG(id)} srcSet={srcSetFor(IMG(id))} sizes={CARD_SIZES} alt={tr('services.interior.project.' + i)} className="w-full h-full object-cover" loading="lazy" />
-                <div className="reveal-on-hover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: 'linear-gradient(180deg,transparent 40%,rgba(8,7,16,.88) 100%)' }} />
+                <div className="reveal-on-hover absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ background: 'linear-gradient(180deg,transparent 40%,rgb(var(--dz-c-ink) / .88) 100%)' }} />
                 <div className="reveal-on-hover absolute bottom-0 left-0 right-0 p-4 translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
                   <p className="text-white font-semibold text-sm flex items-center gap-2"><Icon name="maximize-2" className="w-4 h-4 text-teal-300" /> {tr('services.interior.project.' + i)}</p>
                 </div>
@@ -243,9 +245,9 @@ export default function InteriorRenovation() {
         {/* Book consultation */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-            <div className="zoom rounded-2xl relative min-h-[320px] hidden lg:block">
+            <div className="zoom theme-dark rounded-2xl relative min-h-[320px] hidden lg:block">
               <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1000&q=80" srcSet={srcSetFor('https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1000&q=80')} sizes="(min-width: 1024px) 50vw, 100vw" alt="Designed living room" className="w-full h-full object-cover rounded-2xl" />
-              <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(180deg,transparent 40%,rgba(15,13,26,.85) 100%)' }} />
+              <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(180deg,transparent 40%,rgb(var(--dz-c-ink) / .85) 100%)' }} />
               <div className="absolute bottom-6 left-6 right-6">
                 <div className="flex items-center gap-3 mb-3">
                   <span className="flex items-center gap-1.5 text-xs text-white bg-white/10 border border-white/20 rounded-full px-3 py-1.5"><Icon name="shield-check" className="w-3.5 h-3.5 text-teal-300" /> {tr('services.interior.consultBadge1')}</span>
@@ -279,7 +281,7 @@ export default function InteriorRenovation() {
                     </div>
                     <div className="mt-4">
                       <label className="block text-xs font-medium text-gray-300 mb-1.5">{tr('services.interior.locationLabel')}</label>
-                      <LocalitySelect value={form.location} onChange={(v) => set('location', v)} options={localityNames()} placeholder={tr('services.interior.locationPlaceholder')} ariaLabel={tr('services.interior.locationLabel')} className="w-full" />
+                      <LocalitySelect value={form.location} onChange={(v) => set('location', v)} nameOnly placeholder={tr('services.interior.locationPlaceholder')} ariaLabel={tr('services.interior.locationLabel')} className="w-full" />
                     </div>
                     <button type="submit" className="btn-teal w-full mt-5 py-3 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"><Icon name="send" className="w-4 h-4" /> {tr('services.interior.bookMyConsult')}</button>
                     <p className="text-center text-[11px] text-gray-500 mt-3">{tr('services.interior.consentText')}</p>
@@ -322,15 +324,15 @@ export default function InteriorRenovation() {
 
         {/* CTA */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
-          <div className="rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden reveal">
+          <div className="theme-dark rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden reveal">
             <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=1400&q=80')" }} />
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(120deg,rgba(15,13,26,.94),rgba(49,46,129,.7),rgba(13,148,136,.55))' }} />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(120deg,rgb(var(--dz-c-ink) / .94),rgb(var(--dz-c-indigo-900) / .7),rgb(var(--dz-c-teal-600) / .55))' }} />
             <div className="relative">
               <h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.ctaTitle')}</h2>
               <p className="text-gray-200 mt-3 mb-7">{tr('services.interior.ctaSub')}</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button onClick={scrollToForm} className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name="calendar-heart" className="w-4 h-4" /> {tr('services.interior.ctaBook')}</button>
-                <a href="tel:18002000000" className="px-6 py-3.5 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 inline-flex items-center justify-center gap-2 transition-all"><Icon name="phone" className="w-4 h-4" /> {tr('services.interior.ctaCall')}</a>
+                <a href={SUPPORT_TEL} className="px-6 py-3.5 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 inline-flex items-center justify-center gap-2 transition-all"><Icon name="phone" className="w-4 h-4" /> {tr('services.interior.ctaCall', { phone: SUPPORT_PHONE })}</a>
               </div>
             </div>
           </div>
@@ -340,8 +342,8 @@ export default function InteriorRenovation() {
       {lightbox ? (
         /* 1500 = the "blocking modals" rung, which keeps the lightbox below the toast layer (1600).
            See the ladder in index.css. */
-        <div className="fixed inset-0 z-[1500] flex items-center justify-center p-6" style={{ background: 'rgba(8,7,16,.92)', backdropFilter: 'blur(8px)' }} onClick={() => setLightbox(null)}>
-          <img src={lightbox} alt={tr('services.interior.lightboxAlt')} className="rounded-2xl" style={{ maxWidth: '92vw', maxHeight: '86vh', boxShadow: '0 24px 80px rgba(0,0,0,.6)' }} />
+        <div className="fixed inset-0 z-[1500] flex items-center justify-center p-6" style={{ background: 'rgb(var(--dz-c-black) / .92)', backdropFilter: 'blur(8px)' }} onClick={() => setLightbox(null)}>
+          <img src={lightbox} alt={tr('services.interior.lightboxAlt')} className="rounded-2xl" style={{ maxWidth: '92vw', maxHeight: '86vh', boxShadow: '0 24px 80px rgb(var(--dz-c-black) / .6)' }} />
         </div>
       ) : null}
     </div>

@@ -1,78 +1,143 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { uploadPhoto } from '../../../services/photoService.js';
+import usePhotoLimit from '../../../lib/uploads/usePhotoLimit.js';
 
-/* The `accept` attribute on a file input is a picker HINT only — drag-drop and a
-   scripted DataTransfer both bypass it. Without these guards a several-hundred-MB
-   video gets base64'd into memory and localStorage (tab freeze + QuotaExceededError),
-   and arbitrary MIME data URLs enter the store to be re-opened later. Mirrors the
-   caps already enforced in EvidenceUpload and the flatmates agreement upload. */
-const PHOTO_MIME_RE = /^image\/(png|jpe?g|webp|heic|heif|avif)$/i;
-const VIDEO_MIME_RE = /^video\/(mp4|quicktime|webm)$/i;
-const DOC_MIME_RE = /^(image\/(png|jpe?g|webp|heic|heif)|application\/pdf)$/i;
-const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
-const MAX_DOC_BYTES = 3 * 1024 * 1024;
+const MAX_PARALLEL_PHOTO_UPLOADS = 3;
+const moveItem = (items, from, to) => {
+  const next = [...items];
+  const [item] = next.splice(from, 1);
+  next.splice(Math.max(0, Math.min(to, next.length)), 0, item);
+  return next;
+};
 
-export default function useListingMedia({ errors, setErrors }) {
+export default function useListingMedia({ setErrors }) {
+  const maxPhotos = usePhotoLimit();
   const [photos, setPhotos] = useState([]);
   const [video, setVideo] = useState(null);
   const [videoName, setVideoName] = useState('');
-  const [documents, setDocuments] = useState({});
+  const [mediaStatus, setMediaStatus] = useState('');
+  const operation = useRef(null);
+  const uploadSeq = useRef(0);
+  const previewUrls = useRef(new Set());
+  useEffect(() => () => {
+    operation.current?.abort();
+    previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls.current.clear();
+  }, []);
 
   const setError = (key, msg) => setErrors((prev) => ({ ...prev, [key]: msg }));
   const clearError = (key) => setErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
-  const accepts = (file, re, max) => !!file && re.test(file.type || '') && (file.size || 0) <= max;
+  const start = () => {
+    if (operation.current) return null;
+    const controller = new AbortController();
+    operation.current = controller;
+    return controller;
+  };
+  const finish = (controller) => {
+    if (!controller.signal.aborted) { operation.current = null; setMediaStatus(''); }
+  };
 
-  /* ---------- uploads ---------- */
+  const uploadPhotoSlot = async (slot, controller) => {
+    setPhotos((prev) => prev.map((photo) => (photo.id === slot.id ? { ...photo, uploading: true, error: '' } : photo)));
+    try {
+      const { url, look } = await uploadPhoto(slot.file, { signal: controller.signal });
+      controller.signal.throwIfAborted();
+      setPhotos((prev) => prev.map((photo) => {
+        if (photo.id !== slot.id) return photo;
+        if (photo.previewUrl) {
+          URL.revokeObjectURL(photo.previewUrl);
+          previewUrls.current.delete(photo.previewUrl);
+        }
+        return { id: photo.id, url, category: photo.category || 'Other', look };
+      }));
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      setPhotos((prev) => prev.map((photo) => (photo.id === slot.id
+        ? { ...photo, uploading: false, error: error.message || 'Upload failed. Please try again.' }
+        : photo)));
+    }
+  };
+
   const handlePhotoUpload = async (e) => {
     const input = e.target;
-    const picked = Array.from(input.files);
+    const picked = Array.from(input.files || []);
     input.value = '';
-    const ok = picked.filter((f) => accepts(f, PHOTO_MIME_RE, MAX_PHOTO_BYTES));
-    // One upload at a time keeps the gallery order stable (the first photo is the cover) and the
-    // failure accounting simple. In mock mode `uploadPhoto` reads a `data:` URL in the browser —
-    // the wizard's original behaviour; in http mode it stores to R2 and returns a CDN URL.
-    let failed = 0;
-    for (const file of ok) {
-      try {
-        const { url } = await uploadPhoto(file);
-        setPhotos((prev) => [...prev, { url, category: 'Other' }]);
-      } catch {
-        failed += 1;
-      }
+    if (!picked.length) return;
+    const controller = start();
+    if (!controller) return;
+    const available = Math.max(0, maxPhotos - photos.length);
+    const batch = picked.slice(0, available);
+    const failures = picked.length > available ? [`Only ${maxPhotos} photos are allowed. Extra selections were skipped.`] : [];
+    clearError('photos');
+    const slots = batch.map((file) => {
+      const previewUrl = URL.createObjectURL(file);
+      previewUrls.current.add(previewUrl);
+      return {
+        id: `photo-${Date.now()}-${uploadSeq.current++}`,
+        file,
+        previewUrl,
+        category: 'Other',
+        uploading: true,
+        error: '',
+      };
+    });
+    setPhotos((prev) => [...prev, ...slots]);
+    try {
+      let done = 0;
+      let cursor = 0;
+      await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL_PHOTO_UPLOADS, slots.length) }, async () => {
+        for (;;) {
+          const slot = slots[cursor];
+          cursor += 1;
+          if (!slot) return;
+          setMediaStatus(`Uploading photo ${done + 1} of ${slots.length}…`);
+          await uploadPhotoSlot(slot, controller);
+          done += 1;
+        }
+      }));
+      if (failures.length) setError('photos', failures.join(' '));
+    } finally { finish(controller); }
+  };
+  const retryPhoto = async (i) => {
+    const slot = photos[i];
+    if (!slot?.file) return;
+    const controller = start();
+    if (!controller) return;
+    clearError('photos');
+    setMediaStatus(`Retrying ${slot.file.name}…`);
+    try { await uploadPhotoSlot(slot, controller); } finally { finish(controller); }
+  };
+  const removePhoto = (i) => setPhotos((prev) => {
+    if (prev[i]?.previewUrl) {
+      URL.revokeObjectURL(prev[i].previewUrl);
+      previewUrls.current.delete(prev[i].previewUrl);
     }
-    if (failed) setError('photos', `Couldn't upload ${failed === ok.length ? 'the photo' : 'some photos'} — please try again.`);
-    else if (ok.length < picked.length) setError('photos', 'Some files were skipped — photos must be JPG/PNG/WebP under 5 MB.');
-    else if (ok.length && errors.photos) clearError('photos');
+    return prev.filter((_, idx) => idx !== i);
+  });
+  const setPhotoCategory = (i, cat) => {
+    if (i === '__retry') { void retryPhoto(cat); return; }
+    setPhotos((prev) => {
+      if (i === '__move') return moveItem(prev, cat.from, cat.to);
+      if (i === '__cover') return moveItem(prev, cat, 0);
+      return prev.map((p, idx) => idx === i ? { ...p, category: cat } : p);
+    });
   };
-  const removePhoto = (i) => setPhotos((prev) => prev.filter((_, idx) => idx !== i));
-  const setPhotoCategory = (i, cat) => setPhotos((prev) => prev.map((p, idx) => idx === i ? { ...p, category: cat } : p));
-  const handleVideoUpload = (e) => {
-    const file = e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!accepts(file, VIDEO_MIME_RE, MAX_VIDEO_BYTES)) { setError('video', 'Video must be MP4/WebM/MOV under 25 MB.'); return; }
-    clearError('video');
-    const reader = new FileReader();
-    reader.onload = (evt) => { setVideo(evt.target.result); setVideoName(file.name); };
-    reader.readAsDataURL(file);
-  };
-  const handleDocUpload = (key, e) => {
-    const file = e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
-    if (!accepts(file, DOC_MIME_RE, MAX_DOC_BYTES)) { setError(key, 'Document must be a PDF or image under 3 MB.'); return; }
-    clearError(key);
-    const reader = new FileReader();
-    reader.onload = (evt) => setDocuments((prev) => ({ ...prev, [key]: { name: file.name, data: evt.target.result, size: file.size, mime: file.type || '' } }));
-    reader.readAsDataURL(file);
+  const resetMedia = () => {
+    operation.current?.abort();
+    operation.current = null;
+    previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
+    previewUrls.current.clear();
+    setPhotos([]);
+    setVideo(null);
+    setVideoName('');
+    setMediaStatus('');
   };
 
   return {
     photos, setPhotos,
     video, setVideo,
     videoName, setVideoName,
-    documents, setDocuments,
-    handlePhotoUpload, removePhoto, setPhotoCategory, handleVideoUpload, handleDocUpload,
+    mediaStatus, isMediaBusy: !!mediaStatus, isMediaProcessing: () => !!operation.current, maxPhotos,
+    handlePhotoUpload, removePhoto, setPhotoCategory, retryPhoto, resetMedia,
   };
 }

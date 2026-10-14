@@ -1,43 +1,11 @@
-/**
- * Vite plugin: compiles the help centre's Markdown source into a single virtual
- * module at build time.
- *
- * Why build-time rather than runtime:
- *   - No Markdown parser ships to the browser. `marked` is a devDependency; the
- *     client receives finished HTML strings and metadata only.
- *   - Headings, the search index and prev/next ordering are all derived once,
- *     during the build, instead of on every page view.
- *
- * Authors write plain `.md` files under src/content/help/<category>/, with YAML-ish
- * frontmatter. Everything else — slugs, anchors, table of contents, section
- * grouping — is derived from the file and its frontmatter.
- *
- * Translations: a file named `<slug>.hi.md` or `<slug>.mr.md` beside the English
- * `<slug>.md` supplies that language's version of the same article. English is
- * canonical — it defines which articles exist, their category and their ordering
- * — so a missing translation degrades to the English body rather than to a 404.
- * The reader is told when that happens; see HelpArticle.jsx.
- *
- * Consumers import the virtual module:
- *
- *     import { sections, categories, articles, translations, changelog } from 'virtual:help-content';
- *
- * Security note: article HTML is rendered with dangerouslySetInnerHTML on the
- * client. The content is authored in-repo and compiled at build time, so it is
- * trusted — but raw HTML inside Markdown is deliberately dropped (see the
- * renderer overrides below) so that pasting untrusted text into a doc can never
- * introduce a script tag.
- */
 
-import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from 'node:fs';
-import { join, relative, resolve, sep } from 'node:path';
+import { readFileSync, readdirSync, statSync, existsSync, writeFileSync, mkdirSync } from 'node:fs';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { Marked } from 'marked';
+import { esc, headTags, jsonLd, renderPage } from './seo-html.mjs';
 
 const VIRTUAL_ID = 'virtual:help-content';
 const RESOLVED_ID = '\0' + VIRTUAL_ID;
-
-/** Languages an article may be translated into. English is the canonical source. */
-const LANGS = ['hi', 'mr'];
 
 /* GitHub-style callouts: > [!NOTE] / [!TIP] / [!WARNING] / [!IMPORTANT] */
 const CALLOUTS = {
@@ -47,16 +15,7 @@ const CALLOUTS = {
   IMPORTANT: { icon: 'shield-check', label: 'Important' },
 };
 
-/* Heading slugs.
- *
- * The character class deliberately keeps Devanagari (U+0900–U+097F) alongside
- * ASCII. Stripping to [a-z0-9] silently reduced every Hindi and Marathi heading
- * to an empty string, so a translated article's table of contents anchored to
- * "", "-2", "-3" and no heading link worked. Fragment identifiers are allowed to
- * carry non-ASCII — browsers percent-encode them in the address bar and
- * getElementById matches the raw string — so keeping the script is both simpler
- * and more useful than transliterating. */
-const SLUG_KEEP = /[^a-z0-9\u0900-\u097F]+/g;
+const SLUG_KEEP = /[^a-z0-9]+/g;
 
 function slugify(s) {
   return String(s)
@@ -65,8 +24,6 @@ function slugify(s) {
     // Drop apostrophes rather than turning them into separators, so "owner's"
     // becomes `owners` and not `owner-s`.
     .replace(/['’‘]/g, '')
-    // Devanagari danda and double danda are sentence punctuation, not letters.
-    .replace(/[।॥]/g, ' ')
     .replace(SLUG_KEEP, '-')
     .replace(/(^-|-$)/g, '');
 }
@@ -77,9 +34,8 @@ const NAMED_ENTITIES = {
   lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”',
 };
 
-/* Marked escapes text for HTML output, so the derived plain text (used for the
-   table of contents, heading anchors and the search haystack) has to be decoded
-   again — otherwise a heading reads "I&#39;m" and anchors to `i-39-m`. */
+/* Marked escapes text for HTML output, so the derived plain text has to be decoded again —
+   otherwise a heading reads "I&#39;m" and anchors to `i-39-m`. */
 function decodeEntities(s) {
   return s
     .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
@@ -87,12 +43,9 @@ function decodeEntities(s) {
     .replace(/&([a-z]+);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()] ?? m);
 }
 
-/**
- * Minimal frontmatter reader. Supports `key: value`, quoted strings, booleans,
- * numbers and inline `[a, b]` arrays — the subset the help content actually uses.
- * A full YAML parser would be another dependency for no gain.
- */
-function parseFrontmatter(raw) {
+/* Supports only the frontmatter subset the help content uses; a full YAML parser would be
+   another dependency for no gain. */
+export function parseFrontmatter(raw) {
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) return { data: {}, body: raw };
 
@@ -121,7 +74,7 @@ function parseFrontmatter(raw) {
 }
 
 /** Strip HTML tags, decode entities and collapse whitespace — the search haystack. */
-function toPlainText(html) {
+export function toPlainText(html) {
   return decodeEntities(
     html
       .replace(/<pre[\s\S]*?<\/pre>/g, ' ')
@@ -131,11 +84,8 @@ function toPlainText(html) {
     .trim();
 }
 
-/**
- * Build a Marked instance that collects headings and rewrites blockquote
- * callouts. A fresh instance per file keeps the heading collector isolated.
- */
-function createRenderer(headings) {
+/* A fresh Marked instance per file keeps the heading collector isolated. */
+export function createRenderer(headings) {
   const marked = new Marked({ gfm: true, breaks: false });
   const seen = new Map();
 
@@ -162,13 +112,10 @@ function createRenderer(headings) {
         return `<div class="doc-callout doc-callout--${kind.toLowerCase()}" data-icon="${icon}">`
           + `<p class="doc-callout__label">${label}</p>${body}</div>\n`;
       },
-      // Raw HTML in Markdown is dropped rather than passed through — see the
-      // security note at the top of this file.
+      // Raw HTML in Markdown is dropped so pasted untrusted text can never introduce a script tag.
       html() { return ''; },
-      // marked v15 removed its built-in sanitizer, so an unguarded `[x](javascript:…)`
-      // in any article (including a translation contributed under a narrower review
-      // bar) would render a live script-executing anchor. Allowlist the schemes a
-      // help article can legitimately need; anything else becomes an inert '#'.
+      // marked v15 removed its built-in sanitizer, so an unguarded `[x](javascript:…)` would render
+      // a live script-executing anchor. Anything outside the allowlist becomes an inert '#'.
       link({ href, title, tokens }) {
         const text = this.parser.parseInline(tokens);
         const safe = /^(https?:|mailto:|tel:|\/|#)/i.test(href || '') ? href : '#';
@@ -198,28 +145,11 @@ function compileMarkdown(full, rel) {
   return { data, html, text, headings, rel };
 }
 
-/**
- * Compile every article, keyed by language.
- *
- * English defines the article set. A `<slug>.<lang>.md` sibling contributes only
- * the translatable surface — title, summary, body, headings — while category,
- * ordering, access and audience always come from the English file, so a
- * translation can never move an article into a different section or expose a
- * staff runbook publicly by getting its frontmatter wrong.
- */
 function compileArticles(contentDir) {
-  const files = walkMarkdown(contentDir);
   const articles = [];
-  const translations = Object.fromEntries(LANGS.map((l) => [l, {}]));
+  const baseSlug = (rel) => rel.replace(/\.md$/, '').split('/').pop();
 
-  const langOf = (rel) => {
-    const m = rel.match(/\.([a-z]{2})\.md$/);
-    return m && LANGS.includes(m[1]) ? m[1] : null;
-  };
-  const baseSlug = (rel) => rel.replace(/(\.[a-z]{2})?\.md$/, '').split('/').pop();
-
-  for (const { full, rel } of files) {
-    if (langOf(rel)) continue; // handled in the second pass
+  for (const { full, rel } of walkMarkdown(contentDir)) {
     const { data, html, text, headings } = compileMarkdown(full, rel);
     const fileSlug = baseSlug(rel);
     const dirCategory = rel.includes('/') ? rel.split('/')[0] : 'general';
@@ -236,38 +166,33 @@ function compileArticles(contentDir) {
       readMinutes: Math.max(1, Math.round(text.split(' ').length / 200)),
       featured: data.featured === true,
       tags: Array.isArray(data.tags) ? data.tags : [],
+      modules: Array.isArray(data.modules) ? data.modules : [],
       headings,
       html,
       text: text.slice(0, 4000),
     });
   }
 
-  const bySlug = new Map(articles.map((a) => [a.slug, a]));
-
-  for (const { full, rel } of files) {
-    const lang = langOf(rel);
-    if (!lang) continue;
-    const slug = baseSlug(rel);
-    const english = bySlug.get(slug);
-    if (!english) {
-      throw new Error(`help content: ${rel} translates "${slug}", which has no English source.`);
-    }
-    const { data, html, text, headings } = compileMarkdown(full, rel);
-    translations[lang][slug] = {
-      title: data.title || english.title,
-      summary: data.summary || text.slice(0, 160),
-      // Tags feed search, so translated tags let a Marathi reader find the
-      // article using Marathi words rather than only the English ones.
-      tags: Array.isArray(data.tags) ? data.tags : english.tags,
-      readMinutes: Math.max(1, Math.round(text.split(' ').length / 200)),
-      headings,
-      html,
-      text: text.slice(0, 4000),
-    };
-  }
-
   articles.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
-  return { articles, translations };
+  return articles;
+}
+
+/* Access is inherited downwards — a staff category makes its articles staff, a staff section its
+   categories — because this flag decides whether the text ships in the public bundle at all. */
+function splitByAccess({ sections, categories, articles }) {
+  const staffSections = new Set(sections.filter((s) => s.access === 'staff').map((s) => s.id));
+  const categoryIsStaff = (c) => c.access === 'staff' || staffSections.has(c.section);
+  const staffCategories = new Set(categories.filter(categoryIsStaff).map((c) => c.id));
+  const articleIsStaff = (a) => a.access === 'staff' || staffCategories.has(a.category);
+
+  const side = (staff) => {
+    return {
+      sections: sections.filter((s) => staffSections.has(s.id) === staff),
+      categories: categories.filter((c) => categoryIsStaff(c) === staff),
+      articles: articles.filter((a) => articleIsStaff(a) === staff),
+    };
+  };
+  return { open: side(false), staff: side(true) };
 }
 
 function compileChangelog(file) {
@@ -297,9 +222,97 @@ function loadTaxonomy(file) {
   };
 }
 
-/**
- * @param {{ root?: string, siteUrl?: string }} [options]
- */
+const crumbs = (siteUrl, trail) => ({
+  '@type': 'BreadcrumbList',
+  itemListElement: trail.map(([name, path], i) => ({ '@type': 'ListItem', position: i + 1, name, item: `${siteUrl}${path}` })),
+});
+
+/* Titles and descriptions mirror src/components/help/HelpLayout.jsx and the help pages, so a
+   prerendered head matches what the app sets after in-app navigation. */
+export function helpPages({ sections, categories, articles, changelog }, copy, siteUrl) {
+  const pageTitle = (title) => (title ? `${title} · Draazy ${copy.centre}` : `Draazy ${copy.centre}`);
+  const org = { '@id': `${siteUrl}/#organization` };
+  const link = (path, text) => `<a href="${path}">${esc(text)}</a>`;
+  const page = (path, { title, description, type = 'website', schema, body }) => ({
+    path,
+    head: headTags({
+      title: pageTitle(title),
+      description,
+      url: `${siteUrl}${path}`,
+      image: `${siteUrl}/og-image.jpg`,
+      type,
+      extra: schema ? [jsonLd({ '@context': 'https://schema.org', ...schema })] : [],
+    }),
+    body: `<main class="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 sm:py-10">\n${body}\n</main>`,
+  });
+  const intro = (h1, text) => `<h1 class="text-xl font-extrabold text-white sm:text-2xl">${esc(h1)}</h1>\n<p class="mt-1.5 text-sm leading-relaxed text-gray-400">${esc(text)}</p>`;
+  const helpCrumb = [copy.centre, '/help'];
+
+  return [
+    page('/help', {
+      description: copy.heroSubtitle,
+      body: `${intro(copy.heroTitle, copy.heroSubtitle)}\n${sections.map((s) => {
+        const cats = categories.filter((c) => c.section === s.id);
+        return `<section class="mt-8"><h2 class="text-lg font-bold text-white">${esc(s.title)}</h2><ul>${cats.map((c) => `<li>${link(`/help/c/${c.id}`, c.title)}: ${esc(c.description || '')}</li>`).join('')}</ul></section>`;
+      }).join('\n')}\n<p class="mt-8">${link('/help/faq', copy.faqTitle)} · ${link('/help/changelog', copy.changelogTitle)}</p>`,
+    }),
+    page('/help/faq', {
+      title: copy.faq,
+      description: copy.faqSubtitle,
+      body: `${intro(copy.faqTitle, copy.faqSubtitle)}\n<p class="mt-6">${link('/help', copy.centre)}</p>`,
+    }),
+    page('/help/changelog', {
+      title: copy.changelogTitle,
+      description: copy.changelogSubtitle,
+      body: `${intro(copy.changelogTitle, copy.changelogSubtitle)}\n${changelog.map((e) => `<section class="mt-10"><h2 class="text-lg font-bold text-white">${esc(e.version)}${e.date ? ` — ${esc(e.date)}` : ''}</h2><div class="doc-prose mt-3">${e.html}</div></section>`).join('\n')}`,
+    }),
+    ...categories.map((c) => {
+      const list = articles.filter((a) => a.category === c.id);
+      return page(`/help/c/${c.id}`, {
+        title: c.title,
+        description: c.description || `${c.title} — ${copy.centre}`,
+        schema: crumbs(siteUrl, [helpCrumb, [c.title, `/help/c/${c.id}`]]),
+        body: `<nav aria-label="Breadcrumb" class="mb-4 text-xs text-gray-500">${link('/help', copy.centre)}</nav>\n${intro(c.title, c.description || '')}\n<ul class="mt-6">${list.map((a) => `<li>${link(`/help/a/${a.slug}`, a.title)}: ${esc(a.summary)}</li>`).join('')}</ul>`,
+      });
+    }),
+    ...articles.map((a) => {
+      const c = categories.find((x) => x.id === a.category);
+      const path = `/help/a/${a.slug}`;
+      return page(path, {
+        title: a.title,
+        description: a.summary,
+        type: 'article',
+        schema: {
+          '@graph': [
+            {
+              '@type': 'Article',
+              headline: a.title,
+              description: a.summary,
+              url: `${siteUrl}${path}`,
+              mainEntityOfPage: `${siteUrl}${path}`,
+              inLanguage: 'en-IN',
+              author: org,
+              publisher: org,
+              ...(a.updated && { dateModified: a.updated }),
+            },
+            crumbs(siteUrl, [helpCrumb, [c.title, `/help/c/${c.id}`], [a.title, path]]),
+          ],
+        },
+        body: `<nav aria-label="Breadcrumb" class="mb-4 text-xs text-gray-500">${link('/help', copy.centre)} › ${link(`/help/c/${c.id}`, c.title)}</nav>\n<article>\n${intro(a.title, a.summary)}\n<div class="doc-prose mt-7">${a.html}</div>\n</article>`,
+      });
+    }),
+  ];
+}
+
+/* Staff runbooks never enter the public bundle: `scripts/gen-staff-help.mjs` writes this to the backend,
+   which serves it to back-office roles only. */
+export function compileStaffHelp(root) {
+  const contentDir = join(root, 'src/content/help');
+  const { sections, categories } = loadTaxonomy(join(contentDir, 'categories.json'));
+  return splitByAccess({ sections, categories, articles: compileArticles(contentDir) }).staff;
+}
+
+/** @param {{ root?: string, siteUrl?: string }} [options] */
 export default function helpContentPlugin(options = {}) {
   const root = options.root || process.cwd();
   const siteUrl = (options.siteUrl || 'https://draazy.com').replace(/\/$/, '');
@@ -312,97 +325,73 @@ export default function helpContentPlugin(options = {}) {
 
   const build = () => {
     const { sections, categories } = loadTaxonomy(categoriesFile);
-    const { articles, translations } = compileArticles(contentDir);
-    const changelog = compileChangelog(changelogFile);
-    return `export const sections = ${JSON.stringify(sections)};\n`
-      + `export const categories = ${JSON.stringify(categories)};\n`
-      + `export const articles = ${JSON.stringify(articles)};\n`
-      + `export const translations = ${JSON.stringify(translations)};\n`
-      + `export const changelog = ${JSON.stringify(changelog)};\n`;
+    const articles = compileArticles(contentDir);
+    const open = splitByAccess({ sections, categories, articles }).open;
+    return `export const sections = ${JSON.stringify(open.sections)};\n`
+      + `export const categories = ${JSON.stringify(open.categories)};\n`
+      + `export const articles = ${JSON.stringify(open.articles)};\n`
+      + `export const changelog = ${JSON.stringify(compileChangelog(changelogFile))};\n`;
   };
 
   return {
     name: 'vite-plugin-help-content',
     configResolved(config) { outDir = resolve(root, config.build?.outDir || 'dist'); },
     configureServer(s) { server = s; },
-    resolveId(id) { return id === VIRTUAL_ID ? RESOLVED_ID : null; },
-    load(id) { return id === RESOLVED_ID ? build() : null; },
+    resolveId(id) {
+      return id === VIRTUAL_ID ? RESOLVED_ID : null;
+    },
+    load(id) {
+      return id === RESOLVED_ID ? build() : null;
+    },
     /* Editing a doc invalidates the virtual module so the dev server hot-reloads
        the compiled output instead of requiring a restart. */
     handleHotUpdate(ctx) {
       const changed = ctx.file.replace(/\\/g, '/');
       if (!changed.includes('/src/content/')) return;
       const mod = server?.moduleGraph.getModuleById(RESOLVED_ID);
-      if (mod) {
-        server.moduleGraph.invalidateModule(mod);
-        server.ws.send({ type: 'full-reload' });
-      }
+      if (mod) server.moduleGraph.invalidateModule(mod);
+      server?.ws.send({ type: 'full-reload' });
       return [];
     },
-    /* Help articles are public and worth indexing, and a hand-maintained sitemap
-       would drift the moment anyone adds a doc. Inject the public URLs into the
-       static sitemap after it has been copied to the output directory.
-
-       Each entry carries xhtml:link alternates so a crawler treats the three
-       language URLs as translations rather than duplicates. A language is only
-       listed for an article that genuinely has a translation — advertising
-       /mr/help/a/x when it serves English is a duplicate-content signal, and
-       the opposite of what hreflang is for. */
+    /* Runs after Vite writes dist/index.html and copies the static sitemap. */
     writeBundle() {
+      const { sections, categories } = loadTaxonomy(categoriesFile);
+      const open = splitByAccess({ sections, categories, articles: compileArticles(contentDir) }).open;
+      const publicCategoryIds = new Set(open.categories.map((c) => c.id));
+      const articles = open.articles.filter((a) => publicCategoryIds.has(a.category));
+
+      const shell = readFileSync(join(outDir, 'index.html'), 'utf-8');
+      const { help: copy } = JSON.parse(readFileSync(join(root, 'src/i18n/locales/en/help.json'), 'utf-8'));
+      const pages = helpPages({ ...open, articles, changelog: compileChangelog(changelogFile) }, copy, siteUrl);
+      for (const { path, head, body } of pages) {
+        const file = join(outDir, `${path.slice(1)}.html`);
+        mkdirSync(dirname(file), { recursive: true });
+        writeFileSync(file, renderPage(shell, head, body), 'utf-8');
+      }
+
       const sitemap = join(outDir, 'sitemap.xml');
       if (!existsSync(sitemap)) return;
+      const entry = (path, { changefreq, priority, lastmod }) => [
+        '  <url>',
+        `    <loc>${siteUrl}${path}</loc>`,
+        lastmod ? `    <lastmod>${lastmod}</lastmod>` : null,
+        `    <changefreq>${changefreq}</changefreq>`,
+        `    <priority>${priority}</priority>`,
+        '  </url>',
+      ].filter(Boolean).join('\n');
 
-      const { categories } = loadTaxonomy(categoriesFile);
-      const { articles, translations } = compileArticles(contentDir);
-      const publicCategories = categories.filter((c) => c.access !== 'staff');
-      const publicCategoryIds = new Set(publicCategories.map((c) => c.id));
-      const prefixOf = (lang) => (lang === 'en' ? '' : `/${lang}`);
-
-      /** One <url> per language, each listing every language as an alternate. */
-      const entriesFor = (path, langs, { changefreq, priority, lastmod }) => {
-        const alternates = langs
-          .map((l) => `    <xhtml:link rel="alternate" hreflang="${l}" href="${siteUrl}${prefixOf(l)}${path}"/>`)
-          .concat(`    <xhtml:link rel="alternate" hreflang="x-default" href="${siteUrl}${path}"/>`)
-          .join('\n');
-        return langs.map((l) => [
-          '  <url>',
-          `    <loc>${siteUrl}${prefixOf(l)}${path}</loc>`,
-          lastmod ? `    <lastmod>${lastmod}</lastmod>` : null,
-          `    <changefreq>${changefreq}</changefreq>`,
-          `    <priority>${priority}</priority>`,
-          alternates,
-          '  </url>',
-        ].filter(Boolean).join('\n'));
-      };
-
-      const allLangs = ['en', ...LANGS];
       const urls = [
-        // Chrome pages are fully translated, so all three languages are listed.
-        ...entriesFor('/help', allLangs, { changefreq: 'weekly', priority: '0.7' }),
-        ...entriesFor('/help/faq', allLangs, { changefreq: 'weekly', priority: '0.6' }),
-        // Release notes stay English-only by design; see HelpChangelog.jsx.
-        ...entriesFor('/help/changelog', ['en'], { changefreq: 'weekly', priority: '0.4' }),
-        ...publicCategories.flatMap((c) =>
-          entriesFor(`/help/c/${c.id}`, allLangs, { changefreq: 'weekly', priority: '0.6' })),
-        ...articles
-          .filter((a) => a.access !== 'staff' && publicCategoryIds.has(a.category))
-          .flatMap((a) => entriesFor(
-            `/help/a/${a.slug}`,
-            ['en', ...LANGS.filter((l) => translations[l]?.[a.slug])],
-            { changefreq: 'monthly', priority: '0.5', lastmod: a.updated },
-          )),
+        entry('/help', { changefreq: 'weekly', priority: '0.7' }),
+        entry('/help/faq', { changefreq: 'weekly', priority: '0.6' }),
+        entry('/help/changelog', { changefreq: 'weekly', priority: '0.4' }),
+        ...open.categories.map((c) => entry(`/help/c/${c.id}`, { changefreq: 'weekly', priority: '0.6' })),
+        ...articles.map((a) => entry(`/help/a/${a.slug}`, { changefreq: 'monthly', priority: '0.5', lastmod: a.updated })),
       ];
 
       const xml = readFileSync(sitemap, 'utf-8');
       if (xml.includes('/help/a/')) return; // already injected
 
-      // hreflang alternates live in the xhtml namespace, which the existing
-      // static sitemap does not declare.
-      const withNs = xml.includes('xmlns:xhtml')
-        ? xml
-        : xml.replace('<urlset ', '<urlset xmlns:xhtml="http://www.w3.org/1999/xhtml" ');
-
-      writeFileSync(sitemap, withNs.replace('</urlset>', `${urls.join('\n')}\n</urlset>`), 'utf-8');
+      writeFileSync(sitemap, xml.replace('</urlset>', `${urls.join('\n')}\n</urlset>`), 'utf-8');
     },
   };
 }

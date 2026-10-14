@@ -1,23 +1,24 @@
-/**
- * HTTP client for the live Draazy API — the only `fetch` in the service layer.
- * Transport contract and the reasoning behind it: docs/system/frontend-data-seam.md
- */
+// The only `fetch` in the service layer. Transport contract and the reasoning behind it:
+// docs/system/frontend-data-seam.md
 import { API_BASE } from './config.js';
 import {
-  localStorageWritable, logoutUser, readAccessToken, sessionRemembered, writeTokens,
+  isInternal, localStorageWritable, logoutUser, readAccessToken, readUser, sessionRemembered, writeTokens,
 } from '../lib/auth.js';
+import { deviceId } from '../lib/deviceId.js';
 
 const TRACE_HEADER = 'X-Trace-Id';
+/** Opaque id of the build that answered. Set by the backend's `BuildStampFilter`. */
+const BUILD_HEADER = 'X-Draazy-Build';
 const REFRESH_PATH = '/auth/refresh';
+// Sign-in, refresh, referral and refund calls only: the id is a fraud signal, so the rest of the API never sees it.
+const DEVICE_ID_PATH = /^\/(auth\/|referrals\/|me\/referrals|me\/payments)/;
 /** Name of the cross-tab Web Lock that serialises token refreshes. */
 const REFRESH_LOCK = 'draazy:auth-refresh';
 
-/**
- * A failed API call, normalised. Branch on `code`, the backend's stable machine-readable string —
- * never on `message`, which is human-facing and may be reworded at any time.
- */
+// Branch on `code`, the backend's stable machine-readable string — never on `message`, which is
+// human-facing and may be reworded at any time.
 export class ApiError extends Error {
-  constructor({ code, message, status, traceId, fields, attemptsRemaining, retryAfterSeconds }) {
+  constructor({ code, message, status, traceId, fields, attemptsRemaining, retryAfterSeconds, reason }) {
     super(message || code || `HTTP ${status}`);
     this.name = 'ApiError';
     this.code = code || null;
@@ -31,6 +32,8 @@ export class ApiError extends Error {
     /** The *remaining* wait a rate-limited response reports; `null` on every other status. */
     this.retryAfterSeconds =
       Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0 ? retryAfterSeconds : null;
+    /** The sub-code a 422 adds beside `code`, e.g. why a refund is not eligible. */
+    this.reason = typeof reason === 'string' ? reason : null;
   }
 
   /** True when the failure was a validation rejection, so a form can map `fields` onto inputs. */
@@ -48,45 +51,148 @@ export class NetworkError extends Error {
   }
 }
 
-/**
- * True for the rejection `fetch` produces when its `AbortSignal` fires — never a failure.
- * Why it must not reach the reachability observer: docs/system/frontend-data-seam.md
- */
+// True for the rejection `fetch` produces when its `AbortSignal` fires — never a failure. Why it
+// must not reach the reachability observer: docs/system/frontend-data-seam.md
 export const isAbort = (err) => err?.name === 'AbortError';
 
 /** The single reachability listener, or null when nobody is watching. @see observeReachability */
 let reachabilityObserver = null;
 
-/**
- * Watch whether requests reach the server: one listener, called once per HTTP attempt.
- * Contract (a 500 counts as "answered") and why it is an inversion: docs/system/frontend-data-seam.md
- */
+// One listener, called once per HTTP attempt. Contract (a 500 counts as "answered") and why it is
+// an inversion: docs/system/frontend-data-seam.md
 export function observeReachability(fn) {
   reachabilityObserver = fn;
 }
 
-/**
- * Perform an API request. Opts: `method`, `body`, `query`, `headers`, `auth`, `withStatus`, `signal`.
- * Their exact semantics, and what `withStatus` is for: docs/system/frontend-data-seam.md
- */
+/** The single build-stamp listener, or null when nobody is watching. @see observeBuildStamp */
+let buildStampObserver = null;
+
+// Called once per HTTP attempt with `X-Draazy-Build`, or `null`. Inverted like
+// `observeReachability`: importing the consumer here would reinstate the provider import cycle.
+export function observeBuildStamp(fn) {
+  buildStampObserver = fn;
+}
+
+let lastBuild = null;
+let failedTraceId = null;
+/** Build id of the last response that carried one, for crash reports. */
+export const lastBuildStamp = () => lastBuild;
+/** Trace id of the last 5xx response, so a crash report can be matched to a server log line. */
+export const lastFailedTraceId = () => failedTraceId;
+
+// Opts: `method`, `body`, `query`, `headers`, `auth`, `withStatus`, `signal`. Their exact
+// semantics, and what `withStatus` is for: docs/system/frontend-data-seam.md
 export async function request(path, opts = {}) {
+  try {
+    return await exchange(path, opts);
+  } finally {
+    // A refused write (409, 404…) usually means client and server state diverged, so the re-read
+    // that recovers from it must not be served from the cache either.
+    if ((opts.method ?? 'GET') !== 'GET' && !opts.keepReads) clearReads();
+  }
+}
+
+async function exchange(path, opts) {
   const { auth = true, withStatus = false } = opts;
   const res = await send(path, opts, auth ? readAccessToken() : null);
 
-  // An expired access token is the expected steady state: refresh and replay once. The path and
-  // token guards keep this off `/auth/refresh` itself — see docs/flows/consumer/auth.md.
-  if (res.status === 401 && auth && path !== REFRESH_PATH && readAccessToken()) {
+  // Refresh and replay once (never for `/auth/refresh` itself: docs/flows/consumer/auth.md). A wrong-code
+  // 401 carries `attemptsRemaining` and is not replayed, since that would spend a second guess.
+  if (res.status === 401 && auth && path !== REFRESH_PATH && readAccessToken() && !(await isWrongCode(res))) {
     const token = await refreshAccessToken();
     if (token) return toResult(await send(path, opts, token), withStatus);
     // Reached only when the server actually refused; an unreachable server throws instead, so this
     // sign-out always follows an answer rather than the absence of one.
-    logoutUser();
+    endSession();
   }
 
   return toResult(res, withStatus);
 }
 
-export const get = (path, query, opts) => request(path, { ...opts, method: 'GET', query });
+// Concurrent identical reads share one fetch; `ttl` (ms) keeps a result, and a primed seed until its first reader.
+// Any write drops everything, so a read after a write is never stale.
+const reads = new Map();
+// Bumped on every clear, so a read that was in flight across a write is not kept as fresh.
+let readGeneration = 0;
+function clearReads() {
+  reads.clear();
+  readGeneration += 1;
+}
+
+function endSession() {
+  clearReads();
+  logoutUser();
+}
+
+// Registered at module load, so it runs before every listener that re-reads on this signal.
+globalThis.addEventListener?.('draazy-settings-change', clearReads);
+
+const readKey = (path, query, auth = true) =>
+  `${auth ? readAccessToken() ?? '' : ''} ${path}${buildQuery(query)}`;
+
+function forget(key, entry) {
+  if (reads.get(key) === entry) reads.delete(key);
+}
+
+function track(key, promise, { ttl = 0, once = false } = {}) {
+  const entry = { until: Infinity, once };
+  const generation = readGeneration;
+  entry.promise = promise.then(
+    (data) => {
+      entry.settled = true;
+      if (ttl > 0 && !entry.taken && generation === readGeneration) entry.until = Date.now() + ttl;
+      else forget(key, entry);
+      return data;
+    },
+    (err) => { forget(key, entry); throw err; },
+  );
+  reads.set(key, entry);
+  return entry;
+}
+
+// The shared fetch carries no caller's signal, so one caller aborting cannot fail the others.
+function abortable(promise, signal) {
+  if (!signal) return promise;
+  const aborted = () => new DOMException('The operation was aborted.', 'AbortError');
+  if (signal.aborted) return Promise.reject(aborted());
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(aborted());
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+  });
+}
+
+export function get(path, query, opts = {}) {
+  const { ttl, signal, ...rest } = opts;
+  if (rest.withStatus || rest.headers) return request(path, { ...rest, method: 'GET', query, signal });
+  const key = readKey(path, query, rest.auth);
+  const hit = reads.get(key);
+  if (!hit || hit.until <= Date.now()) {
+    return abortable(track(key, request(path, { ...rest, method: 'GET', query }), { ttl }).promise, signal);
+  }
+  hit.read = true;
+  if (hit.once) {
+    hit.taken = true;
+    if (hit.settled) forget(key, hit);
+  }
+  return abortable(hit.promise, signal);
+}
+
+// Long enough to absorb the reads a page's panels repeat while mounting; any write clears it first.
+export const PAGE_LOAD_TTL = 5_000;
+// Matches the server's public-read cache TTL (`draazy.cache.public-reads.ttl`), so a repeat visit costs no request.
+export const PUBLIC_READ_TTL = 30_000;
+
+// Seeds the read `get(path, query)` would make with a value fetched elsewhere; a null or failed seed falls back.
+// An unread seed is dropped so the next `get` can surface its own error; without `ttl` it is single-use.
+export function prime(path, query, value, { ttl } = {}) {
+  let entry;
+  const fallback = () => (entry.read
+    ? request(path, { method: 'GET', query })
+    : Promise.reject(new Error('unread seed')));
+  entry = track(readKey(path, query), value.then((data) => data ?? fallback(), fallback), ttl ? { ttl } : { ttl: 10_000, once: true });
+  entry.promise.catch(() => {});
+}
 export const post = (path, body, opts) => request(path, { ...opts, method: 'POST', body });
 export const patch = (path, body, opts) => request(path, { ...opts, method: 'PATCH', body });
 // PUT carries no body on the endpoints that use it so far (`/me/saved/{id}` is an idempotent
@@ -94,16 +200,25 @@ export const patch = (path, body, opts) => request(path, { ...opts, method: 'PAT
 export const put = (path, body, opts) => request(path, { ...opts, method: 'PUT', body });
 export const del = (path, opts) => request(path, { ...opts, method: 'DELETE' });
 
-/**
- * POST a `multipart/form-data` body — the one content type the JSON path above cannot carry.
- * Why it is a thin sibling of {@link post} rather than a branch: docs/system/frontend-data-seam.md
- */
+// The one content type the JSON path above cannot carry. Why it is a thin sibling of `post` rather
+// than a branch: docs/system/frontend-data-seam.md
 export const postMultipart = (path, form, opts) => request(path, { ...opts, method: 'POST', body: form });
 
-/**
- * Read a `PageEnvelope` response into the shape the seam uses — one place to be wrong.
- * Field precedence (never fall back to the requested page): docs/system/frontend-data-seam.md
- */
+export async function openEventStream(path, { onEvent, onOpen, signal } = {}) {
+  let res = await stream(path, readAccessToken(), signal);
+  if (res.status === 401 && readAccessToken()) {
+    const token = await refreshAccessToken();
+    if (token) res = await stream(path, token, signal);
+    else endSession();
+  }
+  if (!res.ok) return toResult(res);
+  onOpen?.();
+  await readEventStream(res.body, onEvent);
+  return null;
+}
+
+// Read a `PageEnvelope` into the shape the seam uses — one place to be wrong. Field precedence
+// (never fall back to the requested page): docs/system/frontend-data-seam.md
 export function unwrapPage(res, requested = {}) {
   // A bare array is a legitimate response from the endpoints that are deliberately unpaged
   // (bounded reads, e.g. a property's reviews), so normalise rather than treating it as malformed.
@@ -119,16 +234,12 @@ export function unwrapPage(res, requested = {}) {
   };
 }
 
-/**
- * Re-exported so existing importers keep working; the value itself lives in `./apiLimits.js`,
- * outside the provider import cycle. New provider code imports it from there — see that header.
- */
+// Re-exported so existing importers keep working; the value lives in `./apiLimits.js`, outside the
+// provider import cycle. New provider code imports it from there.
 export { MAX_PAGE_SIZE } from './apiLimits.js';
 
-/**
- * Read a paged endpoint that the UI consumes as a plain list, and say so out loud when it overflows.
- * Why `?size=100` is honest and why the warning names the caller: docs/system/frontend-data-seam.md
- */
+// Read a paged endpoint the UI consumes as a plain list, saying so out loud when it overflows. Why
+// `?size=100` is honest and why the warning names the caller: docs/system/frontend-data-seam.md
 export function unwrapFullPage(res, label) {
   if (Array.isArray(res)) return res;
   const rows = res?.content ?? [];
@@ -142,10 +253,19 @@ export function unwrapFullPage(res, label) {
   return rows;
 }
 
-// ─── Internals ────────────────────────────────────────────────────────────────────────────────
-
 /** True for a `multipart/form-data` body: the platform owns its `Content-Type` (boundary and all). */
 const isFormData = (body) => typeof FormData !== 'undefined' && body instanceof FormData;
+
+// index.html starts `GET /bootstrap` (and `/me/bootstrap` when a token is stored) before the bundle loads; the
+// first read of each takes that response once, if sent with the same token. Staff revalidate, so they never do.
+const EARLY_READS = { '/bootstrap': '__dzBootstrap', '/me/bootstrap': '__dzMeBootstrap' };
+function takeEarlyRead(url, token) {
+  const name = EARLY_READS[url];
+  const early = name && globalThis[name];
+  if (!early) return null;
+  globalThis[name] = undefined;
+  return !isInternal(readUser()) && (early.token || null) === (token || null) ? early : null;
+}
 
 async function send(path, { method = 'GET', body, query, headers: extra, signal }, token) {
   const headers = { Accept: 'application/json' };
@@ -155,30 +275,104 @@ async function send(path, { method = 'GET', body, query, headers: extra, signal 
   // Caller headers are merged *before* Authorization, so a stray `Authorization` in `extra` cannot
   // displace the real session token — the one header that must never be a per-call decision.
   if (extra) Object.assign(headers, extra);
+  if (DEVICE_ID_PATH.test(path)) headers['X-Device-Id'] = deviceId();
   if (token) headers.Authorization = `Bearer ${token}`;
 
   try {
-    const res = await fetch(API_BASE + path + buildQuery(query), {
+    const early = method === 'GET' ? takeEarlyRead(path + buildQuery(query), token) : null;
+    const res = (early && await early) || await fetch(API_BASE + path + buildQuery(query), {
       method,
       headers,
       // The refresh token rides an HttpOnly cookie. Same-origin this is a no-op; it earns its place
       // only in the cross-origin `VITE_API_BASE` deployment — docs/system/frontend-data-seam.md.
       credentials: 'include',
+      // Staff revalidate every read, so an editor never sees the anonymous-visitor cache;
+      // consumers accept its few seconds: PublicReadCacheFilter.java, docs/system/cross-cutting.md §9.
+      cache: isInternal(readUser()) ? 'no-cache' : 'default',
       body: body === undefined ? undefined : isFormData(body) ? body : JSON.stringify(body),
       signal,
     });
     // The server answered — whatever its status, the connection is demonstrably working, so clear
     // any standing "can't reach" verdict: a 500 is as much proof of reachability as a 200.
     reachabilityObserver?.(null);
+    // Read from every answer, statuses included: a deploy that moved the contract shows up as a 4xx,
+    // so the response most in need of explaining is the one watching only successes would skip.
+    buildStampObserver?.(res.headers.get(BUILD_HEADER));
+    lastBuild = res.headers.get(BUILD_HEADER) ?? lastBuild;
     return res;
   } catch (cause) {
-    /* An abort is the caller's own decision: neither an error to normalise nor evidence about the
-       network, so it is rethrown unchanged and reported to nobody. */
+    // An abort is the caller's own decision: neither an error to normalise nor evidence about the
+    // network, so it is rethrown unchanged and reported to nobody.
     if (isAbort(cause)) throw cause;
     const err = new NetworkError(cause);
     reachabilityObserver?.(err);
     throw err;
   }
+}
+
+async function stream(path, token, signal) {
+    const headers = { Accept: 'text/event-stream' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    try {
+      const res = await fetch(API_BASE + path, {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+        signal,
+      });
+      reachabilityObserver?.(null);
+      buildStampObserver?.(res.headers.get(BUILD_HEADER));
+      return res;
+    } catch (cause) {
+      if (isAbort(cause)) throw cause;
+      const err = new NetworkError(cause);
+      reachabilityObserver?.(err);
+      throw err;
+    }
+}
+
+async function readEventStream(body, onEvent) {
+    if (!body?.getReader) return;
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let event = 'message';
+    let data = [];
+    const dispatch = () => {
+      if (data.length) {
+        const text = data.join('\n');
+        let payload = text;
+        try {
+          payload = JSON.parse(text);
+        } catch {
+          payload = text;
+        }
+        onEvent?.({ type: event, data: payload });
+      }
+      event = 'message';
+      data = [];
+    };
+    const line = (raw) => {
+      const next = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+      if (!next) { dispatch(); return; }
+      if (next.startsWith(':')) return;
+      const split = next.indexOf(':');
+      const field = split === -1 ? next : next.slice(0, split);
+      const value = split === -1 ? '' : next.slice(split + 1).replace(/^ /, '');
+      if (field === 'event') event = value || 'message';
+      else if (field === 'data') data.push(value);
+    };
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      lines.forEach(line);
+    }
+    buffer += decoder.decode();
+    if (buffer) line(buffer);
+    dispatch();
 }
 
 function buildQuery(query) {
@@ -196,20 +390,27 @@ function buildQuery(query) {
 
 async function toResult(res, withStatus = false) {
   const payload = await parseBody(res);
-  if (res.ok) return withStatus ? { data: payload, status: res.status } : payload;
+  if (res.ok) return withStatus ? { data: payload, status: res.status, etag: res.headers.get('ETag') } : payload;
+  const traceId = payload?.traceId || res.headers.get(TRACE_HEADER);
+  if (res.status >= 500 && traceId) failedTraceId = traceId;
   throw new ApiError({
     code: payload?.error,
     message: payload?.message,
     status: res.status,
     // Prefer the body's traceId, but fall back to the header: 502s and other proxy-level failures
     // never reach our exception handler and so carry no envelope at all.
-    traceId: payload?.traceId || res.headers.get(TRACE_HEADER),
+    traceId,
     fields: payload?.fields,
     attemptsRemaining: payload?.attemptsRemaining,
     // From the envelope, not the `Retry-After` header beside it: the API exposes no CORS response
     // headers, so a browser on another origin can read the body and nothing else.
     retryAfterSeconds: payload?.retryAfterSeconds,
+    reason: payload?.reason,
   });
+}
+
+async function isWrongCode(res) {
+  return (await parseBody(res.clone()))?.attemptsRemaining != null;
 }
 
 async function parseBody(res) {
@@ -225,10 +426,8 @@ async function parseBody(res) {
   }
 }
 
-/**
- * Refresh the access token, coalescing concurrent callers **within and across tabs**.
- * Why both layers are load-bearing, and where the lock degrades: docs/flows/consumer/auth.md
- */
+// Coalesces concurrent callers within and across tabs. Why both layers are load-bearing, and where
+// the lock degrades: docs/flows/consumer/auth.md
 let refreshInFlight = null;
 
 function refreshAccessToken() {
@@ -240,10 +439,8 @@ function refreshAccessToken() {
   return refreshInFlight;
 }
 
-/**
- * Run `fn` under a cross-tab lock where supported, degrading to inline execution rather than
- * rejecting — a raw `SecurityError` would escape the ApiError/NetworkError normalisation.
- */
+// Degrades to inline execution rather than rejecting — a raw `SecurityError` would escape the
+// ApiError/NetworkError normalisation.
 function exclusively(fn) {
   if (!navigator.locks) {
     console.warn('[http] navigator.locks unavailable (non-secure context?) — refresh is not '
@@ -273,6 +470,7 @@ async function doRefresh(entryToken) {
       method: 'POST',
       body: { remember },
       auth: false,
+      keepReads: true,
     });
     if (!data?.accessToken) return null;
     persistTokens(data, remember);
@@ -288,28 +486,22 @@ async function doRefresh(entryToken) {
   }
 }
 
-/**
- * Mark an error as the renewal's rather than the caller's, so a rate limit on `/auth/refresh` is
- * not reported as one on saved properties. Only the message moves — docs/flows/consumer/auth.md.
- */
+// Marks an error as the renewal's rather than the caller's, so a rate limit on `/auth/refresh` is
+// not reported as one on saved properties. Only the message moves — docs/flows/consumer/auth.md.
 function fromRefresh(err) {
   err.duringRefresh = true;
   err.message = `Could not renew your session — ${err.message}`;
   return err;
 }
 
-/**
- * Turn a surviving refresh cookie back into a session, once, at cold boot; callers must have
- * checked `sessionHinted()`. Why it is not folded into the 401 path: docs/flows/consumer/auth.md
- */
+// Once, at cold boot; callers must have checked `sessionHinted()`. Why it is not folded into the
+// 401 path: docs/flows/consumer/auth.md
 export function restoreSession() {
   return refreshAccessToken();
 }
 
-/**
- * Store the access token, preserving the tier the session lives in and demoting when localStorage
- * is unwritable. Why the two questions must not be one boolean: docs/flows/consumer/auth.md
- */
+// Preserves the tier the session lives in and demotes when localStorage is unwritable. Why the two
+// questions must not be one boolean: docs/flows/consumer/auth.md
 export function persistTokens({ accessToken }, remember) {
   const choice = remember ?? sessionRemembered();
   writeTokens({ accessToken }, choice && localStorageWritable());

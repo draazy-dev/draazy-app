@@ -19,124 +19,6 @@ deleted; the answer is the valuable part.
 
 ## Engineering decisions blocking specific work
 
-### Q2 — Can owners hide their number even after approving a request? *(blocks D5)*
-
-The frontend mock has a `hideNumber` preference; there is no `users.hide_number` column and no
-contract field. The question is whether the product wants it at all.
-
-Against: approving a contact request *is* the act of sharing a number — a preference that silently
-un-does it makes the approve button mean two different things, and buyers will read it as a bug.
-For: some owners want in-app chat only, which is a coherent (and different) product.
-
-Note this overlaps Q5 — if the answer to Q5 is chat-first, this preference may be the wrong shape
-for the requirement entirely.
-
-**Owner:** product. **Status:** OPEN.
-
----
-
-### Q13 — Should scoped back-office accounts exist server-side at all? *(blocks D13)*
-
-Raised 2026-08-11 while removing `settings.customRoles` (D67). The admin console has a whole
-Team & Access model — a per-user `roleId`, a `moduleAccess` list, named custom-role bundles — and
-**none of it exists on the server**: no `users.role_id`, no `module_access`, no claim, no
-team-member endpoint. It lives in browser storage. So this is not an unfinished feature; it is a
-feature that was only ever drawn.
-
-Three answers are needed before anyone writes code, and the first is the one that decides the
-other two:
-
-1. **Do we want per-account scoping at all, or is per-team scoping the model?** Today access is
-   `role` plus `users.team` plus the `permissions` allow-list, which is enforced and narrows
-   correctly. Per-account scoping means a team-member management slice — invite, assign, revoke,
-   audit — not a column.
-2. **If custom roles return, must they only narrow?** `PermissionMap`'s rule is that a stored
-   document can only ever remove access; the console computes `BASE ∪ role-bundle ∪ moduleAccess`,
-   which adds it. A widening document is a privilege-escalation surface — an operator would be
-   granting through settings what the role guard was written to withhold — so it cannot be adopted
-   as drawn. Narrowing-only is implementable today; widening needs a story for who may grant what,
-   and a guarantee that nobody can grant beyond their own authority.
-3. **What does a "module" grant mean server-side?** The bundles name client modules
-   (`enquiries`, `content`, `properties:verify`); the server's vocabulary is four `Capabilities`,
-   three of them enforced. Either modules map onto capabilities — which means agreeing that mapping
-   as policy — or a new route-level vocabulary gets designed. Neither is a backend chore.
-
-Until then the answer is visible rather than silent: the key is deleted (`V61`) and writing it is
-refused with 422, so the console cannot accumulate access rules that nothing honours. The client
-was brought into line on 2026-08-10: custom roles moved out of the settings document into their own
-console-local collection, so nothing the mock would hand to `PUT /admin/settings` carries the key,
-and the Custom roles tab is labelled *console-only — not enforced by the server*. The editor was
-labelled rather than deleted precisely because question 1 is open; removing the UI would answer it
-by attrition.
-
-**Owner:** product, then backend. **Status:** OPEN.
-
----
-
-### Q14 — Does an owner's edit take the listing offline, or does it stay live and get flagged? *(blocked D76)*
-
-Raised 2026-08-10. There are two coherent designs for what happens after an owner edits an approved
-listing, and the codebase has been shipping one of each.
-
-- **The server's:** `ListingService.update` calls `Property.revertToPending()` whenever a foundation
-  field changes, so the listing leaves search until a moderator re-approves it. Safe, and the
-  strongest possible anti bait-and-switch — nobody sees the changed listing until somebody has
-  looked at it.
-- **The client's Tier A/B model:** the edit stays live and is flagged for a fast re-check. Kinder to
-  the owner, and much kinder to the number the platform actually lives on — a listing that goes dark
-  for a day every time its price moves teaches owners not to move the price, which is the opposite
-  of what a marketplace wants.
-
-Both are defensible; they are different products, not a bug and a fix. What was *not* defensible was
-the client describing the second while the server did the first, so the owner-facing banner now
-reports the server's rule truthfully (D76) and `npm run check:listing` keeps it that way. The
-question left is which contract we want:
-
-1. **Does a price change really need to cost a takedown?** Price is the most-edited field on any
-   marketplace and the one an owner is most often asked to move. A revert on price is the harshest
-   rule with the weakest bait-and-switch argument — the buyer sees the new price either way.
-2. **If some foundation edits stay live, which?** Locality and property type are identity; price and
-   furnishing are not. A split set is implementable (`apply` already returns one boolean; it would
-   return two) but it is a policy decision about what a moderator is protecting against.
-3. **Is "live but flagged" enough of a control?** It needs a queue that is actually worked, and an
-   SLA — otherwise it is a flag nobody reads and the anti bait-and-switch rule has quietly become
-   opt-in.
-
-**Answered 2026-08-11 — neither design wholesale; the set splits.**
-
-- **Stays live, re-checked in the background:** `price`, `furnishing`, `possession`.
-- **Goes off search, reverts to `pending` as before:** `locality`, `propertyType`, `bhk`, `deal`.
-
-The line is what the edit does to the *claim*, not how much the value moved. The second group changes
-what the listing fundamentally is, so a stale index entry would actively mislead searchers — a 2BHK
-appearing under 3BHK, or a rental under sale, is a wrong answer, not a slightly stale one. The first
-group changes an attribute of a listing that is still the same property, so the worst case is a
-briefly out-of-date number on a listing that is still genuinely what it claims to be. Fraud risk is
-handled by the re-check either way; the difference is only whether the listing earns while it waits.
-
-That answers the three sub-questions in order. (1) No — price is the most-edited field and the one
-with the weakest bait-and-switch argument, since the buyer sees the new price either way. (2) The
-split above; `apply` now returns an `EditImpact` record rather than one boolean, which is exactly the
-shape sub-question 2 predicted. (3) "Live but flagged" needed a work item that was not the `pending`
-status itself and not `flagged` (which also removes the listing from search), so `V62` adds
-`properties.recheck_requested_at` + `recheck_reason` beside the existing `flag_reason`, `GET
-/admin/properties?recheck=true` is the queue, and `PATCH /properties/{id}/status` with `approved`
-clears it. ~~**The SLA and the admin UI for that queue are not part of this answer**~~ — **the UI
-shipped 2026-08-11**, on the reasoning that a stays-live re-check nobody is shown is not a
-rebalanced control but a loosened one. `/admin/properties` gained a **Re-check Queue** tab (oldest
-first, showing the changed fields and the waiting age, pass or reject via the existing status
-transitions, count surfaced in the tab label and a KPI). **The SLA itself is still not answered**:
-the tab escalates its age colour at 24h and calls a row overdue past 72h, but those two numbers were
-chosen to make the age legible, not agreed as a commitment — nothing enforces them, nothing alerts
-on them, and no one is paged. Deciding the real SLA (and whether breaching it should auto-revert the
-listing to `pending`) remains open and is carried on D76.
-
-Work landed in `tech-debt.md` **D76**.
-
-**Owner:** product, then backend. **Status:** CLOSED (2026-08-11).
-
----
-
 ### Q19 — When an owner withdraws a confirmed stay, what happens to the review it authorised? *(blocks D204)*
 
 Raised 2026-08-11 by the D194 security review. D194 made a self-declared tenancy into real evidence
@@ -171,60 +53,35 @@ evidence it protects is worth something in the first place.
 
 Carried in `tech-debt.md` as **D204**.
 
-**Owner:** product. **Status:** OPEN.
+**Partly answered in code, and the answer is option 2 — not the option 3 this entry leaned toward.**
+`TenancyDeclarationService.revoke` is **forward-only by design** and touches no review: a review
+written while the stay was confirmed stays published and keeps its `tenant` badge; revoking only
+stops the *next* one being authorised. `TenancyRevocationIsForwardOnlyTest` pins both halves, so
+**option 1 is closed — retraction must not be added.** The reasoning is this entry's own: retraction
+would hand the owner of the reviewed listing a one-tap silencer, and the declaration evidences that
+the reviewer was really there, which revoking cannot alter.
+
+**Still open, and it is the whole of option 3:** whether a revoked stay should drop the published
+review's badge to `NONE` and say so on the card, and what that card should say — "the owner withdrew
+confirmation of this stay" is honest and is also an accusation. Still open too is the alt-account
+half above, which needs an identity signal the platform does not collect.
+
+**Owner:** product. **Status:** OPEN — narrowed to the badge-drop and card copy. Carried on D204.
 
 ---
 
-### Q20 — Should the administrator who creates a back-office account be allowed to set its credentials? *(blocks D206)*
+### Q20 — Should the administrator who creates a back-office account be allowed to set its credentials? *(closed)*
 
-Raised 2026-08-11 by the D200 security review. D200 stopped one administrator minting a colleague
-alone: an account created through `POST /users/staff` cannot obtain a token until a *second*
-administrator approves it. The review confirmed the rule holds — there is no way to get a usable
-administrator without a second human. The question is what that second human is actually signing.
-
-Today the maker supplies the new account's **mobile and password**, and the checker sees
-`masked(user)` — a name, an email, a role, and a mobile with most of its digits removed — with **no
-`createdBy` field on the response at all**. So a narrowed admin holding `users:write` can mint an
-admin account on a handset they control, ask any unrelated colleague to clear the queue, and sign
-in as an account with no grant row and therefore the full role baseline. That is D200's original
-attack, executed with a second signature attached, and the audit log reads as ordinary onboarding —
-because that is what it is, apart from who holds the phone. **The second key currently attests
-"this record may have access", not "this person may have access".**
-
-Three answers, and they are not exclusive:
-
-1. **Show the checker who is asking.** Add `createdBy` to the pending-approval response, and show
-   the mobile unmasked. Small, and it is the difference between a checker who *could* notice the
-   number belongs to the maker and one who structurally cannot. **The cost is real**:
-   `pendingApprovals` masks on purpose, and its own note explains why — a queue screen listing one
-   unmasked number per waiting colleague is "a small bulk-export surface wearing the clothes of a
-   to-do list". A middle option is to show `createdBy` (cheap, no new exposure) and reveal the
-   mobile only on the deliberate, individually-audited single-account view that already exists.
-2. **Take credentials away from the maker.** Create the account passwordless, and require the new
-   colleague to establish their own credentials from their own device at first sign-in. This is the
-   answer that makes the approval mean something about a *person*, and it closes the attack rather
-   than making it noticeable. It is also a product change — it needs an invite flow, an expiry on
-   the invite, and a story for what the queue shows before the invite is accepted.
-3. **Accept it and rely on detection.** `created_by` is recorded, immutable, and every approval is
-   audited, so this is discoverable after the fact. Defensible at founding-team scale, where every
-   administrator is known personally; it stops being defensible at exactly the point D200's row
-   said back-office administration would be handed to someone outside that team.
-
-**Timing is the reason this is a question now rather than later.** There is no approval screen yet
-(see D205 — the Team & Access console still writes to `localStorage`), so whichever way this goes,
-it can be built in rather than retrofitted. Deciding after the console exists means changing a
-screen people have started trusting.
-
-Carried in `tech-debt.md` as **D206**.
-
-**Owner:** founder / product, then backend. **Status:** OPEN.
+Closed by the single-admin bootstrap decision. `POST /users/staff` no longer creates administrators,
+staff accounts are invite-redeemed, and the staff-account pending-approval queue no longer exists.
+D206 is closed for this flow; unrelated badge/listing/service maker-checker questions remain separate.
 
 ---
 
 ## Product / GTM questions (from the trust-model pivot)
 
 These predate the backend work and are recorded here so they stop living as an unticked checkbox
-halfway down a 2,700-line worklog. Source: `docs/system/trust-and-verification-model.md`, ADR-019.
+halfway down a 2,700-line worklog. Source: `docs/system/platform-architecture.md` §6.4, ADR-019.
 
 ### Q6 — Freshness ping cadence
 
@@ -240,14 +97,6 @@ column, which is why the `dormant` status is unimplemented.
 Does an L1 (mobile-verified) user get the owner's number on approval, or in-app chat only? This is
 the same decision as Q2 seen from the buyer's side, and it determines whether the contact gate's
 payoff is a phone number or a thread.
-
-**Owner:** product. **Status:** OPEN.
-
-### Q8 — Broker-lane timing
-
-Brokers are explicitly *not* excluded by the thesis (the incumbent analysis concluded brokers are
-paying customers and liquidity beats purity). When the broker lane opens — and whether it is a
-distinct role or a flag — is undecided.
 
 **Owner:** product. **Status:** OPEN.
 
@@ -318,6 +167,15 @@ contract bug either way; this decides whether anything is built *on top of* it.
 
 ## Closed
 
+Q20 is decided but not yet built, so it stays in the open section above rather than here.
+
+### Q8 — Do brokers have a place on Draazy? *(closed 2026-10-11)*
+
+**Answer: no.** Draazy is strictly broker-free: owners, buyers and tenants only, with no broker role,
+flag, plan or listing label.
+
+**Owner:** founder. **Status:** CLOSED.
+
 ### Q15 — What must a listing carry before it can claim "verified"? *(closed 2026-08-11)*
 
 **Answer: three required artefacts — ownership proof, owner identity, physical existence.** RERA
@@ -327,7 +185,7 @@ project of its own). Moderator discretion alone was explicitly rejected.
 | Artefact | Accepted evidence |
 | --- | --- |
 | Ownership proof | Property tax receipt, electricity bill, or Index II |
-| Owner identity | Aadhaar or PAN on the posting account |
+| Owner identity | A government document (Aadhaar, PAN or driving licence) + selfie, staff-reviewed |
 | Physical existence | Timestamped photos or a video walkthrough |
 
 **Why this matters more than it looks.** Today `ListingService` has *no* document gate — "verified"
@@ -356,8 +214,8 @@ This is a real decision, not a deferral, and it has three immediate consequences
 2. **Rent agreement is the surface that must not break.** It is the only one taking real money today,
    which promotes its failure modes from "bug" to "revenue incident". Its fee maths is already gated
    by `check:finance` (26 checks); that gate is load-bearing and should stay strict.
-3. **Contact reveals, subscriptions and boosted placement stay built but stay quiet.** They are not
-   removed — they are the mix we return to once liquidity exists (see Q16a below).
+3. **Contact reveals and subscriptions stay built but stay quiet.** They are the mix we return to
+   once liquidity exists (see Q16a below).
 
 **Follow-on (Q16a) — the *threshold* is deferred, the *mechanism* is not.** What liquidity level flips
 monetisation on is a founder call that wants evidence we do not have yet, so pinning a number today
@@ -379,6 +237,15 @@ Two constraints on whoever sets it, recorded now while the reasoning is fresh:
 
 Q10's "50 hand-recruited owners" and Q11's flatmates gate remain the two numbers already on record.
 **Owner:** founder. **Status:** mechanism decided; threshold OPEN, deliberately.
+
+**Follow-on (Q16b) — the MVP price list *(decided 2026-10-11)*.** Subscriptions are retired; nothing
+auto-renews. The only paid items are the rent agreement (₹499 + government charges, first or
+renewal), a listing pass (₹999, each extra *live* rent/sell listing beyond 1 free, 60 days) and a
+contact pack (₹199, 15 contacts for 30 days, after 15 free in the first 30 days). Flatmate posts
+are free and unlimited; the 3-active-post cap on non-owner hosts stays as an anti-broker guard. Over
+the free tier a listing is never refused: it waits paused until the owner buys a pass or pauses
+another. Featured is a 7-day reward for ownership verification, not a paid boost. Lawyer and loan
+partners are commission-only and carry no user-facing price. Target: ~₹10,000/month covers infra.
 
 ### Q17 — What counts as a genuine referral? *(closed 2026-08-11)*
 
@@ -425,10 +292,32 @@ takes its contacts back with no grant to reverse. The old module now lives at
 `services/providers/mock/contactQuota.js` as the mock server's state and is not re-exported from
 `lib/store.js`.
 
-**Deliberately still open, and narrower than it was:** the **listing** ceiling is *reported* by
-`GET /me/entitlements` (`listings.allowance`, `listings.referralBonus`) but is **not enforced** —
-`POST /me/listings` does not check it. The wizard's paywall remains a client-side courtesy. That is a
-separate piece of work from the contact quota and was not smuggled into this one.
+**Deliberately still open, and narrower than it was:** superseded by Q17a below.
+
+### Q17a — Two-sided, automatically verified referrals *(closed 2026-10-12)*
+
+**Answer:** two tracks, both sides rewarded, no manual desk. Every number is a `settings.fees.referral*` key.
+- **Owner track:** qualifies when the referee's first listing passes ownership verification (Q17 trigger). The
+  referrer gets a free rent agreement per referral; the referee's listing is Featured 14 days instead of 7.
+- **Seeker track (new):** qualifies when the referee's first contact request is accepted. The referrer gets 15
+  contacts; the referee gets 5 extra free contacts.
+- **Automatic verification:** a code redeems only at signup (24 h, no listing or contact yet, not the referrer's
+  device). At qualification a risk check grants (low), holds 7 days (medium) or rejects (high); calendar-month and
+  yearly caps reject the overflow; suspension, take-down or revoked verification claws back within 30 days. The ops
+  desk is audit plus override (an appeal needs a reason). The listing-slot reward is gone (pay-per-use, Q16b).
+
+### Q17b — Refunds: what comes back, and who decides? *(closed 2026-10-12)*
+
+**Answer:** refund only what was not delivered, decided from server facts; every number is a `settings.fees` key.
+- **Contacts:** a request counts until the owner declines it or it lapses after `contactReplyDays`; then it comes
+  back. Open requests are capped at `contactPendingMax`; paused, let or sold listings take no requests or approvals.
+- **Pack:** full refund within `packRefundDays` if no contact was spent from it. **Pass:** no-enquiry guarantee
+  (≤ `passGuaranteeMaxEnquiries` from start to claim, never paused in the first `passGuaranteeDays`, once per
+  `passGuaranteeEveryMonths` across linked accounts).
+- **Every customer refund is approved by staff** (`refunds` function); the order is frozen while pending.
+  Money taken in error (failed, late, mismatched, closed listing) is refunded automatically.
+- Sequential invoices and credit notes per FY; a dispute freezes only that order, never the account; grievance
+  officer in `legal`.
 
 ### Q18 — What should the ops console be allowed to see and act on? *(closed 2026-08-11)*
 
@@ -495,10 +384,152 @@ stored `Formats.MOBILE` shape (`^[6-9][0-9]{9}$`). That second gate matters: `no
 closed on length only, so without it a ten-digit number with a leading 1-5 would pass the edge and
 then be rejected by a column CHECK as a 500. Because a `ConstraintValidator` cannot mutate, each
 consuming service normalises at the persist/lookup edge — `AuthService.login`,
-`ConversationOpeningService.start`, `DealService.addParty`, `SocietyLeadService`, `CityService`,
+`ConversationOpeningService.start`, `CityService`,
 `RentAgreementService`, `FlatmateSupplyService.ownerConsent`, `UserAdminService.addStaff`, plus the
 finalization/close paths that already did. The OpenAPI `Mobile` schema keeps its strict pattern as
 the stored/returned shape and now carries a description noting the input tolerance. The frontend was
 already hardened: the shared `MobileField` renders a fixed `+91` chip and accepts only ten digits.
 Covered by `IndianMobileValidatorTest` plus updated edge tests in `DealEndpointsTest` and
 `ConversationEndpointsTest`. Register item **D23 resolved**.
+
+---
+
+### Q2 — Can owners hide their number even after approving a request? *(closed — D5)*
+
+The frontend mock has a `hideNumber` preference; there is no `users.hide_number` column and no
+contract field. The question is whether the product wants it at all.
+
+Against: approving a contact request *is* the act of sharing a number — a preference that silently
+un-does it makes the approve button mean two different things, and buyers will read it as a bug.
+For: some owners want in-app chat only, which is a coherent (and different) product.
+
+Note this overlaps Q5 — if the answer to Q5 is chat-first, this preference may be the wrong shape
+for the requirement entirely.
+
+**Answer, revised 2026-10-03 by user decision:** `users.hide_number` shipped in V31, rides
+`PATCH /auth/me`, and reaches the client as `ownerHidesNumber` on `ContactStatus`. It sits on
+`users` rather than on `properties` because the number is the person's, not the listing's. The old
+D5 global policy said no gate status ever handed a buyer digits; that is superseded. Approval now
+reveals the owner's number to that requester unless `hide_number` is true, and the owner sees the
+approved requester's number.
+
+**Owner:** product. **Status:** CLOSED. D5 is closed and no longer in the register.
+
+---
+
+### Q13 — Should scoped back-office accounts exist server-side at all? *(closed — D192/D13)*
+
+Raised 2026-08-11 while removing `settings.customRoles` (D67). The admin console has a whole
+Team & Access model — a per-user `roleId`, a `moduleAccess` list, named custom-role bundles — and
+**none of it exists on the server**: no `users.role_id`, no `module_access`, no claim, no
+team-member endpoint. It lives in browser storage. So this is not an unfinished feature; it is a
+feature that was only ever drawn.
+
+Three answers are needed before anyone writes code, and the first is the one that decides the
+other two:
+
+1. **Do we want per-account scoping at all, or is per-team scoping the model?** Today access is
+   `role` plus `users.team` plus the `permissions` allow-list, which is enforced and narrows
+   correctly. Per-account scoping means a team-member management slice — invite, assign, revoke,
+   audit — not a column.
+2. **If custom roles return, must they only narrow?** `PermissionMap`'s rule is that a stored
+   document can only ever remove access; the console computes `BASE ∪ role-bundle ∪ moduleAccess`,
+   which adds it. A widening document is a privilege-escalation surface — an operator would be
+   granting through settings what the role guard was written to withhold — so it cannot be adopted
+   as drawn. Narrowing-only is implementable today; widening needs a story for who may grant what,
+   and a guarantee that nobody can grant beyond their own authority.
+3. **What does a "module" grant mean server-side?** The bundles name client modules
+   (`enquiries`, `content`, `properties:verify`); the server's vocabulary is four `Capabilities`,
+   three of them enforced. Either modules map onto capabilities — which means agreeing that mapping
+   as policy — or a new route-level vocabulary gets designed. Neither is a backend chore.
+
+Until then the answer is visible rather than silent: the key is deleted (`V61`) and writing it is
+refused with 422, so the console cannot accumulate access rules that nothing honours. The client
+was brought into line on 2026-08-10: custom roles moved out of the settings document into their own
+console-local collection, so nothing the mock would hand to `PUT /admin/settings` carries the key,
+and the Custom roles tab is labelled *console-only — not enforced by the server*. The editor was
+labelled rather than deleted precisely because question 1 is open; removing the UI would answer it
+by attrition.
+
+**Answer: yes — per-account scoping, narrowing-only, over a server-served catalogue.** All three
+sub-questions went the same way and shipped as **D192**. (1) `account_permissions` scopes one
+*account*, re-read per request on top of `role` + `users.team` — the server half of the Q18 ruling.
+(2) A permission document may only ever *remove* access, never add it; the console's
+`BASE ∪ role-bundle ∪ moduleAccess` widening model was not adopted in any form, and
+`AccountPermissionsGuardTest` pins the narrowing. (3) No new route-level vocabulary was invented:
+The atoms stay the ones the server already enforces (`BackOfficePermissions.CATALOGUE`), so the
+write refuses anything outside the catalogue.
+`BackOfficeAccessController` holds the routes behind `users:read` / `users:write` — the same
+atom as minting a colleague, since editing who may do what is the same privilege — and refuses
+self-edit. `AdminTeam.jsx` now reads and writes the server's set instead of browser storage, and
+the `V61` refusal of `settings.customRoles` stands.
+
+**Follow-on:** narrowing produced the old D200/D206 administrator-minting concern; Q20 is closed by
+single-admin bootstrap and staff-only account creation.
+
+**Owner:** product, then backend. **Status:** CLOSED. D13 is closed and no longer in the register.
+
+---
+
+### Q14 — Does an owner's edit take the listing offline, or does it stay live and get flagged? *(closed 2026-08-11 — D76)*
+
+Raised 2026-08-10. There are two coherent designs for what happens after an owner edits an approved
+listing, and the codebase has been shipping one of each.
+
+- **The server's:** `ListingService.update` calls `Property.revertToPending()` whenever a foundation
+  field changes, so the listing leaves search until a moderator re-approves it. Safe, and the
+  strongest possible anti bait-and-switch — nobody sees the changed listing until somebody has
+  looked at it.
+- **The client's Tier A/B model:** the edit stays live and is flagged for a fast re-check. Kinder to
+  the owner, and much kinder to the number the platform actually lives on — a listing that goes dark
+  for a day every time its price moves teaches owners not to move the price, which is the opposite
+  of what a marketplace wants.
+
+Both are defensible; they are different products, not a bug and a fix. What was *not* defensible was
+the client describing the second while the server did the first, so the owner-facing banner now
+reports the server's rule truthfully (D76) and `npm run check:listing` keeps it that way. The
+question left is which contract we want:
+
+1. **Does a price change really need to cost a takedown?** Price is the most-edited field on any
+   marketplace and the one an owner is most often asked to move. A revert on price is the harshest
+   rule with the weakest bait-and-switch argument — the buyer sees the new price either way.
+2. **If some foundation edits stay live, which?** Locality and property type are identity; price and
+   furnishing are not. A split set is implementable (`apply` already returns one boolean; it would
+   return two) but it is a policy decision about what a moderator is protecting against.
+3. **Is "live but flagged" enough of a control?** It needs a queue that is actually worked, and an
+   SLA — otherwise it is a flag nobody reads and the anti bait-and-switch rule has quietly become
+   opt-in.
+
+**Answered 2026-08-11 — neither design wholesale; the set splits.**
+
+- **Stays live, re-checked in the background:** `price`, `furnishing`, `possession`.
+- **Goes off search, reverts to `pending` as before:** `locality`, `propertyType`, `bhk`, `deal`.
+
+The line is what the edit does to the *claim*, not how much the value moved. The second group changes
+what the listing fundamentally is, so a stale index entry would actively mislead searchers — a 2BHK
+appearing under 3BHK, or a rental under sale, is a wrong answer, not a slightly stale one. The first
+group changes an attribute of a listing that is still the same property, so the worst case is a
+briefly out-of-date number on a listing that is still genuinely what it claims to be. Fraud risk is
+handled by the re-check either way; the difference is only whether the listing earns while it waits.
+
+That answers the three sub-questions in order. (1) No — price is the most-edited field and the one
+with the weakest bait-and-switch argument, since the buyer sees the new price either way. (2) The
+split above; `apply` now returns an `EditImpact` record rather than one boolean, which is exactly the
+shape sub-question 2 predicted. (3) "Live but flagged" needed a work item that was not the `pending`
+status itself and not `flagged` (which also removes the listing from search), so `V62` adds
+`properties.recheck_requested_at` + `recheck_reason` beside the existing `flag_reason`, `GET
+/admin/properties?recheck=true` is the queue, and `PATCH /properties/{id}/status` with `approved`
+clears it. ~~**The SLA and the admin UI for that queue are not part of this answer**~~ — **the UI
+shipped 2026-08-11**, on the reasoning that a stays-live re-check nobody is shown is not a
+rebalanced control but a loosened one. `/admin/properties` gained a **Re-check Queue** tab (oldest
+first, showing the changed fields and the waiting age, pass or reject via the existing status
+transitions, count surfaced in the tab label and a KPI). **The SLA itself is still not answered**:
+the tab escalates its age colour at 24h and calls a row overdue past 72h, but those two numbers were
+chosen to make the age legible, not agreed as a commitment — nothing enforces them, nothing alerts
+on them, and no one is paged. Deciding the real SLA (and whether breaching it should auto-revert the
+listing to `pending`) remains open.
+
+Work landed in `tech-debt.md` **D76**, which has since been closed and removed from the register —
+so for a while this residual was tracked nowhere. It is now carried as **D264**.
+
+**Owner:** product, then backend. **Status:** CLOSED (2026-08-11), except the SLA residual (D264).

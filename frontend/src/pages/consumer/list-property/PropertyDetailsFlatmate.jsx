@@ -1,22 +1,21 @@
 import { Home, Users, ArrowRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Select from '../../../components/ui/Select';
-import FeatureSelector from '../../../components/ui/FeatureSelector';
 import { Pill, FieldError, ToggleRow } from './controls.jsx';
 import AgreementUpload from '../flatmates/AgreementUpload.jsx';
+import FlatmateTerms from '../flatmates/FlatmateTerms.jsx';
+import FurnitureIncluded from './FurnitureIncluded.jsx';
 import { fld, lbl, lbl3 } from './styles.js';
-import { facingOptions, ageOptions, floorOptions, totalFloorsOptions, furnitureFor, lifestyleTags } from './constants.js';
-import { toDecimal } from './sanitize.js';
+import { floorOptions, totalFloorsOptions, lifestyleTags, HOME_TYPE_PILLS } from './constants.js';
 
 export default function PropertyDetailsFlatmate({ form, set, errors, isHouse, toggleInArray, nextStep }) {
   const { t: tr } = useTranslation();
 
   return (
                     <div className="lp-step mt-2">
-                      {/* Who's listing — host eligibility. An owner lists a spare room in
-                          their own flat; a sitting tenant seeking a replacement self-attests
-                          a registered agreement and can share the owner's mobile so Ops can
-                          confirm consent. Tenant posts are routed to the Ops review queue. */}
+
+                      {/* An owner lists a spare room in their own flat; a sitting tenant seeking a replacement self-attests
+                         a registered agreement and can share the owner's mobile so Ops can confirm consent. */}
                       <div className="mb-6 rounded-2xl bg-white/[0.03] border border-white/5 p-4 sm:p-5">
                         <label className={lbl3}>{tr('listProperty.fields.whoListing')}</label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -37,22 +36,34 @@ export default function PropertyDetailsFlatmate({ form, set, errors, isHouse, to
                           <div className="mt-3 space-y-3">
                             <ToggleRow
                               title={tr('listProperty.host.agreementTitle')}
-                              subtitle={tr('listProperty.host.agreementSubtitle')}
                               on={form.agreementDeclared}
                               onClick={() => set('agreementDeclared', !form.agreementDeclared)}
+                              className={errors.agreementDeclared ? 'dz-invalid' : ''}
                             />
+                            <FieldError show={!!errors.agreementDeclared}>{tr('listProperty.err.agreementRequired')}</FieldError>
                             {form.agreementDeclared && (
-                              <AgreementUpload
-                                doc={form.agreementDoc}
-                                onChange={(doc) => set('agreementDoc', doc)}
-                                ariaLabel={tr('listProperty.host.agreementAria')}
-                                hint={tr('listProperty.host.agreementHint')}
-                              />
+                              <div data-err="agreementDoc">
+                                <AgreementUpload
+                                  doc={form.agreementDoc}
+                                  onChange={(doc) => set('agreementDoc', doc)}
+                                  ariaLabel={tr('listProperty.host.agreementAria')}
+                                />
+                                <FieldError show={!!errors.agreementDoc}>{tr('listProperty.err.agreementRequired')}</FieldError>
+                              </div>
                             )}
+                            <label data-err="ownerConsent" className={`flex min-h-[44px] items-start gap-3 rounded-xl border bg-white/[0.03] p-3 text-sm ${errors.ownerConsent ? 'dz-invalid border-red-400/60' : 'border-white/10'}`}>
+                              <input
+                                type="checkbox"
+                                checked={!!form.ownerConsent}
+                                onChange={(e) => set('ownerConsent', e.target.checked)}
+                                className="mt-1 h-4 w-4 accent-teal-500"
+                              />
+                              <span className="block font-medium text-white">{tr('listProperty.host.ownerConsentTitle')}</span>
+                            </label>
+                            <FieldError show={!!errors.ownerConsent}>{tr('listProperty.err.ownerConsent')}</FieldError>
                             <div>
                               <label className={lbl}>{tr('listProperty.fields.homeOwnerMobile')} <span className="text-gray-500 font-normal">{tr('listProperty.optional')}</span></label>
                               <input type="tel" inputMode="numeric" autoComplete="tel-national" maxLength={10} value={form.ownerConsentMobile} onChange={(e) => set('ownerConsentMobile', e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder={tr('listProperty.ph.tenDigit')} className={fld} />
-                              <p className="text-xs text-gray-500 mt-1">{tr('listProperty.host.consentHelp')}</p>
                             </div>
                           </div>
                         )}
@@ -60,14 +71,15 @@ export default function PropertyDetailsFlatmate({ form, set, errors, isHouse, to
 
                       <div className="mb-6">
                         <label className={lbl3}>{tr('listProperty.fields.homeType')}</label>
-                        <p className="text-gray-500 text-xs mb-3">{tr('listProperty.help.homeTypeHelp')}</p>
                         <div className="flex flex-wrap gap-2.5">
-                          {[['flat', 'Flat'], ['independent', 'Independent House'], ['villa', 'Villa'], ['independent', 'Row House']].map(([pt, label]) => (
+                          {HOME_TYPE_PILLS.map(([pt, label]) => (
                             <Pill key={label} selected={form.homeTypeLabel === label} onClick={() => { set('propertyType', pt); set('homeTypeLabel', label); }} className="px-5 py-2.5">{label}</Pill>
                           ))}
                         </div>
                       </div>
 
+                      {/* Physical flat details — a flatmate share is the same flat as a whole-place let, so it
+                         carries the same specs. */}
                       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className={lbl3}>{isHouse() ? tr('listProperty.fields.configuration') : tr('listProperty.fields.flatType')}</label>
@@ -81,16 +93,14 @@ export default function PropertyDetailsFlatmate({ form, set, errors, isHouse, to
                         <div>
                           <label className={lbl3}>{tr('listProperty.fields.roomOffered')}</label>
                           <div className={`flex flex-wrap gap-2.5 ${errors.roomType ? 'dz-invalid-group' : ''}`} data-err="roomType">
-                            {['Private room', 'Shared room'].map((r) => (
-                              <Pill key={r} selected={form.roomType === r} onClick={() => set('roomType', r)} className="px-5 py-2.5">{r}</Pill>
+                            {[['Private room', 'listProperty.opt.roomSingle'], ['Shared room', 'listProperty.opt.roomDouble']].map(([v, k]) => (
+                              <Pill key={v} selected={form.roomType === v} onClick={() => set('roomType', v)} className="px-5 py-2.5">{tr(k)}</Pill>
                             ))}
                           </div>
                           <FieldError show={!!errors.roomType}>{tr('listProperty.err.roomType')}</FieldError>
                         </div>
                       </div>
 
-                      {/* Attached washroom — a top-3 question for room seekers, so it's
-                          asked explicitly and shown as a chip + filter on Flatmates. */}
                       <div className="mb-6">
                         <label className={lbl3}>{tr('listProperty.fields.washroomForRoom')}</label>
                         <div className="flex flex-wrap gap-2.5">
@@ -100,9 +110,6 @@ export default function PropertyDetailsFlatmate({ form, set, errors, isHouse, to
                         </div>
                       </div>
 
-                      {/* Physical flat details — a flatmate share is the same flat as a
-                          whole-place let, so it carries the same specs. All optional to
-                          keep posting quick; the required set stays lean. */}
                       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
                           <label className={lbl3}>{tr('listProperty.fields.bathroomsOptional')}</label>
@@ -118,23 +125,6 @@ export default function PropertyDetailsFlatmate({ form, set, errors, isHouse, to
                             {[['0', tr('listProperty.opt.none')], ['1', '1'], ['2', '2'], ['3', '3+']].map(([v, l]) => (
                               <Pill key={v} selected={form.balconies === v} onClick={() => set('balconies', v)} className="px-5 py-2.5">{l}</Pill>
                             ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className={lbl3}>{tr('listProperty.fields.carpetArea')}</label>
-                          <div className="relative">
-                            <input inputMode="decimal" maxLength={9} value={form.carpetArea} onChange={(e) => set('carpetArea', toDecimal(e.target.value))} placeholder={tr('listProperty.ph.eg1050')} className={`${fld} pr-20`} />
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium bg-white/5 px-3 py-1 rounded-lg">sq.ft.</div>
-                          </div>
-                        </div>
-                        <div>
-                          <label className={lbl3}>{tr('listProperty.fields.builtUpArea')}</label>
-                          <div className="relative">
-                            <input inputMode="decimal" maxLength={9} value={form.builtUp} onChange={(e) => set('builtUp', toDecimal(e.target.value))} placeholder={tr('listProperty.ph.eg1200')} className={`${fld} pr-20`} />
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 text-sm font-medium bg-white/5 px-3 py-1 rounded-lg">sq.ft.</div>
                           </div>
                         </div>
                       </div>
@@ -172,41 +162,16 @@ export default function PropertyDetailsFlatmate({ form, set, errors, isHouse, to
                         </div>
                       )}
 
-                      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className={lbl3}>{tr('listProperty.fields.facing')}</label>
-                          <Select value={form.facing} onChange={(v) => set('facing', v)} placeholder={tr('listProperty.ph.selectFacing')} options={facingOptions} />
-                        </div>
-                        <div>
-                          <label className={lbl3}>{tr('listProperty.fields.ageOfProperty')}</label>
-                          <Select value={form.age} onChange={(v) => set('age', v)} placeholder={tr('listProperty.ph.selectAge')} options={ageOptions} />
-                        </div>
-                      </div>
-
                       <div className="mb-6">
                         <label className={lbl3}>{tr('listProperty.fields.furnishing')}</label>
-                        <div className="flex flex-wrap gap-3">
+                        <div className="flex flex-wrap gap-1.5 sm:gap-3">
                           {[['unfurnished', tr('listProperty.opt.unfurnished')], ['semi', tr('listProperty.opt.semiFurnished')], ['furnished', tr('listProperty.opt.furnished')]].map(([v, l]) => (
-                            <Pill key={v} selected={form.furnishing === v} onClick={() => set('furnishing', v)} className="px-6 py-3">{l}</Pill>
+                            <Pill key={v} selected={form.furnishing === v} onClick={() => set('furnishing', v)} className="grow shrink-0 whitespace-nowrap px-2 py-3 text-center sm:grow-0 sm:px-6">{l}</Pill>
                           ))}
                         </div>
                       </div>
 
-                      {/* Furniture — same "What's included?" selector as a whole-place let,
-                          shown once the room is furnished or semi-furnished. */}
-                      {(form.furnishing === 'furnished' || form.furnishing === 'semi') && (
-                        <div className="mb-8">
-                          <label className={`${lbl} mb-1`}>{tr('listProperty.fields.whatsIncluded')}</label>
-                          <p className="text-gray-600 text-xs mb-3">{tr('listProperty.help.furnitureIncluded', { what: tr('listProperty.word.room') })}</p>
-                          <FeatureSelector
-                            options={furnitureFor(form.propertyType)}
-                            values={form.furniture}
-                            onToggle={(label) => toggleInArray('furniture', label)}
-                            placeholder={tr('listProperty.ph.addOtherFurniture')}
-                            addAriaLabel={tr('listProperty.aria.furnitureItem')}
-                          />
-                        </div>
-                      )}
+                      <FurnitureIncluded form={form} toggleInArray={toggleInArray} whatKey="listProperty.word.room" />
 
                       <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
                         <div>
@@ -234,6 +199,20 @@ export default function PropertyDetailsFlatmate({ form, set, errors, isHouse, to
                             <Pill key={t} selected={form.lifestyle.includes(t)} onClick={() => toggleInArray('lifestyle', t)} className="px-4 py-2">{t}</Pill>
                           ))}
                         </div>
+                      </div>
+
+                      <div className="mb-6">
+                        <label className={lbl3}>{tr('listProperty.fields.occupantsNow')}</label>
+                        <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label={tr('listProperty.fields.occupantsNow')}>
+                          {['0', '1', '2', '3'].map((n) => (
+                            <Pill key={n} role="radio" selected={form.occupants === n} onClick={() => set('occupants', n)} className="px-5 py-2.5">{n === '0' ? tr('listProperty.opt.nobodyYet') : n}</Pill>
+                          ))}
+                        </div>
+                        <p className="mt-2 text-xs text-gray-400">{tr('listProperty.help.occupantsNow')}</p>
+                      </div>
+
+                      <div className="mb-8">
+                        <FlatmateTerms value={form} onChange={(patch) => Object.entries(patch).forEach(([k, v]) => set(k, v))} />
                       </div>
 
                       <div className="flex justify-end lp-step-actions">

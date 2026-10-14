@@ -1,47 +1,45 @@
 ---
-title: Notifications and language
+title: Notifications and appearance
 slug: notifications-language
 category: account
 audience: everyone
 order: 2
-updated: 2026-07-25
-summary: Control which alerts you receive, on which channel, and switch the app between English, Hindi and Marathi.
-tags: [notifications, alerts, language, i18n]
+updated: 2026-10-10
+summary: Control which alerts you receive, on which channel, and how the interface looks and moves.
+tags: [notifications, alerts, light mode, reduce motion]
 ---
 
 ## Notification channels
 
-Draazy can reach you three ways:
+Draazy can reach you through:
 
-- **In-app** — the bell in the top bar and the [Notifications](/notifications) page
-- **SMS** — OTPs and time-critical updates only
-- **Email** — receipts, invoices and digests, if you added an email
+- **In-app** - the bell in the top bar and the Notifications page
+- **Email** - if you added an email
+- **WhatsApp** - for enabled account alerts
+- **Push on this device** - shown only when your browser supports it and notifications are enabled for the app
 
-Manage all of them under **Dashboard → Settings → Notifications**.
+Manage them under **Dashboard > Profile > Notification Preferences**.
 
-### What you can turn off
+Draazy is English-only today. There is no Hindi or Marathi switch in the app.
 
-| Notification | Default | Can disable |
-| --- | --- | --- |
-| Saved-search matches | On | Yes |
-| Owner replied to your enquiry | On | Yes |
-| Visit reminders | On | Yes |
-| Price drop on a saved property | On | Yes |
-| Product updates & offers | On | Yes |
-| Security and OTP | On | No |
+### What you can change
+
+| Setting | What it controls |
+| --- | --- |
+| New property match alerts | Saved-search and match alerts |
+| Email | Delivery by email |
+| WhatsApp | Delivery by WhatsApp |
+| Message alerts on this device | Browser push alerts for this device |
+| Quiet hours | A daily window when non-urgent alerts stay quiet |
 
 > [!NOTE]
-> If you are getting too much, reduce your saved-search alerts to a daily digest rather than turning notifications off entirely — most people who go silent miss the property they wanted.
+> OTP and security checks may still appear even if you turn other channels down.
 
-## Changing language
+## Appearance
 
-Draazy is available in **English, हिन्दी and मराठी**. Switch from the globe icon in the top bar, or under **Dashboard → Settings → Language**.
+Draazy opens in light mode. For a dark background, turn off **Dashboard > Profile > Appearance > Light mode**.
 
-Your choice is remembered on that device. Note that listing descriptions are shown in the language the owner wrote them in — we translate the interface, not user-written content.
-
-## Reduce motion
-
-If animations are uncomfortable, enable **Dashboard → Settings → Reduce motion**. This respects your operating system setting by default.
+If animations are uncomfortable, enable **Reduce motion** in the same card. The app also respects your operating system's reduced-motion preference where the browser exposes it. Both settings are saved on the device you are using, so they do not follow you to another browser or phone.
 
 ## Related
 

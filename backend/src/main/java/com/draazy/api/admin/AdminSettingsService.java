@@ -3,8 +3,10 @@ package com.draazy.api.admin;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.PreconditionFailedException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.settings.Setting;
 import com.draazy.api.common.settings.SettingRepository;
+import com.draazy.api.common.settings.SettingsCache;
 import com.draazy.api.security.AuthPrincipal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -17,17 +19,13 @@ import java.util.Set;
 import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Read and write the platform configuration document behind {@code /admin/settings}.
- * Storage shape, merge, ETag and refusal rationale: docs/system/api-standards.md section 12.
- */
 @Service
 public class AdminSettingsService {
 
@@ -41,67 +39,84 @@ public class AdminSettingsService {
      * A deny-list, not an allow-list, because the table is deliberately open. */
     private static final Set<String> UNSUPPORTED_KEYS = Set.of("customRoles");
 
+    private static final String ADMIN_FLAGS_KEY = "adminFlags";
+
+    private static final int MAX_OFFICER_NAME = 80;
+
+    private static final int MAX_OFFICER_EMAIL = 120;
+
+    private static final java.util.regex.Pattern OFFICER_EMAIL =
+            java.util.regex.Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+
     private final SettingRepository settings;
+    private final SettingsCache cache;
     private final ObjectMapper objectMapper;
     private final AuditService audit;
 
-    public AdminSettingsService(SettingRepository settings, ObjectMapper objectMapper,
-            AuditService audit) {
+    public AdminSettingsService(SettingRepository settings, SettingsCache cache,
+            ObjectMapper objectMapper, AuditService audit) {
         this.settings = settings;
+        this.cache = cache;
         this.objectMapper = objectMapper;
         this.audit = audit;
     }
 
-    /**
-     * {@code GET /admin/settings} - every stored block folded into one document, with its tag. An
-     * unparseable row is skipped: an admin locked out cannot fix the row that locked them out.
-     */
+    // `GET /admin/settings` - every stored block folded into one document, with its tag, from one read.
+    // An unparseable row is skipped: an admin locked out cannot fix the row that locked them out.
     @Transactional(readOnly = true)
     public SettingsDocument current() {
+        List<Object[]> rows = settings.storedText();
         Map<String, Object> document = new TreeMap<>();
-        for (Setting row : settings.findAll()) {
-            JsonNode value = parseOrNull(row.getKey(), row.getValue());
+        for (Object[] row : rows) {
+            JsonNode value = parseOrNull((String) row[0], (String) row[1]);
             if (value != null) {
-                document.put(row.getKey(), objectMapper.convertValue(value, Object.class));
+                document.put((String) row[0], objectMapper.convertValue(value, Object.class));
             }
         }
-        return new SettingsDocument(document, etag());
+        return new SettingsDocument(document, etag(rows));
     }
 
-    /**
-     * A strong content hash over every stored block, computed inside the transaction that produced
-     * the body it describes. Rationale: docs/system/api-standards.md section 12.
-     */
+    // `GET /admin/settings/flags` - the console's module switches alone, one row instead of the whole table.
+    @Transactional(readOnly = true)
+    public Map<String, Object> adminFlags() {
+        return settings.findById(ADMIN_FLAGS_KEY)
+                .map(row -> parseOrNull(row.getKey(), row.getValue()))
+                .filter(JsonNode::isObject)
+                .map(node -> objectMapper.convertValue(node, new TypeReference<Map<String, Object>>() { }))
+                .orElseGet(Map::of);
+    }
+
+    // Strong hash of every stored block as jsonb renders it, so a tag taken after a write matches the next read.
     private String etag() {
+        settings.flush();
+        return etag(settings.storedText());
+    }
+
+    private static String etag(List<Object[]> rows) {
         MessageDigest digest;
         try {
             digest = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException impossible) {
             throw new IllegalStateException("SHA-256 is required of every JRE", impossible);
         }
-        for (Setting row : settings.findAll(Sort.by("key"))) {
-            digest.update(row.getKey().getBytes(StandardCharsets.UTF_8));
+        for (Object[] row : rows) {
+            digest.update(((String) row[0]).getBytes(StandardCharsets.UTF_8));
             digest.update((byte) 0);
-            digest.update(row.getValue().getBytes(StandardCharsets.UTF_8));
+            digest.update(((String) row[1]).getBytes(StandardCharsets.UTF_8));
             digest.update((byte) 0);
         }
         return "\"" + HexFormat.of().formatHex(digest.digest(), 0, 16) + "\"";
     }
-
-    /**
-     * {@code PUT /admin/settings} - deep-merge {@code patch} into what is stored, and return the
-     * result. Merge, refusal order and {@code If-Match}: docs/system/api-standards.md section 12.
-     */
     @Transactional
     public SettingsDocument update(AuthPrincipal caller, Map<String, Object> patch,
             String ifMatch) {
         rejectUnsupportedKeys(patch);
         requirePrecondition(ifMatch);
         List<String> touched = new ArrayList<>();
+        Map<String, Object> saved = new TreeMap<>();
         for (Map.Entry<String, Object> entry : patch.entrySet()) {
             if (entry.getValue() == null) {
-                // A null is "not changing this": a client that serialises its whole form cannot
-                // distinguish it from a delete, and deleting would quietly unprice the platform.
+
                 continue;
             }
             String key = entry.getKey();
@@ -112,16 +127,14 @@ public class AdminSettingsService {
             row.setValue(objectMapper.writeValueAsString(merged));
             settings.save(row);
             touched.add(key);
+            saved.put(key, objectMapper.convertValue(merged, Object.class));
         }
+        cache.evictAfterCommit();
         audit.record(caller, "settings.update", "settings", "platform",
                 "keys", String.join(",", touched));
-        return current();
+        return new SettingsDocument(saved, etag());
     }
 
-    /**
-     * Refuse anything that would be stored and enforced by nothing while the console reports it
-     * saved. The three cases: docs/system/api-standards.md section 12.
-     */
     private static void rejectUnsupportedKeys(Map<String, Object> patch) {
         for (String key : patch.keySet()) {
             if (UNSUPPORTED_KEYS.contains(key)) {
@@ -132,19 +145,64 @@ public class AdminSettingsService {
         }
         rejectRetiredCityLive(patch);
         rejectNonBooleanFlags(patch);
+        rejectOutOfRange(patch, PlatformSettings.LISTINGS_KEY, "maxPhotos",
+                PlatformSettings.MIN_LISTING_PHOTOS, PlatformSettings.MAX_LISTING_PHOTOS);
+        rejectOutOfRange(patch, PlatformSettings.FLATMATES_KEY, "maxGroupsPerPerson",
+                PlatformSettings.MIN_GROUPS_PER_PERSON, PlatformSettings.MAX_GROUPS_PER_PERSON);
+        // Floor of 1: a cleared field arrives as 0, and a ₹0 plan activates without payment.
+        for (String price : PlatformSettings.PRICE_FIELDS) {
+            rejectOutOfRange(patch, PlatformSettings.FEES_KEY, price, 1, PlatformSettings.MAX_PRICE);
+        }
+        PlatformSettings.FEE_BOUNDS.forEach((field, bound) -> rejectOutOfRange(
+                patch, PlatformSettings.FEES_KEY, field, (int) bound.min(), (int) bound.max()));
+        rejectBadGrievanceOfficer(patch);
     }
 
-    /**
-     * Refuse a leaf under {@code flags} that is not a JSON boolean: every reader treats one as
-     * undecided, so it would be stored, echoed back and enforced as <em>on</em>.
-     */
+    private static void rejectBadGrievanceOfficer(Map<String, Object> patch) {
+        if (!(patch.get(PlatformSettings.LEGAL_KEY) instanceof Map<?, ?> legal)
+                || !(legal.get("grievanceOfficer") instanceof Map<?, ?> officer)) {
+            return;
+        }
+        if (officer.get("name") instanceof String name && (name.isBlank() || name.length() > MAX_OFFICER_NAME)) {
+            throw new ValidationException("'legal.grievanceOfficer.name' must be 1 to " + MAX_OFFICER_NAME
+                    + " characters. Nothing was saved.");
+        }
+        if (officer.get("email") instanceof String email
+                && (email.length() > MAX_OFFICER_EMAIL || !OFFICER_EMAIL.matcher(email).matches())) {
+            throw new ValidationException("'legal.grievanceOfficer.email' must be an email address of at most "
+                    + MAX_OFFICER_EMAIL + " characters. Nothing was saved.");
+        }
+        if ((officer.containsKey("name") && !(officer.get("name") instanceof String))
+                || (officer.containsKey("email") && !(officer.get("email") instanceof String))) {
+            throw new ValidationException("'legal.grievanceOfficer' name and email must be text."
+                    + " Nothing was saved.");
+        }
+    }
+
+    private static void rejectOutOfRange(Map<String, Object> patch, String key, String field,
+            int min, int max) {
+        if (!(patch.get(key) instanceof Map<?, ?> block)) {
+            return;
+        }
+        Object value = block.get(field);
+        if (value == null) {
+            return;
+        }
+        boolean whole = value instanceof Integer || value instanceof Long;
+        long n = whole ? ((Number) value).longValue() : -1;
+        if (n < min || n > max) {
+            throw new ValidationException("'" + key + "." + field + "' must be a whole number from "
+                    + min + " to " + max + ", not " + value + ". Nothing was saved.");
+        }
+    }
+
     private static void rejectNonBooleanFlags(Map<String, Object> patch) {
         if (!(patch.get("flags") instanceof Map<?, ?> flags)) {
             return;
         }
         for (Map.Entry<?, ?> entry : flags.entrySet()) {
             Object value = entry.getValue();
-            // null is "not changing this", handled by the skip in `update`.
+
             if (value != null && !(value instanceof Boolean)) {
                 throw new ValidationException("'flags." + entry.getKey() + "' must be true or false, "
                         + "not " + value.getClass().getSimpleName() + ". A flag stored as anything "
@@ -154,10 +212,7 @@ public class AdminSettingsService {
         }
     }
 
-    /**
-     * Refuse {@code geo.cities.*.live}: city launch state is a column on {@code cities}, because a
-     * value deciding what a logged-out visitor sees cannot have an administrator-only reader.
-     */
+    // City launch state lives on `cities`; public visibility cannot depend on admin-only JSON.
     private static void rejectRetiredCityLive(Map<String, Object> patch) {
         if (!(patch.get("geo") instanceof Map<?, ?> geo)
                 || !(geo.get("cities") instanceof Map<?, ?> cities)) {
@@ -167,16 +222,12 @@ public class AdminSettingsService {
             if (entry.getValue() instanceof Map<?, ?> city && city.containsKey("live")) {
                 throw new ValidationException("'geo.cities." + entry.getKey() + ".live' is no longer "
                         + "stored here: city launch state is a column on the city roster. Use PATCH "
-                        + "/admin/cities/{slug} instead, and read it back from GET /cities. Nothing "
+                        + "/admin/cities/{slug} instead, and read it back from GET /bootstrap (cities). Nothing "
                         + "was saved.");
             }
         }
     }
 
-    /**
-     * Enforce {@code If-Match} per RFC 9110 13.1.1, strong comparison only.
-     * Semantics: docs/system/api-standards.md section 12.
-     */
     private void requirePrecondition(String ifMatch) {
         if (ifMatch == null || ifMatch.isBlank()) {
             return;
@@ -195,10 +246,6 @@ public class AdminSettingsService {
                 "The settings changed since you loaded them. Reload and re-apply your edit.");
     }
 
-    /**
-     * Deep-merge {@code incoming} onto {@code base}. Past {@link #MAX_MERGE_DEPTH} the incoming
-     * subtree replaces the base one outright - nobody is editing a settings form twelve levels deep.
-     */
     private static JsonNode merge(JsonNode base, JsonNode incoming, int depth) {
         if (base == null || !base.isObject() || !incoming.isObject() || depth >= MAX_MERGE_DEPTH) {
             return incoming;

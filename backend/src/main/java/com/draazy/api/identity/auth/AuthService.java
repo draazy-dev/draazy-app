@@ -1,6 +1,5 @@
 package com.draazy.api.identity.auth;
 
-import com.draazy.api.common.access.StaffAccountApprovalRepository;
 import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.RateLimitedException;
@@ -18,20 +17,13 @@ import com.draazy.api.security.Roles;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Orchestrates the four authentication flows, owning none of the crypto itself. Session refusals,
- * rollback rules and the enumeration-oracle reasoning: docs/flows/consumer/auth.md
- */
+/** Mints every session but owns none of the crypto; staff sign-in calls {@link #issueFor} after its second factor.
+ * Refusals, rollback rules and enumeration-oracle reasoning: docs/flows/consumer/auth.md */
 @Service
 public class AuthService {
-
-    // BCrypt hash for a dummy secret used only to equalize unknown-email work in staff login.
-    private static final String STAFF_LOGIN_DUMMY_BCRYPT =
-            "$2a$10$7EqJtq98hPqEX7fNZaFWoOeR6Y4u5M4YB9Gf4bm/FvGV8eK3oprm.";
 
     private final UserRepository users;
     private final UserService userService;
@@ -39,14 +31,11 @@ public class AuthService {
     private final OtpService otpService;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokens;
-    private final PasswordEncoder passwordEncoder;
-    private final StaffAccountApprovalRepository approvals;
     private final StaffInviteRepository invites;
     private final PlatformSettings platformSettings;
 
     public AuthService(UserRepository users, UserService userService, SelfProfile selfProfile,
             OtpService otpService, JwtService jwtService, RefreshTokenService refreshTokens,
-            PasswordEncoder passwordEncoder, StaffAccountApprovalRepository approvals,
             StaffInviteRepository invites, PlatformSettings platformSettings) {
         this.users = users;
         this.userService = userService;
@@ -54,16 +43,11 @@ public class AuthService {
         this.otpService = otpService;
         this.jwtService = jwtService;
         this.refreshTokens = refreshTokens;
-        this.passwordEncoder = passwordEncoder;
-        this.approvals = approvals;
         this.invites = invites;
         this.platformSettings = platformSettings;
     }
 
-    /**
-     * Dual-mode mobile-OTP login: no OTP ⇒ send a code; OTP present ⇒ verify, find-or-create, issue.
-     * Every listed {@code noRollbackFor} type is load-bearing — see docs/flows/consumer/auth.md.
-     */
+    /** Every listed {@code noRollbackFor} type is load-bearing: see docs/flows/consumer/auth.md. */
     @Transactional(noRollbackFor = {UnauthorizedException.class, RateLimitedException.class,
             ForbiddenException.class, OtpSender.DeliveryFailedException.class})
     public AuthResponse login(LoginRequest request) {
@@ -76,39 +60,16 @@ public class AuthService {
         }
         otpService.verifyLoginCode(mobile, request.otp());
         User user = findOrProvision(mobile);
-        return issueFor(user);
-    }
-
-    /**
-     * Internal staff/admin email+password login. The {@code staffLoginEnabled} check sits after the
-     * password so the refusal is not an oracle; admins are exempt — docs/flows/consumer/auth.md.
-     */
-    @Transactional
-    public AuthResponse staffLogin(StaffLoginRequest request) {
-        User user = users.findByEmailIgnoreCaseAndArchivedFalse(request.email()).orElse(null);
-
-        // Keep the unknown-email path on equivalent bcrypt work so staff-email enumeration is harder.
-        String hash = user != null && user.getPasswordHash() != null
-            ? user.getPasswordHash()
-            : STAFF_LOGIN_DUMMY_BCRYPT;
-        boolean passwordMatches = passwordEncoder.matches(request.password(), hash);
-
-        // Never reveal which half failed; a null hash (passwordless account) must also 401.
-        if (user == null || user.getPasswordHash() == null || !passwordMatches) {
-            throw new UnauthorizedException("Invalid credentials");
-        }
-        if (Roles.Wire.STAFF.equals(user.getRole()) && !platformSettings.staffLoginEnabled()) {
-            throw new ForbiddenException(
-                "Staff sign-in is switched off at the moment. Ask an administrator to turn it "
-                    + "back on.");
+        // After the OTP, so the refusal tells only the phone's holder that this is a staff number.
+        if (Roles.isBackOffice(user.getRole())) {
+            throw new ForbiddenException(ErrorCodes.STAFF_SIGN_IN_REQUIRED,
+                    "Staff, manager and administrator accounts sign in at Staff sign-in with email, password "
+                            + "and authenticator code.");
         }
         return issueFor(user);
     }
 
-    /**
-     * Rotate a refresh token and mint a new access token. {@code noRollbackFor} the 401 so the two
-     * revocations on this path survive it — see docs/flows/consumer/auth.md.
-     */
+    /** {@code noRollbackFor} the 401 so the two revocations on this path survive it: see the auth flow doc. */
     @Transactional(noRollbackFor = UnauthorizedException.class)
     public AuthResponse refresh(String presentedToken) {
         RefreshTokenService.Rotation rotation = refreshTokens.rotate(presentedToken);
@@ -122,7 +83,7 @@ public class AuthService {
         refuseIfCannotYetAuthenticate(user);
         String access = jwtService.issueAccessToken(user);
         return AuthResponse.tokens(access, rotation.refreshToken(),
-                jwtService.accessTtl().toSeconds(), selfProfile.of(user));
+                jwtService.accessTtl().toSeconds(), selfProfile.forSession(user));
     }
 
     /** Best-effort session kill (contract {@code POST /auth/logout}): revoke the user's refresh family. */
@@ -131,10 +92,7 @@ public class AuthService {
         refreshTokens.revokeAllForUser(userId);
     }
 
-    /**
-     * Return the live account for a just-verified mobile, creating a passwordless {@code buyer} on
-     * first sign-in. {@code signupsEnabled} is enforced here, and only here — see the auth flow doc.
-     */
+    /** {@code signupsEnabled} is enforced here, and only here: see the auth flow doc. */
     private User findOrProvision(String mobile) {
         User user = users.findByMobile(mobile).map(existing -> {
             if (existing.isArchived()) {
@@ -162,7 +120,7 @@ public class AuthService {
     }
 
     /** Mint an access+refresh pair for an authenticated user and stamp last-active. */
-    private AuthResponse issueFor(User user) {
+    AuthResponse issueFor(User user) {
         refuseIfCannotYetAuthenticate(user);
         user.setLastActive(Instant.now());
         String access = jwtService.issueAccessToken(user);
@@ -170,40 +128,23 @@ public class AuthService {
         // SelfProfile, not the bare mapper: the client caches the embedded user as its session
         // identity, and a sign-in missing the back-office atoms leaves the console sidebar empty.
         return AuthResponse.tokens(access, refresh,
-                jwtService.accessTtl().toSeconds(), selfProfile.of(user));
+                jwtService.accessTtl().toSeconds(), selfProfile.forSession(user));
     }
 
-    /**
-     * The three independent conditions that stop an account obtaining a session — suspension, then
-     * maker-checker approval, then invite activation. Order and 403 choice: the auth flow doc.
-     */
-    private void refuseIfCannotYetAuthenticate(User user) {
+    void refuseIfCannotYetAuthenticate(User user) {
         refuseIfSuspended(user);
-        if (approvals.existsByUserIdAndApprovedAtIsNull(user.getId())) {
-            throw new ForbiddenException(
-                    "This account is waiting to be approved by a second administrator. "
-                            + "Ask an administrator other than the one who created it to approve "
-                            + "it, then sign in again.");
-        }
         refuseIfInviteIsStillOpen(user);
     }
 
-    /**
-     * V77: a suspended account may not obtain a session. Checked first, and deliberately unspecific —
-     * the reason lives in {@code audit_log}. See docs/flows/consumer/auth.md.
-     */
+    /** Deliberately unspecific: the reason lives in {@code audit_log}. See docs/flows/consumer/auth.md. */
     private void refuseIfSuspended(User user) {
         if (UserStatuses.SUSPENDED.equals(user.getStatus())) {
-            throw new ForbiddenException(
-                    "This account has been suspended. Contact support if you think that is a "
-                            + "mistake.");
+            throw new ForbiddenException(ErrorCodes.ACCOUNT_SUSPENDED, Roles.isBackOffice(user.getRole())
+                    ? "This account is suspended. Ask an administrator to restore it."
+                    : "This account is suspended. Contact support if you think this is a mistake.");
         }
     }
 
-    /**
-     * V71: an account whose holder has not yet redeemed their invite may not obtain a token. A second
-     * independent gate, not a restatement of approval — see docs/flows/consumer/auth.md.
-     */
     private void refuseIfInviteIsStillOpen(User user) {
         if (invites.existsByUserIdAndRedeemedAtIsNull(user.getId())) {
             throw new ForbiddenException(

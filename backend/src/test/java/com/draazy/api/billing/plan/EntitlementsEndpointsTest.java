@@ -22,37 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * The owner-contact quota is the server's to enforce, and the referral scheme's reward is contacts
- * (D31b).
- *
- * <p><strong>What this replaced.</strong> Until this slice the free tier's fifteen contacts were
- * counted in {@code localStorage}, under a key derived from the user's own mobile number, by a
- * module whose header comment said in as many words that it was not real security. Clearing site
- * data reset it. So did opening a second browser. The referral bonus that topped it up was computed
- * the same way, which meant the platform's referral scheme paid out an entitlement the platform had
- * never granted and could never withdraw.
- *
- * <p>The properties proved here are the ones that make the gate worth having:
- *
- * <ol>
- *   <li><strong>Nothing is stored.</strong> The allowance is derived from the caller's live plan and
- *       their qualified referrals on every call, so a clawback withdraws contacts with no
- *       compensating write — {@link #clawingBackAReferralWithdrawsTheContactsItGranted}.</li>
- *   <li><strong>Only a new owner costs a contact.</strong> Re-reading a request already open, and
- *       looking at your own listing, are free even after the allowance is gone. Idempotency and the
- *       quota have to coexist, and this is where that is settled.</li>
- *   <li><strong>The refusal is 422.</strong> Not 403, which invites a client to offer a login that
- *       cannot help, and not 429, which promises that waiting will.</li>
- *   <li><strong>A priced plan lifts the ceiling</strong> and reports it as {@code null} rather than
- *       as a very large number nobody can read.</li>
- * </ol>
- *
- * <p>Lives in {@code billing.plan} so it can build a {@link Subscription} through the
- * package-private constructor, for the same reason {@code SubscriptionLifecycleTest} does: going
- * through the checkout and its payment gateway to prove something about entitlement would test the
- * gateway.
- */
+/** The owner-contact quota is server-enforced; allowances derive from the live plan and referrals each call. */
 @DisplayName("Entitlements — the contact quota the browser used to keep")
 class EntitlementsEndpointsTest extends AbstractApiTest {
 
@@ -62,10 +32,14 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     /** {@code fees.freeContactLimit} and {@code fees.referralContactBonus} in the seeded row. */
     private static final int FREE_LIMIT = 15;
     private static final int REFERRAL_BONUS = 15;
+    private static final int FRIEND_BONUS = 5;
 
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired SubscriptionRepository subscriptions;
+
+    @Autowired PlanRepository plans;
+    @Autowired TestPlanGrants grants;
 
     // ---- fixtures ----
 
@@ -76,9 +50,9 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    private User aadhaarVerified(String mobile, String role) {
+    private User identityVerified(String mobile, String role) {
         User u = user(mobile, role);
-        u.setAadhaarVerified(true);
+        u.setVerified(true);
         return users.saveAndFlush(u);
     }
 
@@ -105,26 +79,25 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         for (int i = 0; i < count; i++) {
             User owner = user(String.valueOf(firstOwnerMobile + i), "owner");
             assertThat(ask(buyer, listing(owner, "Flat " + i))).isEqualTo(200);
+            jdbc.update("update contact_requests set status = 'approved' where requester_id = ?", buyer.getId());
         }
     }
 
     private void unlimitedPlan(User u) {
-        subscriptions.saveAndFlush(new Subscription(u.getId(), UUID.fromString(UNLIMITED_PLAN),
-                SubscriptionStatuses.ACTIVE, Instant.now(),
+        subscriptions.saveAndFlush(new Subscription(u.getId(), UUID.fromString(UNLIMITED_PLAN), null,
+                SubscriptionStatuses.ACTIVE, priceOf(UNLIMITED_PLAN), Instant.now(),
                 Instant.now().plus(30, ChronoUnit.DAYS), null, null));
     }
 
-    /**
-     * Earn one qualified referral for {@code referrer}, through the real endpoints.
-     *
-     * <p>Driven through redeem-then-approve rather than by inserting a {@code qualified} row,
-     * because the point of the derivation is that it reads whatever the referral desk actually
-     * wrote. A fixture that sets the status directly would still pass if the desk stopped setting
-     * it.
-     */
+    /** Read, not written out: a literal price here would drift the first time the plan is repriced. */
+    private long priceOf(String planId) {
+        return plans.findById(UUID.fromString(planId)).orElseThrow().getPrice();
+    }
+
+    /** Earns the referral through real endpoints; setting the status directly would pass even if it broke. */
     private String referralApprovedFor(User referrer, String refereeMobile, User staff)
             throws Exception {
-        User referee = aadhaarVerified(refereeMobile, "buyer");
+        User referee = identityVerified(refereeMobile, "buyer");
         String code = mvc.perform(get(Routes.Referrals.MINE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andReturn().getResponse().getContentAsString()
@@ -161,10 +134,45 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT))
                 .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT))
                 .andExpect(jsonPath("$.contacts.referralBonus").value(0))
+                .andExpect(jsonPath("$.contacts.friendBonus").value(0))
                 // Owner Free's listing_limit. Reported even to a buyer, because the number is a
                 // property of the account rather than of the role it is browsing under.
                 .andExpect(jsonPath("$.listings.allowance").value(1))
-                .andExpect(jsonPath("$.listings.referralBonus").value(0));
+                .andExpect(jsonPath("$.listings.referralBonus").doesNotExist())
+                .andExpect(jsonPath("$.listings.used").value(0));
+    }
+
+    @Test
+    @DisplayName("the free window opens at the first contact; a pack adds its contacts and its expiry")
+    void freeWindowAndPackAreReported() throws Exception {
+        User buyer = user("9844400030", "buyer");
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.freeWindowEndsAt").value(org.hamcrest.Matchers.nullValue()))
+                .andExpect(jsonPath("$.contacts.packExpiresAt").value(org.hamcrest.Matchers.nullValue()));
+
+        spend(buyer, 1, 9844400031L);
+        grants.grantPack(buyer.getId(), Instant.now(), Instant.now().plus(30, ChronoUnit.DAYS));
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(jsonPath("$.contacts.unlimited").value(false))
+                .andExpect(jsonPath("$.contacts.used").value(1))
+                .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT + 15 - 1))
+                .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT + 15))
+                .andExpect(jsonPath("$.contacts.freeWindowEndsAt").isString())
+                .andExpect(jsonPath("$.contacts.packExpiresAt").isString());
+    }
+
+    @Test
+    @DisplayName("a pack lets a buyer whose free contacts are spent carry on")
+    void aPackReopensAnExhaustedBuyer() throws Exception {
+        User buyer = user("9844400040", "buyer");
+        spend(buyer, FREE_LIMIT, 9844400041L);
+        assertThat(ask(buyer, listing(user("9844400070", "owner"), "One too many"))).isEqualTo(422);
+
+        grants.grantPack(buyer.getId(), Instant.now(), Instant.now().plus(30, ChronoUnit.DAYS));
+
+        assertThat(ask(buyer, listing(user("9844400071", "owner"), "Now allowed"))).isEqualTo(200);
     }
 
     @Test
@@ -222,14 +230,7 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.error").value("contact_quota_exhausted"));
     }
 
-    /**
-     * The property that makes the quota liveable rather than punitive.
-     *
-     * <p>Running out means you cannot approach a <em>new</em> owner. It must not mean the
-     * conversations you already opened stop working — a buyer locked out of a request an owner has
-     * already replied to would read as a broken product rather than a paywall, and it would break
-     * the idempotency the contact gate depends on for double-taps.
-     */
+    /** Running out blocks only new owners; opened conversations must stay open for double-tap idempotency. */
     @Test
     @DisplayName("an exhausted caller can still re-read the requests they already opened")
     void exhaustionNeverClosesADoorAlreadyOpened() throws Exception {
@@ -261,48 +262,62 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT + REFERRAL_BONUS))
                 .andExpect(jsonPath("$.contacts.referralBonus").value(REFERRAL_BONUS));
 
-        // Three referrals buy one listing slot, so one buys none. Integer division on purpose:
-        // part of a listing slot is not a thing.
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
-                .andExpect(jsonPath("$.listings.referralBonus").value(0))
-                // Same threshold, same reason, and asserted separately because they are two offers
-                // that happen to share a divisor rather than one offer read twice.
+                .andExpect(jsonPath("$.listings.referralBonus").doesNotExist())
+                .andExpect(jsonPath("$.listings.allowance").value(1))
                 .andExpect(jsonPath("$.agreements.free").value(0));
     }
 
-    /**
-     * The threshold itself, from below and from on it.
-     *
-     * <p>Asserted at two and at three rather than only at three, because a bonus computed with the
-     * wrong operator — {@code granting >= 1 ? 1 : 0}, or a divisor of one — passes every test that
-     * only ever earns the reward. The interesting number is the last one that earns nothing.
-     */
     @Test
-    @DisplayName("the third qualified referral is the one that pays — two earn nothing")
-    void threeReferralsBuyASlotAndAFreeAgreement() throws Exception {
+    @DisplayName("each owner-track referral buys one free agreement and no contacts; no listing slots")
+    void ownerTrackReferralsBuyAgreements() throws Exception {
         User referrer = user("9844403100", "owner");
         User staff = user("9844403109", "staff");
-        referralApprovedFor(referrer, "9844403101", staff);
-        referralApprovedFor(referrer, "9844403102", staff);
+        String first = referralApprovedFor(referrer, "9844403101", staff);
+        jdbc.update("update referrals set track = 'owner' where id = ?::uuid", first);
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.listings.referralBonus").value(0))
+                .andExpect(jsonPath("$.contacts.referralBonus").value(0))
                 .andExpect(jsonPath("$.listings.allowance").value(1))
-                .andExpect(jsonPath("$.agreements.free").value(0));
+                .andExpect(jsonPath("$.agreements.free").value(1));
 
-        referralApprovedFor(referrer, "9844403103", staff);
+        String second = referralApprovedFor(referrer, "9844403102", staff);
+        jdbc.update("update referrals set track = 'owner' where id = ?::uuid", second);
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.listings.referralBonus").value(1))
-                // The bonus is *inside* the allowance. A client that adds the two together grants
-                // every earned slot twice, which is exactly what the Refer page used to do.
-                .andExpect(jsonPath("$.listings.allowance").value(2))
-                .andExpect(jsonPath("$.agreements.free").value(1));
+                .andExpect(jsonPath("$.listings.allowance").value(1))
+                .andExpect(jsonPath("$.agreements.free").value(2));
+    }
+
+    @Test
+    @DisplayName("the friend gets extra free contacts while the redeemed code stands, and loses them on rejection")
+    void theFriendBonusFollowsTheReferral() throws Exception {
+        User referrer = user("9844403200", "owner");
+        User referee = user("9844403201", "buyer");
+        String code = mvc.perform(get(Routes.Referrals.MINE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(referrer)))
+                .andReturn().getResponse().getContentAsString()
+                .replaceAll("^.*?\"code\":\"([^\"]+)\".*$", "$1");
+        mvc.perform(post(Routes.Referrals.REDEEM)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(referee))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"code\":\"" + code + "\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(referee)))
+                .andExpect(jsonPath("$.contacts.friendBonus").value(FRIEND_BONUS))
+                .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT + FRIEND_BONUS))
+                .andExpect(jsonPath("$.contacts.remaining").value(FREE_LIMIT + FRIEND_BONUS));
+
+        jdbc.update("update referrals set status = 'rejected' where referred_mobile = ?", referee.getMobile());
+
+        mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(referee)))
+                .andExpect(jsonPath("$.contacts.friendBonus").value(0))
+                .andExpect(jsonPath("$.contacts.allowance").value(FREE_LIMIT));
     }
 
     @Test
@@ -346,20 +361,13 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.listings.allowance").value(2));
     }
 
-    /**
-     * A pending order buys nothing, which is the whole reason this endpoint is not
-     * {@code GET /me/subscription} with extra fields.
-     *
-     * <p>That endpoint deliberately reports a {@code pending} row so a first-time subscriber can
-     * find and resume their unpaid order. Reading entitlement off the same answer would hand a
-     * priced plan's contact allowance to anyone who opened a checkout and closed the tab.
-     */
+    /** Pending rows exist so unpaid orders can resume; reading entitlement off them would grant the plan. */
     @Test
     @DisplayName("an unpaid order confers nothing — capability is not the same question as standing")
     void aPendingSubscriptionEntitlesNothing() throws Exception {
         User u = user("9844406000", "owner");
-        subscriptions.saveAndFlush(new Subscription(u.getId(), UUID.fromString(UNLIMITED_PLAN),
-                SubscriptionStatuses.PENDING, Instant.now(), null, null, null));
+        subscriptions.saveAndFlush(new Subscription(u.getId(), UUID.fromString(UNLIMITED_PLAN), null,
+                SubscriptionStatuses.PENDING, priceOf(UNLIMITED_PLAN), Instant.now(), null, null, null));
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(u)))
                 .andExpect(status().isOk())

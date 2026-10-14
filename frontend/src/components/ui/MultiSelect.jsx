@@ -3,32 +3,18 @@ import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { classNames } from '../../lib/format.js';
 import useSheetViewport from '../../lib/useSheetViewport.js';
+import useVisualViewportInsets from '../../lib/useVisualViewportInsets.js';
 import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
+import useScrollLock from '../../hooks/useScrollLock.js';
 import PoweredByGoogle from './PoweredByGoogle.jsx';
+import { isSearchableList } from './dropdownSearch.js';
+/* Selection order is meaningful here (it drives the trigger summary), so an order-sensitive compare is the right
+   equality for "has the parent caught up". */
 
-/* Selection order is meaningful here (it drives the trigger summary), so an
-   order-sensitive compare is the right equality for "has the parent caught up". */
 const sameValues = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
+/* Mirrors Select.jsx for visual and keyboard parity, but holds an array and keeps the menu open while the user
+   toggles choices. */
 
-/**
- * Custom multi-select dropdown (themed, dark). Mirrors Select.jsx for visual and
- * keyboard parity, but holds an array of values and keeps the menu open while the
- * user toggles choices — the right fit for "pick all that apply" fields.
- * @param {object} props
- * @param {string[]} props.values - Currently selected values.
- * @param {(values: string[]) => void} props.onChange - Callback with the next selection.
- * @param {Array<{value: string, label: string}>|string[]} props.options - Menu options.
- * @param {string} [props.placeholder] - Placeholder when nothing is selected; defaults to the translated "Select…".
- * @param {boolean} [props.searchable] - Force search input (auto-enabled for ≥8 options).
- * @param {string} [props.className] - Additional class on the trigger wrapper.
- * @param {boolean} [props.disabled] - Disable interaction.
- * @param {string} [props.ariaLabel] - Accessible label for the trigger button.
- * @param {boolean} [props.invalid] - Show error styling.
- * @param {string} [props.dataErr] - data-err attribute for field-error binding.
- * @param {boolean} [props.autoClose] - Close the menu after each selection (single-pick feel).
- * @param {(query: string) => Promise<Array>} [props.asyncSearch] - Optional live search (see Select).
- * @param {(option: object) => void} [props.onPick] - Called with the full option when one is added.
- */
 const MultiSelect = forwardRef(function MultiSelect({
   values = [],
   onChange,
@@ -39,22 +25,23 @@ const MultiSelect = forwardRef(function MultiSelect({
   disabled,
   ariaLabel,
   invalid,
+  ariaDescribedBy,
   dataErr,
   autoClose,
   asyncSearch,
   onPick,
   noResultsText,
+  anchored,
 }, ref) {
+  /* Resolved at render rather than as a default parameter: a default is evaluated against whatever language was
+     active on first mount and would never follow a later switch. */
   const { t } = useTranslation();
-  /* Resolved at render rather than as a default parameter: a default is evaluated
-     against whatever language was active on first mount and would never follow a
-     later switch. */
   const noResults = noResultsText || t('ui.noMatches');
   const opts = useMemo(
     () => options.map((o) => (typeof o === 'string' ? { value: o, label: o } : o)),
     [options],
   );
-  const isSearchable = searchable ?? (asyncSearch ? true : opts.length >= 8);
+  const isSearchable = isSearchableList(searchable, asyncSearch, opts.length);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
@@ -66,11 +53,11 @@ const MultiSelect = forwardRef(function MultiSelect({
   const searchRef = useRef(null);
   useImperativeHandle(ref, () => triggerRef.current, []);
   const [portalOpen, setPortalOpen] = useState(false);
+  /* On phones the menu docks to the bottom edge as a sheet instead of hanging off the trigger. */
   const listId = useId();
-  /* On phones the menu docks to the bottom edge as a sheet instead of hanging off
-     the trigger: an anchored panel there opens under the thumb's own hand and is
-     routinely half-covered by the keyboard when the field is searchable. */
-  const sheet = useSheetViewport();
+  const sheet = useSheetViewport() && !anchored;
+  const picker = sheet && isSearchable;
+  useVisualViewportInsets(open && picker);
 
   const selectedSet = useMemo(() => new Set(values), [values]);
   const summary = useMemo(
@@ -103,8 +90,8 @@ const MultiSelect = forwardRef(function MultiSelect({
     setAsyncOpts([]);
     setLoading(false);
   }, []);
-
   // Debounced live search — mirrors Select; races guarded by a cancelled flag.
+
   useEffect(() => {
     if (!asyncSearch || !open) return undefined;
     const q = query.trim();
@@ -142,12 +129,22 @@ const MultiSelect = forwardRef(function MultiSelect({
       if (!inRoot && !inMenu) close();
     };
     document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
+    // Capture phase: focus sits on an option after a pick, where Escape would otherwise reach the dialog behind.
+    const onEscape = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    };
+    document.addEventListener('keydown', onEscape, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onEscape, true);
+    };
   }, [open, close]);
+  // Fixed positioning against the trigger so the portalled menu escapes any ancestor
+  // overflow/transform trap and can flip up near the viewport edge.
 
-  // Portal the menu to <body> and anchor it to the trigger with fixed
-  // positioning so it escapes any ancestor overflow/transform trap and can
-  // flip up near the viewport edge — identical behaviour to Select.
   const position = useCallback(() => {
     const trigger = triggerRef.current;
     const menu = menuRef.current;
@@ -186,51 +183,40 @@ const MultiSelect = forwardRef(function MultiSelect({
       window.removeEventListener('resize', onAnchor);
     };
   }, [open, position, visible.length]);
-
   /* A sheet covers the page, so the page behind it must not scroll with it. */
-  useEffect(() => {
-    if (!open || !sheet) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, [open, sheet]);
 
-  // Focus the search box once after the menu is anchored — mirrors Select and
-  // avoids the inline ref callback re-focusing (and stealing focus) on every
-  // re-render, which the async live-search now triggers more often.
+  useScrollLock(open && sheet);
+  // Focused here rather than from an inline ref callback, which would steal focus back on every
+  // re-render the async live-search triggers.
+
   useLayoutEffect(() => {
     if (!open || !isSearchable) return;
     searchRef.current?.focus({ preventScroll: true });
   }, [open, isSearchable]);
+  /* A parent applying `onChange` inside a transition leaves `values` at the pre-click array, so building the next
+     toggle off the prop discards every rapid pick but the last. */
 
-  /* Our last emission, and the `values` prop it was derived from.
-
-     A parent may apply `onChange` inside a React transition (the Listings filters do:
-     recomputing results is expensive, so the commit is deliberately low priority). Until
-     that transition commits, `values` is still the pre-click array — so deriving the next
-     toggle from the prop silently discards every pick but the last. Reproduced at 8x CPU
-     throttle: three consecutive picks in the Property Type filter left exactly one
-     selected, 3/3 runs. On a mid-range phone that is an ordinary tap speed.
-
-     So: while the prop still equals what we were handed when we emitted, keep building on
-     what we emitted. The moment it differs, the parent has spoken (it committed ours, or
-     changed the value itself) and the prop wins again. */
   const pendingRef = useRef(null);
   const toggle = useCallback((opt) => {
-    if (opt.disabled) return;
+    if (opt.disabled || disabled) return;
     const pending = pendingRef.current;
     const current = pending && sameValues(pending.from, values) ? pending.next : values;
     const has = current.includes(opt.value);
     const next = has
       ? current.filter((v) => v !== opt.value)
       : [...current, opt.value];
+    if (opt.deferChange && !has) {
+      if (onPick) onPick(opt);
+      if (autoClose) close();
+      return;
+    }
     pendingRef.current = { from: values, next };
     onChange(next);
     if (!has && onPick) onPick(opt);
     if (autoClose) close();
-  }, [onChange, values, autoClose, close, onPick]);
-
+  }, [onChange, values, autoClose, close, onPick, disabled]);
   /* Drag the sheet's grab handle down to dismiss. Mobile-only by construction. */
+
   const swipe = useSwipeDismiss(close);
 
   const onKeyDown = (e) => {
@@ -267,7 +253,9 @@ const MultiSelect = forwardRef(function MultiSelect({
         }
         break;
       case 'Escape':
+        /* Escape closes the innermost thing only. */
         e.preventDefault();
+        e.stopPropagation();
         close();
         break;
       default:
@@ -284,6 +272,7 @@ const MultiSelect = forwardRef(function MultiSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
         className={classNames('dz-dropdown__trigger', invalid && 'dz-invalid dz-shake')}
         onClick={() => (open ? close() : setOpen(true))}
         onKeyDown={onKeyDown}
@@ -298,14 +287,13 @@ const MultiSelect = forwardRef(function MultiSelect({
 
       {open && typeof document !== 'undefined'
         ? createPortal(
+              /* Scrim: a sheet is a modal surface, so the page behind it has to read as dismissed rather than merely covered. */
             <>
-              {/* Scrim: a sheet is a modal surface, so the page behind it has to
-                  read as dismissed rather than merely covered. */}
               {sheet ? <div className="dz-dropdown__scrim" onClick={close} aria-hidden="true" /> : null}
               <div
                 ref={menuRef}
                 {...(sheet ? swipe : null)}
-                className={classNames('dz-dropdown__menu', 'dz-dropdown__menu--portal', sheet && 'dz-dropdown__menu--sheet', portalOpen && 'is-portal-open')}
+                className={classNames('dz-dropdown__menu', 'dz-dropdown__menu--portal', sheet && 'dz-dropdown__menu--sheet', picker && 'dz-dropdown__menu--picker', portalOpen && 'is-portal-open')}
                 role="listbox"
                 aria-multiselectable="true"
                 id={listId}
@@ -323,6 +311,11 @@ const MultiSelect = forwardRef(function MultiSelect({
                       placeholder={t('ui.searchPlaceholder')}
                       ref={searchRef}
                     />
+                    {picker ? (
+                      <button type="button" className="dz-dropdown__search-close" onClick={close}>
+                        {t('ui.pickerCancel')}
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
 

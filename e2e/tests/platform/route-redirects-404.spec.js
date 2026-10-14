@@ -1,0 +1,74 @@
+import { test, expect } from '../../fixtures/live.js';
+
+/* Redirects and the 404 catch-all: a redirect is invisible when it works and looks like a dead link when it
+   breaks; `/share-flat`, `/docs` and `/help-center` are permanent public URLs. */
+
+const PUBLIC_REDIRECTS = [
+  ['/map', '/listings', 'view=map'],
+  ['/docs', '/help', null],
+  ['/help-center', '/help', null],
+  ['/share-flat', '/flatmates', null],
+];
+
+test.describe('Route redirects', () => {
+  for (const [from, to, query] of PUBLIC_REDIRECTS) {
+    test(`${from} forwards to ${to}`, async ({ page }) => {
+      await page.goto(from);
+      // Match the resolved pathname, not a glob: `/help-center` already satisfies a "contains /help" glob, so the
+      // wait would return before the redirect happened.
+      await page.waitForURL((u) => new URL(u).pathname === to, { timeout: 15_000 });
+
+      const url = new URL(page.url());
+      expect(url.pathname).toBe(to);
+      if (query) expect(url.search).toContain(query);
+
+      // The target actually rendered — a redirect into a blank page is not a fix.
+      await expect(page.locator('h1, h2').first()).toBeVisible({ timeout: 20_000 });
+    });
+  }
+
+  test('/owner-hub forwards into the dashboard hub anchor', async ({ page, login }) => {
+    await login.asOwner();
+    await page.goto('/owner-hub');
+    await page.waitForURL((u) => new URL(u).pathname === '/dashboard', { timeout: 15_000 });
+    expect(page.url()).toContain('#owner-hub');
+  });
+
+  test('/admin/support is the support queue, not a forward to a service desk', async ({ page, login }) => {
+    await login.asAdmin();
+    await page.goto('/admin/support');
+    await expect(page.getByRole('heading', { name: 'Support queue' })).toBeVisible({ timeout: 15_000 });
+    expect(new URL(page.url()).pathname).toBe('/admin/support');
+  });
+});
+
+test.describe('404 catch-all', () => {
+  test('an unknown URL renders the not-found page with a way back', async ({ page, consoleErrors }) => {
+    await page.goto('/this-route-does-not-exist');
+
+    await expect(page.getByText('404', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+
+    await expect(page.getByRole('link', { name: 'Back to home' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Browse properties' })).toBeVisible();
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('the not-found page keeps the consumer chrome so the user is not stranded', async ({ page }) => {
+    await page.goto('/nope/nested/deep');
+    await expect(page.getByRole('heading', { name: 'Page not found' })).toBeVisible();
+
+    // Escape hatch works.
+    await page.getByRole('link', { name: 'Browse properties' }).click();
+    await page.waitForURL('**/listings**');
+    expect(new URL(page.url()).pathname).toBe('/listings');
+  });
+
+  test('an unknown /help article resolves to the help not-found state, not the app 404', async ({ page }) => {
+    // Help articles are compiled into a virtual module and resolved client-side;
+    // a missing slug is a help-centre concern, not a routing one.
+    await page.goto('/help/a/zzz-no-such-article', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByText(/could not find that article/i).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Page not found' })).toHaveCount(0);
+  });
+});

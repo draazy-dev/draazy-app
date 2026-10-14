@@ -7,5 +7,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 /** Plans, in a stable order — the price list is rendered cheapest first. */
 public interface PlanRepository extends JpaRepository<Plan, UUID> {
 
-    List<Plan> findAllByOrderByPriceAsc();
+    List<Plan> findAllByActiveTrueOrderByPriceAsc();
 }

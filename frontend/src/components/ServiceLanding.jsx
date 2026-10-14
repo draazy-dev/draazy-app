@@ -1,31 +1,34 @@
 import NativeSelect from './ui/NativeSelect.jsx';
 import LocalitySelect from './ui/LocalitySelect.jsx';
-import { localityNames } from '../data/localities.js';
+import DateField from './ui/DateField.jsx';
 import FieldError from './ui/FieldError.jsx';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router';
+import { Link } from 'react-router';
 import Icon from './Icon.jsx';
+import { ServiceBreadcrumbs } from './Breadcrumbs.jsx';
 import MobileField from './MobileField.jsx';
 import { useScrollReveal } from '../lib/useScrollReveal.js';
+import { useSignInGate } from '../lib/useSignInGate.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { SUPPORT_PHONE, SUPPORT_TEL } from '../lib/supportContact.js';
+/* Two distinct writes: the ops lead ticket a desk calls back from, and the flow request the customer then tracks. */
 import { useToast } from '../context/ToastContext.jsx';
-/* Two distinct writes: the ops lead ticket a desk calls back from, and the flow request
-   the customer then tracks (which crosses the seam per `VITE_API_DOMAINS`). */
 import { createTicket } from '../services/ticketService.js';
 import { createServiceRequest as createFlowRequest } from '../services/serviceRequestService.js';
 import ServiceTracker from './ServiceTracker.jsx';
 import AutosaveBanner from './AutosaveBanner.jsx';
 import { useFormDraft, useFieldErrors } from '../lib/hooks.js';
 import { srcSetFor } from '../lib/imgSrcSet.js';
+/* Full-bleed hero needs a wider ladder than imgSrcSet's 960w card default, so a phone fetches ~640w rather than the
+   full 1.26 MB asset while desktop keeps the 1600w source. */
 
-/* Full-bleed hero needs a wider ladder than imgSrcSet's 960w card default, so a phone
-   fetches ~640w rather than the full 1.26 MB asset while desktop keeps the 1600w source. */
 const HERO_WIDTHS = [640, 960, 1280, 1600];
-
+const CRUMB_KEY = { packers: 'packersMovers', legal: 'propertyLegal', loans: 'homeLoans' };
 /* Shared shell for every service landing page (packers, legal, home-loans, interior, valuation). */
+
 export default function ServiceLanding({
-  team, heroGradient = 'linear-gradient(140deg,#0a1120 0%,#0c2321 52%,#0e332f 100%)',
-  heroImage, heroOverlay = 'linear-gradient(140deg,rgba(10,17,32,.93) 0%,rgba(12,35,33,.87) 52%,rgba(14,51,47,.9) 100%)',
+  desk, heroGradient = 'linear-gradient(140deg,rgb(var(--dz-c-slate-950)) 0%,rgb(var(--dz-c-teal-950)) 52%,rgb(var(--dz-c-teal-900)) 100%)',
+  heroImage, heroOverlay = 'linear-gradient(140deg,rgb(var(--dz-c-slate-950) / .93) 0%,rgb(var(--dz-c-teal-950) / .87) 52%,rgb(var(--dz-c-teal-900) / .9) 100%)',
   badge, badgeIcon = 'badge-check', titleTop, titleAccent, subtitle,
   features = [], quote, stats = [], services = [], trust = [], steps = [], faqs = [],
   cta, extra, flowType, trackerTitle, draftKey,
@@ -33,26 +36,25 @@ export default function ServiceLanding({
   const rootRef = useScrollReveal();
   const { user, isIn } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const sendToSignIn = useSignInGate();
   const formRef = useRef(null);
+  const leadRef = useRef(undefined);
 
   const initial = { name: isIn ? user?.name || '' : '', mobile: isIn ? user?.mobile || '' : '' };
   (quote?.fields || []).forEach((f) => { initial[f.name] = f.value || ''; });
   const [form, setForm] = useState(initial);
-  const [done, setDone] = useState(false);
+  const [status, setStatus] = useState('idle');
   const [trackerRefresh, setTrackerRefresh] = useState(0);
   const [openFaq, setOpenFaq] = useState(-1);
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-  // Never autosave contact PII to localStorage — matches the ignore list every service page uses,
-  // so name/mobile are not left at rest on a shared device.
-  const draft = useFormDraft(draftKey || 'dzDraft:service', form, setForm, { enabled: !!draftKey, ignore: ['name', 'mobile'] });
+  // Contact PII never reaches localStorage, so name/mobile are not left at rest on a shared device.
+  const draft = useFormDraft(draftKey || 'dzDraft:service', form, setForm, { enabled: !!draftKey, omit: ['name', 'mobile'] });
   const err = useFieldErrors(formRef);
 
   useEffect(() => { window.scrollTo(0, 0); }, []);
-
   // Apply field default/prefill values (e.g. from ?type=/?scope=/?service= query params that
   // resolve after mount) without clobbering anything the user has already entered.
+
   const fieldDefaults = (quote?.fields || []).map((f) => f.value || '').join('|');
   useEffect(() => {
     const flds = quote?.fields || [];
@@ -62,14 +64,14 @@ export default function ServiceLanding({
       flds.forEach((f) => { if (f.value && !p[f.name]) { next[f.name] = f.value; changed = true; } });
       return changed ? next : p;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- defaults should not overwrite typed form values
   }, [fieldDefaults]);
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    if (status === 'sending') return;
     // Public page, so gate on use rather than on arrival; the draft carries input across the hop.
-    // `reason=services` is plural because `resolveAuthIntent` drops any reason `AUTH_REASONS` omits.
-    if (!isIn) { navigate(`/signin?reason=services&next=${encodeURIComponent(location.pathname + location.search)}`); return; }
+    if (!isIn) { sendToSignIn('services'); return; }
     const reqd = (quote?.fields || []).find((f) => f.required && !form[f.name]);
     const ok = err.check([
       { name: 'name', ok: !!form.name.trim(), msg: 'Please enter your name.' },
@@ -80,28 +82,34 @@ export default function ServiceLanding({
     const detail = (quote?.fields || []).filter((f) => form[f.name]).map((f) => `${f.label}: ${form[f.name]}`).join(' · ');
     const service = form[quote?.serviceField] || quote?.title || 'Service request';
     const details = (quote?.fields || []).filter((f) => form[f.name]).reduce((o, f) => { o[f.name] = form[f.name]; return o; }, {});
+    /* One submit, two records that must name each other: `POST /tickets` returns the server id carried onto the
+       request as `ticketId`. */
 
-    /* One submit, two records that must name each other: `POST /tickets` returns the server id
-       carried onto the request as `ticketId`. Seam rules: docs/flows/consumer/services-calculators.md */
     const raiseLead = async () => {
       // Contact details are not sent: the page is sign-in gated above and the server copies the
       // name and number off the session, so a form-supplied pair would be a second, unverified one.
-      const ticket = await createTicket({ team, subject: service, body: detail });
+      const ticket = await createTicket({ desk, subject: service, body: detail });
       return ticket?.id || null;
     };
 
-    /* Chained, not gated: a rejected ticket yields a null ref and the flow request is still
-       created, unlinked — a failed lead must not also cost the customer their request. */
-    raiseLead()
-      .catch(() => null)
-      .then((ref) => {
-        if (!flowType) return null;
-        return createFlowRequest({ type: flowType, service, customer: { name: form.name }, ticketRef: ref, details });
-      })
-      .catch(() => {})
-      .finally(() => { if (flowType) setTrackerRefresh((value) => value + 1); });
+    /* Chained, not gated: a rejected ticket yields a null ref and the flow request is still created, unlinked — a
+       failed lead must not also cost the customer their request. */
+    setStatus('sending');
+    if (leadRef.current === undefined) leadRef.current = await raiseLead().catch(() => null);
+    const ref = leadRef.current;
+    let filed = true;
+    if (flowType) {
+      try {
+        await createFlowRequest({ type: flowType, service, customer: { name: form.name }, ticketRef: ref, details });
+      } catch {
+        filed = false;
+      }
+      setTrackerRefresh((value) => value + 1);
+    }
+    if (!filed) { setStatus('failed'); return; }
+    leadRef.current = undefined;
     draft.clear();
-    setDone(true);
+    setStatus('done');
   };
 
   const scrollToForm = () => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -109,10 +117,8 @@ export default function ServiceLanding({
   return (
     <div ref={rootRef}>
       <div>
-        {/* Hero + quote */}
-        <section className="relative overflow-hidden" style={{ background: heroGradient }}>
-          {/* A real <img>, not a CSS background — a srcset has no effect on one. Decorative;
-              the headline below carries the meaning. */}
+          {/* A real <img>, not a CSS background — a srcset has no effect on one. */}
+        <section className="theme-dark relative overflow-hidden" style={{ background: heroGradient }}>
           {heroImage && (
             <img
               src={heroImage} srcSet={srcSetFor(heroImage, HERO_WIDTHS)} sizes="100vw"
@@ -121,9 +127,10 @@ export default function ServiceLanding({
             />
           )}
           {heroImage && <div className="absolute inset-0" style={{ background: heroOverlay }} />}
-          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 18% 30%,rgba(255,255,255,.3) 0,transparent 40%),radial-gradient(circle at 85% 70%,rgba(20,184,166,.5) 0,transparent 42%)' }} />
+          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 18% 30%,rgb(var(--dz-c-white) / .3) 0,transparent 40%),radial-gradient(circle at 85% 70%,rgb(var(--dz-c-teal-500) / .5) 0,transparent 42%)' }} />
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="reveal">
+              <ServiceBreadcrumbs k={CRUMB_KEY[desk]} />
               <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs text-teal-200 font-medium mb-5"><Icon name={badgeIcon} className="w-3.5 h-3.5" /> {badge}</span>
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight">{titleTop}<br /><span className="gradient-text">{titleAccent}</span></h1>
               <p className="text-gray-200 text-base sm:text-lg mt-5 max-w-xl">{subtitle}</p>
@@ -134,9 +141,8 @@ export default function ServiceLanding({
               </div>
             </div>
 
-            {/* Quick quote form */}
             <div ref={formRef} id="quote" className="glass-card svc-quote rounded-2xl p-6 sm:p-7 reveal">
-              {!done ? (
+              {status !== 'done' ? (
                 <>
                   <div className="flex items-center gap-2 mb-1"><Icon name={quote?.icon || 'send'} className="w-5 h-5 text-teal-400" /><h2 className="text-lg font-bold text-white">{quote?.title || 'Get a Free Quote'}</h2></div>
                   <p className="text-gray-400 text-xs mb-5">{quote?.subtitle || "Fill in a few details — we'll call you back within 24 hours."}</p>
@@ -144,13 +150,13 @@ export default function ServiceLanding({
                   <form onSubmit={submit} className="space-y-4" noValidate>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-medium text-gray-300 mb-1.5">Full Name <span className="text-rose-400">*</span></label>
-                        <input value={form.name} onChange={(e) => { set('name', e.target.value); err.clear('name'); }} placeholder="Your name" className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx('name')} data-err="name" />
+                        <label htmlFor="service-landing-name" className="block text-xs font-medium text-gray-300 mb-1.5">Full Name <span className="text-rose-400">*</span></label>
+                        <input id="service-landing-name" value={form.name} onChange={(e) => { set('name', e.target.value); err.clear('name'); }} placeholder="Your name" className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx('name')} data-err="name" />
                         <FieldError show={err.has('name')}>{err.msg('name')}</FieldError>
                       </div>
                       <div>
-                        <label className="block text-xs font-medium text-gray-300 mb-1.5">Mobile Number <span className="text-rose-400">*</span></label>
-                        <div data-err="mobile"><MobileField value={form.mobile} onChange={(v) => { set('mobile', v); err.clear('mobile'); }} error={err.has('mobile')} /></div>
+                        <label htmlFor="service-landing-mobile" className="block text-xs font-medium text-gray-300 mb-1.5">Mobile Number <span className="text-rose-400">*</span></label>
+                        <div data-err="mobile"><MobileField id="service-landing-mobile" value={form.mobile} onChange={(v) => { set('mobile', v); err.clear('mobile'); }} error={err.has('mobile')} /></div>
                         <FieldError show={err.has('mobile')}>{err.msg('mobile')}</FieldError>
                       </div>
                     </div>
@@ -164,7 +170,9 @@ export default function ServiceLanding({
                               {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
                             </NativeSelect>
                           ) : f.type === 'locality' ? (
-                            <LocalitySelect value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} options={localityNames()} unrestricted={f.unrestricted} placeholder={f.placeholder || 'Select locality'} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="w-full" />
+                            <LocalitySelect value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} nameOnly unrestricted={f.unrestricted} placeholder={f.placeholder || 'Select locality'} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="w-full" />
+                          ) : f.type === 'date' ? (
+                            <DateField value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm" />
                           ) : f.type === 'textarea' ? (
                             <textarea rows={2} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 resize-none' + err.cx(f.name)} />
                           ) : f.type === 'money' ? (
@@ -176,23 +184,27 @@ export default function ServiceLanding({
                         </div>
                       ))}
                     </div>
-                    <button type="submit" className="btn-teal w-full py-3 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"><Icon name="send" className="w-4 h-4" /> {quote?.submitLabel || 'Request Free Quote'}</button>
-                    <p className="text-center text-[11px] text-gray-500">By submitting, you agree to be contacted by Draazy &amp; its verified partners.</p>
+                    {status === 'failed' ? (
+                      <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                        We couldn't file this — retry or call us on <a href={SUPPORT_TEL} className="font-semibold underline">{SUPPORT_PHONE}</a>.
+                      </div>
+                    ) : null}
+                    <button type="submit" disabled={status === 'sending'} aria-busy={status === 'sending'} className="btn-teal w-full py-3 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"><Icon name="send" className="w-4 h-4" /> {status === 'failed' ? 'Retry' : quote?.submitLabel || 'Request Free Quote'}</button>
+                    <p className="text-center text-[11px] text-gray-500">By submitting, you agree to be contacted by Draazy &amp; its service partners.</p>
                   </form>
                 </>
               ) : (
                 <div className="text-center py-8">
                   <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mb-4"><Icon name="check" className="w-7 h-7 text-emerald-400" /></div>
                   <h3 className="text-white font-bold text-lg">Request received!</h3>
-                  <p className="text-gray-400 text-sm mt-2 max-w-xs mx-auto">{quote?.successMessage || <>Our team will call you back within <span className="text-teal-400 font-semibold">24 hours</span>. Your request is queued with our verified partners.</>}</p>
-                  <button onClick={() => { setDone(false); setForm(initial); }} className="mt-5 text-teal-400 text-sm font-medium hover:underline">Submit another request</button>
+                  <p className="text-gray-400 text-sm mt-2 max-w-xs mx-auto">{quote?.successMessage || <>Our team will call you back within <span className="text-teal-400 font-semibold">24 hours</span>. Your request is queued with our service partners.</>}</p>
+                  <button onClick={() => { setStatus('idle'); setForm(initial); }} className="mt-5 text-teal-400 text-sm font-medium hover:underline">Submit another request</button>
                 </div>
               )}
             </div>
           </div>
         </section>
 
-        {/* Stats */}
         {flowType ? <ServiceTracker key={trackerRefresh} typeFilter={flowType} title={trackerTitle || 'Your requests'} /> : null}
         {stats.length ? (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
@@ -202,7 +214,6 @@ export default function ServiceLanding({
           </section>
         ) : null}
 
-        {/* Why choose */}
         {services.length ? (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-y">
             <div className="text-center mb-6 sm:mb-10 reveal">
@@ -223,7 +234,6 @@ export default function ServiceLanding({
 
         {extra}
 
-        {/* Why choose */}
         {trust.length ? (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
             <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{quote?.trustHeading || 'Why choose Draazy'}</h2></div>
@@ -239,7 +249,6 @@ export default function ServiceLanding({
           </section>
         ) : null}
 
-        {/* How it works */}
         {steps.length ? (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
             <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">How it works</h2></div>
@@ -257,7 +266,6 @@ export default function ServiceLanding({
           </section>
         ) : null}
 
-        {/* FAQ */}
         {faqs.length ? (
           <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
             <div className="text-center mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">Frequently asked questions</h2></div>
@@ -275,17 +283,16 @@ export default function ServiceLanding({
           </section>
         ) : null}
 
-        {/* CTA */}
         {cta ? (
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
             <div className="glass-card rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden reveal">
-              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%,#14b8a6 0,transparent 40%),radial-gradient(circle at 70% 50%,#0d9488 0,transparent 40%)' }} />
+              <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%,rgb(var(--dz-c-teal-500)) 0,transparent 40%),radial-gradient(circle at 70% 50%,rgb(var(--dz-c-teal-600)) 0,transparent 40%)' }} />
               <div className="relative">
                 <h2 className="text-2xl sm:text-3xl font-bold text-white">{cta.title}</h2>
                 <p className="text-gray-400 mt-3 mb-7">{cta.sub}</p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <button onClick={scrollToForm} className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name={cta.icon || 'send'} className="w-4 h-4" /> {cta.primary}</button>
-                  {cta.phone ? <a href={`tel:${cta.phone.replace(/\s/g, '')}`} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> Call {cta.phone}</a> : null}
+                  {cta.phone ? <a href={`tel:${cta.phone.replace(/[^\d+]/g, '')}`} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> Call {cta.phone}</a> : null}
                   {cta.link ? <Link to={cta.link} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2">{cta.linkLabel}</Link> : null}
                 </div>
               </div>

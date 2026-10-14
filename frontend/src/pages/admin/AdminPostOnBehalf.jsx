@@ -1,16 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { ArrowLeft, ArrowRight, Check, CheckCircle2, Send } from 'lucide-react';
-import { createListingOnBehalf, listForModeration, ownerListingStanding } from '../../services/propertyService.js';
-import { parseAmount } from '../../lib/format.js';
+import { ArrowLeft, ArrowRight, Check, CheckCircle2, MessageCircle, Send } from 'lucide-react';
+import { createListingOnBehalf, ownerListingStanding } from '../../services/propertyService.js';
+import { chaseOwner, markOutreachSent } from '../../services/outreachService.js';
+import { addNote } from '../../services/noteService.js';
+import { classNames, parseAmount } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
-import { useAuth } from '../../context/AuthContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import HScroll from '../../components/ui/HScroll.jsx';
-import { classNames } from '../../lib/format.js';
-import { STEPS, INITIAL_FORM, NONRES_TYPES, LAND_TYPES, DRAFT_KEY, commercialSubtypes, pgSharingOptions } from './post-on-behalf/constants.js';
+import {
+  STEPS, LAST_STEP, INITIAL_FORM, NONRES_TYPES, LAND_TYPES, DRAFT_KEY, commercialLabelOf, landUseFor,
+} from './post-on-behalf/constants.js';
 import { OwnerStep, PropertyStep, LocationStep, PricingStep, PhotosStep, ReviewStep } from './post-on-behalf/WizardSteps.jsx';
-import { resolveLocalitySlug } from '../../data/localities.js';
 
 function loadDraft() {
   try {
@@ -25,79 +26,19 @@ function loadDraft() {
 export default function AdminPostOnBehalf() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [localityBusy, setLocalityBusy] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [createdId, setCreatedId] = useState(null);
+  const [createdListing, setCreatedListing] = useState(null);
+  const [claimMessage, setClaimMessage] = useState(null);
   const [form, setForm] = useState(INITIAL_FORM);
   const [draft, setDraft] = useState(() => loadDraft());
   const [restored, setRestored] = useState(false);
 
-  /*
-   * How many listings each mobile already has waiting on a moderator.
-   *
-   * The owner step warns "this owner already has N pending listings", which is the one chance the
-   * desk gets to notice it is taking the same flat down twice — most often because the owner rang
-   * a second time and got a different operator. It used to be counted out of `rawDb().listings`,
-   * i.e. the mock store, which the live provider never writes to; against the API the warning was
-   * therefore always absent and always would be.
-   *
-   * Read once when the wizard opens, not per keystroke. `status: 'pending'` is the whole of what
-   * the warning is about — an approved listing is not a queue collision — and it keeps the read to
-   * the smallest slice of the queue that answers the question. The tally is by mobile because that
-   * is the only identifier the operator has while on the phone; the wizard has no user id to work
-   * with, and that is the same reason `POST /admin/properties` takes a mobile.
-   *
-   * A failure is swallowed to an empty map rather than surfaced. This is an advisory count on a
-   * screen whose actual job is to take down a listing, and the server runs its own duplicate probe
-   * on the write regardless — an error banner here would stop an operator mid-call over a hint.
-   */
-  const [pendingByMobile, setPendingByMobile] = useState(() => new Map());
-  useEffect(() => {
-    let alive = true;
-    listForModeration({ status: 'pending' })
-      .then((rows) => {
-        if (!alive) return;
-        const tally = new Map();
-        for (const l of rows || []) {
-          const m = String(l.ownerMobile || '').replace(/\D/g, '').slice(-10);
-          if (m) tally.set(m, (tally.get(m) || 0) + 1);
-        }
-        setPendingByMobile(tally);
-      })
-      .catch(() => { /* advisory only — see above */ });
-    return () => { alive = false; };
-  }, []);
-
-  /*
-   * Where this owner stands against their own plan, once the operator has typed a whole number.
-   *
-   * The desk is exempt from the freemium listing ceiling. It has to be: the ceiling is a rule about
-   * self-service, and inheriting it meant an operator on a call with somebody who owns three flats
-   * could record one of them and was refused the rest — with the owner's own wizard copy ("take one
-   * down, upgrade your plan, or refer an owner"), addressed to a member of staff, about an account
-   * that is not theirs.
-   *
-   * Exempt is not blind, though. An owner going past what they pay for is an upgrade conversation,
-   * and the operator is the only person on the call able to have it. So the numbers are shown and
-   * the desk decides — which is the whole reason the refusal was the wrong tool.
-   *
-   * Keyed off the mobile rather than read once on open, unlike the pending tally above: the tally
-   * is a slice of a queue the wizard can fetch before it knows anything, this is a question about
-   * one person and there is nobody to ask about until the field is complete. Ten digits is the gate
-   * — the server 400s on anything shorter, and asking on every keystroke would spend nine requests
-   * to answer the tenth.
-   *
-   * The response echoes the mobile back, and a reply for a number the operator has since edited is
-   * dropped. Without that, a fast typist gets one owner's standing rendered against another's name
-   * — the classic out-of-order-response bug, and a uniquely bad one here because what it mislabels
-   * is somebody's billing position.
-   *
-   * Swallowed on failure, for the same reason as the tally: advisory copy must never be able to
-   * stop a listing being taken down.
-   */
+  /* The desk is exempt from the freemium ceiling, but an owner past their plan is an upgrade conversation
+     only the operator can have. A reply for an edited number is dropped so standing never crosses owners. */
   const [standing, setStanding] = useState(null);
   const ownerMobile = form.ownerMobile;
   useEffect(() => {
@@ -122,8 +63,8 @@ export default function AdminPostOnBehalf() {
 
   const resumeDraft = () => {
     if (!draft) return;
-    setForm(draft.form);
-    setStep(Math.min(Math.max(draft.step || 1, 1), 6));
+    setForm({ ...INITIAL_FORM, ...draft.form });
+    setStep(Math.min(Math.max(draft.step || 1, 1), LAST_STEP));
     setRestored(true);
     setDraft(null);
   };
@@ -135,23 +76,17 @@ export default function AdminPostOnBehalf() {
       // the saved listing or the Review screen.
       if (field === 'propertyType') {
         next.bhk = '';
-        next.sharing = [];
-        next.sharingRents = {};
-        next.amenities = [];
-        next.furniture = [];
-        next.bathrooms = ''; next.balconies = ''; next.builtUp = ''; next.plotArea = ''; next.floorsInHouse = '';
-        next.washrooms = ''; next.shellType = ''; next.parkingSpaces = ''; next.powerBackup = false; next.pantry = false; next.camCharges = ''; next.suitableFor = [];
-        next.plotLength = ''; next.plotWidth = ''; next.openSides = ''; next.roadWidth = ''; next.cornerPlot = false; next.boundaryWall = false; next.plotZone = ''; next.naSanctioned = false; next.waterSource = ''; next.electricity = false; next.roadAccess = false; next.satbara = false;
-        if (value !== 'commercial') next.commercialType = '';
-        if (LAND_TYPES.includes(value)) {
-          next.floor = ''; next.totalFloors = ''; next.facing = ''; next.age = ''; next.furnishing = 'unfurnished';
-        }
+        next.commercialType = '';
+        next.shellType = '';
+        next.naStatus = ''; next.otherRights = ''; next.buyerEligibility = '';
+        if (NONRES_TYPES.includes(value)) next.furnishing = 'unfurnished';
+        if (LAND_TYPES.includes(value)) { next.floor = ''; next.totalFloors = ''; }
       }
       // Sale has no security deposit or preferred-tenant list — drop rent-era values.
-      if (field === 'deal' && value === 'buy') { next.deposit = ''; next.preferredTenants = []; }
+      if (field === 'deal' && value === 'buy') next.deposit = '';
       return next;
     });
-    if (errors[field]) setErrors((prev) => { const n = { ...prev }; delete n[field]; return n; });
+    setErrors((prev) => { if (prev[field] === undefined) return prev; const n = { ...prev }; delete n[field]; return n; });
   };
 
   function validateStep(s) {
@@ -159,127 +94,160 @@ export default function AdminPostOnBehalf() {
     if (s === 1) {
       if (!form.ownerName.trim()) err.ownerName = true;
       if (!/^[6-9]\d{9}$/.test(form.ownerMobile)) err.ownerMobile = true;
-    } else if (s === 2) {
       if (!form.propertyType) err.propertyType = true;
       if (form.propertyType === 'commercial' && !form.commercialType) err.commercialType = true;
-      if (!form.bhk && form.propertyType !== 'pg' && !NONRES_TYPES.includes(form.propertyType)) err.bhk = true;
-      if (form.propertyType === 'pg' && !(form.sharing && form.sharing.length)) err.sharing = true;
+      if (form.propertyType === 'commercial' && !form.shellType) err.shellType = true;
+      if (!form.bhk && !NONRES_TYPES.includes(form.propertyType)) err.bhk = true;
       if (!form.carpetArea) err.carpetArea = true;
-    } else if (s === 3) {
+      /* The server 422s this unnamed, so the operator would only see a generic toast on the last step. */
+      if (form.floor && form.totalFloors && (parseInt(form.floor, 10) || 0) > Number(form.totalFloors)) err.floor = true;
+      /* Held to the same bar as the owner's own wizard: a land listing that reaches a buyer without
+         these is one the ops desk has to chase the owner about later anyway. */
+      if (LAND_TYPES.includes(form.propertyType)) {
+        if (!form.naStatus) err.naStatus = true;
+        if (!form.otherRights) err.otherRights = true;
+        if (form.propertyType === 'farmland' && form.deal === 'buy' && !form.buyerEligibility) err.buyerEligibility = true;
+      }
+    } else if (s === 2) {
       if (!form.locality) err.locality = true;
-    } else if (s === 4) {
+    } else if (s === 3) {
       if (!form.price) err.price = true;
     }
     setErrors(err);
     return Object.keys(err).length === 0;
   }
 
-  function next() { if (!validateStep(step)) return; setStep((s) => Math.min(s + 1, 6)); }
+  function next() { if (!validateStep(step)) return; setStep((s) => Math.min(s + 1, LAST_STEP)); }
   function prev() { setStep((s) => Math.max(s - 1, 1)); }
 
   async function handleSubmit() {
-    if (!validateStep(step)) return;
+    const firstInvalidStep = [1, 2, 3].find((candidate) => !validateStep(candidate));
+    if (firstInvalidStep) { setStep(firstInvalidStep); return; }
     setSubmitting(true);
     try {
-      const isPg = form.propertyType === 'pg';
-      const land = NONRES_TYPES.includes(form.propertyType) && LAND_TYPES.includes(form.propertyType);
+      const land = LAND_TYPES.includes(form.propertyType);
       const isCommercial = form.propertyType === 'commercial';
-      const residentialHome = !NONRES_TYPES.includes(form.propertyType) && !isPg;
-      const bhkNum = (isPg || NONRES_TYPES.includes(form.propertyType)) ? 0 : (Number(form.bhk) || 0);
-      const typeMap = { flat: 'Flat', independent: 'Independent House', villa: 'Villa', pg: 'PG / Hostel', commercial: 'Commercial', openplot: 'Open Plot', farmland: 'Farm Land' };
-      const subtypeLabel = commercialSubtypes.find((s) => s.value === form.commercialType)?.label || '';
-      const typeLabel = (form.propertyType === 'commercial' && subtypeLabel) ? subtypeLabel : (typeMap[form.propertyType] || 'Property');
-      const primaryShare = isPg && Array.isArray(form.sharing) && form.sharing.length ? form.sharing[0] : '';
-      const sharingLabel = primaryShare ? (pgSharingOptions.find((o) => o.value === primaryShare)?.label || '') : '';
-      const titlePrefix = isPg && sharingLabel ? sharingLabel + ' ' : bhkNum ? bhkNum + ' BHK ' : '';
+      const sale = form.deal === 'buy';
+      const residentialHome = !NONRES_TYPES.includes(form.propertyType);
+      const datedPossession = !sale || (!land && (form.possession === 'new' || form.possession === 'under'));
+      const availableFrom = datedPossession ? form.availableFrom || '' : '';
+      const bhkNum = residentialHome ? (Number(form.bhk) || 0) : 0;
+      const typeMap = { flat: 'Flat', independent: 'Independent House', villa: 'Villa', commercial: 'Commercial', openplot: 'Open Plot', farmland: 'Farm Land' };
+      const subtypeLabel = commercialLabelOf(form.commercialType);
+      const typeLabel = (isCommercial && subtypeLabel) ? subtypeLabel : (typeMap[form.propertyType] || 'Property');
+      const titlePrefix = bhkNum ? bhkNum + ' BHK ' : '';
       const title = titlePrefix + typeLabel + ' in ' + (form.locality || 'Pune');
-
+      const society = form.societyId ? form.society : '';
+      /* Only keys `toListingCreate` reads travel; everything else the owner adds after claiming. */
       const listing = {
-        title, type: typeLabel,
-        bhk: bhkNum ? bhkNum + ' BHK' : '', bhkNum, deal: form.deal,
-        bath: residentialHome ? (Number(form.bathrooms) || 0) : 0,
-        balconies: residentialHome ? (Number(form.balconies) || 0) : 0,
-        builtUpArea: Number(form.builtUp) || 0,
-        plotArea: Number(form.plotArea) || 0,
-        floorsInHouse: Number(form.floorsInHouse) || 0,
-        furniture: form.furniture || [],
-        ...(isPg && { shareType: 'pg', sharing: form.sharing, sharingRents: form.sharingRents || {}, room: 'shared' }),
-        ...(isCommercial && { shellType: form.shellType || '', washrooms: form.washrooms || '', parkingSpaces: Number(form.parkingSpaces) || 0, powerBackup: form.powerBackup, pantry: form.pantry, camCharges: parseAmount(form.camCharges), suitableFor: form.suitableFor || [] }),
-        ...(land && { plotLength: Number(form.plotLength) || 0, plotWidth: Number(form.plotWidth) || 0, openSides: form.openSides || '', roadWidth: Number(form.roadWidth) || 0, cornerPlot: form.cornerPlot, boundaryWall: form.boundaryWall, plotZone: form.plotZone || '', naSanctioned: form.naSanctioned, waterSource: form.waterSource || '', electricity: form.electricity, roadAccess: form.roadAccess, satbara: form.satbara }),
+        title, type: typeLabel, bhkNum, deal: form.deal,
         locality: form.locality || 'Pune',
-        localitySlug: resolveLocalitySlug(form.locality || 'Pune'),
-        area: Number(form.carpetArea) || 0, floor: form.floor || 'N/A',
-        totalFloors: Number(form.totalFloors) || 0, facing: form.facing || '',
-        age: form.age || 'new', furnishing: form.furnishing,
-        price: parseAmount(form.price), priceNegotiable: form.priceNegotiable,
-        monthlyMaintenance: parseAmount(form.maintenance),
-        owner: form.ownerName, ownerMobile: form.ownerMobile,
-        ownerVerified: false, ownershipVerified: false,
-        image: form.photos[0] || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=600&q=80',
-        gallery: form.photos, amenities: form.amenities || [], rera: form.reraId || '',
-        transactionType: form.deal === 'buy' ? (form.transactionType || '') : '',
-        possession: form.possession || 'ready',
-        ownership: form.deal === 'buy' ? (form.ownership || '') : '',
-        loanAvailable: residentialHome ? form.loanAvailable : false,
-        available: (form.deal === 'rent' || form.possession === 'available') ? (form.availableFrom || '') : '',
-        tenants: isPg ? (form.pgGender || 'any') : (form.preferredTenants || []).join(','),
-        food: isPg ? (form.pgMeals === 'veg' ? 'veg' : 'any') : 'any',
-        lockin: form.lockIn || '0', notice: form.noticePeriod || '1', agreementDuration: form.agreementDuration || '11',
-        description: form.description || '', society: form.society || '',
-        address: form.address || '', landmark: form.landmark || '',
-        deposit: form.deal === 'rent' ? parseAmount(form.deposit) : 0,
-        /* `postedByAdmin`, `postedByStaff` and `postedByStaffMobile` used to be set here and sent
-           in the body. They are server-set now — see `createListingOnBehalf` — and a client that
-           names the actor is a client asking to be believed about it. `owner`/`ownerMobile` go as
-           the request's own arguments rather than listing fields, because they decide ownership. */
-        adminNotes: form.ownerNotes || '', status: 'pending',
+        localitySlug: form.localitySlug || undefined,
+        area: Number(form.carpetArea) || 0,
+        floor: land || !form.floor ? undefined : parseInt(form.floor, 10) || 0,
+        totalFloors: land ? undefined : form.totalFloors,
+        furnishing: residentialHome ? form.furnishing : undefined,
+        price: parseAmount(form.price),
+        images: form.photos,
+        reraId: sale && !land ? form.reraId.trim() : '',
+        landUse: landUseFor(form.propertyType),
+        /* Possession is a sale-only question here and on the consumer form, so a rental or a plot
+           states nothing rather than claiming "ready to move". `writePossession` omits the key. */
+        construction: sale && !land ? (form.possession || 'ready') : undefined,
+        available: availableFrom,
+        society,
+        societyId: form.societyId || undefined,
+        lat: form.lat ?? undefined,
+        lng: form.lng ?? undefined,
+        pincode: form.pincode || undefined,
+        address: form.address || '',
+        deposit: sale ? 0 : parseAmount(form.deposit),
+        formDetails: {
+          society,
+          availableFrom,
+          ...(isCommercial && {
+            commercialType: form.commercialType || '',
+            shellType: form.shellType || '',
+          }),
+          ...(land && {
+            naStatus: form.naStatus || '',
+            otherRights: form.otherRights || '',
+            buyerEligibility: sale && form.propertyType === 'farmland' ? (form.buyerEligibility || '') : '',
+          }),
+        },
       };
 
       const created = await createListingOnBehalf(form.ownerMobile, form.ownerName, listing);
-      /*
-       * `OnBehalfListingService` records two audit rows for this one call —
-       * `user.provision_on_behalf` when the owner account is created, and
-       * `property.create_on_behalf` for the listing — both naming the staff member from their
-       * token. The `logAudit` line that stood here wrote a third, browser-local sentence that no
-       * reader on this deployment can see.
-       *
-       * `logStaffActivity` has now gone the same way, and the comment that kept it was wrong on the
-       * point it turned on. It said the Staff Activity console was "a different record with a
-       * different purpose and **no server home yet**". It has one: `AdminStaffActivity.jsx` reads
-       * `GET /admin/staff-activity`, which is `audit_log` narrowed to back-office actors, and
-       * `property.create_on_behalf` is exactly such a row. So the browser-local write was not
-       * feeding that console on a live build — nothing read it — while the console showed the
-       * server's version of the same event either way.
-       *
-       * Decision 40 ("keep post-on-behalf visible on Staff Activity … the operator-facing activity
-       * surface keeps that event as a first-class item") is unaffected and still satisfied: the
-       * event is on that surface, from the server, which is the only place it was ever visible to
-       * a second operator.
-       */
-      setCreatedId(created.id);
+      /* No client-side audit write: `OnBehalfListingService` records both rows itself, naming the
+         staff member from their token, and the Staff Activity console reads those. */
+      setCreatedListing(created);
+      setClaimMessage(null);
       setSuccess(true);
       clearDraft();
-      toast('Listing created \u2014 owner will receive claim link', 'success');
-    } catch {
+      toast('Listing created \u2014 send the owner their claim link', 'success');
+      /* `ListingCreate` has no notes field, so the call notes go to the listing's internal-notes
+         timeline. The listing already exists, so a failure here is reported, not retried. */
+      if (form.ownerNotes.trim()) {
+        addNote('listing', created.uuid, form.ownerNotes)
+          .catch(() => toast('Listing created, but the internal note was not saved', 'error'));
+      }
+    } catch (err) {
+      /* A 422 names its field and `writePossession` names an unmappable value, but the toast can say
+         neither — so log it, or staff can only report "it failed". */
+      console.error(err);
       toast('Failed to create listing \u2014 please try again', 'error');
     } finally {
       setSubmitting(false);
     }
   }
 
+  // Opened synchronously inside the click so popup blockers allow it; navigated once the server records the message.
+  const sendClaimLink = async () => {
+    const handoff = window.open('', '_blank');
+    try {
+      const prepared = await chaseOwner(createdListing.uuid || createdListing.id, 'wa-onboard');
+      if (handoff) handoff.location = prepared.handoffLink;
+      setClaimMessage({ id: prepared.id, sent: false });
+    } catch (err) {
+      if (handoff) handoff.close();
+      toast(err?.message || 'Could not prepare the claim link', 'error');
+    }
+  };
+
+  const confirmClaimSent = async () => {
+    try {
+      await markOutreachSent(createdListing.uuid || createdListing.id, claimMessage.id);
+      setClaimMessage({ ...claimMessage, sent: true });
+    } catch (err) {
+      toast(err?.message || 'Could not mark the claim link as sent', 'error');
+    }
+  };
+
   if (success) {
-    const hasPhotos = form.photos.length > 0;
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-teal-500/15"><CheckCircle2 className="h-10 w-10 text-teal-400" /></div>
-        <h2 className="text-2xl font-bold mb-2">Listing Sent to Owner</h2>
-        <p className="text-gray-400 mb-2 max-w-md">A claim link has been sent to <span className="text-white font-medium">{form.ownerName}</span> (+91 {form.ownerMobile}). {hasPhotos
-          ? <>Photos are already attached — once they complete Aadhaar verification, the listing will appear in your verification queue.</>
-          : <>Once they upload photos &amp; complete Aadhaar verification, the listing will appear in your verification queue.</>}</p>
-        <p className="text-sm text-gray-500 mb-8">Listing ID: {createdId}</p>
-        <div className="flex gap-3">
+        <h2 className="text-2xl font-bold mb-2">Listing created</h2>
+        <p className="text-gray-400 mb-2 max-w-md">Saved under <span className="text-white font-medium">{form.ownerName}</span> (+91 {form.ownerMobile}). It goes live once they open the claim link and confirm it&apos;s theirs.</p>
+        <p className="text-sm text-gray-500 mb-6">Listing ID: {createdListing?.id}</p>
+        <div className="mb-8">
+          {!claimMessage && (
+            <button onClick={sendClaimLink} className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-emerald-400 transition">
+              <MessageCircle className="h-4 w-4" /> Send claim link on WhatsApp
+            </button>
+          )}
+          {claimMessage && !claimMessage.sent && (
+            <button onClick={confirmClaimSent} className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-emerald-400 transition">
+              <Check className="h-4 w-4" /> I&apos;ve sent it
+            </button>
+          )}
+          {claimMessage?.sent && (
+            <p role="status" className="inline-flex items-center gap-2 text-sm font-medium text-emerald-300"><Check className="h-4 w-4" /> Claim link sent</p>
+          )}
+        </div>
+        <div className="flex flex-wrap justify-center gap-3">
           <button onClick={() => navigate('/admin/properties')} className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium hover:bg-white/10 transition">View All Properties</button>
-          <button onClick={() => { setSuccess(false); setStep(1); setForm(INITIAL_FORM); setRestored(false); }} className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-teal-400 transition">Post Another</button>
+          <button onClick={() => { setSuccess(false); setStep(1); setForm(INITIAL_FORM); setRestored(false); setClaimMessage(null); }} className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-teal-400 transition">Post Another</button>
         </div>
       </div>
     );
@@ -287,12 +255,20 @@ export default function AdminPostOnBehalf() {
 
   const stepContent = () => {
     switch (step) {
-      case 1: return <OwnerStep form={form} set={set} errors={errors} pendingByMobile={pendingByMobile} standing={standing} />;
-      case 2: return <PropertyStep form={form} set={set} errors={errors} />;
-      case 3: return <LocationStep form={form} set={set} errors={errors} />;
-      case 4: return <PricingStep form={form} set={set} errors={errors} />;
-      case 5: return <PhotosStep form={form} set={set} />;
-      case 6: return <ReviewStep form={form} />;
+      case 1: return (
+        <div className="space-y-6">
+          <OwnerStep form={form} set={set} errors={errors} standing={standing} />
+          <div className="border-t border-white/10 pt-6"><PropertyStep form={form} set={set} errors={errors} /></div>
+        </div>
+      );
+      case 2: return <LocationStep form={form} set={set} errors={errors} onLocalityBusy={setLocalityBusy} />;
+      case 3: return <PricingStep form={form} set={set} errors={errors} />;
+      case 4: return (
+        <div className="space-y-6">
+          <PhotosStep form={form} set={set} />
+          <div className="border-t border-white/10 pt-6"><ReviewStep form={form} /></div>
+        </div>
+      );
       default: return null;
     }
   };
@@ -311,7 +287,7 @@ export default function AdminPostOnBehalf() {
         </div>
       )}
 
-      {/* Rent vs Sale is the first decision an agent makes on the call — surface it up
+      {/* Rent vs Sale is the first decision staff make on the call — surface it up
           top and keep it visible on every step (it drives deposit, price labels & fields). */}
       <div className="mb-6 max-w-2xl">
         <span className="mb-1.5 block text-sm font-medium text-gray-300">Listing for</span>
@@ -340,8 +316,8 @@ export default function AdminPostOnBehalf() {
         {stepContent()}
         <div className="mt-8 flex items-center justify-between">
           {step > 1 ? <button onClick={prev} className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium hover:bg-white/10 transition"><ArrowLeft className="h-4 w-4" /> Back</button> : <div />}
-          {step < 6 ? (
-            <button onClick={next} className="flex items-center gap-1.5 rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-teal-400 transition">Next <ArrowRight className="h-4 w-4" /></button>
+          {step < LAST_STEP ? (
+            <button onClick={next} disabled={localityBusy} className="flex items-center gap-1.5 rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-teal-400 transition disabled:opacity-50">Next <ArrowRight className="h-4 w-4" /></button>
           ) : (
             <button onClick={handleSubmit} disabled={submitting} className="flex items-center gap-1.5 rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-teal-400 transition disabled:opacity-50">{submitting ? 'Saving...' : 'Send to Owner'} <Send className="h-4 w-4" /></button>
           )}

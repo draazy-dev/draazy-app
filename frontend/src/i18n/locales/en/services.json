@@ -15,16 +15,15 @@
         "chip": {
           "govt": "Govt-registered",
           "doorstep": "Doorstep biometric",
-          "fast": "Ready in 48 hrs"
+          "fast": "Track every step online"
         },
         "cta": "Start rent agreement"
       },
       "stat": {
-        "verifiedProperties": "Verified Properties",
-        "happyFamilies": "Happy Families",
-        "underOneRoof": "Under One Roof",
-        "brokerageCharged": "Brokerage Charged",
-        "servicesSuffix": "+ Services"
+        "localityGuides": "Pune locality guides",
+        "otpVerified": "OTP-verified members",
+        "underOneRoof": "Services under one roof",
+        "brokerageCharged": "Brokerage Charged"
       },
       "cat": {
         "all": "All Services",
@@ -40,7 +39,7 @@
       "card": {
         "buyHome": {
           "name": "Buy a Home",
-          "desc": "Browse 10,000+ verified, RERA-compliant listings across Pune with genuine photos."
+          "desc": "Browse owner-direct homes for sale across Pune, with ID, ownership and RERA badges where they apply."
         },
         "rentHome": {
           "name": "Rent a Home",
@@ -56,7 +55,7 @@
         },
         "homeLoans": {
           "name": "Home Loans & EMI",
-          "desc": "Compare rates from 25+ banks, check eligibility and plan repayments with a built-in EMI calculator."
+          "desc": "Compare offers from partner banks, check eligibility and plan repayments with a built-in EMI calculator."
         },
         "propertyLegal": {
           "name": "Property & Legal",
@@ -68,11 +67,11 @@
         },
         "interior": {
           "name": "Interior & Renovation",
-          "desc": "Designed-in-3D interiors by trusted partners with a 10-year warranty."
+          "desc": "Interiors designed in 3D by partner designers, with an itemised quote upfront."
         },
         "valuation": {
           "name": "Property Valuation",
-          "desc": "Get a fair, data-backed estimate and a certified valuation report in 48 hours."
+          "desc": "Get a free instant estimate, then a certified valuation report from a registered valuer."
         }
       },
       "step": {
@@ -86,27 +85,13 @@
         },
         "visit": {
           "t": "Visit & Decide",
-          "d": "Book site visits and chat directly with verified owners."
+          "d": "Book site visits and chat directly with owners."
         },
         "moveIn": {
           "t": "Move In",
           "d": "Close with loans, legal, movers & interiors — all sorted."
         }
       },
-      "testi": [
-        {
-          "role": "Bought a 3 BHK in Baner",
-          "quote": "We found our flat, got the loan and even the movers — all through Draazy. Zero brokerage, zero stress."
-        },
-        {
-          "role": "Rented in Wakad",
-          "quote": "Chatted directly with the owner, signed the rent agreement online. The whole thing took two days."
-        },
-        {
-          "role": "Sold & relocated",
-          "quote": "The valuation report and legal help made selling effortless. Interiors team set up our new home beautifully."
-        }
-      ],
       "pack": {
         "movers": "Packers & Movers",
         "clean": "Deep Cleaning",
@@ -134,7 +119,6 @@
       "signInRequiredAria": "{{name}} — sign in required",
       "howItWorksTitle": "How Draazy works",
       "howItWorksSub": "Four simple steps from search to settled in.",
-      "testimonialsTitle": "Loved by Pune homeowners",
       "packBadge": "Bundle & save",
       "packTitle": "Draazy Move-in Pack",
       "packDesc": "Closing a deal? Bundle everything for move-in and save. Pick what you need:",
@@ -166,14 +150,25 @@
     "ra": {
       "trackerTitle": "Your rent agreement requests",
       "reissueHint": "Reissuing the agreement for this flat — we've prefilled the property so you can update the group.",
+      "renewHint": "Renewal — check the rent and dates, then submit. {{price}} + government charges.",
+      "listingOtherFlat": "Your saved draft is for a different flat, so we kept it. To use this listing instead, pick it from your listings on the Property step.",
       "back": "Back",
       "next": "Next",
       "validationRequired": "Please complete the highlighted required fields.",
+      "errorCount_one": "{{count}} field needs attention.",
+      "errorCount_other": "{{count}} fields need attention.",
       "declarationRequired": "Please confirm the declaration to proceed.",
       "detailsTooLong": "This form is {{over}} characters longer than we can save. Please shorten \u201c{{field}}\u201d and try again.",
       "saveError": "We couldn't save your request — your device storage may be full. Remove large uploads and try again.",
-      "identitiesFailed": "Your request is submitted, but we couldn't pass on the PAN and Aadhaar details. Our team will ask you for them before drafting.",
-      "docsFailed": "Your request is submitted, but we couldn't upload one or more of your documents. Our team will ask you for them before drafting.",
+      "identityReminder": {
+        "note": "For privacy, saved drafts do not keep PAN or Aadhaar numbers.",
+        "reEnter": "Re-enter: {{fields}}",
+        "licensor": "Licensor {{n}}",
+        "tenant": "Tenant {{n}}",
+        "witness": "Witness {{n}}",
+        "pan": "PAN",
+        "aadhaar": "Aadhaar"
+      },
       "doneInviteTitle": "Request sent to the tenant!",
       "doneOwnerTitle": "Request submitted!",
       "doneInviteDesc": "We've asked the tenant to fill in their details & documents. Once they're done, our team prepares the draft for your approval.",
@@ -183,6 +178,20 @@
       "donePaymentPendingTitle": "We couldn't confirm your payment yet",
       "donePaymentPendingDesc": "Your rent agreement details are saved. If you've just paid, your bank may still be confirming it — check your requests in a few minutes before paying again. Our team starts drafting once the payment is confirmed.",
       "donePaymentPendingCta": "Complete payment",
+      "police": {
+        "title": "Tell the police about your tenant",
+        "pending": "After registration, the owner must submit tenant information to the police commissionerate. Draazy does not file it; our team marks this done after the owner confirms.",
+        "done": "Owner confirmation recorded. This post-registration step is complete.",
+        "copyNote": "Use the registered agreement copy — that is what the police portal will ask for.",
+        "pune": "Pune City Police tenant information",
+        "pcmc": "Pimpri-Chinchwad Police tenant information",
+        "reference": "Reference: {{ref}}"
+      },
+      "formC": {
+        "title": "Form C / FRRO reminder",
+        "notice": "Foreign national tenant: the owner must submit Form C to FRRO on indiafrro.gov.in within 24 hours of the foreigner's arrival or occupation. Draazy reminds you, but the owner files it.",
+        "tracker": "Foreign national tenant: after registration, the owner must submit Form C to FRRO on indiafrro.gov.in within 24 hours of the foreigner's arrival or occupation. Draazy does not file this for you."
+      },
       "invite": {
         "sendTitle": "Send the invite to your tenant",
         "sendDesc": "Request saved. Send the secure link to {{mobile}} so they can add their details & documents.",
@@ -200,7 +209,12 @@
         "readonlyTitle": "Set up by the owner — view only",
         "readonlyDesc": "You can review every part of this agreement, but only your Tenant details can be edited here.",
         "editableTitle": "Your details — please complete this step",
-        "editableDesc": "Add your tenant information and documents. This is the only section you need to fill in."
+        "editableDesc": "Add your tenant information and documents. This is the only section you need to fill in.",
+        "sendTitle_owner": "Send the invite to the owner",
+        "sendNote_owner": "The owner opens the link, signs in, and fills only their part. You'll be notified once they're done.",
+        "readonlyTitle_owner": "Set up by the tenant — view only",
+        "readonlyDesc_owner": "You can review every part of this agreement, but only your Owner details can be edited here.",
+        "editableDesc_owner": "Add your owner information, ID and ownership papers. This is the only section you need to fill in."
       },
       "stepLabel": {
         "0": "Property",
@@ -230,26 +244,104 @@
         "subtitle": "Tell us about the property being rented.",
         "pickerQuestion": "Which property is this agreement for?",
         "enterManually": "Or enter details manually below ↓",
-        "agreementType": "Agreement Type",
-        "typeResidential": "Residential",
-        "typeCommercial": "Commercial",
         "propertyType": "Property Type",
         "furnishing": "Furnishing",
         "flatNo": "Flat / House No.",
         "flatNoPlaceholder": "e.g. B-1204",
         "flatNoErr": "Enter the flat / house number.",
         "society": "Building / Society Name",
-        "societyPlaceholder": "e.g. Skyline Heights",
-        "societyErr": "Enter the building / society name.",
+        "societyPlaceholder": "Search your society on Google Maps",
+        "societyErr": "Pick your society, or choose Not on Google Maps.",
+        "buildingText": "Building name (as on agreement)",
         "locality": "Area / Locality",
         "localityPlaceholder": "e.g. Baner",
-        "localityErr": "Enter the area / locality.",
+        "localityErr": "Pick the area / locality from the suggestions.",
+        "gramPanchayat": "Is the property under a gram panchayat?",
+        "gramPanchayatYes": "Yes",
+        "gramPanchayatNo": "No",
+        "gramPanchayatErr": "Choose Yes or No.",
         "city": "City",
+        "taluka": "Taluka",
+        "talukaPlaceholder": "Select taluka",
+        "talukaErr": "Choose the Pune taluka.",
+        "villageCity": "Village / City",
+        "villageCityPlaceholder": "e.g. Baner, Pune",
+        "villageCityErr": "Enter the city or village from the Index II.",
+        "roadName": "Road name (optional)",
+        "roadNamePlaceholder": "e.g. Baner Road",
+        "policeStation": "Police station (optional)",
+        "policeStationPlaceholder": "e.g. Chaturshringi",
         "pincode": "Pincode",
         "pincodePlaceholder": "411045",
         "pincodeErr": "Enter a valid 6-digit pincode.",
-        "builtUpArea": "Built-up Area (sq.ft.)",
-        "areaPlaceholder": "e.g. 850"
+        "pincodeState": "We draft Maharashtra agreements only — enter the flat's Maharashtra pincode (it starts 40 to 44).",
+        "area": "Area",
+        "areaErr": "Enter the flat's area — it is on your Index II or tax bill.",
+        "areaBasis": "Measured as",
+        "areaBasisOpt": {
+          "carpet": "Carpet",
+          "built-up": "Built-up"
+        },
+        "areaUnit": "Unit",
+        "areaUnitOpt": {
+          "sqft": "sq ft",
+          "sqm": "sq m"
+        },
+        "floor": "Floor",
+        "floorPlaceholder": "0 = ground",
+        "floorErr": "Enter a floor from 0 to {{max}}.",
+        "surveyNo": "CTS / Survey No. (optional)",
+        "surveyNoPlaceholder": "From your Index II or property tax bill",
+        "attributes": "Property attributes",
+        "attributesHint": "Add the CTS, survey, plot or property numbers printed on the Index II.",
+        "attributeAdd": "Add attribute",
+        "attributeKind": "Kind",
+        "attributeKindErr": "Choose the attribute type.",
+        "attributeNumber": "Number",
+        "attributeNumberPlaceholder": "e.g. 1234/5",
+        "attributeNumberErr": "Enter the number, up to 80 characters.",
+        "attributesErr": "Check the property attribute rows.",
+        "galleryArea": "Gallery / balcony area (optional)",
+        "galleryAreaUnit": "Gallery area unit",
+        "optionalAreaErr": "Enter an area from 1 to 100000, with up to two decimals.",
+        "areaPlaceholder": "e.g. 850",
+        "smallAreaPlaceholder": "e.g. 40",
+        "commercialNote": "This agreement is for homes only. Renting a shop, office or godown carries different tax rules —",
+        "commercialCta": "get a commercial agreement from our legal desk",
+        "propTypeErr": "Choose a residential property type. Commercial premises need a commercial agreement."
+      },
+      "party": {
+        "type": "Party type",
+        "typeOpt": {
+          "individual": "Individual",
+          "entity": "Company or firm"
+        },
+        "entityNote": "Company, LLP, partnership, trust or society parties need board resolutions, authorised signatory checks and entity PAN, so this self-serve flow cannot handle them.",
+        "entityErr": "Company or firm parties need the legal desk quote flow.",
+        "quoteCta": "Get a quote from the legal desk",
+        "residency": "Residency",
+        "residencyOpt": {
+          "resident": "Resident Indian with Aadhaar",
+          "nri": "NRI / Indian citizen abroad",
+          "foreign": "Foreign national"
+        },
+        "offlineNote": "This party cannot use Aadhaar e-registration. Our staff will book an SRO appointment; the party must attend with passport, or a registered Power of Attorney can sign.",
+        "passport": "Passport number",
+        "passportPlaceholder": "e.g. Z1234567",
+        "passportErr": "Enter a passport number, 6 to 20 letters or digits.",
+        "visaOci": "Visa / OCI details",
+        "visaOciPlaceholder": "Visa, OCI or e-FRRO reference",
+        "visaOciErr": "Enter visa or OCI details for a foreign national.",
+        "frro": "FRRO registration number (optional)",
+        "frroPlaceholder": "If already registered",
+        "mother": "Mother's name",
+        "motherPlaceholder": "As per identity proof",
+        "motherErr": "Enter mother's name.",
+        "dob": "Date of birth",
+        "dobErr": "Choose a valid date of birth for an adult party.",
+        "alias": "Alias name (optional)",
+        "aliasPlaceholder": "If used in older papers",
+        "aliasErr": "Keep alias within 80 characters."
       },
       "owner": {
         "title": "Owner / Licensor Details",
@@ -260,14 +352,17 @@
         "age": "Age",
         "agePlaceholder": "e.g. 42",
         "gender": "Gender",
+        "genderPlaceholder": "Select",
+        "occupationPlaceholder": "e.g. Business, Retired",
         "pan": "PAN Number",
         "panErr": "Enter a valid PAN (e.g. ABCDE1234F).",
         "aadhaar": "Aadhaar Number",
         "aadhaarPlaceholder": "12-digit Aadhaar",
-        "aadhaarErr": "Enter a valid 12-digit Aadhaar number.",
+        "aadhaarErr": "Enter a valid Aadhaar number — 12 digits, and it must pass the Aadhaar check digit.",
         "mobile": "Mobile",
         "mobilePlaceholder": "10-digit mobile",
         "mobileErr": "Enter a valid 10-digit mobile number.",
+        "mobileNotYou": "Only the owner fills this part. Use your own number if you own the flat, or invite the owner.",
         "email": "Email",
         "address": "Permanent Address",
         "addressPlaceholder": "Full permanent address",
@@ -277,12 +372,60 @@
         "doc": {
           "o-pan": "PAN Card",
           "o-aadhaar": "Aadhaar Card",
+          "o-passport": "Passport Scan",
+          "o-visa": "Visa / OCI Scan",
           "o-photo": "Passport Photo",
-          "o-own": "Ownership Proof (Index II / Bill)"
+          "o-own": "Ownership Proof (Index II / Bill)",
+          "o-poa": "Registered Power of Attorney"
         },
         "vaultNote": "PAN, Aadhaar & ownership proof are saved to your dashboard Documents — no need to upload them twice.",
         "vaultReused": "From your Documents",
-        "vaultSaved": "Saved to your Documents"
+        "vaultSaved": "Saved to your Documents",
+        "capacity": "You are signing as",
+        "capacityHint": "Every owner on the title must sign the agreement, either in person or through a registered Power of Attorney.",
+        "capacityErr": "With co-owners listed, choose Co-owner or Power of Attorney holder.",
+        "capacityOpt": {
+          "owner": "Sole owner",
+          "co-owner": "Co-owner",
+          "poa": "Power of Attorney holder"
+        },
+        "poa": {
+          "title": "Power of Attorney details",
+          "note": "The Sub-Registrar checks the POA before accepting your signature. Carry the registered original to the visit.",
+          "principal": "Owner you are signing for",
+          "regNo": "POA registration number",
+          "sro": "Registered at (Sub-Registrar office)",
+          "sroPlaceholder": "e.g. Haveli No. 11, Pune",
+          "date": "POA registration date",
+          "required": "Required when signing under a Power of Attorney.",
+          "dateErr": "Enter the POA registration date — it can't be in the future."
+        },
+        "coDoc": {
+          "pan": "PAN Card",
+          "aadhaar": "Aadhaar Card",
+          "passport": "Passport Scan",
+          "visa": "Visa / OCI Scan",
+          "photo": "Passport Photo",
+          "poa": "Registered Power of Attorney"
+        },
+        "coOwners": {
+          "title": "Co-owners",
+          "hint": "Add everyone else on the title deed or Index II. All co-owners are licensors and must sign.",
+          "add": "Add co-owner",
+          "label": "Co-owner {{n}}",
+          "nameErr": "Enter the co-owner's full name as on the title deed."
+        },
+        "fillTitle": "I'm the owner — I'll fill this",
+        "fillDesc": "Enter the owner's details & upload their ID and ownership papers.",
+        "inviteTitle": "I'm the tenant — invite the owner",
+        "inviteDesc": "Send a request by mobile — the owner fills only their part.",
+        "inviteMobile": "Owner's Mobile Number",
+        "inviteMobileErr": "Enter the owner's 10-digit mobile number.",
+        "inviteName": "Owner's Name (optional)",
+        "inviteNamePlaceholder": "e.g. Rajesh Deshpande",
+        "messagePlaceholder": "Add a short note for the owner…",
+        "inviteInfo": "The owner gets a request to fill only their own details, ID and ownership papers. You fill your tenant details, the terms and the witnesses, and you pay once the owner is done.",
+        "inviteFinishNote": "You don't have to wait for the owner — finish your details, the terms and witnesses now and submit. The owner's step stays pending until they add their own details and papers."
       },
       "tenant": {
         "title": "Tenant / Licensee Details",
@@ -309,7 +452,7 @@
         "panErr": "Enter a valid PAN (e.g. ABCDE1234F).",
         "aadhaar": "Aadhaar Number",
         "aadhaarPlaceholder": "12-digit Aadhaar",
-        "aadhaarErr": "Enter a valid 12-digit Aadhaar number.",
+        "aadhaarErr": "Enter a valid Aadhaar number — 12 digits, and it must pass the Aadhaar check digit.",
         "mobile": "Mobile",
         "mobilePlaceholder": "10-digit mobile",
         "mobileErr": "Enter a valid 10-digit mobile number.",
@@ -322,7 +465,71 @@
           "0": "PAN Card",
           "1": "Aadhaar Card",
           "2": "Passport Photo",
-          "3": "Employment / Income Proof"
+          "3": "Employment / Income Proof",
+          "pan": "PAN Card",
+          "aadhaar": "Aadhaar Card",
+          "passport": "Passport Scan",
+          "visa": "Visa / OCI Scan",
+          "photo": "Passport Photo",
+          "income": "Employment / Income Proof",
+          "addressproof": "Address Proof",
+          "prevaddressproof": "Previous Address Proof"
+        },
+        "police": {
+          "title": "Tenant police record",
+          "permanentSame": "Permanent address is the same as the tenant address above",
+          "previousSame": "Previous address is the same as permanent address",
+          "address": "Address",
+          "addressPlaceholder": "Flat, building, street, locality",
+          "addressErr": "Enter the address.",
+          "pincode": "Pincode",
+          "pincodeErr": "Enter a 6-digit pincode.",
+          "village": "Village / city",
+          "villagePlaceholder": "e.g. Shivajinagar",
+          "policeStation": "Police Station",
+          "policeStationPlaceholder": "e.g. Deccan Police Station",
+          "addressProofType": "Address proof type",
+          "previousAddressProofType": "Previous address proof type",
+          "uidProofHint": "The Aadhaar scan above is used for this proof.",
+          "addressProofOpt": {
+            "driving-license": "Driving License",
+            "election-card": "Election Card",
+            "passport": "Passport",
+            "uid": "UID (Aadhaar)"
+          },
+          "workplaceAddress": "Workplace address",
+          "workplacePlaceholder": "Company / office address",
+          "workplaceErr": "Enter the workplace address, unless the tenant is a student, homemaker or retired.",
+          "workIdProofType": "Work ID proof type",
+          "workIdPlaceholder": "e.g. Employee ID, offer letter",
+          "required": "Required.",
+          "occupants": "Family members / co-occupants",
+          "addOccupant": "Add person",
+          "removeOccupant": "Remove person",
+          "occupantType": "Tenant type",
+          "occupantTypeOpt": {
+            "family": "Family",
+            "co-tenant": "Co-tenant"
+          },
+          "fullName": "Full name",
+          "nameErr": "Enter the person's full name.",
+          "relation": "Relation",
+          "selectRelation": "Select relation",
+          "relationOpt": {
+            "father": "Father",
+            "mother": "Mother",
+            "spouse": "Spouse",
+            "son": "Son",
+            "daughter": "Daughter",
+            "brother": "Brother",
+            "sister": "Sister",
+            "friend": "Friend",
+            "other": "Other"
+          },
+          "age": "Age",
+          "ageErr": "Enter an age from 0 to 120.",
+          "mobile": "Mobile",
+          "occupantsHint": "Keep this aligned with the occupants count on the Terms step."
         },
         "addAnother": "Add another tenant",
         "inviteMobile": "Tenant's Mobile Number",
@@ -348,9 +555,10 @@
         "rentErr": "Enter the monthly rent.",
         "deposit": "Refundable Security Deposit (₹)",
         "depositPlaceholder": "e.g. 100000",
-        "depositErr": "Enter the security deposit.",
+        "depositErr": "Enter the security deposit — 0 if there is none.",
         "nrDeposit": "Non-refundable Deposit / Premium (₹)",
-        "increment": "Annual Rent Increment (%)",
+        "increment": "Rent Increase (%)",
+        "incrementEvery": "Rent increases every",
         "lockin": "Lock-in Period (months)",
         "notice": "Notice Period (months)",
         "dueDay": "Rent Due Day (of month)",
@@ -360,51 +568,166 @@
           "Tenant": "Tenant",
           "Owner": "Owner"
         },
-        "regArea": "Registration Area (affects registration fee)",
+        "regArea": "Registration Area",
         "regUrban": "Municipal / Urban",
         "regRural": "Gram Panchayat / Rural",
         "furniture": "Furniture & Amenities provided",
         "furnitureHint": "Tap to add an item, then set its quantity. This list is shared with our staff and included in your agreement.",
         "itemsIncluded": "Items included",
         "customTag": "Custom",
+        "qtyDecrease": "Fewer {{name}}",
+        "qtyIncrease": "More {{name}}",
         "customPlaceholder": "Add a custom item (e.g. Study Table, Curtain Rods)",
         "customQtyAria": "Quantity",
         "add": "Add",
         "specialClauses": "Special Clauses (optional)",
         "clausesPlaceholder": "e.g. No subletting, pets allowed, painting at exit...",
-        "clausesLong": "{{chars}} characters. There is a limit on how long the whole form can be \u2014 keep this concise so your agreement saves."
+        "clausesLong": "{{chars}} characters. There is a limit on how long the whole form can be — keep this concise so your agreement saves.",
+        "startDateRange": "Choose a start date between {{min}} and {{max}}.",
+        "lockinErr": "Lock-in must be between 0 and {{months}} months.",
+        "noticeErr": "Notice must be between 0 and {{months}} months.",
+        "dueDayErr": "Enter a day between 1 and 28, so it falls in every month.",
+        "incrementErr": "Enter an increase between 0 and 100%.",
+        "cashLimit": "Cash of ₹2 lakh or more in one go is barred by s.269ST of the Income-tax Act, and the owner can be fined the same amount. Pay a sum this size by bank transfer, UPI or cheque.",
+        "depositPay": {
+          "title": "How the deposit was paid",
+          "total": "Entered {{paid}} of {{deposit}}",
+          "mode": "Payment mode",
+          "modeOpt": {
+            "upi": "UPI",
+            "netbanking": "Internet Banking",
+            "dd": "Demand Draft (DD) / Cheque",
+            "cash": "Cash"
+          },
+          "ref_upi": "UPI Ref. No. / UTR No.",
+          "ref_netbanking": "Transfer Ref. No.",
+          "ref_dd": "DD / Cheque Number",
+          "ref": "Reference No.",
+          "bank": "Bank Name",
+          "branch": "Branch Name",
+          "amount": "Amount (₹)",
+          "date": "Date",
+          "date_dd": "DD / Cheque Date",
+          "add": "Add payment",
+          "remove": "Remove payment",
+          "err": {
+            "required": "Required.",
+            "format": "Letters and digits only, 4 to 30.",
+            "range": "Can't be a future date.",
+            "none": "Add how the deposit was paid — the registration portal asks for it.",
+            "total": "Payments add up to {{paid}}; they must equal the deposit of {{deposit}}."
+          }
+        },
+        "tdsNote": "Rent above ₹50,000 a month: under s.194-IB an individual tenant deducts 2% TDS and deposits it with Form 26QC against the owner's PAN.",
+        "furnishMismatch": "Step 1 says the flat is Unfurnished, but this list has furniture or appliances in it. The deed should say what is actually handed over.",
+        "furnishMismatchFix": "Mark it Semi-Furnished",
+        "furnishUnlisted": "Step 1 says the flat is {{furnish}}. List what comes with it: this schedule is what the deposit is settled against at move-out.",
+        "periodCustom": "Other…",
+        "periodCustomMonths": "Months (1 – 60)",
+        "monthsErr": "Enter a period of 1 to 60 months.",
+        "incrementRenewal": "Increase on Renewal (%)",
+        "utilitiesBy": "Electricity & water bills paid by",
+        "taxBy": "Property tax paid by",
+        "costBy": "Stamp duty & registration paid by",
+        "payerOpt": {
+          "Tenant": "Tenant",
+          "Owner": "Owner",
+          "Split": "Split equally"
+        },
+        "parking": "Parking included",
+        "parkingOpt": {
+          "none": "None",
+          "two-wheeler": "Two-wheeler",
+          "car": "Car",
+          "both": "Car & two-wheeler"
+        },
+        "parkingArea": "Parking area (optional)",
+        "parkingAreaUnit": "Parking area unit",
+        "occupants": "Number of occupants",
+        "occupantsPlaceholder": "e.g. 3",
+        "occupantsErr": "Enter between 1 and {{max}} occupants.",
+        "language": "Agreement language",
+        "languageOpt": {
+          "English": "English",
+          "Marathi": "Marathi (मराठी)"
+        },
+        "languageHint": "The deed is drafted and registered in this language, so pick one every signatory can read.",
+        "visit": "Biometric visit",
+        "visitHint": "For e-registration our executive visits with a biometric device to take each party's thumbprint and photo. Tell us where and when suits you; we call to confirm the slot.",
+        "visitAt": "Where",
+        "visitAtOpt": {
+          "property": "At the rented flat",
+          "licensor": "At the owner's address",
+          "licensee": "At the tenant's address"
+        },
+        "visitDate": "Preferred date",
+        "visitDateAria": "Preferred date for the biometric visit",
+        "visitDateErr": "Pick a date from {{min}} to {{max}}, or leave it blank.",
+        "visitSlot": "Preferred time",
+        "visitSlotOpt": {
+          "any": "Any time",
+          "morning": "Morning (9 am – 12 pm)",
+          "afternoon": "Afternoon (12 – 4 pm)",
+          "evening": "Evening (4 – 8 pm)"
+        },
+        "regAreaAuto": "— set from your gram panchayat answer; our team confirms it from the property's Index II and settles any difference."
       },
       "witnesses": {
         "title": "Witnesses",
-        "subtitle": "Two witnesses are required for registration.",
+        "subtitle": "Two adult witnesses are required to execute and register the agreement.",
         "witness": "Witness {{n}}",
         "fullName": "Full Name",
         "address": "Address",
-        "optional": "Optional",
-        "biometricNote": "You can add witnesses now to pre-fill the draft, but it isn’t required here. Two witnesses with valid photo ID must be physically present for thumb/biometric and photo capture at the registration visit."
+        "biometricNote": "Both witnesses must be present at the registration visit with their Aadhaar for thumb/biometric and live-photo capture. Their names and addresses go into the registered deed; Aadhaar is used to verify them and appears only masked.",
+        "age": "Age",
+        "mobile": "Mobile",
+        "aadhaar": "Aadhaar Number",
+        "nameErr": "Enter the witness's full name as on their Aadhaar.",
+        "addressErr": "Enter the witness's address."
       },
       "review": {
         "title": "Review & Generate",
         "subtitle": "Verify the key details before proceeding.",
         "rowAgreement": "Agreement",
         "rowProperty": "Property",
+        "rowJurisdiction": "Jurisdiction",
         "rowOwner": "Owner",
         "rowTenants": "Tenant(s)",
+        "rowTenantPolice": "Tenant police record",
         "invitedPending": "Invited: {{name}} (pending)",
         "rowTerm": "Term",
         "termValue_one": "{{count}} month from {{date}}",
         "termValue_other": "{{count}} months from {{date}}",
         "rowMonthlyRent": "Monthly Rent",
+        "rowIncrement": "Rent Increase",
+        "incrementValue": "{{pct}}% every {{months}} months",
         "rowDeposit": "Security Deposit",
         "rowMaintenance": "Maintenance by",
         "rowFurniture": "Furniture",
         "rowRegistration": "Registration",
-        "declaration": "I confirm the above details are correct and authorize Draazy to draft the Leave & License agreement and assist with stamp duty payment & e-registration as per Maharashtra rules.",
+        "sroRoute": "SRO appointment — offline route",
+        "offlineNotice": "Because one party is NRI or a foreign national, Aadhaar e-registration is not available. Draazy staff will book a Sub-Registrar Office appointment; the party must attend with passport, or a registered Power of Attorney can sign.",
+        "declaration": "I confirm the above details are correct and authorize Draazy to draft the Leave & License agreement and assist with stamp duty payment & e-registration as per Maharashtra rules. I consent to the Aadhaar and PAN details and documents given here being used only for this agreement and its e-registration with the Department of Registration & Stamps, Maharashtra, and I confirm every person named has agreed to their details being shared for that purpose.",
         "generate": "Generate Agreement & Proceed",
-        "generating": "Opening secure payment…"
+        "payAndSubmit": "Pay {{amount}} & Submit",
+        "payNote": "Your request reaches our team only after payment.",
+        "generating": "Opening secure payment…",
+        "residential": "Residential",
+        "rowCoOwners": "Co-owners",
+        "rowWitnesses": "Witnesses",
+        "rowOwnerIdentity": "Owner identity",
+        "rowCoOwnerIdentity": "Co-owner identity",
+        "rowTenantIdentity": "Tenant identity",
+        "retry": "Retry payment",
+        "rowLanguage": "Agreement language",
+        "rowVisit": "Biometric visit",
+        "visitAnyDate": "date to be agreed"
       },
       "upload": {
         "clickToUpload": "Click to upload",
+        "reattach": "Re-attach {{name}}",
+        "preparing": "Preparing file…",
+        "failed": "{{name}} can't be used: {{reason}}",
         "previewAlt": "Preview"
       },
       "cost": {
@@ -416,7 +739,7 @@
         "stampDuty": "Stamp Duty (0.25%)",
         "registrationFee": "Registration Fee",
         "serviceFee": "Draazy Service Fee",
-        "gst": "GST",
+        "referralWaiver": "Free with your referral reward (\u2212{{amount}})",
         "estimatedTotal": "Estimated Total",
         "totalPayable": "Total Payable",
         "loading": "Loading current charges\u2026",
@@ -425,9 +748,10 @@
         "chargedDiffers": "You'll be charged {{amount}} \u2014 our confirmed price for this agreement.",
         "title": "Cost Estimate",
         "subtitle": "Maharashtra Leave & License (Art. 36A)",
-        "formula": "Stamp duty = 0.25% of (rent × months + non-refundable deposit + 10% of refundable deposit × years). Registration fee ₹1,000 urban / ₹500 rural. Final amount confirmed at registration.",
+        "formula": "Stamp duty = 0.25% of (rent for every month of the term, including agreed increases, + non-refundable deposit + 10% of refundable deposit × years), rounded up to the next ₹100 (minimum ₹100). Registration fee ₹1,000 urban / ₹500 rural, plus ₹300 document handling. Final amount confirmed at registration.",
         "needHelp": "Need help?",
-        "needHelpSub": "Talk to our agreement desk."
+        "needHelpSub": "Talk to our agreement desk.",
+        "handling": "Document Handling (DHC)"
       },
       "docs": {
         "title": "Documents Required",
@@ -440,7 +764,9 @@
           "Aadhaar Card",
           "Passport-size photograph",
           "Ownership proof — Index II / Sale Deed",
-          "Latest Electricity Bill or Property Tax receipt"
+          "Latest Electricity Bill or Property Tax receipt",
+          "Every co-owner's PAN, Aadhaar and photo — all co-owners sign",
+          "Registered Power of Attorney, if signing for the owner"
         ],
         "docTenant": [
           "PAN Card",
@@ -450,8 +776,8 @@
           "Proof of current address (if outstation)"
         ],
         "docOther": [
-          "Two witnesses — Aadhaar / PAN + photo",
-          "Biometric (thumb) of all parties for e-registration",
+          "Two adult witnesses — name, address and Aadhaar number",
+          "Biometric (thumb) and live photo of all parties and witnesses at e-registration",
           "Registered mobile numbers (OTP based)"
         ]
       },
@@ -461,7 +787,7 @@
         "item": [
           {
             "name": "Drafting Leave & License",
-            "desc": "Legally sound, government-approved residential & commercial drafts."
+            "desc": "Legally sound, government-approved residential leave & licence drafts."
           },
           {
             "name": "Online e-Registration",
@@ -487,11 +813,11 @@
         "faq": [
           {
             "q": "Is registration of a rent agreement mandatory in Maharashtra?",
-            "a": "Yes. Under the Maharashtra Rent Control Act, a Leave & License agreement must be registered. An unregistered agreement is not valid evidence and attracts penalties."
+            "a": "Yes. Section 55 of the Maharashtra Rent Control Act, 1999 makes registration compulsory for every leave and licence agreement, whatever its term, and puts the duty on the owner. If it is not registered, the tenant's account of the terms prevails in a dispute, and the owner can be fined up to ₹5,000 or jailed for up to three months."
           },
           {
             "q": "How is stamp duty calculated?",
-            "a": "For Leave & License (Article 36A), stamp duty is 0.25% of the total of: rent for the full period + any non-refundable deposit + 10% of the refundable deposit for each year of the term."
+            "a": "For Leave & License (Article 36A), stamp duty is 0.25% of the total of: rent for the full period, including any agreed increases, + any non-refundable deposit + 10% of the refundable deposit for each year of the term. The duty is paid in whole hundreds: it is rounded up to the next ₹100, and is never less than ₹100."
           },
           {
             "q": "What is the registration fee?",
@@ -499,7 +825,7 @@
           },
           {
             "q": "Why is the agreement usually for 11 months?",
-            "a": "An 11-month term keeps registration simpler and is the common practice, though agreements can be made for any tenure both parties agree to."
+            "a": "Mostly habit, and a shorter term means less stamp duty and a chance to renegotiate at renewal. In Maharashtra it does not avoid registration: every leave and licence agreement must be registered, whether it runs 11 months or 60. You can choose any term up to 60 months here."
           },
           {
             "q": "Do all parties need to be physically present?",
@@ -548,21 +874,71 @@
         "desc": "You have a rent agreement in progress. The details you submitted are now locked so they can be drafted and registered accurately.",
         "changesHint": "Need to change something? Use the request tracker above — open Messages to talk to our team, or choose \"Request changes\" when we share the draft for your approval.",
         "startNew": "Start a new agreement",
-        "startNewHint": "For a different property"
-      }
+        "startNewHint": "For a different property",
+        "continue": "Add what's missing to this request",
+        "continueHint": "Opens your saved answers. Submitting again completes this request rather than filing a new one.",
+        "topUpHint": "Your answers are shared with your tenant and stay as filed ? this adds only your PAN/Aadhaar numbers and any papers still missing.",
+        "toppedUp": "Your side of the agreement is complete.",
+        "topUpChanged": "Your answers are shared with your tenant and can't be changed here. Undo the change, or cancel this request from your dashboard and file a new one.",
+        "topUpHint_owner": "Your answers are shared with the owner and stay as filed — this adds only your PAN/Aadhaar numbers and any papers still missing.",
+        "topUpChanged_owner": "Your answers are shared with the owner and can't be changed here. Undo the change, or cancel this request from your dashboard and file a new one."
+      },
+      "checkoutFailed": "We saved your request but couldn't open payment. Please try again.",
+      "identitiesRetry": "We saved your request but couldn't send the PAN and Aadhaar details. Please try again.",
+      "identitiesDuplicate": "A PAN or Aadhaar entered here is already on this agreement for another party. Each person needs their own — please correct it and submit again.",
+      "checkoutIncomplete": "We saved your request, but it is not ready for payment yet: {{detail}}",
+      "detailsRejected": "We couldn't save the agreement details: {{detail}}",
+      "declined": {
+        "title": "Your tenant declined the invitation",
+        "noTenantTitle": "No tenant is invited to this agreement",
+        "desc": "The agreement cannot go ahead until a tenant fills in their side. Invite someone else, or cancel this request to start again.",
+        "mobileLabel": "Tenant's mobile number",
+        "mobilePlaceholder": "10-digit mobile",
+        "reinvite": "Invite someone else",
+        "cancel": "Cancel this request",
+        "cancelled": "Request cancelled.",
+        "cancelConfirm": "Tap again to cancel this request",
+        "reinvited": "Invitation sent.",
+        "failed": "That did not go through. Please try again.",
+        "title_owner": "The owner declined the invitation",
+        "noTenantTitle_owner": "No owner is invited to this agreement",
+        "desc_owner": "The agreement cannot go ahead until the owner fills in their side. Invite the right number, or cancel this request to start again.",
+        "mobileLabel_owner": "Owner's mobile number"
+      },
+      "pay": {
+        "title": "Ready for payment",
+        "coFilledTitle": "Your tenant has filled in their part",
+        "desc": "Pay to send this agreement to our drafting team. If anything is still missing, we'll say exactly what.",
+        "cta": "Pay {{amount}}",
+        "paid": "Payment received ? our drafting team will start on your agreement.",
+        "coFilledTitle_owner": "The owner has filled in their part"
+      },
+      "docsRetry": "We saved your request but couldn't upload one or more documents. Please try again.",
+      "docsReattach": "You changed the agreement, so it has to be filed again ? please re-attach the papers marked below.",
+      "err": {
+        "adult": "Enter an age between 18 and 120.",
+        "ageDob": "Age must match the date of birth.",
+        "docRequired": "This document is required for registration.",
+        "dupAadhaar": "This Aadhaar is already entered for another party. Each person needs their own.",
+        "dupMobile": "This mobile is already used by another party. Each person needs their own.",
+        "dupPan": "This PAN is already entered for another party. Each person needs their own.",
+        "email": "Enter a valid email address."
+      },
+      "doneInviteTitle_owner": "Request sent to the owner!",
+      "doneInviteDesc_owner": "We've asked the owner to fill in their details & ownership papers. Once they're done, you pay and our team prepares the draft for approval."
     },
     "interior": {
-      "heroBadge": "10-year warranty · 45-day move-in",
+      "heroBadge": "Free 3D design · Itemised quote",
       "heroTitle1": "Interiors that",
       "heroTitleAccent": "feel like home",
-      "heroSubtitle": "Full home interiors, modular kitchens and renovations in Pune — designed in 3D, built by vetted partners, delivered on time at a transparent price.",
+      "heroSubtitle": "Full home interiors, modular kitchens and renovations in Pune ? designed in 3D, built by our partner teams, at a transparent price with the handover date written into your quote.",
       "bookConsult": "Book Free Consultation",
       "viewWork": "View Our Work",
       "stat": {
-        "homesDesigned": "Homes Designed",
-        "daysToMoveIn": "Days to Move-in",
-        "warranty": "Warranty",
-        "customerRating": "Customer Rating"
+        "design": "3D design",
+        "quote": "Quote",
+        "handover": "Handover date",
+        "warranty": "Warranty terms"
       },
       "servicesTitle": "What We Design & Build",
       "servicesSub": "From a single modular kitchen to a turnkey home — end to end.",
@@ -644,7 +1020,7 @@
             "Acrylic / membrane finishes",
             "Designer ceilings & lighting",
             "Custom storage solutions",
-            "10-year warranty"
+            "Itemised quote before work starts"
           ]
         },
         {
@@ -655,7 +1031,7 @@
             "Premium veneer / lacquered glass",
             "Imported hardware & appliances",
             "Dedicated design lead",
-            "10-year warranty"
+            "Itemised quote before work starts"
           ]
         }
       ],
@@ -675,14 +1051,14 @@
         },
         {
           "t": "Move In",
-          "d": "On-time handover with a 10-year warranty. Welcome home!"
+          "d": "Handover after a final quality check. Welcome home!"
         }
       ],
       "trackerTitle": "Your interior & renovation requests",
       "consultBadge1": "10-yr warranty",
       "consultBadge2": "No hidden costs",
       "consultImgAlt": "Designed living room",
-      "consultPromo": "Free 3D design + quote in 48 hours",
+      "consultPromo": "Free 3D design and an itemised quote",
       "bookConsultTitle": "Book a Free Design Consultation",
       "bookConsultSub": "Share your details — our designer calls you back within 24 hours.",
       "fullName": "Full Name",
@@ -706,12 +1082,12 @@
       "whyTitle": "Why design with Draazy",
       "trust": [
         {
-          "t": "10-Year Warranty",
-          "d": "Comprehensive warranty on modular work and materials, in writing."
+          "t": "Warranty in Your Quote",
+          "d": "Warranty terms for the materials and work are written into your quote before you sign."
         },
         {
-          "t": "45-Day Move-in",
-          "d": "On-time delivery guarantee for standard full-home projects."
+          "t": "Agreed Timeline",
+          "d": "Your handover date is agreed and written into the quote before work starts."
         },
         {
           "t": "Transparent Pricing",
@@ -733,8 +1109,8 @@
           "a": "Yes — the consultation and 3D design concept are free. You only pay once you approve the design and quote and decide to proceed."
         },
         {
-          "q": "What does the 10-year warranty cover?",
-          "a": "It covers modular cabinetry, hardware and workmanship against manufacturing defects, as detailed in your written warranty card."
+          "q": "Is there a warranty?",
+          "a": "Warranty terms depend on the partner and the materials you choose, and are written into your quote before you sign. Ask your designer for them at the consultation."
         },
         {
           "q": "Can you work on an under-construction or occupied home?",
@@ -746,20 +1122,20 @@
         }
       ],
       "ctaTitle": "Ready to reimagine your home?",
-      "ctaSub": "Book a free consultation and get a 3D design + transparent quote in 48 hours.",
+      "ctaSub": "Book a free consultation and get a 3D design and an itemised quote.",
       "ctaBook": "Book Free Consultation",
-      "ctaCall": "Call 1800 200 0000",
+      "ctaCall": "Call {{phone}}",
       "lightboxAlt": "Project preview"
     },
     "valuation": {
       "rateBasedComparables": "≈ ₹{{rate}} / sq.ft · based on {{comps}} comparables in {{loc}}",
       "rateBasedCityAvg": "≈ ₹{{rate}} / sq.ft · based on Pune city-average rates for {{loc}}",
-      "heroBadge": "Data-backed · IBBI-certified valuers",
+      "heroBadge": "Data-backed ? Qualified valuers",
       "heroTitle1": "Know what your",
       "heroTitleAccent": "property is really worth",
       "heroSubtitle": "Get an instant ballpark estimate for free, then request a certified valuation report — accepted by banks, courts and tax authorities. Our valuers analyse real Pune comparables, not guesswork.",
       "heroChip1": "Instant estimate",
-      "heroChip2": "Bank-accepted report",
+      "heroChip2": "Signed valuer report",
       "heroChip3": "Real local comparables",
       "widgetTitle": "Instant Valuation Estimate",
       "widgetSub": "A free, indicative range based on current Pune market rates.",
@@ -787,10 +1163,10 @@
       "getCertified": "Get a Certified Report",
       "indicativeOnly": "Indicative only. A certified valuation requires a physical inspection.",
       "stat": {
-        "valuationsDone": "Valuations Done",
-        "puneLocalities": "Pune Localities",
-        "reportTurnaround": "Report Turnaround",
-        "certifiedValuers": "Certified Valuers"
+        "estimate": "Instant estimate",
+        "comparables": "Local comparables",
+        "callback": "Callback",
+        "fees": "Fee shared upfront"
       },
       "servicesTitle": "Valuation Reports We Provide",
       "servicesSub": "A certified, purpose-specific valuation for whatever you need it for.",
@@ -865,7 +1241,7 @@
         },
         {
           "t": "Site Inspection",
-          "d": "An IBBI valuer visits to verify area, condition, amenities and surroundings."
+          "d": "A qualified valuer visits to verify area, condition, amenities and surroundings."
         },
         {
           "t": "Data Analysis",
@@ -873,22 +1249,22 @@
         },
         {
           "t": "Certified Report",
-          "d": "You receive a signed, bank- & court-accepted valuation report."
+          "d": "You receive a signed valuation report."
         }
       ],
       "whyTitle": "Why value with Draazy",
       "trust": [
         {
-          "t": "IBBI Certified",
-          "d": "Reports are signed by registered valuers and accepted by banks, courts & tax authorities."
+          "t": "Qualified Valuers",
+          "d": "Every report is signed by the valuer who inspected the property."
         },
         {
           "t": "Data-backed",
           "d": "Valuations use real recent comparables and ready-reckoner rates — not gut feel."
         },
         {
-          "t": "Fast Turnaround",
-          "d": "Most certified reports are ready within 48 hours of the site inspection."
+          "t": "Clear Timeline",
+          "d": "We confirm the report timeline and fee with you before the site inspection."
         },
         {
           "t": "Transparent Fees",
@@ -903,7 +1279,7 @@
         },
         {
           "q": "What is a certified valuation report?",
-          "a": "A signed report by an IBBI-registered valuer detailing the property's fair market value with methodology and comparables — accepted by banks, courts and tax authorities."
+          "a": "A signed report by a qualified valuer detailing the property's fair market value, with the method and comparables used."
         },
         {
           "q": "How is property value calculated?",
@@ -911,17 +1287,17 @@
         },
         {
           "q": "How long does it take and what does it cost?",
-          "a": "A certified report is typically ready within 48 hours of inspection. Fees are fixed and shared upfront — the instant online estimate is always free."
+          "a": "The report timeline depends on the property and is confirmed with you before the inspection. Fees are fixed and shared upfront — the instant online estimate is always free."
         },
         {
           "q": "Will banks accept this valuation?",
-          "a": "Yes — our valuers are IBBI-registered and on major bank panels, so reports are accepted for home loans and mortgages."
+          "a": "Banks often send their own panel valuer for a home loan, so ask your lender first. Our report suits resale pricing, family settlements, tax filings and insurance."
         }
       ],
       "ctaTitle": "Need an official property valuation?",
-      "ctaSub": "Get a certified, bank-accepted report from IBBI valuers — we call you back within 24 hours.",
+      "ctaSub": "Get a signed report from a qualified valuer ? we call you back within 24 hours.",
       "ctaRequest": "Request Valuation",
-      "ctaCall": "Call 1800 200 0000"
+      "ctaCall": "Call {{phone}}"
     },
     "homeLoans": {
       "compareTitle": "Compare Home Loan Rates",
@@ -934,9 +1310,9 @@
       "badge": "Interest rates from 8.45% p.a.",
       "titleTop": "Home loans made",
       "titleAccent": "simple & affordable",
-      "subtitle": "Share a few details and our loan desk compares offers from 25+ banks & NBFCs, negotiates the lowest rate for your profile, and calls you back — paperwork handled at your doorstep.",
-      "feature1": "Free eligibility check",
-      "feature2": "Zero processing-fee deals",
+      "subtitle": "Share a few details and our loan desk compares offers from partner banks & NBFCs for your profile, and calls you back — paperwork handled at your doorstep.",
+      "feature1": "Eligibility check",
+      "feature2": "Many lenders compared",
       "feature3": "Doorstep documentation",
       "quoteTitle": "Check Your Eligibility",
       "quoteSub": "Get personalised loan offers — our expert calls you back within 24 hours.",
@@ -953,10 +1329,10 @@
       "fIncomePlaceholder": "e.g. 90,000",
       "fCity": "City",
       "stat": {
-        "lendingPartners": "Lending Partners",
-        "ratesStarting": "Rates Starting",
-        "loansFacilitated": "Loans Facilitated",
-        "avgApproval": "Avg. Approval Time"
+        "lenders": "Lenders compared",
+        "eligibility": "Eligibility check",
+        "callback": "Callback",
+        "oneForm": "Form for all lenders"
       },
       "service": [
         {
@@ -986,20 +1362,20 @@
       ],
       "trust": [
         {
-          "t": "25+ Lenders",
+          "t": "Many Lenders, One Place",
           "d": "Compare offers from leading banks & NBFCs in one place — no running branch to branch."
         },
         {
-          "t": "Lowest Rate Negotiated",
-          "d": "Our desk negotiates the best rate and waived processing fees for your profile."
+          "t": "Offers Side by Side",
+          "d": "See rates, fees and EMIs from different lenders together before you choose."
         },
         {
-          "t": "Free Eligibility Check",
-          "d": "Know how much you qualify for upfront — no cost, no impact, no obligation."
+          "t": "Eligibility Check",
+          "d": "Know how much you qualify for upfront — no impact on your credit score, no obligation."
         },
         {
-          "t": "Dedicated Loan Manager",
-          "d": "One expert guides you from application to disbursal, with doorstep document pickup."
+          "t": "One Point of Contact",
+          "d": "One person from our loan desk guides you from application to disbursal, with doorstep document pickup."
         }
       ],
       "step": [
@@ -1009,7 +1385,7 @@
         },
         {
           "t": "Compare Offers",
-          "d": "We match you with the best rates and EMIs from 25+ lenders."
+          "d": "We match you with suitable rates and EMIs from our partner lenders."
         },
         {
           "t": "Submit Documents",
@@ -1023,7 +1399,7 @@
       "faq": [
         {
           "q": "Does Draazy charge for loan assistance?",
-          "a": "No. Our advisory and eligibility check are completely free — you only pay the lender's standard charges on the loan you choose."
+          "a": "Draazy does not take brokerage on your home. Our loan desk compares offers and guides you through the application; the lender's own charges apply to the loan you choose."
         },
         {
           "q": "How much loan can I get?",
@@ -1031,7 +1407,7 @@
         },
         {
           "q": "Which documents are required?",
-          "a": "Typically ID & address proof, PAN, income proof (salary slips/ITR & bank statements) and property papers. Your loan manager shares an exact checklist and collects them at your doorstep."
+          "a": "Typically ID & address proof, PAN, income proof (salary slips/ITR & bank statements) and property papers. Our loan desk shares an exact checklist and collects them at your doorstep."
         },
         {
           "q": "Can I transfer my existing home loan?",
@@ -1043,11 +1419,11 @@
         }
       ],
       "ctaTitle": "Ready to finance your dream home?",
-      "ctaSub": "Get a free eligibility check and matched offers — our loan expert calls you back within 24 hours.",
+      "ctaSub": "Check your eligibility and get matched offers — our loan expert calls you back within 24 hours.",
       "ctaPrimary": "Check Eligibility",
       "emiCalc": {
         "title": "Plan your EMI before you apply",
-        "sub": "Move the sliders to see your monthly EMI and total interest instantly — then get matched to the lowest-rate lender.",
+        "sub": "Move the sliders to see your monthly EMI and total interest instantly ? then get matched to a suitable lender.",
         "loanAmount": "Loan amount",
         "interestRate": "Interest rate (p.a.)",
         "tenure": "Tenure",
@@ -1077,7 +1453,7 @@
         },
         {
           "t": "Stamp Duty Payment",
-          "d": "Stamp duty (≈6% in Pune municipal limits) and 1% registration fee are computed and paid online; e-stamp generated."
+          "d": "Stamp duty (7% within PMC and PCMC limits) and the 1% registration fee are computed and paid online; e-stamp generated."
         },
         {
           "t": "Execution & Biometric",
@@ -1123,10 +1499,10 @@
       "fNote": "Brief Note (optional)",
       "fNotePlaceholder": "Anything specific we should know?",
       "stat": {
-        "deedsRegistered": "Deeds Registered",
-        "titleSearch": "Title Search",
-        "verifiedAdvocates": "Verified Advocates",
-        "transparentFees": "Transparent Fees",
+        "stampDuty": "Stamp duty in PMC/PCMC",
+        "titleSearch": "Title search",
+        "callback": "Callback",
+        "fees": "Professional fees",
         "fixedValue": "Fixed"
       },
       "service": [
@@ -1158,7 +1534,7 @@
       "trust": [
         {
           "t": "Verified Advocates",
-          "d": "Every deed is drafted and vetted by experienced, empanelled property advocates."
+          "d": "Every deed is drafted and checked by a property advocate."
         },
         {
           "t": "Transparent Fixed Fees",
@@ -1176,7 +1552,7 @@
       "faq": [
         {
           "q": "What are the stamp duty and registration charges in Pune?",
-          "a": "Within Pune municipal limits stamp duty is about 6% (5% state duty + 1% local cess) and the registration fee is 1% of the value, capped at ₹30,000. Charges are calculated on the higher of the agreement value or the government ready-reckoner rate."
+          "a": "Within PMC and PCMC limits stamp duty is 7% (5% stamp duty + 1% local body tax + 1% metro cess) and the registration fee is 1% of the value, capped at ₹30,000. Charges are calculated on the higher of the agreement value or the government ready-reckoner rate."
         },
         {
           "q": "Is online property registration possible?",
@@ -1200,25 +1576,23 @@
       "ctaPrimary": "Request Assistance",
       "calc": {
         "title": "Estimate your stamp duty & registration",
-        "sub": "Maharashtra government charges before you sign — adjust the value, area and buyer to see indicative stamp duty and registration fees for Pune.",
+        "sub": "Maharashtra government charges before you sign — adjust the value to see indicative stamp duty and registration fees for Pune Municipal Corporation and PCMC limits.",
         "propertyValue": "Agreement / property value",
-        "areaType": "Property location",
-        "buyer": "Buyer",
         "govtCharges": "Total government charges",
         "stampDuty": "Stamp duty",
         "registration": "Registration fee",
-        "note": "Indicative only. Actual stamp duty follows ready-reckoner value and current Maharashtra rates; women buyers get a 1% concession on residential property. Our experts confirm exact figures before registration."
+        "note": "Indicative only, for PMC and PCMC limits at 7%. Actual stamp duty follows ready-reckoner value and current Maharashtra rates. Our experts confirm exact figures before registration."
       }
     },
     "packers": {
-      "badge": "Vetted & background-verified partners",
+      "badge": "Registered moving partners",
       "titleTop": "Stress-free home shifting",
       "titleAccent": "in & from Pune",
       "subtitle": "Share your moving details and our relocation desk negotiates transparent, all-inclusive rates with trusted movers — then calls you back with the best quote. No haggling, no hidden charges.",
       "trackerTitle": "Your packers & movers requests",
       "feature1": "Transit insurance",
       "feature2": "Transparent pricing",
-      "feature3": "Dedicated move manager",
+      "feature3": "One point of contact",
       "quoteTitle": "Get a Free Quote",
       "quoteSub": "Fill in a few details — we'll call you back within 24 hours.",
       "submitLabel": "Request Free Quote",
@@ -1233,12 +1607,12 @@
       "fToPlaceholder": "Search area / city",
       "fSize": "Home Size",
       "fDate": "Preferred Move Date",
-      "successMessage": "Our relocation desk will call you back within 24 hours with the best quote from a verified partner.",
+      "successMessage": "Our relocation desk will call you back within 24 hours with a quote from a moving partner.",
       "stat": {
-        "verifiedPartners": "Verified Moving Partners",
-        "homesRelocated": "Homes Relocated",
-        "averageRating": "Average Rating",
-        "platformFee": "Platform Fee"
+        "survey": "Survey & quote",
+        "callback": "Callback",
+        "allIn": "Quotes, no hidden charges",
+        "contact": "Point of contact"
       },
       "service": [
         {
@@ -1268,8 +1642,8 @@
       ],
       "trust": [
         {
-          "t": "Vetted Partners",
-          "d": "Every mover is background-checked, GST-registered and rated by real Draazy customers."
+          "t": "Registered Partners",
+          "d": "We only recommend registered movers, and we go through every quote with you before you confirm."
         },
         {
           "t": "Transparent Rates",
@@ -1280,7 +1654,7 @@
           "d": "Optional all-risk insurance covers your belongings end to end during the move."
         },
         {
-          "t": "Dedicated Manager",
+          "t": "One Point of Contact",
           "d": "A single point of contact coordinates your move and is reachable through move day."
         }
       ],
@@ -1295,7 +1669,7 @@
         },
         {
           "t": "Confirm Partner",
-          "d": "Approve the quote — we lock in a verified mover and assign your move manager."
+          "d": "Approve the quote ? we book the mover and give you one Draazy contact for the move."
         },
         {
           "t": "Move Day",
@@ -1309,7 +1683,7 @@
         },
         {
           "q": "How are the moving partners verified?",
-          "a": "Every partner is background-checked, GST-registered and reviewed against past Draazy customer ratings before we recommend them."
+          "a": "We only recommend registered moving partners, and we go through every quote with you before you confirm."
         },
         {
           "q": "Are my belongings insured during the move?",
@@ -1325,11 +1699,11 @@
         }
       ],
       "ctaTitle": "Planning a move soon?",
-      "ctaSub": "Get a free, no-obligation quote from a verified partner — our team calls you back within 24 hours.",
+      "ctaSub": "Get a free, no-obligation quote from a moving partner ? our team calls you back within 24 hours.",
       "ctaPrimary": "Get Free Quote",
       "estimator": {
         "title": "Instant moving-cost estimate",
-        "sub": "Get a ballpark price in seconds — then request a free, exact quote from a verified partner.",
+        "sub": "Get a ballpark price in seconds ? then request a free, exact quote from a moving partner.",
         "fSize": "Home size",
         "fDistance": "Move distance",
         "fPacking": "Packing type",

@@ -1,6 +1,6 @@
 # Flow: Schedule a Property Visit
 
-> How a buyer/tenant books an in-person or video visit to a listing, and how the owner confirms,
+> How a buyer/tenant books an in-person visit to a listing (there are no video visits), and how the owner confirms,
 > completes, reschedules or cancels it.
 > **Status:** documented from React source - **Primary role(s):** buyer/tenant (maker), owner (checker)
 
@@ -16,19 +16,20 @@
   completed may leave a "Visited" review (see section 5).
 
 ## 2. Entry points
-- **Routes:** `/schedule-visit` (full page, `ProtectedRoute` - sign-in required). Query params:
-  `p` / `listing` (listing id), `o` (owner mobile), `title` (property title, sanitized of `<>`).
+- **Routes:** `/schedule-visit` (`ProtectedRoute`). With `p` / `listing` (listing id) it redirects to
+  `/property/:id?visit=1`, which opens the booking modal; without one it shows a "browse listings" card.
 - **Tiles / triggers:**
-  - Property detail page (`/property/:id`) - "Schedule Visit" opens either the full page or the
-    inline modal (`property/ScheduleVisitModal.jsx`).
+  - Property detail page (`/property/:id`) - "Schedule Visit" opens the inline modal
+    (`property/ScheduleVisitModal.jsx`), the only booking form.
   - Owner dashboard "Scheduled Visits" calendar/list tab (`components/dashboard/VisitsTab.jsx`).
-- **Source components:** `src/pages/consumer/ScheduleVisit.jsx` (booking page),
-  `src/pages/consumer/property/ScheduleVisitModal.jsx` (inline modal),
+- **Source components:** `src/pages/consumer/ScheduleVisit.jsx` (redirect),
+  `src/pages/consumer/property/ScheduleVisitModal.jsx` (booking form),
   `src/components/dashboard/VisitsTab.jsx` (owner triage + calendar),
   `src/lib/visitWhen.js` (slot list + `when` string vocabulary).
 
 ## 3. Actors & roles
-- **Maker = buyer/tenant** (signed in) picks mode/date/time and submits the request.
+- **Maker = buyer/tenant** (signed in) picks date/time and submits the request. The owner sees the
+  visitor's profile name and (once confirmed) account mobile; the form collects neither.
 - **Checker = owner** confirms, completes (marks visited), cancels or reschedules from the dashboard.
 - **Admin/staff** can view all visits (`GET /visits`) and reschedule via the same `updateVisit`.
 - `/schedule-visit` is a `ProtectedRoute` (any signed-in user). The dashboard visit actions are
@@ -39,12 +40,12 @@
 There are **two parallel visit stores** (a known duplication - see section 8):
 
 - [`visits`](../../system/data-model.md) - the global visits collection (seed
-  `src/data/visits.json`, ids `V8###`), read/written by `scheduleVisit` / `updateVisit` in
-  `src/lib/mockApi/staff.js`. This feeds the owner dashboard calendar and the admin visits view.
+  `src/data/visits.json`, ids `V8###`), read/written by `scheduleVisit` / `updateVisit`.
+  This feeds the owner dashboard calendar and the admin visits view.
   Statuses: `scheduled | confirmed | completed | cancelled | no-show`. **Created** on booking,
   **updated** on owner actions.
 - `property_visit_requests` - owner-mobile-keyed store `draazyPropVisitReqs:<ownerDigits>` in
-  `src/lib/store/visits.js` (**deleted** with the mock provider lane; visits are now served by
+  `src/lib/store/visits.js` (**deleted**; visits are now served by
   `services/visitService.js`). Statuses: `requested | completed` (plus whatever `setVisitStatus`
   writes). **Created** by `addVisitRequest`, read by the review-eligibility gate. This is what
   unlocks the "Visited" review.
@@ -54,27 +55,28 @@ There are **two parallel visit stores** (a known duplication - see section 8):
 ## 5. Business rules & logic  *(the meat)*
 
 ### Slot selection (`src/lib/visitWhen.js`)
-- **Visit mode:** `in-person` (default) or `video` (live walkthrough). Stored inside the `when`
+- **Visit mode:** always `in-person`; the API rejects any other value. Stored inside the `when`
   string in parentheses.
-- **Time slots:** `VISIT_SLOTS = ['9:00 AM', '10:30 AM', '12:00 PM', '1:30 PM', '3:00 PM', '4:30 PM',
-  '6:00 PM', '7:00 PM']` (owner-friendly hours). Default is `10:30 AM`.
+- **Time:** `TimeField` (12-hour picker, hour/minute/AM-PM), same control as the dashboard
+  reschedule dialog. Default is `10:30 AM`; any future time is accepted.
 - **Date:** free date field, `min = todayIso()` (local yyyy-mm-dd) - visits are **forward-only**.
 - **Canonical `when` string:** `formatWhen(dateIso, time, mode)` -> `"19 Jul 2026, 10:30 AM
   (in-person)"`. `parseWhen` reads back both this human form and the seed's ISO form
   (`"2026-07-07"`), so a booked slot and a rescheduled slot stay mutually parseable. This one
   vocabulary is the single source of truth across booking, dashboard reschedule and admin.
 
-### Booking submit (`ScheduleVisit.confirm`)
-1. Validate name (non-empty) and phone (`/^[6-9]\d{9}$/` after stripping non-digits and a leading
-   `91`). Errors surface inline via `useFieldErrors` + toast.
-2. Only if signed in (`isIn`):
-   - `scheduleVisit({ listingId, listing: title, customer: name, mobile: phone, when, note })` ->
-     appends a `{ id: 'V'+Date.now(), status: 'scheduled', ... }` row to `db.visits`.
-   - If an `ownerMobile` is known, **also** `addVisitRequest(ownerMobile, { propId, propTitle,
-     visitorName, phone, date, time, mode, note })` -> appends a `requested` row to
-     `draazyPropVisitReqs:<owner>`.
-3. Clears the autosaved draft (`dzDraft:schedule-visit`), shows the booked confirmation, offers a
-   pre-filled WhatsApp handoff to the owner and a "track on dashboard" link.
+### Booking submit (`ScheduleVisitModal.submit`)
+1. Refuse a missing or past slot (`property.pastSlot`); send a signed-out user to sign-in.
+2. `scheduleVisit({ propertyId, dateIso, time, note })` -> `POST /visits` with `mode: 'in-person'`
+   and the listing's UUID (`p.uuid`), never its URL slug. A second live visit on the same property
+   is a 409 `conflict` ("already booked").
+3. **Charging:** a visit spends one owner contact from the contact allowance (`ContactService
+   .requireRoomForVisit`), free when the listing already has a counted contact request or visit, and
+   free on your own listing. Only a cancel before the owner's first confirmation (`visits.confirmed_at`)
+   gives it back; there is no reply-window lapse, because a reschedule would revive a lapsed visit
+   unchecked. Scheduled visits count towards `contactPendingMax`.
+   422 `contact_quota_exhausted` opens `ContactsExhaustedModal`; 422 `contact_pending_limit` toasts.
+4. Shows the booked confirmation; the visit appears under Dashboard -> Visits.
 
 ### `addVisitRequest` idempotency (`src/lib/store/visits.js`)
 - Requires a signed-in user (`readUser()`); returns `null` otherwise.
@@ -151,18 +153,12 @@ property_visit_requests (review gate):
   review gate reads. Reschedule re-opens a confirmed visit back to `scheduled`.
 
 ## 8. Edge cases, validation & error states
-- **Not signed in:** the page is `ProtectedRoute`, so a guest is redirected to `/signin?next=`.
-  The booking `confirm` also no-ops the persistence when `!isIn` (defensive).
-- **Field validation:** name required; mobile must match `^[6-9]\d{9}$` (Indian 10-digit). Messages:
-  `svErrName` / `svErrPhone` (page) or `property.enterName` / `property.validMobile` (modal).
+- **Not signed in:** the modal sends the user to sign-in and reopens itself on return (`?visit=1`).
 - **Past dates blocked:** date field `min = todayIso()`.
 - **Duplicate request:** `addVisitRequest` updates the existing `requested` record instead of
   creating a second one.
 - **Mark-visited guard:** "Mark visited" only appears for a `confirmed` visit whose slot is already
   in the past - an owner can't complete a future visit.
-- **Inline modal does NOT persist (inconsistency):** `property/ScheduleVisitModal.jsx` validates and
-  shows a success toast but **never calls** `scheduleVisit` / `addVisitRequest`. Only the full
-  `/schedule-visit` page persists. A backend must make the modal path write a real request too.
 - **Two stores, no shared id (inconsistency):** `db.visits` (V8###) and `draazyPropVisitReqs`
   ('v'+timestamp) are written separately with no cross-reference, so a visit can be `completed` in
   one and `requested` in the other. The backend should unify them into one `visit_requests` table.

@@ -2,17 +2,18 @@ import NativeSelect from '../../../components/ui/NativeSelect.jsx';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useLocation } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
-import { localityNames } from '../../../data/localities.js';
+import { ServiceBreadcrumbs } from '../../../components/Breadcrumbs.jsx';
 import MobileField from '../../../components/MobileField.jsx';
 import { useScrollReveal } from '../../../lib/useScrollReveal.js';
+import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import ServiceTracker from '../../../components/ServiceTracker.jsx';
 import { createServiceRequest as createFlowRequest } from '../../../services/serviceRequestService.js';
 import AutosaveBanner from '../../../components/AutosaveBanner.jsx';
 import FieldError from '../../../components/ui/FieldError.jsx';
+import { SUPPORT_PHONE, SUPPORT_TEL } from '../../../lib/supportContact.js';
 import { useFormDraft, useFieldErrors } from '../../../lib/hooks.js';
 
 const RATES= { 'Koregaon Park': 16500, 'Kalyani Nagar': 15500, Kothrud: 13000, 'Viman Nagar': 12500, Baner: 11500, Aundh: 12000, Kharadi: 10500, Wakad: 9200, Hadapsar: 8800, Hinjawadi: 8200, Wagholi: 6800, Undri: 7200, Ravet: 7800 };
@@ -33,14 +34,14 @@ const SERVICES = [
   ['Pre-sale Pricing Advisory', 'tag', 'Price your home right to sell faster — backed by demand and comparable data.'],
 ];
 const FACTORS = [['Location & locality', 'map-pin'], ['Carpet area & layout', 'ruler'], ['Property age & condition', 'calendar-clock'], ['Floor, view & facing', 'building'], ['Amenities & parking', 'dumbbell'], ['Construction quality', 'hard-hat'], ['Demand & recent deals', 'trending-up']];
-const STEPS = [['Share Details', 'clipboard-list', 'Try the instant estimate, then request a certified report in a minute.'], ['Site Inspection', 'home', 'An IBBI valuer visits to verify area, condition, amenities and surroundings.'], ['Data Analysis', 'line-chart', 'We benchmark against recent comparable deals and ready-reckoner rates.'], ['Certified Report', 'file-badge', 'You receive a signed, bank- & court-accepted valuation report.']];
-const TRUST = [['IBBI Certified', 'badge-check', 'Reports are signed by registered valuers and accepted by banks, courts & tax authorities.'], ['Data-backed', 'database', 'Valuations use real recent comparables and ready-reckoner rates — not gut feel.'], ['Fast Turnaround', 'timer', 'Most certified reports are ready within 48 hours of the site inspection.'], ['Transparent Fees', 'indian-rupee', 'A clear, fixed valuation fee shared upfront before we begin.']];
+const STEPS = [['Share Details', 'clipboard-list', 'Try the instant estimate, then request a certified report in a minute.'], ['Site Inspection', 'home', 'A qualified valuer visits to verify area, condition, amenities and surroundings.'], ['Data Analysis', 'line-chart', 'We benchmark against recent comparable deals and ready-reckoner rates.'], ['Certified Report', 'file-badge', 'You receive a signed valuation report.']];
+const TRUST = [['Qualified Valuers', 'badge-check', 'Every report is signed by the valuer who inspected the property.'], ['Data-backed', 'database', 'Valuations use real recent comparables and ready-reckoner rates — not gut feel.'], ['Clear Timeline', 'timer', 'We confirm the report timeline and fee with you before the site inspection.'], ['Transparent Fees', 'indian-rupee', 'A clear, fixed valuation fee shared upfront before we begin.']];
 const FAQ = [
   ['Is the instant estimate accurate?', "It's a free, indicative range from current locality rates and your inputs — great for a quick idea. For an exact, official figure you need a certified valuation with a physical inspection."],
-  ['What is a certified valuation report?', "A signed report by an IBBI-registered valuer detailing the property's fair market value with methodology and comparables — accepted by banks, courts and tax authorities."],
+  ['What is a certified valuation report?', "A signed report by a qualified valuer detailing the property's fair market value, with the method and comparables used."],
   ['How is property value calculated?', 'Mainly the comparable-sales method (recent deals nearby) cross-checked with ready-reckoner rates, adjusted for area, age, floor, amenities and condition.'],
-  ['How long does it take and what does it cost?', 'A certified report is typically ready within 48 hours of inspection. Fees are fixed and shared upfront — the instant online estimate is always free.'],
-  ['Will banks accept this valuation?', 'Yes — our valuers are IBBI-registered and on major bank panels, so reports are accepted for home loans and mortgages.'],
+  ['How long does it take and what does it cost?', 'The report timeline depends on the property and is confirmed with you before the inspection. Fees are fixed and shared upfront — the instant online estimate is always free.'],
+  ['Will banks accept this valuation?', 'Banks often send their own panel valuer for a home loan, so ask your lender first. Our report suits resale pricing, family settlements, tax filings and insurance.'],
 ];
 
 export default function PropertyValuation() {
@@ -48,8 +49,7 @@ export default function PropertyValuation() {
   const rootRef = useScrollReveal();
   const { user, isIn } = useAuth();
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const sendToSignIn = useSignInGate();
   const formRef = useRef(null);
   const [loc, setLoc] = useState('Baner');
   const [type, setType] = useState('1');
@@ -60,17 +60,10 @@ export default function PropertyValuation() {
   const [done, setDone] = useState(false);
   const [form, setForm] = useState({ name: isIn ? user?.name || '' : '', mobile: isIn ? user?.mobile || '' : '', purpose: '', ptype: 'Flat', location: '', area: '' });
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
-  const draft = useFormDraft('dzDraft:property-valuation', form, setForm, { ignore: ['name', 'mobile', 'ptype'] });
+  const draft = useFormDraft('dzDraft:property-valuation', form, setForm, { ignore: ['ptype'], omit: ['name', 'mobile'] });
   const err = useFieldErrors(formRef);
 
-  // Every Pune locality (curated registry + user-minted community ones) is
-  // selectable; the 13 with hand-tuned rates lead, the rest use the city avg.
-  const locOptions = useMemo(() => {
-    const known = Object.keys(RATES);
-    const knownLower = new Set(known.map((k) => k.toLowerCase()));
-    const rest = localityNames().filter((n) => !knownLower.has(n.toLowerCase())).sort((a, b) => a.localeCompare(b));
-    return known.concat(rest);
-  }, []);
+  const locOptions = Object.keys(RATES);
 
   const est = useMemo(() => {
     const known = RATES[loc] != null;
@@ -95,7 +88,7 @@ export default function PropertyValuation() {
   const submit = (e) => {
     e.preventDefault();
     // Instant estimate is public; the certified report requires sign-in (draft is restored on return).
-    if (!isIn) { navigate(`/signin?reason=services&next=${encodeURIComponent(location.pathname + location.search)}`); return; }
+    if (!isIn) { sendToSignIn('services'); return; }
     const ok = err.check([
       { name: 'name', ok: !!form.name.trim(), msg: tr('services.valuation.errName') },
       { name: 'mobile', ok: /^[6-9]\d{9}$/.test((form.mobile || '').replace(/\D/g, '')), msg: tr('services.valuation.errMobile') },
@@ -134,12 +127,13 @@ export default function PropertyValuation() {
       <div>
         {/* A dark valuation-specific gradient, because the shared bright-teal --hero-gradient washes
             the translucent estimator controls out. */}
-        <section className="relative overflow-hidden" style={{ background: 'linear-gradient(140deg,#0a1120 0%,#0d2b24 55%,#0f3d31 100%)' }}>
+        <section className="theme-dark relative overflow-hidden" style={{ background: 'linear-gradient(140deg,rgb(var(--dz-c-slate-950)) 0%,rgb(var(--dz-c-teal-950)) 55%,rgb(var(--dz-c-teal-900)) 100%)' }}>
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1600&q=80')" }} />
-          <div className="absolute inset-0" style={{ background: 'linear-gradient(140deg,rgba(10,17,32,.93) 0%,rgba(13,43,36,.9) 55%,rgba(15,61,49,.92) 100%)' }} />
-          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 18% 30%,rgba(255,255,255,.3) 0,transparent 40%),radial-gradient(circle at 85% 70%,rgba(20,184,166,.5) 0,transparent 42%)' }} />
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(140deg,rgb(var(--dz-c-slate-950) / .93) 0%,rgb(var(--dz-c-teal-950) / .9) 55%,rgb(var(--dz-c-teal-900) / .92) 100%)' }} />
+          <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'radial-gradient(circle at 18% 30%,rgb(var(--dz-c-pure-white) / .3) 0,transparent 40%),radial-gradient(circle at 85% 70%,rgb(var(--dz-c-teal-500) / .5) 0,transparent 42%)' }} />
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="reveal">
+              <ServiceBreadcrumbs k="valuation" />
               <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs text-teal-200 font-medium mb-5"><Icon name="trending-up" className="w-3.5 h-3.5" /> {tr('services.valuation.heroBadge')}</span>
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight">{tr('services.valuation.heroTitle1')}<br /><span className="gradient-text">{tr('services.valuation.heroTitleAccent')}</span></h1>
               <p className="text-gray-200 text-base sm:text-lg mt-5 max-w-xl">{tr('services.valuation.heroSubtitle')}</p>
@@ -206,7 +200,7 @@ export default function PropertyValuation() {
         {/* Stats */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
           <div className="glass-card rounded-2xl p-6 grid grid-cols-2 lg:grid-cols-4 gap-6 reveal">
-            {[['20K+', 'valuationsDone'], ['150+', 'puneLocalities'], ['48 hrs', 'reportTurnaround'], ['IBBI', 'certifiedValuers']].map(([v, slug]) => <div key={slug} className="text-center"><p className="text-3xl font-extrabold gradient-text">{v}</p><p className="text-gray-500 text-xs mt-1">{tr('services.valuation.stat.' + slug)}</p></div>)}
+            {[['Free', 'estimate'], ['Pune', 'comparables'], ['24 hrs', 'callback'], ['Fixed', 'fees']].map(([v, slug]) => <div key={slug} className="text-center"><p className="text-3xl font-extrabold gradient-text">{v}</p><p className="text-gray-500 text-xs mt-1">{tr('services.valuation.stat.' + slug)}</p></div>)}
           </div>
         </section>
 
@@ -273,7 +267,7 @@ export default function PropertyValuation() {
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-300 mb-1.5">{tr('services.valuation.location')}</label>
-                        <LocalitySelect value={form.location} onChange={(v) => set('location', v)} options={localityNames()} placeholder={tr('services.valuation.locationPlaceholder')} ariaLabel={tr('services.valuation.location')} className="w-full" />
+                        <LocalitySelect value={form.location} onChange={(v) => set('location', v)} nameOnly placeholder={tr('services.valuation.locationPlaceholder')} ariaLabel={tr('services.valuation.location')} className="w-full" />
                       </div>
                       <div>
                         <label className="block text-xs font-medium text-gray-300 mb-1.5">{tr('services.valuation.carpetAreaSqft')}</label>
@@ -344,13 +338,13 @@ export default function PropertyValuation() {
         {/* CTA */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="glass-card rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden reveal">
-            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%,#14b8a6 0,transparent 40%),radial-gradient(circle at 70% 50%,#0d9488 0,transparent 40%)' }} />
+            <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%,rgb(var(--dz-c-teal-500)) 0,transparent 40%),radial-gradient(circle at 70% 50%,rgb(var(--dz-c-teal-600)) 0,transparent 40%)' }} />
             <div className="relative">
               <h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.ctaTitle')}</h2>
               <p className="text-gray-400 mt-3 mb-7">{tr('services.valuation.ctaSub')}</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button onClick={scrollToForm} className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name="file-badge" className="w-4 h-4" /> {tr('services.valuation.ctaRequest')}</button>
-                <a href="tel:18002000000" className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> {tr('services.valuation.ctaCall')}</a>
+                <a href={SUPPORT_TEL} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> {tr('services.valuation.ctaCall', { phone: SUPPORT_PHONE })}</a>
               </div>
             </div>
           </div>

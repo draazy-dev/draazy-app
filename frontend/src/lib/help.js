@@ -1,33 +1,11 @@
-/* Help centre data access and search.
- *
- * The content itself is compiled at build time by scripts/vite-plugin-help-content.mjs
- * and exposed as the `virtual:help-content` module. This file is the only place that
- * imports it, so the rest of the app talks to plain functions rather than to the
- * shape of the compiled bundle.
- *
- * Language: English is canonical — it defines which articles exist, their category,
- * ordering and access. A translation overlays only the readable surface (title,
- * summary, body, headings, tags). An article with no translation in the reader's
- * language falls back to English rather than disappearing, because a half-populated
- * help centre that hides its own articles is worse than one that admits an article
- * is only available in English. `translated: false` on the result is what the
- * article page uses to say so.
- *
- * Access model: articles and categories carry `access: 'public' | 'staff'`. Staff
- * content is filtered out for everyone except internal accounts. This is a UX
- * boundary, not a security one — the same caveat that applies to every guard in
- * this prototype (see components/RouteGuards.jsx). Once there is a real backend,
- * staff docs must be served from a separate, authorised endpoint rather than
- * shipped in the client bundle and hidden.
- */
-
+/* English help content is canonical; staff-only content comes from the API after staff sign-in. */
 import {
   sections as rawSections,
   categories as rawCategories,
   articles as rawArticles,
-  translations as rawTranslations,
   changelog as rawChangelog,
 } from 'virtual:help-content';
+import { staffHelpContent } from '../services/contentService.js';
 
 export const changelog = rawChangelog;
 
@@ -38,72 +16,70 @@ export function isStaff(user) {
   return !!user && STAFF_ROLES.has(user.role);
 }
 
-const visible = (item, staff) => item.access !== 'staff' || staff;
+const NO_STAFF_CONTENT = { sections: [], categories: [], articles: [], loaded: false };
 
-/** Normalise an i18next language tag (`mr-IN`, `HI`) to a content language. */
-function normalizeLang(lang) {
-  const short = String(lang || 'en').toLowerCase().split('-')[0];
-  return rawTranslations[short] ? short : 'en';
+let staffContent = NO_STAFF_CONTENT;
+let staffRequest = null;
+const staffListeners = new Set();
+
+/** Whatever staff content has arrived. One stable identity until the response lands. */
+export function getStaffContent() {
+  return staffContent;
 }
 
-/** Overlay the translated surface onto the canonical English article. */
-function localize(article, lang) {
-  if (lang === 'en') return { ...article, translated: true, lang: 'en' };
-  const t = rawTranslations[lang]?.[article.slug];
-  if (!t) return { ...article, translated: false, lang: 'en' };
-  return { ...article, ...t, translated: true, lang };
+/** Once per session. The caller establishes that the reader is staff; the API enforces it. */
+export function loadStaffContent() {
+  // A failure settles as "loaded, empty" so pages stop waiting, and clears the request so the next mount retries.
+  staffRequest ??= staffHelpContent()
+    .then((content) => { staffContent = { ...content, loaded: true }; })
+    .catch(() => {
+      staffRequest = null;
+      staffContent = { ...NO_STAFF_CONTENT, loaded: true };
+    })
+    .finally(() => staffListeners.forEach((notify) => notify()));
+  return staffRequest;
 }
 
-/** Pick the translated label for a section or category, falling back to English. */
-function localizeTaxonomy(item, lang) {
-  const t = lang !== 'en' && item.i18n ? item.i18n[lang] : null;
-  return t ? { ...item, ...t } : item;
+export function onStaffContent(notify) {
+  staffListeners.add(notify);
+  return () => staffListeners.delete(notify);
 }
 
-/**
- * Sections, categories and articles the given user is allowed to see, in the
- * given language.
- *
- * @param {object} user
- * @param {string} [lang] i18next language tag; defaults to English.
- */
-export function helpTree(user, lang) {
-  const L = normalizeLang(lang);
-  const staff = isStaff(user);
-  const sections = rawSections.filter((s) => visible(s, staff)).map((s) => localizeTaxonomy(s, L));
+const byOrder = (items) => items.sort((a, b) => (a.order ?? 999) - (b.order ?? 999));
+
+/* `staff` is passed in rather than read from a module global, so the "may this reader have it"
+   decision stays at one visible call site (lib/useHelp.js). */
+export function helpTree(staff = NO_STAFF_CONTENT) {
+  const sections = byOrder([...rawSections, ...staff.sections]);
   const sectionIds = new Set(sections.map((s) => s.id));
-  const categories = rawCategories
-    .filter((c) => visible(c, staff) && sectionIds.has(c.section))
-    .map((c) => localizeTaxonomy(c, L));
+  const categories = byOrder([...rawCategories, ...staff.categories])
+    .filter((c) => sectionIds.has(c.section));
   const categoryIds = new Set(categories.map((c) => c.id));
-  const articles = rawArticles
-    .filter((a) => visible(a, staff) && categoryIds.has(a.category))
-    .map((a) => localize(a, L));
-  return { sections, categories, articles, lang: L };
+  const articles = [...rawArticles, ...staff.articles]
+    .filter((a) => categoryIds.has(a.category))
+    .sort((a, b) => a.order - b.order || a.title.localeCompare(b.title));
+  return { sections, categories, articles };
 }
 
-export function getCategory(id, user, lang) {
-  return helpTree(user, lang).categories.find((c) => c.id === id) || null;
+export function getCategory(id, staff) {
+  return helpTree(staff).categories.find((c) => c.id === id) || null;
 }
 
-export function articlesInCategory(id, user, lang) {
-  return helpTree(user, lang).articles.filter((a) => a.category === id);
+export function articlesInCategory(id, staff) {
+  return helpTree(staff).articles.filter((a) => a.category === id);
 }
 
 /** Featured articles for the landing page's "Start here" row. */
-export function featuredArticles(user, lang, limit = 6) {
-  const { articles } = helpTree(user, lang);
+export function featuredArticles(limit = 6, staff) {
+  const { articles } = helpTree(staff);
   const featured = articles.filter((a) => a.featured);
   return (featured.length ? featured : articles).slice(0, limit);
 }
 
-/**
- * Previous/next within the same category, so an article always offers a next step.
- * Ordering matches the sidebar, which is what a reader expects "next" to mean.
- */
-export function articleNeighbours(article, user, lang) {
+/** Previous/next within the same category, ordered as the sidebar is. */
+export function articleNeighbours(article, staff) {
   if (!article) return { prev: null, next: null };
-  const siblings = articlesInCategory(article.category, user, lang);
+  const siblings = articlesInCategory(article.category, staff);
   const i = siblings.findIndex((a) => a.slug === article.slug);
   return {
     prev: i > 0 ? siblings[i - 1] : null,
@@ -111,16 +87,8 @@ export function articleNeighbours(article, user, lang) {
   };
 }
 
-/* ── Search ──────────────────────────────────────────────────────────────────
-   A scored substring match rather than a fuzzy index. The corpus is a few dozen
-   articles, so an index would be more machinery than the problem needs — and an
-   exact-substring match is more predictable for a help centre, where people
-   usually type a word that is literally in the article.
-
-   Search runs over the *localized* article, so a Marathi reader searching Marathi
-   words hits the Marathi text. Articles with no translation keep their English
-   body, which means an English query still finds them from any language — the
-   desirable direction of leakage. */
+/* A scored substring match rather than a fuzzy index: the corpus is a few dozen articles, and
+   exact substrings are more predictable for a help centre. */
 
 const FIELD_WEIGHTS = [
   { key: 'title', weight: 12 },
@@ -136,10 +104,6 @@ function fieldValue(article, key) {
   return article[key] || '';
 }
 
-/* JavaScript's \b is defined against [A-Za-z0-9_], so it never fires next to a
-   Devanagari character — a Marathi query would silently lose the whole-word
-   bonus that ranks a title match above a passing mention in the body. Testing
-   for a separator character instead works for both scripts. */
 const SEPARATOR = /[\s.,;:!?()[\]{}"'—–\-/\\|]/;
 
 function hasWordStart(haystack, term) {
@@ -162,18 +126,12 @@ export function excerptFor(article, query) {
   return (start > 0 ? '…' : '') + text.slice(start, end).trim() + (end < text.length ? '…' : '');
 }
 
-/**
- * @param {string} query
- * @param {object} user
- * @param {{ limit?: number, lang?: string }} [opts]
- * @returns {Array<{ article: object, score: number }>}
- */
-export function searchHelp(query, user, opts = {}) {
+export function searchHelp(query, opts = {}) {
   const q = (query || '').trim().toLowerCase();
   if (q.length < 2) return [];
 
   const terms = q.split(/\s+/).filter(Boolean);
-  const { articles } = helpTree(user, opts.lang);
+  const { articles } = helpTree(opts.staff);
   const results = [];
 
   for (const article of articles) {
@@ -200,10 +158,6 @@ export function searchHelp(query, user, opts = {}) {
   return opts.limit ? results.slice(0, opts.limit) : results;
 }
 
-/* ── Article feedback ────────────────────────────────────────────────────────
-   Stored locally for now. When the backend lands this becomes a POST; the shape
-   below is what that endpoint should accept. */
-
 const FEEDBACK_KEY = 'dz_help_feedback_v1';
 
 function readFeedback() {
@@ -229,8 +183,6 @@ export function saveFeedback(slug, helpful, comment = '') {
   }
 }
 
-/* ── Recently viewed ─────────────────────────────────────────────────────── */
-
 const RECENT_KEY = 'dz_help_recent_v1';
 const RECENT_MAX = 5;
 
@@ -242,11 +194,11 @@ export function markViewed(slug) {
   } catch { /* storage unavailable — recents are a nicety, not a requirement */ }
 }
 
-export function recentArticles(user, lang) {
+export function recentArticles(staff) {
   let slugs = [];
   try {
     slugs = JSON.parse(localStorage.getItem(RECENT_KEY)) || [];
   } catch { /* ignore */ }
-  const { articles } = helpTree(user, lang);
+  const { articles } = helpTree(staff);
   return slugs.map((s) => articles.find((a) => a.slug === s)).filter(Boolean);
 }

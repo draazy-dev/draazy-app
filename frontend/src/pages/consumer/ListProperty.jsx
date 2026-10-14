@@ -1,37 +1,76 @@
 import { Sparkles, CheckCircle2, LayoutDashboard } from 'lucide-react';
+import { useSearchParams, Link } from 'react-router';
+import { useAuth } from '../../context/AuthContext';
+import { usePricing } from '../../context/PricingContext';
 import '../../styles/routes/list-property.css';
 import useListProperty from './list-property/useListProperty';
 import ListPropertyModals from './list-property/ListPropertyModals';
 import ProgressMeter from './list-property/ProgressMeter.jsx';
-import StepNav from './list-property/StepNav.jsx';
+import StepNav, { LISTING_STEPS } from './list-property/StepNav.jsx';
 import EditPolicyBanner from './list-property/EditPolicyBanner.jsx';
-import ListingPaywall from './list-property/ListingPaywall.jsx';
 import PropertyDetailsStep from './list-property/PropertyDetailsStep.jsx';
-import LocationPricingStep from './list-property/LocationPricingStep.jsx';
+import LocationStep from './list-property/LocationStep.jsx';
+import PricingStep from './list-property/PricingStep.jsx';
 import PhotosDocumentsStep from './list-property/PhotosDocumentsStep.jsx';
 import FlatmateFlow from './list-property/FlatmateFlow.jsx';
-import PostSuccessVerifyNudge from './list-property/PostSuccessVerifyNudge.jsx';
 import PostSuccessSplitNudge from './list-property/PostSuccessSplitNudge.jsx';
+import InlineOtpSheet from '../../components/auth/InlineOtpSheet.jsx';
+import ListingStatusCard from '../../components/listing/ListingStatusCard.jsx';
 
-const ListProperty = () => {
+const ListPropertyForm = () => {
   const vm = useListProperty();
+  const { fee } = usePricing();
   const {
-    t, navigate, showSuccess, isFlatmateMode, editId, editApproved, editChanges,
-    postedListing,
-    progressState, canPost,
-    activeListingCount, listingLimit, currentStep, setCurrentStep,
-    form, set, setForm, changePropertyType, rentMode, setRentMode, errors,
-    isResidential, isLand, isCommercial, isHouse, isPg,
-    toggleInArray, toggleTenant, nextStep, prevStep, money, setDepositMonths, openResetConfirm,
-    mapSearch, onMapSearchChange, doMapSearch, runMapSearch, mapSearchStatus, onAreaSelect,
-    geoFillStatus, flyTo, onLocalityChange, onPinMove, locationSet,
+    t, navigate, showSuccess, isFlatmateMode, editId, editRoomId, editApproved, editChanges,
+    postedListing, savedListingStatus, editReady, editLoading, editLoadError, retryEditLoad, legacyAddress,
+    authPromptOpen, closeAuthPrompt,
+    progressState, passListingId,
+    activeListingCount, listingLimit, quotaFull, currentStep, setCurrentStep,
+    form, set, changePropertyType, changeCommercialType, rentMode, setRentMode, errors,
+    isResidential, isLand, isCommercial, isHouse,
+    toggleInArray, toggleTenant, nextStep, prevStep, dupPending, money, setDepositMonths, openResetConfirm,
+    mapSearch, onMapSearchChange, runMapSearch, mapSearchStatus, onAreaSelect, onSocietyPick,
+    geoFillStatus, societyFillNotice, currentLocationStatus, canUseCurrentLocation, useCurrentLocation,
+    flyTo, onLocalityChange, onPinMove, locationSet,
     photos, handlePhotoUpload, removePhoto, setPhotoCategory,
-    video, videoName, handleVideoUpload, setVideo, setVideoName,
-    documents, handleDocUpload, submitProperty, submitFlatmate, posting,
+    isMediaBusy, mediaStatus,
+    submitProperty, submitFlatmate, posting, postAnother,
+    needsAuthForMedia, requestAuthPrompt,
   } = vm;
+  const editSavedApproved = /approved|verified|live/i.test(String(savedListingStatus || ''));
+  const jumpTo = (n) => { setCurrentStep(n); window.scrollTo({ top: 0, behavior: 'smooth' }); };
 
-  /* ================= SUCCESS ================= */
+  if ((editId || editRoomId) && !editReady) {
+    return (
+      <div className="lp-page min-h-[100dvh] px-4 pt-8">
+        <div className="glass-card rounded-2xl p-6 sm:p-8 max-w-3xl mx-auto" aria-busy={editLoading}>
+          <h1 className="text-2xl font-bold text-white mb-3">{editRoomId ? t('listProperty.edit.roomTitle') : t('listProperty.edit.title', { defaultValue: 'Edit listing' })}</h1>
+          <p role={editLoadError ? 'alert' : 'status'} className="text-sm text-gray-400 mb-5">
+            {editRoomId
+              ? t(editLoadError ? 'listProperty.edit.roomLoadError' : 'listProperty.edit.roomLoading')
+              : editLoadError
+              ? t('listProperty.edit.loadError', { defaultValue: 'We could not load your listing. Nothing has been changed. Please try again.' })
+              : t('listProperty.edit.loading', { defaultValue: 'Loading your listing…' })}
+          </p>
+          {editLoadError && (
+            <button type="button" onClick={retryEditLoad} className="btn-teal px-6 py-3 rounded-xl text-white font-semibold text-sm">
+              {t('listProperty.edit.retry', { defaultValue: 'Try again' })}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (showSuccess) {
+    const successListingId = postedListing?.id || postedListing?.uuid || editId;
+    const successListing = postedListing || {
+      id: successListingId,
+      status: editSavedApproved && !editChanges?.remoderation?.length ? 'approved' : 'pending',
+      ownershipVerified: false,
+    };
+    const successEditHref = successListingId ? `/list-property?edit=${successListingId}&step=photos` : '/dashboard#listings';
+    const successViewHref = successListingId ? `/property/${successListingId}` : '/dashboard#listings';
     return (
       <div className="lp-page min-h-[100dvh] flex items-center justify-center p-4">
         <div className="lp-success-card glass-card rounded-2xl p-8 sm:p-10 max-w-md w-full text-center">
@@ -45,21 +84,44 @@ const ListProperty = () => {
             {editId
               ? (editApproved && editChanges?.remoderation?.length
                   ? t('listProperty.success.editRemoderationBody')
-                  : editApproved && editChanges?.recheck?.length
+                  : editSavedApproved && editChanges?.recheck?.length
                     ? t('listProperty.success.editApprovedBody')
-                    : t('listProperty.success.editBody'))
+                    : editSavedApproved
+                      ? t('listProperty.success.editBody')
+                      : t('listProperty.success.editReviewBody'))
               : t('listProperty.success.newBody')}
           </p>
-          <button onClick={() => navigate('/dashboard')} className="btn-teal inline-flex items-center gap-2 px-8 py-3.5 rounded-xl text-white font-semibold text-sm">
-            <LayoutDashboard className="w-4 h-4" /> {t('listProperty.success.goToListings')}
-          </button>
+            {/* Verification is optional and offered only after a new property is posted. */}
+          {!isFlatmateMode && (
+            <ListingStatusCard
+              listing={successListing}
+              variant="hero"
+              editHref={successEditHref}
+              viewHref={successViewHref}
+              t={t}
+              className="mb-6"
+            />
+          )}
+          {passListingId && !isFlatmateMode && !editId && (
+            <div className="mb-6 rounded-xl border border-amber-400/30 bg-amber-400/5 p-4 text-left">
+              <p className="text-sm text-amber-100">{t('listProperty.success.passNote', { price: fee('listingPass') })}</p>
+              <Link to={`/checkout?plan=listing-pass&property=${encodeURIComponent(passListingId)}`} className="btn-teal mt-3 inline-flex min-h-[44px] items-center justify-center px-5 py-2.5 rounded-xl text-white font-semibold text-sm">
+                {t('listProperty.success.passCta', { price: fee('listingPass') })}
+              </Link>
+            </div>
+          )}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button onClick={() => navigate('/dashboard#properties')} className="btn-teal inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl text-white font-semibold text-sm">
+              <LayoutDashboard className="w-4 h-4" /> {t('listProperty.success.goToListings')}
+            </button>
+            {!editId && (
+              <button onClick={postAnother} className="btn-outline inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl text-gray-200 font-semibold text-sm">
+                {t('listProperty.shell.postAnother')}
+              </button>
+            )}
+          </div>
+          {/* A rent listing can also be let one room at a time. */}
 
-          {/* C1 growth lever: offer the opt-in Verified badge only for a brand-new property
-              post — at the value moment (listing is already live), never as a gate. */}
-          {(!editId && !isFlatmateMode) && <PostSuccessVerifyNudge t={t} />}
-
-          {/* A rent listing can also be let one room at a time. Offered here, while
-              the owner is still thinking about how to fill it. */}
           {postedListing && <PostSuccessSplitNudge listing={postedListing} />}
         </div>
       </div>
@@ -69,47 +131,47 @@ const ListProperty = () => {
   return (
     <div className="lp-page min-h-[100dvh] pb-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
+        {/* Keep the first form field above the fold on small phones. */}
 
-        {/* Page header.
-
-            The badge and the subtitle are desktop-only. They are motivational copy
-            — "List with Draazy", "Reach thousands of genuine buyers" — aimed at
-            someone deciding *whether* to post. By the time this route renders that
-            decision is already made: the user tapped Post. On a 360x640 phone the
-            full header plus the progress meter and step tabs pushed the first form
-            field entirely below the fold, so the most commercially important flow in
-            the app opened on an advert for itself. The heading stays at every width;
-            it is the only part that says which page this is. */}
         <div className="text-center mb-5 sm:mb-10">
           <div className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-sm font-medium mb-5">
             <Sparkles className="w-4 h-4" /> {t('listProperty.page.badge')}
           </div>
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-0 sm:mb-3">{t('listProperty.page.title')}</h1>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-0 sm:mb-3">{editRoomId ? t('listProperty.edit.roomTitle') : t('listProperty.page.title')}</h1>
           <p className="hidden sm:block text-gray-400 text-lg">{t('listProperty.page.subtitle')}</p>
         </div>
 
-        {/* Momentum meter — reflects listing-field completion. Posting requires
-           only a signed-in (mobile-verified) account; identity verification is an
-           opt-in "Verified" badge, never a wall (ADR-019). */}
-        <ProgressMeter pct={progressState.pct} tierKey={progressState.key} label={progressState.label} cheer={progressState.cheer} />
+        <ProgressMeter
+          pct={progressState.pct}
+          tierKey={progressState.key}
+          label={progressState.label}
+          done={progressState.done}
+          total={progressState.total}
+          nudge={progressState.nudge}
+        />
+
+        {listingLimit != null && !editId && !isFlatmateMode && (
+          <div className="mb-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3 text-xs font-semibold text-gray-300">
+            <p>{t('listProperty.quota.entry', { count: listingLimit, used: activeListingCount, allowance: listingLimit })}</p>
+            {quotaFull && <p className="mt-1 font-normal text-amber-200">{t('listProperty.success.passNote', { price: fee('listingPass') })}</p>}
+          </div>
+        )}
 
         {editId && <EditPolicyBanner approved={editApproved} changes={editChanges} />}
 
-        {(!editId && !canPost) ? (
-          <ListingPaywall count={activeListingCount()} limit={listingLimit()} />
-        ) : (<>
-            {/* Step indicator — the same 3-phase wizard for whole-place & flatmate */}
-            <StepNav current={currentStep} onJump={(n) => { setCurrentStep(n); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+            <StepNav current={currentStep} steps={LISTING_STEPS} onJump={jumpTo} />
+            {/* Narrow mobile gutters leave room for paired fields. */}
 
-            {/* ===== Form Card ===== */}
-            <div className="glass-card rounded-2xl p-6 sm:p-8 lg:p-10">
+            <div className="glass-card rounded-2xl px-3 py-6 sm:p-8 lg:p-10" data-testid="listing-wizard">
 
-              {/* -------- STEP 1 -------- */}
               {(currentStep === 1) && (
                 <PropertyDetailsStep
+                  allowFlatmate={!editId && !editRoomId}
+                  lockDeal={!!editRoomId}
                   form={form}
                   set={set}
                   onPropertyType={changePropertyType}
+                  onCommercialType={changeCommercialType}
                   rentMode={rentMode}
                   setRentMode={setRentMode}
                   isFlatmateMode={isFlatmateMode}
@@ -118,7 +180,6 @@ const ListProperty = () => {
                   isLand={isLand}
                   isCommercial={isCommercial}
                   isHouse={isHouse}
-                  isPg={isPg}
                   toggleInArray={toggleInArray}
                   nextStep={nextStep}
                   money={money}
@@ -126,19 +187,16 @@ const ListProperty = () => {
                 />
               )}
 
-              {/* -------- STEP 2 -------- */}
               {(currentStep === 2 && !isFlatmateMode) && (
-                <LocationPricingStep
+                <LocationStep
                   form={form}
+                  legacyAddress={legacyAddress}
                   set={set}
-                  setForm={setForm}
                   errors={errors}
                   isLand={isLand}
                   isCommercial={isCommercial}
-                  money={money}
                   mapSearch={mapSearch}
                   onMapSearchChange={onMapSearchChange}
-                  doMapSearch={doMapSearch}
                   runMapSearch={runMapSearch}
                   mapSearchStatus={mapSearchStatus}
                   onAreaSelect={onAreaSelect}
@@ -146,7 +204,28 @@ const ListProperty = () => {
                   flyTo={flyTo}
                   onLocalityChange={onLocalityChange}
                   onPinMove={onPinMove}
+                  onSocietyPick={onSocietyPick}
+                  societyFillNotice={societyFillNotice}
+                  canUseCurrentLocation={canUseCurrentLocation}
+                  useCurrentLocation={useCurrentLocation}
+                  currentLocationStatus={currentLocationStatus}
                   locationSet={locationSet}
+                  prevStep={prevStep}
+                  nextStep={nextStep}
+                  nextPending={dupPending}
+                  onRequireAuth={requestAuthPrompt}
+                  onReset={openResetConfirm}
+                />
+              )}
+
+              {(currentStep === 3 && !isFlatmateMode) && (
+                <PricingStep
+                  form={form}
+                  set={set}
+                  errors={errors}
+                  isLand={isLand}
+                  isCommercial={isCommercial}
+                  money={money}
                   setDepositMonths={setDepositMonths}
                   toggleTenant={toggleTenant}
                   prevStep={prevStep}
@@ -155,8 +234,7 @@ const ListProperty = () => {
                 />
               )}
 
-              {/* -------- STEP 3 -------- */}
-              {(currentStep === 3 && !isFlatmateMode) && (
+              {(currentStep === 4 && !isFlatmateMode) && (
                 <PhotosDocumentsStep
                   form={form}
                   set={set}
@@ -166,22 +244,19 @@ const ListProperty = () => {
                   handlePhotoUpload={handlePhotoUpload}
                   removePhoto={removePhoto}
                   setPhotoCategory={setPhotoCategory}
-                  video={video}
-                  videoName={videoName}
-                  handleVideoUpload={handleVideoUpload}
-                  setVideo={setVideo}
-                  setVideoName={setVideoName}
-                  documents={documents}
-                  handleDocUpload={handleDocUpload}
+                  isMediaBusy={isMediaBusy || posting}
+                  mediaStatus={mediaStatus}
                   prevStep={prevStep}
                   submitProperty={submitProperty}
                   posting={posting}
                   onReset={openResetConfirm}
+                  onJump={jumpTo}
+                  needsAuthForMedia={needsAuthForMedia}
+                  onRequireAuth={requestAuthPrompt}
                 />
               )}
 
-              {/* -------- STEPS 2 & 3 (flatmate) -------- */}
-              {(isFlatmateMode && (currentStep === 2 || currentStep === 3)) && (
+              {(isFlatmateMode && currentStep > 1) && (
                 <FlatmateFlow
                   form={form}
                   set={set}
@@ -192,30 +267,51 @@ const ListProperty = () => {
                   removePhoto={removePhoto}
                   setPhotoCategory={setPhotoCategory}
                   currentStep={currentStep}
+                  isMediaBusy={isMediaBusy || posting}
+                  mediaStatus={mediaStatus}
                   prevStep={prevStep}
                   nextStep={nextStep}
                   submitFlatmate={submitFlatmate}
+                  isEditing={!!editRoomId}
                   onReset={openResetConfirm}
                   mapSearch={mapSearch}
                   onMapSearchChange={onMapSearchChange}
-                  doMapSearch={doMapSearch}
                   runMapSearch={runMapSearch}
                   mapSearchStatus={mapSearchStatus}
                   onAreaSelect={onAreaSelect}
+                  onSocietyPick={onSocietyPick}
                   geoFillStatus={geoFillStatus}
                   flyTo={flyTo}
                   onLocalityChange={onLocalityChange}
                   onPinMove={onPinMove}
                   locationSet={locationSet}
+                  needsAuthForMedia={needsAuthForMedia}
+                  onRequireAuth={requestAuthPrompt}
                 />
               )}
             </div>
-            </>)}
       </div>
 
       <ListPropertyModals ctx={vm} />
+      <InlineOtpSheet
+        open={authPromptOpen}
+        title={t('listProperty.deferredLogin.title')}
+        subtitle={t('listProperty.deferredLogin.subtitle')}
+        onClose={closeAuthPrompt}
+        onVerified={closeAuthPrompt}
+      />
     </div>
   );
+};
+// Remount per owner/listing so pending uploads, geocodes and draft timers cannot cross editors.
+
+const ListProperty = () => {
+  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const editId = searchParams.get('edit');
+  const editRoomId = searchParams.get('editRoom');
+  const key = JSON.stringify([editId, editRoomId, (editId || editRoomId) ? (user?.id || user?.uuid || user?.mobile || '') : 'new']);
+  return <ListPropertyForm key={key} />;
 };
 
 export default ListProperty;

@@ -1,29 +1,8 @@
-/**
- * The signed-in user's entitlements, as React state.
- *
- * Same shape of problem as `useContactGate`, and the same answer: what used to be a synchronous
- * localStorage read (`contactsRemaining()`) is now a network read, so every consumer needs an
- * effect to fetch it, something safe to render before it lands, and a way to refresh it after the
- * user has spent one. ContactBox, ContactOwnerModal and the exhausted modal all want the same
- * numbers, so the fetching lives here once.
- *
- * ## `null` is not zero
- *
- * `entitlements` is `null` until the answer arrives, and stays `null` for a signed-out visitor and
- * for a request that failed. None of those three mean "you have no contacts left" — they mean there
- * is no number to show — so consumers must render nothing rather than "0 left". The `remaining`
- * field is *also* `null` on an unlimited plan, for a different reason again, which is why
- * `unlimited` is a separate boolean and not something to be inferred from the numbers.
- *
- * ## This hook does not gate anything
- *
- * It reports. `POST /contacts/request` refuses, with a 422 the caller catches. Reading `remaining`
- * and skipping the request when it hits zero would put the decision back in the browser, which is
- * precisely what D31b removed — and it would be wrong as well as unsafe, since another tab or
- * device may have spent or earned contacts since this fetch.
- */
+/* `null` is not zero: it means "no number to show" (not loaded, signed out, or failed), so consumers
+   render nothing rather than "0 left". This hook reports only — `POST /contacts/request` refuses. */
 import { useCallback, useEffect, useState } from 'react';
 import { getEntitlements } from '../../../services/entitlementService.js';
+import { fmtDate } from '../../../lib/format.js';
 
 export function useEntitlements(enabled = true) {
   const [entitlements, setEntitlements] = useState(null);
@@ -60,12 +39,16 @@ export function useEntitlements(enabled = true) {
   return { entitlements, refresh };
 }
 
-/**
- * Owner contacts left, or `null` when there is no number worth showing — not loaded yet, signed
- * out, or on a plan with no ceiling. Callers render the counter only when this is a finite number.
- */
+/** Owner contacts left, or `null` when there is no number worth showing — not loaded yet, signed
+ *  out, or on a plan with no ceiling. Callers render the counter only for a finite number. */
 export const contactsLeft = (entitlements) => {
   const c = entitlements?.contacts;
   if (!c || c.unlimited) return null;
   return Number.isFinite(c.remaining) ? c.remaining : null;
+};
+
+/** The free-contacts deadline as a short date, only while it is still ahead. */
+export const freeContactsTill = (entitlements) => {
+  const at = entitlements?.contacts?.freeWindowEndsAt;
+  return at && new Date(at).getTime() > Date.now() ? fmtDate(at) : '';
 };

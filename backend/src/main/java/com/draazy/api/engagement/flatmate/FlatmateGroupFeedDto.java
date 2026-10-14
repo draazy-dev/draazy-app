@@ -4,20 +4,21 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Contract schema {@code FlatmateGroupFeed} — the anonymous card projection of a group; what it
- * omits is the guarantee. Fields and why: docs/flows/consumer/flatmates.md §5.
- */
 public record FlatmateGroupFeedDto(
         UUID id,
         String title,
         String locality,
         String policy,
         Long rent,
+        Long deposit,
+        Integer noticePeriodDays,
+        Integer lockInMonths,
+        String maintenanceBilling,
+        String electricityBilling,
         Long perHead,
         int seatsTotal,
         int seatsOpen,
-        List<FlatmateGroupDto.Member> members,
+        List<Member> members,
         UUID propertyId,
         String hostRole,
         String verificationTier,
@@ -27,5 +28,10 @@ public record FlatmateGroupFeedDto(
         List<String> tags,
         String note,
         String ownerName,
-        Instant createdAt) {
+        Instant createdAt,
+        FlatmateGroupPreferences preferences) {
+
+    /** No member-row id: only the host's own read needs it, to remove someone. */
+    public record Member(String name, String initials, boolean verified, boolean host) {
+    }
 }

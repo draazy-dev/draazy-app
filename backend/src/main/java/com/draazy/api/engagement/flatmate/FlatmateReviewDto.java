@@ -1,16 +1,11 @@
 package com.draazy.api.engagement.flatmate;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Contract schema {@code FlatmateReview} — one item in the Ops host-verification queue.
- *
- * <p>{@link #hostMobile()} is present and unmasked, which is the exception rather than the rule on
- * this platform. Ops cannot verify a rent agreement without being able to ring the person who
- * uploaded it, and this payload is only ever served to staff on an admin route.
- */
+/** Contract schema {@code FlatmateReview}. Back-office only, so the host's mobile is in full. */
 public record FlatmateReviewDto(
         UUID id,
         String kind,
@@ -23,6 +18,7 @@ public record FlatmateReviewDto(
         boolean flagForReview,
         boolean ownerConsent,
         Map<String, Object> agreementDoc,
+        LocalDate agreementValidTill,
         String status,
         String reason,
         Instant createdAt,
@@ -41,6 +37,7 @@ public record FlatmateReviewDto(
                 review.isFlagForReview(),
                 review.isOwnerConsent(),
                 review.getAgreementDoc(),
+                review.getAgreement().getValidTill(),
                 review.getStatus(),
                 review.getReason(),
                 review.getCreatedAt(),

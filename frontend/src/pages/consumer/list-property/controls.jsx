@@ -1,22 +1,13 @@
-/* ---------- small UI atoms ---------- */
+import { useId } from 'react';
+import { onActivateKey } from '../../../lib/onActivateKey.js';
 
-// Enter/Space should activate a div-based control just like a native button, so
-// keyboard users get the same behaviour as a click (and Space never scrolls the
-// page). Shared by the pill and toggle atoms below.
-const onActivateKey = (fn) => (e) => {
-  if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-    e.preventDefault();
-    fn?.(e);
-  }
-};
-
-export const Pill = ({ selected, onClick, children, className = '', dataErr, ariaLabel }) => (
+export const Pill = ({ selected, onClick, children, className = '', dataErr, ariaLabel, role = 'button' }) => (
   <div
     onClick={onClick}
     onKeyDown={onActivateKey(onClick)}
-    role="button"
+    role={role}
     tabIndex={0}
-    aria-pressed={!!selected}
+    {...(role === 'radio' ? { 'aria-checked': !!selected } : { 'aria-pressed': !!selected })}
     aria-label={ariaLabel}
     data-err={dataErr}
     className={`radio-pill rounded-xl text-sm font-medium cursor-pointer ${selected ? 'selected' : 'text-gray-400'} ${className}`}
@@ -25,8 +16,6 @@ export const Pill = ({ selected, onClick, children, className = '', dataErr, ari
   </div>
 );
 
-/* Inline required-field error — re-exported from the shared UI component so the
-   whole app (list-property + every other form) uses one implementation. */
 export { default as FieldError } from '../../../components/ui/FieldError.jsx';
 
 export const Toggle = ({ on, onClick, ariaLabel }) => (
@@ -37,18 +26,31 @@ export const Toggle = ({ on, onClick, ariaLabel }) => (
     tabIndex={0}
     aria-checked={!!on}
     aria-label={ariaLabel}
-    className={`toggle-track cursor-pointer ${on ? 'active' : ''}`}
+    className={`toggle-track tap-extend cursor-pointer ${on ? 'active' : ''}`}
   >
     <div className="toggle-thumb" />
   </div>
 );
 
-export const ToggleRow = ({ title, subtitle, on, onClick, className = '', pad = 'p-4' }) => (
-  <div className={`flex items-center justify-between ${pad} rounded-xl bg-white/[0.03] border border-white/5 ${className}`}>
-    <div>
-      <p className="text-sm font-medium text-white">{title}</p>
-      {subtitle && <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>}
-    </div>
-    <Toggle on={on} onClick={onClick} ariaLabel={typeof title === 'string' ? title : undefined} />
-  </div>
-);
+export const ToggleRow = ({ title, subtitle, on, onClick, className = '', pad = 'p-4' }) => {
+  const subtitleId = useId();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={!!on}
+      aria-label={typeof title === 'string' ? title : undefined}
+      aria-describedby={subtitle ? subtitleId : undefined}
+      onClick={onClick}
+      className={`flex w-full items-center justify-between text-left ${pad} rounded-xl bg-white/[0.03] border border-white/5 ${className}`}
+    >
+      <span>
+        <span className="block text-sm font-medium text-white">{title}</span>
+        {subtitle && <span id={subtitleId} className="block text-xs text-gray-500 mt-0.5">{subtitle}</span>}
+      </span>
+      <span aria-hidden="true" className={`toggle-track ${on ? 'active' : ''}`}>
+        <span className="toggle-thumb" />
+      </span>
+    </button>
+  );
+};

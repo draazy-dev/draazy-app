@@ -2,8 +2,8 @@
 
 > Mobile + OTP authentication for consumers, with a role stamped at sign-up, a
 > localStorage-backed session, and UX-only route guards. Mobile-OTP sign-in is **L1** — the trust
-> ladder's floor for posting and contacting (ADR-019); the DigiLocker Verified badge (L2) is opt-in.
-> **Status:** documented from React source · re-synced to ADR-019 (badge-not-gate) - **Primary role(s):** buyer, owner (consumer door); staff/admin use a separate door
+> ladder's floor for posting and contacting (ADR-019); the reviewed Verified badge (L2) is opt-in.
+> **Status:** documented from React source · re-synced to ADR-019 (badge-not-gate) - **Primary role(s):** buyer, owner (consumer door); staff/manager/admin use a separate door
 
 ---
 
@@ -48,7 +48,7 @@
 - [`users`](../../system/data-model.md) - the session user object
   (`{ name, mobile, role, loginAt }`) written to storage; on sign-up also appended to the local
   account registry (`draazyUsers`).
-- [`aadhaar_verifications`](../../system/data-model.md) - not written here. The DigiLocker Verified
+- [`identity_verifications`](../../system/data-model.md) - not written here. The reviewed Verified
   badge (L2) is an **opt-in trust signal** that layers on top of auth — it is **not** a gate for
   posting or contacting (mobile-OTP sign-in / L1 is the only floor; see
   [contact-gate-leads.md](./contact-gate-leads.md) and ADR-019).
@@ -153,11 +153,13 @@
   unrecognised profile lands on the safe side and a superset activation such as `prod,sandbox` fails
   too. The runtime guards are not redundant with the properties pins: a classpath config-data file is
   the *lowest*-precedence source Spring consults, so `DRAAZY_OTP_FIXED_CODE` exported into a
-  deployment's environment silently outranks both pins and only the boot check is left.The sandbox cost is real and accepted: a committed `000000`, seeded staff mobiles in the repo,
-  and login that resolves a user by mobile — the guard keeps the blast radius to that one environment.
-- **`AuthResponse` carries two shapes in one record** because the contract models login as a single
-  dual-mode operation: the send step returns `{otpSent, resendAfterSeconds}` and no tokens, a completed
-  verify/staff-login/refresh returns the token pair plus `user`. `NON_NULL` keeps each shape clean.
+  deployment's environment silently outranks both pins and only the boot check is left. The sandbox cost is real and accepted: a committed `000000` and
+  login that resolves a user by mobile — the guard keeps the blast radius to that one environment, and
+  back-office accounts are out of it entirely because `/auth/login` refuses them (§ Staff login).
+- **`AuthResponse` carries several shapes in one record** because the contract models login as a single
+  dual-mode operation: the send step returns `{otpSent, resendAfterSeconds}` and no tokens, the staff
+  password step returns `{mfa, challenge}` and no tokens, and a completed verify/staff-verify/refresh
+  returns the token pair plus `user` (enrol-confirm adds `recoveryCodes`). `NON_NULL` keeps each shape clean.
   `refreshToken` rides the record but is `@JsonIgnore`d — it leaves the server in an `HttpOnly` cookie,
   never in the body — and stays only because `AuthController` needs the raw value to build that cookie.
   The send acknowledgement publishes the *server's* cooldown so the "resend in Ns" counter matches what
@@ -171,30 +173,28 @@
 
 *Home of the reasoning behind `AuthService`.*
 
-- **Three independent refusals, checked in a fixed order** (`refuseIfCannotYetAuthenticate`):
-  suspension (V77), maker-checker approval (V67), then invite activation (V71). Suspension first
-  because the other two name something the holder can chase, while a suspension is a decision taken
-  about them — telling a suspended person to chase an approval sends them to bother an administrator
-  who already knows. Its message names no reason and no moderator: the reason is in `audit_log`, and
-  repeating it here hands the account exactly what is most useful for arguing with or evading the
-  decision. Approval before activation so a colleague who is both unapproved and un-redeemed is told
-  the thing an administrator can act on. An account with no approval/invite row is not subject to
-  that gate — both queries are phrased as "is there an open row" so absence answers `false`.
-- **Activation is a second gate, not a restatement of approval.** Neither administrator supplies a
-  password, so a freshly minted account is passwordless — and passwordless is not unreachable, because
-  `POST /auth/login` needs no password at all. A maker who typed their own number into the create form
-  would hold the account the moment the checker approved it, and the checker saw only a name, an email
-  and a role. Refusing until the invite is redeemed is what makes the co-signature attest to a person.
-- **403, and only after the credential has been checked.** `staffLogin` verifies the password and
-  `login` verifies the OTP before this runs, so a caller who reaches the message has already proved
-  they hold the credential and learns nothing. A 401 would be honest about the outcome and useless to
+- **Two independent refusals, checked in a fixed order** (`refuseIfCannotYetAuthenticate`):
+  suspension (V77), then invite activation (V71). Suspension first because invite activation names
+  something the holder can chase, while a suspension is a decision taken about them. Its message names
+  no reason and no moderator: the reason is in `audit_log`, and repeating it here hands the account
+  exactly what is most useful for arguing with or evading the decision. An account with no open invite
+  row is not subject to that gate — the query is phrased as "is there an open row" so absence answers
+  `false`.
+- **Activation is the staff-account gate.** The administrator supplies no password, so a freshly minted
+  account is passwordless and cannot pass the password step; refusing until the invite is redeemed is
+  what makes the credential belong to the colleague.
+- **403, and only after the credential has been checked.** The staff password step and `login`'s OTP
+  check run before this, so a caller who reaches the message has already proved they hold the
+  credential and learns nothing. A 401 would be honest about the outcome and useless to
   the blocked colleague, who would spend the morning retyping a correct password. The same ordering is
   why `staffLoginEnabled` is read *after* the password: a caller who could tell "staff sign-in is off"
   from "invalid credentials" holds an oracle sorting arbitrary emails into staff and not-staff.
+  `StaffSignInService` re-runs the gate on the second-factor steps, so a suspension landing inside the
+  challenge's five minutes still stops the session.
 - **`refresh` re-checks the same gate** rather than trusting "a refresh token can only exist if
   `issueFor` minted one". That is true by accident of today's write paths and nothing enforces it; the
-  moment anyone holds an account that already exists — the obvious incident-response use of the
-  approvals table — every live session would keep refreshing for the whole refresh TTL. Its
+  moment a privileged account is blocked after sign-in, every live session would keep refreshing for
+  the whole refresh TTL. Its
   `noRollbackFor(Unauthorized)` keeps the two revocations on that path (reuse-detection family burn,
   and revoke-all for an archived user), which are security actions taken *because* the request is being
   refused. `ForbiddenException` is deliberately absent, so a refused rotation rolls back and the
@@ -211,8 +211,50 @@
   listing over the phone. The gate sits at the caller rather than at the insert, so it holds only
   while `UserService.provisionBuyer` has exactly one caller — `AccountProvisioningGuardTest` pins
   that over the source text, and its failure message says what to do with a second one.
-- **Staff login equalises work on an unknown email** with a dummy BCrypt hash, and never reveals which
+- **Staff sign-in equalises work on an unknown email** with a dummy BCrypt hash, and never reveals which
   half failed; a null hash (a passwordless account) must also 401.
+
+### Backend: refresh rotation, reuse detection and session revocation
+
+*Home of the reasoning behind `RefreshTokenService` and `RefreshTokenRepository`.*
+
+- **Rotation with reuse detection (ADR-008).** Each refresh revokes the presented token and chains a new
+  one via `rotated_from`. Presenting an already-revoked token is a replay, so the whole family is revoked.
+- **`noRollbackFor` the 401 on `rotate`, or the tripwire does nothing.** The theft path revokes then
+  throws; `rotate` joins `AuthService.refresh`'s transaction, so without the rule the throw marks it
+  rollback-only and the revocations never reach the database while the caller still sees 401. Both ends
+  need the rule for the reason on `OtpService#sendLoginCode` (D90). The not-found and expired 401s write
+  nothing.
+- **Grace window.** Two tabs waking together present the same token; one wins and the other replays a
+  token spent milliseconds ago. A token spent within `refreshGrace` is forgiven and served the family's
+  *live head*, re-rotated, rather than a parallel sibling: the winner's raw token cannot be recovered and
+  a sibling would break one-live-token-per-family. A row's `created_at` dates its predecessor's
+  revocation, so no `revoked_at` column is needed. The walk is bounded at `MAX_GRACE_HOPS` (3).
+- **`MAX_CONSECUTIVE_GRACES` (3) is what bounds the window.** A thief who keeps rotating holds it open, so
+  thief and victim could alternate forgiven replays for the whole TTL. Counting *consecutive* graces per
+  chain breaks that: the attack is contested at every step and reaches the limit, while an honest race is
+  followed by a clean rotation that resets the count. Three covers four simultaneous tabs. Both the
+  forgiven and the refused replay log a warning with the user id only.
+- **What the grace window does not fix.** The two tabs also race to write the cookie; if the winner's
+  response lands last the jar holds a token the graced loser already revoked, and the next refresh
+  fifteen minutes later burns the family. Server-side repairs each break a commoner case (a dropped
+  response retried with a spent token) or remove the time bound, so the control is the client's Web Lock
+  in `frontend/src/services/http.js`. A single tab that loses its response and retries outside the window
+  still burns the family.
+- **Per-user advisory lock (`lockFamily`).** Row locks are taken on rows the request chooses, so two
+  concurrent calls for one user could deadlock and Postgres would abort one — a family burn rolled back
+  by the database, which `noRollbackFor` cannot save. One `pg_advisory_xact_lock` taken before any row
+  lock gives every family operation a total order and releases itself at transaction end. The owner is
+  read unlocked first only to choose the lock (`user_id` never changes); every decision uses the locked
+  re-read. The key is folded from the UUID in Java because `hashtext` has no stability promise;
+  collisions only serialise two unrelated families.
+- **Row locks.** `findByTokenHash` is `FOR UPDATE` so two concurrent refreshes of one token cannot both
+  mint a successor. `findByUserId` is locked so a sibling's concurrent rotation cannot commit a token the
+  burn never saw. `findByRotatedFrom` is locked because the grace path is about to rotate the heir.
+- **Logout and suspension end the access token at once.** `revokeAllForUser` also stamps
+  `users.sessions_revoked_at` (whole seconds, matching a JWT `iat`). `JwtAuthFilter` reads it through
+  `RoleSource` with the current role and refuses any access token issued before the stamp, so the
+  15-minute access token stops working on the next request rather than at expiry.
 
 ### Sign in (`Signin.jsx`)
 - **Mobile normalisation:** `useMobileInput` + `MobileField`; a valid number is exactly 10 digits.
@@ -279,30 +321,42 @@
   because only it sees the profile *before* the patch — afterwards every account has a name.
 
 ### Staff login (`/staff-login`, `StaffLogin.jsx`)
-- **Which half is real.** Against the live API the console signs in through the ordinary
-  `/auth/login` mobile-OTP route — the same one consumers use — because that is the only staff
-  sign-in the server offers a browser. `POST /auth/staff-login` is email+password, and a staff
-  account has no password until its holder redeems an emailed invite, so a console demanding one
-  could not sign in the very people it was built for.
+- **Password plus an authenticator, never the mobile OTP.** `POST /auth/login` refuses staff,
+  manager and admin accounts with 403 `staff_sign_in_required` after the code is checked, so a SIM
+  swap or a leaked SMS cannot open the back office. The console posts email + password to
+  `POST /auth/staff-login`, which returns `{mfa, challenge}` and no tokens; `mfa` is `totp` or, on a
+  first sign-in, `enrol`. The challenge is an HMAC-signed, five-minute token naming the account.
+- **Second step.** `totp`: `/auth/staff-login/verify` takes a 6-digit code or a single-use recovery
+  code. `enrol`: `/auth/staff-login/enrol` returns a fresh secret and `otpauth://` URI (rendered as a
+  QR), and `/enrol/confirm` proves the app holds it and returns ten recovery codes, shown once. The
+  app entry is named `Draazy` (prod), `Draazy Sandbox` or `Draazy Local`, so one phone holds a separate
+  code per environment. Both
+  completing steps set the refresh cookie and return the session; the password step sets none.
+- **What the server keeps.** The TOTP secret is AES-256-GCM encrypted under `STAFF_TOTP_KEY`;
+  recovery codes are SHA-256 hashes. The last accepted time step is stored, so a code cannot be
+  replayed inside its window. Five misses — wrong passwords or wrong codes — lock the account for 15
+  minutes (429 `staff_sign_in_locked`). An expired or tampered challenge is 401
+  `staff_sign_in_expired`, and the screen restarts at the password.
+- **Recovery is a back-office manager's job.** Admin › Team has *Reset 2FA* (next sign-in re-enrols)
+  and *Reissue invite* (voids the open invite and returns a one-time `/staff-invite#...` link to the
+  creator; the account cannot sign in until it is redeemed). Managers can do this for staff only;
+  admin actions are audited, and manager actions also notify the administrator.
+- **There is one administrator per environment.** First deploy sets `BOOTSTRAP_ADMIN_EMAIL`,
+  `BOOTSTRAP_ADMIN_MOBILE` and optionally `BOOTSTRAP_ADMIN_NAME`; startup logs a one-hour
+  `/staff-invite#...` link for that account. Break-glass recovery sets `BOOTSTRAP_ADMIN_RECOVER` to a
+  fresh nonce and redeploys: startup resets that admin's 2FA, revokes sessions and logs a fresh link.
 - **Role and team are not a choice made in the browser.** The server returns the authenticated
   account's own role and team and this screen obeys them: the token it holds was minted for that
   account, and every API call behind the console is authorised server-side regardless of what the
-  page believes. A picker here could only show an operator a console their token cannot load — which
-  is why the old "I am signing in as" radio pair and the demo sign-in-as chips are gone rather than
-  rendered inert.
-- **Only administrators open the admin console.** `manager` went with the custom-role bundles it
-  labelled; an ops staffer's permission atoms widen what the API grants them *inside* the service
-  portal rather than promoting them to a different shell.
+  page believes.
+- **Managers are real back-office roles.** Admin is the single environment owner, managers sit below
+  admin and above function staff, and manager/admin can load the admin shell. Modules still open only
+  when `GET /auth/me` returns the needed permission atom.
 - **Safe `next` asks two separate questions:** is it a usable in-app path (`safeInAppPath`, shared
   with the consumer screens so the two doors cannot drift, and where the `/staff-login` self-redirect
   dead end is rejected), and does it match this role's access. Asking only the second let
   `?next=//evil.com` through, since it starts with neither `/admin` nor `/ops`.
-- **A consumer who signs in here is signed back out.** The code was valid, so leaving the session
-  open would sign a buyer in through the staff entrance and merely decline to redirect them — a
-  console every route guard refuses reads as a broken product rather than a closed door.
-- **The server's error sentence is kept verbatim**, because this console is internal and
-  English-only. The remaining-guesses count is kept too: this screen posts to the same `/auth/login`
-  and spends the same per-code budget, so without it a mistyped digit burns the code silently.
+- **The server's error sentence is kept verbatim**, because this console is internal and English-only.
 
 ### Contextual intent copy (`authIntent.js`)
 - `resolveAuthIntent(params)` picks heading/sub from an explicit `?reason=` key, else infers a
@@ -368,7 +422,7 @@
   reasoning. Note that MockMvc sends no `Sec-Fetch-Site` header, which is the "treat as ours"
   branch — so the whole condition could be deleted and every auth test bar the two in
   `AuthEndpointsTest` that pin it explicitly would stay green.
-- Helpers: `roleLabel`, `firstName`, `initial`, `isInternal` (admin/staff).
+- Helpers: `roleLabel`, `firstName`, `initial`, `isInternal` (admin/manager/staff).
 
 > **The browser holds a cache, not a session.** The credential is a rotating refresh token
 > (hashed server-side in `refresh_tokens`, 30d) plus a 15-minute access JWT; the OTP is real,
@@ -390,6 +444,8 @@ single-use token. The final clause asks "did we think we had a session?". It can
 refresh token, which is an `HttpOnly` cookie we are not allowed to see; the access token stands in
 for it, because the two are written and cleared together. Being wrong is cheap in the only direction
 it can be wrong — a stale access token with no cookie behind it costs one 401 on `/auth/refresh`.
+A 401 whose body carries `attemptsRemaining` is a wrong OTP on a signed-in call (owner consent, for
+example), not an expired token. It is never replayed, because a replay would spend a second guess.
 
 **Clearing the session follows an answer, never the absence of one.** `refreshAccessToken` resolves
 `null` only when the server actually refused, and throws when it could not be reached at all, so an
@@ -430,7 +486,7 @@ propagate would send a raw `SecurityError` out through `request()`, past the
 **The loser of the race must not refresh again.** `doRefresh` compares the access token it entered
 with against the current one; if another tab rotated or signed out, it hands back whatever is there.
 The `entryToken &&` guard is load-bearing, and the obvious "tidy-up" of bailing when it is null is a
-real regression (caught by `live-flow.spec.js`, which logs out instead of renewing): a null access
+real regression (caught by `signin-otp-session.spec.js`, which logs out instead of renewing): a null access
 token does **not** mean there is no session to renew, because the credential this call spends is the
 `HttpOnly` cookie. Entering with nothing is exactly the cold-boot case where refreshing is the only
 way to find out, so the comparison must stay a guard against a token that *moved*, not a
@@ -451,7 +507,7 @@ access token alongside it would just 401 again.
 asked. The case that proved this is not offline-with-a-dead-session; it is an in-flight refresh
 cancelled by a navigation: `fetch` rejects with `AbortError`, `send` wraps it, and a session that
 was fine a millisecond earlier gets cleared. Rare per navigation, but the window is exactly the
-moment a user clicks a link on an expired token. It failed `live-flow.spec.js` only in the full
+moment a user clicks a link on an expired token. It failed `signin-otp-session.spec.js` only in the full
 suite, where load widened the gap between the 401 and the reload.
 
 Same reasoning one step further: a 429 or a 5xx is the server declining to answer, not answering
@@ -543,7 +599,7 @@ also **not** interchangeable with `Dashboard.jsx`'s `isOwner` (`listings.length 
 ownsInventory`), which is LIVE inventory and the right question for a screen managing what is
 currently posted. Two questions, two answers; one name would make them one wrong answer.
 
-`login`, `register` and `staffLogin` all resolve with what the *server* returned, and that is part
+`login`, `register`, `staffVerify` and `staffConfirm` all resolve with what the *server* returned, and that is part
 of the contract. Two screens act inside the same handler, before the next render exists:
 `/staff-login` needs the role and team to choose a console, and `/signin` needs to know whether the
 account it just authenticated has a name yet. `register` resolves `wasNew` because `/auth/login`
@@ -563,11 +619,8 @@ somewhere different than `/signin` would.
   forget would leave the longer-lived half of the session behind.
 - **`register` is not a create.** There is no registration endpoint; `/auth/login` provisions a
   nameless buyer from the mobile alone, so this is a sign-in followed by a profile patch.
-- **`staffLogin`** stays even though the `/staff-login` screen signs staff in with mobile + OTP:
-  D206 removed the password from `POST /users/staff`, so a staff account has no password until its
-  holder redeems an emailed invite, but the endpoint is real and redeemed accounts can use it. The
-  argument check exists because a caller reaching it without credentials has almost certainly passed
-  the OTP screen's user object by mistake, and a named message beats a bare 422.
+- **`staffLogin`** is only the password step: it resolves `{mfa, challenge}` and opens no session.
+  `staffVerify` and `staffConfirm` open it, which is why only those two go through `AuthContext`.
 - **`logout` clears locally even if the server call fails** — a user who clicks "sign out" must end
   up signed out regardless of connectivity. The server call does something the client cannot: revoke
   the family *and* expire the `__Host-draazy_rt` cookie, which `logoutUser()` cannot reach. If the
@@ -619,16 +672,15 @@ not "which screen am I", because `/signup` has no create endpoint behind it. The
 validated too, so a future caller cannot turn that trusted literal seam into another redirect path.
 
 `resolveAuthIntent` resolves i18n **keys**, never copy: the strings live in
-`i18n/locales/<lang>/auth.json` under `auth.intent.*`, so a Marathi visitor sent here by a gate
-reads the reason in Marathi, and English text here would make the module a second, untranslated copy
-deck.
+`i18n/locales/en/auth.json` under `auth.intent.*`, so the copy has one home and this module does not
+become a second copy deck.
 
 ### OTP verification errors are classified on `code`, never status
 
 `lib/otpVerifyError.js` is shared because every OTP screen posts to a route that goes through the
 same server primitive, so they all face the same refusals — and the one thing none of them may do is
-render `err.message`. The API answers in English; these screens ship in three languages, so showing
-the server's sentence is itself the bug.
+render `err.message`. The server's sentence is written for logs, not for the person at the form, and
+the copy for each refusal lives in the locale catalogue, so showing it is itself the bug.
 
 The statuses collide in both directions: a 401 is "wrong digits" *or* "this account is archived",
 and a 429 is "this code is burnt" *or* "the IP you share is busy" — opposite remedies behind one
@@ -681,7 +733,7 @@ logout <---------------------------------------------------------------+
 
 ## 9. Invariants the live auth specs pin
 
-`e2e/tests/platform/auth/live-flow.spec.js` and `live-improvements.spec.js` carry only one-line
+`e2e/tests/platform/auth/signin-otp-session.spec.js` and `improvements.spec.js` carry only one-line
 comments; the reasoning lives here.
 
 **No user-enumeration oracle.** The live API deliberately has no "does this mobile exist?" endpoint —
@@ -761,8 +813,8 @@ wrong reason.
 second tab or an earlier visit already spent, so a local counter would promise three guesses to someone
 who has one. Asserting the *numbers* is the point: an off-by-one either burns a guess the user was owed
 or offers one the server will refuse, and both read as a working form. The wording is read as rendered
-because the server's prose is English-only and the form ships in three languages — a screen showing the
-server's sentence would be the bug. Sign Up posts to the same `/auth/login` and so spends the same
+because the server's prose is not the product copy — a screen showing the server's sentence would be
+the bug. Sign Up posts to the same `/auth/login` and so spends the same
 budget, but it also raises refusals Sign In never can: a signup *validation* message names the field to
 fix and keeps the server's text, while everything else is a refusal about the code or the account and
 must be translated.
@@ -802,7 +854,7 @@ from the same flag — but the storage half is the half a script on the page can
 **City copy on the auth panels.** City selection is client state; what the panel *says* about a city is
 not. Pune's inventory count next to "launching in Mumbai soon" is not a cosmetic slip — it is a claim
 about stock that does not exist. These assertions move again when the cities/geo work lands
-(`cities.live` becomes a server fact); recorded in `docs/migration/README.md` under decision 2.
+(`cities.live` becomes a server fact); recorded in `tasks/DECISIONS-NEEDED.md` under decision 2.
 
 **The resend countdown is the server's number.** It was a hardcoded 30s in the browser while a
 deployment enforces a 60s gap, so the button came back while the server still refused and a person who

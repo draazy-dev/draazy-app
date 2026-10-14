@@ -1,24 +1,15 @@
 import {
   ShieldCheck,
   Tv, Refrigerator, Sofa, Shirt, BedDouble, CookingPot, WashingMachine, AirVent,
-  Microwave, Utensils, ShowerHead, Fan, Blinds, Droplets, Lamp, Flame,
+  Microwave, Utensils, ShowerHead, Fan, Blinds, Droplets, Lamp, Flame, ChefHat,
   Waves, Dumbbell, Zap, ArrowUpDown, Landmark, Trees, Footprints,
   Briefcase, Goal, Blocks, Armchair,
-  Wifi, UtensilsCrossed, Sparkles, Cctv, Snowflake, BookOpen,
   Bike, Car
 } from 'lucide-react';
-import { localityNames, localityCoordMap } from '../../../data/localities.js';
 
-/* ---------- static option data ---------- */
-/* Locality identity is owned by the canonical registry (data/localities.js).
-   Both the shortlist and the offline centre-coords derive from it so "Search an
-   area" works instantly/offline; free-text queries still fall back to live
-   geocoding, and a live Google pick refines the exact pin. */
-export const localities = localityNames();
-export const localityCoords = localityCoordMap();
-export const facingOptions = ['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West', 'Park Facing', 'Road Facing'];
+export const facingOptions = ['East', 'West', 'North', 'South'];
+export const overlookingOptions = ['Garden', 'Amenity', 'Parking', 'Main Road'];
 export const ageOptions = [
-  { value: 'under-construction', label: 'Under Construction' },
   { value: 'new', label: 'New (less than 1 year)' },
   { value: '1-5', label: '1 - 5 years' },
   { value: '5-10', label: '5 - 10 years' },
@@ -26,6 +17,8 @@ export const ageOptions = [
   { value: '15+', label: '15+ years' },
 ];
 export const ownershipOptions = ['Freehold', 'Leasehold', 'Co-operative Society', 'Power of Attorney'];
+/* Commercial branch only — a flat is never held this way. */
+export const commercialOwnershipOptions = [...ownershipOptions, 'MIDC / Industrial Lease'];
 export const floorOptions = ['Ground', ...Array.from({ length: 50 }, (_, i) => String(i + 1))];
 export const totalFloorsOptions = Array.from({ length: 50 }, (_, i) => String(i + 1));
 export const agreementOptions = [
@@ -38,9 +31,6 @@ export const lockinOptions = [
 ];
 export const noticeOptions = [{ value: '1', label: '1 month' }, { value: '2', label: '2 months' }, { value: '3', label: '3 months' }];
 
-/* Commercial leases run far longer than residential — years, not months — with
-   longer lock-ins and notice periods. Values stored in months so downstream
-   parsing stays consistent with the residential lists. */
 export const commercialAgreementOptions = [
   { value: '36', label: '3 years' }, { value: '60', label: '5 years' },
   { value: '108', label: '9 years' }, { value: '120', label: '10+ years' },
@@ -55,25 +45,40 @@ export const commercialNoticeOptions = [
   { value: '3', label: '3 months' }, { value: '6', label: '6 months' },
 ];
 
+/* A plot or farm is let by the year, never on the 11-month tenancy the Rent Act shapes a flat's
+ * lease around. */
+export const landAgreementOptions = [
+  { value: '12', label: '1 year' }, { value: '36', label: '3 years' },
+  { value: '60', label: '5 years' }, { value: '108', label: '9 years' },
+  { value: '120', label: '10+ years' }, { value: 'long', label: 'Long term' },
+];
+export const landLockinOptions = [
+  { value: '0', label: 'None' }, { value: '12', label: '1 year' },
+  { value: '24', label: '2 years' }, { value: '36', label: '3 years' },
+];
+export const landNoticeOptions = [
+  { value: '1', label: '1 month' }, { value: '3', label: '3 months' }, { value: '6', label: '6 months' },
+];
+
+export const LEASE_DEFAULTS = {
+  residential: { agreementDuration: '11', lockIn: '0', noticePeriod: '1' },
+  commercial: { agreementDuration: '12', lockIn: '0', noticePeriod: '1' },
+  land: { agreementDuration: '12', lockIn: '0', noticePeriod: '1' },
+};
+
+/* Shared with the desk console so the same owner is never quoted different norms for the same
+ * property. */
+export const DEPOSIT_MONTHS = {
+  residential: [2, 3], commercial: [3, 4], land: [6, 12],
+};
+
 export const furnitureItems = [
   { label: 'TV', Icon: Tv }, { label: 'Refrigerator', Icon: Refrigerator }, { label: 'Sofa', Icon: Sofa },
   { label: 'Wardrobe', Icon: Shirt }, { label: 'Bed', Icon: BedDouble }, { label: 'Kitchen Trolley', Icon: CookingPot },
   { label: 'Washing Machine', Icon: WashingMachine }, { label: 'AC', Icon: AirVent }, { label: 'Microwave', Icon: Microwave },
   { label: 'Dining Table', Icon: Utensils }, { label: 'Geyser', Icon: ShowerHead }, { label: 'Fans', Icon: Fan },
   { label: 'Curtains', Icon: Blinds }, { label: 'Water Purifier', Icon: Droplets }, { label: 'Light Fittings', Icon: Lamp },
-  { label: 'Chimney', Icon: Flame },
-];
-
-/* PG / Hostel furnished inventory — a PG room is sold on its bed-side essentials
-   (bed, wardrobe, study desk) and comfort add-ons, not a family kitchen's trolley
-   or chimney. Kept separate from furnitureItems so a "Fully Furnished" PG lists
-   what a tenant actually gets in their room. */
-export const pgFurnitureItems = [
-  { label: 'Bed', Icon: BedDouble }, { label: 'Mattress', Icon: BedDouble }, { label: 'Wardrobe', Icon: Shirt },
-  { label: 'Study Table', Icon: BookOpen }, { label: 'Study Chair', Icon: Armchair }, { label: 'AC', Icon: AirVent },
-  { label: 'Fans', Icon: Fan }, { label: 'Geyser', Icon: ShowerHead }, { label: 'TV', Icon: Tv },
-  { label: 'Refrigerator', Icon: Refrigerator }, { label: 'Curtains', Icon: Blinds }, { label: 'Water Purifier', Icon: Droplets },
-  { label: 'Washing Machine', Icon: WashingMachine },
+  { label: 'Chimney', Icon: Flame }, { label: 'Modular Kitchen', Icon: ChefHat },
 ];
 export const amenitiesList = [
   { label: 'Swimming Pool', Icon: Waves }, { label: 'Gym', Icon: Dumbbell },
@@ -81,100 +86,115 @@ export const amenitiesList = [
   { label: 'Smart Security', Icon: ShieldCheck }, { label: 'Power Backup', Icon: Zap }, { label: 'Lift', Icon: ArrowUpDown },
   { label: 'Club House', Icon: Landmark }, { label: 'Garden', Icon: Trees }, { label: 'Jogging Track', Icon: Footprints },
   { label: 'Co-Working Spaces', Icon: Briefcase }, { label: 'Sports Court', Icon: Goal }, { label: 'Kids Play Zone', Icon: Blocks },
-  { label: 'Senior Seating', Icon: Armchair },
+  { label: 'Senior Seating', Icon: Armchair }, { label: 'Piped Gas', Icon: Flame },
 ];
+export const SOCIETY_AMENITY_LABELS = [
+  'Swimming Pool', 'Gym', '2-Wheeler Parking', '4-Wheeler Parking', 'Smart Security', 'Power Backup',
+  'Lift', 'Club House', 'Garden', 'Jogging Track', 'Sports Court', 'Kids Play Zone', 'Senior Seating', 'Piped Gas',
+];
+const LEGACY_IN_FLAT_AMENITIES = { 'Modular Kitchen': 'Modular Kitchen', AC: 'AC', Wardrobes: 'Wardrobe', 'Water Purifier': 'Water Purifier', Geyser: 'Geyser' };
+export const withInFlatAsFurniture = (listing) => {
+  const amenities = listing.amenities || [];
+  const moved = amenities.filter((a) => Object.hasOwn(LEGACY_IN_FLAT_AMENITIES, a));
+  if (!moved.length) return listing;
+  return {
+    ...listing,
+    amenities: amenities.filter((a) => !moved.includes(a)),
+    furniture: [...new Set([...(listing.furniture || []), ...moved.map((a) => LEGACY_IN_FLAT_AMENITIES[a])])],
+  };
+};
 export const lifestyleTags = ['Non-smoker', 'Early riser', 'Night owl', 'Pet-friendly', 'Working professional', 'Student', 'Fitness', 'Vegetarian'];
 
-/* PG / Hostel amenities — the services that actually sell a bed: connectivity,
-   meals, housekeeping and safety. Separate from the society-scale amenitiesList
-   (a PG advertises WiFi and a warden, not a club house or jogging track). */
-export const pgAmenitiesList = [
-  { label: 'WiFi', Icon: Wifi }, { label: 'Meals / Mess', Icon: UtensilsCrossed }, { label: 'Housekeeping', Icon: Sparkles },
-  { label: 'Laundry', Icon: WashingMachine }, { label: 'Power Backup', Icon: Zap }, { label: 'CCTV Security', Icon: Cctv },
-  { label: 'Warden / Security', Icon: ShieldCheck }, { label: '2-Wheeler Parking', Icon: Bike }, { label: '4-Wheeler Parking', Icon: Car },
-  { label: 'Refrigerator', Icon: Refrigerator }, { label: 'Geyser', Icon: ShowerHead }, { label: 'TV', Icon: Tv }, { label: 'Water Purifier', Icon: Droplets },
-  { label: 'Study Table', Icon: BookOpen }, { label: 'AC', Icon: Snowflake }, { label: 'Co-Working Space', Icon: Briefcase },
-];
+const lightBillDoc = (deal) => ({
+  key: 'Electricity Bill',
+  i18n: 'lightBill',
+  verifies: deal === 'rent',
+  supporting: deal === 'buy',
+  recommended: deal === 'rent',
+});
+const propertyTaxDoc = (deal) => ({
+  key: 'Property Tax Receipt',
+  i18n: 'propertyTax',
+  verifies: deal === 'rent',
+  supporting: deal === 'buy',
+});
+const titleProofDocsFor = (propertyType) => {
+  if (propertyType === 'farmland') {
+    return [
+      { key: '7/12 Extract', i18n: 'satbara', verifies: true },
+      { key: '8A Extract', i18n: 'eightA', verifies: true },
+    ];
+  }
+  if (propertyType === 'openplot') {
+    return [
+      { key: '7/12 Extract', i18n: 'satbara', verifies: true },
+      { key: '8A Extract', i18n: 'eightA', verifies: true },
+      { key: 'Property Card', i18n: 'propertyCard', verifies: true },
+    ];
+  }
+  return [
+    { key: 'Index II', i18n: 'indexII', verifies: true },
+    { key: 'Share Certificate', i18n: 'shareCertificate', verifies: true },
+  ];
+};
 
-/* ---------- ownership documents ----------
-   Every document is OPTIONAL to post. The ownership proof is flagged `verifies`
-   rather than `required`: it's what earns the Verified Owner badge, not a gate on
-   publishing. A listing without it goes live unverified, so a genuine owner who
-   can't find their Index II today isn't blocked from listing. */
+export const badgeDocsFor = (deal, propertyType) => {
+  const titleDocs = titleProofDocsFor(propertyType);
+  if (propertyType === 'openplot' || propertyType === 'farmland' || propertyType === 'plot') return titleDocs;
+  return deal === 'rent'
+    ? [lightBillDoc(deal), ...titleDocs, propertyTaxDoc(deal)]
+    : [...titleDocs, propertyTaxDoc(deal), lightBillDoc(deal)];
+};
+
+export const badgeDocumentProgress = (deal, propertyType, documents = {}) => {
+  const titleKeys = titleProofDocsFor(propertyType).map((doc) => doc.key);
+  if (deal === 'rent') {
+    const keys = badgeDocsFor(deal, propertyType).filter((doc) => doc.verifies).map((doc) => doc.key);
+    return Number(keys.some((key) => documents[key]));
+  }
+  return Number(titleKeys.some((key) => documents[key]));
+};
+
 export const saleDocs = [
-  { key: 'Index II', label: 'Index II — Property Ownership Proof', cta: 'Upload Index II', hint: 'Earns your Verified Owner badge — listings with it get noticeably more serious enquiries.', verifies: true },
-  { key: 'Agreement to Sale', label: 'Registered Agreement for Sale', cta: 'Upload Agreement for Sale' },
-  { key: 'Sale Deed', label: 'Registered Sale Deed', cta: 'Upload Sale Deed' },
-  { key: 'Occupancy Certificate', label: 'Occupancy Certificate', cta: 'Upload Occupancy Certificate' },
-  { key: 'Share Certificate', label: 'Share Certificate', cta: 'Upload Share Certificate' },
-  { key: 'Society Registration Certificate', label: 'Society Registration Certificate', cta: 'Upload Society Certificate' },
-  { key: 'Sanctioned Building Plan', label: 'Approved Plan Copy', cta: 'Upload Approved Plan' },
-  { key: 'Conveyance Deed', label: 'Conveyance Deed', cta: 'Upload Conveyance Deed' },
-  { key: 'Property Tax Receipt', label: 'Property Tax Receipt', cta: 'Upload Tax Receipt' },
-  { key: 'Maintenance Bill', label: 'Maintenance Bill', cta: 'Upload Maintenance Bill' },
-  { key: 'Electricity Bill', label: 'Electricity Bill', cta: 'Upload Electricity Bill' },
-  { key: 'Builder Payment Receipts', label: 'Payment Receipts from Builder', cta: 'Upload Payment Receipts' },
+  ...badgeDocsFor('buy'),
 ];
 export const rentDocs = [
-  { key: 'Ownership Proof', label: 'Ownership Proof', cta: 'Upload Index II / Tax Receipt / Electricity Bill', hint: 'Any document in your name proving you own the property. Earns a Verified Owner badge.', verifies: true },
-  { key: 'Society NOC', label: 'Society NOC (optional)', cta: 'Upload Society NOC', hint: 'No-objection certificate to rent out, shown as a Society Approved badge.' },
+  ...badgeDocsFor('rent'),
 ];
 
-/* PG / Hostel documents. A PG is a licensed lodging business, so beyond ownership
-   proof the differentiator is the trade / Gumasta licence (and, for a sale, the
-   usual building records). Kept lean so a genuine owner can list in minutes. */
-export const pgRentDocs = [
-  { key: 'Ownership Proof', label: 'Ownership Proof', cta: 'Upload Index II / Tax Receipt', hint: 'Any document in your name proving you own the building. Earns a Verified Owner badge.', verifies: true },
-  { key: 'PG Trade License', label: 'PG Trade / Gumasta License (optional)', cta: 'Upload Trade License', hint: 'Shown as a Licensed PG badge — reassures tenants the PG runs legally.' },
-  { key: 'Society NOC', label: 'Society NOC (optional)', cta: 'Upload Society NOC', hint: 'No-objection certificate to run a PG, shown as a Society Approved badge.' },
-];
-export const pgSaleDocs = [
-  { key: 'Index II', label: 'Index II — Property Ownership Proof', cta: 'Upload Index II', hint: 'Earns your Verified Owner badge.', verifies: true },
-  { key: 'PG Trade License', label: 'PG Trade / Gumasta License', cta: 'Upload Trade License', hint: 'Confirms the building already runs as a licensed PG — a strong signal for investors.' },
-  { key: 'Occupancy Certificate', label: 'Occupancy Certificate', cta: 'Upload Occupancy Certificate' },
-  { key: 'Property Tax Receipt', label: 'Property Tax Receipt', cta: 'Upload Tax Receipt' },
-  { key: 'Electricity Bill', label: 'Electricity Bill', cta: 'Upload Electricity Bill' },
-];
-
-/* ---------- property-type model ----------
-   Single source of truth for the "Post a property" flow. The dropdown order,
-   the Step-1 field groups, validation, progress and admin all read from here,
-   so a type only has to be described once. */
 export const PROPERTY_TYPES = [
   { value: 'flat', label: 'Flat / Apartment' },
   { value: 'independent', label: 'Independent House' },
   { value: 'villa', label: 'Villa' },
-  { value: 'pg', label: 'PG / Hostel' },
   { value: 'commercial', label: 'Commercial' },
   { value: 'openplot', label: 'Open Plot' },
   { value: 'farmland', label: 'Farm Land' },
 ];
 
-/* PG / Hostel occupancy options, sourced from the canonical taxonomy so the
-   authored `sharing` key always matches what the home search + listings filter
-   read. Kept separate from Flatmates's Private/Shared roommate concept. */
-export { PG_SHARING, PG_SHARING_OPTS, PG_SHARING_HELP } from '../../../data/propertyTypes.js';
-
+/* Co-working is absent because it is transacted per seat per month and this wizard collects one
+ * lump rent. */
 export const COMMERCIAL_SUBTYPES = [
   { value: 'office', label: 'Office Space' },
   { value: 'shop', label: 'Shop / Showroom' },
   { value: 'retail', label: 'Retail / Mall Unit' },
   { value: 'warehouse', label: 'Warehouse / Godown' },
   { value: 'industrial', label: 'Industrial / Factory' },
-  { value: 'coworking', label: 'Co-working Space' },
 ];
 
+const RETIRED_COMMERCIAL_SUBTYPES = [{ value: 'coworking', label: 'Co-working Space' }];
+export const commercialSubtypeOptions = (current) => {
+  const retired = RETIRED_COMMERCIAL_SUBTYPES.find((s) => s.value === current);
+  return retired ? [...COMMERCIAL_SUBTYPES, retired] : COMMERCIAL_SUBTYPES;
+};
+export const commercialLabelOf = (value) => commercialSubtypeOptions(value).find((s) => s.value === value)?.label || '';
+
 export const TYPE_CONFIG = {
-  flat: { group: 'residential', house: false, areaLabel: 'Carpet Area' },
-  independent: { group: 'residential', house: true, areaLabel: 'Carpet Area' },
-  villa: { group: 'residential', house: true, premium: true, areaLabel: 'Carpet Area' },
-  // PG / Hostel reuses the residential authoring fields but is defined by room
-  // occupancy (Sharing) instead of BHK. It's usually rented per bed, but the
-  // whole building can also be listed for sale, so both deals are allowed.
-  pg: { group: 'residential', house: false, sharing: true, areaLabel: 'Room Area' },
-  commercial: { group: 'commercial', areaLabel: 'Carpet Area', subtypes: COMMERCIAL_SUBTYPES },
-  openplot: { group: 'land', land: 'plot', areaLabel: 'Plot Area' },
-  farmland: { group: 'land', land: 'farm', areaLabel: 'Land Area' },
+  flat: { group: 'residential', house: false },
+  independent: { group: 'residential', house: true },
+  villa: { group: 'residential', house: true, premium: true },
+  commercial: { group: 'commercial' },
+  openplot: { group: 'land', land: 'plot' },
+  farmland: { group: 'land', land: 'farm' },
 };
 
 export const groupOf = (t) => TYPE_CONFIG[t]?.group || 'residential';
@@ -182,48 +202,154 @@ export const isResidentialType = (t) => groupOf(t) === 'residential';
 export const isCommercialType = (t) => groupOf(t) === 'commercial';
 export const isLandType = (t) => groupOf(t) === 'land';
 export const isHouseType = (t) => !!TYPE_CONFIG[t]?.house;
-/* PG / Hostel: a residential rental defined by Sharing (occupancy) not BHK. */
-export const isPgType = (t) => !!TYPE_CONFIG[t]?.sharing;
 
-/* Non-residential type keys. Legacy 'plot' is kept so listings saved before the
-   Open Plot / Farm Land split still classify correctly. */
+/* The flatmate wizard's home-type pills, as one `[propertyType, label]` list because the two are halves of a single
+   answer and the server stores both. */
+export const HOME_TYPE_PILLS = [
+  ['flat', 'Flat'],
+  ['independent', 'Independent House'],
+  ['villa', 'Villa'],
+  ['independent', 'Row House'],
+];
+export const homeTypeLabelFor = (t) => HOME_TYPE_PILLS.find(([pt]) => pt === t)?.[1] || '';
+
+export const leaseKindOf = (t) => (isCommercialType(t) ? 'commercial' : isLandType(t) ? 'land' : 'residential');
+
 export const NONRES = ['commercial', 'openplot', 'farmland', 'plot'];
 
-/* ---------- commercial + land option data ---------- */
 export const shellOptions = [['bareShell', 'Bare Shell'], ['warmShell', 'Warm Shell'], ['furnished', 'Furnished']];
 export const washroomOptions = ['1', '2', '3', '4+'];
+/* The full set the server's `ListingFormDetails` accepts. */
 export const suitableForTags = ['Office', 'Retail', 'Restaurant', 'Clinic', 'Showroom', 'Warehouse', 'Bank / ATM', 'Gym / Studio'];
-export const plotZoneOptions = ['Residential', 'Commercial', 'Industrial', 'Agricultural', 'Mixed-Use'];
+/* "Residential" alone cannot distinguish an R1 plot from an R2 one — a difference of FSI and
+ * permitted height, which is why a buyer asks. */
+export const plotZoneOptions = [
+  'Residential (R1)', 'Residential (R2)', 'Commercial (C-1)', 'Industrial (I-1)',
+  'Public / Semi-public', 'Mixed-Use', 'Agriculture Zone', 'Green Zone / No-Development Zone',
+];
 export const openSidesOptions = ['1', '2', '3', '4'];
-export const plotUnitOptions = [['sqft', 'sq.ft.'], ['sqyd', 'sq.yd.'], ['guntha', 'Guntha']];
+
+/* `plotZone` is the owner's label; `landUse` is the column the Land-use filter reads. */
+const LAND_USE_BY_ZONE = {
+  'Residential (R1)': 'residential', 'Residential (R2)': 'residential',
+  'Commercial (C-1)': 'commercial', 'Industrial (I-1)': 'industrial',
+  'Public / Semi-public': 'mixed', 'Mixed-Use': 'mixed',
+  'Agriculture Zone': 'agricultural', 'Green Zone / No-Development Zone': 'agricultural',
+  Residential: 'residential', Commercial: 'commercial', Industrial: 'industrial',
+  Agricultural: 'agricultural',
+};
+
+export const landUseFor = (propertyType, plotZone) => {
+  if (!isLandType(propertyType)) return undefined;
+  return TYPE_CONFIG[propertyType]?.land === 'farm' ? 'agricultural' : LAND_USE_BY_ZONE[plotZone];
+};
+
+export const plotUnitOptions = [['sqft', 'sq.ft.'], ['sqyd', 'sq.yd.'], ['sqm', 'sq.m.'], ['guntha', 'Guntha']];
 export const farmUnitOptions = [['acre', 'Acre'], ['guntha', 'Guntha'], ['hectare', 'Hectare']];
+export const landUnitOptionsFor = (propertyType) => (
+  TYPE_CONFIG[propertyType]?.land === 'farm' ? farmUnitOptions : plotUnitOptions
+);
+export const defaultAreaUnitFor = (propertyType) => (
+  TYPE_CONFIG[propertyType]?.land === 'farm' ? 'guntha' : 'sqft'
+);
+
+/* Bounds per unit, because the number means nothing without one: a floor of 1 on Acre refuses
+ * most farm inventory and a ceiling of 1,000,000 on Acre accepts a district. */
+const NON_LAND_AREA_RANGE = [1, 1000000];
+const AREA_RANGE_BY_UNIT = {
+  sqft: [100, 1000000],
+  sqyd: [10, 110000],
+  sqm: [10, 93000],
+  guntha: [1, 4000],
+  acre: [0.1, 100],
+  hectare: [0.04, 40],
+};
+export const areaRangeFor = (propertyType, areaUnit) => (
+  isLandType(propertyType) ? (AREA_RANGE_BY_UNIT[areaUnit] ?? NON_LAND_AREA_RANGE) : NON_LAND_AREA_RANGE
+);
+
 export const waterSourceOptions = ['Borewell', 'Open Well', 'Canal', 'Municipal', 'River / Stream', 'None'];
 
-/* ---------- commercial use-profiles ----------
-   The six commercial subtypes collapse into three profiles that actually differ
-   in what buyers/tenants need to see: workspace (office, co-working),
-   retail (shop, showroom, mall unit) and industrial (warehouse, factory). */
+export const naStatusOptions = [
+  { value: 'agricultural', label: 'Still agricultural (no NA)' },
+  { value: 'deemed', label: 'Deemed NA (s.42B / 42C)' },
+  { value: 'sanctioned', label: 'NA order sanctioned' },
+];
+
+/* Every parcel has a 7/12; what decides whether a buyer needs a title search is the Other
+ * Rights column. */
+export const otherRightsOptions = [
+  { value: 'clear', label: 'Clear — no entries in Other Rights' },
+  { value: 'mortgage', label: 'Mortgage / bank charge entered' },
+  { value: 'tenancy', label: 'Kul / protected tenant entered' },
+  { value: 'minor', label: 'Minor or heir entry' },
+  { value: 'dispute', label: 'Boundary or ownership dispute' },
+  { value: 'unknown', label: 'Not checked yet' },
+];
+
+/* A buyer who discovers this at the sub-registrar has lost the deal and the deposit. */
+export const buyerEligibilityOptions = [
+  { value: 'agriculturist', label: 'Agriculturist buyer only' },
+  { value: 'permission', label: 'Non-agriculturist buyer — needs s.63(1A) Collector permission' },
+  { value: 'converted', label: 'NA-converted — no agriculturist restriction' },
+  { value: 'unknown', label: 'Not sure' },
+];
+
 export const commercialProfileOf = (subtype) => {
   if (subtype === 'shop' || subtype === 'retail') return 'retail';
   if (subtype === 'warehouse' || subtype === 'industrial') return 'industrial';
-  return 'workspace'; // office, coworking, or not-yet-picked
+  /* Not-yet-picked is its own answer: every lookup below is keyed on the profile, so defaulting to 'workspace' offers
+     a warehouse owner office fixtures before they have chosen anything. */
+  return subtype ? 'workspace' : null;
 };
 
-/* ---------- commercial fixtures (per use-profile) ----------
-   Owner-declared, sub-type-specific fit-out a business seeker actually evaluates — a
-   warehouse's loading bay vs an office's server room vs a shop's frontage. Scoped by the
-   same three profiles as commercialProfileOf so a warehouse never offers "Reception". */
+const NO_OPTIONS = [];
+
+/* Scoped by the same three profiles as commercialProfileOf so a warehouse never offers
+ * "Reception". */
 export const COMMERCIAL_FIXTURES = {
   workspace: ['Server / UPS Room', 'Meeting Cabins', 'Reception Area', 'Conference Room', 'False Ceiling', 'Central AC'],
   retail: ['Main-Road Frontage', 'Display Windows', 'Rolling Shutter', 'Signage Space', 'Mezzanine Floor', 'Customer Washroom'],
   industrial: ['Loading Bay / Dock', 'High Ceiling', '3-Phase Power', 'Wide Truck Access', 'Crane / Gantry Support', 'Covered Yard'],
 };
 
-/* Options for the fixtures multi-select, given the chosen commercial subtype value. */
-export const fixturesFor = (subtype) => COMMERCIAL_FIXTURES[commercialProfileOf(subtype)];
+export const fixturesFor = (subtype) => COMMERCIAL_FIXTURES[commercialProfileOf(subtype)] ?? NO_OPTIONS;
 
-/* Resolve a stored subtype value OR its display label (seed listings persist only the label
-   in `type`) to a use-profile — with a keyword fallback for legacy strings. */
+/* The businesses each profile can actually house, drawn from `suitableForTags` so every offered
+ * value stays inside the server's own set. */
+const COMMERCIAL_SUITABLE_FOR = {
+  workspace: ['Office', 'Clinic', 'Bank / ATM'],
+  retail: ['Retail', 'Showroom', 'Restaurant', 'Clinic', 'Gym / Studio', 'Bank / ATM'],
+  industrial: ['Warehouse', 'Showroom'],
+};
+export const suitableForFor = (subtype) => COMMERCIAL_SUITABLE_FOR[commercialProfileOf(subtype)] ?? NO_OPTIONS;
+
+/* Physical specs scoped per use-profile so a shop is never asked its floor load. */
+const COMMERCIAL_SPECS = {
+  workspace: [{ key: 'seatCount', unit: '', ph: 'eg40', max: 4 }],
+  retail: [{ key: 'frontage', unit: 'ft', ph: 'eg30', max: 4 }],
+  industrial: [
+    { key: 'floorLoad', unit: 'T/sq.m', ph: 'eg4', max: 4 },
+    { key: 'clearHeight', unit: 'ft', ph: 'eg30', max: 4 },
+    { key: 'sanctionedPower', unit: 'KVA', ph: 'eg60', max: 6 },
+    { key: 'dockCount', unit: '', ph: 'eg4', max: 3 },
+  ],
+};
+export const commercialSpecsFor = (subtype) => COMMERCIAL_SPECS[commercialProfileOf(subtype)] ?? NO_OPTIONS;
+/* Every spec key across every profile: what a type switch has to clear, and what the write
+ * spreads onto the wire. */
+export const COMMERCIAL_SPEC_KEYS = Object.values(COMMERCIAL_SPECS).flat().map((s) => s.key);
+
+export const fitOutOptions = [
+  { value: '0', label: 'None' }, { value: '1', label: '1 month' }, { value: '2', label: '2 months' },
+  { value: '3', label: '3 months' }, { value: '6', label: '6 months' },
+];
+/* A leased asset is bought for its yield, so the buyer needs the rent in place and the date the
+ * lease runs to; a vacant one is bought for its use. */
+export const tenancyStatusOptions = [['vacant', 'Vacant'], ['leased', 'Leased / Tenanted']];
+
+/* Resolve a stored subtype value OR its display label (seed listings persist only the label in
+ * `type`) to a use-profile — with a keyword fallback for legacy strings. */
 export const commercialProfileFromType = (valueOrLabel) => {
   if (!valueOrLabel) return 'workspace';
   const byValue = COMMERCIAL_SUBTYPES.find((s) => s.value === valueOrLabel);
@@ -236,23 +362,16 @@ export const commercialProfileFromType = (valueOrLabel) => {
   return 'workspace';
 };
 
-/* ---------- type-aware documents ----------
-   The required key stays 'Index II' (buy) / 'Ownership Proof' (rent) for every
-   type so validation + progress weighting remain in sync; only the label and the
-   supplementary optional documents change by property type. */
 export const commercialSaleDocs = [
-  { key: 'Index II', label: 'Index II — Ownership Proof', cta: 'Upload Index II', hint: 'Earns your Verified Owner badge.', verifies: true },
+  ...badgeDocsFor('buy'),
   { key: 'Occupancy Certificate', label: 'Occupancy / Completion Certificate', cta: 'Upload OC' },
   { key: 'Sanctioned Building Plan', label: 'Sanctioned Building Plan', cta: 'Upload Approved Plan' },
   { key: 'Fire NOC', label: 'Fire / Trade NOC', cta: 'Upload NOC', hint: 'Required for most commercial usage — reassures serious tenants and buyers.' },
-  { key: 'Property Tax Receipt', label: 'Property Tax Receipt', cta: 'Upload Tax Receipt' },
-  { key: 'Electricity Bill', label: 'Electricity Bill', cta: 'Upload Electricity Bill' },
 ];
 export const commercialRentDocs = [
-  { key: 'Ownership Proof', label: 'Ownership Proof', cta: 'Upload Index II / Tax Receipt', hint: 'Any document in your name proving you own the unit. Earns a Verified Owner badge.', verifies: true },
-  { key: 'Fire NOC', label: 'Fire / Trade NOC (optional)', cta: 'Upload NOC', hint: 'Shown as a Compliance Ready badge to business tenants.' },
+  ...badgeDocsFor('rent'),
+  { key: 'Fire NOC', label: 'Fire / Trade NOC', cta: 'Upload NOC', hint: 'Supporting compliance records for business tenants.' },
 ];
-/* Extra, profile-specific compliance documents appended to the commercial base set. */
 const commercialProfileDocs = {
   workspace: { buy: [], rent: [] },
   retail: {
@@ -267,64 +386,49 @@ const commercialProfileDocs = {
     rent: [{ key: 'MPCB Consent', label: 'MPCB Consent (optional)', cta: 'Upload MPCB Consent', hint: 'Reassures manufacturing tenants the site is compliant.' }],
   },
 };
-/* Open Plot (typically NA-converted for building) keeps the NA Order.
-   Farm Land is agricultural by definition, so an NA Order is contradictory — it
-   instead carries agricultural records (8A holding, cultivation/crop entry).
-   For Maharashtra land the 7/12 Extract (Satbara) is the authoritative proof of
-   ownership; a Sale Deed / Index II only exists when the current owner acquired
-   the land through a registered sale, so it is optional (inherited land has none). */
+/* The NA Order slot is on all four land sets because the conversion question is asked of both
+ * branches in both deals. */
+const naOrderDoc = { key: 'NA Order', label: 'NA Order / Zone Certificate', cta: 'Upload NA Order', hint: 'Confirms the plot is sanctioned for non-agricultural use.' };
 export const plotSaleDocs = [
-  { key: '7/12 Extract', label: '7/12 Extract (Satbara) — Ownership Proof', cta: 'Upload 7/12 Extract', verifies: true, hint: 'The core Maharashtra land record and primary proof of ownership. Earns a Verified Owner badge.' },
-  { key: 'Index II', label: 'Sale Deed / Index II (if purchased)', cta: 'Upload Index II', hint: 'Only if you acquired the plot through a registered sale.' },
+  ...badgeDocsFor('buy', 'openplot'),
   { key: 'Mutation Entry', label: 'Mutation Entry (Ferfar)', cta: 'Upload Mutation Extract' },
-  { key: 'NA Order', label: 'NA Order / Zone Certificate', cta: 'Upload NA Order', hint: 'Confirms the plot is sanctioned for non-agricultural use.' },
-  { key: 'Property Tax Receipt', label: 'Property Tax Receipt', cta: 'Upload Tax Receipt' },
+  naOrderDoc,
 ];
 export const plotRentDocs = [
-  { key: '7/12 Extract', label: '7/12 Extract (Satbara) — Ownership Proof', cta: 'Upload 7/12 Extract', verifies: true, hint: 'The core Maharashtra land record and primary proof of ownership. Earns a Verified Owner badge.' },
-  { key: 'Property Tax Receipt', label: 'Property Tax Receipt (optional)', cta: 'Upload Tax Receipt' },
+  ...badgeDocsFor('rent', 'openplot'),
+  naOrderDoc,
 ];
 export const farmSaleDocs = [
-  { key: '7/12 Extract', label: '7/12 Extract (Satbara) — Ownership Proof', cta: 'Upload 7/12 Extract', verifies: true, hint: 'The core agricultural land record and primary proof of ownership. Earns a Verified Owner badge.' },
-  { key: '8A Extract', label: '8A Extract (Holding Record)', cta: 'Upload 8A Extract', hint: 'Village holding record confirming the cultivator’s account.' },
-  { key: 'Index II', label: 'Sale Deed / Index II (if purchased)', cta: 'Upload Index II', hint: 'Only if you acquired the land through a registered sale.' },
+  ...badgeDocsFor('buy', 'farmland'),
   { key: 'Mutation Entry', label: 'Mutation Entry (Ferfar)', cta: 'Upload Mutation Extract' },
   { key: 'Land Revenue Receipt', label: 'Land Revenue / Tax Receipt', cta: 'Upload Revenue Receipt' },
+  naOrderDoc,
 ];
 export const farmRentDocs = [
-  { key: '7/12 Extract', label: '7/12 Extract (Satbara) — Ownership Proof', cta: 'Upload 7/12 Extract', verifies: true, hint: 'The core agricultural land record and primary proof of ownership. Earns a Verified Owner badge.' },
+  ...badgeDocsFor('rent', 'farmland'),
   { key: 'Land Revenue Receipt', label: 'Land Revenue / Tax Receipt (optional)', cta: 'Upload Revenue Receipt' },
+  naOrderDoc,
 ];
 
 export const docsFor = (deal, propertyType, commercialType) => {
   if (deal === 'buy') {
     if (isLandType(propertyType)) return propertyType === 'farmland' ? farmSaleDocs : plotSaleDocs;
-    if (isCommercialType(propertyType)) return [...commercialSaleDocs, ...commercialProfileDocs[commercialProfileOf(commercialType)].buy];
-    if (isPgType(propertyType)) return pgSaleDocs;
+    if (isCommercialType(propertyType)) return [...commercialSaleDocs, ...(commercialProfileDocs[commercialProfileOf(commercialType)]?.buy ?? [])];
     return saleDocs;
   }
   if (isLandType(propertyType)) return propertyType === 'farmland' ? farmRentDocs : plotRentDocs;
-  if (isCommercialType(propertyType)) return [...commercialRentDocs, ...commercialProfileDocs[commercialProfileOf(commercialType)].rent];
-  if (isPgType(propertyType)) return pgRentDocs;
+  if (isCommercialType(propertyType)) return [...commercialRentDocs, ...(commercialProfileDocs[commercialProfileOf(commercialType)]?.rent ?? [])];
   return rentDocs;
 };
 
-/* The one document that earns the Verified Owner badge per flow. Land is proven by
-   the 7/12 Extract (Satbara) for both sale and rent; built property uses Index II
-   (sale) or a generic Ownership Proof (rent). It is NOT required to publish — the
-   progress meter reads this key so it stays in sync with the document list shown to
-   the owner, but validation never blocks on it. */
-export const ownershipDocKeyFor = (deal, propertyType) => {
-  if (isLandType(propertyType)) return '7/12 Extract';
-  return deal === 'buy' ? 'Index II' : 'Ownership Proof';
-};
-
-/* ---------- type-aware photo categories ---------- */
-const RESIDENTIAL_PHOTO_CATS = ['Living Room', 'Kitchen', 'Bedroom', 'Bathroom', 'Balcony', 'Exterior / Building', 'Floor Plan', 'Other'];
+/* Not merely a label: tagging a photo with it is how an owner states "this is my unit's plan",
+ * and `submit.js` reads it into `floorPlan`. */
+export const FLOOR_PLAN_CATEGORY = 'Floor Plan';
+const RESIDENTIAL_PHOTO_CATS = ['Living Room', 'Kitchen', 'Bedroom', 'Bathroom', 'Balcony', 'Exterior / Building', FLOOR_PLAN_CATEGORY, 'Other'];
 const COMMERCIAL_PHOTO_CATS = {
-  workspace: ['Frontage / Entrance', 'Reception', 'Workstation Area', 'Cabins / Meeting Rooms', 'Pantry', 'Washroom', 'Parking', 'Floor Plan', 'Other'],
-  retail: ['Frontage / Display', 'Signage', 'Interior', 'Storage / Back Office', 'Washroom', 'Parking', 'Floor Plan', 'Other'],
-  industrial: ['Frontage / Gate', 'Loading Bay', 'Interior / Shop Floor', 'Office Cabin', 'Power / Utility', 'Yard / Access', 'Washroom', 'Floor Plan', 'Other'],
+  workspace: ['Frontage / Entrance', 'Reception', 'Workstation Area', 'Cabins / Meeting Rooms', 'Pantry', 'Washroom', 'Parking', FLOOR_PLAN_CATEGORY, 'Other'],
+  retail: ['Frontage / Display', 'Signage', 'Interior', 'Storage / Back Office', 'Washroom', 'Parking', FLOOR_PLAN_CATEGORY, 'Other'],
+  industrial: ['Frontage / Gate', 'Loading Bay', 'Interior / Shop Floor', 'Office Cabin', 'Power / Utility', 'Yard / Access', 'Washroom', FLOOR_PLAN_CATEGORY, 'Other'],
 };
 const COMMERCIAL_KEY_CATS = {
   workspace: ['Frontage / Entrance', 'Workstation Area', 'Parking'],
@@ -333,26 +437,27 @@ const COMMERCIAL_KEY_CATS = {
 };
 const PLOT_PHOTO_CATS = ['Front / Entrance', 'Road / Access', 'Corner / Boundary', 'Surroundings', 'Layout Plan', 'Other'];
 const FARM_PHOTO_CATS = ['Front / Entrance', 'Road / Access', 'Water Source', 'Boundary', 'Surroundings', 'Layout Plan', 'Other'];
-/* PG / Hostel photos lead with the room (what a tenant books) and the shared
-   spaces that decide day-to-day life — mess, washroom, study area, common room. */
-const PG_PHOTO_CATS = ['Bedroom / Room', 'Common Area', 'Kitchen / Mess', 'Washroom', 'Study Area', 'Balcony / Terrace', 'Building Exterior', 'Floor Plan', 'Other'];
+/* "Surroundings" is excluded: it is the one land category that can be shot without standing on the land, and a parcel
+   is bought on where its edges run, not on a photograph of the horizon. */
+const PLOT_KEY_CATS = ['Corner / Boundary', 'Layout Plan', 'Road / Access'];
+const FARM_KEY_CATS = ['Boundary', 'Layout Plan', 'Road / Access'];
 
 export const photoCategoriesFor = (propertyType, commercialType) => {
   if (isLandType(propertyType)) return propertyType === 'farmland' ? FARM_PHOTO_CATS : PLOT_PHOTO_CATS;
-  if (isCommercialType(propertyType)) return COMMERCIAL_PHOTO_CATS[commercialProfileOf(commercialType)];
-  if (isPgType(propertyType)) return PG_PHOTO_CATS;
+  if (isCommercialType(propertyType)) return COMMERCIAL_PHOTO_CATS[commercialProfileOf(commercialType)] ?? NO_OPTIONS;
   return RESIDENTIAL_PHOTO_CATS;
 };
 export const keyPhotoCategoriesFor = (propertyType, commercialType) => {
-  if (isLandType(propertyType)) return ['Front / Entrance', 'Road / Access', 'Surroundings'];
-  if (isCommercialType(propertyType)) return COMMERCIAL_KEY_CATS[commercialProfileOf(commercialType)];
-  if (isPgType(propertyType)) return ['Bedroom / Room', 'Common Area', 'Washroom'];
+  if (isLandType(propertyType)) return propertyType === 'farmland' ? FARM_KEY_CATS : PLOT_KEY_CATS;
+  if (isCommercialType(propertyType)) return COMMERCIAL_KEY_CATS[commercialProfileOf(commercialType)] ?? NO_OPTIONS;
   return ['Living Room', 'Kitchen', 'Bedroom', 'Bathroom'];
 };
 
-/* ---------- type-aware amenities ----------
-   Raw land has no amenities (section hidden); each commercial profile gets a
-   relevant subset (a godown shouldn't advertise a club house or co-working). */
+export const MIN_PUBLISH_PHOTOS = 1;
+export const MIN_PUBLISH_KEY_CATEGORIES = 2;
+export const STRONG_PHOTO_COUNT = 5;
+
+const RESIDENTIAL_AMENITIES = amenitiesList.filter((a) => SOCIETY_AMENITY_LABELS.includes(a.label));
 const COMMERCIAL_AMENITY_LABELS = {
   workspace: ['2-Wheeler Parking', '4-Wheeler Parking', 'Power Backup', 'Lift', 'Smart Security', 'Co-Working Spaces', 'Club House'],
   retail: ['2-Wheeler Parking', '4-Wheeler Parking', 'Power Backup', 'Lift', 'Smart Security'],
@@ -360,14 +465,9 @@ const COMMERCIAL_AMENITY_LABELS = {
 };
 export const amenitiesFor = (propertyType, commercialType) => {
   if (isLandType(propertyType)) return [];
-  if (isPgType(propertyType)) return pgAmenitiesList;
   if (isCommercialType(propertyType)) {
     const labels = COMMERCIAL_AMENITY_LABELS[commercialProfileOf(commercialType)];
-    return amenitiesList.filter((a) => labels.includes(a.label));
+    return labels ? amenitiesList.filter((a) => labels.includes(a.label)) : NO_OPTIONS;
   }
-  return amenitiesList;
+  return RESIDENTIAL_AMENITIES;
 };
-
-/* Type-aware furnished inventory — a PG room's "What's included" list is its
-   bed-side essentials (pgFurnitureItems), everything else uses the household set. */
-export const furnitureFor = (propertyType) => (isPgType(propertyType) ? pgFurnitureItems : furnitureItems);

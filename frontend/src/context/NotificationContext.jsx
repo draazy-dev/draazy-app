@@ -1,79 +1,88 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { unreadCount as fetchUnreadCount } from '../services/notificationService.js';
 import { useAuth } from './AuthContext.jsx';
+import { useConversationUnread } from './ConversationContext.jsx';
 
-/**
- * The unread-notification count for the navbar bell, held once for the whole app.
- *
- * ## Why this exists
- *
- * `unreadNotifCount()` was a synchronous localStorage read, so the navbar could call it inline
- * during render and re-run it on every store event. Against the API the same question is a network
- * call, and a network call cannot happen during render — so the count has to be state that is
- * fetched once and refreshed on demand. Same shape as `SavedContext`, for the same reason.
- *
- * ## Why the count is not `list().length`
- *
- * There is no unread-count endpoint, so the provider counts a large page. That is a real ceiling
- * and it is warned about in the provider — but it must be counted in **one** place, not once per
- * consumer, or the navbar and the page would disagree after any action.
- *
- * ## Signed out
- *
- * The inbox is caller-scoped and the API 401s without a session, so this holds zero rather than
- * reading an anonymous store. The bell renders no badge, which is what a signed-out user should see
- * regardless of provider.
- */
 const NotificationContext = createContext(null);
+const POLL_MS = 60_000;
+// The stream says when the count changes, but only from the server instance holding it, so a slow
+// poll still catches a notification written on another instance.
+const STREAM_POLL_MS = 300_000;
+
+function clearLegacyNotificationStorage() {
+  try {
+    localStorage.removeItem('dzDismissedNotifs');
+    Object.keys(localStorage)
+      .filter((key) => key.startsWith('dzNotifications:'))
+      .forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // localStorage may be disabled; a cleanup miss must not block the app shell.
+  }
+}
 
 export function NotificationProvider({ children }) {
   const { isIn } = useAuth();
+  const { subscribe, streamConnected } = useConversationUnread();
   const [unread, setUnread] = useState(0);
+  const [status, setStatus] = useState('loading');
+
+  const lastRefreshAt = useRef(0);
+  const streamUp = useRef(streamConnected);
+  streamUp.current = streamConnected;
 
   const refresh = useCallback(async () => {
+    lastRefreshAt.current = Date.now();
     if (!isIn) {
       setUnread(0);
+      setStatus('ready');
       return 0;
     }
+    setStatus((s) => (s === 'ready' ? s : 'loading'));
     try {
       const n = await fetchUnreadCount();
       setUnread(n);
+      setStatus('ready');
       return n;
     } catch {
-      // An unreachable inbox shows no badge rather than a stale one. That is the safe direction:
-      // a missing badge under-promises, whereas a stale badge sends the user to a page that cannot
-      // explain why the number was wrong.
       setUnread(0);
+      setStatus('error');
       return 0;
     }
   }, [isIn]);
 
   useEffect(() => {
-    let alive = true;
-    if (!isIn) {
-      setUnread(0);
-      return undefined;
-    }
-    fetchUnreadCount()
-      .then((n) => { if (alive) setUnread(n); })
-      .catch(() => { if (alive) setUnread(0); });
-    return () => { alive = false; };
-  }, [isIn]);
+    clearLegacyNotificationStorage();
+  }, []);
 
-  /**
-   * The mock provider writes through `lib/store`, which broadcasts `pn:store` on every write. The
-   * navbar used to listen for that itself and re-read synchronously; now the listener lives here so
-   * the mock keeps its live-update behaviour without the navbar knowing which provider is active.
-   * The http provider never emits it, and does not need to — its writes go through `refresh`.
-   */
   useEffect(() => {
-    if (!isIn) return undefined;
-    const onStoreWrite = () => { refresh(); };
-    window.addEventListener('pn:store', onStoreWrite);
-    return () => window.removeEventListener('pn:store', onStoreWrite);
-  }, [isIn, refresh]);
+    refresh();
+  }, [refresh]);
 
-  const value = useMemo(() => ({ unread, refresh }), [unread, refresh]);
+  useEffect(() => {
+    // Focus and visibilitychange fire together on a tab switch; one read answers both.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && Date.now() - lastRefreshAt.current >= 1_000) refresh();
+    };
+    // One fixed timer: the stream reconnects every few minutes, so a timer keyed on its state never fires.
+    const poll = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      const due = streamUp.current ? STREAM_POLL_MS : POLL_MS;
+      if (Date.now() - lastRefreshAt.current >= due - 1_000) refresh();
+    }, POLL_MS);
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      window.clearInterval(poll);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [refresh]);
+
+  useEffect(() => subscribe((event) => {
+    if (event.type === 'notification') refresh();
+  }), [subscribe, refresh]);
+
+  const value = useMemo(() => ({ unread, refresh, status }), [unread, refresh, status]);
   return <NotificationContext.Provider value={value}>{children}</NotificationContext.Provider>;
 }
 

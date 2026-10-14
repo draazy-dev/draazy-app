@@ -1,91 +1,93 @@
 package com.draazy.api.catalog.listing;
 
+import com.draazy.api.catalog.property.AreaUnit;
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Furnishing;
-import com.draazy.api.catalog.property.PhotoHash;
+import com.draazy.api.catalog.property.LandUse;
 import com.draazy.api.catalog.property.PropertyPossession;
+import com.draazy.api.catalog.property.PropertyTypeLabel;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
 
-/**
- * Partial listing update (contract {@code ListingUpdate} — {@code allOf ListingCreate} with every
- * field optional, PATCH semantics). A {@code null} field means "leave unchanged"; only fields the
- * client actually sends are applied.
- *
- * <p>The foundation fields — {@code price}, {@code bhk}, {@code propertyType}, {@code locality},
- * {@code deal} — are the ones whose change reverts the listing to {@code pending} for re-moderation
- * (enforced in the service, per the domain rule; ADR-019 trust). Server-owned fields
- * ({@code status}/{@code owner}/counters/badges) are omitted so a PATCH can't self-escalate.
- *
- * @param deal         buy|rent, nullable (foundation field)
- * @param bhk          bedroom count, nullable (foundation field)
- * @param price        amount in whole INR, positive when present (foundation field)
- * @param deposit      security deposit, nullable
- * @param maintenance  monthly maintenance, nullable
- * @param area         built area, nullable
- * @param locality     display locality, nullable (foundation field)
- * @param reraId       MahaRERA id, nullable
- * @param possession   possession state ({@link PropertyPossession}), nullable = not stated
- * @param images       image URLs, nullable
- * @param address      street address, nullable; re-normalised into the duplicate key on every write
- * @param floor        which floor the unit is on, nullable
- * @param societyId    the society this unit sits in, nullable
- * @param electricityMeterNo the unit's meter number, nullable; never returned to the public
- */
+/** Partial listing update, PATCH semantics: {@code null} means "leave unchanged". Cross-field coherence sees
+ * only what this body states, so a pair split across two PATCHes is caught only when submitted together. */
+@CoherentDimensions
+@ListingSanityLimits
 public record ListingUpdate(
-        String title,
+        @Size(max = 200) @NoContactDetails String title,
         @Pattern(regexp = DealIntent.PATTERN, message = DealIntent.PATTERN_MESSAGE) String deal,
-        String propertyType,
+
+        // Guarded as on the POST: an unreadable label is not rejected, it is unfindable, and re-labelling
+        // is exactly where that happens. Null still means "leave unchanged" — @Pattern does not fire on it.
+        @Size(max = 80) @Pattern(regexp = PropertyTypeLabel.PATTERN,
+                message = PropertyTypeLabel.PATTERN_MESSAGE) String propertyType,
         BigDecimal bhk,
         @Positive Long price,
-        Long deposit,
-        Long maintenance,
+        @PositiveOrZero Long deposit,
+        @PositiveOrZero Long maintenance,
+        Boolean clearMaintenance,
         Boolean negotiable,
         BigDecimal area,
-        String areaUnit,
+        @Pattern(regexp = AreaUnit.PATTERN, message = AreaUnit.PATTERN_MESSAGE) String areaUnit,
         @Pattern(regexp = Furnishing.PATTERN,
                 message = Furnishing.PATTERN_MESSAGE) String furnishing,
         String locality,
+        String localitySlug,
         String city,
         Double lat,
         Double lng,
-        String reraId,
+        @Pattern(regexp = "^$|^P[0-9]{11}$",
+                message = "must be a MahaRERA id: P followed by 11 digits") String reraId,
         @Pattern(regexp = PropertyPossession.PATTERN,
                 message = PropertyPossession.PATTERN_MESSAGE) String possession,
-        List<String> amenities,
-        List<String> images,
-        String description,
-        // Bounded to match ListingCreate; both columns are indexed, and an over-long value is a 500
-        // rather than a 422 without this. See the note there.
-        @Size(max = 300) String address,
+        @Size(max = 5) List<@NotNull @Pattern(regexp = "family|bachelors|bachelor-male|bachelor-female|company|anyone") String> tenants,
+
+        // Bounded, contact-guarded and null-free to match ListingCreate; see the notes there.
+        @Size(max = 40) List<@NotNull @Size(max = 60) @NoContactDetails String> amenities,
+
+        @Size(max = 20, message = "cannot carry more than 20 photos") List<@NotNull @Size(max = 512) String> images,
+
+        @Size(max = 512) String floorPlan,
+        @Pattern(regexp = "^$|^[A-Za-z0-9_-]{11}$") String video,
+        @Size(max = 4000) @NoContactDetails String description,
+
+        @Size(max = 300) @NoContactDetails String address,
         Integer floor,
-        UUID societyId,
+        @Pattern(regexp = "^$|^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$") String societyId,
         @Size(max = 64) String electricityMeterNo,
-        // Mirrors ListingCreate; see the notes there for why facing is bounded rather than
-        // enumerated and why ageYears is a band lower bound. All five are non-foundation: editing
-        // any of them leaves the listing live, because none of them is a thing the moderator
-        // approved. That is why none appears in the tier sets in ListingEditRules.
+
+        // Match ListingCreate's bounds to preserve legacy values rather than enforce picker options.
+        // These details are non-foundation fields, so edits do not trigger server re-review.
         @Min(0) Integer bathrooms,
         @Min(0) Integer parking,
         @Min(0) Integer balconies,
         @Size(max = 32) String facing,
+        @Size(max = 32) String overlooking,
         @Min(1) Integer totalFloors,
         @Min(0) Integer ageYears,
-        /* Perceptual hashes of the photographs now on the listing; see ListingCreate for why the
-         * browser computes them and why a malformed one is dropped rather than refused.
-         *
-         * Absent means "this PATCH is not about the photographs" and leaves the stored hashes
-         * alone — a rent change must not blank the evidence. An empty list is a statement, and
-         * clears them: it is what a listing with its photographs removed sends.
-         *
-         * Not a foundation field, and deliberately not in ListingEditRules' tier lists. Swapping
-         * photographs does change what a buyer sees, but it is the duplicate probe that cares, and
-         * it is told directly — sending a listing back for re-moderation on a photo swap would put
-         * every owner who retook a dark photograph into the queue. */
-        @Size(max = PhotoHash.MAX_PER_LISTING) List<String> photoHashes) {
+        @Pattern(regexp = "^$|^[1-9][0-9]{5}$") String pincode,
+        @Positive BigDecimal carpetArea,
+        @Positive BigDecimal builtUpArea,
+        @Positive BigDecimal superBuiltUpArea,
+
+        @Pattern(regexp = "^$|now|15|30") String availableFrom,
+        @Pattern(regexp = AvailableOn.PATTERN, message = AvailableOn.PATTERN_MESSAGE) String availableOn,
+        Boolean pets,
+
+        // Absent `pets` cannot mean "withdraw", so returning to unstated needs its own word.
+        Boolean clearPets,
+        @ListingFormDetails Map<String, Object> formDetails,
+
+        @Pattern(regexp = LandUse.PATTERN, message = LandUse.PATTERN_MESSAGE)
+        String landUse,
+
+        Boolean clearLandUse) implements CoherentDimensions.Dimensions, ListingSanityLimits.Input {
 }

@@ -4,30 +4,12 @@ import com.draazy.api.common.persistence.AuditedEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 
-/**
- * A buyer's request to see a listing owner's contact details — the row behind the contact gate.
- * Maps {@code contact_requests} (V4).
- *
- * <p><strong>Ids, not associations.</strong> {@code propertyId} and {@code requesterId} are plain
- * UUID columns rather than {@code @ManyToOne} graphs. Two reasons: the owner inbox reads thousands of
- * rows and an eager association is an N+1 waiting to happen, and — more importantly — this entity
- * lives in the {@code leads} context while the targets live in {@code catalog} and {@code identity},
- * so an object reference would hard-wire a cross-context join that
- * {@code package-structure.md} §5 asks us to keep at the id level.
- *
- * <p><strong>No soft-delete triplet</strong>, unlike most business tables: V4 gives
- * {@code contact_requests} no {@code archived}/{@code archived_at}/{@code archive_reason} columns, so
- * this extends {@link AuditedEntity} rather than {@code SoftDeleteEntity}. Nothing here is ever hard
- * deleted either — a request is answered ({@code approved}/{@code declined}), not removed, because
- * the gate's audit trail is the record of who was granted a number and when.
- *
- * <p><strong>Masking is never stored</strong> (V4 header): the raw owner mobile lives on
- * {@code users} and is masked or revealed at the API edge per {@link ContactStatuses#revealsContact}.
- */
+/** Contact gate row ({@code contact_requests}); ids rather than associations to keep the leads context decoupled. */
 @Entity
 @Table(name = "contact_requests")
 @Getter
@@ -49,6 +31,14 @@ public class ContactRequest extends AuditedEntity {
     @Column(name = "message")
     @Setter
     private String message;
+
+    /** When the asker first spent this contact; written once by the database, never moved by a renewal. */
+    @Column(name = "first_requested_at", nullable = false, insertable = false, updatable = false)
+    private Instant firstRequestedAt;
+
+    /** When the asker first enquired on the listing; written once by the database and never moved. */
+    @Column(name = "enquired_at", nullable = false, insertable = false, updatable = false)
+    private Instant enquiredAt;
 
     protected ContactRequest() {
         // JPA

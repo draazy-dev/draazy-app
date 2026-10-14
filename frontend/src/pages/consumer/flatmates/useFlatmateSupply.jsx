@@ -1,50 +1,82 @@
 import { useState, useRef, useEffect } from 'react';
-import { useSearchParams, useLocation } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { useFormDraft, useFieldErrors } from '../../../lib/hooks.js';
 import { useVerification } from '../../../context/VerificationContext.jsx';
 import { digits } from '../../../lib/contact.js';
-import { isSeekerVerified, setSeekerVerified, evaluateHostEligibility, enqueueFlatmateReview, recordAskLocally, rememberAsk } from '../../../lib/data/flatmates.js';
+import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { evaluateHostEligibility, recordAskLocally, rememberAsk } from '../../../lib/data/flatmates.js';
 import * as flatmateService from '../../../services/flatmateService.js';
-import { initials, seatsLeft, hasAgreementEvidence, inr, perHead, FLATMATE_GROUP_IMG, deriveLocality, replacementTitle } from './helpers.js';
+import { getLocality } from '../../../services/localityService.js';
+import { initials, hasAgreementEvidence, inr, perHead, numeric, terms, FLATMATE_GROUP_IMG, replacementTitle, detailPath, seekerHeadline, moveInByForm, moveInByWire } from './helpers.js';
+import { groupOpener } from './openers.js';
+import { hasContactDetails } from '../list-property/contactDetails.js';
+import { headlineOf } from '../../../lib/headline.js';
 
-// Supply: posting / group / room / verify / aadhaar / consent state and handlers. Shared data
-// mutations go through `refresh`, so this hook never owns the source-of-truth collections.
-export function useFlatmateSupply({ refresh, setRooms, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, ownsRoom, myPost, myPostsStatus }) {
+const leaksContact = (...texts) => texts.some(hasContactDetails);
+
+const liveLocality = async (slug) => {
+  if (!slug) return null;
+  try {
+    const row = await getLocality(slug);
+    return row.archived ? null : row;
+  } catch {
+    return null;
+  }
+};
+
+const BLANK_GROUP = { hunting: true, localities: [], bhk: [], rentMin: '', rentMax: '', depositMin: '', depositMax: '', gatedOnly: false, bachelors: false, furnishing: '', moveInBy: '', moveInByStored: '', title: '', locality: '', localitySlug: '', policy: 'women', rent: '', deposit: '', noticePeriodDays: '', lockInMonths: '', maintenanceBilling: '', electricityBilling: '', seats: '2', name: '', note: '', tags: [], role: 'tenant', propertyId: '', agreement: false, agreementDoc: null, consentMobile: '', consentVerified: false };
+
+const formMoney = (v) => (v == null ? '' : String(v));
+const preferencesForm = (p) => ({
+  hunting: true,
+  localities: p.localities,
+  bhk: p.bhk,
+  rentMin: formMoney(p.rentMin),
+  rentMax: formMoney(p.rentMax),
+  depositMin: formMoney(p.depositMin),
+  depositMax: formMoney(p.depositMax),
+  gatedOnly: p.gatedOnly,
+  bachelors: p.bachelors,
+  furnishing: p.furnishing || '',
+  moveInBy: moveInByForm(p.moveInBy),
+  moveInByStored: p.moveInBy || '',
+});
+
+// Marks "this mount already sent the visitor to sign in" in the same ref that latches a handled
+// `?post=`. A Symbol rather than a string so it can never collide with a value the URL carries.
+const SIGNIN_LATCH = Symbol('sent-to-signin');
+
+export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, myPost, myPostsStatus, onGroupEdited = (id) => navigate(detailPath('group', id)) }) {
   const [params, setParams] = useSearchParams();
-  const location = useLocation();
+  const sendToSignIn = useSignInGate();
   const [postOpen, setPostOpen] = useState(false);
   const [groupOpen, setGroupOpen] = useState(false);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [consentOpen, setConsentOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [post, setPost] = useState({ name: '', gender: 'female', age: '', occupation: '', budget: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', verifiedContactOnly: false });
-  const [grp, setGrp] = useState({ title: '', locality: 'Baner', policy: 'women', rent: '', seats: '2', seatsOpen: '1', name: '', note: '', tags: [], role: 'tenant', propertyId: '', agreement: false, agreementDoc: null, consentMobile: '', consentVerified: false });
+  const [editingGroupId, setEditingGroupId] = useState(null);
+  const [post, setPost] = useState({ name: '', gender: 'female', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
+  const [grp, setGrp] = useState(BLANK_GROUP);
   const postDraft = useFormDraft('dzDraft:flatmate-post', post, setPost, { ignore: ['gender', 'moveIn', 'flatPref', 'roomPref', 'verifiedContactOnly'] });
-  // role/propertyId/agreement are ephemeral eligibility signals — intentionally
-  // NOT draft-persisted, so a stale badge claim can't be silently restored later.
-  const grpDraft = useFormDraft('dzDraft:share-group', grp, setGrp, { ignore: ['locality', 'policy', 'seats', 'seatsOpen', 'role', 'propertyId', 'agreement', 'agreementDoc', 'consentMobile', 'consentVerified'] });
+  const grpDraft = useFormDraft('dzDraft:share-group:v3', grp, setGrp, { ignore: ['policy', 'seats', 'locality', 'hunting'], omit: ['role', 'propertyId', 'agreement', 'agreementDoc', 'consentMobile', 'consentVerified'] });
   const postFormRef = useRef(null);
   const grpFormRef = useRef(null);
   const postErr = useFieldErrors(postFormRef);
   const grpErr = useFieldErrors(grpFormRef);
 
-  const userKey = user ? (user.mobile || user.name || 'anon') : 'anon';
-  // The opt-in Aadhaar badge, held once in VerificationContext (see below for why it also
+  // The opt-in identity badge, held once in VerificationContext (see below for why it also
   // gates the Flatmates Verified filter and verified-only contact).
-  const { verified: aadhaarVerified } = useVerification();
-  /* The same government-backed KYC the rest of the app uses (DigiLocker, ADR-009a) — flatmates is
-     where strangers agree to share a home. `isSeekerVerified` honours the older OTP-granted badge. */
-  const isVerified = user ? (aadhaarVerified || isSeekerVerified(userKey)) : false;
+  const { verified: identityVerified } = useVerification();
+  const isVerified = user ? identityVerified : false;
 
-
-  // Supply-side floor (badge-not-gate, ADR-019): posting only needs an L1 mobile-verified sign-in,
-  // the same floor as List Property. Identity verification is an opt-in badge, never a wall.
+  // Posting only needs an L1 mobile-verified sign-in, the same floor as List Property.
+  // Identity verification is an opt-in badge, never a wall.
   const requireSignedIn = (action) => {
-    if (!user) { navigate('/signin?next=' + encodeURIComponent(location.pathname + location.search)); return; }
+    if (!user) { sendToSignIn('listproperty'); return; }
     action();
   };
-  /* No `listRoom` twin of these: the app-wide sheet navigates to `/list-property?flatmate=1` from
-     wherever it was opened, so a board-only copy would be a second door to the same room. */
+  /* No `listRoom` twin of these: the app-wide sheet navigates to `/list-property?flatmate=1` from wherever it was
+     opened, so a board-only copy would be a second door to the same room. */
   const createGroup = () => requireSignedIn(() => setGroupOpen(true));
   const openPostModal = (id = null) => {
     requireSignedIn(() => {
@@ -62,30 +94,35 @@ export function useFlatmateSupply({ refresh, setRooms, user, authLoading, toast,
           age: myPost.age || '',
           occupation: myPost.occupation || '',
           budget: myPost.budget || '',
-          moveIn: myPost.moveIn || 'now',
+          budgetMax: myPost.budgetMax || '',
+          moveIn: myPost.moveIn || '',
           flatPref: myPost.flatPref || 'any',
           roomPref: myPost.roomPref || 'any',
           localities: myPost.localities || [],
           tags: myPost.tags || [],
           note: myPost.note || '',
+          title: myPost.title && myPost.title !== seekerHeadline(myPost) ? myPost.title : '',
           verifiedContactOnly: myPost.verifiedContactOnly || false,
         });
       } else if (!id) {
-        setPost({ name: user.name || '', gender: 'female', age: '', occupation: '', budget: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', verifiedContactOnly: false });
+        setPost({ name: user.name || '', gender: 'female', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
       }
       setPostOpen(true);
     });
   };
-  /* `?post=` carries a posting intent from the app-wide PostChooser. Consumed on arrival and gated
-     on auth and own-posts settling — see `docs/flows/consumer/flatmates.md` § One posting entry. */
   const postIntent = params.get('post');
-  /* Latched by value and disarmed when the param goes away, so StrictMode replays cannot
-     double-toast and a second press of the same branch still opens something. */
+  /* A Symbol marks the signed-out redirect — it can never equal a `?post=` value. */
   const handledIntent = useRef(null);
   useEffect(() => {
     if (!postIntent) { handledIntent.current = null; return; }
     if (authLoading) return;
-    if (!user) { navigate('/signin?next=' + encodeURIComponent(location.pathname + location.search)); return; }
+    if (!user) {
+      if (handledIntent.current !== SIGNIN_LATCH) {
+        handledIntent.current = SIGNIN_LATCH;
+        sendToSignIn('listproperty', `/flatmates?post=${encodeURIComponent(postIntent)}`);
+      }
+      return;
+    }
     if (myPostsStatus === 'loading') return;
     if (handledIntent.current === postIntent) return;
     handledIntent.current = postIntent;
@@ -95,23 +132,81 @@ export function useFlatmateSupply({ refresh, setRooms, user, authLoading, toast,
       return next;
     }, { replace: true });
     if (postIntent === 'group') createGroup(); else openPostModal();
-    // `createGroup`/`openPostModal` are rebuilt every render; their stale-able closures are gated above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `post` is a.
   }, [postIntent, authLoading, Boolean(user), myPostsStatus]);
+
+  const editGroup = (id) => flatmateService.getFlatmateDetail('group', id)
+    .then(({ owned, item: g }) => {
+      if (!owned) return;
+      setGrp({
+        ...BLANK_GROUP,
+        ...(g.preferences ? preferencesForm(g.preferences) : { hunting: false }),
+        title: g.title,
+        locality: g.locality || '',
+        localitySlug: g.localitySlug || '',
+        policy: g.policy,
+        rent: g.rent ? String(g.rent) : '',
+        deposit: g.deposit ? String(g.deposit) : '',
+        noticePeriodDays: g.noticePeriodDays == null ? '' : String(g.noticePeriodDays),
+        lockInMonths: g.lockInMonths == null ? '' : String(g.lockInMonths),
+        maintenanceBilling: g.maintenanceBilling || '',
+        electricityBilling: g.electricityBilling || '',
+        seats: String(g.seatsTotal || 2),
+        name: g.ownerName || g.members?.[0]?.name || user?.name || '',
+        note: g.note,
+        tags: g.tags,
+        role: g.hostRole === 'owner' ? 'owner' : 'tenant',
+        propertyId: g.propertyId || '',
+        agreement: g.agreementDeclared,
+        consentMobile: g.ownerConsentMobile,
+        consentVerified: g.ownerConsent,
+        seatsOpen: g.seatsOpen,
+        seatsWas: g.seatsTotal,
+      });
+      setEditingGroupId(g.id);
+      setGroupOpen(true);
+    })
+    .catch((err) => toast(err?.message || t('common.somethingWentWrong'), 'error'));
+  const editGroupIntent = params.get('editGroup');
+  const handledEditGroup = useRef(null);
+  useEffect(() => {
+    if (!editGroupIntent) { handledEditGroup.current = null; return; }
+    if (authLoading || !user || handledEditGroup.current === editGroupIntent) return;
+    handledEditGroup.current = editGroupIntent;
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('editGroup');
+      return next;
+    }, { replace: true });
+    editGroup(editGroupIntent);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `editGroup` is.
+  }, [editGroupIntent, authLoading, Boolean(user)]);
+  useEffect(() => {
+    if (groupOpen || !editingGroupId) return;
+    setEditingGroupId(null);
+    setGrp(BLANK_GROUP);
+    grpDraft.clear();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- closing the.
+  }, [groupOpen]);
   const submitPost = async (e) => {
     e.preventDefault();
     const ok = postErr.check([
       { name: 'name', ok: !!post.name.trim(), msg: t('flatmates.valAddName') },
       { name: 'budget', ok: !!post.budget, msg: t('flatmates.valAddBudget') },
       { name: 'localities', ok: post.localities.length > 0, msg: t('flatmates.valPickLocality') },
+      { name: 'budgetMax', ok: !post.budgetMax || +post.budgetMax >= +post.budget, msg: t('flatmates.valBudgetRange') },
+      { name: 'note', ok: !leaksContact(post.name, post.occupation, post.note), msg: t('flatmates.valNoContact') },
+      { name: 'title', ok: !leaksContact(post.title), msg: t('common.headline.contact') },
     ], toast);
     if (!ok) return;
     const data = {
+      title: editingId && !myPost?.title && !post.title?.trim() ? undefined : headlineOf(post.title, seekerHeadline(post)),
       name: post.name.trim(),
       gender: post.gender,
       age: +post.age || undefined,
       occupation: post.occupation,
       budget: +post.budget,
+      ...numeric('budgetMax', post.budgetMax),
       localities: post.localities,
       moveIn: post.moveIn,
       flatPref: post.flatPref,
@@ -139,78 +234,98 @@ export function useFlatmateSupply({ refresh, setRooms, user, authLoading, toast,
     postDraft.clear();
     setPostOpen(false);
     setEditingId(null);
-    setPost({ name: '', gender: 'female', age: '', occupation: '', budget: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', verifiedContactOnly: false });
+    setPost({ name: '', gender: 'female', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
     toast(editingId ? t('flatmates.requestUpdated') : t('flatmates.requestLive'));
   };
-  const deleteMyRequest = async () => {
-    if (!myPost) return;
-    try {
-      await flatmateService.deletePost(myPost.id);
-    } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
-      return;
-    }
-    await refresh();
-    toast(t('flatmates.requestRemoved'));
-  };
-  const markFilled = async () => {
-    if (!myPost) return;
-    try {
-      await flatmateService.deletePost(myPost.id);
-    } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
-      return;
-    }
-    await refresh();
-    toast(t('flatmates.markedFilled'));
-  };
-  // Fills only the descriptive fields, never the trust signals, so the role/agreement/consent flow
-  // is unchanged. Rent is copied only from a rent listing — a sale price is not a monthly rent.
-  const prefillGroupFromListing = (listing) => {
+  const prefillGroupFromListing = async (listing) => {
     if (!listing) return;
-    const loc = deriveLocality(listing.locality, listing.title, listing.loc);
+    const live = await liveLocality(listing.localitySlug);
+    const loc = live?.name || '';
     const rent = listing.deal === 'rent' && listing.price ? String(listing.price) : '';
-    setGrp((g) => ({
-      ...g,
-      propertyId: listing.id,
-      title: g.title || replacementTitle({ bhk: listing.bhk, locality: loc || listing.locality }),
-      ...(loc ? { locality: loc } : {}),
-      ...(rent && !g.rent ? { rent } : {}),
-    }));
+    setGrp((g) => {
+      const title = g.title || replacementTitle({ bhk: listing.bhk, locality: loc || listing.locality });
+      const locality = loc || g.locality;
+      const moved = title !== g.title || locality !== g.locality;
+      return {
+        ...g,
+        hunting: false,
+        propertyId: listing.uuid || listing.id,
+        title,
+        locality,
+        ...(live && locality !== g.locality ? { localitySlug: live.slug } : {}),
+        ...(rent && !g.rent ? { rent } : {}),
+        ...(moved ? { consentVerified: false } : {}),
+      };
+    });
     grpErr.clear('title'); if (rent) grpErr.clear('rent');
   };
   // Seeds the owner-consent number too, making the consent-OTP step one tap. The number is only
   // pre-filled, never marked verified — the owner's OTP is still required.
-  const prefillGroupFromTenancy = (t) => {
+  const prefillGroupFromTenancy = async (t) => {
     if (!t) return;
-    const loc = deriveLocality(t.title, t.address);
+    const live = await liveLocality(t.localitySlug);
+    const loc = live?.name || '';
     setGrp((g) => ({
       ...g,
+      hunting: false,
       role: 'tenant',
+      propertyId: t.propertyId || t.propId || g.propertyId,
       title: g.title || replacementTitle({ locality: loc }),
-      ...(loc ? { locality: loc } : {}),
+      ...(live ? { locality: loc, localitySlug: live.slug } : {}),
       ...(t.rent && !g.rent ? { rent: String(t.rent) } : {}),
       consentMobile: g.consentMobile || digits(t.ownerMobile).slice(-10),
       consentVerified: false,
     }));
     grpErr.clear('title'); if (t.rent) grpErr.clear('rent');
   };
+  const members = () => [{ name: grp.name.trim(), initials: initials(grp.name), verified: isVerified }];
+  const seatsOpenAfterEdit = (seats) => (editingGroupId && grp.seatsOpen != null
+    ? { seatsOpen: Math.max(0, grp.seatsOpen + seats - (grp.seatsWas || seats)) } : {});
+  const huntingGroup = () => {
+    const ok = grpErr.check([
+      { name: 'title', ok: !!grp.title.trim(), msg: t('flatmates.valAddGroupTitle') },
+      { name: 'localities', ok: grp.localities.length > 0, msg: t('flatmates.valPickLocality') },
+      { name: 'rentMax', ok: +grp.rentMax > 0, msg: t('flatmates.valAddBudgetMax') },
+      { name: 'rentMin', ok: !grp.rentMin || +grp.rentMin <= +grp.rentMax, msg: t('flatmates.valBudgetRange') },
+      { name: 'depositMax', ok: !grp.depositMin || !grp.depositMax || +grp.depositMin <= +grp.depositMax, msg: t('flatmates.valDepositRange') },
+      { name: 'name', ok: !!grp.name.trim(), msg: t('flatmates.valAddName') },
+      { name: 'note', ok: !leaksContact(grp.title, grp.name, grp.note), msg: t('flatmates.valNoContact') },
+    ], toast);
+    if (!ok) return null;
+    const guard = evaluateHostEligibility({ mobile: user ? user.mobile : '', tier: 'identity' });
+    if (guard.overCap) { toast(guard.reason, 'error'); return null; }
+    const seats = parseInt(grp.seats, 10) || 2;
+    return {
+      title: grp.title.trim(), policy: grp.policy, seatsTotal: seats, ...seatsOpenAfterEdit(seats),
+      members: members(), tags: grp.tags, note: grp.note, time: 'Just now',
+      ownerMobile: user ? (user.mobile || '') : '', ownerName: grp.name.trim(), hostRole: 'tenant', verificationTier: 'identity',
+      preferences: {
+        localities: grp.localities, bhk: grp.bhk,
+        rentMin: grp.rentMin, rentMax: grp.rentMax, depositMin: grp.depositMin, depositMax: grp.depositMax,
+        gatedOnly: grp.gatedOnly, bachelors: grp.bachelors, furnishing: grp.furnishing, moveInBy: moveInByWire(grp.moveInBy, grp.moveInByStored),
+      },
+    };
+  };
   const submitGroup = async (e) => {
     e.preventDefault();
+    if (grp.hunting) {
+      const group = huntingGroup();
+      if (group) await saveGroup(group);
+      return;
+    }
+    if (grp.agreementDoc?.uploading) { toast(t('common.waitForUpload'), 'error'); return; }
     const ok = grpErr.check([
       { name: 'title', ok: !!grp.title.trim(), msg: t('flatmates.valAddGroupTitle') },
       { name: 'rent', ok: !!grp.rent, msg: t('flatmates.valAddRent') },
       { name: 'name', ok: !!grp.name.trim(), msg: t('flatmates.valAddName') },
+      { name: 'note', ok: !leaksContact(grp.title, grp.name, grp.note), msg: t('flatmates.valNoContact') },
     ], toast);
     if (!ok) return;
     const seats = parseInt(grp.seats, 10) || 2;
-    // Seats open right now, which is honest for a tenant backfilling one seat in an occupied flat.
-    // The owner can later reopen/close seats without re-verifying the group.
-    const seatsOpen = Math.max(1, Math.min(seats, parseInt(grp.seatsOpen, 10) || 1));
     // Derive the host eligibility tier from the declared role + proof signal.
     // Sign-in (L1) is the floor; the Verified badge is an optional trust signal.
     const role = grp.role === 'owner' ? 'owner' : 'tenant';
-    const propertyId = role === 'owner' ? (grp.propertyId || '') : '';
+    const propertyId = grp.propertyId || '';
     // A tenant claims the Tenant tier only by declaring AND attaching the agreement — the artifact
     // Ops verifies. Declared-without-upload stays identity tier: still posts, no host badge.
     const agreementDoc = role === 'tenant' && grp.agreement ? (grp.agreementDoc || null) : null;
@@ -218,8 +333,6 @@ export function useFlatmateSupply({ refresh, setRooms, user, authLoading, toast,
     const verificationTier = role === 'owner'
       ? (propertyId ? 'owner' : 'identity')
       : (agreementDeclared ? 'tenant' : 'identity');
-    // Anti-broker guardrails: a hard block stops the save; a soft flag still posts but routes to
-    // the Ops review queue.
     const guard = evaluateHostEligibility({
       mobile: user ? user.mobile : '',
       tier: verificationTier,
@@ -227,154 +340,49 @@ export function useFlatmateSupply({ refresh, setRooms, user, authLoading, toast,
     });
     if (guard.blocked) { toast(guard.reason, 'error'); return; }
     const ownerConsent = role === 'tenant' ? !!grp.consentVerified : false;
-    const group = { title: grp.title.trim(), locality: grp.locality, policy: grp.policy, rent: +grp.rent, seatsTotal: seats, seatsOpen, members: [{ name: grp.name.trim(), initials: initials(grp.name), verified: isVerified }], tags: grp.tags, note: grp.note, time: 'Just now', ownerMobile: user ? (user.mobile || '') : '', ownerName: grp.name.trim(), hostRole: role, verificationTier, propertyId, agreementDeclared, agreementDoc, ownerConsentMobile: role === 'tenant' ? (grp.consentMobile || '') : '', ownerConsent, addressFingerprint: guard.fingerprint, flagForReview: guard.flagForReview };
+    await saveGroup({ title: grp.title.trim(), locality: grp.locality, localitySlug: grp.localitySlug || '', policy: grp.policy, rent: +grp.rent, ...numeric('deposit', grp.deposit), ...terms(grp), seatsTotal: seats, ...seatsOpenAfterEdit(seats), members: members(), tags: grp.tags, note: grp.note, time: 'Just now', ownerMobile: user ? (user.mobile || '') : '', ownerName: grp.name.trim(), hostRole: role, verificationTier, propertyId, agreementDeclared, agreementDoc, ownerConsentMobile: role === 'tenant' ? (grp.consentMobile || '') : '', ownerConsent, addressFingerprint: guard.fingerprint, flagForReview: guard.flagForReview });
+  };
+  const saveGroup = async (group) => {
+    const editedId = editingGroupId;
+    let created;
     // The saved record carries the server-assigned id, which the review queue below keys on — the
     // locally minted `'mg' + Date.now()` would enqueue a review against a group that does not exist.
-    let saved;
     try {
-      saved = await flatmateService.createGroup(group);
+      if (editedId) await flatmateService.updateGroup(editedId, group);
+      else created = await flatmateService.createGroup(group);
     } catch (err) {
       toast(err?.message || t('common.somethingWentWrong'), 'error');
       return;
-    }
-    // Tenant declarations are self-attested and contested addresses are fuzzy, so both go to Ops.
-    // Owner-tier skips the queue: the linked property was already vetted.
-    if (verificationTier === 'tenant' || guard.flagForReview) {
-      enqueueFlatmateReview({
-        groupId: saved.id,
-        kind: 'group',
-        host: group.ownerName,
-        hostMobile: digits(group.ownerMobile),
-        address: (group.title || '') + ' · ' + (group.locality || 'Pune'),
-        tier: verificationTier,
-        flagForReview: guard.flagForReview,
-        ownerConsent,
-        agreementDoc,
-      });
     }
     await refresh();
     grpDraft.clear();
-    setGroupOpen(false); setGrp({ title: '', locality: 'Baner', policy: 'women', rent: '', seats: '2', seatsOpen: '1', name: '', note: '', tags: [], role: 'tenant', propertyId: '', agreement: false, agreementDoc: null, consentMobile: '', consentVerified: false });
-    toast(t('flatmates.groupLive'));
+    setGroupOpen(false); setGrp(BLANK_GROUP); setEditingGroupId(null);
+    if (editedId) {
+      toast(t('flatmates.groupUpdated'));
+      onGroupEdited(editedId);
+      return;
+    }
+    toast(t(created?.publiclyVisible ? 'flatmates.groupLive' : 'flatmates.groupInReview'));
   };
-  // Owner-consent OTP ping: a tenant enters the flat owner's mobile, then confirms
-  // via an OTP sent to the owner. Requires a valid 10-digit number before opening.
+  // Requires a valid 10-digit number, plus the title and locality the consent row is scoped by:
+  // the server names the flat from those two, so without them the owner's SMS vouches for nothing.
   const openConsent = () => {
     const m = digits(grp.consentMobile);
     if (m.length !== 10) { toast(t('flatmates.enterOwnerMobile'), 'error'); return; }
+    if (!grp.title.trim() || !grp.locality.trim()) {
+      toast(t('flatmates.consentNeedsTitle'), 'error');
+      return;
+    }
     setConsentOpen(true);
   };
-  /* Steppers are tapped in bursts, and an async handler lets the second tap read a row the render
-     has not updated yet. These hold the value each row is moving TO while its request is in flight. */
-  const pendingGroupSeats = useRef({});
-  const pendingSeats = useRef({});
-  const pendingPeople = useRef({});
-
-  // Backfill lifecycle: adjusts only seatsOpen. The group keeps its verificationTier, so a re-list
-  // needs no re-verification.
-  const setGroupSeats = async (g, delta) => {
-    if (!ownsGroup(g)) return;
-    const cur = pendingGroupSeats.current[g.id] ?? seatsLeft(g);
-    const next = Math.max(0, Math.min(g.seatsTotal, cur + delta));
-    if (next === cur) return;
-    pendingGroupSeats.current[g.id] = next;
-    try {
-      await flatmateService.setGroupSeats(g.id, next);
-    } catch (err) {
-      delete pendingGroupSeats.current[g.id];
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
-      return;
-    }
-    if (pendingGroupSeats.current[g.id] === next) delete pendingGroupSeats.current[g.id];
-    await refresh();
-    toast(delta > 0
-      ? t('flatmates.groupSeatReopened')
-      : (next === 0 ? t('flatmates.groupAllFilled') : t('flatmates.seatMarkedFilled')));
-  };
-  // Room backfill adjusts only seatsOpen, so the tier stays and no re-verification is needed. Only
-  // tier-aware rooms carry seatsOpen; seed rooms have no stepper.
-  const setRoomSeats = async (r, delta) => {
-    if (!ownsRoom(r) || r.seatsOpen == null) return;
-    const cur = pendingSeats.current[r.id] ?? seatsLeft(r);
-    const next = Math.max(0, Math.min(r.seatsTotal, cur + delta));
-    if (next === cur) return;
-    pendingSeats.current[r.id] = next;
-    // Patch from the server's answer, not `next`: the count is clamped server-side against the
-    // flat's cap, so echoing the optimistic value shows a number the flat does not have.
-    let saved;
-    try {
-      saved = await flatmateService.setRoomSeats(r.id, next);
-    } catch (err) {
-      delete pendingSeats.current[r.id];
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
-      return;
-    }
-    const applied = saved?.seatsOpen ?? next;
-    if (pendingSeats.current[r.id] === next) delete pendingSeats.current[r.id];
-    setRooms((prev) => prev.map((x) => (x.id === r.id ? { ...x, seatsOpen: applied } : x)));
-    toast(delta > 0
-      ? t('flatmates.roomSeatReopened')
-      : (applied === 0 ? t('flatmates.roomAllFilled') : t('flatmates.seatMarkedFilled')));
-  };
-  /* Owner-split rooms are priced per room and occupancy is decided by tenants, so the owner records
-     who ACTUALLY lives in each room rather than declaring seats up front. */
-  const setRoomPeople = async (r, delta) => {
-    if (!ownsRoom(r)) return;
-    const cur = pendingPeople.current[r.id] ?? (Number(r.occupants) || 0);
-    const want = cur + delta;
-    if (want < 0) return;
-    pendingPeople.current[r.id] = want;
-    let saved;
-    try {
-      saved = await flatmateService.setRoomOccupants(r.id, want);
-    } catch (err) {
-      delete pendingPeople.current[r.id];
-      // The clamp is a rule, not a fault: "this flat is full" is the useful message, and the
-      // server's own text says which cap was hit.
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
-      return;
-    }
-    const applied = Number(saved?.occupants ?? cur);
-    if (pendingPeople.current[r.id] === want) delete pendingPeople.current[r.id];
-    if (applied === (Number(r.occupants) || 0)) return;
-    setRooms((prev) => prev.map((x) => (x.id === r.id ? { ...x, occupants: applied } : x)));
-    // One agreement covers the owner and everyone in the flat, so any change to
-    // who lives there is the moment to reissue it.
-    toast(delta > 0 ? t('flatmates.roomPersonAdded') : t('flatmates.roomPersonRemoved'));
-  };
-
-  /* One document covers the owner and every flatmate, so when a room changes hands the old one
-     stops naming the people living there and the owner starts a fresh one. */
-  const reissueAgreement = (r) => {
-    if (!ownsRoom(r)) return;
-    navigate('/services/rent-agreement?flat=' + encodeURIComponent(r.propertyId || r.id) + '&reissue=1');
-  };
-
-  // Owner removes a group they created. Seed groups have no owner and are never
-  // deletable, so this only ever touches the persisted user-created set.
-  const deleteGroup = async (g) => {
-    if (!ownsGroup(g)) return;
-    try {
-      await flatmateService.deleteGroup(g.id);
-    } catch (err) {
-      toast(err?.message || t('common.somethingWentWrong'), 'error');
-      return;
-    }
-    await refresh();
-    toast(t('flatmates.groupRemoved'));
-  };
-  /* No client-side "is it full?" pre-check — only the provider knows. Its `group_full` is a
-     refusal, distinct from the informational `already_interested`; neither is a generic error. */
   const onJoin = async (g) => {
-    if (!user) { navigate('/signin?next=' + encodeURIComponent(location.pathname + location.search)); return; }
+    if (!user) { sendToSignIn('community'); return; }
     if (ownsGroup(g)) { toast(t('flatmates.alreadyMember')); return; }
     const key = 'group-' + g.id;
     const open = g.policy === 'any';
-    const opener = open
-      ? "Hi! I'd love to join your flatmate group. When can I move in?"
-      : "Hi! I'd like to request a spot in your flatmate group — is it still open?";
-    /* One record for both answers: the device receiving the duplicate `409` is often not the one
-       that made the request, and must still hold the same Messages thread. */
+    const opener = groupOpener(g);
+    /* One record for both answers: the device receiving the duplicate `409` is often not the
+     * one that made the request, and must still hold the same Messages thread. */
     const ask = {
       request: { propertyId: key, property: { title: g.title, price: inr(perHead(g)) + '/mo', loc: (g.locality || 'Pune') + ', Pune', img: FLATMATE_GROUP_IMG }, party: { name: g.title, avatar: (g.title || 'GR').slice(0, 2).toUpperCase() }, firstMessage: opener },
     };
@@ -386,8 +394,6 @@ export function useFlatmateSupply({ refresh, setRooms, user, authLoading, toast,
     } catch (err) {
       if (err?.code === flatmateService.CONFLICT_ALREADY_INTERESTED) {
         rememberAsk(user.mobile, key);
-        // Idempotent on `propertyId`: the device that already holds the request writes nothing, and
-        // the one seeing this 409 still gets a thread behind its joined card.
         recordAskLocally(ask);
         toast(t('flatmates.joinRequestAlreadyRecorded', { title: g.title }));
         return;
@@ -400,6 +406,8 @@ export function useFlatmateSupply({ refresh, setRooms, user, authLoading, toast,
         toast(t('flatmates.groupAlreadyFull', { title: g.title }), 'error');
         return;
       }
+      // The clamp is a rule, not a fault: "this flat is full" is the useful message, and the
+      // server's own text says which cap was hit.
       toast(err?.message || t('common.somethingWentWrong'), 'error');
       return;
     }
@@ -412,32 +420,17 @@ export function useFlatmateSupply({ refresh, setRooms, user, authLoading, toast,
   };
 
   const openVerify = () => {
-    if (!user) { navigate('/signin?next=' + encodeURIComponent(location.pathname + location.search)); return; }
+    if (!user) { sendToSignIn('verify'); return; }
     setVerifyOpen(true);
-  };
-  /* DigiLocker has already persisted the badge; this only mirrors it onto the seeker's live request
-     so their card shows the pill without waiting for a re-post. */
-  const onVerified = async () => {
-    setSeekerVerified(userKey);
-    if (myPost) {
-      // Best-effort: a failure costs the badge on one card until the next post edit, not the
-      // verification, so swallowing it keeps the success toast honest.
-      try {
-        await flatmateService.updatePost(myPost.id, { verified: true });
-        await refresh();
-      } catch (err) { console.warn('[flatmates] badge mirror failed', err); }
-    }
-    setVerifyOpen(false);
-    toast(t('flatmates.nowVerifiedSeeker'));
   };
 
   return {
     post, setPost, postOpen, setPostOpen, postFormRef, postDraft, postErr, editingId,
-    openPostModal, submitPost, deleteMyRequest, markFilled,
-    grp, setGrp, groupOpen, setGroupOpen, grpFormRef, grpDraft, grpErr, submitGroup,
+    openPostModal, submitPost,
+    grp, setGrp, groupOpen, setGroupOpen, grpFormRef, grpDraft, grpErr, submitGroup, editingGroupId, editGroup,
     prefillGroupFromListing, prefillGroupFromTenancy,
     openConsent, consentOpen, setConsentOpen,
-    setGroupSeats, setRoomSeats, setRoomPeople, reissueAgreement, deleteGroup, onJoin, createGroup,
-    verifyOpen, setVerifyOpen, openVerify, onVerified, isVerified,
+    onJoin, createGroup,
+    verifyOpen, setVerifyOpen, openVerify, isVerified,
   };
 }

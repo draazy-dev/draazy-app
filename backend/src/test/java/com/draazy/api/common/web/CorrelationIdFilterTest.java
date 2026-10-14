@@ -36,4 +36,15 @@ class CorrelationIdFilterTest {
         assertThat(echoed).doesNotContain("\r").doesNotContain("\n").doesNotContain("Set-Cookie");
         assertThat(echoed).matches("^[A-Za-z0-9-]{36}$");
     }
+
+    @Test
+    void replacesAnInboundJobTraceIdSoRequestErrorsAreNotFiledAsJobs() throws Exception {
+        var request = new MockHttpServletRequest();
+        request.addHeader(RequestCorrelation.TRACE_ID_HEADER, "job-forged_1a2b3c4d");
+        var response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, (req, res) -> {});
+
+        assertThat(response.getHeader(RequestCorrelation.TRACE_ID_HEADER)).doesNotStartWith("job-");
+    }
 }

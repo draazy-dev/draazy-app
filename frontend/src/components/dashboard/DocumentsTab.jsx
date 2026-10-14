@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
+import BadgeRequestCard from './BadgeRequestCard.jsx';
+import AgreementPerks from './AgreementPerks.jsx';
 import PropertyImage from '../ui/PropertyImage.jsx';
 import Select from '../ui/Select.jsx';
 import Tip from '../ui/Tip.jsx';
@@ -8,16 +11,14 @@ import useAsyncList from '../../hooks/useAsyncList.js';
 import LoadError from '../LoadError.jsx';
 import { fmtINR, timeAgo, avatarFor } from '../../lib/format.js';
 import { formatSize, checklistFromDocs, DOC_CATEGORIES, docInfo } from '../../lib/data/documents.js';
-import { listDocuments, uploadDocument, deleteDocument, listDocRequests, respondDocRequest } from '../../services/documentService.js';
+import { listDocuments, uploadDocument, deleteDocument, listDocRequests, respondDocRequest, getDocumentUrl } from '../../services/documentService.js';
 import { generateRentReceipts, fyStart, thisMonth } from '../../lib/data/rentReceiptGen.js';
 import { myTenancies, myRentAgreements } from '../../services/rentService.js';
 import { toRentalCards } from '../../lib/data/tenancy.js';
-import { openDocUrl } from '../../lib/openDoc.js';
+import { openDocFrom } from '../../lib/openDoc.js';
+import { DOCUMENT_ACCEPT, DOCUMENT_GUIDANCE_KEY, PDF_GUIDANCE_KEY } from '../../lib/uploads/policy.js';
+/* Owner-side document packs (property-based). */
 
-/* Owner-side document packs (property-based). Uses the richer domain category model so the
-   vault mirrors what an Indian owner/seller actually needs for a sale or bank submission.
-   `cats` holds the English document-type ids that are stored on every upload, so they stay
-   as-is; only the group heading and sub-line are keyed. */
 const OWNER_GROUPS = [
   { id: 'title', titleKey: 'dash.grpTitle', subKey: 'dash.grpTitleSub', icon: 'scroll-text', tone: 'teal', cats: DOC_CATEGORIES['Title & Ownership'] },
   { id: 'society', titleKey: 'dash.grpSociety', subKey: 'dash.grpSocietySub', icon: 'building-2', tone: 'teal', cats: DOC_CATEGORIES['Society'] },
@@ -29,18 +30,16 @@ const OWNER_GROUPS = [
 const KYC_GROUP = { id: 'kyc', titleKey: 'dash.grpKyc', subKey: 'dash.grpKycSub', icon: 'fingerprint', tone: 'amber', cats: ['Aadhaar Card', 'PAN Card', 'Passport Photo', 'Ownership Proof'] };
 
 const OWNER_CATS = OWNER_GROUPS.flatMap((g) => g.cats);
+/* Match an uploaded doc to a slot: exact category first, then the legacy loose match so any documents saved by the
+   previous version of the tab still line up with their slot. */
 
-/* Match an uploaded doc to a slot: exact category first, then the legacy loose match so any
-   documents saved by the previous version of the tab still line up with their slot. */
 const findDoc = (list, category) =>
   (list || []).find((d) => d.category === category) ||
   (list || []).find((d) => d.category?.toLowerCase().includes(category.toLowerCase().slice(0, 8)));
 
 const countDone = (cats, docs) => cats.filter((c) => findDoc(docs, c)).length;
+/* A rent agreement belongs to the property it was registered for. */
 
-/* A rent agreement belongs to the property it was registered for. Match by the
-   canonical `propId` first; fall back to a loose title match so legacy agreements
-   (which only stored a property name) still land under the right flat. */
 const agreementMatchesProp = (ra, propId, listing) => {
   if (ra.propId) return ra.propId === propId;
   const t = (listing?.title || '').toLowerCase();
@@ -53,16 +52,15 @@ function Ring({ done, total, size = 72, stroke = 7, loading = false }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
   const complete = total > 0 && done === total;
-  const col = complete ? '#34d399' : done > 0 ? '#2dd4bf' : 'rgba(255,255,255,0.18)';
-  // While the vault is still loading its first read, show a muted, indeterminate ring rather than a
-  // confident 0/N — the count is not known yet, and painting 0 then snapping is the reflow D125-3
-  // called out (it is what destabilised doc-info.spec).
+  const col = complete ? 'stroke-emerald-400' : done > 0 ? 'stroke-teal-400' : 'stroke-white/20';
+  // While the vault is still loading its first read the count is unknown, so show a muted,
+  // indeterminate ring — painting 0 and then snapping is a reflow.
   if (loading) {
     return (
       <div className="relative flex-shrink-0 animate-pulse" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} fill="none" />
-          <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.18)" strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * 0.75} />
+          <circle cx={size / 2} cy={size / 2} r={r} className="stroke-white/[0.08]" strokeWidth={stroke} fill="none" />
+          <circle cx={size / 2} cy={size / 2} r={r} className="stroke-white/[0.18]" strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * 0.75} />
         </svg>
       </div>
     );
@@ -70,8 +68,8 @@ function Ring({ done, total, size = 72, stroke = 7, loading = false }) {
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} fill="none" />
-        <circle cx={size / 2} cy={size / 2} r={r} stroke={col} strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} style={{ transition: 'stroke-dashoffset .6s ease' }} />
+        <circle cx={size / 2} cy={size / 2} r={r} className="stroke-white/[0.08]" strokeWidth={stroke} fill="none" />
+        <circle cx={size / 2} cy={size / 2} r={r} className={col} strokeWidth={stroke} fill="none" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - pct)} style={{ transition: 'stroke-dashoffset .6s ease' }} />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
         <span className="text-white text-sm font-bold leading-none">{done}<span className="text-gray-500 text-[10px] font-semibold">/{total}</span></span>
@@ -113,8 +111,8 @@ function DocTile({ category, doc, onUpload, onRemove, onView }) {
     );
   }
   return (
+      /* Full-tile click layer for upload; the info button sits above it as a sibling (never nested). */
     <div className="group relative rounded-xl border border-dashed border-white/15 bg-white/[0.02] min-h-[96px] transition hover:border-teal-400/50 hover:bg-teal-400/[0.04]">
-      {/* Full-tile click layer for upload; the info button sits above it as a sibling (never nested). */}
       <button onClick={() => onUpload(category)} className="absolute inset-0 w-full h-full rounded-xl" aria-label={t('dash.uploadCat', { category })} />
       <InfoDot category={category} />
       <div className="relative pointer-events-none p-3 flex flex-col gap-2 h-full">
@@ -180,10 +178,10 @@ function PanelCard({ id, icon, tone, title, sub, badge, open, onToggle, children
 }
 
 const pill = (cls, children) => <span className={'text-[10px] px-2 py-0.5 rounded-full font-semibold ' + cls}>{children}</span>;
+/* Shared renderer for a list of rent agreements, used by both the tenant "Personal" vault and the owner per-property
+   vault so the two can never drift apart. */
 
-/* Shared renderer for a list of rent agreements, used by both the tenant "Personal"
-   vault and the owner per-property vault so the two can never drift apart. */
-function AgreementList({ ras, emptyText }) {
+function AgreementList({ ras, emptyText, ownerView = false }) {
   const { t } = useTranslation();
   if (!ras.length) {
     return (
@@ -196,18 +194,19 @@ function AgreementList({ ras, emptyText }) {
   return (
     <div className="space-y-2">
       {ras.map((ra, i) => (
-        <div key={ra.id || i} className="flex items-center gap-4 p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-          <div className="w-9 h-9 rounded-lg bg-teal-400/15 flex items-center justify-center flex-shrink-0"><Icon name="file-text" className="w-4 h-4 text-teal-400" /></div>
-          <div className="flex-1 min-w-0"><p className="text-white text-sm font-medium truncate">{ra.property || ra.title || t('dash.agreementFallback')}</p><p className="text-gray-500 text-[11px] truncate">{ra.tenant || t('dash.tenantFallback')} · {ra.date || 'N/A'}</p></div>
-          <button className="text-[10px] px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 font-semibold hover:bg-white/10 flex-shrink-0">{t('dash.download')}</button>
+        <div key={ra.id || i} className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+          <div className="flex items-center gap-4">
+            <div className="w-9 h-9 rounded-lg bg-teal-400/15 flex items-center justify-center flex-shrink-0"><Icon name="file-text" className="w-4 h-4 text-teal-400" /></div>
+            <div className="flex-1 min-w-0"><p className="text-white text-sm font-medium truncate">{ra.property || ra.title || t('dash.agreementFallback')}</p><p className="text-gray-500 text-[11px] truncate">{ra.tenant || t('dash.tenantFallback')} · {ra.date || 'N/A'}</p></div>
+            <button className="text-[10px] px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 font-semibold hover:bg-white/10 flex-shrink-0">{t('dash.download')}</button>
+          </div>
+          <AgreementPerks ra={ra} isOwner={ownerView} />
         </div>
       ))}
     </div>
   );
 }
 
-/* Placeholder tiles shown while a vault is loading its first read, so a full vault never paints as
-   an empty one and then snaps (D125-3). */
 function VaultSkeleton() {
   return (
     <div className="glass-card rounded-2xl p-4 sm:p-5">
@@ -219,28 +218,15 @@ function VaultSkeleton() {
     </div>
   );
 }
+/* A failed load degrades to a retry affordance rather than vanishing. */
 
-/* A failed load degrades to a retry affordance instead of vanishing — the honest counterpart to
-   the old `.catch(() => [])` that removed the panel entirely (D125-1).
-
-   The card itself now lives in `components/LoadError.jsx`, because the vault was only the first
-   surface that needed it and copying it to the next eleven is how the wording drifts apart (D166).
-   `VaultError` survives as the local binding so the three call sites below read unchanged. */
 const VaultError = LoadError;
 
 export default function DocumentsTab({ user, listings, toast, isOwner = false }) {
   const { t } = useTranslation();
-  // The dashboard's shared `listings` collection also contains flatmate posts, groups and rooms.
-  // They deliberately imitate property-card fields for the My Properties panel, but have no
-  // catalogue-property UUID and therefore no `/me/documents/{propertyId}` vault. Showing one in
-  // this picker made its first (and often only) selection a guaranteed 404. The mapper adds `uuid`
-  // exclusively to real property rows.
+  /* Both caller-scoped, and the agreement list answers for either side of the lease — this tab renders an owner pack
+     and a tenancy pack from the same list. */
   const propList = (listings || []).filter((listing) => !!listing.uuid);
-  /* A tenant's rented home(s) and the agreements they signed. Both are caller-scoped server reads,
-     and the agreement list answers for either side of the lease — which is what this tab needs, as
-     it renders an owner pack and a tenancy pack from the same list, narrowed by property. A
-     non-owner who has an agreement but no finalised tenancy still counts as a tenant, so their
-     paperwork always has a home. */
   const [rental, setRental] = useState({ tenancies: [], agreements: [], loaded: false });
   useEffect(() => {
     let alive = true;
@@ -249,7 +235,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
       myRentAgreements().catch(() => []),
     ]).then(async ([rows, agreementRows]) => {
       if (!alive) return;
-      const tenancies = await toRentalCards(rows);
+      const tenancies = await toRentalCards((rows || []).filter((row) => row.confirmed));
       if (!alive) return;
       setRental({
         tenancies,
@@ -264,53 +250,50 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
   const agreements = rental.agreements;
   const isTenant = tenancies.length > 0 || (!isOwner && agreements.length > 0);
 
+  /* `isOwner` arrives a render late, so a `useState` initialiser keeps the first `false` and opens every owner's
+     vault on the wrong half of itself. */
   const [context, setContext] = useState(isOwner ? 'owner' : 'personal');
-  /* `isOwner` is derived in `Dashboard` from a listings fetch, so it is false on the first render
-     of every owner's session and true a moment later. A `useState` initialiser reads that first
-     value once and keeps it, which put every owner on the Personal tab and left their property
-     paperwork behind a toggle they had to find — the vault opened on the wrong half of itself.
-     Only the initial default is corrected: an owner who has since clicked Personal is left there. */
   const contextChosen = useRef(false);
   useEffect(() => {
     if (isOwner && !contextChosen.current) setContext((c) => (c === 'personal' ? 'owner' : c));
+  // The tenancy context only exists once the server confirms a lease, so open on the safe default
+  // and move when the answer arrives — else a non-tenant lands on a tab that vanishes under them.
   }, [isOwner]);
-  // The tenancy context only exists once the server has confirmed a lease, so the tab opens on the
-  // safe default and moves there when the answer arrives. Choosing it up front would put a
-  // non-tenant on a tab that then vanished under them.
   useEffect(() => {
     if (rental.loaded && !isOwner && isTenant) setContext((c) => (c === 'personal' ? 'tenancy' : c));
   }, [rental.loaded, isOwner, isTenant]);
-  const [docProp, setDocProp] = useState(propList[0]?.id || 'portfolio');
+  const linkedProp = useSearchParams()[0].get('prop');
+  const linkedListing = linkedProp ? propList.find((l) => l.id === linkedProp || l.uuid === linkedProp) : null;
+  const [docProp, setDocProp] = useState(linkedListing?.id || propList[0]?.id || 'portfolio');
+  const appliedLink = useRef(linkedListing ? linkedProp : null);
   const [tenProp, setTenProp] = useState('');
   useEffect(() => {
     if (!tenProp && tenancies[0]?.propId) setTenProp(tenancies[0].propId);
+  // Listings load async, so re-point the selector once real properties arrive and fall back when
+  // the last one goes away, rather than holding a dead id the server would 404 on.
   }, [tenancies, tenProp]);
-  // Listings load async in Dashboard, so on first render propList is empty and docProp
-  // falls back to 'portfolio'. Once the owner's real properties arrive, point the selector
-  // at the first one instead of leaving it stuck on the empty-state bucket — and when the last
-  // listing goes away, fall back rather than holding a dead id the selector cannot show and the
-  // server would 404 on.
   useEffect(() => {
+    if (linkedListing && appliedLink.current !== linkedProp) {
+      appliedLink.current = linkedProp;
+      setDocProp(linkedListing.id);
+      return;
+    }
     if (!propList.some((l) => l.id === docProp)) setDocProp(propList[0]?.id || 'portfolio');
-  }, [listings]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [listings, linkedProp]); // eslint-disable-line react-hooks/exhaustive-deps -- linkedProp derives from listings
   useEffect(() => {
     if (tenancies.length && !tenancies.some((t) => t.propId === tenProp)) setTenProp(tenancies[0].propId);
-  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user]); // eslint-disable-line react-hooks/exhaustive-deps -- initial property follows the signed-in user
   const [openSections, setOpenSections] = useState({ title: true, kyc: true });
   const toggle = (key) => setOpenSections((s) => ({ ...s, [key]: !s[key] }));
   const [hraForm, setHraForm] = useState({ landlordName: '', landlordPan: '', landlordAddr: '', tenantName: user?.name || '', tenantPan: '', fromMonth: fyStart(), toMonth: thisMonth(), rentAmt: '', propertyAddr: '' });
+  // A listing's `id` is the route token (`slug || uuid`) but document endpoints are UUID-addressed.
+  // Keep `docProp` as the picker value for stable deep links; translate only at the API boundary.
 
-  // A listing's `id` is the route token (`slug || uuid`), but every document endpoint is
-  // UUID-addressed. Passing the display/routing token here made an owner whose listing had a slug
-  // receive a 404 and see an error card even though the vault existed. Keep `docProp` as the picker
-  // value so the UI and deep links remain stable; translate only at the API boundary.
   const selectedListing = propList.find((l) => l.id === docProp);
   const docPropertyId = selectedListing?.uuid || docProp;
   const activeProp = context === 'owner' ? docPropertyId : 'personal';
-  // Vault reads go through `documentService` (mock or live, per-domain). They are async, so the
-  // rows the render body used to read synchronously become state, reloaded whenever the identity,
-  // the selected property, or a mutation changes. Each list carries its own loading/error status so
-  // a live failure surfaces as a retry affordance rather than a confident empty vault (D125-1/3).
+  // Vault reads are async, reloaded whenever identity, selected property or a mutation changes.
+  // Each list carries its own loading/error status so a failure reads as retry, not empty vault.
   const mobile = user?.mobile;
   // 'portfolio' is the empty-state bucket shown before any listing exists. It is not a real listing
   // id, so it has no server vault — skip the fetch, or the GET 404s.
@@ -324,9 +307,8 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
   const [docReqs, reqStatus, setDocReqs, reloadReqs, reqError] = useAsyncList(
     () => listDocRequests(mobile), [mobile], !!mobile,
   );
-  // A mutation resolves to the value the provider returns; applying it needs to know which vault is
-  // on screen *now*, because the OS file dialog can stay open while the property picker moves. The
-  // ref is read after the await so a stale closure cannot prepend a file to the wrong flat (D125-4).
+  // The OS file dialog can stay open while the property picker moves, so read the ref after the
+  // await — a stale closure must not prepend a file to the wrong flat.
   const activePropRef = useRef(activeProp);
   activePropRef.current = activeProp;
   const setDocsFor = (prop) => (prop === 'personal' ? setPersonalDocs : setOwnerDocs);
@@ -334,8 +316,6 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
   // Rent agreement is tenancy/property-specific, so the owner vault shows only the
   // agreement(s) for the currently selected property (matched by propId).
   const propAgreements = agreements.filter((ra) => agreementMatchesProp(ra, docPropertyId, selectedListing));
-  // Tenant side: the rental they signed for. Scope the agreement to the selected
-  // tenancy when we know the flat; otherwise show all of the tenant's own agreements.
   const selectedTenancy = tenancies.find((t) => t.propId === tenProp) || tenancies[0];
   const tenancyAgreements = selectedTenancy
     ? agreements.filter((ra) => agreementMatchesProp(ra, selectedTenancy.propId, selectedTenancy))
@@ -348,21 +328,20 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
   const uploadForCategory = (category) => {
     const targetProp = activeProp; // capture now — context/property may change while the picker is open
     const inp = document.createElement('input');
-    inp.type = 'file'; inp.accept = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
+    inp.type = 'file'; inp.accept = DOCUMENT_ACCEPT;
     inp.onchange = async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       try {
-        // The seam speaks in `File`s; the provider (mock or live) owns the byte handling and returns
-        // the created document. Apply it to the list it belongs to — but only if that vault is still
-        // the one on screen, so a file uploaded to one flat never appears under another (D125-4).
+        // Apply the created document only if its vault is still the one on screen, so a file
+        // uploaded to one flat never appears under another.
         const created = await uploadDocument(mobile, targetProp, { category, file });
         if (created && activePropRef.current === targetProp) {
           setDocsFor(targetProp)((prev) => [created, ...prev]);
         }
         toast(t('dash.uploadedToast', { file: file.name, category }), 'success');
-      } catch {
-        toast(t('dash.uploadFailedToast'), 'error');
+      } catch (error) {
+        toast(error.message || t('dash.uploadFailedToast'), 'error');
       }
     };
     inp.click();
@@ -385,14 +364,12 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
       toast(t('dash.reqFailedToast'), 'error');
       return;
     }
-    // Patch just the answered row from the provider's return value — a grant no longer costs a
-    // refetch of all three lists (D125-4).
+    // Patch just the answered row from the provider's return value, so a grant costs no refetch.
     const nextStatus = grant ? 'granted' : 'declined';
     setDocReqs((prev) => prev.map((r) => (r.id === reqId ? (updated || { ...r, status: nextStatus }) : r)));
     if (!grant) { toast(t('dash.reqDeclinedToast'), 'info'); return; }
-    // The server computes the count from the private vault after its own re-read. Counting
-    // categories would lie when the owner approves a paper they have not uploaded yet, so this
-    // counts actual files.
+    // The server counts actual files in the private vault; counting categories would lie when the
+    // owner approves a paper they have not uploaded yet.
     const shared = updated?.sharedDocumentCount || 0;
     if (shared > 0) {
       toast(t('dash.accessGrantedToast'), 'success');
@@ -400,15 +377,14 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
       toast(t('dash.approvedNoDocToast'), 'info');
     }
   };
-  // Live docs carry a signed `url`. `openDocUrl` refuses anything it cannot safely render as a
-  // passive document, including the dev storage stub host that never resolves in the browser
-  // (D120); a refusal gets the "no preview" toast (D125-5).
-  const viewDoc = (doc) => {
-    if (!openDocUrl(doc.url || doc.dataUrl)) toast(t('dash.noPreviewToast'));
+  // `openDocFrom` refuses anything it cannot safely render as a passive document, including the dev
+  // storage stub host; a refusal or a failed mint gets the "no preview" toast.
+  const viewDoc = async (doc) => {
+    if (!(await openDocFrom(() => getDocumentUrl(doc.id)))) toast(t('dash.noPreviewToast'));
   };
-  const genHraReceipts = () => {
+  const genHraReceipts = async () => {
     if (!hraForm.landlordName || !hraForm.tenantName || !hraForm.rentAmt || !hraForm.propertyAddr) { toast(t('dash.fillRequiredToast'), 'error'); return; }
-    try { generateRentReceipts({ landlordName: hraForm.landlordName, landlordPan: hraForm.landlordPan, landlordAddress: hraForm.landlordAddr, tenantName: hraForm.tenantName, tenantPan: hraForm.tenantPan, fromMonth: hraForm.fromMonth, toMonth: hraForm.toMonth, rentAmount: parseFloat(hraForm.rentAmt), propertyAddress: hraForm.propertyAddr }); toast(t('dash.receiptsDownloaded'), 'success'); } catch { toast(t('dash.receiptsFailed'), 'error'); }
+    try { await generateRentReceipts({ landlordName: hraForm.landlordName, landlordPan: hraForm.landlordPan, landlordAddress: hraForm.landlordAddr, tenantName: hraForm.tenantName, tenantPan: hraForm.tenantPan, fromMonth: hraForm.fromMonth, toMonth: hraForm.toMonth, rentAmount: parseFloat(hraForm.rentAmt), propertyAddress: hraForm.propertyAddr }); toast(t('dash.receiptsDownloaded'), 'success'); } catch { toast(t('dash.receiptsFailed'), 'error'); }
   };
 
   const headerDone = context === 'owner' ? countDone(OWNER_CATS, ownerDocs)
@@ -418,8 +394,8 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
     : context === 'tenancy' ? 1
     : KYC_GROUP.cats.length;
   const pendingReqs = docReqs.filter((r) => r.status === 'pending').length;
-  // The header ring reflects the vault in view; while that vault is still loading its first read,
-  // show it as indeterminate rather than a confident 0/N (D125-3).
+  // The header ring reflects the vault in view; while it is still loading its first read, show it
+  // as indeterminate rather than a confident 0/N.
   const vaultStatus = context === 'owner' ? ownerStatus : context === 'personal' ? personalStatus : 'ready';
   const vaultDocs = context === 'owner' ? ownerDocs : context === 'personal' ? personalDocs : [];
   const vaultLoading = vaultStatus === 'loading' && vaultDocs.length === 0;
@@ -427,21 +403,37 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
   return (
     <div className="space-y-5">
       {/* ── Vault header: completeness ring + trust + context switch ── */}
-      <div className="glass-card rounded-2xl p-5 sm:p-6 relative overflow-hidden">
+      <div className="glass-card rounded-2xl p-4 sm:p-6 relative overflow-hidden">
         <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
-        <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
-          <Ring done={headerDone} total={headerTotal} loading={vaultLoading} />
+        <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <Icon name="folder-lock" className="w-5 h-5 text-teal-400" />
-              <h2 className="text-white text-lg font-bold">{t('dash.vaultTitle')}</h2>
+            <div className="flex items-center gap-4">
+              <Ring done={headerDone} total={headerTotal} loading={vaultLoading} size={60} stroke={6} />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <Icon name="folder-lock" className="w-5 h-5 text-teal-400" />
+                  <h2 className="text-white text-lg font-bold">{t('dash.vaultTitle')}</h2>
+                </div>
+                <p className="text-gray-400 text-sm leading-relaxed mt-1.5 flex items-start gap-1.5">
+                  <Icon name="lock" className="w-3.5 h-3.5 mt-1 text-emerald-400 flex-shrink-0" />
+                  {t('dash.vaultSub')}
+                </p>
+              </div>
             </div>
-            <p className="text-gray-400 text-sm mt-1 flex items-center gap-1.5">
-              <Icon name="lock" className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
-              {t('dash.vaultSub')}
-            </p>
+            {context !== 'tenancy' && (
+              <ul className="mt-4 space-y-2.5 text-xs leading-relaxed">
+                <li className="flex items-start gap-2 text-gray-400">
+                  <Icon name="file-text" className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  {t(DOCUMENT_GUIDANCE_KEY)}
+                </li>
+                <li className="flex items-start gap-2 text-amber-200">
+                  <Icon name="file-signature" className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                  {t(PDF_GUIDANCE_KEY)}
+                </li>
+              </ul>
+            )}
             {(isOwner || isTenant) && (
-              <div className="inline-flex mt-3 p-1 rounded-full bg-white/5 border border-white/10">
+              <div className="inline-flex mt-4 p-1 rounded-full bg-white/5 border border-white/10">
                 {[
                   isOwner && ['owner', 'home', 'dash.ctxOwner'],
                   isTenant && ['tenancy', 'key', 'dash.ctxTenancy'],
@@ -468,8 +460,8 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
           )}
         </div>
       </div>
-
       {/* ── Owner context: property-based document packs ── */}
+
       {context === 'owner' && (
         <>
           {ownerStatus === 'error' ? (
@@ -477,20 +469,25 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
           ) : ownerStatus === 'loading' && ownerDocs.length === 0 ? (
             <VaultSkeleton />
           ) : (
-            OWNER_GROUPS.map((g) => (
-              <CategoryCard key={g.id} group={g} docs={ownerDocs} open={!!openSections[g.id]} onToggle={toggle} onUpload={uploadForCategory} onRemove={removeDoc} onView={viewDoc} />
-            ))
+            <>
+              {selectedListing && ownerStatus === 'ready' ? (
+                <BadgeRequestCard key={selectedListing.uuid} listing={selectedListing} docs={ownerDocs} onUpload={uploadForCategory} toast={toast} />
+              ) : null}
+              {OWNER_GROUPS.map((g) => (
+                <CategoryCard key={g.id} group={g} docs={ownerDocs} open={!!openSections[g.id]} onToggle={toggle} onUpload={uploadForCategory} onRemove={removeDoc} onView={viewDoc} />
+              ))}
+            </>
           )}
 
           <PanelCard id="ownerAgreements" icon="file-signature" tone="teal" title={t('dash.rentAgreement')}
             sub={selectedListing ? t('dash.agreementForProp', { title: selectedListing.title }) : t('dash.agreementForThis')}
             badge={propAgreements.length ? pill('bg-teal-500/15 text-teal-300', String(propAgreements.length)) : null}
             open={!!openSections.ownerAgreements} onToggle={toggle}>
-            <AgreementList ras={propAgreements} emptyText={t('dash.noAgreementProp')} />
+            <AgreementList ras={propAgreements} ownerView emptyText={t('dash.noAgreementProp')} />
           </PanelCard>
+          {/* The loan checklist is derived from the vault, so it only means anything once the vault is read — hiding
+             it while loading/errored avoids a confident, wrong progress count. */}
 
-          {/* The loan checklist is derived from the vault, so it only means anything once the vault
-              is read — hiding it while loading/errored avoids a confident, wrong progress count. */}
           {ownerStatus === 'ready' && (
             <PanelCard id="checklist" icon="clipboard-list" tone="amber" title={t('dash.loanChecklist')} sub={t('dash.loanChecklistSub')}
               badge={pill(checklist.items.every((i) => i.done) ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300', `${checklist.items.filter((i) => i.done).length}/${checklist.items.length}`)}
@@ -528,21 +525,9 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
                         </div>
                       ) : r.status === 'granted' ? (
                         <span className="inline-flex items-center gap-1 text-xs text-emerald-300 font-medium flex-shrink-0"><Icon name="badge-check" className="w-3.5 h-3.5" /> {t('dash.granted')}</span>
+                        /* Its own arm: the else below reads "Declined",
+                           and this owner granted; the window simply lapsed. */
                       ) : r.status === 'expired' ? (
-                        /* Its own arm, because the `else` below reads "Declined" and this owner did
-                           not decline — they granted, and the 7-day window (`DocumentRequestService
-                           .GRANT_TTL`) has since run out. `DocumentRequestMapper.projectedStatus`
-                           derives `expired` from `expiresAt` against the clock on every read, so it
-                           arrives without any row having changed and the ladder's terminal `else`
-                           silently absorbed it. Telling an owner they refused a buyer they helped
-                           misreports their own past conduct back to them.
-
-                           A label and no button, deliberately. `DocumentRequestStatuses
-                           .canTransition` allows only `pending → granted|declined`, so a "Grant
-                           again" here would 409; the server's design is that the *buyer* asks again
-                           (V20's partial unique index is on pending alone, and DocumentsSection now
-                           re-offers the request once every row has lapsed), which produces a fresh
-                           pending row for this owner to answer. */
                         <span className="inline-flex items-center gap-1 text-xs text-gray-400 font-medium flex-shrink-0"><Icon name="clock" className="w-3.5 h-3.5" /> {t('dash.accessExpired')}</span>
                       ) : (
                         <span className="inline-flex items-center gap-1 text-xs text-gray-400 font-medium flex-shrink-0"><Icon name="x-circle" className="w-3.5 h-3.5" /> {t('dash.declined')}</span>
@@ -553,16 +538,12 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
               )}
             </PanelCard>
           )}
+          {/* There was a "Rent received online" panel here, listing settled rows from `GET /me/rent-ledger`. */}
 
-          {/* There was a "Rent received online" panel here, listing settled rows from
-              `GET /me/rent-ledger`. The rent-pay rail was withdrawn, so the endpoint is gone and
-              there is nothing to list — an empty panel promising "no online rent yet" would read as
-              a feature the owner had simply not used. The owner's rent income is still recorded, in
-              the Finances tab, where they enter it themselves as a recurring ledger row. */}
         </>
       )}
-
       {/* ── Tenancy context: the flat the user rents + its registered agreement ── */}
+
       {context === 'tenancy' && (
         <>
           {selectedTenancy && (
@@ -584,8 +565,8 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
           </PanelCard>
         </>
       )}
-
       {/* ── Personal context: identity + tenant/buyer tools ── */}
+
       {context === 'personal' && (
         <>
           {personalStatus === 'error' ? (

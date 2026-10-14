@@ -8,6 +8,7 @@ import Switch from './ui/Switch.jsx';
 
 const KEY = 'dz_cookie_consent_v1';
 const VERSION = 1;
+export const CONSENT_CHANGE = 'dz:consent-change';
 
 export function getCookieConsent() {
   try {
@@ -17,9 +18,11 @@ export function getCookieConsent() {
   return null;
 }
 
+export const hasAnalyticsConsent = () => Boolean(getCookieConsent()?.analytics);
+
 const CATEGORIES = [
   ['functional', 'Functional', 'Remembers preferences like language, recently viewed properties, and saved searches.'],
-  ['analytics', 'Analytics', 'Aggregated, non-identifying usage stats that help us improve the platform.'],
+  ['analytics', 'Analytics', 'Product analytics (PostHog): usage events and fully masked session replays that help us improve the platform.'],
   ['marketing', 'Marketing', 'Used for retargeting and measuring the effectiveness of our campaigns.'],
 ];
 
@@ -72,6 +75,7 @@ export default function CookieConsent() {
     try {
       localStorage.setItem(KEY, JSON.stringify({ necessary: true, ...value, version: VERSION, ts: Date.now() }));
     } catch { /* ignore */ }
+    window.dispatchEvent(new Event(CONSENT_CHANGE));
     setMode('hidden');
   };
 
@@ -82,13 +86,13 @@ export default function CookieConsent() {
   if (mode === 'hidden') return null;
 
   return (
-    <div className="dz-safe-x fixed inset-x-0 bottom-[var(--dz-bottom-inset)] z-[1400] flex justify-center p-3 sm:p-4 pointer-events-none">
+    <div data-kbd-hide className="dz-safe-x fixed inset-x-0 bottom-[var(--dz-bottom-inset)] z-[1400] flex justify-center p-3 sm:p-4 pointer-events-none">
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="false"
         aria-label="Cookie preferences"
-        className="pointer-events-auto w-full max-w-4xl rounded-2xl border border-white/10 bg-[#15122a]/95 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgba(0,0,0,0.7)] overflow-hidden"
+        className="pointer-events-auto w-full max-w-4xl rounded-2xl border border-white/10 bg-ink-card/95 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgb(var(--dz-c-black)/0.7)] overflow-hidden"
       >
         {mode === 'banner' ? (
           /* ── Sleek landscape bar: message left, actions right ── */

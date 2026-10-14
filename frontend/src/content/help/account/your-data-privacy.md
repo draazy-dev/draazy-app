@@ -4,56 +4,59 @@ slug: your-data-privacy
 category: account
 audience: everyone
 order: 3
-updated: 2026-07-25
+updated: 2026-10-10
 summary: What we collect, who sees it, how long we keep it, and how to get it deleted.
 tags: [privacy, data, dpdp, deletion]
 ---
 
-This is the plain-language version. The binding document is the [Privacy Policy](/privacy).
+This is the plain-language version. The binding document is the Privacy Policy.
 
 ## What we collect
 
-- **Account data** — name, mobile number, optional email
-- **Identity data** — ID verification results for owners and, optionally, tenants
-- **Activity** — searches, saved properties, enquiries, visits, messages
-- **Device data** — approximate location (only if you allow it), device type, and diagnostics
+- **Account data** - name, mobile number, optional email
+- **Identity data** - ID verification results for owners and, optionally, tenants
+- **Activity** - searches, saved properties, enquiries, visits, messages
+- **Device data** - approximate location (only if you allow it), device type, and diagnostics
+- **Analytics** - product usage events and masked session replays, only if you accept analytics cookies
 
 ## Who sees what
 
 | Data | Owner you enquire with | Other users | Draazy staff |
 | --- | --- | --- | --- |
-| Name & mobile | Yes | No | Yes |
-| Tenant profile | Yes | No | Yes |
-| Search history | No | No | Aggregated only |
+| Name & mobile | Name and masked mobile until the contact request is approved | No | Yes |
+| Tenant profile | A **Serious Buyer** badge if you verified your identity; not the profile details | No | Yes |
+| Search history | No | No | Aggregated or support-only |
 | Messages | Only your thread | No | On dispute or report |
 | ID documents | No | No | Verification team only |
 
-We do **not** sell your contact details to brokers or third parties. This is a structural commitment, not a policy preference — the business model does not depend on it.
+We do **not** sell your contact details to brokers or third parties. This is a structural commitment, not a policy preference - the business model does not depend on it.
+
+People you chat with can see when you are online and whether you have read their messages. Turn either off under **Dashboard > Profile > Chat privacy** - if you do, you stop seeing theirs too.
 
 ## How long we keep it
 
-- Active account data: until you delete your account
-- Messages and enquiries: 24 months
-- Invoices and tax records: as required by Indian law (currently 8 years)
-- ID verification results: 5 years after account closure, for fraud prevention
+- Active account data: until erasure is approved or the account is otherwise closed
+- Invoices, rent agreements, rent receipts, closed deals and tax records: retained where law or counterparty rights require it
+- Abuse reports, reviews, listing records and audit logs: retained where needed for trust, safety and legal accountability
+- ID verification images: deleted 7 days after the review decision. We keep only the last 4 digits of the ID number, fingerprints of the documents and the review record, for fraud prevention and accountability. You can also remove your ID data yourself from the **Verify identity** page
 
 ## Your rights
 
 Under India's DPDP Act you can ask us to:
 
-- **Access** a copy of your data — **Dashboard → Settings → Download my data**
+- **Access** a copy of your data - **Dashboard > Profile > Privacy & Account > Download my data**
 - **Correct** anything inaccurate
-- **Delete** your account and associated data
-- **Withdraw consent** for optional processing, such as location
+- **Request erasure** of your account and associated data
+- **Withdraw consent** for optional processing - location, and analytics cookies (reopen **Cookie preferences** in the site footer; the banner offers Accept all, Customize or Reject non-essential)
 
 > [!NOTE]
-> Deletion requests are completed within 30 days. Some records are retained where the law requires it — invoices, for example — but they are removed from your profile immediately.
+> Erasure is a reviewed request, not an instant delete button. Some records are retained where the law, safety duties or another person's rights require it.
 
 ## Contact
 
-Data protection queries go to [privacy@draazy.com](mailto:privacy@draazy.com), or raise a ticket at [Support](/support).
+Data protection queries go to [support@draazy.com](mailto:support@draazy.com), or raise a ticket through support.
 
 ## Related
 
-- [Privacy Policy](/privacy)
-- [Terms of Service](/terms)
+- [Managing your profile](/help/a/manage-profile)
+- [Getting help from support](/help/a/getting-help-from-support)

@@ -2,47 +2,53 @@ package com.draazy.api.catalog.locality;
 
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-/**
- * Spring Data access for {@link Locality}. Reference data \u2014 curated through
- * {@link LocalityAdminService} and through migrations, never by consumer-facing code.
- *
- * <p>Every finder except {@link #findAllByOrderByNameAsc()} is scoped to {@code active = true}: an
- * archived/retired locality must never become the resolution target for a new listing, even though
- * existing rows may still point at it.
- */
+/** Consumer finders return live localities only; archived rows must not receive new listings. */
 public interface LocalityRepository extends JpaRepository<Locality, String> {
 
-    /** Exact slug hit — the fast path when the client already sends a canonical key. */
-    Optional<Locality> findBySlugAndActiveTrue(String slug);
+    Optional<Locality> findByPlaceId(String placeId);
 
-    /** Case-insensitive display-name match (names are not unique, hence a list, not an Optional). */
-    List<Locality> findByNameIgnoreCaseAndActiveTrue(String name);
+    List<Locality> findByNameIgnoreCaseAndArchivedAtIsNull(String name);
 
-    /**
-     * The full active set, for the geo fallback. Deliberately unpaged and loaded whole: this is a
-     * curated reference table of city-level areas (tens of rows, not thousands), and the caller needs
-     * every candidate to compute a nearest-neighbour. Revisit only if it ever grows past a few
-     * hundred rows, at which point this becomes a PostGIS/earthdistance query instead.
-     */
-    List<Locality> findByActiveTrue();
+    Optional<Locality> findBySlugAndArchivedAtIsNull(String slug);
 
-    /**
-     * The public locality list, alphabetical.
-     *
-     * <p>Active only, for the same reason as the finders above, and unpaged for the same reason as
-     * {@link #findByActiveTrue()} — the contract's {@code GET /localities} takes no page parameters
-     * because there are tens of rows, not thousands.
-     */
-    List<Locality> findByActiveTrueOrderByNameAsc();
+    @Query("""
+            select l from Locality l
+            where l.archivedAt is null and lower(l.name) like concat('%', lower(:q), '%')
+            order by case when lower(l.name) like concat(lower(:q), '%') then 0 else 1 end, l.name
+            """)
+    List<Locality> searchLive(@Param("q") String q, Pageable page);
 
-    /**
-     * Every locality, retired ones included, alphabetical — the curation console's list.
-     *
-     * <p>The one finder here that is not scoped to {@code active = true}, and deliberately so: a
-     * console that could not see a retired locality could not un-retire one, and retiring would be
-     * the only irreversible action in the back office.
-     */
-    List<Locality> findAllByOrderByNameAsc();
+    /** Inserts a live row; 0 means the slug or the place is already taken, and nothing was written. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            insert into localities (slug, name, city, lat, lng, place_id, active)
+            values (:slug, :name, :city, :lat, :lng, :placeId, true)
+            on conflict do nothing""", nativeQuery = true)
+    int mint(@Param("slug") String slug, @Param("name") String name, @Param("city") String city,
+            @Param("placeId") String placeId, @Param("lat") double lat, @Param("lng") double lng);
+
+    /** Gives a dormant seed row (inactive, no place) the one just picked; 0 means somebody else got there first. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(value = """
+            update localities
+            set place_id = :placeId, name = :name, lat = :lat, lng = :lng, active = true, archived_at = null
+            where slug = :slug and place_id is null and active = false""", nativeQuery = true)
+    int adopt(@Param("slug") String slug, @Param("placeId") String placeId, @Param("name") String name,
+            @Param("lat") double lat, @Param("lng") double lng);
+
+    /** The directory: live rows, plus non-live ones that still have approved listings bound to them. */
+    @Query("""
+            select l from Locality l
+            where l.archivedAt is null
+               or exists (select 1 from Property p
+                          where p.localitySlug = l.slug and p.status = :status and p.archived = false)
+            order by l.name
+            """)
+    List<Locality> findDirectory(@Param("status") String status);
 }

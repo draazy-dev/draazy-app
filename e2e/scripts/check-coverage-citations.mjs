@@ -1,8 +1,5 @@
-/* Check that every spec path cited in COVERAGE.md actually exists.
- *
- * The matrix is only useful if its citations are real; a stale name reads as
- * coverage that is not there. Worth re-running whenever specs move or are added.
- */
+/* COVERAGE.md is a two-way gate: stale citations overstate coverage, and undocumented specs hide
+   coverage the matrix cannot report. */
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -24,14 +21,16 @@ const dirs = new Set();
 
 const doc = readFileSync('COVERAGE.md', 'utf8');
 
-/* Cited spec paths look like `consumer/home/featured`. Anchor on the real
-   top-level test folders, and reject anything preceded by a slash: without both
-   guards, app routes (`/admin/team`, `/services/rent-agreement`), source paths
-   (`lib/chrome`) and plain prose ("role/flag/team") all read as citations. */
+/* Anchor path citations on real test roots and skip retired rows; otherwise app routes, source
+   paths and intentionally deleted specs become false failures. */
 const ROOTS = new Set(readdirSync(TESTS, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name));
+const RETIRED = /\(retired\b/i;
 const cited = new Set();
-for (const [, name] of doc.matchAll(/(?<![/\w-])([a-z][a-z0-9-]*(?:\/[a-z0-9-]+)+(?:\/?\*+|-\*)?)/g)) {
-  if (ROOTS.has(name.split('/')[0])) cited.add(name);
+for (const line of doc.split('\n')) {
+  if (RETIRED.test(line)) continue;
+  for (const [, name] of line.matchAll(/(?<![/\w-])([a-z][a-z0-9-]*(?:\/[a-z0-9-]+)+(?:\/?\*+|-\*)?)/g)) {
+    if (ROOTS.has(name.split('/')[0])) cited.add(name);
+  }
 }
 
 const missing = [...cited].filter((n) => {
@@ -44,26 +43,12 @@ const missing = [...cited].filter((n) => {
   return !have.has(n) && !dirs.has(n);
 }).sort();
 
-/* Second pass: bare citations, which the scan above cannot see.
- *
- * Many specs are cited without their folder (`live-my-rental`, `maker-checker`, `emi-calculator`),
- * and the path regex requires at least one slash — so a *bare* citation was never validated at
- * all. That is not a theoretical hole: `pay-rent` was deleted in D256 and this script kept
- * reporting "every cited spec path exists", which is the precise failure a citation checker
- * exists to prevent. A gate that answers green on a question it never asked is worse than no
- * gate, because the doc's header promises it did ask.
- *
- * Two things make this pass tolerable rather than noisy. It is scoped to the **spec column** —
- * the last-but-one cell of a status row — because bare names cannot be told from prose anywhere
- * else ("saved", "refer" and "finance" are all ordinary English in this document). And within
- * that cell everything from the first prose marker onward is discarded, since citations lead and
- * commentary follows: `live-listing-entitlements ("taking a listing down frees its slot")` is one
- * citation, not a citation plus four words. A bare name resolves against spec *basenames*, which
- * is what the doc's own convention means by it.
- */
+/* Bare spec names are validated only in the spec column; elsewhere ordinary prose words look like
+   basenames and would drown the gate in false positives. */
 const basenames = new Set([...have].map((h) => h.split('/').pop()));
 const STATUS = /^(✅|🟡|❌|⚠️|⬜)/u;
 const bareMissing = new Set();
+const citedBare = new Set();
 for (const line of doc.split('\n')) {
   if (!line.startsWith('|')) continue;
   const cells = line.split('|').map((c) => c.trim());
@@ -74,12 +59,38 @@ for (const line of doc.split('\n')) {
     const token = part.trim().split(/\s+/)[0];
     if (!/^[a-z][a-z0-9-]*$/.test(token)) continue; // bare only; paths are covered above
     if (token === 'backend') continue; // `backend `OtpService`` cites a JUnit class, not a spec
+    citedBare.add(token);
     if (!basenames.has(token) && !have.has(token) && !dirs.has(token)) bareMissing.add(token);
   }
 }
 
-console.log(`cited: ${cited.size}   on disk: ${have.size}`);
-if (missing.length || bareMissing.size) {
+/* UNDOCUMENTED is a self-emptying worklist: cited or deleted entries fail so the allowlist cannot
+   become permanent. */
+const UNDOCUMENTED = [
+  'consumer/account/listing-freshness',
+  'consumer/localities',
+  'consumer/reels',
+  'consumer/trust-counters',
+  'consumer/property/signin-gates',
+  'consumer/services/interior-lead',
+  'admin-content',
+  'admin-services',
+  'demand-signals',
+  'service-landing-ticket',
+];
+
+const globPrefixes = [...cited].filter((n) => n.endsWith('*')).map((n) => n.replace(/\/?\*+$/, ''));
+const isCited = (spec) =>
+  cited.has(spec)
+  || citedBare.has(spec.split('/').pop())
+  || globPrefixes.some((g) => spec === g || spec.startsWith(g));
+
+const allowed = new Set(UNDOCUMENTED);
+const undocumented = [...have].filter((h) => !isCited(h) && !allowed.has(h)).sort();
+const staleAllowance = UNDOCUMENTED.filter((n) => !have.has(n) || isCited(n)).sort();
+
+console.log(`cited: ${cited.size}   on disk: ${have.size}   undocumented (known): ${UNDOCUMENTED.length}`);
+if (missing.length || bareMissing.size || undocumented.length || staleAllowance.length) {
   if (missing.length) {
     console.error(`\nCITED BUT MISSING (${missing.length}):`);
     missing.forEach((m) => console.error('  ' + m));
@@ -88,7 +99,15 @@ if (missing.length || bareMissing.size) {
     console.error(`\nCITED BUT MISSING — bare names in the spec column (${bareMissing.size}):`);
     [...bareMissing].sort().forEach((m) => console.error('  ' + m));
   }
+  if (undocumented.length) {
+    console.error(`\nON DISK BUT UNDOCUMENTED (${undocumented.length}) — give each a COVERAGE.md row:`);
+    undocumented.forEach((m) => console.error('  ' + m));
+  }
+  if (staleAllowance.length) {
+    console.error(`\nSTALE UNDOCUMENTED ALLOWANCE (${staleAllowance.length}) — now cited or gone; delete from UNDOCUMENTED:`);
+    staleAllowance.forEach((m) => console.error('  ' + m));
+  }
   process.exitCode = 1;
 } else {
-  console.log('every cited spec path exists.');
+  console.log('every cited spec path exists, and every spec is cited.');
 }

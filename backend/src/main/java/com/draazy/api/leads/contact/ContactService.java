@@ -1,56 +1,41 @@
 package com.draazy.api.leads.contact;
 
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ContactPendingLimitException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ContactQuotaExhaustedException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.VerificationRequiredException;
+import com.draazy.api.common.persistence.RateLimitLock;
+import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.trust.ContactAllowanceLookup;
 import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.common.trust.VerifiedTenantLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.security.AuthPrincipal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * The contact gate: the rules that decide whether a signed-in buyer may see a listing owner's phone
- * number, and the owner-side inbox for granting it.
- *
- * <p><strong>Badge-not-gate (ADR-019) — the invariant this class exists to protect.</strong> Asking
- * for contact requires only L1 (a mobile-OTP account). The L2 Aadhaar badge is a trust <em>signal</em>
- * and never a wall, with exactly one exception: an owner may opt into
- * {@code users.verified_contact_only}, and only then does a badge-less caller get
- * {@code 403 verification_required}. No other code path in this slice may 403 on a missing badge.
- *
- * <p><strong>Cross-context reads.</strong> This service reads {@code catalog.property} and
- * {@code identity.user} repositories directly. {@code package-structure.md} §5 asks features not to
- * import each other; {@code leads} is inherently a <em>join</em> context (it relates a listing to a
- * user), so inverting these two reads would cost three interfaces and two adapters for no behavioural
- * change today. Recorded as a deliberate, reviewed exception in the slice-3 plan, alongside the
- * existing {@code security.JwtService → identity.user.User} precedent. The one direction that
- * <em>is</em> inverted is the security-critical one — {@code catalog} reaches this feature only
- * through the {@code common.trust.ContactGate} port.
- */
 @Service
 public class ContactService {
-
-    private static final Logger LOG = LoggerFactory.getLogger(ContactService.class);
 
     private final ContactRequestRepository contactRequests;
     private final PropertyRepository properties;
@@ -59,10 +44,18 @@ public class ContactService {
     private final Notifier notifier;
     private final VerifiedTenantLookup verifiedTenants;
     private final ContactAllowanceLookup allowances;
+    private final RateLimitLock locks;
+    private final ReferralTriggers referralTriggers;
+    private final ContactReplyWindow window;
+    private final ContactReturns returnedContact;
+    private final PlatformSettings settings;
+    private final ContactUsageService usage;
 
     public ContactService(ContactRequestRepository contactRequests, PropertyRepository properties,
             UserRepository users, ContactMapper contactMapper, Notifier notifier,
-            VerifiedTenantLookup verifiedTenants, ContactAllowanceLookup allowances) {
+            VerifiedTenantLookup verifiedTenants, ContactAllowanceLookup allowances, RateLimitLock locks, ReferralTriggers referralTriggers,
+            ContactReplyWindow window, ContactReturns returnedContact, PlatformSettings settings,
+            ContactUsageService usage) {
         this.contactRequests = contactRequests;
         this.properties = properties;
         this.users = users;
@@ -70,53 +63,20 @@ public class ContactService {
         this.notifier = notifier;
         this.verifiedTenants = verifiedTenants;
         this.allowances = allowances;
+        this.locks = locks;
+        this.referralTriggers = referralTriggers;
+        this.window = window;
+        this.returnedContact = returnedContact;
+        this.settings = settings;
+        this.usage = usage;
     }
 
-    /**
-     * Contract {@code contactStatus} — the caller's gate state for one listing, read-only.
-     *
-     * @param viewerId   the authenticated caller (never {@code null}; the route is authenticated)
-     * @param propertyId a listing id or slug
-     * @throws NotFoundException when no such listing exists
-     */
     @Transactional(readOnly = true)
     public ContactStatusResponse status(UUID viewerId, String propertyId) {
         return describe(viewerId, resolve(propertyId));
     }
 
-    /**
-     * Contract {@code requestContact} — open (or re-read) this caller's request against a listing.
-     *
-     * <p>Three outcomes, in the order they are decided:
-     * <ol>
-     *   <li>the caller owns the listing → {@link ContactStatuses#OWNER}, and <em>no row is written</em>
-     *       (asking yourself for your own number is not a lead);</li>
-     *   <li>the owner accepts verified contacts only and the caller has no badge →
-     *       {@code 403 verification_required}, the single legitimate badge 403;</li>
-     *   <li>otherwise the existing request is returned unchanged, or a new {@code pending} one is
-     *       created — and creating one spends an owner contact, which can run out.</li>
-     * </ol>
-     *
-     * <p><strong>Idempotent by design.</strong> Re-requesting returns the current state rather than
-     * inserting a second row, so a double-tap cannot flood an owner's inbox and — more importantly —
-     * cannot reset a {@code declined} request back to {@code pending}, which would turn "no" into a
-     * retry loop. Two genuinely concurrent taps can both miss the read, so the
-     * {@code uq_contact_requests_requester_property} constraint (V9) is the real guarantee and the
-     * loser of the race simply re-reads the winner's row.
-     *
-     * <p><strong>The quota is checked last, and only on the insert branch (D31b).</strong> Order
-     * matters twice over. An owner looking at their own listing never spends a contact, because
-     * outcome 1 returns before the check — a quota that could be exhausted by inspecting your own
-     * property would be absurd. And a caller re-reading a conversation they already opened never
-     * spends one either, because the existing-row probe short-circuits: running out of contacts stops
-     * you approaching a <em>new</em> owner, it does not close the doors you already walked through.
-     * That is also what makes idempotency survive the quota — the same request that succeeded before
-     * still succeeds after the allowance is gone.
-     *
-     * @throws NotFoundException               when no such listing exists
-     * @throws VerificationRequiredException   when the owner opted in and the caller lacks the L2 badge
-     * @throws ContactQuotaExhaustedException  when the caller has no owner contacts left
-     */
+    // Idempotent.
     @Transactional
     public ContactStatusResponse request(UUID viewerId, ContactRequestCreate body) {
         Property property = resolve(body.propertyId());
@@ -125,62 +85,75 @@ public class ContactService {
         if (owner != null && owner.getId().equals(viewerId)) {
             return describe(viewerId, property);
         }
+        if (!property.isPubliclyVisible()) {
+            throw closedListing(property);
+        }
         if (owner != null && owner.isVerifiedContactOnly() && !hasBadge(viewerId)) {
             throw new VerificationRequiredException("This owner only accepts verified contacts");
         }
 
-        if (contactRequests.findByRequesterIdAndPropertyId(viewerId, property.getId()).isEmpty()) {
-            requireContactAllowance(viewerId);
-            try {
-                contactRequests.saveAndFlush(
-                        new ContactRequest(property.getId(), viewerId, body.message()));
-            } catch (DataIntegrityViolationException concurrentDuplicate) {
-                // A parallel tap won the race; its row is the one true request, so this call is
-                // simply a re-read. Nothing to repair, nothing worth telling the user about.
-                LOG.debug("Concurrent contact request for property {}", property.getId());
+        // Serialises one buyer's requests so the allowance count is never read stale and a parallel duplicate
+        // finds the winner's row instead of tripping the unique key, which would abort this transaction.
+        locks.holdUntilCommit(RateLimitLock.Limit.CONTACT_REQUEST, viewerId.toString());
+        Optional<ContactRequest> existing =
+                contactRequests.findByRequesterIdAndPropertyId(viewerId, property.getId());
+        Instant now = Instant.now();
+        if (existing.isEmpty()) {
+            requireRoomForAnotherRequest(viewerId, property.getId(), now);
+            contactRequests.saveAndFlush(new ContactRequest(property.getId(), viewerId, body.message()));
+            announceToOwner(owner, viewerId, property);
+        } else if (window.lapsed(existing.get().getStatus(), existing.get().getCreatedAt(), now)) {
+
+            // A lapsed request does not count, so asking again is a new spend and is checked as one.
+            requireRoomForAnotherRequest(viewerId, property.getId(), now);
+            if (contactRequests.renewIfLapsed(existing.get().getId(), body.message(), now,
+                    window.cutoff(now)) > 0) {
+                announceToOwner(owner, viewerId, property);
             }
         }
 
         return describe(viewerId, property);
     }
 
-    /**
-     * Refuse when the caller has spent every owner contact they are entitled to (D31b).
-     *
-     * <p>Counts rows rather than reading a stored balance, which is what makes the check safe under
-     * concurrency without a lock: the count and the spend are the same fact, and
-     * {@code uq_contact_requests_requester_property} settles a tie by failing the loser's insert. Two
-     * simultaneous requests against two <em>different</em> listings could in principle both pass a
-     * check at the last contact and both insert — one contact over. That is accepted knowingly: the
-     * remedy is a lock on every contact request to stop a user from over-spending by one against
-     * themselves, and the cost is out of all proportion to the harm.
-     *
-     * <p>The message names the two ways out, because a refusal that does not is a dead end. It does
-     * not name the number remaining, since by definition it is zero.
-     */
-    private void requireContactAllowance(UUID viewerId) {
-        OptionalInt allowance = allowances.contactAllowance(viewerId);
-        if (allowance.isEmpty()) {
+    // Name only: the requester's mobile stays behind the gate the owner is being asked to open.
+    private void announceToOwner(User owner, UUID requesterId, Property property) {
+        if (owner == null) {
             return;
         }
-        if (contactRequests.countByRequesterId(viewerId) >= allowance.getAsInt()) {
+        String name = users.findById(requesterId).map(User::getName)
+                .filter(n -> !n.isBlank()).orElse("Someone");
+        notifier.notify(owner.getId(), "contact.received",
+                "New contact request",
+                name + " wants to contact you about " + property.getTitle() + ". Approve or decline it.",
+                "/dashboard#leads");
+    }
+
+    // A visit reaches the owner just as a contact request does, so it spends from the same allowance.
+    @Transactional
+    public void requireRoomForVisit(UUID viewerId, UUID propertyId) {
+        locks.holdUntilCommit(RateLimitLock.Limit.CONTACT_REQUEST, viewerId.toString());
+        requireRoomForAnotherRequest(viewerId, propertyId, Instant.now());
+    }
+
+    // A listing already reached by a request or a visit costs nothing more.
+    private void requireRoomForAnotherRequest(UUID viewerId, UUID propertyId, Instant now) {
+        ContactUsageService.Uses uses = usage.uses(viewerId, window.cutoff(now));
+        if (uses.spentAt().containsKey(propertyId)) {
+            return;
+        }
+        int open = uses.awaitingReply().size();
+        if (open >= settings.contactPendingMax()) {
+            throw new ContactPendingLimitException("You already have " + open + " requests waiting for an owner's reply."
+                    + " Wait for a reply or for a request to lapse, or cancel a visit you no longer need.");
+        }
+        OptionalInt remaining = allowances.contactsRemaining(viewerId);
+        if (remaining.isPresent() && remaining.getAsInt() <= 0) {
             throw new ContactQuotaExhaustedException(
-                    "You have used all " + allowance.getAsInt() + " of your owner contacts. "
-                            + "Subscribe for unlimited contacts, or refer a friend to earn more.");
+                    "You have used all your owner contacts. "
+                            + "Buy a contact pack, or refer a friend to earn more.");
         }
     }
 
-    /**
-     * Contract {@code myContactRequests} — every request against listings the caller owns, newest
-     * first.
-     *
-     * <p>Strictly owner-scoped: the id set comes from {@code properties.owner_id}, so a caller can
-     * never see a request against someone else's listing, and an owner with no listings gets an empty
-     * array without a second query.
-     *
-     * <p>N+1-safe: one query for the owner's listing ids, one for the requests, one for all the
-     * requesters — regardless of inbox size.
-     */
     @Transactional(readOnly = true)
     public Page<ContactRequestResponse> myRequests(UUID ownerId, Pageable pageable) {
         List<UUID> ownedPropertyIds = properties.findIdsByOwnerId(ownerId);
@@ -195,86 +168,75 @@ public class ContactService {
                 .stream()
                 .collect(Collectors.toMap(User::getId, Function.identity()));
 
-        // One extra query for the whole page, not one per row — same batching discipline as the
-        // requester fetch above. The badge has to be carried on the party because the mobile the
-        // owner receives is masked, so the client holds the key to this answer but not one that
-        // works (D114/D185).
+        // One extra query for the whole page, not one per row. The badge rides on the party because
+        // the mobile the owner receives is masked, so the client cannot derive this answer itself.
         Set<UUID> verifiedIds = verifiedTenants.verifiedAmong(requesters.keySet());
 
-        return rows.map(row -> contactMapper.toResponse(row, requesters.get(row.getRequesterId()),
-                visibilityOf(row.getStatus()), verifiedIds));
+        Instant now = Instant.now();
+        return rows.map(row -> withDerivedStatus(contactMapper.toResponse(
+                row, requesters.get(row.getRequesterId()), visibilityOf(row.getStatus()),
+                verifiedIds), row, now));
     }
 
-    /**
-     * Contract {@code myPendingContactCount} — how many requests are waiting on this owner.
-     *
-     * <p><strong>Why this is an endpoint and not a client-side filter.</strong> It used to be one:
-     * the owner's dashboard fetched the whole inbox and counted the pending rows. That is only
-     * correct while the inbox is unpaged, and paging it (D78) would have quietly turned the badge
-     * into "pending requests on page one" — a number that is wrong in exactly the situation the
-     * badge exists for, an owner with a lot of leads. Counted in the database, it is right at any
-     * inbox size and costs one integer instead of an inbox.
-     *
-     * <p>Owner-scoped by the same property-id set as the inbox itself; an owner with no listings
-     * gets {@code 0} without a second query.
-     */
-    @Transactional(readOnly = true)
-    public long myPendingCount(UUID ownerId) {
-        List<UUID> ownedPropertyIds = properties.findIdsByOwnerId(ownerId);
-        if (ownedPropertyIds.isEmpty()) {
-            return 0L;
-        }
-        return contactRequests.countByPropertyIdInAndStatus(
-                ownedPropertyIds, ContactRequestStatuses.PENDING);
-    }
-
-    /**
-     * Contract {@code respondContactRequest} — the owner approves or declines one request.
-     *
-     * <p><strong>Owner-scoping is enforced by lookup, not by a check after the fact:</strong> the row
-     * is only accepted once {@code properties.findByIdAndOwner_Id} confirms the caller owns the
-     * listing it points at. A request belonging to another owner is a {@code 404}, never a
-     * {@code 403} — we do not confirm that someone else's lead exists.
-     *
-     * @throws NotFoundException when the id is unknown, malformed, or belongs to a foreign listing
-     * @throws ConflictException when the request has already been answered (both end states are
-     *                           terminal, so an owner cannot revoke a reveal the buyer has already
-     *                           seen, and the trail cannot be rewritten)
-     */
     @Transactional
-    public void respond(UUID ownerId, String reqId, StatusUpdate body) {
+    public void respond(AuthPrincipal owner, String reqId, StatusUpdate body) {
         ContactRequest row = Ids.parseUuid(reqId)
                 .flatMap(contactRequests::findById)
-                .filter(r -> properties.findByIdAndOwner_Id(r.getPropertyId(), ownerId).isPresent())
+                .filter(r -> properties.findByIdAndOwner_Id(
+                        r.getPropertyId(), owner.userId()).isPresent())
                 .orElseThrow(() -> NotFoundException.of("Contact request"));
 
+        String before = row.getStatus();
+        if (window.lapsed(before, row.getCreatedAt(), Instant.now())) {
+            throw new ConflictException("This contact request has expired");
+        }
+        if (ContactRequestStatuses.APPROVED.equals(body.status()) && !listingIsLive(row.getPropertyId())) {
+            throw new ConflictException(ErrorCodes.LISTING_NOT_LIVE, "This listing is not live, so its contact cannot be shared");
+        }
+        if (body.status().equals(before)) {
+            return;
+        }
         if (!ContactRequestStatuses.canTransition(row.getStatus(), body.status())) {
             throw new ConflictException("This contact request has already been answered");
         }
-        row.setStatus(body.status());
-        contactRequests.save(row);
+        if (contactRequests.updateStatusIfCurrent(
+                row.getId(), ContactRequestStatuses.PENDING, body.status()) == 0) {
+            ContactRequest current = contactRequests.findById(row.getId())
+                    .orElseThrow(() -> NotFoundException.of("Contact request"));
+            if (body.status().equals(current.getStatus())) {
+                return;
+            }
+            throw new ConflictException("This contact request has already been answered");
+        }
 
-        // Tell the buyer the moment the owner grants contact — the positive outcome they are
-        // waiting on, and until now (tech-debt D92) one nothing announced. A decline is left
-        // silent on purpose: it is a terminal "no", not news the buyer needs pushed at them. The
-        // notify runs inside this transaction, so a rollback takes it with the approval it reports.
         if (ContactRequestStatuses.APPROVED.equals(body.status())) {
             notifier.notify(
                     row.getRequesterId(),
                     "contact.approved",
                     "Your contact request was approved",
-                    "You can now message the owner \u2014 open the listing to start the conversation.",
+                    "You can now message the owner and see their number unless they keep it hidden \u2014 open the listing.",
                     "/property/" + row.getPropertyId());
+            referralTriggers.contactAccepted(
+                    row.getRequesterId(), owner.userId(), row.getPropertyId(), Instant.now());
+        } else {
+            returnedContact.notifySeeker(row, "declined");
         }
     }
 
-    /**
-     * Build the {@code ContactStatus} shape for one viewer/listing pair — the one place the five-value
-     * vocabulary is assembled, so {@code contactStatus} and {@code requestContact} can never disagree.
-     *
-     * <p>{@code verificationRequired} is false for the owner of the listing: an owner is never blocked
-     * from their own contact, whatever their own preference says.
-     */
+    // A listing a visitor can still open (paused, rented, sold) is closed; anything else is not visible to the caller.
+    private static RuntimeException closedListing(Property property) {
+        boolean reachable = !property.isArchived() && !property.isOwnerSuspended()
+                && PropertyStatus.DIRECTLY_REACHABLE.contains(property.getStatus());
+        return reachable
+                ? new ConflictException(ErrorCodes.LISTING_NOT_LIVE, "This listing is not live right now")
+                : NotFoundException.of("Property");
+    }
+
+    private boolean listingIsLive(UUID propertyId) {
+        return properties.findById(propertyId).map(Property::isPubliclyVisible).orElse(false);
+    }
+
+    // An owner is never blocked from their own contact by their own opt-in.
     private ContactStatusResponse describe(UUID viewerId, Property property) {
         User owner = property.getOwner();
         boolean verifiedContactOnly = owner != null && owner.isVerifiedContactOnly();
@@ -283,39 +245,34 @@ public class ContactService {
             return new ContactStatusResponse(ContactStatuses.OWNER, verifiedContactOnly, false, false);
         }
         String status = contactRequests.findByRequesterIdAndPropertyId(viewerId, property.getId())
-                .map(ContactRequest::getStatus)
+                .map(row -> window.lapsed(row.getStatus(), row.getCreatedAt(), Instant.now())
+                        ? ContactStatuses.EXPIRED : row.getStatus())
                 .orElse(ContactStatuses.NONE);
-        // D5 (global policy): the owner's raw number is never revealed to another viewer, whatever
-        // their own hide-number preference — approval unlocks the in-app conversation, not the
-        // digits. The signal is therefore constant-true for every non-owner viewer, which routes the
-        // client to the message affordance instead of a tel:/wa.me link.
         return new ContactStatusResponse(
                 status, verifiedContactOnly, verifiedContactOnly && !hasBadge(viewerId),
-                true);
+                owner != null && owner.isHideNumber());
     }
 
-    /**
-     * Does this caller hold the L2 badge?
-     *
-     * <p>Read live from {@code users.aadhaar_verified} rather than from the JWT's
-     * {@code aadhaarVerified} claim: a user who earns the badge mid-session still holds a token minted
-     * before it, and a stale claim here would 403 someone who is in fact verified — the worst possible
-     * failure mode for a rule that is supposed to be an opt-in courtesy.
-     */
+    // Read verification live so old tokens do not block newly verified users.
     private boolean hasBadge(UUID userId) {
-        return users.findById(userId).map(User::isAadhaarVerified).orElse(false);
+        return users.findById(userId).map(User::isVerified).orElse(false);
     }
 
-    /** One reveal rule, shared with {@link ContactStatuses#revealsContact}, expressed for the mapper. */
     private ContactVisibility visibilityOf(String status) {
         return ContactStatuses.revealsContact(status)
                 ? ContactVisibility.REVEALED : ContactVisibility.MASKED;
     }
 
-    /**
-     * Resolve the contract's {@code propertyId} token, which may be a UUID or a slug — the same
-     * either/or the property-detail endpoint accepts, so the client can pass whatever it holds.
-     */
+    private ContactRequestResponse withDerivedStatus(
+            ContactRequestResponse response, ContactRequest row, Instant now) {
+        if (!window.lapsed(row.getStatus(), row.getCreatedAt(), now)) {
+            return response;
+        }
+        return new ContactRequestResponse(response.id(), response.propertyId(), response.requester(),
+                ContactRequestStatuses.EXPIRED, response.contact(), response.createdAt());
+    }
+
+    // Accept UUID or slug here because the property-detail contract accepts both.
     private Property resolve(String idOrSlug) {
         return Ids.parseUuid(idOrSlug)
                 .flatMap(properties::findById)

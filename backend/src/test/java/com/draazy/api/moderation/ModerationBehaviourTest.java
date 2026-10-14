@@ -24,14 +24,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * Behaviour proof for the moderation slice: what the guards let through must also be
- * <em>accountable</em>, <em>self-limiting</em> and <em>bounded</em>.
- *
- * <p>The three properties tested here are the ones a role guard alone does not give you. A guard
- * says who may act; it says nothing about whether the action was recorded, whether the actor was
- * allowed to act on <em>that particular row</em>, or whether one request can drain the database.
- */
 @DisplayName("Moderation — accountability, self-dealing and blast radius")
 class ModerationBehaviourTest extends AbstractApiTest {
 
@@ -40,14 +32,7 @@ class ModerationBehaviourTest extends AbstractApiTest {
     @Autowired
     PropertyRepository properties;
 
-    /**
-     * Audit writes run in {@code REQUIRES_NEW} — deliberately, so an attempted privileged action is
-     * recorded even when the surrounding business transaction rolls back. The consequence for tests
-     * is easy to miss and would have made this class quietly order-dependent: the rows <em>escape
-     * the test's own rollback</em> and persist in the database afterwards. So every assertion below
-     * is scoped to a specific entity id rather than to an action name, and the rows are cleaned up
-     * explicitly here.
-     */
+    // Audit writes use `REQUIRES_NEW`, so they escape this test's rollback too.
     private final List<String> createdActors = new ArrayList<>();
 
     @AfterEach
@@ -61,6 +46,14 @@ class ModerationBehaviourTest extends AbstractApiTest {
         u.setName(name);
         u.setMobileVerified(true);
         User saved = users.saveAndFlush(u);
+        if ("staff".equals(role)) {
+            jdbc.update("""
+                    INSERT INTO back_office_permissions (user_id, permissions)
+                    VALUES (?::uuid, ?::jsonb)
+                    ON CONFLICT (user_id) DO UPDATE SET permissions = EXCLUDED.permissions
+                    """, saved.getId().toString(),
+                    "[\"kyc\",\"propertyVerification\",\"listingModeration\",\"support\",\"content\",\"reports\",\"desk:rental\"]");
+        }
         createdActors.add(saved.getId().toString());
         return saved;
     }
@@ -71,11 +64,9 @@ class ModerationBehaviourTest extends AbstractApiTest {
         p.setPriceUnit("per-month");
         p.setArea(new BigDecimal("950"));
         p.setStatus(PropertyStatus.PENDING);
-        // Filed under a curated area, as a listing whose free text resolved would be. Saving through
-        // the repository skips LocalityResolver, so without this every fixture here is an *unfiled*
-        // listing — and approval now refuses those (register item 24). Approving one is not what any
-        // test in this class is about, and a fixture that trips a guard it never mentions is a
-        // fixture that will be "fixed" by weakening the guard.
+
+        // Filed, because approval refuses an unfiled listing — a fixture tripping a guard it never mentions
+        // gets "fixed" by weakening it.
         p.setLocalitySlug("baner");
         return properties.saveAndFlush(p);
     }
@@ -87,20 +78,37 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 action, String.valueOf(entityId));
     }
 
-    // ---------------------------------------------------------------- accountability
+    private void tickChecklist(Property listing, User staff) throws Exception {
+        String opened = mvc.perform(post("/properties/{id}/verification/start", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<String> items = com.jayway.jsonpath.JsonPath.read(opened, "$.checklist[*].item");
+        for (String item : items) {
+            mvc.perform(patch("/properties/{id}/verification/checklist", listing.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"item\":\"" + item + "\",\"pass\":true}"))
+                    .andExpect(status().isOk());
+        }
+    }
 
-    /**
-     * {@code AuditService} shipped in slice 1 and had <strong>zero callers</strong> until this slice,
-     * so {@code GET /admin/audit-log} would have returned an empty page forever. The endpoint existing
-     * is not the feature; the writes are. This asserts the write happens and that the actor recorded
-     * is the token's subject rather than anything the client sent.
-     */
+    private void hardBrokerSignal(Property listing, User reporter) {
+        jdbc.update("""
+                insert into reports (target_type, target_id, reporter_id, reason, details, status)
+                values ('user', ?, ?, 'brokerage', 'broker', 'open'),
+                       ('user', ?, ?, 'brokerage', 'broker', 'actioned')
+                """, listing.getOwner().getId().toString(), reporter.getId(),
+                listing.getOwner().getId().toString(), reporter.getId());
+    }
+
     @Test
     @DisplayName("approving a listing writes an audit row naming the server-resolved actor")
     void moderationIsAudited() throws Exception {
         User owner = user("9800000101", "owner", "Owner");
         User staff = user("9800000102", "staff", "Ops");
         Property listing = listing(owner);
+        tickChecklist(listing, staff);
 
         mvc.perform(patch("/properties/{id}/status", listing.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
@@ -113,11 +121,33 @@ class ModerationBehaviourTest extends AbstractApiTest {
         assertThat(rows.get(0).get("actor")).isEqualTo(staff.getId().toString());
         assertThat(rows.get(0).get("actor_role")).isEqualTo("staff");
         assertThat(rows.get(0).get("entity_id")).isEqualTo(listing.getId().toString());
-        // Read the document back through Postgres' own jsonb accessors rather than by substring:
-        // jsonb is stored normalised, so a text comparison would be asserting on formatting.
+
         assertThat(metadataField(rows.get(0), "from")).isEqualTo("pending");
         assertThat(metadataField(rows.get(0), "to")).isEqualTo("approved");
         assertThat(metadataField(rows.get(0), "reason")).isEqualTo("docs verified");
+    }
+
+    @Test
+    @DisplayName("approving a second listing over the free tier parks it paused, and the first stays live")
+    void approvalOverTheFreeTierPausesTheListing() throws Exception {
+        User owner = user("9800000103", "owner", "Owner");
+        User staff = user("9800000104", "staff", "Ops");
+        Property live = listing(owner);
+        live.setStatus(PropertyStatus.APPROVED);
+        properties.saveAndFlush(live);
+        Property second = listing(owner);
+        tickChecklist(second, staff);
+
+        mvc.perform(patch("/properties/{id}/status", second.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"docs verified\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(properties.findById(second.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.PAUSED);
+        assertThat(properties.findById(live.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.APPROVED);
     }
 
     private String metadataField(Map<String, Object> auditRow, String key) {
@@ -125,13 +155,274 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 String.class, key, auditRow.get("id"));
     }
 
-    /**
-     * Approving or rejecting a listing tells its owner (tech-debt D92) — until this writer nothing
-     * did, so an owner learned their listing's fate only by revisiting the dashboard. Both terminal
-     * verdicts are announced and the rejection reason travels with it; the moderator is told nothing
-     * about their own decision. Notifications share the business transaction, so unlike the audit
-     * rows above they roll back with the test and need no cleanup.
-     */
+    // The checklist stays unticked on purpose — that is the whole difference between the two.
+    @Test
+    @DisplayName("a queue approval is refused until the checklist is complete")
+    void queueApprovalRequiresChecklist() throws Exception {
+        User owner = user("9800000141", "owner", "Owner");
+        User staff = user("9800000142", "staff", "Ops");
+        Property listing = listing(owner);
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"looks fine as submitted\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("checklist_incomplete"));
+    }
+
+    @Test
+    @DisplayName("queue approval with a hard broker signal requires a second approver")
+    void queueApprovalWithHardSignalRequiresOverride() throws Exception {
+        User owner = user("9800000167", "owner", "Owner");
+        User staff = user("9800000168", "staff", "Ops");
+        User reporter = user("9800000169", "buyer", "Reporter");
+        Property listing = listing(owner);
+        tickChecklist(listing, staff);
+        hardBrokerSignal(listing, reporter);
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"docs verified\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("second_approver_required"));
+    }
+
+    @Test
+    @DisplayName("queue approval cannot reverse a final rejection")
+    void queueApprovalCannotReverseFinalReject() throws Exception {
+        User owner = user("9800000170", "owner", "Owner");
+        User staff = user("9800000171", "staff", "Ops");
+        Property listing = listing(owner);
+        listing.setStatus(PropertyStatus.REJECTED);
+        properties.saveAndFlush(listing);
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"appeal accepted\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("second_approver_required"));
+    }
+
+    @Test
+    @DisplayName("a rejected listing cannot be flagged or clear-flag reopened")
+    void rejectedListingCannotBeFlagReopened() throws Exception {
+        User owner = user("9800000172", "owner", "Owner");
+        User staff = user("9800000173", "staff", "Ops");
+        Property listing = listing(owner);
+        listing.setStatus(PropertyStatus.REJECTED);
+        properties.saveAndFlush(listing);
+
+        mvc.perform(post("/properties/{id}/flag", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"complaint\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("second_approver_required"));
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/properties/{id}/flag", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isConflict());
+
+        assertThat(properties.findById(listing.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("queue rejection requires a reason code")
+    void queueRejectionRequiresReasonCode() throws Exception {
+        User owner = user("9800000153", "owner", "Owner");
+        User staff = user("9800000154", "staff", "Ops");
+        Property listing = listing(owner);
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"rejected\",\"reason\":\"bad\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("reason_code_required"));
+    }
+
+    @Test
+    @DisplayName("status patch rejects needs-info and flagged as explicit workflows")
+    void statusPatchRejectsWorkflowOnlyStatuses() throws Exception {
+        User owner = user("9800000180", "owner", "Owner");
+        User staff = user("9800000181", "staff", "Ops");
+        Property listing = listing(owner);
+
+        for (String statusValue : List.of("needs_info", "flagged")) {
+            mvc.perform(patch("/properties/{id}/status", listing.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"status\":\"" + statusValue + "\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.error").value("invalid_status"));
+        }
+    }
+
+    // Bulk approve must not create an all-false checklist for every row.
+    @Test
+    @DisplayName("bulk-style approvals gate each row independently")
+    void bulkStyleApprovalGatesEachRow() throws Exception {
+        User owner = user("9800000143", "owner", "Owner");
+        User staff = user("9800000144", "staff", "Ops");
+        Property ready = listing(owner);
+        Property blocked = listing(owner);
+        tickChecklist(ready, staff);
+
+        mvc.perform(patch("/properties/{id}/status", ready.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/properties/{id}/status", blocked.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("checklist_incomplete"));
+
+        assertThat(jdbc.queryForObject("select status from properties where id = ?",
+                String.class, ready.getId())).isEqualTo(PropertyStatus.APPROVED);
+        assertThat(jdbc.queryForObject("select status from properties where id = ?",
+                String.class, blocked.getId())).isEqualTo(PropertyStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("relisting a rented home needs a fresh checklist")
+    void relistNeedsFreshChecklist() throws Exception {
+        User owner = user("9800000155", "owner", "Owner");
+        User staff = user("9800000156", "staff", "Ops");
+        Property listing = listing(owner);
+        tickChecklist(listing, staff);
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\"}"))
+                .andExpect(status().isOk());
+        properties.findById(listing.getId()).orElseThrow().setStatus(PropertyStatus.RENTED);
+        properties.flush();
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("checklist_incomplete"));
+    }
+
+    @Test
+    @DisplayName("re-approving an edited listing does not overwrite the reviewer who did the work")
+    void reApprovalLeavesARealVerdictAlone() throws Exception {
+        User owner = user("9800000145", "owner", "Owner");
+        User desk = user("9800000146", "staff", "Desk");
+        User other = user("9800000147", "staff", "Other");
+        Property listing = listing(owner);
+
+        mvc.perform(post("/properties/{id}/verification/start", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
+                .andExpect(status().isOk());
+
+        tickChecklist(listing, desk);
+        mvc.perform(post("/properties/{id}/verification/decision", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"approve\",\"note\":\"deed and tax receipt seen\"}"))
+                .andExpect(status().isOk());
+
+        Property approved = properties.findById(listing.getId()).orElseThrow();
+        approved.requestRecheck(List.of("price"));
+        properties.saveAndFlush(approved);
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(other))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"Owner edits reviewed\"}"))
+                .andExpect(status().isOk());
+
+        Map<String, Object> review = jdbc.queryForMap(
+                "select * from property_reviews where property_id = ?", listing.getId());
+        assertThat(review.get("reviewer")).isEqualTo(desk.getId().toString());
+        assertThat(review.get("notes")).isEqualTo("deed and tax receipt seen");
+        assertThat(properties.findById(listing.getId()).orElseThrow().isRecheckPending()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a hard signal first raised after approval escalates the stays-live re-check")
+    void recheckPassEscalatesASignalRaisedAfterApproval() throws Exception {
+        User owner = user("9800000181", "owner", "Owner");
+        User desk = user("9800000182", "staff", "Desk");
+        User other = user("9800000183", "staff", "Other");
+        User reporter = user("9800000184", "buyer", "Reporter");
+        Property listing = approvedWithPendingRecheck(owner, desk);
+        hardBrokerSignal(listing, reporter);
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(other))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"Owner edits reviewed\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("second_approver_required"));
+
+        assertThat(properties.findById(listing.getId()).orElseThrow().isRecheckPending()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a re-check passes over a signal a second approver already cleared at approval")
+    void recheckPassKeepsAnOverriddenApproval() throws Exception {
+        User owner = user("9800000185", "owner", "Owner");
+        User desk = user("9800000186", "staff", "Desk");
+        User peer = user("9800000187", "staff", "Peer");
+        User reporter = user("9800000188", "buyer", "Reporter");
+        Property listing = listing(owner);
+        mvc.perform(post("/properties/{id}/verification/start", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
+                .andExpect(status().isOk());
+        tickChecklist(listing, desk);
+        hardBrokerSignal(listing, reporter);
+        String requested = mvc.perform(post("/properties/{id}/verification/override-requests", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Hard broker signal reviewed\"}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String requestId = com.jayway.jsonpath.JsonPath.read(requested, "$.overrideRequest.id");
+        mvc.perform(post("/properties/{id}/verification/override-requests/{rid}/approve", listing.getId(), requestId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(peer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"second approval\"}"))
+                .andExpect(status().isOk());
+        Property approved = properties.findById(listing.getId()).orElseThrow();
+        approved.requestRecheck(List.of("price"));
+        properties.saveAndFlush(approved);
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"Owner edits reviewed\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(properties.findById(listing.getId()).orElseThrow().isRecheckPending()).isFalse();
+    }
+
+    private Property approvedWithPendingRecheck(User owner, User desk) throws Exception {
+        Property listing = listing(owner);
+        mvc.perform(post("/properties/{id}/verification/start", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
+                .andExpect(status().isOk());
+        tickChecklist(listing, desk);
+        mvc.perform(post("/properties/{id}/verification/decision", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"approve\",\"note\":\"deed and tax receipt seen\"}"))
+                .andExpect(status().isOk());
+        Property approved = properties.findById(listing.getId()).orElseThrow();
+        approved.requestRecheck(List.of("price"));
+        return properties.saveAndFlush(approved);
+    }
+
     @Test
     @DisplayName("a moderation verdict notifies the listing's owner, approve and reject")
     void moderationNotifiesTheOwner() throws Exception {
@@ -139,6 +430,7 @@ class ModerationBehaviourTest extends AbstractApiTest {
         User staff = user("9800000132", "staff", "Ops");
         Property approved = listing(owner);
         Property rejected = listing(owner);
+        tickChecklist(approved, staff);
 
         mvc.perform(patch("/properties/{id}/status", approved.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
@@ -148,7 +440,8 @@ class ModerationBehaviourTest extends AbstractApiTest {
         mvc.perform(patch("/properties/{id}/status", rejected.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"rejected\",\"reason\":\"blurry photos\"}"))
+                        .content("{\"status\":\"rejected\",\"reasonCode\":\"photos_not_real\","
+                                + "\"reason\":\"blurry photos\"}"))
                 .andExpect(status().isOk());
 
         List<Map<String, Object>> notes = notificationsFor(owner);
@@ -164,12 +457,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 "select type, title, body from notifications where user_id = ?", user.getId());
     }
 
-    /**
-     * A moderator's note is operator-supplied free text landing in a jsonb column. Hand-built JSON
-     * was the obvious shortcut here and would have let a quote in a note forge fields inside the one
-     * table that exists to be trusted — so this asserts the note survives a quote intact and that the
-     * surrounding document is still parseable with its other keys unharmed.
-     */
     @Test
     @DisplayName("a quote in a moderator's note cannot corrupt or forge the audit metadata")
     void auditMetadataIsInjectionProof() throws Exception {
@@ -180,12 +467,12 @@ class ModerationBehaviourTest extends AbstractApiTest {
         mvc.perform(patch("/properties/{id}/status", listing.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"rejected\",\"reason\":\"said \\\"fake\\\", to\\\":\\\"approved\"}"))
+                        .content("{\"status\":\"rejected\",\"reasonCode\":\"other\","
+                                + "\"reason\":\"said \\\"fake\\\", to\\\":\\\"approved\"}"))
                 .andExpect(status().isOk());
 
         Map<String, Object> row = auditRows("property.status", listing.getId()).get(0);
-        // Read back through Postgres' own jsonb parser: if the document were corrupt the insert
-        // would have failed, and if the note had escaped its string the ->> would return the forgery.
+
         String to = jdbc.queryForObject("select metadata->>'to' from audit_log where id = ?",
                 String.class, row.get("id"));
         assertThat(to).isEqualTo("rejected");
@@ -194,13 +481,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
         assertThat(reason).contains("said \"fake\"");
     }
 
-    // ---------------------------------------------------------------- self-dealing
-
-    /**
-     * Roles are additive: a staff member is also a user who can list a flat. Without an explicit
-     * check, the cheapest abuse of the role is to approve and feature your own listing — and the
-     * audit row it produces looks entirely ordinary, so nothing downstream would catch it.
-     */
     @Test
     @DisplayName("staff cannot moderate their own listing")
     void staffCannotModerateOwnListing() throws Exception {
@@ -213,18 +493,26 @@ class ModerationBehaviourTest extends AbstractApiTest {
                         .content("{\"status\":\"approved\"}"))
                 .andExpect(status().isForbidden());
 
-        mvc.perform(post("/properties/{id}/toggle-featured", own.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
-                .andExpect(status().isForbidden());
-
         assertThat(auditRows("property.status", own.getId())).isEmpty();
     }
 
-    /**
-     * The one moderation action that can destroy the ability to undo itself: only admins can restore
-     * a user, so an admin archiving itself on a single-admin platform locks the back office
-     * permanently, with no in-product recovery.
-     */
+    // A self-archiving sole admin would lock the back office permanently.
+    @Test
+    @DisplayName("staff cannot flag a listing they posted for the owner")
+    void staffCannotFlagListingTheyPostedOnBehalf() throws Exception {
+        User owner = user("9800000151", "owner", "Owner");
+        User staff = user("9800000152", "staff", "Ops");
+        Property listing = listing(owner);
+        listing.markPostedOnBehalf(staff.getId().toString());
+        properties.saveAndFlush(listing);
+
+        mvc.perform(post("/properties/{id}/flag", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"broker\"}"))
+                .andExpect(status().isForbidden());
+    }
+
     @Test
     @DisplayName("an admin cannot archive their own account")
     void adminCannotArchiveSelf() throws Exception {
@@ -239,46 +527,43 @@ class ModerationBehaviourTest extends AbstractApiTest {
         assertThat(users.findById(admin.getId()).orElseThrow().isArchived()).isFalse();
     }
 
-    // ---------------------------------------------------------------- PII blast radius
-
-    /**
-     * The list/detail asymmetry (D9.2). Ops genuinely need a phone number to act on a case, so
-     * refusing it entirely would push the work off-platform — but a paged list hands over a page of
-     * numbers per click, which is a bulk-export surface wearing the clothes of a search screen.
-     * Requiring one deliberate, individually-logged read per person makes exfiltration cost linear in
-     * the number of people exfiltrated and leaves a trail naming each one.
-     */
     @Test
-    @DisplayName("the user list masks mobiles; the detail read reveals and is audited")
-    void mobileIsMaskedOnListAndAuditedOnReveal() throws Exception {
+    @DisplayName("the user list shows masked mobiles and no contact or privacy fields")
+    void userListMasksMobileAndDropsPrivateFields() throws Exception {
         User staff = user("9800000107", "staff", "Ops");
-        User subject = user("9800000108", "buyer", "Subject");
+        user("9800000108", "buyer", "Subject");
 
         mvc.perform(get("/users").param("q", "Subject")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].mobile").value(org.hamcrest.Matchers.not("9800000108")));
-
-        assertThat(auditRows("user.contact.reveal", subject.getId())).isEmpty();
-
-        mvc.perform(get("/users/{id}", subject.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mobile").value("9800000108"));
-
-        List<Map<String, Object>> rows = auditRows("user.contact.reveal", subject.getId());
-        assertThat(rows).hasSize(1);
-        assertThat(rows.get(0).get("actor")).isEqualTo(staff.getId().toString());
-        assertThat(rows.get(0).get("entity_id")).isEqualTo(subject.getId().toString());
+                .andExpect(jsonPath("$.content[0].mobile").value("98XXXXX108"))
+                .andExpect(jsonPath("$.content[0].email").doesNotExist())
+                .andExpect(jsonPath("$.content[0].hideNumber").doesNotExist())
+                .andExpect(jsonPath("$.content[0].permissions").doesNotExist())
+                .andExpect(jsonPath("$.content[0].mobileVerified").doesNotExist());
     }
 
-    // ---------------------------------------------------------------- blast radius
+    @Test
+    @DisplayName("customers=true lists owners and buyers only")
+    void customersFilterExcludesBackOffice() throws Exception {
+        User staff = user("9800000193", "staff", "Custfilter Staff");
+        user("9800000194", "owner", "Custfilter Owner");
+        user("9800000195", "buyer", "Custfilter Buyer");
 
-    /**
-     * Both back-office lists are new growth surfaces — every signed-in user can add to the report
-     * queue and only ops can take anything out of it. An uncapped {@code size} on either is a
-     * one-request database dump; an unhandled {@code sort} on a server-ordered query is a 500.
-     */
+        mvc.perform(get("/users").param("q", "Custfilter").param("customers", "true")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(2))
+                .andExpect(jsonPath("$.content[*].role", org.hamcrest.Matchers.everyItem(
+                        org.hamcrest.Matchers.oneOf("owner", "buyer"))));
+
+        mvc.perform(get("/users").param("q", "Custfilter")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(3));
+    }
+
+    // Every signed-in user can add to the report queue and only ops can take anything out.
     @Test
     @DisplayName("back-office lists cap page size and ignore a client sort")
     void listsAreBounded() throws Exception {
@@ -295,21 +580,14 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.size").value(org.hamcrest.Matchers.lessThanOrEqualTo(100)));
     }
 
-    /**
-     * The user search is anchored on purpose: there is no {@code pg_trgm}, so V18's
-     * {@code text_pattern_ops} indexes serve prefix matches and nothing else. The caller supplies the
-     * term and the server appends the {@code %} — so an unescaped {@code %} or {@code _} in the term
-     * would smuggle the caller's own wildcards past the anchor, turning a staff-callable endpoint
-     * into an unindexed scan of every user on the platform. A page cap does not help: the scan
-     * happens before the limit does.
-     */
+    // Prefix indexes need an anchored, escaped term; `%` must not smuggle in
+    // a full-table wildcard scan.
     @Test
     @DisplayName("a wildcard in the search term is matched literally, not interpreted")
     void searchWildcardsAreNeutralised() throws Exception {
         User staff = user("9800000111", "staff", "Ops");
         user("9800000112", "buyer", "Wildcard Target");
 
-        // '%' alone would match every row if it reached Postgres as a wildcard.
         mvc.perform(get("/users").param("q", "%")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
@@ -328,14 +606,7 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(1));
     }
 
-    // ---------------------------------------------------------------- the abuse queue
-
-    /**
-     * The queue is the platform's most abusable write: anyone signed in may file. Without the guard,
-     * one user can bury a rival by filing the same complaint repeatedly, and ops see a queue whose
-     * volume is indistinguishable from genuine consensus. The service checks first and V18's partial
-     * UNIQUE index catches the concurrent pair the check cannot.
-     */
+    // Anyone signed in may file; duplicate complaints must not masquerade as consensus.
     @Test
     @DisplayName("a second live report on the same target by the same reporter is refused")
     void duplicateLiveReportIsRefused() throws Exception {
@@ -351,11 +622,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-    /**
-     * The reason vocabulary is per-target-type, not a flat union (D9.3). {@code brokerage} is a
-     * meaningful complaint about a person and meaningless about a listing; a flat CHECK over the
-     * union would accept every nonsensical pairing while appearing to validate.
-     */
     @Test
     @DisplayName("a reason valid for one target type is refused for another")
     void reasonVocabularyIsPerTargetType() throws Exception {
@@ -372,12 +638,7 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
     }
 
-    /**
-     * Triage was added to the contract in spec fix S30 because the queue had no verb capable of
-     * moving a report out of {@code open} — a four-state status nothing could set. A decided report
-     * is never reopened: reopening would let a moderator quietly relitigate a colleague's decision
-     * with no new evidence and no new row.
-     */
+    // Triage is the only verb that moves a report out of `open`.
     @Test
     @DisplayName("a decided report cannot be reopened")
     void decidedReportsAreFinal() throws Exception {
@@ -403,10 +664,7 @@ class ModerationBehaviourTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
     }
 
-    /**
-     * The reporter's identity must not travel with the report into the ops queue. Ops act on what was
-     * alleged, not on who alleged it — and a queue that names reporters is a queue that leaks them.
-     */
+    // The reporter's identity must not travel with the report into the ops queue.
     @Test
     @DisplayName("the ops queue does not carry the reporter's identity")
     void queueDoesNotLeakReporter() throws Exception {

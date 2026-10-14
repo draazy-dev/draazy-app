@@ -182,7 +182,7 @@ nameserver move anyway.** Three reasons, in ascending order of how much they wil
 2. **ADR-015 chose "Cloudflare edge WAF / rate-limit / Turnstile"** as the abuse strategy instead of
    Redis. Those are *zone* features. Without the zone in your account they do not exist, and ADR-015
    quietly becomes a decision you did not implement.
-3. `DEPLOY.md` §4's remediation 2 — restricting origin ingress — assumes the same.
+3. The free edge controls in `DEPLOY.md` §4 (managed WAF, a rate-limiting rule) assume the same.
 
 Steps:
 
@@ -253,9 +253,9 @@ not in Mumbai and §2.1 needs doing again.
 
 | | `DB_URL` — transaction, `6543` | `FLYWAY_DB_URL` — session, `5432` |
 |---|---|---|
-| Used by | every request the app serves | Flyway, once per boot |
+| Used by | every request the app serves | the migration job, once per deploy |
 | Because | Cloud Run scales to zero and back, so each cold start would otherwise open fresh real backends against a free-tier ceiling measured in dozens | Flyway serialises concurrent deploys with `pg_advisory_lock`, which is **session**-scoped |
-| Fails how | prepared statements break — `prepared statement "S_1" does not exist`, intermittently, on the busiest endpoints only. Already handled: `prepareThreshold=0` is pinned in `application-prod.properties` | **it hangs.** The lock is taken on one backend and released against another, readiness never passes, and nothing in the log says "Flyway" |
+| Fails how | prepared statements break — `prepared statement "S_1" does not exist`, intermittently, on the busiest endpoints only. Already handled: `prepareThreshold=0` is pinned in `application-prod.properties` | **it hangs.** The lock is taken on one backend and released against another, the job runs to its timeout, and nothing in the log says "Flyway" |
 
 The direct connection *would* work for Flyway — it is a real session — but it is IPv6-only on the
 free tier, and it uses a different username (`postgres`, not `postgres.<project-ref>`), which means
@@ -386,9 +386,20 @@ configuration — that is the next step, and it is the one that matters.
 
 ### 3.4 Run it against Supabase
 
-Ten variables, which is not a coincidence: `ProdProfileContractTest` asserts that the set of
-`${ENV}` lookups in `application-prod.properties` is **exactly** this list, so it cannot drift
-without a test going red. Omit any one and the container refuses to start rather than defaulting.
+Not an arbitrary list: `ProdProfileContractTest` asserts that the set of `${ENV}` lookups in
+`application-prod.properties` is **exactly** the documented one, so it cannot drift without a test
+going red. Omit any one and the container refuses to start rather than defaulting.
+
+The serving app never migrates (`docs/DEPLOY.md` §2.1), so apply the schema first, then start it:
+
+```bash
+docker run --rm \
+  -e SPRING_PROFILES_ACTIVE='sandbox' \
+  -e FLYWAY_DB_URL='jdbc:postgresql://aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require' \
+  -e FLYWAY_DB_USER='postgres.<project-ref>' \
+  -e FLYWAY_DB_PASSWORD='<from §2.1>' \
+  draazy-api --migrate-only
+```
 
 **macOS**
 
@@ -396,15 +407,17 @@ without a test going red. Omit any one and the container refuses to start rather
 docker run --rm -p 8080:8080 \
   -e SPRING_PROFILES_ACTIVE='sandbox' \
   -e DB_URL='jdbc:postgresql://aws-0-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require' \
-  -e FLYWAY_DB_URL='jdbc:postgresql://aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require' \
   -e DB_USER='postgres.<project-ref>' \
+  -e FLYWAY_DB_USER='postgres.<project-ref>' \
   -e DB_PASSWORD='<from §2.1>' \
   -e JWT_SECRET="$(openssl rand -base64 48)" \
   -e REFERRAL_SIGNAL_SALT='any-long-random-string-for-now' \
+  -e IDENTITY_HASH_SECRET='any-long-random-string-for-now' \
   -e CASHFREE_WEBHOOK_SECRET='any-non-empty-value-for-now' \
   -e WEB_ORIGINS='https://sandbox.draazy.com' \
   -e API_PUBLIC_ORIGIN='https://sandbox.draazy.com' \
   -e INTERNAL_PROXIES='none' \
+  -e ORIGIN_SHARED_SECRET='none' \
   draazy-api
 ```
 
@@ -418,7 +431,7 @@ docker run --rm -p 8080:8080 `
   draazy-api
 ```
 
-Four of those deserve a note:
+Five of those deserve a note:
 
 - **`SPRING_PROFILES_ACTIVE='sandbox'`, on its own.** The image bakes `prod` as its default —
   deliberately, because `application.properties` holds developer values (local Postgres, a committed
@@ -431,15 +444,21 @@ Four of those deserve a note:
 - **`WEB_ORIGINS` and `API_PUBLIC_ORIGIN` are both the public origin**, never a `localhost` and never
   the `*.run.app` URL. `CookieDeliveryCheck` compares them and refuses to boot on a cross-site shape.
   Using the real values here means you test the real check.
+- **`ORIGIN_SHARED_SECRET='none'`** because nothing proxies a local container. The deployed service
+  reads the real secret, and then every non-health route refuses a caller without it.
 - **`JWT_SECRET` is throwaway here.** Generating a fresh one per run is fine and slightly better than
   reusing the real one on a laptop. Windows has no `openssl` — use the .NET RNG from [§4.7](#adding-the-values).
-- **`CASHFREE_WEBHOOK_SECRET` must be non-empty even though payments are off.** A blank HMAC key makes
-  every forged signature valid, which is why it has no default.
+- **`CASHFREE_WEBHOOK_SECRET` must be non-empty even though this run leaves payments off.** A blank
+  HMAC key makes every forged signature valid, which is why the deployed profiles bind it bare. A
+  throwaway value is right *here* — no `CASHFREE_ENABLED` is passed, so the container falls back to
+  `false` and runs `MockPaymentGateway`. The deployed service does not: `cloudrun-sandbox.yaml` sets
+  `CASHFREE_ENABLED: 'true'`, and there the value must be the Cashfree **secret key** itself, because
+  that is what Cashfree signs callbacks with.
 
 ### 3.5 Read the log — three specific lines
 
 ```
-Picked up JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75.0 ...
+Picked up JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70.0 ...
 The following 2 profiles are active: "prod", "sandbox"      ← both, in that order
 Flyway ... Successfully applied N migrations                 ← the FLYWAY_DB_URL proof
 Tomcat started on port 8080 (http) with context path '/api'  ← note the context path
@@ -646,8 +665,8 @@ Note that you create the service account but **not** the Cloud Run service — �
 
 ```bash
 # macOS
-for s in db-password jwt-secret referral-signal-salt cashfree-webhook-secret \
-         cashfree-app-id cashfree-secret-key; do
+for s in db-password jwt-secret referral-signal-salt \
+         cashfree-app-id cashfree-secret-key identity-hash-secret origin-shared-secret; do
   gcloud secrets create "draazy-sandbox-$s" --replication-policy=automatic
   gcloud secrets add-iam-policy-binding "draazy-sandbox-$s" \
     --member="serviceAccount:$RUNTIME" --role=roles/secretmanager.secretAccessor
@@ -656,8 +675,9 @@ done
 
 ```powershell
 # Windows
-foreach ($s in 'db-password','jwt-secret','referral-signal-salt','cashfree-webhook-secret',
-                'cashfree-app-id','cashfree-secret-key') {
+foreach ($s in 'db-password','jwt-secret','referral-signal-salt',
+                'cashfree-app-id','cashfree-secret-key','identity-hash-secret',
+                'origin-shared-secret') {
   gcloud secrets create "draazy-sandbox-$s" --replication-policy=automatic
   gcloud secrets add-iam-policy-binding "draazy-sandbox-$s" `
     --member="serviceAccount:$RUNTIME" --role=roles/secretmanager.secretAccessor
@@ -665,17 +685,26 @@ foreach ($s in 'db-password','jwt-secret','referral-signal-salt','cashfree-webho
 ```
 
 The names are not free-form — `cloudrun-sandbox.yaml` refers to each by literal name in a
-`secretKeyRef`, and a mismatch is a revision that will not start. Six secrets with one active version
-each sits inside the free allowance.
+`secretKeyRef`, and a mismatch is a revision that will not start. Seven secrets with one active
+version each is one past Secret Manager's free allowance of six; the seventh costs cents a month.
 
-**All six must exist before the first `gcloud run services replace`, including the two Cashfree
-credentials you are not using yet.** A `secretKeyRef` pointing at a secret that does not exist is a
-hard deploy error, not an empty string — Cloud Run rejects the revision outright. Placeholders are
-safe while `CASHFREE_ENABLED` is `false`, because `CashfreeClient` is not instantiated at all in
-that state, so nothing ever reads the value. Replace them with the real ones before turning payments
-on.
+There is deliberately **no** `cashfree-webhook-secret`. Cashfree signs callbacks with
+`x-client-secret`, so `CASHFREE_WEBHOOK_SECRET` reads `draazy-sandbox-cashfree-secret-key` — one
+credential, one entry. Two entries obliged to hold identical bytes drift the first time either is
+rotated alone, and `key: latest` means the drift lands without a deploy: every callback starts being
+rejected, nothing fails at boot, and the one log line names the timestamp or the HMAC rather than the
+rotation. The cost of collapsing them is that this entry carries order-creation and refund authority
+as well as signing, so treat it as the API credential it is.
 
-The grant is **per secret**, not project-wide, so the runtime can read these six and nothing added
+**All seven must exist before the first `gcloud run services replace`.** A `secretKeyRef` pointing at
+a secret that does not exist is a hard deploy error, not an empty string — Cloud Run rejects the
+revision outright. The two Cashfree entries take no placeholder either, because sandbox deploys
+with `CASHFREE_ENABLED=true`: a placeholder is non-blank, so the service boots normally and every
+order creation 401s instead. `identity-hash-secret` takes no placeholder for a different reason — it
+is read on the first badge submission, and a value you meant to replace later cannot be replaced
+— see the table below.
+
+The grant is **per secret**, not project-wide, so the runtime can read these seven and nothing added
 later without an explicit grant.
 
 #### Adding the values
@@ -683,8 +712,9 @@ later without an explicit grant.
 **This is the one step where PowerShell will silently corrupt a secret.** Piping a string to
 `--data-file=-` appends a trailing `CRLF`, and `Out-File` prepends a UTF-8 BOM. Both become part of
 the secret bytes. `JWT_SECRET` survives it (it is just bytes, and self-consistent), but
-`CASHFREE_WEBHOOK_SECRET` does not — the HMAC never matches Cashfree's signature, and you meet it
-weeks later as *every webhook rejected*, with nothing pointing at a stray newline.
+`CASHFREE_SECRET_KEY` does not — it is also the webhook signing key, so a stray byte both 401s every
+order and makes the HMAC never match Cashfree's signature. You meet the second half weeks later as
+*every webhook rejected*, with nothing pointing at a stray newline.
 
 ```bash
 # macOS — printf, never echo; and piped, never as an argument, because a command
@@ -704,16 +734,29 @@ function Add-DraazySecret {
 }
 ```
 
-The six values:
+The eight values:
 
 | Secret | Value |
 |---|---|
 | `draazy-sandbox-db-password` | the Supabase password |
 | `draazy-sandbox-jwt-secret` | HS256, ≥ 32 bytes, per environment |
 | `draazy-sandbox-referral-signal-salt` | any long random string, **never** the local one |
-| `draazy-sandbox-cashfree-webhook-secret` | from the Cashfree dashboard — required even with `CASHFREE_ENABLED` off, because a blank value makes every forged signature valid |
-| `draazy-sandbox-cashfree-app-id` | from the Cashfree dashboard, or `placeholder` while payments are off |
-| `draazy-sandbox-cashfree-secret-key` | from the Cashfree dashboard, or `placeholder` while payments are off |
+| `draazy-sandbox-identity-hash-secret` | any long random string, **never** the local one. Keys the digest behind "one document, one badge". **Set it once and leave it**: a new value does not invalidate the old badges, it makes them unrecognisable, so the same document can be presented again as a new person |
+| `draazy-sandbox-cashfree-app-id` | the sandbox App ID (`TEST…`) from Dashboard → Developers → API Keys |
+| `draazy-sandbox-cashfree-secret-key` | the sandbox Secret Key (`cfsk_…`) from the same page. Read **twice** — as the API credential and as `CASHFREE_WEBHOOK_SECRET`. Sandbox deploys with `CASHFREE_ENABLED=true`, so a `placeholder` here boots cleanly and 401s on the first order |
+| `draazy-sandbox-origin-shared-secret` | `openssl rand -base64 48`, ≥ 32 characters. **Keep a copy**: §8 puts the identical value on the Pages project. A mismatch 403s every `/api` call while health stays green — `DEPLOY.md` §4 |
+| `draazy-sandbox-google-places-server-key` | a Google Cloud API key restricted to **Places API (New)** only, with no referrer restriction (it is called server-side) and a daily quota cap. Mint verifies every new society against Place Details with it; blank, members get "Adding societies is temporarily unavailable" |
+
+Nothing else about Cashfree needs a decision here. `CASHFREE_NOTIFY_URL` — the address Cashfree
+POSTs settlements to — is a **literal** in `cloudrun-sandbox.yaml`
+(`https://sandbox.draazy.com/api/webhooks/cashfree/payment`), not a secret and not a template, so it
+neither needs a Secret Manager entry nor an entry in the `envsubst` allowlist in `deploy.yml`. Sent
+on every order, it also means the single endpoint under Dashboard → Developers → Webhooks is
+optional: that field holds one address across every environment, which is exactly the thing sandbox
+and prod cannot share. The `/api` is `server.servlet.context-path` and is part of the address —
+a URL without it is still a valid https URL, so it passes the boot check and 404s every callback.
+`SandboxDeploymentManifestTest` asserts that literal against `Routes.Webhooks.CASHFREE_PAYMENT`, so
+a route rename cannot leave it pointing at nothing.
 
 Generating the JWT secret:
 
@@ -850,8 +893,9 @@ It builds on an amd64 runner, pushes to Artifact Registry tagged with the commit
 so the file is the whole truth and a setting deleted from the repo is deleted from the service
 rather than lingering on it forever.
 
-Read `backend/deploy/cloudrun-sandbox.yaml` before this runs. `maxScale`, `containerConcurrency`,
-`memory` and `cpu-throttling` all encode consequences that are invisible from the console.
+Read `backend/deploy/cloudrun-sandbox.yaml` before this runs. `minScale`, `maxScale`,
+`containerConcurrency`, `memory` and `cpu-throttling` all encode consequences that are invisible
+from the console — `minScale: '1'` is the one that bills whether or not anyone uses the service.
 
 **Checkpoint** — the workflow deliberately does not print the URL, so fetch it:
 
@@ -862,7 +906,8 @@ curl -fsS "$(gcloud run services describe "$SERVICE" --region="$REGION" --format
 
 If the revision fails to start, in order of likelihood: wrong `FLYWAY_DB_URL` port (hangs, no Flyway
 in the log); an arm64 image if you pushed one by hand rather than via CI; a memory limit below `1Gi`,
-which OOMs *during* startup because `MaxRAMPercentage=75` on 512 MiB leaves 128 MiB non-heap.
+which OOMs *during* startup because `MaxRAMPercentage=70` on 512 MiB leaves ~154 MiB for a ~250 MiB
+non-heap.
 
 ### 6.5 Deploying without CI — the manual path
 
@@ -1108,6 +1153,7 @@ Settings → Environment variables → **Production**:
 | Name | Value | Notes |
 |---|---|---|
 | `API_ORIGIN` | the Cloud Run URL from §6 | scheme + host only, no path, no trailing slash |
+| `ORIGIN_SHARED_SECRET` | the value you put in `draazy-sandbox-origin-shared-secret` (§4.7) | choose **Encrypt**. Must match byte for byte |
 | `VITE_API_BASE` | `/api` | relative, deliberately |
 | `VITE_GOOGLE_MAPS_API_KEY` | your key | restrict to HTTP referrers + Maps JavaScript API only, and set a quota cap |
 
@@ -1116,7 +1162,7 @@ Leave `VITE_PMF_MODE` unset.
 Setting a variable does **not** rebuild. Trigger a redeploy afterwards or the bundle keeps the old
 values.
 
-If `API_ORIGIN` is missing the Function answers **502** rather than falling through — a fall-through
+If `API_ORIGIN` or `ORIGIN_SHARED_SECRET` is missing the Function answers **502** rather than falling through — a fall-through
 would return the HTML shell with a 200, which `http.js` reads as success and renders as a confident
 "no results" on every catalogue.
 
@@ -1162,6 +1208,8 @@ npx wrangler pages project create draazy-sandbox --production-branch=main
 # API_ORIGIN is read at request time, so it belongs on the project, not in the build.
 npx wrangler pages secret put API_ORIGIN --project-name=draazy-sandbox
 # paste the Cloud Run URL from §6 — scheme + host, no path, no trailing slash
+npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=draazy-sandbox
+# paste the same value as draazy-sandbox-origin-shared-secret (§4.7)
 ```
 
 `pages secret put` rather than a plain variable: both arrive on `context.env` identically, and a
@@ -1236,11 +1284,17 @@ curl -fsS https://sandbox.draazy.com/api/properties
 
 # A protected route rejects cleanly rather than erroring. /me/** has no permitAll entry.
 curl -s -o /dev/null -w '%{http_code}\n' https://sandbox.draazy.com/api/me   # 401, not 500
+
+# The origin refuses anyone who skips the proxy. Use the Cloud Run URL from §6.
+curl -s -o /dev/null -w '%{http_code}\n' "$CLOUD_RUN_URL/api/properties"     # 403
 ```
 
 The third is the one worth watching. A **200 with an empty list** where the seed should have put 38
 listings means the request never reached Cloud Run — `API_ORIGIN` is wrong and something is
-answering with the SPA shell. A **502** means `API_ORIGIN` is unset.
+answering with the SPA shell. A **502** means `API_ORIGIN` or `ORIGIN_SHARED_SECRET` is unset on
+Pages. A **403** means the two copies of `ORIGIN_SHARED_SECRET` differ.
+
+The last must be **403**. A 200 means the gate is off, and the origin serves anyone who has its URL.
 
 Then in a browser: the catalogue renders cards, a listing detail page opens, and the map appears. A
 blank map with a console error is `VITE_GOOGLE_MAPS_API_KEY` — either missing from the build (§8.0)
@@ -1279,10 +1333,11 @@ points a second hostname at the backend.
   per *recipient*, so walking valid-looking numbers gets a fresh budget for each. On WhatsApp that is
   worse than a bill — sends to non-WhatsApp numbers drag the sending number's quality rating down,
   which cuts the daily messaging limit and takes sign-in itself offline days later.
-- **The eight `@Scheduled` sweeps do not run.** CPU throttling freezes the scheduler thread between
-  requests. Accepted on the sandbox, fatal for production — ADR-011 / ADR-021, and `DEPLOY.md` §7.
-- **`INTERNAL_PROXIES=none`.** The anonymous rate limiter is advisory, not enforcing. Do not open the
-  sandbox to untrusted traffic until one of `DEPLOY.md` §4's three remediations is in place.
+- **Scheduled jobs do not run.** CPU throttling freezes the scheduler thread between requests.
+  Accepted on the sandbox; production needs an always-on host — ADR-021, and `DEPLOY.md` §5.
+- **`INTERNAL_PROXIES=none`.** The origin gate is on, so the `*.run.app` URL refuses direct
+  callers, but every anonymous visitor still shares one rate-limit bucket. Widen it only as
+  `DEPLOY.md` §4 describes, after confirming a direct non-health request answers 403.
 - **Supabase free pauses after 7 days with no connections**, and has no PITR.
 - **GitHub Actions are tag-pinned, not SHA-pinned.**
 - **`workflow_dispatch` accepts any ref** until the `sandbox` environment carries a deployment branch
@@ -1299,6 +1354,5 @@ points a second hostname at the backend.
 
 If your Google Cloud organisation enforces `constraints/iam.allowedPolicyMemberDomains`, the
 workflow's "Allow public invocation" step fails — `allUsers` cannot be granted. Either exempt the
-project, or accept that Cloudflare must authenticate to the origin. The latter is `DEPLOY.md` §4's
-remediation 2 arriving early, and it means §4 stops being deferred: the Pages Function has to mint an
-identity token.
+project, or accept that the Pages Function must mint a Google identity token for every call, on top
+of the shared secret in `DEPLOY.md` §4.

@@ -1,75 +1,27 @@
-import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { classNames } from '../../lib/format.js';
+import useModalDialog from '../../hooks/useModalDialog.js';
 import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
+import useScrollLock from '../../hooks/useScrollLock.js';
+/* Accessible modal dialog — portals to body, traps focus, closes on Escape/backdrop. */
 
-/**
- * Accessible modal dialog — portals to body, traps focus, closes on Escape/backdrop.
- * @param {object} props
- * @param {boolean} props.open - Whether the modal is visible.
- * @param {() => void} props.onClose - Callback to close the modal.
- * @param {string} props.title - Modal heading (also used as aria-label).
- * @param {React.ReactNode} props.children - Modal body content.
- * @param {React.ReactNode} [props.footer] - Optional footer (action buttons).
- * @param {'sm'|'md'|'lg'} [props.size='md'] - Width preset.
- */
 export default function Modal({ open, onClose, title, children, footer, size = 'md' }) {
-  const panelRef = useRef(null);
-  /* Below 640px the panel is a bottom sheet with a grab handle; make the handle
-     mean something. Desktop never arms the gesture. */
+  const { t } = useTranslation();
+  /* Gives the grab handle that `.dz-modal-sheet::before` draws an actual behaviour. */
   const swipe = useSwipeDismiss(onClose);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e) => {
-      // When modals stack, only the top-most dialog reacts to Escape/Tab so one
-      // keypress doesn't collapse the whole stack.
-      const dialogs = document.querySelectorAll('[role="dialog"]');
-      if (dialogs.length && dialogs[dialogs.length - 1] !== panelRef.current) return;
-      if (e.key === 'Escape') { onClose?.(); return; }
-      // Focus trap: keep Tab within the modal
-      if (e.key === 'Tab') {
-        const panel = panelRef.current;
-        if (!panel) return;
-        const focusable = panel.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-        if (!focusable.length) return;
-        const first = focusable[0];
-        const last = focusable[focusable.length - 1];
-        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    /* Re-running on an `onClose` identity change is load-bearing: a dialog that swaps its contents
-       in place unmounts the focused button, and focus would otherwise fall to `document.body`. */
-    panelRef.current?.focus();
-    return () => {
-      document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [open, onClose]);
-
-  /* Its own effect, keyed only on `open`: the effect above also re-runs whenever `onClose` changes
-     identity, and restoring focus there would eject the user from a dialog that is still open. */
-  useEffect(() => {
-    if (!open) return undefined;
-    const opener = document.activeElement;
-    return () => {
-      // A trigger whose dialog navigated away is gone from the document; focusing it would take
-      // focus off the page the user just arrived at.
-      if (opener instanceof HTMLElement && opener.isConnected) opener.focus();
-    };
-  }, [open]);
+  useScrollLock(open);
+  const panelRef = useModalDialog(open, onClose);
 
   if (!open) return null;
 
-  const width = size === 'lg' ? 'max-w-2xl' : size === 'sm' ? 'max-w-sm' : 'max-w-lg';
-
+  const width = { sm: 'max-w-sm', lg: 'max-w-2xl', xl: 'max-w-6xl' }[size] || 'max-w-lg';
+  const closeLabel = title ? t('common.closeTitle', { title }) : t('common.close');
   // Below 640px the dialog docks as a bottom sheet, and `z-[1550]` places it in the app's
   // floating-chrome band — see docs/system/design-system.md § Bottom sheets.
+
   return createPortal(
     <div className="fixed inset-0 z-[1550] flex items-end justify-center p-0 sm:items-center sm:justify-center sm:p-4">
       <div className="absolute inset-0 bg-black/75 backdrop-blur-md" onClick={onClose} />
@@ -91,7 +43,7 @@ export default function Modal({ open, onClose, title, children, footer, size = '
       >
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6 sm:py-4">
           <h3 className="text-lg font-bold text-white">{title}</h3>
-          <button onClick={onClose} aria-label={title ? `Close ${title}` : 'Close'} className="tap-target -mr-2 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition sm:mr-0 sm:min-h-0 sm:min-w-0 sm:p-1.5">
+          <button onClick={onClose} aria-label={closeLabel} className="tap-target -mr-2 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition sm:mr-0 sm:min-h-0 sm:min-w-0 sm:p-1.5">
             <X className="h-5 w-5" />
           </button>
         </div>

@@ -3,25 +3,21 @@ import { Trans, useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import HelpLayout from '../../../components/help/HelpLayout.jsx';
 import { ArticleRow, Breadcrumbs, EmptyState } from '../../../components/help/HelpCards.jsx';
-import { useHelpTree, useHelpLang, useHelpPath } from '../../../lib/useHelp.js';
-import { useHelpSeo } from '../../../lib/useHelpSeo.js';
+import { useHelpTree } from '../../../lib/useHelp.js';
 
 export default function HelpCategory() {
   const { categoryId } = useParams();
   const { t } = useTranslation();
-  const { sections, categories, articles: allArticles } = useHelpTree();
+  const { sections, categories, articles: allArticles, pending } = useHelpTree();
   const category = categories.find((c) => c.id === categoryId) || null;
-  const hp = useHelpPath();
-  // Staff runbooks stay out of the index: a crawler has no staff session, so the
-  // category is a real URL with nothing behind it for the public.
-  useHelpSeo(`/help/c/${categoryId}`, useHelpLang(), { index: category?.access !== 'staff' });
 
   if (!category) {
+    if (pending) return <HelpLayout />;
     return (
-      <HelpLayout title={t('help.topicNotFound')}>
+      <HelpLayout title={t('help.topicNotFound')} noindex>
         <EmptyState icon="folder-x" title={t('help.topicNotFound')}>
           {t('help.topicNotFoundBody')}{' '}
-          <Link to={hp('/help')} className="text-teal-400 hover:underline">{t('help.backToHelp')}</Link>.
+          <Link to="/help" className="text-teal-400 hover:underline">{t('help.backToHelp')}</Link>.
         </EmptyState>
       </HelpLayout>
     );
@@ -31,10 +27,17 @@ export default function HelpCategory() {
   const articles = allArticles.filter((a) => a.category === category.id);
   const siblings = categories.filter((c) => c.section === category.section && c.id !== category.id);
 
+  // Staff runbooks stay out of the index: a crawler has no staff session, so the
+  // category is a real URL with nothing behind it for the public.
   return (
-    <HelpLayout title={category.title}>
+    <HelpLayout
+      title={category.title}
+      description={category.description}
+      path={`/help/c/${category.id}`}
+      noindex={category.access === 'staff'}
+    >
       <Breadcrumbs
-        trail={[[t('help.centre'), hp('/help')], [section?.title || t('help.topics'), null], [category.title, null]]}
+        trail={[[t('help.centre'), '/help'], [section?.title || t('help.topics'), null], [category.title, null]]}
       />
 
       <header className="mb-8 border-b border-white/5 pb-6">
@@ -71,7 +74,7 @@ export default function HelpCategory() {
             {siblings.map((c) => (
               <Link
                 key={c.id}
-                to={hp(`/help/c/${c.id}`)}
+                to={`/help/c/${c.id}`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-gray-400 transition-colors hover:border-teal-400/40 hover:text-teal-300"
               >
                 <Icon name={c.icon} className="w-3.5 h-3.5" /> {c.title}

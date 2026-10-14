@@ -5,36 +5,20 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.UUID;
 import lombok.Getter;
 
-/**
- * A passwordless-login OTP (ADR-008). The code is stored hashed; {@code attempts} + {@code expiresAt}
- * back throttling. Maps {@code otp_codes} (V2) — append-only, no {@code updated_at}.
- *
- * <p>No {@code @Setter}: every field is either constructor-set or changed only through a named
- * behaviour method ({@link #recordAttempt()}, {@link #consume()}). A setter would let a caller
- * decrement the attempt count or un-consume a code, which is the throttle this class exists to be.
- */
 @Entity
 @Table(name = "otp_codes")
 @Getter
 public class OtpCode extends BaseEntity {
 
-    /**
-     * The only OTP purpose in use today. The column is scoped by purpose so future flows (e.g. a
-     * transaction or contact-approval OTP) can share the table without colliding with login codes —
-     * which is exactly why the lookup query filters on it rather than assuming a single kind.
-     */
+    /** Sign-in. Lookups filter on purpose, so other flows share the table without colliding. */
     public static final String PURPOSE_LOGIN = "login";
 
-    /**
-     * A flat owner confirming they know their tenant is seeking a replacement flatmate (V29).
-     *
-     * <p>Deliberately not {@link #PURPOSE_LOGIN}: this code authenticates nobody, issues no token,
-     * and is sent to a person who usually has no account. Sharing the login purpose would have made
-     * the consent form a way to mint login codes for any number a caller can name.
-     */
     public static final String PURPOSE_OWNER_CONSENT = "owner-consent";
+
+    public static final String PURPOSE_DRAFT_APPROVAL = "draft-approval";
 
     @Column(name = "mobile", nullable = false, updatable = false)
     private String mobile;
@@ -54,15 +38,22 @@ public class OtpCode extends BaseEntity {
     @Column(name = "expires_at", nullable = false, updatable = false)
     private Instant expiresAt;
 
+    /** The account that asked; null for login and signup. Read only by the per-caller send
+     * budget — every other limit keys on the recipient, the wrong end of this flow. */
+    @Column(name = "requested_by", updatable = false)
+    private UUID requestedBy;
+
     protected OtpCode() {
-        // JPA
+
     }
 
-    public OtpCode(String mobile, String codeHash, String purpose, Instant expiresAt) {
+    public OtpCode(String mobile, String codeHash, String purpose, Instant expiresAt,
+            UUID requestedBy) {
         this.mobile = mobile;
         this.codeHash = codeHash;
         this.purpose = purpose;
         this.expiresAt = expiresAt;
+        this.requestedBy = requestedBy;
     }
 
     public void recordAttempt() {
@@ -73,10 +64,7 @@ public class OtpCode extends BaseEntity {
         this.consumed = true;
     }
 
-    /**
-     * Not a property — there is no {@code expired} field, so Lombok generates nothing that collides
-     * with this name and it stays free for the computed answer.
-     */
+    /** Not a property: there is no {@code expired} field, so Lombok generates no colliding getter. */
     public boolean isExpired() {
         return Instant.now().isAfter(expiresAt);
     }

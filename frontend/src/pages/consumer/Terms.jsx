@@ -3,12 +3,11 @@ import LegalPage from '../../components/LegalPage.jsx';
 
 export default function Terms() {
   return (
-    <LegalPage title="Terms of Service" lastUpdated="1 July 2026" current="terms">
+    <LegalPage title="Terms of Service" lastUpdated="10 October 2026" current="terms">
       <p>
         These Terms of Service ("<strong>Terms</strong>") govern your access to and use of draazy.com and associated
-        applications (the "<strong>Platform</strong>") operated by Draazy Technologies Private Limited, a company
-        incorporated under the Companies Act, 2013, with its registered office at 201, Business Bay, Baner Road, Pune 411045
-        ("<strong>Draazy</strong>", "we", "us").
+        applications (the "<strong>Platform</strong>")         operated by Draazy Technologies
+                ("<strong>Draazy</strong>", "we", "us").
       </p>
       <p>
         By registering an account or using the Platform, you agree to be bound by these Terms. If you do not agree,
@@ -24,7 +23,7 @@ export default function Terms() {
       <h2>2. Account and verification</h2>
       <ul>
         <li>You are responsible for maintaining the confidentiality of your OTP and login credentials.</li>
-        <li>Property owners must complete identity verification (Aadhaar/PAN eKYC) before publishing listings.</li>
+        <li>Identity verification is optional. Property owners may publish listings without it; completing it earns a Verified badge and is required only to reach owners who accept verified contacts only.</li>
         <li>Draazy may suspend or terminate accounts that fail verification or violate these Terms.</li>
       </ul>
 
@@ -45,7 +44,7 @@ export default function Terms() {
       <h3>3.3 No brokerage</h3>
       <p>
         Draazy does not charge brokerage or commission from buyers or tenants for property transactions. Revenue is
-        generated through premium listing plans, subscription packages, and referral fees from service partners.
+        generated through Listing Passes, Contact Packs, rent agreements, and referral fees from service partners.
       </p>
 
       <h2>4. User obligations</h2>
@@ -80,12 +79,12 @@ export default function Terms() {
         remove the content or delete your account.
       </p>
 
-      <h2>7. Payments and subscriptions</h2>
+      <h2>7. Payments</h2>
       <ul>
-        <li>Subscription plans are billed in advance as per the plan selected (monthly or annual).</li>
-        <li>Prices are inclusive of applicable GST (currently 18%).</li>
-        <li>Auto-renewal can be cancelled at any time before the next billing cycle from your account settings.</li>
-        <li>Refunds are governed by our <Link to="/refund-policy">Refund Policy</Link>.</li>
+        <li>Listing Passes, Contact Packs and rent agreements are one-off purchases, paid in advance. There are no subscriptions and nothing renews automatically.</li>
+        <li>Rent agreements also carry government charges — stamp duty, registration fee and document handling charge. We pay these to the government on behalf of the owner and tenant, in their names, and collect exactly the amount paid; they are not Draazy&apos;s fee.</li>
+        <li>A Listing Pass ends early when its listing is rented, sold or archived, with no refund for unused days.</li>
+        <li>Refunds, returned contacts and disputes are governed by our <Link to="/refund-policy">Refund Policy</Link>.</li>
       </ul>
 
       <h2>8. Limitation of liability</h2>
@@ -134,9 +133,9 @@ export default function Terms() {
 
       <h2>13. Grievance redressal &amp; contact</h2>
       <p>
-        For questions about these Terms, contact us at <a href="mailto:legal@draazy.com">legal@draazy.com</a>.
+        For questions about these Terms, contact us at <a href="mailto:support@draazy.com">support@draazy.com</a>.
         Complaints and grievances may be addressed to our Grievance Officer, whose details (along with our company
-        identity, CIN, and GSTIN) are published in our <Link to="/privacy">Privacy Policy</Link>. We acknowledge
+        identity) are published in our <Link to="/privacy">Privacy Policy</Link>. We acknowledge
         grievances within 24 hours and resolve them within 15 days, as required under applicable law.
       </p>
     </LegalPage>

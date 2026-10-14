@@ -1,169 +1,219 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { listSaved, saveProperty, unsaveProperty } from '../services/savedService.js';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { listSaved, listSavedKeys, saveProperty, unsaveProperty } from '../services/savedService.js';
 import { useAuth } from './AuthContext.jsx';
 
-/**
- * The caller's saved-property shortlist, held once for the whole app.
- *
- * ## Why this exists at all
- *
- * Every result card asks "is this one saved?" to draw its heart. That used to be a synchronous
- * localStorage read, so asking thirty times to render thirty cards cost nothing. Against a real API
- * the same question is a network call, and the naive conversion — `await isSaved(id)` per card — is
- * thirty requests to draw thirty hearts, on every scroll of every results page.
- *
- * So membership is not a request. The shortlist is fetched once, kept as a Set, and `has(id)`
- * answers from memory in O(1). The network is touched only when the user actually saves or unsaves
- * something. This mirrors `CompareContext`, which solves the same problem for the compare tray.
- *
- * ## Writes are optimistic
- *
- * A heart must respond to the tap, not to the round trip — a spinner on a heart is worse than the
- * feature. `toggle` flips the Set immediately, fires the write, and **puts the id back if the write
- * fails**. Rolling back matters more than it looks: without it a failed save leaves a filled heart
- * over a property the server never recorded, and the user only discovers it when the shortlist is
- * empty on their phone.
- *
- * ## Signed out
- *
- * The shortlist is caller-scoped, and the API 401s without a session. Every heart in the app already
- * redirects to sign-in before calling `toggle`, so this holds an empty set rather than a separate
- * anonymous shortlist — one that could never be merged into the real one on sign-in anyway.
- */
+/* Saved membership is held as keys, so result cards answer from memory and the shell never
+   downloads the cards themselves; the pages that draw them read `useSavedItems`. */
 const SavedContext = createContext(null);
 
-/** Large enough that a real shortlist arrives whole; see the note on `loadAll` below. */
-const PAGE_SIZE = 500;
+const ITEMS_PAGE_SIZE = 100;
+const FOREGROUND_RELOAD_MS = 30000;
 
 export function SavedProvider({ children }) {
   const { isIn } = useAuth();
-  const [items, setItems] = useState([]);
-  const [ids, setIds] = useState(() => new Set());
+  // routing token (slug || uuid) -> uuid, because the writes take the uuid
+  const [keys, setKeys] = useState(() => new Map());
   const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState(isIn ? 'loading' : 'ready');
+  const [error, setError] = useState(null);
+  const [busyIds, setBusyIds] = useState(() => new Set());
+  const keysRef = useRef(keys);
+  const busyRef = useRef(new Set());
+  const lastForegroundReload = useRef(0);
 
-  /**
-   * Fetch the whole shortlist in one page.
-   *
-   * A shortlist grows only through the user's own saves, so it is bounded by their own effort in a
-   * way that, say, an owner's contact inbox is not — that one grows with other people's demand and
-   * genuinely needs paging. One large page is the same bridge `propertyProvider` takes, for the same
-   * reason: the alternative is a paged id set, which would leave hearts wrong on the results page
-   * for anyone who has saved more than one page worth.
-   */
-  const loadAll = useCallback(async () => {
-    const res = await listSaved({ size: PAGE_SIZE });
-    setItems(res.items);
-    setIds(new Set(res.items.map((p) => p.id)));
-    return res;
+  useEffect(() => { keysRef.current = keys; }, [keys]);
+
+  const applyKeys = useCallback((rows) => {
+    setKeys(new Map(rows.map((k) => [k.token, k.uuid])));
+    setError(null);
+    setStatus('ready');
   }, []);
+
+  const loadAll = useCallback(async ({ silent = false } = {}) => {
+    if (!isIn) {
+      applyKeys([]);
+      return [];
+    }
+    if (!silent) {
+      setLoading(true);
+      setStatus('loading');
+    }
+    const rows = await listSavedKeys();
+    applyKeys(rows);
+    if (!silent) setLoading(false);
+    return rows;
+  }, [applyKeys, isIn]);
 
   useEffect(() => {
     if (!isIn) {
-      setItems([]);
-      setIds(new Set());
+      applyKeys([]);
+      setLoading(false);
       return undefined;
     }
     let alive = true;
     setLoading(true);
-    listSaved({ size: PAGE_SIZE })
-      .then((res) => {
+    setStatus('loading');
+    listSavedKeys()
+      .then((rows) => { if (alive) applyKeys(rows); })
+      .catch((err) => {
         if (!alive) return;
-        setItems(res.items);
-        setIds(new Set(res.items.map((p) => p.id)));
-      })
-      // An unreachable shortlist renders as empty hearts, never as filled ones. That is the safe
-      // direction: an unfilled heart invites a save the server will accept, whereas a filled one
-      // claims a save that may not exist.
-      .catch(() => {
-        if (!alive) return;
-        setItems([]);
-        setIds(new Set());
+        setError(err);
+        setStatus('error');
       })
       .finally(() => {
         if (alive) setLoading(false);
       });
     return () => { alive = false; };
-  }, [isIn]);
+  }, [applyKeys, isIn]);
 
-  const has = useCallback((id) => ids.has(id), [ids]);
+  useEffect(() => {
+    if (!isIn) return undefined;
+    const maybeReload = () => {
+      if (document.visibilityState === 'hidden') return;
+      const now = Date.now();
+      if (now - lastForegroundReload.current < FOREGROUND_RELOAD_MS) return;
+      lastForegroundReload.current = now;
+      loadAll({ silent: true }).catch(() => {});
+    };
+    document.addEventListener('visibilitychange', maybeReload);
+    window.addEventListener('focus', maybeReload);
+    return () => {
+      document.removeEventListener('visibilitychange', maybeReload);
+      window.removeEventListener('focus', maybeReload);
+    };
+  }, [isIn, loadAll]);
 
-  /**
-   * Flip one property's saved state.
-   *
-   * <b>Two identifiers, deliberately.</b> `id` is the routing token — `propertyMapper` sets it to
-   * `slug || uuid` because the UI puts it in `/property/:id` — and it is what every membership
-   * check in this context is keyed on. `uuid` is the row's real primary key. They are different
-   * strings for every curated listing, and `PUT|DELETE /me/saved/{propId}` binds a `UUID`, so
-   * addressing the write with the routing token answers **400** and the optimistic heart silently
-   * rolls back. That was the bug: this feature shipped in `e330cd3` addressing the write with `id`,
-   * and it could not be seen in mock mode, where ids are the only identifier there is.
-   *
-   * `uuid` is optional and the resolution is layered, so a caller that does not have one still
-   * behaves correctly: the argument first, then this context's own shortlist (which is guaranteed
-   * to hold the row on an *unsave*, since you cannot unsave what is not listed), then `id` itself,
-   * which is the right answer in mock mode where no view model carries a `uuid` at all.
-   *
-   * @param {string} id   routing token; the key this context stores and `has()` answers on
-   * @param {string} [uuid] the row's primary key, when the caller has it
-   * @returns {Promise<boolean>} the state it settled on — `true` when now saved. Callers use this
-   *   for their toast, so on a rollback they are told what actually happened rather than what was
-   *   attempted.
-   */
-  const toggle = useCallback(async (id, uuid) => {
-    const wasSaved = ids.has(id);
-    const next = !wasSaved;
-    const address = uuid || items.find((p) => p.id === id)?.uuid || id;
+  const ids = useMemo(() => new Set(keys.keys()), [keys]);
+  const has = useCallback((id) => keys.has(id), [keys]);
 
-    // Optimistic: the heart fills on tap. `items` is updated too, so the Saved page reorders in the
-    // same frame instead of waiting for a refetch.
-    setIds((prev) => {
-      const copy = new Set(prev);
-      if (next) copy.add(id); else copy.delete(id);
+  const setBusy = useCallback((id, busy) => {
+    if (busy) busyRef.current.add(id);
+    else busyRef.current.delete(id);
+    setBusyIds(new Set(busyRef.current));
+  }, []);
+
+  const write = useCallback(async (id, uuid, next) => {
+    if (!id || busyRef.current.has(id)) return false;
+    const wasSaved = keysRef.current.has(id);
+    if (wasSaved === next) return true;
+    const address = uuid || keysRef.current.get(id) || id;
+    const flip = (on) => setKeys((prev) => {
+      const copy = new Map(prev);
+      if (on) copy.set(id, address); else copy.delete(id);
       return copy;
     });
-    if (!next) setItems((prev) => prev.filter((p) => p.id !== id));
 
+    setBusy(id, true);
+    setError(null);
+    flip(next);
     try {
       if (next) await saveProperty(address); else await unsaveProperty(address);
-      // A save adds a card the shortlist does not have the body for yet. Refetch rather than guess
-      // at the summary from whatever the card happened to be holding, so the Saved page shows the
-      // server's row and not a locally assembled lookalike.
-      if (next) await loadAll();
-      return next;
-    } catch {
-      setIds((prev) => {
-        const copy = new Set(prev);
-        if (next) copy.delete(id); else copy.add(id);
-        return copy;
-      });
-      if (!next) await loadAll().catch(() => {});
-      return wasSaved;
+      return true;
+    } catch (err) {
+      setError(err);
+      flip(!next);
+      return false;
+    } finally {
+      setBusy(id, false);
     }
-  }, [ids, items, loadAll]);
+  }, [setBusy]);
+
+  const save = useCallback((id, uuid) => write(id, uuid, true), [write]);
+  const unsave = useCallback((id, uuid) => write(id, uuid, false), [write]);
+
+  /** Two identifiers, deliberately: `id` is the routing token this context keys on, `uuid` the row's primary key. */
+  const toggle = useCallback(async (id, uuid) => {
+    const next = !keysRef.current.has(id);
+    const ok = await write(id, uuid, next);
+    return ok ? next : keysRef.current.has(id);
+  }, [write]);
+
+  const reload = useCallback(async () => {
+    try {
+      return await loadAll();
+    } catch (err) {
+      setError(err);
+      setStatus('error');
+      setLoading(false);
+      throw err;
+    }
+  }, [loadAll]);
 
   const value = useMemo(
-    () => ({ items, ids, count: ids.size, loading, has, toggle, refresh: loadAll }),
-    [items, ids, loading, has, toggle, loadAll],
+    () => ({ ids, count: ids.size, loading, status, error, busyIds, has, save, unsave, toggle, reload, refresh: reload }),
+    [ids, loading, status, error, busyIds, has, save, unsave, toggle, reload],
   );
   return <SavedContext.Provider value={value}>{children}</SavedContext.Provider>;
 }
 
-/**
- * The shortlist.
- *
- * Returns a null-safe stub outside the provider so a component rendered in isolation — a test
- * harness, a storybook page — degrades to "nothing saved" instead of throwing on `.has`.
- */
+/* Null-safe stub outside the provider so a component rendered in isolation degrades to "nothing
+   saved" instead of throwing on `.has`. */
 export function useSaved() {
   return useContext(SavedContext) ?? EMPTY;
 }
 
+/** The shortlist's cards, for the pages that draw them. Re-read only when the key set gains an id
+ * (or, for a short `size`, loses one that may have hidden others); removals filter locally. */
+export function useSavedItems({ size = ITEMS_PAGE_SIZE } = {}) {
+  const saved = useSaved();
+  const { isIn } = useAuth();
+  const [rows, setRows] = useState([]);
+  const [status, setStatus] = useState(isIn ? 'loading' : 'ready');
+  const loadedFor = useRef(null);
+  const seq = useRef(0);
+
+  const load = useCallback(async () => {
+    const n = ++seq.current;
+    try {
+      const res = await listSaved({ size });
+      if (n === seq.current) {
+        setRows(res.items);
+        setStatus('ready');
+      }
+      return res;
+    } catch (err) {
+      if (n === seq.current) setStatus('error');
+      throw err;
+    }
+  }, [size]);
+
+  const { ids, status: keysStatus, busyIds, reload: reloadKeys } = saved;
+
+  useEffect(() => {
+    if (!isIn) {
+      loadedFor.current = null;
+      setRows([]);
+      setStatus('ready');
+      return;
+    }
+    // A heart mid-write is in `ids` before the server has the row; read once the write settles.
+    if (keysStatus !== 'ready' || busyIds.size) return;
+    const prev = loadedFor.current;
+    const stale = !prev
+      || [...ids].some((id) => !prev.has(id))
+      || (ids.size < prev.size && prev.size > size);
+    if (!stale) return;
+    loadedFor.current = ids;
+    load().catch(() => {});
+  }, [isIn, keysStatus, busyIds, ids, size, load]);
+
+  const items = useMemo(() => rows.filter((p) => ids.has(p.id)), [rows, ids]);
+  const reload = useCallback(() => Promise.all([reloadKeys(), load()]), [reloadKeys, load]);
+  const merged = saved.status === 'error' ? 'error' : saved.status === 'loading' ? 'loading' : status;
+  return { ...saved, items, status: merged, reload, refresh: reload };
+}
+
 const EMPTY = {
-  items: [],
   ids: new Set(),
   count: 0,
   loading: false,
+  status: 'ready',
+  error: null,
+  busyIds: new Set(),
   has: () => false,
+  save: async () => false,
+  unsave: async () => false,
   toggle: async () => false,
+  reload: async () => {},
   refresh: async () => {},
 };

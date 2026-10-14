@@ -3,9 +3,11 @@ package com.draazy.api.catalog.listing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyController;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -17,8 +19,10 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,42 +30,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestParam;
 
-/**
- * The foundation-field rule, tied to the search facets it exists to protect.
- *
- * <p><strong>What the rule is for.</strong> Editing a foundation field on an approved listing costs
- * the owner a re-review. That exists to stop bait-and-switch, and bait-and-switch has a precise
- * shape: get approved into one set of search results, then edit your way into a different, more
- * valuable one. So the fields that must trigger a re-review are exactly the fields a buyer can
- * filter on. A facet outside the rule is a hole of exactly that shape.
- *
- * <p><strong>Two prices, not one (Q14).</strong> Every foundation edit is re-checked; they differ
- * only in whether the listing keeps earning while it waits. {@code locality}, {@code propertyType},
- * {@code bhk} and {@code deal} change what the listing fundamentally <em>is</em>, so leaving it in
- * the index returns a wrong answer — a 2BHK under 3BHK, a rental under sale — and it goes back to
- * {@code pending}. {@code price}, {@code furnishing} and {@code possession} change an attribute of
- * a listing that is still the same property, so the worst case is a briefly stale value on a
- * listing that is genuinely what it claims to be; those stay {@code approved}, stay in search, and
- * raise {@code recheckPending} instead.
- *
- * <p><strong>Why the facets are read by reflection.</strong> The rule was five fields — price, bhk,
- * type, locality, deal — while {@code GET /properties} accepted seven facets. The two extra,
- * {@code furnishing} and {@code possession}, were applied as ordinary edits, so an approved
- * unfurnished flat could be relabelled "furnished" and an under-construction one "ready to move"
- * with no moderator involved. Nothing failed, because nothing connected the two lists: they lived in
- * different packages and agreed only by someone remembering. Writing the facet list out by hand here
- * would reproduce that failure — a third hand-maintained list drifting on the same schedule as the
- * first two — so it is read off {@link PropertyController#search} itself.
- *
- * <p><strong>And why the rule is asserted behaviourally.</strong> Reflection can see the facets but
- * not what {@code ListingEditRules.apply} does with them; a constant listing the foundation fields
- * would be a claim about the implementation rather than a measurement of it. So each field is
- * actually PATCHed onto an approved listing through the real endpoint, and the resulting status —
- * and, for the stays-live half, an actual {@code GET /properties} hit — is the assertion. The two
- * halves together are what make this self-maintaining: a new facet fails
- * {@link #everySearchFacetIsClassified} until it is classified, and a field that changes sides
- * fails its own case here.
- */
+/** Facets are reflected off {@link PropertyController#search} so a third hand-kept list cannot drift. */
 @DisplayName("Listings — every search facet costs a re-review, at one of two prices")
 class ListingFoundationTest extends AbstractApiTest {
 
@@ -70,58 +39,20 @@ class ListingFoundationTest extends AbstractApiTest {
     @Autowired
     PropertyRepository properties;
 
-    /**
-     * Foundation fields whose edit takes the listing <strong>off search</strong>: they change what
-     * the listing is, so a stale index entry is a wrong answer rather than a late one (Q14).
-     *
-     * <p>Kept here, and only here, as this test's half of the contract — the other half is the
-     * blocks in {@code ListingEditRules.apply}, which is what the cases below actually measure.
-     */
+    /** Edits that take the listing off search. {@code landUse} is stated rather than derived: it carries no
+     *  {@code @RequestParam}, so the facet loop below can never reach it. */
     private static final Set<String> OFF_SEARCH =
-            Set.of("bhk", "propertyType", "locality", "deal");
+            Set.of("bhk", "propertyType", "locality", "deal", "landUse");
 
-    /**
-     * Foundation fields whose edit <strong>stays live</strong>: re-checked, but still approved and
-     * still in search, because the listing is still the same property (Q14).
-     *
-     * <p>{@code address} is here for a different reason from the other three and is deliberately not
-     * a search facet: it is what the duplicate key is derived from, so editing it is how a listing
-     * moves onto an address another owner already holds (D219). Being in this set rather than the
-     * one above is the whole of the decision — an address correction is overwhelmingly a typo fix,
-     * and taking the listing dark for one would price honesty at a day offline.
-     */
     private static final Set<String> STAYS_LIVE =
-            Set.of("price", "furnishing", "possession", "address");
+            Set.of("price", "furnishing", "possession", "address", "societyId", "electricityMeterNo",
+                    "carpetArea", "images", "description", "amenities", "reraId");
 
-    /**
-     * Facets that legitimately do not cost a re-review, each for a reason about the facet rather
-     * than about convenience.
-     *
-     * <ul>
-     *   <li>{@code minPrice} / {@code maxPrice} — bounds on {@code price}, which <em>is</em> a
-     *       foundation field. They are not listing attributes; there is nothing on the entity for
-     *       them to change.</li>
-     *   <li>{@code q} — free-text over title and description. Title is deliberately editable without
-     *       review: it is marketing copy, it is the field owners most often fix typos in, and
-     *       reverting on it would make correcting "2BKH" cost a day offline.</li>
-     *   <li>{@code status} — the moderation state itself, owned by moderation rather than by the
-     *       owner. Reverting on it would mean approving a listing sends it back to pending.</li>
-     *   <li>{@code owner} — the owner's id, matched with {@code cb.equal(root.get("owner").get("id"),
-     *       UUID.fromString(...))} in {@code PropertySpecs}. It is not a listing attribute at all:
-     *       there is no edit that changes it, because a listing cannot be transferred through
-     *       {@code PATCH /me/listings/{id}}. Ownership moves, when it moves, through a path that
-     *       re-reviews the listing for its own reasons.</li>
-     *   <li>{@code rank} — {@code relevance} or {@code newest}, the order the result set comes back
-     *       in. It is a property of the <em>question</em>, not of any listing: there is no column
-     *       behind it and no edit that can change it, so there is nothing here for a re-review to
-     *       re-check. It is a {@code @RequestParam} rather than part of Spring's {@code sort} for
-     *       the reason given on {@code PropertyController.search}.</li>
-     * </ul>
-     */
+    /** Facets with no listing attribute behind them: price bounds, free text, moderation state, the owner id
+     *  (untransferable by PATCH) and the result ordering. */
     private static final Set<String> NOT_LISTING_ATTRIBUTES =
             Set.of("minPrice", "maxPrice", "q", "status", "owner", "rank");
 
-    /** {@code type} is the wire spelling of the entity's {@code propertyType}. */
     private static String toFieldName(String facet) {
         return "type".equals(facet) ? "propertyType" : facet;
     }
@@ -145,6 +76,13 @@ class ListingFoundationTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
+    private User staff(String mobile) {
+        User u = new User(mobile, "staff");
+        u.setName("Foundation Staff");
+        u.setMobileVerified(true);
+        return users.saveAndFlush(u);
+    }
+
     private Property approvedListing(User owner) {
         return approvedListing(owner, "Bright 2BHK");
     }
@@ -157,19 +95,78 @@ class ListingFoundationTest extends AbstractApiTest {
         p.setStatus(PropertyStatus.APPROVED);
         p.setFurnishing("unfurnished");
         p.setPossession("under-construction");
-        // Filed, because saving through the repository skips LocalityResolver and re-approval now
-        // refuses an unfiled listing (register item 24). An approved listing with a null slug is a
-        // state the platform is no longer willing to produce, so it is the wrong fixture here.
+
+        // Filed, because re-approval refuses an unfiled listing.
         p.setLocalitySlug("kothrud");
         return properties.saveAndFlush(p);
     }
 
-    /**
-     * The guard against a facet being added and quietly left unprotected. It does not check the
-     * behaviour — the cases below do that — only that somebody has decided which side a facet is on,
-     * and that "which side" is a real answer: exactly one of the two sets, never both and never
-     * neither.
-     */
+    /** Not a behaviour check — only that somebody decided which side a facet is on, and that it is
+     *  exactly one of the two sets. */
+    private Property pendingListing(User owner, String title) {
+        Property p = approvedListing(owner, title);
+        p.setStatus(PropertyStatus.PENDING);
+        return properties.saveAndFlush(p);
+    }
+
+    private Property approvedSalePlot(User owner, String reraId, String plottedProject) {
+        Property p = new Property(owner, "Clear title plot", "buy", "Open Plot",
+                5_000_000L, "Kothrud", "Pune");
+        p.setPriceUnit("total");
+        p.setStatus(PropertyStatus.APPROVED);
+        p.setLocalitySlug("kothrud");
+        p.setArea(new BigDecimal("1200"));
+        p.setAreaUnit("sqft");
+        p.setReraId(reraId);
+        p.setFormDetails(Map.of("plottedProject", plottedProject));
+        return properties.saveAndFlush(p);
+    }
+
+    private Property approvedSaleListing(User owner) {
+        Property p = new Property(owner, "Bright sale flat", "buy", "apartment",
+                5_000_000L, "Kothrud", "Pune");
+        p.setBhk(new BigDecimal("2"));
+        p.setPriceUnit("total");
+        p.setStatus(PropertyStatus.APPROVED);
+        p.setLocalitySlug("kothrud");
+        p.setCarpetArea(new BigDecimal("1000"));
+        return properties.saveAndFlush(p);
+    }
+
+    private static String upload(User owner) {
+        return "/api/dev/storage/public/photos/" + owner.getId() + "/" + java.util.UUID.randomUUID();
+    }
+
+    private UUID society(String slug) {
+        UUID id = UUID.randomUUID();
+        jdbc.update("insert into societies (id, created_at, updated_at, slug, name, registration, conveyance, amenities) "
+                + "values (?, now(), now(), ?, ?, false, false, '[]'::jsonb)",
+                id, slug, "Society " + slug);
+        return id;
+    }
+
+    private String verificationPath(Property p, String suffix) {
+        return "/properties/" + p.getId() + "/verification" + suffix;
+    }
+
+    private void openCaseAndTickPhotoLine(Property p, User owner, User ops) throws Exception {
+        mvc.perform(post(verificationPath(p, "")).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isCreated());
+        for (String item : List.of(
+                "Photos are real and match the listing",
+                "Not a duplicate of another listing",
+                "Details and location look right")) {
+            mvc.perform(patch(verificationPath(p, "/checklist")).header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"item\":\"" + item + "\",\"pass\":true}"))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(get(verificationPath(p, "")).header(HttpHeaders.AUTHORIZATION, bearer(ops)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.checklist[?(@.item == 'Photos are real and match the listing')].pass")
+                        .value(true));
+    }
+
     @Test
     @DisplayName("every search facet is either a foundation field or a recorded exemption")
     void everySearchFacetIsClassified() {
@@ -216,11 +213,8 @@ class ListingFoundationTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.recheckPending").value(false));
     }
 
-    /**
-     * The stays-live half: still approved, and a re-check work item naming the field that earned it.
-     * Searchability itself is proven separately in {@link #aPriceEditKeepsTheListingInSearch} —
-     * status is the mechanism, but being findable is the promise.
-     */
+    /** Searchability is proven separately in {@link #aPriceEditKeepsTheListingInSearch} — status is the
+     *  mechanism, being findable is the promise. */
     private void assertStaysLiveAndQueuesRecheck(String jsonPatch, String field) throws Exception {
         User o = owner("98764" + String.format("%05d", Math.abs(jsonPatch.hashCode()) % 100000));
         Property p = approvedListing(o);
@@ -232,7 +226,205 @@ class ListingFoundationTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("approved"))
                 .andExpect(jsonPath("$.recheckPending").value(true))
-                .andExpect(jsonPath("$.recheckReason").value(field));
+                .andExpect(jsonPath("$.recheckReason").value(field))
+                .andExpect(jsonPath("$.recheckRequestedAt").exists());
+        storedListing(o, p.getId()).andExpect(jsonPath("$.resubmittedAt").exists());
+    }
+
+    @Test
+    @DisplayName("a ready-to-move sale create drops the future available date")
+    void readyToMoveSaleCreateDropsAvailableDate() throws Exception {
+        User o = owner("9876300001");
+
+        mvc.perform(post("/me/listings")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Ready sale flat","deal":"buy","propertyType":"apartment","price":5000000,
+                                 "bhk":2,"locality":"Kothrud","city":"Pune","possession":"ready-to-move",
+                                 "images":["%s"],"availableOn":"%s","formDetails":{"availableFrom":"2027-01-20"}}
+                                """.formatted(upload(o), AvailableOn.today().plusDays(40))))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.resubmittedAt").doesNotExist())
+                .andExpect(jsonPath("$.availableDate").doesNotExist())
+                .andExpect(jsonPath("$.availableOn").doesNotExist())
+                .andExpect(jsonPath("$.formDetails.availableFrom").doesNotExist());
+
+        assertThat(properties.findAll().stream()
+                .filter(p -> "Ready sale flat".equals(p.getTitle()))
+                .findFirst()
+                .orElseThrow()
+                .getResubmittedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("owner edit of a rejected listing keeps the final verdict")
+    void rejectedListingEditStaysRejected() throws Exception {
+        User o = owner("9876300099");
+        Property p = approvedListing(o, "Rejected resubmit");
+        p.setStatus(PropertyStatus.REJECTED);
+        properties.saveAndFlush(p);
+
+        mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locality\":\"Baner\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("rejected"))
+                .andExpect(jsonPath("$.resubmittedAt").doesNotExist());
+
+        Property saved = properties.findById(p.getId()).orElseThrow();
+        assertThat(saved.getStatus()).isEqualTo(PropertyStatus.REJECTED);
+        assertThat(saved.getResubmittedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("restoring a rejected listing keeps the final verdict")
+    void restoreRejectedListingStaysRejected() throws Exception {
+        User o = owner("9876300100");
+        Property p = approvedListing(o, "Rejected restore");
+        p.setStatus(PropertyStatus.REJECTED);
+        p.archive("owner took it down");
+        properties.saveAndFlush(p);
+
+        mvc.perform(patch("/properties/" + p.getId() + "/restore")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("rejected"));
+
+        Property saved = properties.findById(p.getId()).orElseThrow();
+        assertThat(saved.isArchived()).isFalse();
+        assertThat(saved.getStatus()).isEqualTo(PropertyStatus.REJECTED);
+    }
+
+    @Test
+    @DisplayName("editing a needs-info listing resubmits the review and clears old checklist ticks")
+    void needsInfoListingEditResubmits() throws Exception {
+        User o = owner("9876300199");
+        User ops = staff("9876300200");
+        Property p = pendingListing(o, "Needs info resubmit");
+
+        openCaseAndTickPhotoLine(p, o, ops);
+        mvc.perform(post(verificationPath(p, "/decision")).header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"decision\":\"needs_info\",\"reasonCode\":\"photos_not_real\","
+                        + "\"note\":\"Use current photos.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("needs_info"))
+                .andExpect(jsonPath("$.progress.flags").value(org.hamcrest.Matchers.hasItem("needs_info")));
+
+        mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locality\":\"Viman Nagar\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("pending"));
+
+        mvc.perform(get(verificationPath(p, "")).header(HttpHeaders.AUTHORIZATION, bearer(ops)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("in_review"))
+                .andExpect(jsonPath("$.progress.step").value("in_review"))
+                .andExpect(jsonPath("$.progress.flags").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("needs_info"))))
+                .andExpect(jsonPath("$.checklist[?(@.item == 'Photos are real and match the listing')].pass")
+                        .value(false));
+    }
+
+    @Test
+    @DisplayName("an off-search owner edit clears old checklist ticks")
+    void offSearchEditUnticksChecklist() throws Exception {
+        User o = owner("9876300201");
+        User ops = staff("9876300202");
+        Property p = approvedListing(o, "Off search checklist reset");
+
+        openCaseAndTickPhotoLine(p, o, ops);
+        mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"locality\":\"Viman Nagar\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("pending"));
+
+        mvc.perform(get(verificationPath(p, "")).header(HttpHeaders.AUTHORIZATION, bearer(ops)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("in_review"))
+                .andExpect(jsonPath("$.checklist[?(@.item == 'Photos are real and match the listing')].pass")
+                        .value(false));
+    }
+
+    @Test
+    @DisplayName("a stays-live re-check keeps the approval's ticks, so 'looks fine' clears it")
+    void liveRecheckKeepsTicksAndPasses() throws Exception {
+        User o = owner("9876300221");
+        User ops = staff("9876300222");
+        Property p = approvedListing(o, "Live recheck keeps ticks");
+
+        openCaseAndTickPhotoLine(p, o, ops);
+        mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\":26000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"))
+                .andExpect(jsonPath("$.recheckPending").value(true));
+
+        mvc.perform(patch("/properties/" + p.getId() + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"expectedStatus\":\"approved\"}"))
+                .andExpect(status().isOk());
+        assertThat(properties.findById(p.getId()).orElseThrow().isRecheckPending()).isFalse();
+    }
+
+    @Test
+    @DisplayName("a needs-info owner edit resubmits even when the listing is already pending")
+    void needsInfoOwnerEditResubmits() throws Exception {
+        User o = owner("9876300205");
+        User ops = staff("9876300206");
+        Property p = pendingListing(o, "Needs info edit reset");
+
+        openCaseAndTickPhotoLine(p, o, ops);
+        mvc.perform(post(verificationPath(p, "/decision")).header(HttpHeaders.AUTHORIZATION, bearer(ops))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"needs_info\",\"reasonCode\":\"photos_not_real\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("needs_info"));
+
+        mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\":26000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("pending"));
+
+        mvc.perform(get(verificationPath(p, "")).header(HttpHeaders.AUTHORIZATION, bearer(ops)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("in_review"))
+                .andExpect(jsonPath("$.progress.step").value("in_review"))
+                .andExpect(jsonPath("$.progress.flags").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("needs_info"))))
+                .andExpect(jsonPath("$.checklist[?(@.item == 'Photos are real and match the listing')].pass")
+                        .value(false));
+    }
+
+    @Test
+    @DisplayName("a PATCH to ready-to-move sale clears the stale available date")
+    void readyToMoveSalePatchClearsAvailableDate() throws Exception {
+        User o = owner("9876300002");
+        Property p = approvedSaleListing(o);
+        p.setPossession("under-construction");
+        p.setFormDetails(Map.of("availableFrom", "2027-01-20", "ownership", "Freehold"));
+        p.setAvailableOn(AvailableOn.today().plusDays(40));
+        properties.saveAndFlush(p);
+
+        mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"possession\":\"ready-to-move\"}"))
+                .andExpect(status().isOk());
+        storedListing(o, p.getId())
+                .andExpect(jsonPath("$.availableDate").doesNotExist())
+                .andExpect(jsonPath("$.availableOn").doesNotExist())
+                .andExpect(jsonPath("$.formDetails.availableFrom").doesNotExist())
+                .andExpect(jsonPath("$.formDetails.ownership").value("Freehold"));
     }
 
     @Test
@@ -241,15 +433,9 @@ class ListingFoundationTest extends AbstractApiTest {
         assertRevertsToPending("{\"bhk\":3}");
         assertRevertsToPending("{\"propertyType\":\"villa\"}");
         assertRevertsToPending("{\"locality\":\"Baner\"}");
-        assertRevertsToPending("{\"deal\":\"buy\"}");
+        assertRevertsToPending("{\"deal\":\"buy\",\"price\":100000}");
     }
 
-    /**
-     * The other three foundation fields (Q14). Each is still a filter a buyer trusts, so each is
-     * still re-checked — relabelling an unfurnished flat as furnished, or an under-construction one
-     * as ready to move, moves it into a filter it has not earned. But the listing is still that
-     * flat, so the re-check happens with it in search rather than out of it.
-     */
     @Test
     @DisplayName("price, furnishing and possession stay live and queue a re-check instead")
     void attributeEditsStayLive() throws Exception {
@@ -258,24 +444,253 @@ class ListingFoundationTest extends AbstractApiTest {
         assertStaysLiveAndQueuesRecheck("{\"possession\":\"ready-to-move\"}", "possession");
     }
 
-    /**
-     * The fourth stays-live field, which no buyer filters on (D219). An owner who edits the address
-     * has either corrected a typo or moved the listing onto a flat somebody else is already selling,
-     * and the two are indistinguishable from the text. The duplicate probe only speaks when the
-     * second case actually collides with a live listing; this re-check is raised either way, so the
-     * desk sees the edit rather than only its consequences.
-     */
+    @Test
+    @DisplayName("a partial PATCH cannot put changed values outside listing sanity limits")
+    void partialPatchRejectsChangedSanityLimitViolations() throws Exception {
+        User saleOwner = owner("9876541111");
+        Property sale = approvedSaleListing(saleOwner);
+        mvc.perform(patch("/me/listings/" + sale.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(saleOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\":85000}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("price"));
+
+        User rentOwner = owner("9876541112");
+        Property rent = approvedListing(rentOwner);
+        mvc.perform(patch("/me/listings/" + rent.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(rentOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deposit\":600001}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("deposit"));
+
+        User areaOwner = owner("9876541113");
+        Property area = approvedSaleListing(areaOwner);
+        mvc.perform(patch("/me/listings/" + area.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(areaOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"carpetArea\":99}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("carpetArea"));
+
+        User dealOwner = owner("9876541114");
+        Property deal = approvedListing(dealOwner);
+        mvc.perform(patch("/me/listings/" + deal.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(dealOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deal\":\"buy\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("price"));
+
+        User typeOwner = owner("9876541115");
+        Property type = new Property(typeOwner, "Small godown", "rent", "warehouse",
+                25_000L, "Kothrud", "Pune");
+        type.setStatus(PropertyStatus.APPROVED);
+        type.setLocalitySlug("kothrud");
+        type.setCarpetArea(new BigDecimal("50"));
+        properties.saveAndFlush(type);
+        mvc.perform(patch("/me/listings/" + type.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(typeOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyType\":\"Flat / Apartment\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("carpetArea"));
+
+        User reraOwner = owner("9876541118");
+        Property rera = approvedSalePlot(reraOwner, "P52100012345", "yes");
+        mvc.perform(patch("/me/listings/" + rera.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(reraOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reraId\":\"not-a-rera-id\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("reraId"));
+
+        User plottedOwner = owner("9876541119");
+        Property plotted = approvedSalePlot(plottedOwner, null, "no");
+        mvc.perform(patch("/me/listings/" + plotted.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(plottedOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"formDetails\":{\"plottedProject\":\"yes\"}}"))
+                .andExpect(status().isOk());
+        storedListing(plottedOwner, plotted.getId())
+                .andExpect(jsonPath("$.formDetails.plottedProject").value("yes"));
+    }
+
     @Test
     @DisplayName("an address edit stays live and queues a re-check, naming the field")
     void anAddressEditStaysLiveAndQueuesARecheck() throws Exception {
         assertStaysLiveAndQueuesRecheck("{\"address\":\"Flat 902, C Wing, Rohan Nilay\"}", "address");
     }
 
-    /**
-     * The point of the whole split, asserted against the thing that actually pays the owner: the
-     * public search. {@code status} staying {@code approved} is only the mechanism —
-     * {@code GET /properties} hard-floors to approved and un-archived, so this is the promise.
-     */
+    @Test
+    @DisplayName("photos, description and amenities stay live and queue a re-check")
+    void evidenceEditsStayLiveAndQueueARecheck() throws Exception {
+        User o = owner("9876300003");
+        Property p = approvedListing(o);
+        mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"images\":[\"" + upload(o) + "\"]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"))
+                .andExpect(jsonPath("$.recheckPending").value(true))
+                .andExpect(jsonPath("$.recheckReason").value("images"));
+        assertStaysLiveAndQueuesRecheck("{\"description\":\"Newly renovated, south facing.\"}", "description");
+        assertStaysLiveAndQueuesRecheck("{\"amenities\":[\"Gym\",\"Lift\"]}", "amenities");
+        assertStaysLiveAndQueuesRecheck("{\"video\":\"dQw4w9WgXcQ\"}", "video");
+    }
+
+    @Test
+    @DisplayName("society and meter edits stay live, queue a re-check, and revoke the ownership badge")
+    void societyAndMeterEditsStayLiveAndRevokeOwnership() throws Exception {
+        User societyOwner = owner("9876541121");
+        Property societyListing = approvedListing(societyOwner);
+        societyListing.verifyOwnership(java.time.Instant.now(), null);
+        properties.saveAndFlush(societyListing);
+        UUID societyId = society("new-recheck-society");
+
+        mvc.perform(patch("/me/listings/" + societyListing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(societyOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"societyId\":\"" + societyId + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"))
+                .andExpect(jsonPath("$.recheckPending").value(true))
+                .andExpect(jsonPath("$.recheckReason").value("societyId"));
+        storedListing(societyOwner, societyListing.getId()).andExpect(jsonPath("$.ownershipVerified").value(false));
+
+        User meterOwner = owner("9876541122");
+        Property meterListing = approvedListing(meterOwner);
+        meterListing.setElectricityMeterNo("170012345678");
+        meterListing.verifyOwnership(java.time.Instant.now(), null);
+        properties.saveAndFlush(meterListing);
+
+        mvc.perform(patch("/me/listings/" + meterListing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(meterOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"electricityMeterNo\":\"170087654321\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"))
+                .andExpect(jsonPath("$.recheckPending").value(true))
+                .andExpect(jsonPath("$.recheckReason").value("electricityMeterNo"));
+        storedListing(meterOwner, meterListing.getId()).andExpect(jsonPath("$.ownershipVerified").value(false));
+    }
+
+    @Test
+    @DisplayName("address edits revoke ownership while floor and pincode stay ordinary")
+    void addressRevokesOwnershipButFloorAndPincodeDoNotRecheck() throws Exception {
+        User o = owner("9876541123");
+        Property p = approvedListing(o);
+        p.verifyOwnership(java.time.Instant.now(), null);
+        properties.saveAndFlush(p);
+
+        mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"address\":\"Flat 902, C Wing\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recheckPending").value(true))
+                .andExpect(jsonPath("$.recheckReason").value("address"));
+        storedListing(o, p.getId()).andExpect(jsonPath("$.ownershipVerified").value(false));
+
+        User ordinaryOwner = owner("9876541124");
+        Property ordinary = approvedListing(ordinaryOwner);
+        mvc.perform(patch("/me/listings/" + ordinary.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(ordinaryOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"floor\":7,\"pincode\":\"411045\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"))
+                .andExpect(jsonPath("$.recheckPending").value(false));
+    }
+
+    @Test
+    @DisplayName("carpet area re-check starts at twenty percent and map moves at five hundred metres")
+    void thresholdedEditsQueueOnlyAfterTheMaterialMove() throws Exception {
+        User carpetOwner = owner("9876541125");
+        Property carpet = approvedSaleListing(carpetOwner);
+        mvc.perform(patch("/me/listings/" + carpet.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(carpetOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"carpetArea\":1199}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recheckPending").value(false));
+
+        User materialCarpetOwner = owner("9876541127");
+        Property materialCarpet = approvedSaleListing(materialCarpetOwner);
+        mvc.perform(patch("/me/listings/" + materialCarpet.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(materialCarpetOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"carpetArea\":1200}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recheckPending").value(true))
+                .andExpect(jsonPath("$.recheckReason").value("carpetArea"));
+
+        User mapOwner = owner("9876541126");
+        Property map = approvedListing(mapOwner);
+        map.setLat(18.5204);
+        map.setLng(73.8567);
+        properties.saveAndFlush(map);
+        mvc.perform(patch("/me/listings/" + map.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(mapOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lat\":18.5210,\"lng\":73.8567}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recheckPending").value(false));
+
+        mvc.perform(patch("/me/listings/" + map.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(mapOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lat\":18.5260,\"lng\":73.8567}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.recheckPending").value(true))
+                .andExpect(jsonPath("$.recheckReason").value("location"));
+    }
+
+    @Test
+    @DisplayName("RERA and plotted-project evidence changes stay live and queue a re-check")
+    void reraEvidenceEditsStayLiveAndQueueARecheck() throws Exception {
+        User reraOwner = owner("9876541116");
+        Property rera = approvedSalePlot(reraOwner, "P52100012345", "yes");
+        mvc.perform(patch("/me/listings/" + rera.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(reraOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reraId\":\"P52100012346\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"))
+                .andExpect(jsonPath("$.recheckPending").value(true))
+                .andExpect(jsonPath("$.recheckReason").value("reraId"));
+
+        User plottedOwner = owner("9876541117");
+        Property plotted = approvedSalePlot(plottedOwner, "P52100012345", "no");
+        mvc.perform(patch("/me/listings/" + plotted.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(plottedOwner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"formDetails\":{\"plottedProject\":\"yes\"}}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"))
+                .andExpect(jsonPath("$.recheckPending").value(true))
+                .andExpect(jsonPath("$.recheckReason").value("plottedProject"));
+    }
+
+    @Test
+    @DisplayName("legacy plotted-project RERA gaps do not block unrelated edits")
+    void legacyPlottedProjectReraGapAllowsUnrelatedEdits() throws Exception {
+        User o = owner("9876541120");
+        Property p = approvedSalePlot(o, null, "yes");
+
+        mvc.perform(patch("/me/listings/" + p.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(o))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"negotiable\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"))
+                .andExpect(jsonPath("$.recheckPending").value(false));
+    }
+
+    /** {@code status} staying approved is the mechanism; {@code GET /properties} hard-floors to approved and
+     *  un-archived, so this is the promise. */
     @Test
     @DisplayName("a price edit leaves the listing findable in public search, re-check and all")
     void aPriceEditKeepsTheListingInSearch() throws Exception {
@@ -300,11 +715,8 @@ class ListingFoundationTest extends AbstractApiTest {
                 .isTrue();
     }
 
-    /**
-     * When one PATCH trips both halves, the revert wins and no separate re-check is left behind: a
-     * full re-moderation already looks at the whole listing, so queueing the price change as well
-     * would put the same edit in front of a moderator twice.
-     */
+    /** A full re-moderation already looks at the whole listing, so queueing the price change too would show
+     *  the same edit twice. */
     @Test
     @DisplayName("an edit that trips both halves reverts, and does not also queue a re-check")
     void remoderationSupersedesRecheck() throws Exception {
@@ -320,11 +732,7 @@ class ListingFoundationTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.recheckPending").value(false));
     }
 
-    /**
-     * A stays-live re-check is a request for a moderator's decision, and this is where decisions are
-     * made — so acting on the listing at all clears it. Without this the queue only ever grows, and
-     * "live but flagged" becomes a flag nobody reads, which is the failure mode Q14 named.
-     */
+    /** Otherwise the queue only grows and "live but flagged" becomes a flag nobody reads. */
     @Test
     @DisplayName("a moderator setting a status clears the pending re-check")
     void moderatorActionClearsTheRecheck() throws Exception {
@@ -341,6 +749,7 @@ class ListingFoundationTest extends AbstractApiTest {
                         .content("{\"price\":31000}"))
                 .andExpect(jsonPath("$.recheckPending").value(true));
 
+        openCaseAndTickPhotoLine(p, o, staff);
         mvc.perform(patch("/properties/" + p.getId() + "/status")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -352,10 +761,8 @@ class ListingFoundationTest extends AbstractApiTest {
                 .isFalse();
     }
 
-    /**
-     * The other half of the rule. Without this, "re-review everything" would pass every case above
-     * and make editing a photo caption cost a moderator's time.
-     */
+    /** Without this, "re-review everything" passes every case above while making a deposit correction cost a
+     *  moderator's time. */
     @Test
     @DisplayName("a non-searchable edit still leaves an approved listing approved and unqueued")
     void nonFoundationEditsDoNotRevert() throws Exception {
@@ -365,18 +772,12 @@ class ListingFoundationTest extends AbstractApiTest {
         mvc.perform(patch("/me/listings/" + p.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"description\":\"Newly painted, great light\",\"deposit\":50000}"))
+                        .content("{\"deposit\":50000,\"negotiable\":false}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("approved"))
                 .andExpect(jsonPath("$.recheckPending").value(false));
     }
 
-    /**
-     * PATCH semantics: re-sending a field's current value is not an edit. Worth pinning separately
-     * because the natural implementation — "the field was present, so re-review" — passes every test
-     * above while sending listings to a moderator for changing nothing, which is how an owner saving
-     * a form twice loses a day (or, now, wastes a moderator's).
-     */
     @Test
     @DisplayName("re-sending an unchanged foundation value is not an edit, on either side")
     void unchangedValuesAreNotEdits() throws Exception {

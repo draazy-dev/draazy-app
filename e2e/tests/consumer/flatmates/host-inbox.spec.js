@@ -1,0 +1,92 @@
+import { test, expect } from '@playwright/test';
+import { API, apiLogin, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { ACTORS } from '../../../fixtures/live.js';
+import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { withSocietyId } from '../../../helpers/liveSociety.js';
+/* Accept is verified by reading `GET /me/flatmate-requests` from an independent API client, not by
+   the optimistic UI flip — a handler that dropped the write would still hide the button. */
+
+const BASE = process.env.BASE_URL || 'http://localhost:5173';
+const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
+const track = flatmateCleanup(test);
+
+async function approve(id) {
+  const { accessToken } = await apiLogin(ACTORS.admin);
+  const res = await fetch(`${API}/admin/flatmates/${id}/moderation`, {
+    method: 'PATCH',
+    headers: auth(accessToken),
+    body: JSON.stringify({ modStatus: 'live', note: 'e2e' }),
+  });
+  expect(res.status, `approve ${id}: ${await res.clone().text()}`).toBeLessThan(300);
+}
+
+test('host sees a seeker\'s room interest in the dashboard, and Accept persists to the server', async ({ page }) => {
+  const hostMobile = uniqueMobile();
+  const { accessToken: hostToken } = await apiLogin(hostMobile);
+
+  const society = `Inbox Host ${Date.now().toString(36)}`;
+  const roomRes = await fetch(`${API}/flatmates/rooms`, {
+    method: 'POST',
+    headers: auth(hostToken),
+    body: JSON.stringify({
+      ...(await withSocietyId(hostToken, { society })),
+      roomType: 'Private room',
+      locality: 'Baner',
+      rentShare: 15000,
+      bhk: '2',
+      attachedBath: 'attached',
+      furnishing: 'semi',
+      hostRole: 'owner',
+      photos: await uploadedListingPhotos(hostToken),
+    }),
+  });
+  const roomBody = await roomRes.text();
+  expect(roomRes.status, roomBody).toBe(201);
+  const room = JSON.parse(roomBody);
+  track('rooms', room.id, hostToken);
+
+  await approve(room.id);
+
+  const seekerMobile = uniqueMobile();
+  const { accessToken: seekerToken } = await apiLogin(seekerMobile);
+
+  const interestRes = await fetch(`${API}/flatmates/rooms/${room.id}/interest`, {
+    method: 'POST',
+    headers: auth(seekerToken),
+    body: JSON.stringify({ message: 'I am interested in this room' }),
+  });
+  expect(interestRes.status, await interestRes.clone().text()).toBeLessThan(300);
+  // --- Browser: sign the host in and open the enquiries panel ---
+  await signedInAs(page, hostMobile);
+  await page.goto(`${BASE}/dashboard#enquiries`);
+  // The dashboard opens on "All leads" (the unified queue). The Flatmate sub-tab exists as a
+  // filter; verify it shows a badge proving the server returned the request, then select it.
+  const flatTab = page.getByRole('tab', { name: /Flatmate/i });
+  await expect(flatTab).toBeVisible({ timeout: 15_000 });
+  await flatTab.click();
+  // --- Assert the row renders with the room's society name and the kind label ---
+  // The row's "Open details" button carries the request's meta text. Locate by text content.
+  const rowText = page.getByText(new RegExp(`Room enquiry.*${society}|${society}.*Room enquiry`));
+  await expect(rowText.first()).toBeVisible({ timeout: 15_000 });
+  // --- Click Accept and prove it reaches the server ---
+  // Accept is rendered after the row in the same list item (our request is the only flatmate one).
+  const acceptBtn = page.getByRole('button', { name: /^Accept$/i }).first();
+  await expect(acceptBtn).toBeVisible({ timeout: 5_000 });
+  await acceptBtn.click();
+  // Poll API with a fresh client so browser state cannot satisfy the assertion.
+  const { accessToken: freshHostToken } = await apiLogin(hostMobile);
+  await expect
+    .poll(async () => {
+      const res = await fetch(`${API}/me/flatmate-requests?size=100`, {
+        headers: auth(freshHostToken),
+      });
+      expect(res.status).toBe(200);
+      const row = (await res.json()).content.find((r) => r.targetId === room.id);
+      return row?.status ?? 'missing';
+    }, { message: 'Accept must reach the server, not just flip the button', timeout: 15_000 })
+    .toBe('accepted');
+
+  await page.getByTestId('flatmate-req-chat').click({ timeout: 15_000 });
+  await expect(page).toHaveURL(/\/messages\?c=/, { timeout: 15_000 });
+  await expect(page.locator('.pc-input')).toBeVisible({ timeout: 15_000 });
+});

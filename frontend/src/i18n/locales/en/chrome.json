@@ -31,6 +31,7 @@
     "moreActions": "More actions",
     "selectPlaceholder": "Select…",
     "searchPlaceholder": "Search…",
+    "pickerCancel": "Cancel",
     "qualityScore": "Quality Score",
     "listingQuality": "Listing quality: {{score}}/100",
     "qualityShort": "Quality: {{score}}/100",
@@ -40,12 +41,16 @@
     "noMatches": "No matches",
     "typeToSearch": "Type to search…",
     "searching": "Searching…",
+    "localityAdding": "Adding locality…",
+    "localityPick": "Pick the locality from the suggestions.",
+    "localityFailed": "Couldn’t add that locality. Try again.",
+    "clearPlace": "Clear place",
     "featureNoun": "feature"
   },
   "chrome": {
     "maintenanceTitle": "We’ll be right back",
     "maintenanceBody": "Draazy is undergoing scheduled maintenance. Please check back shortly — your saved data is safe.",
-    "staffSignIn": "Staff & Admin sign in →"
+    "postPropertyFree": "Post property — Free"
   },
   "install": {
     "title": "Keep Draazy one tap away",

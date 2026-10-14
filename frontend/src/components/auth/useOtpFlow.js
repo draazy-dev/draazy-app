@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { classifyOtpSendError } from '../../lib/otpSendError.js';
+import { healStaleShell } from '../../lib/seamErrors.js';
 
-/* Simulated dispatch for the flows still on mocks: the 700ms delay preserves the "Sending…"
-   affordance. Its own cooldown, because nothing here can refuse a resend. */
-const mockDispatch = () => new Promise((resolve) => {
+/* Default dispatch for callers that have no sender of their own: the 700ms delay preserves the
+   "Sending…" affordance. Its own cooldown, because nothing here can refuse a resend. */
+const inertDispatch = () => new Promise((resolve) => {
   setTimeout(() => resolve({ resendAfterSeconds: 30 }), 700);
 });
 
@@ -10,12 +12,8 @@ const mockDispatch = () => new Promise((resolve) => {
    `OtpSendBudget.SEND_COOLDOWN`, so the pessimistic guess is the deployed one. */
 const DEFAULT_RESEND_COOLDOWN_SECONDS = 60;
 
-/**
- * Send-OTP + resend-timer state machine. The countdown is the server's, and `dispatch` keeps the
- * hook domain-agnostic. Rules: docs/flows/consumer/auth.md § OTP flow.
- * @param {(mobile: string) => Promise<{ resendAfterSeconds?: number }|any>} [dispatch]
- */
-export function useOtpFlow(dispatch = mockDispatch) {
+/** The countdown is the server's. Rules: docs/flows/consumer/auth.md § OTP flow. */
+export function useOtpFlow(dispatch = inertDispatch) {
   const [otpSent, setOtpSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [otp, setOtp] = useState('');
@@ -51,8 +49,8 @@ export function useOtpFlow(dispatch = mockDispatch) {
     timer.current = setInterval(tick, 1000);
   }, [tick]);
 
-  /** Dispatch a code. Resolves `true` only if one was actually sent, so a caller can tell a
-      delivered code from a refused one without reading `sendError` through a stale closure. */
+  /** Resolves `true` only if a code was actually sent. On failure `sendError` holds
+      `{ messageKey, count? }`, not a sentence — pass it through `t()`. */
   const send = useCallback(async (mobile) => {
     const mine = session.current;
     setSending(true);
@@ -69,7 +67,10 @@ export function useOtpFlow(dispatch = mockDispatch) {
       if (session.current !== mine) return false;
       // Leave `otpSent` untouched: on a rate-limit or network failure the user must stay on the
       // "send" step rather than facing a code box no code will ever arrive for.
-      setSendError(err?.message || 'Could not send the OTP. Please try again.');
+      setSendError(classifyOtpSendError(err));
+      // Set the message FIRST: the heal only paints its absence. If a reload starts, this sentence
+      // is never read; if it is refused, it is the fallback the user was always going to get.
+      healStaleShell(err);
       // A refusal that says when to come back restarts the countdown, or the button stays live and
       // the only response the screen offers is the one that just failed.
       if (Number.isFinite(err?.retryAfterSeconds)) startTimer(err.retryAfterSeconds);
@@ -116,8 +117,10 @@ export function useOtpFlow(dispatch = mockDispatch) {
 
   useEffect(() => () => clearInterval(timer.current), []);
 
+  /* `setSendError` is deliberately NOT returned: `sendError` is a translatable message by contract,
+     and a sentence written into it would never reach `t()`. */
   return {
-    otpSent, sending, otp, setOtp, otpError, setOtpError, sendError, setSendError,
+    otpSent, sending, otp, setOtp, otpError, setOtpError, sendError,
     send, resend, reset, seconds, canResend: otpSent && seconds === 0,
   };
 }

@@ -29,9 +29,8 @@
 
 ## 3. Actors & roles
 - **Reporter = any signed-in user** (maker) who flags a listing/user from the consumer app.
-- **Checker = admin / manager**, or a staff member with the `reports` module
-  (`ModuleRoute moduleKey="reports"` + `FlagRoute flag="reports"`, inside
-  `RoleRoute roles={['admin','manager']}` in `src/App.jsx`).
+- **Checker = admin / manager**, or staff holding the `reports` function (Listings, Users and
+  Flatmate posts tabs) and/or the `reviews` function (Reviews tab). Either one opens `/admin/reports`.
 - Guards are UX-only (cross-cutting section 1).
 
 ## 4. Entities touched
@@ -77,7 +76,7 @@
   so the platform knows exactly who filed the report — telling a moderator it was anonymous would
   suggest an unattributable complaint, which is a far easier one to dismiss. The string is rendered
   in four places (table column, detail drawer, mobile card and the CSV export, where a blank cell
-  would read as missing rather than withheld); `admin/live-reports` asserts that "Anonymous" appears
+  would read as missing rather than withheld); `admin/reports` asserts that "Anonymous" appears
   **nowhere** on the page, which is what caught the last two copies.
 - **`kind` routing:** rooms, flatmate seekers and groups all report as `kind: 'share'` →
   `targetType: 'post'`, and land in the admin **posts** tab. That tab arrived late: the queue split

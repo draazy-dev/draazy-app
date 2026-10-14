@@ -1,18 +1,8 @@
-/* ---------- property-type-aware filter relevance ----------
-   Single source of truth for WHICH filter sections are meaningful given the
-   Property Type(s) the user has selected. Used by both the Filters UI (to render
-   only relevant groups) and the Listings results/chips logic (so a filter that is
-   hidden can never silently narrow results). Selecting nothing means "browse all"
-   → every section is shown.
+/* Shared by the Filters UI and results logic so a hidden filter can
+   never silently narrow results; selecting nothing means browse all. */
 
-   The eight canonical property-type keys collapse into three groups that actually
-   differ in what a buyer/tenant needs to see:
-     residential — flat, house, villa, pg, flatmates
-     commercial  — commercial
-     land        — plot (legacy), openplot, farmland                              */
-
-const RESIDENTIAL = new Set(['flat', 'house', 'villa', 'pg', 'flatmates']);
-const LAND = new Set(['plot', 'openplot', 'farmland']);
+const RESIDENTIAL = new Set(['flat', 'house', 'villa', 'flatmates']);
+const LAND = new Set(['plot', 'farmland']);
 
 export function typeGroups(types) {
   const g = new Set();
@@ -24,31 +14,23 @@ export function typeGroups(types) {
   return g;
 }
 
-/* Sections whose relevance depends on the selected type. Anything not listed here
-   (budget, property type, localities, area, verification, near a place) is always
-   relevant. `commercialType` keeps its own upstream condition. `room` (Private/
-   Shared) is a flatmates-only concept; `sharing` (occupancy) is PG/Hostel-only. */
+/* Sections not listed are always relevant; `room` (Private/Shared) is a flatmates-only concept. */
 export function sectionVisible(section, types) {
   const g = typeGroups(types || new Set());
-  // Land Use is a land-only filter: gate it on the land group even in browse-all,
-  // so a stale zone selection can never apply to (or hide) non-land listings.
-  if (section === 'landUse') return g.has('land');
-  // Sharing (PG occupancy) is meaningful only when PG/Hostel is in the selection,
-  // even in browse-all — so a stale sharing pick can't narrow non-PG results.
-  if (section === 'sharing') return !!types && types.has('pg');
+  if (section === 'landUse' || section === 'na') return g.size === 1 && g.has('land');
   if (section === 'room') return !!types && types.has('flatmates');
+  if (section === 'food') return g.size === 1 && g.has('residential');
+  if (section === 'shell' || section === 'preLeased') return g.size === 1 && g.has('commercial');
   if (!types || types.size === 0) return true; // browse-all
   const builtOrCommercial = g.has('residential') || g.has('commercial');
+  const builtOnly = builtOrCommercial && !g.has('land');
+  const residentialOnly = g.size === 1 && g.has('residential');
   switch (section) {
     case 'bhk':
-      // BHK is meaningless for a PG (defined by occupancy/Sharing). Hide it when
-      // PG is the only residential type chosen, but keep it when a BHK-based home
-      // (flat/house/villa/flatmates) is also selected.
-      return [...types].some((t) => RESIDENTIAL.has(t) && t !== 'pg');
+    case 'facing':
+    case 'baths':
     case 'tenants':
-    // falls through — housing-society & society-conveyance checks only exist for residential homes.
-    case 'verifSociety':
-      return g.has('residential');
+      return residentialOnly;
     case 'furnishing':
     case 'availability':
     case 'construction':
@@ -58,7 +40,7 @@ export function sectionVisible(section, types) {
     case 'availFrom':
     // falls through — RERA registration covers residential & commercial projects, not raw land.
     case 'verifRera':
-      return builtOrCommercial;
+      return builtOnly;
     default:
       return true;
   }
@@ -66,4 +48,4 @@ export function sectionVisible(section, types) {
 
 /* Per-verification-option relevance. Options not listed here (Verified Owner,
    Ownership Verified) apply to every property type. */
-export const VERIF_SECTIONS = { rera: 'verifRera', society: 'verifSociety', conveyance: 'verifSociety' };
+export const VERIF_SECTIONS = { rera: 'verifRera' };

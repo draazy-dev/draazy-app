@@ -1,8 +1,13 @@
 package com.draazy.api.finance.payment;
 
 import com.draazy.api.billing.BillingPayments;
+import com.draazy.api.billing.refund.PaymentDisputes;
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.provider.PaymentGateway;
+import com.draazy.api.provider.ProviderCalls;
 import com.draazy.api.provider.cashfree.WebhookSignature;
+import com.draazy.api.services.request.ServiceRequestAmendments;
+import com.draazy.api.services.request.ServiceRequestRefunds;
 import com.draazy.api.services.request.ServiceRequestService;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -21,44 +26,8 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
-/**
- * The Cashfree payment callback at {@code /webhooks/cashfree/payment} — the source of truth for
- * whether a purchase was actually paid for.
- *
- * <p>This is the most consequential handler in the application: the synchronous {@code 201} on a
- * checkout only says an order was created, and <em>this</em> is what tells a customer they were
- * charged. The same four rules as the DigiLocker callback apply, for the same reasons.
- *
- * <ol>
- *   <li><em>Signature-verified.</em> The route is {@code permitAll} because a provider has no user
- *       session; authenticity is an HMAC over the raw body ({@link WebhookSignature}). Without it,
- *       anyone who learned the URL could mark any order paid.</li>
- *   <li><em>Raw body, not a bound object.</em> The signature covers the exact bytes sent, so the
- *       body arrives as a {@code String} and is parsed here. Letting Spring bind and re-serialize
- *       would change key order and whitespace, and every genuine callback would fail.</li>
- *   <li><em>Idempotent.</em> Deduped on {@code data.order.order_id}, which every settling family
- *       stores under a unique constraint. Cashfree explicitly may redeliver an event, and each
- *       family's state machine refuses to move an order that has already settled.</li>
- *   <li><em>Always {@code 200}.</em> A bad signature, malformed JSON and an unknown order all
- *       return the same empty {@code 200}. A provider that sees an error retries forever, and a
- *       differentiated response would let a prober confirm which order ids are real.</li>
- * </ol>
- *
- * <p><strong>The payload is nested, and that matters (spec fix S15).</strong> The contract used to
- * document a flat body that Cashfree has never sent. Anyone implementing it faithfully would have
- * built a handler that silently never fired: every field would read null, the signature would still
- * verify, and the endpoint would answer 200 while doing nothing — the worst failure mode available
- * to a payment webhook.
- *
- * <p><strong>Why it lives in {@code finance} rather than in a product package.</strong>
- * Three unrelated families settle here — subscriptions, boosts and paid service requests — so the
- * callback belongs to none of them, and it cannot move into the shared kernel either: it has to
- * call into all three, and {@code package-structure.md} §2 forbids the kernel from importing a
- * feature ({@code ArchitectureBoundaryTest} fails the build over it). {@code finance} is the
- * context ranked above billing and services precisely so that this arrow is legal. It sat in
- * {@code finance.rent} while online rent-pay existed; when that rail was withdrawn the handler
- * stayed in {@code finance}, one package across, because the other three still depend on it.
- */
+// Cashfree payment callback — source of truth for whether a purchase was paid.
+// Rationale: docs/flows/admin/finance.md#payment-webhook-signature-raw-body-idempotent-always-200
 @RestController
 public class PaymentWebhookController {
 
@@ -67,103 +36,185 @@ public class PaymentWebhookController {
     /** Provider status meaning the money moved. */
     private static final String PROVIDER_SUCCESS = "SUCCESS";
 
+    private static final String REFUND_EVENT = "REFUND_STATUS_WEBHOOK";
+
+    private static final String PASS_REFUND_PREFIX = "lp_";
+
+    private static final String DISPUTE_EVENT_PREFIX = "DISPUTE_";
+
     private final BillingPayments billingPayments;
     private final ServiceRequestService serviceRequests;
+    private final ServiceRequestAmendments amendments;
+    private final ServiceRequestRefunds refunds;
     private final WebhookSignature webhookSignature;
     private final ObjectMapper objectMapper;
+    private final ProviderCalls calls;
 
     public PaymentWebhookController(BillingPayments billingPayments,
-            ServiceRequestService serviceRequests, WebhookSignature webhookSignature,
-            ObjectMapper objectMapper) {
+            ServiceRequestService serviceRequests, ServiceRequestAmendments amendments,
+            ServiceRequestRefunds refunds, WebhookSignature webhookSignature, ObjectMapper objectMapper, ProviderCalls calls) {
         this.billingPayments = billingPayments;
         this.serviceRequests = serviceRequests;
+        this.amendments = amendments;
+        this.refunds = refunds;
         this.webhookSignature = webhookSignature;
         this.objectMapper = objectMapper;
+        this.calls = calls;
     }
 
-    /**
-     * {@code POST /webhooks/cashfree/payment} (contract {@code cashfreePaymentWebhook}).
-     *
-     * @param signature {@code x-webhook-signature}, base64 HMAC-SHA256 over {@code timestamp + body}
-     * @param timestamp {@code x-webhook-timestamp}, signed alongside the body so a captured callback
-     *                  cannot be replayed under a new time
-     * @param rawBody   the exact bytes that were signed
-     */
+    /** {@code POST /webhooks/cashfree/payment}; timestamp is signed so a callback cannot be replayed. */
     @PostMapping(Routes.Webhooks.CASHFREE_PAYMENT)
     @ResponseStatus(HttpStatus.OK)
     public void cashfreePaymentWebhook(
             @RequestHeader(name = "x-webhook-signature", required = false) String signature,
             @RequestHeader(name = "x-webhook-timestamp", required = false) String timestamp,
-            @RequestBody(required = false) String rawBody) {
+            @RequestBody(required = false) byte[] rawBody) {
 
-        if (!webhookSignature.matches(signature, timestamp, rawBody)) {
-            log.warn("Rejected payment webhook: signature did not verify");
+        WebhookSignature.Verification verification =
+                webhookSignature.verify(signature, timestamp, rawBody);
+        if (verification != WebhookSignature.Verification.VERIFIED) {
+            logRefusal(verification, timestamp);
+            calls.record(ProviderCalls.CASHFREE, PaymentGateway.WEBHOOK, ProviderCalls.Outcome.FAILED,
+                    null, null, "signature " + verification, null);
             return;
         }
         try {
             JsonNode root = objectMapper.readTree(rawBody);
+            String eventType = root.path("type").asString(null);
+            if (REFUND_EVENT.equals(eventType)) {
+                settleRefund(root.path("data").path("refund"));
+                return;
+            }
+            if (eventType != null && eventType.startsWith(DISPUTE_EVENT_PREFIX)) {
+                settleDispute(eventType, root.path("data"));
+                return;
+            }
             JsonNode data = root.path("data");
             JsonNode payment = data.path("payment");
 
             String orderId = data.path("order").path("order_id").asString(null);
             String providerStatus = payment.path("payment_status").asString(null);
             boolean paid = PROVIDER_SUCCESS.equals(providerStatus);
+            if (paid) {
+                recordInstrument(orderId, payment.path("payment_method"));
+            }
 
             String paymentTime = payment.path("payment_time").asString(null);
             Instant settledAt = settlementInstant(paymentTime);
-            long amount = toWholeRupees(payment.path("payment_amount").asString(null));
+            BigDecimal exactAmount = exactAmount(payment.path("payment_amount").asString(null));
+            String currency = payment.path("payment_currency").asString(null);
 
-            // One gateway, several products: a subscription, a listing boost and a paid rent
-            // agreement all land on this same callback. Each side ignores an order id it does not
-            // own, so all three are always offered the event rather than guessing from the payload
-            // which it was.
-            //
-            // Each gets its own try/catch. They used to share one, which meant a failure in the
-            // first — an unrelated bug in one path, say — returned 200 without the others ever
-            // being asked. Cashfree does not retry a 200, so a paid agreement would have sat at
-            // awaiting-payment forever with the money already taken.
+            // Three families settle here; each ignores an order id it does not own. Each gets its
+            // own try/catch so a failure in one cannot rob the others of the event.
             List<Settlement> outcomes = List.of(
-                    settle("subscription", () -> billingPayments.settleSubscription(orderId, paid, settledAt)),
-                    settle("boost", () -> billingPayments.settleBoost(orderId, paid, settledAt)),
-                    settle("service-request", () -> serviceRequests.applyWebhookOutcome(orderId, paid, amount)));
+                    settle("subscription",
+                            () -> billingPayments.settleSubscription(orderId, paid, settledAt, exactAmount, currency)),
+                    settle("service-request",
+                            () -> serviceRequests.applyWebhookOutcome(orderId, paid, exactAmount, currency)),
+                    settle("amendment", () -> amendments.applyWebhookOutcome(orderId, paid, exactAmount, currency)));
 
-            if (paid && !outcomes.contains(Settlement.CLAIMED)) {
-                // Money moved and nothing recorded it. Dropping this silently is how a customer pays
-                // and nothing at all happens; there is no automatic recovery and no retry, so the
-                // only correct response is to make it findable — and to say which of the two very
-                // different causes it was, because they send whoever is paged to different places.
+            boolean unreconciled = paid && !outcomes.contains(Settlement.CLAIMED);
+            if (unreconciled) {
+
                 if (outcomes.contains(Settlement.FAILED)) {
                     log.error("Paid webhook for order {} was not settled: a handler failed (see the "
                             + "error above). The payment is unreconciled and will not be retried", orderId);
                 } else {
-                    log.error("Paid webhook for order {} matched no subscription, boost or service "
-                            + "request; the payment is unreconciled", orderId);
+                    log.error("Paid webhook for order {} matched no subscription, service request "
+                            + "or amendment; the payment is unreconciled", orderId);
                 }
             }
+            calls.record(ProviderCalls.CASHFREE, PaymentGateway.WEBHOOK,
+                    unreconciled ? ProviderCalls.Outcome.FAILED : ProviderCalls.Outcome.OK,
+                    null, orderId, unreconciled ? providerStatus + " unreconciled" : providerStatus, null);
 
         } catch (Exception unprocessable) {
+
             // why: a signed-but-unreadable payload is our bug or a provider change, not the
             // sender's problem. Retrying will not help, so we swallow it and keep the 200 contract.
             log.error("Signed payment webhook could not be processed", unprocessable);
+            calls.record(ProviderCalls.CASHFREE, PaymentGateway.WEBHOOK, ProviderCalls.Outcome.FAILED,
+                    null, null, "unprocessable", null);
         }
     }
 
-    /** What one settle handler did with the event. */
+    // Refund status events share this endpoint but carry no payment, so they must not reach settlement families.
+    private void settleRefund(JsonNode refund) {
+        String refundId = refund.path("refund_id").asString(null);
+        String status = refund.path("refund_status").asString(null);
+        String gatewayRef = refund.path("cf_refund_id").asString(null);
+        Settlement outcome = settle("refund", () -> refundId != null && refundId.startsWith(PASS_REFUND_PREFIX)
+                ? billingPayments.settleRefund(refundId, status, gatewayRef)
+                : refunds.applyWebhookOutcome(refundId, status));
+        boolean ok = outcome == Settlement.CLAIMED;
+        if (outcome == Settlement.NOT_MINE) {
+            log.warn("Refund webhook {} matched no refund of ours", refundId);
+        }
+        calls.record(ProviderCalls.CASHFREE, PaymentGateway.WEBHOOK,
+                ok ? ProviderCalls.Outcome.OK : ProviderCalls.Outcome.FAILED,
+                null, refund.path("order_id").asString(null), "refund " + status, null);
+    }
+
+    // Disputes freeze one order and tell the refunds desk; an unknown DISPUTE_* type still freezes on first sight.
+    private void settleDispute(String eventType, JsonNode data) {
+        JsonNode dispute = data.path("dispute");
+        String orderId = data.path("order_details").path("order_id").asString(null);
+        if (orderId == null) {
+            orderId = data.path("order").path("order_id").asString(null);
+        }
+        BigDecimal amount = exactAmount(dispute.path("dispute_amount").asString(null));
+        String finalOrderId = orderId;
+        Settlement outcome = settle("dispute", () -> {
+            billingPayments.applyDispute(new PaymentDisputes.Event(eventType,
+                    dispute.path("dispute_id").asString(null), finalOrderId,
+                    dispute.path("dispute_status").asString(null), amount == null ? null : amount.longValue(),
+                    dispute.path("reason_description").asString(null)));
+            return true;
+        });
+        calls.record(ProviderCalls.CASHFREE, PaymentGateway.WEBHOOK,
+                outcome == Settlement.CLAIMED ? ProviderCalls.Outcome.OK : ProviderCalls.Outcome.FAILED,
+                null, orderId, eventType, null);
+    }
+
+    // The card or UPI id behind a payment, so accounts paying from the same instrument can be linked.
+    private void recordInstrument(String orderId, JsonNode method) {
+        String card = method.path("card").path("card_number").asString(null);
+        String upi = method.path("upi").path("upi_id").asString(null);
+        String fingerprint = card != null ? "card:" + card : upi != null ? "upi:" + upi : null;
+        if (orderId == null || fingerprint == null) {
+            return;
+        }
+        try {
+            billingPayments.recordInstrument(orderId, fingerprint);
+        } catch (Exception failed) {
+            log.warn("Could not record the payment instrument for order {}", orderId, failed);
+        }
+    }
+
+    // Only HMAC-authenticated stale callbacks cost money, so only they log as errors.
+    private void logRefusal(WebhookSignature.Verification verification, String timestamp) {
+        switch (verification) {
+            case STALE -> log.error("Rejected payment webhook: STALE (x-webhook-timestamp={}); this "
+                    + "one was signed with our key, so it is a genuine callback refused on the "
+                    + "clock — money that will not be reconciled. Check for drift between Cashfree "
+                    + "and this host", timestamp.trim());
+            case MISMATCH -> log.warn("Rejected payment webhook: MISMATCH — well-formed signature, "
+                    + "wrong key. Occasional lines here are unauthenticated internet noise; a "
+                    + "sustained run alongside failing order creation means CASHFREE_WEBHOOK_SECRET "
+                    + "is not the key Cashfree signs with");
+            default -> log.warn("Rejected payment webhook: {}", verification);
+        }
+    }
+
     private enum Settlement {
-        /** The handler owned the order and recorded the outcome. */
+
         CLAIMED,
-        /** The handler does not own this order id — the normal answer for two of the three. */
+
         NOT_MINE,
-        /** The handler threw. Distinct from {@link #NOT_MINE}: the order may well have been ours. */
+
         FAILED
     }
 
-    /**
-     * Run one settle handler in isolation, so a failure in it cannot cost the others their event.
-     *
-     * @return what the handler did; {@link Settlement#FAILED} if it threw, because a handler that
-     *         failed cannot be said to have settled anything — nor to have disowned the order
-     */
     private Settlement settle(String handler, BooleanSupplier settlement) {
         try {
             return settlement.getAsBoolean() ? Settlement.CLAIMED : Settlement.NOT_MINE;
@@ -174,15 +225,7 @@ public class PaymentWebhookController {
         }
     }
 
-    /**
-     * The instant the payment settled, from the provider's {@code payment_time}.
-     *
-     * <p>Billing needs a timestamp because a subscription term and a boost window both run from the
-     * moment the money moved, not from midnight. Falls back to now when the field is absent or
-     * unparseable rather than failing the whole callback: the fact that the money moved is far more
-     * important than the exact instant it is stamped, and refusing the update over a date format
-     * would leave a paid order showing as unpaid.
-     */
+    // Bad provider timestamps fall back to now rather than failing the callback.
     private static Instant settlementInstant(String paymentTime) {
         if (paymentTime == null || paymentTime.isBlank()) {
             return Instant.now();
@@ -195,33 +238,15 @@ public class PaymentWebhookController {
         }
     }
 
-    /**
-     * Parses the provider's decimal-rupee string ({@code "17000.00"}) into whole rupees.
-     *
-     * <p><strong>Kept in exactly one place deliberately.</strong> Cashfree sends money as a decimal
-     * string with paise while the platform's {@code Money} is whole rupees, so somebody has to make
-     * a lossy conversion — and a lossy conversion duplicated across a codebase is a reconciliation
-     * bug waiting to happen.
-     *
-     * <p>The result is used to <em>check</em> the provider against our own ledger, never to
-     * overwrite it: the amount of record is the one this server computed, and reading it back off
-     * the callback would let the provider's rounding silently become our revenue figure.
-     *
-     * @return whole rupees, or {@code 0} when the provider sent no amount (in which case the
-     *         reconciliation check is skipped rather than failed)
-     */
-    static long toWholeRupees(String decimalAmount) {
+    // Null when absent or unreadable, so a payload that omits the sum is not mistaken for an underpayment.
+    private static BigDecimal exactAmount(String decimalAmount) {
         if (decimalAmount == null || decimalAmount.isBlank()) {
-            return 0L;
+            return null;
         }
         try {
-            return new BigDecimal(decimalAmount.trim())
-                    .setScale(0, java.math.RoundingMode.HALF_UP)
-                    .longValueExact();
-        } catch (ArithmeticException | NumberFormatException notANumber) {
-            log.warn("Unparseable provider amount '{}'; skipping the reconciliation check",
-                    decimalAmount);
-            return 0L;
+            return new BigDecimal(decimalAmount.trim());
+        } catch (NumberFormatException notANumber) {
+            return null;
         }
     }
 }

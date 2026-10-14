@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { srcSetFor, CARD_SIZES } from '../../../lib/imgSrcSet.js';
+import { CARD_SIZES } from '../../../lib/imgSrcSet.js';
 import Icon from '../../../components/Icon.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
 import { featuredProperties, trustStats } from '../../../services/propertyService.js';
 import { priceLabel } from '../../../lib/format.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useSaved } from '../../../context/SavedContext.jsx';
+import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { cityLabelFor } from '../../../lib/geoConfig.js';
+import { propertyHref } from '../../../lib/listingSeo.js';
 
 const specs = (p) => {
   const out = [];
@@ -18,52 +20,46 @@ const specs = (p) => {
   return out.slice(0, 3);
 };
 
-/* Single featured card. Owns its saved state so the heart is a real bookmark
-   (mirrors the listings Card): guests are sent to sign-in, members toggle the
-   saved store that the navbar heart-count reads. */
+/* Guests are sent to sign-in; members toggle the saved store that the navbar heart-count reads. */
 function FeaturedCard({ p, priority = false }) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
   const { isIn } = useAuth();
   const savedList = useSaved();
+  const sendToSignIn = useSignInGate();
   const saved = savedList.has(p.id);
   const image = p.image || p.img || '';
 
   const handleSave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isIn) { navigate('/signin?reason=save&next=/'); return; }
+    if (!isIn) { sendToSignIn('save'); return; }
     savedList.toggle(p.id, p.uuid);
   };
 
   return (
-    <Link to={`/property/${p.id}`} className="property-card list-reveal glass rounded-2xl overflow-hidden group cursor-pointer flex flex-col">
+    <Link to={propertyHref(p)} className="property-card list-reveal glass rounded-2xl overflow-hidden group cursor-pointer flex flex-col">
       <div className="card-img-wrap relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
-        <PropertyImage src={image} srcSet={image ? srcSetFor(image) : undefined} sizes={CARD_SIZES} alt={p.title} width={600} height={400} className="w-full h-full object-cover" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : undefined} />
+        <PropertyImage src={image} sizes={CARD_SIZES} alt={p.title} width={600} height={400} className="w-full h-full object-cover" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : undefined} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
         <div className="absolute top-3 left-3 flex gap-1.5">
           {(p.ownerVerified || p.ownershipVerified) && (
-            <span className="w-7 h-7 rounded-lg bg-black/50 backdrop-blur-sm text-emerald-300 border border-emerald-500/20 inline-flex items-center justify-center" title={t('home.featured.verified')}>
-              <Icon name="shield-check" className="w-4 h-4" />
+            <span className="badge-verified-icon" role="img" aria-label={t('home.featured.verified')} title={t('home.featured.verified')}>
+              <Icon name="shield-check" />
             </span>
           )}
         </div>
-        {/* tap-extend, not tap-target: this heart *is* the drawn 36px tile sitting on
-            the photo, so growing the box would enlarge the visible chrome over the
-            image. .tap-extend keeps the tile at 36px and puts a transparent 44px
-            ::before under the finger, so WCAG 2.5.8 holds without the card art
-            changing. Same treatment the top-bar icon tiles use. Never pair it with
+        {/* .tap-extend adds a transparent 44px hit area (WCAG 2.5.8). Never pair it with
             .tap-target — they set the same property and .tap-target wins by order. */}
         <button
-          className={'tap-extend absolute top-3 right-3 w-9 h-9 rounded-lg backdrop-blur-sm border flex items-center justify-center transition-all ' + (saved ? 'bg-rose-500/90 border-rose-400/40 text-white' : 'bg-black/40 border-white/10 text-white hover:bg-black/60')}
+          className="tap-extend heart-on-photo absolute top-3 right-3 w-9 h-9 flex items-center justify-center transition-all"
           onClick={handleSave}
           aria-pressed={saved}
           aria-label={saved ? t('home.featured.removeSaved') : t('home.featured.saveProperty')}
         >
-          <Icon name="heart" weight={saved ? 'fill' : 'regular'} className="w-4 h-4" />
+          <Icon name="heart" weight={saved ? 'fill' : 'regular'} className="w-6 h-6" />
         </button>
-        <div className="absolute bottom-3 left-3">
-          <span className="text-xl font-extrabold text-white tabular-nums" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.6)' }}>{priceLabel(p)}</span>
+        <div className="theme-dark absolute bottom-3 left-3">
+          <span className="text-xl font-extrabold text-white tabular-nums" style={{ textShadow: '0 1px 4px rgb(var(--dz-c-black) / 0.6)' }}>{priceLabel(p)}</span>
           {p.deal === 'rent' && <span className="text-xs text-gray-300 ml-1">{t('home.featured.perMonth')}</span>}
         </div>
       </div>
@@ -85,18 +81,13 @@ function FeaturedCard({ p, priority = false }) {
   );
 }
 
-/* Home "Featured properties" rail — data-driven off the real catalogue.
-   Featured is a paid promotion slot (admins + paid owners flag a listing), so we
-   pull `featuredProperties()` (promoted first, padded with fresh approved stock). */
+/* Featured is a paid promotion slot: promoted listings come first, padded with fresh approved stock. */
 export default function Featured({ navigate }) {
   const { t } = useTranslation();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  // E1 (ADR-019): honest verified-supply social proof, counted by whoever holds the catalogue.
-  // It used to be computed in this component from the mock's whole listing array, which is exact
-  // on 38 rows and unavailable against a paginated API. Still best-effort: the rail is the point
-  // of this section and a missing count is not worth failing it over, so a rejection just leaves
-  // the proof line hidden.
+  // Verified-supply social proof counted by whoever holds the catalogue, since an exact client-side
+  // count is unavailable against a paginated API. Best-effort: a failure just hides the line.
   const [vstats, setVstats] = useState(null);
 
   useEffect(() => {
@@ -114,10 +105,8 @@ export default function Featured({ navigate }) {
   // feature — drop the whole rail rather than show an empty heading.
   if (!loading && !items.length) return null;
 
-  // The verified counts are inventory proof, so on a phone they belong with the
-  // stock they describe rather than floating under the heading. Same node, two
-  // mutually-exclusive positions — only one is ever visible, so the accessibility
-  // tree never sees a duplicate.
+  // Inventory proof belongs beside the stock it describes on a phone. One node in two
+  // mutually-exclusive positions, so the accessibility tree never sees a duplicate.
   const verifiedProof = vstats && (
     <>
       <Icon name="shield-check" className="w-4 h-4" />
@@ -140,14 +129,12 @@ export default function Featured({ navigate }) {
               </p>
             )}
           </div>
-          <button onClick={() => navigate('/listings')} className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-[#14b8a6] hover:text-[#2dd4bf] transition-colors group">
+          <button onClick={() => navigate('/listings')} className="hidden sm:inline-flex items-center gap-1.5 text-sm font-semibold text-teal-500 hover:text-teal-400 transition-colors group">
             {t('home.featured.viewAll')} <Icon name="arrow-right" className="w-4 h-4 transition-transform group-hover:translate-x-1" />
           </button>
         </div>
 
-        {/* The negative offset pulls the line back out of the standard section
-            header gap so it reads as a caption on the rail below, not as a
-            second subtitle under the heading. */}
+        {/* The negative offset pulls the line out of the section header gap so it reads as a rail caption. */}
         {vstats && (
           <p className="sm:hidden flex w-fit -mt-3 mb-2 items-center gap-1.5 text-xs font-medium text-emerald-300/90">
             {verifiedProof}
@@ -179,7 +166,7 @@ export default function Featured({ navigate }) {
         {!loading && (
           <button
             onClick={() => navigate('/listings')}
-            className="sm:hidden mt-6 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-[#14b8a6] hover:bg-white/10 hover:text-[#2dd4bf] transition-all"
+            className="sm:hidden mt-6 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-teal-500 hover:bg-white/10 hover:text-teal-400 transition-all"
           >
             {t('home.featured.viewAllProperties')} <Icon name="arrow-right" className="w-4 h-4" />
           </button>

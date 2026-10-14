@@ -25,12 +25,10 @@ export default function Support() {
   const { toast } = useToast();
   const { user } = useAuth();
   const [params] = useSearchParams();
+  const invoice = (params.get('invoice') || '').replace(/[^\w-]/g, '').slice(0, 40);
 
-  /* Ticket priority and image attachments used to be offered here and hidden whenever the seam was
-     live. Neither exists on the wire: `SupportTicketCreate` is `{subject, category, body}` and
-     `MessageCreate` is `{body}`. An unknown property is ignored rather than rejected, so sending
-     one would *appear* to work — the user marks a ticket urgent, gets a success toast, and ops
-     never sees it. Both controls are gone rather than inert. */
+  /* No priority or image-attachment control: neither is on the wire, and unknown properties are ignored rather
+     than rejected, so sending one would appear to work while ops never sees it. */
 
   const [tickets, setTickets] = useState([]);
   const [faqs, setFaqs] = useState([]);
@@ -39,7 +37,7 @@ export default function Support() {
     name: user?.name || '',
     mobile: user?.mobile || '',
     category: params.get('cat') || 'payment',
-    subject: '',
+    subject: invoice ? tr('misc.supportRefundSubject', { invoice }) : '',
     message: '',
   });
 
@@ -47,14 +45,6 @@ export default function Support() {
   const [curTicket, setCurTicket] = useState(null);
   const [replyText, setReplyText] = useState('');
 
-  /**
-   * Re-read from whichever provider is active.
-   *
-   * This was `ticketsForUser(mobile)` — the mock keys tickets on a typed mobile. The server keys on
-   * the authenticated caller, so there is nothing to pass: the question "whose tickets?" is answered
-   * by the session on both sides now, and the form's mobile field is contact detail rather than a
-   * lookup key.
-   */
   const reload = useCallback(async () => {
     const list = await listTickets().catch(() => []);
     setTickets(list);
@@ -69,24 +59,22 @@ export default function Support() {
     };
   }, []);
 
+  const openId = params.get('open');
   useEffect(() => {
     let alive = true;
     reload().then((list) => {
       if (!alive) return;
       // Deep-link: auto-open a ticket from URL ?open=<id>. Resolved from the list we just loaded
-      // rather than on a timer — the old 100ms `setTimeout` was racing a synchronous localStorage
-      // read that no longer exists, and against a request it would simply lose.
-      const openId = params.get('open');
-      const t = openId && list.find((x) => x.id === openId);
-      if (t) { setCurTicket(t); setThreadOpen(true); }
+      // rather than on a timer, which would race the request and lose.
+      if (openId && list.some((x) => x.id === openId)) openThread(openId);
     });
     return () => { alive = false; };
-  }, [user, reload, params]);
+  }, [user, reload, openId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (user?.name && !form.name) setForm((p) => ({ ...p, name: user.name }));
     if (user?.mobile && !form.mobile) {
-      const m = user.mobile.replace(/\D/g, '').replace(/^91/, '');
+      const m = user.mobile.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
       setForm((p) => ({ ...p, mobile: m }));
     }
   }, [user]);
@@ -94,20 +82,10 @@ export default function Support() {
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
 
   const submit = async () => {
-    /**
-     * `name` and `digits` are validated but no longer *sent*.
-     *
-     * The mock keyed tickets on this typed mobile; the server takes the raiser from the session and
-     * `SupportTicketCreate` has no identity field. Both are prefilled from the signed-in user on a
-     * `ProtectedRoute`, so the common path is correct either way, and the validation stays because
-     * they are still contact details a human reads.
-     *
-     * The gap: a user who *edits* the mobile to a different callback number is telling us something
-     * the API cannot carry. Support still reaches them through the account and the thread, so this
-     * is recorded as debt rather than papered over.
-     */
+    /** `name` and `digits` are validated but not sent: the server takes the raiser from the session and
+     * `SupportTicketCreate` has no identity field, yet a human still reads them as contact details. */
     const name = form.name.trim();
-    const digits = form.mobile.replace(/\D/g, '').replace(/^91/, '');
+    const digits = form.mobile.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
     const subject = form.subject.trim();
     const msg = form.message.trim();
     if (!name) {
@@ -208,9 +186,8 @@ export default function Support() {
             </p>
           </div>
 
-          {/* Deflection: most tickets are questions the help centre already answers,
-              and a self-served answer arrives in seconds rather than hours. Offered
-              before the form, not after, or nobody reads it. */}
+          {/* Deflection: most tickets are questions the help centre answers, and offering it before the form,
+              not after, is what gets it read. */}
           <Link
             to="/help"
             className="reveal mb-6 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3.5 transition-colors hover:border-teal-400/40 hover:bg-white/[0.05]"
@@ -226,15 +203,14 @@ export default function Support() {
           </Link>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1.15fr_0.85fr] gap-6">
-            {/* Raise a ticket */}
             <TicketForm
               form={form}
               set={set}
               fld={fld}
               submit={submit}
+              faqs={faqs}
             />
 
-            {/* Your tickets */}
             <div className="space-y-6">
               <ContactCard />
               <TicketList tickets={tickets} openThread={openThread} />
@@ -243,7 +219,6 @@ export default function Support() {
         </div>
       </div>
 
-      {/* Thread modal */}
       <TicketThreadModal
         threadOpen={threadOpen}
         closeThread={closeThread}
@@ -254,7 +229,6 @@ export default function Support() {
         fld={fld}
       />
 
-      {/* FAQs */}
       <FaqSection faqs={faqs} openFaq={openFaq} setOpenFaq={setOpenFaq} />
     </div>
   );

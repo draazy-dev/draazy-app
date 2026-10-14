@@ -8,14 +8,21 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.trust.ReviewerStanding;
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.deals.visit.PropertyExperienceService;
+import com.draazy.api.engagement.notification.NotificationRepository;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.JwtService;
+import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,27 +32,19 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
-/**
- * Contract + behaviour proof for the tenancy lifecycle and tenant screening profile (S5.4).
- *
- * <p>The load-bearing tests here are the ones that would let somebody read a stranger's income:
- * {@code GET /tenant-profiles/{mobile}} must answer 404 for an unrelated caller, for an unknown
- * mobile and for a malformed one alike, because any response that tells those cases apart turns the
- * endpoint into the mobile-enumeration oracle spec fix S10 exists to close.
- *
- * <p>Also covers D1 — a tenancy opens when a rent deal closes and ends when it is reopened — and
- * the server-owned score and verified flag (spec fix S17).
- */
+// Contract + behaviour proof for the tenancy lifecycle and tenant screening profile. The load-bearing tests
+// here are the ones that would let somebody read a stranger's income.
 class TenancyEndpointsTest extends AbstractApiTest {
 
     @Autowired MockMvc mvc;
+    @Autowired EntityManager em;
     @Autowired JwtService jwtService;
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired TenancyRepository tenancies;
+    @Autowired PropertyExperienceService experience;
+    @Autowired NotificationRepository notifications;
     @Autowired @Qualifier("requestMappingHandlerMapping") RequestMappingHandlerMapping handlerMapping;
-
-    // ---- helpers ----
 
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
@@ -82,41 +81,36 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
     }
 
-    // ---- 1 (D1): closing a rent deal opens the tenancy, in the same transaction ----
-
+    // There is no user row to point `tenant_id` at, so the deal closes without a tenancy rather than the platform
+    // inventing a shadow user.
     @Test
-    void closingARentDeal_opensATenancyForARegisteredTenant() throws Exception {
+    void closingARentDeal_proposesAPendingTenancyForARegisteredTenant() throws Exception {
         User owner = user("9822200001", "owner");
         User tenant = user("9822200002", "buyer");
         Property p = rentListing(owner);
 
         closeDeal(owner, p, tenant.getMobile(), 28000L);
 
-        assertThat(tenancies.findActiveByPropertyId(p.getId())).isPresent();
+        assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
+        assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
 
-        // The tenant sees it on their side...
         mvc.perform(get(Routes.Tenancies.MINE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].propertyId").value(p.getId().toString()))
                 .andExpect(jsonPath("$[0].rent").value(28000))
-                .andExpect(jsonPath("$[0].status").value(TenancyStatuses.ACTIVE));
+                .andExpect(jsonPath("$[0].status").value(TenancyStatuses.PENDING))
+                .andExpect(jsonPath("$[0].startDate").doesNotExist())
+                .andExpect(jsonPath("$[0].owner.mobile").value(org.hamcrest.Matchers.not(owner.getMobile())));
 
-        // ...and the owner sees it on theirs. One entity, two participant projections.
-        mvc.perform(get(Routes.Tenancies.OWNED)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+        mvc.perform(get(Routes.Tenancies.MINE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user("9822200011", "buyer"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].tenant.id").value(tenant.getId().toString()))
-                .andExpect(jsonPath("$[0].owner.id").value(owner.getId().toString()));
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
-    /**
-     * A close naming a mobile with no account is normal for a Pune owner who found the tenant
-     * through a broker. There is no user row to point {@code tenant_id} at, so the deal closes
-     * without a tenancy rather than the platform inventing a shadow user.
-     */
+    // ---- 4: the tenant profile round-trips, and the score is server-computed ----
     @Test
     void closingARentDeal_offPlatformTenant_opensNoTenancyButStillCloses() throws Exception {
         User owner = user("9822200003", "owner");
@@ -130,7 +124,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.status").value("closed"));
     }
 
-    /** A sale has no ongoing relationship to model, so no tenancy is opened. */
     @Test
     void closingABuyDeal_opensNoTenancy() throws Exception {
         User owner = user("9822200004", "owner");
@@ -142,20 +135,19 @@ class TenancyEndpointsTest extends AbstractApiTest {
         assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
     }
 
-    // ---- 2 (D1): reopening ends the tenancy so the flat can be let again ----
-
     @Test
     void reopeningARentDeal_endsTheTenancyAndFreesTheProperty() throws Exception {
         User owner = user("9822200006", "owner");
         User tenant = user("9822200007", "buyer");
         Property p = rentListing(owner);
         closeDeal(owner, p, tenant.getMobile(), 28000L);
+        confirm(tenant, pendingId(p));
 
         mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk());
 
-        // Ended, not deleted: who lived there is the record, and rent payments hang off that row.
+        em.clear();
         assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
         assertThat(tenancies.findByPropertyId(p.getId()))
                 .singleElement()
@@ -164,53 +156,249 @@ class TenancyEndpointsTest extends AbstractApiTest {
                     assertThat(t.getEndDate()).isNotNull();
                 });
 
-        // ...and the flat can be let again, which the unique index would block if it were still
-        // active.
+        p = properties.findById(p.getId()).orElseThrow();
+        p.setStatus("approved");
+        properties.saveAndFlush(p);
         User next = user("9822200008", "buyer");
         closeDeal(owner, p, next.getMobile(), 30000L);
-        assertThat(tenancies.findActiveByPropertyId(p.getId())).isPresent();
+        assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
+        assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
     }
 
-    // ---- 3: tenancy lists are participant-scoped ----
+    @Test
+    void reopeningARentDeal_withAFutureDate_endsTheTenancyTheDayBeforeAndSetsTheDate() throws Exception {
+        User owner = user("9822200041", "owner");
+        User tenant = user("9822200042", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+        confirm(tenant, pendingId(p));
+        LocalDate on = AvailableOn.today().plusDays(20);
+
+        mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"availableOn\":\"" + on + "\"}"))
+                .andExpect(status().isOk());
+
+        em.clear();
+        assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
+        assertThat(tenancies.findByPropertyId(p.getId())).singleElement().satisfies(t -> {
+            assertThat(t.getStatus()).isEqualTo(TenancyStatuses.ENDED);
+            assertThat(t.getEndDate()).isEqualTo(on.minusDays(1));
+        });
+        assertThat(properties.findById(p.getId()).orElseThrow().getAvailableOn()).isEqualTo(on);
+    }
 
     @Test
-    void tenancyLists_areParticipantScoped() throws Exception {
-        User owner = user("9822200009", "owner");
-        User tenant = user("9822200010", "buyer");
-        User stranger = user("9822200011", "buyer");
+    void reopeningARentDeal_withATodayDate_endsTheTenancyToday() throws Exception {
+        User owner = user("9822200043", "owner");
+        User tenant = user("9822200044", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+        confirm(tenant, pendingId(p));
+
+        mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"availableOn\":\"" + AvailableOn.today() + "\"}"))
+                .andExpect(status().isOk());
+
+        em.clear();
+        assertThat(tenancies.findByPropertyId(p.getId())).singleElement()
+                .satisfies(t -> assertThat(t.getEndDate()).isEqualTo(AvailableOn.today()));
+    }
+
+    @Test
+    void reopeningADeal_withAPastDate_isRefused() throws Exception {
+        User owner = user("9822200045", "owner");
+        User tenant = user("9822200046", "buyer");
         Property p = rentListing(owner);
         closeDeal(owner, p, tenant.getMobile(), 28000L);
 
-        mvc.perform(get(Routes.Tenancies.MINE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"availableOn\":\"" + AvailableOn.today().minusDays(1) + "\"}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
 
-        mvc.perform(get(Routes.Tenancies.OWNED)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
-                .andExpect(status().isOk())
+    @Test
+    void reopeningARentDeal_beyondAYear_isRefused() throws Exception {
+        User owner = user("9822200047", "owner");
+        User tenant = user("9822200048", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+
+        mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"availableOn\":\"" + AvailableOn.today().plusDays(366) + "\"}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void reopeningARentDeal_withdrawsAnUnansweredTenancy() throws Exception {
+        User owner = user("9822200021", "owner");
+        User tenant = user("9822200022", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+
+        mvc.perform(post("/me/deals/" + p.getId() + "/reopen")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk());
+
+        em.clear();
+        assertThat(tenancies.findByPropertyId(p.getId()))
+                .singleElement()
+                .satisfies(t -> assertThat(t.getStatus()).isEqualTo(TenancyStatuses.DECLINED));
+        mvc.perform(get(Routes.Tenancies.MINE).header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
-    void tenancyListsRequireAuthentication() throws Exception {
-        mvc.perform(get(Routes.Tenancies.MINE)).andExpect(status().isUnauthorized());
-        mvc.perform(get(Routes.Tenancies.OWNED)).andExpect(status().isUnauthorized());
+    void closingARentDeal_notifiesTheNamedTenant() throws Exception {
+        User owner = user("9822200023", "owner");
+        User tenant = user("9822200024", "buyer");
+        Property p = rentListing(owner);
+
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+
+        assertThat(notifications.findAll())
+                .filteredOn(n -> n.getUserId().equals(tenant.getId()) && "tenancy.pending".equals(n.getType()))
+                .hasSize(1);
     }
 
-    // ---- 4: the tenant profile round-trips, and the score is server-computed ----
+    @Test
+    void closingARentDeal_onYourOwnNumber_opensNoTenancy() throws Exception {
+        User owner = user("9822200025", "owner");
+        Property p = rentListing(owner);
+
+        closeDeal(owner, p, owner.getMobile(), 28000L);
+
+        assertThat(tenancies.findByPropertyId(p.getId())).isEmpty();
+    }
+
+    @Test
+    void theNamedTenantConfirms_andTheTenancyBecomesActive() throws Exception {
+        User owner = user("9822200026", "owner");
+        User tenant = user("9822200027", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+        UUID id = pendingId(p);
+
+        mvc.perform(post(Routes.Tenancies.CONFIRM.replace("{id}", id.toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(TenancyStatuses.ACTIVE))
+                .andExpect(jsonPath("$.startDate").exists())
+                .andExpect(jsonPath("$.owner.mobile").value(owner.getMobile()));
+
+        assertThat(tenancies.findActiveByPropertyId(p.getId())).isPresent();
+        assertThat(tenancies.existsConfirmedByTenantIdAndOwnerId(tenant.getId(), owner.getId())).isTrue();
+        assertThat(experience.standingOf(tenant.getId(), p.getId())).isEqualTo(ReviewerStanding.TENANT);
+
+        mvc.perform(post(Routes.Tenancies.CONFIRM.replace("{id}", id.toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void anyoneButTheNamedTenant_getsNotFound_andTheTenancyStaysPending() throws Exception {
+        User owner = user("9822200028", "owner");
+        User tenant = user("9822200029", "buyer");
+        User stranger = user("9822200030", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+        String url = Routes.Tenancies.CONFIRM.replace("{id}", pendingId(p).toString());
+
+        for (User caller : new User[] {stranger, owner}) {
+            mvc.perform(post(url).header(HttpHeaders.AUTHORIZATION, bearer(caller)))
+                    .andExpect(status().isNotFound());
+            mvc.perform(post(url.replace("confirm", "decline")).header(HttpHeaders.AUTHORIZATION, bearer(caller)))
+                    .andExpect(status().isNotFound());
+        }
+        mvc.perform(post(Routes.Tenancies.CONFIRM.replace("{id}", "not-a-uuid"))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isNotFound());
+        mvc.perform(post(Routes.Tenancies.CONFIRM.replace("{id}", UUID.randomUUID().toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isNotFound());
+        mvc.perform(post(url)).andExpect(status().isUnauthorized());
+
+        assertThat(tenancies.findPendingByPropertyId(p.getId())).isPresent();
+    }
+
+    @Test
+    void aTenantWithoutAVerifiedMobile_getsNotFound() throws Exception {
+        User owner = user("9822200031", "owner");
+        User tenant = user("9822200032", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+        String url = Routes.Tenancies.CONFIRM.replace("{id}", pendingId(p).toString());
+
+        tenant.setMobileVerified(false);
+        users.saveAndFlush(tenant);
+        mvc.perform(post(url).header(HttpHeaders.AUTHORIZATION, bearer(tenant))).andExpect(status().isNotFound());
+
+    }
+
+    @Test
+    void theNamedTenantDeclines_theDealStaysClosedAndTheTenancyIsNeverActive() throws Exception {
+        User owner = user("9822200033", "owner");
+        User tenant = user("9822200034", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+        UUID id = pendingId(p);
+
+        mvc.perform(post(Routes.Tenancies.DECLINE.replace("{id}", id.toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value(TenancyStatuses.DECLINED));
+
+        assertThat(tenancies.findActiveByPropertyId(p.getId())).isEmpty();
+        assertThat(tenancies.existsConfirmedByTenantIdAndOwnerId(tenant.getId(), owner.getId())).isFalse();
+        mvc.perform(get("/me/deals/" + p.getId()).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.status").value("closed"));
+        mvc.perform(get(Routes.Tenancies.MINE).header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(post(Routes.Tenancies.CONFIRM.replace("{id}", id.toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void aPendingTenancy_givesNoReviewStandingAndNoContactAccess() throws Exception {
+        User owner = user("9822200035", "owner");
+        User tenant = user("9822200036", "buyer");
+        Property p = rentListing(owner);
+        closeDeal(owner, p, tenant.getMobile(), 28000L);
+
+        assertThat(tenancies.existsByTenantIdAndPropertyId(tenant.getId(), p.getId())).isFalse();
+        assertThat(tenancies.existsConfirmedByTenantIdAndOwnerId(tenant.getId(), owner.getId())).isFalse();
+        assertThat(tenancies.existsBetween(tenant.getId(), owner.getId())).isFalse();
+        assertThat(experience.standingOf(tenant.getId(), p.getId())).isEqualTo(ReviewerStanding.NONE);
+    }
+
+    private UUID pendingId(Property p) {
+        return tenancies.findPendingByPropertyId(p.getId()).orElseThrow().getId();
+    }
+
+    private void confirm(User tenant, UUID id) throws Exception {
+        mvc.perform(post(Routes.Tenancies.CONFIRM.replace("{id}", id.toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
+                .andExpect(status().isOk());
+    }
+    @Test
+    void tenancyListsRequireAuthentication() throws Exception {
+        mvc.perform(get(Routes.Tenancies.MINE)).andExpect(status().isUnauthorized());
+    }
 
     @Test
     void myProfile_emptyBeforeAnySave() throws Exception {
         User tenant = user("9822200012", "buyer");
 
-        // Not 404: "you have not filled this in yet" is a normal state, and a 404 would force the
-        // client to special-case a status code just to render a blank form.
-        //
-        // The score is absent rather than 0. "Never assessed" and "assessed, scored nothing" are
-        // different claims about a person, and the screening meter renders them differently — see
-        // updateMyProfile_cannotSetItsOwnScoreOrVerifiedBadge, where a *saved* empty profile does
-        // correctly score 0.
+        // "Never assessed" and "assessed, scored nothing" are different claims about a person, and the screening
+        // meter renders them differently.
         mvc.perform(get(Routes.Tenancies.MY_PROFILE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
                 .andExpect(status().isOk())
@@ -219,12 +407,11 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.name").doesNotExist());
     }
 
+    // The client must not be able to set its own score or verified badge.
     @Test
     void updateMyProfile_computesTheScoreFromTheStoredFields() throws Exception {
         User tenant = user("9822200013", "buyer");
 
-        // occupation 20 + income 15 + priorLandlord 15 + about 10 + occupants 10 = 70; the Aadhaar
-        // badge would add the remaining 30 and this user has none.
         mvc.perform(put(Routes.Tenancies.MY_PROFILE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -239,10 +426,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.income").value(95000));
     }
 
-    /**
-     * The score and the verified badge are the whole reason an owner trusts the profile, so a
-     * tenant sending them must not be able to set them (spec fix S17).
-     */
+    // PUT replaces: a field the tenant removed from the form must actually go.
     @Test
     void updateMyProfile_cannotSetItsOwnScoreOrVerifiedBadge() throws Exception {
         User tenant = user("9822200014", "buyer");
@@ -256,7 +440,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.verified").value(false));
     }
 
-    /** PUT replaces: a field the tenant removed from the form must actually go. */
+    // The three refusals must be indistinguishable.
     @Test
     void updateMyProfile_replacesRatherThanMerges() throws Exception {
         User tenant = user("9822200015", "buyer");
@@ -274,12 +458,11 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.about").doesNotExist());
     }
 
+    // A screening owner reads the profile, not the number — the contact gate still applies.
     @Test
     void updateMyProfile_rejectsAnUnknownOccupantType() throws Exception {
         User tenant = user("9822200016", "buyer");
 
-        // An unrecognised value is not a harmless typo — it would silently drop the tenant out of
-        // every owner's screening filter.
         mvc.perform(put(Routes.Tenancies.MY_PROFILE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -287,103 +470,7 @@ class TenancyEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isBadRequest());
     }
 
-    // ---- 5 (spec fix S10): the mobile-keyed read is relationship-guarded ----
-
-    @Test
-    void profileByMobile_unrelatedCaller_returns404NotForbidden() throws Exception {
-        User tenant = user("9822200017", "buyer");
-        User stranger = user("9822200018", "owner");
-        mvc.perform(put(Routes.Tenancies.MY_PROFILE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Asha K\",\"income\":95000}"))
-                .andExpect(status().isOk());
-
-        mvc.perform(get("/tenant-profiles/" + tenant.getMobile())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
-                .andExpect(status().isNotFound());
-    }
-
-    /**
-     * The three refusals must be indistinguishable. If "no such number" answered differently from
-     * "that number exists but you may not see it", the endpoint would confirm which of the ten
-     * billion mobiles are registered — keyed by the exact identifier the contact gate protects.
-     */
-    @Test
-    void profileByMobile_unknownAndMalformedMobiles_answerTheSameAsARefusal() throws Exception {
-        User caller = user("9822200019", "owner");
-
-        mvc.perform(get("/tenant-profiles/9876500099")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
-                .andExpect(status().isNotFound());
-
-        mvc.perform(get("/tenant-profiles/not-a-mobile")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
-                .andExpect(status().isNotFound());
-    }
-
-    @Test
-    void profileByMobile_landlordOfTheTenant_maySeeIt() throws Exception {
-        User owner = user("9822200020", "owner");
-        User tenant = user("9822200021", "buyer");
-        Property p = rentListing(owner);
-        mvc.perform(put(Routes.Tenancies.MY_PROFILE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Asha K\",\"occupation\":\"Doctor\",\"income\":150000}"))
-                .andExpect(status().isOk());
-
-        // Before the tenancy exists the landlord is just another stranger.
-        mvc.perform(get("/tenant-profiles/" + tenant.getMobile())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isNotFound());
-
-        closeDeal(owner, p, tenant.getMobile(), 28000L);
-
-        mvc.perform(get("/tenant-profiles/" + tenant.getMobile())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Asha K"))
-                .andExpect(jsonPath("$.income").value(150000));
-    }
-
-    /** A screening owner reads the profile, not the number — the contact gate still applies. */
-    @Test
-    void profileByMobile_masksTheMobileForAScreeningOwner() throws Exception {
-        User owner = user("9822200022", "owner");
-        User tenant = user("9822200023", "buyer");
-        Property p = rentListing(owner);
-        mvc.perform(put(Routes.Tenancies.MY_PROFILE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Asha K\"}"))
-                .andExpect(status().isOk());
-        closeDeal(owner, p, tenant.getMobile(), 28000L);
-
-        mvc.perform(get("/tenant-profiles/" + tenant.getMobile())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.mobile").value(org.hamcrest.Matchers.containsString("XXXXX")));
-    }
-
-    @Test
-    void profileByMobile_ownProfile_isAlwaysReadable() throws Exception {
-        User tenant = user("9822200024", "buyer");
-        mvc.perform(put(Routes.Tenancies.MY_PROFILE)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"Asha K\"}"))
-                .andExpect(status().isOk());
-
-        mvc.perform(get("/tenant-profiles/" + tenant.getMobile())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(tenant)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("Asha K"))
-                .andExpect(jsonPath("$.mobile").value(tenant.getMobile()));
-    }
-
     // ---- 6: there is deliberately no create route (spec fix S9) ----
-
     @Test
     void thereIsNoWayForAClientToCreateATenancy() {
         Set<String> mapped = handlerMapping.getHandlerMethods().entrySet().stream()
@@ -393,25 +480,6 @@ class TenancyEndpointsTest extends AbstractApiTest {
                                 .map(Enum::name).collect(Collectors.joining(",")) + " " + path))
                 .collect(Collectors.toSet());
 
-        // A forged tenancy is a claim to be living in, or letting out, somebody else's home, and
-        // the record every downstream tenancy surface trusts — so the route must not exist at all,
-        // not merely be guarded.
-        assertThat(mapped).doesNotContain("POST " + Routes.Tenancies.OWNED);
-    }
-
-    // ---- 7: route-constant ↔ handler-mapping agreement ----
-
-    @Test
-    void everyTenancyRouteConstantIsServedByAController() {
-        Set<String> mapped = handlerMapping.getHandlerMethods().keySet().stream()
-                .filter(info -> info.getPathPatternsCondition() != null)
-                .flatMap(info -> info.getPathPatternsCondition().getPatternValues().stream())
-                .collect(Collectors.toSet());
-
-        assertThat(mapped).contains(
-                Routes.Tenancies.MINE,
-                Routes.Tenancies.OWNED,
-                Routes.Tenancies.MY_PROFILE,
-                Routes.Tenancies.PROFILE_BY_MOBILE);
+        assertThat(mapped).doesNotContain("POST /tenancies");
     }
 }

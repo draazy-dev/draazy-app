@@ -4,16 +4,17 @@ slug: invoices-and-refunds
 category: payments
 audience: everyone
 order: 2
-updated: 2026-07-24
+updated: 2026-10-13
 summary: Where to find your invoices, what is refundable, and how long a refund takes.
-tags: [invoice, refund, gst, billing, receipt]
+tags: [invoice, refund, billing, receipt]
 ---
 
 ## Finding your invoices
 
-All invoices are under **Dashboard → Billing**. Each one is downloadable as a PDF and includes GST details. If you added an email, a copy is sent automatically.
+Your payment history is under **Dashboard → Plan & Billing**, alongside the plan you are currently on. Each row carries the invoice number, what it was for, the amount and the date — that invoice number is what Support needs if you ever query a charge.
 
-Need a GSTIN on the invoice? Add it under **Dashboard → Billing → Tax details** *before* you pay — we cannot re-issue a tax invoice with a GSTIN added afterwards.
+> [!NOTE]
+> Downloadable PDF invoices are not live yet.
 
 ## Payment methods
 
@@ -28,32 +29,40 @@ The binding terms are in the [Refund Policy](/refund-policy). In summary:
 
 | Situation | Refundable |
 | --- | --- |
-| Plan cancelled within 24 hours, unused | Full |
-| Plan cancelled mid-term | Pro-rata, minus used period |
-| Featured placement already delivered | No |
-| Service not delivered (e.g. agreement not drafted) | Full |
-| Service partially delivered | Case by case |
-| Duplicate or failed-but-charged payment | Full |
+| Contact Pack, none of its contacts used, within 7 days of buying | Full |
+| Listing Pass whose listing got no enquiries in its first 7 live days (once every 12 months) | Full |
+| Pack with a contact used, or pass that got enquiries | Not refundable |
+| Rent agreement, before the stamp duty is paid on GRAS | Refundable up to what you paid |
+| Rent agreement, after the stamp duty is paid | Government charges are spent; only eligible service-fee or overpayment refunds can come back |
+| Duplicate or failed-but-charged payment | Refunded automatically |
+
+The windows above are the current settings; the [Refund Policy](/refund-policy) always shows the live numbers.
+
+A contact that an owner declines, or that gets no reply in 7 days, is returned to your allowance automatically — that is not a refund, so you do not need to ask.
 
 ### Timelines
 
-- Approved refunds are initiated within **3 working days**
-- Your bank or card issuer takes a further **5–7 working days**
-- UPI refunds are usually faster, 1–3 working days
+- We review every request within **2 business days**
+- Approved refunds are processed within **5–7 business days**, to the original payment method, with a credit note
+- Your bank, card issuer or UPI app may take longer to show the credit
 
 ## Requesting a refund
 
-Raise a ticket at [Support](/support), category **Payments**, with the invoice number. Attach a screenshot if the charge does not appear in your billing history.
+Open **Dashboard → Plan & Billing**. If a pass or pack qualifies, its row shows **Refund · until {date}**. Tap it, add a reason if you like, and confirm. While we review, the pack's contacts are frozen or the pass's listing is paused; if the request is declined they resume.
+
+If a row does not qualify, it says why. Think it should? Tap **Ask for a review** — it opens a [Support](/support) ticket with the invoice number filled in. Attach a screenshot if the charge does not appear in your billing history.
+
+A chargeback with your bank pauses only that purchase, never your account — but contacting us first is usually faster.
 
 ## A charge you do not recognise
 
-Check the billing page first — the descriptor on your statement may differ from the product name. If it is genuinely unknown, raise a ticket immediately with the amount, date and last four digits of the card; do not wait.
+Check **Dashboard → Plan & Billing** first — the descriptor on your statement may differ from the product name. If it is genuinely unknown, raise a ticket immediately with the amount, date and last four digits of the card; do not wait.
 
 ## Rent receipts
 
 Rent does not move through Draazy, so there are no rent receipts to issue. Record what you pay
-under **Dashboard → Rent Wallet** and it works out your yearly total and HRA exemption for you. See
-[Paying rent online](/help/a/paying-rent-online).
+under **Dashboard → Finances** — your Rent Wallet — and it works out your yearly total and HRA
+exemption for you. See [Paying rent online](/help/a/paying-rent-online).
 
 ## Related
 

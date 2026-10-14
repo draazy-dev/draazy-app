@@ -1,248 +1,191 @@
-# Flow: Ops Referral Verification (fraud-review queue)
+# Flow: Ops Referral Review (automatic decisions and overrides)
 
-> The ops desk that keeps the refer-a-friend program honest. Every referral lands here as a
-> record with background-check signals; a reviewer approves (release reward), rejects, or claws
-> back - the **reward payout** is gated on Aadhaar verification + uniqueness. Under **ADR-019
-> (badge-not-gate)** this identity/uniqueness check is legitimate here because it guards **money at
-> risk (a reward payout)** inside the opt-in reward flow (L2/L3) — it is **not** a browse/post/contact
-> gate (those stay at L1 mobile; see [`../../system/trust-and-verification-model.md`](../../system/trust-and-verification-model.md)).
-> **Status:** documented from React source · re-synced to ADR-019 (badge-not-gate) · **live-only
-> since wave 2c (2026-08-14)** - **Primary role(s):** ops staff / admin (any ops user)
-
-> **The Aadhaar gate is the server's rule now.** Until wave 2c it existed only as a greyed-out
-> button in the browser, under the banner above calling it mandatory, while
-> `POST /referrals/{id}/approve` released the money to anyone who called it. `ReferralService.approve`
-> now refuses with a 409 naming the reason, and the button is a mirror. This is the only *backend*
-> change the mock-retirement migration has made.
+> Referral rewards are decided by the system, not by a queue. Each referral is scored at qualification
+> and granted, held, or rejected automatically; rewards are taken back automatically on defined
+> events. This desk is where ops **see** those decisions and **override** them (approve, reject,
+> claw back). It is a review surface, not a work queue: referrals are not in staff "My work".
+> **Primary role(s):** ops staff / admin (any ops user). Pairs with
+> [`../consumer/plans-billing-refer.md`](../consumer/plans-billing-refer.md).
+>
+> Under **ADR-019 (badge-not-gate)** the identity/uniqueness check that guards a reward payout is
+> legitimate here because it guards **money at risk** inside the opt-in reward flow — it is **not** a
+> browse/post/contact gate (those stay at L1 mobile; see
+> [`../../system/platform-architecture.md`](../../system/platform-architecture.md) §6.4 / ADR-019).
 
 ---
 
 ## 1. Purpose & user problem
 - **Persona:** an ops/trust reviewer responsible for the referral rewards budget.
-- **Job-to-be-done:** "Before we pay a referral reward, confirm the referred user is a real,
-  Aadhaar-verified, unique person - and flag self-referrals, duplicate-device, and reward-farming
-  before any credit is released."
-- **Why it matters:** referral rewards (owner contacts, free rent agreements) are a real cost and
-  a classic fraud target. This queue is the checker gate between "invite sent" and "reward paid".
-  It pairs with the consumer refer-a-friend flow in
-  [`../consumer/plans-billing-refer.md`](../consumer/plans-billing-refer.md).
+- **Job-to-be-done:** "See why the system granted, held or rejected a referral, and correct it when it
+  got one wrong."
+- **Why it matters:** rewards (owner contacts, free rent agreements, Featured days) are a real cost
+  and a classic fraud target. The automatic decision keeps honest referrers from waiting; the desk
+  exists for the exceptions.
 
 ## 2. Entry points
 - **Route:** `/ops/referrals` (under `RoleRoute roles=['staff','admin']` + `AdminLayout variant="ops"`;
-  **no** `TeamRoute`, so any ops user can open it - it is not scoped to a single team).
-- **Tiles / triggers:** the ops sidebar "Referrals" item (`AdminLayout`), the admin command-palette
-  entry "Referrals (Ops)" (`AdminTopbarTools`), and the four stat cards on the page (which double as
-  tab switches).
-- **Source components:**
-  - `src/pages/ops/OpsReferrals.jsx` - the entire queue (stats, tabs, table, actions, export).
-  - Data: `src/services/referralService.js` → `providers/http/referralProvider.js` → `GET /referrals`
-    and the three decision endpoints. **The desk is live-only**: the mock provider's four desk
-    methods throw, and the page renders an explanatory panel instead of a queue when `referral` is
-    not in `VITE_API_DOMAINS`. The mock store disagreed with the server about what a referral *is*
-    (see §5.7), so translating it would have meant maintaining a second fraud vocabulary by hand.
-
-    > **Corrected (D233).** This bullet used to say "**Live-only**: there is no mock provider."
-    > There is one now — `providers/mock/referralProvider.js` — but it carries only the *consumer*
-    > half of the resource (`GET /me/referrals`, `POST /referrals/redeem`), which
-    > `ReferralsController` calls out as the second audience on it. None of the three disagreements
-    > in §5.7 is about "what is my code"; all three are about the desk, and all three still hold.
-
-  - **The funnel had no entrance until D233.** `POST /referrals/redeem` had shipped and nothing in
-    the product called it: `Refer.jsx` minted its own code in the browser, so the codes users
-    shared were strings the server could not resolve, and every row this desk has ever reviewed was
-    seeded. `Signup.jsx` now redeems on `?ref=`.
+  **no** `TeamRoute`, so any ops user can open it).
+- **Source components:** `src/pages/ops/OpsReferrals.jsx`; data via `src/services/referralService.js`
+  → `GET /referrals` and the three override endpoints.
 
 ## 3. Actors & roles
-- **Any ops user (staff or admin)** can review referrals - unlike the service desks, there is **no**
-  team gate on this route. All referral records are visible to every ops user.
-- **Reviewer actions** are the same for all: Approve, Reject, Clawback.
-- See [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 1 for the role model.
-  As with all ops guards, this is UX-only and MUST be re-enforced server-side (section 11).
+- **Staff holding the `referrals` function, or admin:** `referrals:read` lists, `referrals:write`
+  overrides. Server-side enforcement is the rule; the browser only mirrors it.
+- **The system** (`handled_by = 'system'`) makes every automatic decision.
 
 ## 4. Entities touched
-Link definitions: [`../../system/data-model.md`](../../system/data-model.md).
+- **Referral** (`referrals`): identity (`id`, `referrer`, `referrerMobile`, `referred`,
+  `referredMobile`, `channel`), `reward` / `rewardAmount` (0 until qualified), `status`, `track`
+  (`owner` | `seeker`, whichever qualifying event came first), `risk`, the signals
+  (`identityVerified`, `identityUnique`, `activated`, `sameDevice`, `sameIp`, `velocityHigh`),
+  `holdUntil`, `autoReason` and `at`.
+  Both mobiles are masked and stay masked: a privileged list is masked platform-wide, and checkers
+  decide on server-computed signals.
+- **The referrer's rewards** are derived on every read by `billing.entitlement` from the granting
+  referrals (owner-track: free agreements; seeker-track: owner contacts). There is no balance column,
+  which is what makes clawback whole.
+- **`referral_codes`** holds each user's code and the referrer's salted IP / User-Agent / device
+  digests; **`properties.featured_days`** holds the per-listing Featured window an owner-track grant
+  sets.
 
-- **Referral** (`referrals` in Postgres, read through `referralService.js`) - read (list) and
-  updated (status + `handledBy` + `handledAt`). Never hard-deleted; state is a status flag. Fields
-  as they arrive on `ReferralDto`:
-  - Identity: `id` (UUID, not `RF####`), `referrer` (name) + `referrerMobile`, `referred` (name) +
-    `referredMobile`, `channel` (`seeker` | `owner`), `shareChannel`.
-  - **Both mobiles are masked, and stay masked.** A privileged *list* is masked platform-wide, and
-    the contract declares no unmasked single-record read for referrals — so a checker decides on
-    the signals, which are computed server-side from the unmasked data. The checker sees the
-    finding without seeing the evidence.
-  - Reward: `reward` (human string, `"+15 owner contacts"`) and `rewardAmount` (an integer **count of
-    owner contacts**, from `settings.fees.referralContactBonus` at redeem time). Since **D31b** the
-    reward is not money: it was ₹500 of platform credit, which nothing could be spent on, and is now
-    the unit the scheme always advertised. Surfaced to the referrer as `contactsEarned` /
-    `contactsPending` on `GET /me/referrals`, and as spendable balance on `GET /me/entitlements`.
-    Do not format `rewardAmount` as currency.
-  - Signals: `aadhaarVerified`, `aadhaarUnique`, `activated`, `sameDevice`, `sameIp`,
-    `velocityHigh` (booleans); `risk` (`low | medium | high`, computed by `ReferralService.risk`).
-    `aadhaar_verified` and `aadhaar_unique` are `updatable = false` — they are a snapshot of the
-    redeem moment, which is why the approve gate reads the referred party's *current* badge
-    instead (§5.2).
-  - Lifecycle: `status`, `at` (redeemed), `qualifiedAt`, `handledBy`, `handledAt`.
-- **The referrer's reward balance** - owner contacts, reported by `GET /me/entitlements` and derived
-  from the referrals that justify it on every read (`count(qualified or rewarded) ×
-  settings.fees.referralContactBonus`). There is no balance column and no grant ledger, which is
-  precisely what makes **clawback** whole: reversing the referral reverses the contacts, with nothing
-  to un-increment by hand. The mock's device-local perk counters
-  (`services/providers/mock/contactQuota.js`, `dzContactsUsed:<mobile>`) are the *mock server's*
-  equivalent of the same arithmetic; see §5.5.
-- **Audit log** - decisions are audited server-side (`referral.approve` / `.reject` / `.clawback`).
+## 5. Business rules & logic
 
-## 5. Business rules & logic  *(the meat)*
+### 5.1 Settings (all admin-editable, `settings.fees`, validated with bounds)
+`referralContactBonus` (15), `referralSeekerBonusContacts` (5), `referralOwnerFeaturedDays` (14),
+`referralOwnerRewardAgreements` (1), `referralQualifyPerMonth` (10, calendar month IST),
+`referralQualifyPerYear` (50), `referralHoldDays` (7), `referralClawbackDays` (30),
+`referralVelocityPerDay` (5), `referralSignupWindowHours` (24), `referralSignalRetentionDays` (180, bounds 30..180),
+`referralNewReferrerDays` (7), and `featuredDays` (7) for ordinary Featured. `GET /pricing` publishes
+the reward numbers in a `referral` block; velocity, retention and new-referrer days are not published.
+The `referralRewards` flag is the kill switch: off means redeem is refused and nothing new is granted.
 
-### 5.1 Background-check signals
-Rendered as pills (`SIGNALS` in `OpsReferrals.jsx`). Each has a "good when true" polarity:
+### 5.2 Redeem
+`POST /referrals/redeem` is allowed only within `referralSignupWindowHours` of account creation, only
+while the account has no listing and no contact request, and not from the referrer's own device
+(`X-Device-Id`, salted-hashed like the IP and User-Agent). Every refusal is the **same 409**
+("That referral code cannot be redeemed"): distinct messages would make the endpoint an oracle for
+"is this a real code?", the reconnaissance step before farming one. The referrer's digests refresh on
+every `GET /me/referrals`, so the comparison is against their current device.
 
-| Signal | Field | Good when | Meaning if bad |
-|--------|-------|-----------|----------------|
-| Aadhaar verified | `aadhaarVerified` | present | referred user has not completed Aadhaar KYC |
-| Aadhaar unique | `aadhaarUnique` | present | that Aadhaar is already used by another account |
-| Activated | `activated` | present | referred user never became active |
-| Same device | `sameDevice` | absent | referrer and referred share a device fingerprint |
-| Same IP | `sameIp` | absent | shared IP address |
-| High velocity | `velocityHigh` | absent | burst of referrals in a short window (farming) |
+### 5.3 Qualification and risk bands
+A referral qualifies on its first event: the referee's listing passes ownership verification (owner
+track), or an owner accepts the referee's first contact request (seeker track). The track is stored.
+Signals: same IP /64, same User-Agent, same device id, velocity (≥ `referralVelocityPerDay`), a
+referrer account younger than `referralNewReferrerDays`, and **no usable `X-Device-Id` at redeem**
+(omitting the header must never be easier than sending it).
 
-A pill is green when the "good" condition holds, red otherwise. `risk` is computed by
-`ReferralService.risk` from three inputs — velocity, the Aadhaar badge, and device/IP correlation —
-and read, not derived, by the component.
+Seeker-track integrity: only a contact accepted on an **approved, publicly live** listing counts; on a
+draft, pending, paused or archived one the referral stays `pending`. If the approving owner is the
+referrer, the referral is rejected `self_dealing`. If the same owner already qualified another referee of
+the same referrer in the last 30 days, the band is high. A `held` seeker row is re-checked at release
+only for a suspended referee, a listing moderation rejected or flagged, and a referrer-owned listing; a
+listing that was paused, rented, sold or archived meanwhile does not matter (it is a third party's).
+Qualification is serialised per referrer (an advisory lock taken after the referral row lock), so the
+month/year caps and the same-owner check cannot be beaten by concurrent qualifications.
 
-Note what correlation does: it raises the band to `medium` rather than refusing anything. A couple
-sharing a flat and a router is the platform's most common genuine referral, so device/IP
-correlation is a reason for a human to look, which is what a risk band is.
-
-### 5.2 The mandatory qualification gate
-**The rule lives in `ReferralService.approve`.** Approving a referral whose referred party holds no
-Aadhaar badge is answered `409` with:
-
-> The referred party is not Aadhaar-verified, so this reward cannot be released.
-
-The gate reads the referred party's **current** badge, via `UserRepository.findByMobile`, and not
-the `aadhaar_verified` column on the referral — that column is `updatable = false`, a snapshot of
-the redeem moment, and the ordinary order of events is redeem first, verify later. Gating on the
-snapshot would have permanently refused exactly the referrals the scheme exists for. A referee who
-is not in the user table at all is refused too: "cannot check" is not "checked out".
-
-The browser still greys the button out:
-```js
-function canQualify(r) { return !!(r.aadhaarVerified && r.aadhaarUnique); }
-```
-That is now a **mirror** of the server rule, sparing the desk a pointless round trip, rather than
-the rule itself. `aadhaarUnique` is checked alongside because the desk's banner promises both, even
-though the server derives the second from the first (a second account cannot verify an identity
-hash the platform already holds). The other signals (device/IP/velocity) inform `risk` but do not
-by themselves block approval.
-
-This gate applies **only to releasing a referral reward** — it never affects anyone's ability to
-browse, post, or contact (those stay at L1 mobile, ADR-019). The Aadhaar uniqueness check is the same
-composite `identity_hash` invariant (ADR-009b) that caps one Verified badge per human, applied here
-at the reward/deal layer where money is at risk.
-
-### 5.3 Buckets, tabs & stats
-- **Stat cards:** Pending, High risk, Rewarded, Refused. **Tabs:** Pending, High risk, Rewarded,
-  All. The first three cards double as tab switches.
-- **Bucketing:**
-  - Pending = `status === 'pending' || status === 'qualified'` — both are decidable.
-  - High risk = `risk === 'high'`.
-  - Rewarded = `status === 'rewarded'`.
-  - Refused (card only) = `rejected` or `clawed-back`.
-- **There is no Flagged tab.** `ReferralStatuses` has no `flagged`, so the old tab would have sat
-  permanently empty — a fraud desk being told there is nothing suspicious. **High risk** asks the
-  question it was reaching for, using a field the server already computes.
-- The desk pulls a **window** of the 100 newest referrals and counts what is in hand. When the
-  server's total is larger a banner says so, because a fraud queue that size is a queue with a
-  problem and the desk should be told rather than shown the first hundred as if that were all.
-
-### 5.4 Reviewer actions (`doAction`)
-- **Approve** (shown for `pending` / `qualified`, enabled when `canQualify`):
-  `POST /referrals/{id}/approve` → `rewarded`, and the server credits the referrer's rupee balance.
-- **Reject** (shown for `pending` / `qualified`): `POST /referrals/{id}/reject` → `rejected`.
-- **Clawback** (shown for `rewarded` only): `POST /referrals/{id}/clawback` → `clawed-back`.
-- Both refusal endpoints accept an optional `reason`; a blank reason is sent as no body rather than
-  as `""`.
-- **A refusal is shown verbatim.** The server's 409 messages name the reason — an unverified
-  referee, or a state this decision cannot be made from — and paraphrasing them in the browser
-  would lose that. `ReferralService.decide` returns a *sentence* rather than a boolean for exactly
-  this reason: its generic "Referral is pending and cannot be rewarded" is right for an illegal
-  transition but actively misleading for the Aadhaar refusal, since `pending` *is* the state
-  approve works from.
-- `handledBy` and `handledAt` are stamped server-side, closing the mock's reviewer-attribution gap.
-- After any action the list reloads, moving the row into its new tab.
-
-### 5.5 Reward release - what the mock could not do
-- The mock's Approve called `creditReferrer({ mobile: r.referrerMobile, ... })` to grant a listing
-  slot or +15 contacts. That call is gone: `referrerMobile` is masked and there is no unmasked read,
-  so the desk cannot address a referrer by phone number and must not try.
-- **Corrected by D31b.** This section used to end "the server models the reward as money, not as a
-  perk", and recorded the perk grant as intentionally dropped. That was the wrong half to drop. The
-  perk was the product — owner contacts are what the scheme advertises — and the ₹500 of platform
-  credit was a currency with nothing to spend it on. The server now pays owner contacts, so the
-  grant is neither dropped nor device-local: approving moves the referral into a status
-  `EntitlementService` counts, and the referrer's `GET /me/entitlements` reflects it on the next
-  read. **Clawback** takes it back the same way, with no ledger entry to reverse.
-
-### 5.6 Export
-CSV of the current tab's rows including all six signals, the reward amount and the redeemed date
-(`draazy-referrals.csv`).
-
-### 5.7 What the mock disagreed about
-Three disagreements, not three formatting differences — which is why this desk is live-only:
-
-| | mock (`lib/mockApi.js`) | server |
+| Outcome | When | Result |
 |---|---|---|
-| statuses | `pending`, `flagged`, `qualified`, `rewarded`, `rejected` | `pending`, `qualified`, `rewarded`, `rejected`, `clawed-back` |
-| mobiles | both in full | both masked, no unmasked read |
-| approve pays | a perk, device-locally | owner contacts, on the account (D31b) |
-| clawback leaves | `rejected` | `clawed-back` |
-| Aadhaar gate | the button | the endpoint |
+| Self-dealing | the referrer approved the referee's contact | `rejected`, `autoReason = self_dealing` |
+| High | velocity, or two or more signals | `rejected`, `autoReason = high_risk`, referrer notified ("couldn't be verified — contact support") |
+| Cap | over the month or year cap | `rejected`, `autoReason = cap_reached` (no deferral) |
+| Medium | one signal | `held` until `holdUntil` (`referralHoldDays`), `autoReason = medium_risk` |
+| Low | none | `qualified` (granting) at once |
+
+Every automatic decision is audited as `referral.auto.<qualified|held|released|rejected|clawback>`
+with actor `system`. Correlation never refuses at redeem; it only raises the band.
+
+### 5.4 Hold sweep and automatic clawback
+- **Hourly sweep** (`ReferralHoldSweep`): a due `held` row becomes `qualified` if the referee is not
+  suspended and the qualifying listing is still live and not taken down (seeker rows: not rejected or
+  flagged by moderation, and not the referrer's); otherwise `rejected`. It also
+  re-checks recently granted rows, as a backstop for events no hook sees (e.g. an edit that drops
+  verification). Rows whose last decision was a staff override (approve, appeal) are never touched by it.
+- **Clawback** within `referralClawbackDays` of the grant when the referee is suspended
+  (`referee_suspended`), the qualifying listing is taken down by moderation (`listing_taken_down`), or
+  its ownership verification is revoked (`verification_revoked`). On a seeker row the "qualifying
+  listing" is the third-party listing the friend contacted: archiving or un-verifying it changes nothing,
+  and only a moderation reject or flag does. A `held` row meeting the same events
+  is rejected instead. The referrer is notified. Clawback applies to granting rows and removes the
+  derived contacts or agreements immediately.
+- **Friend reward:** the friend's extra free contacts and the 14-day Featured window apply from
+  redemption/qualification and are withdrawn on rejection or clawback.
+
+### 5.5 Desk (overrides)
+- **Approve** (from `pending`, `qualified`, `held`, `rejected`): `rewarded`. No identity-badge
+  requirement.
+- **Reject** (from `pending`, `qualified`, `held`).
+- **Clawback** (from `qualified` / `rewarded` only): clawing back a referral that never paid would
+  rewrite history.
+- Rows show `track`, `holdUntil`, `autoReason` and `handledBy` (`system` or the staff user).
+- Tabs and counts: `all`, `pending`, `held`, `highRisk`, `rewarded`, `refused`
+  (`GET /referrals?counts=true`). The desk is server-paged (20 a page, newest first); `status` is a
+  comma list, `risk=high` filters, `q` searches names, mobiles and id.
+- Export covers the current page.
 
 ## 6. Maker-checker / approval
-Applicable - this queue is a checker gate. See
+Automatic for ordinary decisions; ops overrides are the checker. See
 [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.
-
-- **Maker (proposer):** the **referrer** (and the system), by inviting a friend on the consumer
-  refer-a-friend flow; the referee redeems the code and the record is created in `pending`. There
-  is no auto-`flagged` state — risk is a band, not a status.
-- **Checker (approver):** the **ops reviewer**, who approves (releases reward), rejects (no reward),
-  or claws back a previously released reward.
-- **Approval side-effect:** status `-> rewarded`, an audit entry, and the referrer's rupee balance
-  credited. Rejection has no reward side-effect. Clawback reverses a prior release.
-- **Hard gate:** approval has an extra precondition the **server** enforces — the referred party
-  must hold a current Aadhaar badge (§5.2).
 
 ## 7. State machine
 ```
-   pending  --(approve, server checks Aadhaar)-->  rewarded  --(clawback)-->  clawed-back
-     |                                                |
-     |--(reject)---------------------------------> rejected
-
-  qualified  --(approve / reject)--> as pending above
+pending --(qualify: low)--> qualified (granting) --(staff approve)--> rewarded
+pending --(qualify: medium)--> held --(hold elapses, no problem)--> qualified
+                                    \--(problem found)--> rejected
+pending --(qualify: high | cap_reached)--> rejected
+qualified | rewarded --(clawback event or staff clawback)--> clawed-back
 ```
-- **States:** `pending`, `qualified`, `rewarded`, `rejected`, `clawed-back` (`ReferralStatuses`).
-- **Reviewable:** `pending` and `qualified` offer Approve + Reject. Only `rewarded` offers
-  Clawback. `rejected` and `clawed-back` are terminal (no action - shows a dash).
-- **`clawed-back` is not `rejected`.** The mock wrote `rejected` for both and lost the one
-  distinction a fraud desk needs: a reward that was never paid, versus one that was paid and
-  recovered. `Badge` gives it its own tone for the same reason.
+- **States:** `pending`, `qualified`, `held`, `rewarded`, `rejected`, `clawed-back`
+  (`ReferralStatuses`). `clawed-back` is not `rejected`: a reward never paid versus one paid and
+  recovered.
+- Staff approve works from pending, held, qualified and rejected. Approving a `rejected` row is an
+  appeal: a non-blank reason is required (422) and goes on the row and the audit trail.
 - Any other transition is a 409 naming the current status.
 
 ## 8. Edge cases, validation & error states
-- **Not live:** an explanatory panel replaces the queue, naming the three disagreements (§5.7),
-  rather than a table of referrals the desk could not stand behind.
-- **Read failed:** "The queue could not be read." plus the server's message and a Try again button.
-  A fraud queue that renders a failed read as "no referrals here" is worse than one that says it
-  could not look.
-- **Empty tab:** table shows "No referrals here" (gift emoji).
-- **Loading:** `<Loading />` until the first page arrives.
-- **Approve blocked:** disabled "Blocked" button in the browser, **and** a 409 from the endpoint if
-  anything goes round it. The toast shows the server's own sentence.
-- **Clawback confirmation:** none - a single click reverses the reward. The endpoint takes an
-  optional reason the UI does not yet collect; both are worth adding.
-- **Windowing, not paging:** the 100 newest are fetched and a banner appears when the server holds
-  more. Server-side `status` / `risk` filters exist on `GET /referrals` and are not yet wired to
-  the tabs.
-- **Concurrency:** decisions are single server-side transitions; a second decision on an already
-  decided referral is refused with a 409 rather than silently overwriting.
+- **Read failed:** "The queue could not be read." with the server's message and Try again; never
+  render a failed read as "no referrals here".
+- **Concurrency:** decisions load the row under a write lock; a second decision on an already decided
+  referral is refused with a 409. Automatic decisions run in the triggering transaction (hooks) or one
+  transaction per row (sweep).
+- **Flag off:** pending referrals stay pending and nothing is granted until it is switched back on.
+
+## Appendix: implementation rationale
+
+### Retention of correlation digests
+`same_device` / `same_ip` need both sides of a comparison, so the platform stores a salted digest of
+the referee's address, User-Agent and device id on `referrals`, and of the referrer's on
+`referral_codes`. A request without a User-Agent or device id produces no digest, so the comparison
+signals stay `false` (a missing device id is itself a risk signal, see 5.3). The digests are personal
+data kept for one purpose, never on the wire, and blanked by `ReferralSignalRetention` after
+`referralSignalRetentionDays`. The findings (`same_device`, `same_ip`, `risk`) outlive the evidence on
+purpose: they are outcomes, not identifiers. The columns have no getters, the cheapest guarantee they
+never reach a DTO. Time-based expiry is a different mechanism from a subject's erasure request; the
+overlap is disclosed in `ErasureRetention#knownGaps()`.
+
+### Reward amount
+`reward` is a free-text label and `rewardAmount` its magnitude (owner contacts for the seeker track,
+agreements for the owner track), frozen when the referral qualifies; it is 0 and neutral until then.
+Older `rewarded` rows keep the unit they were decided in. Audit metadata names the unit
+(`contacts`, not `amount`) so an append-only trail is not misread.
+
+### Code minting and normalisation
+The alphabet excludes `I`, `O`, `0`, `1` because codes are dictated and read off phone screens.
+Codes are minted on first read of `GET /me/referrals`, not at signup, and normalised (trim + upper).
+Collisions are avoided by looking before leaping: a constraint violation poisons the persistence
+context, so no retry is possible once one fires; a racing loser still gets the same 409.
+
+### Channel and risk (queue read paths)
+`ReferralMapper.channelOf` reads the referred party's current `listingsCount` (the lifetime tally):
+somebody whose first listing was rejected still joined on the owner side. Not to be confused with
+`Referral.shareChannel` (how the link travelled, D60).
+
+### Idempotent qualification
+`qualifyOn` moves a `pending` row exactly once; a retried verification, or a second property or
+contact announcing against the same referral, mints nothing. A rejected row is never resurrected by
+a later event. `uq_referrals_referred_mobile` admits one row per referred mobile, so "one reward per
+referee, ever" needs no further constraint.
+
+### Queue paging and masking
+`ReferralService.queue` resolves the page's referrer names in one query (`toDtos`). `ReferralMapper.masked`
+is hand-written and private per api-standards §8.1; both mobiles go through it and nothing returns a
+raw one.

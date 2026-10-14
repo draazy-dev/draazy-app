@@ -1,85 +1,120 @@
-/**
- * Ops flatmates desk — three boards over `FlatmateModerationController`, live-only.
- *
- * ## Why three boards and not one screen
- *
- * The controller keeps verification and moderation on separate routes deliberately, and this page
- * keeps them on separate boards for the same reason: they are different questions about the same
- * post, with different outcomes and different consequences for getting them wrong.
- *
- *   **Verification** — *has this host proved what they claimed?* Outcome: a trust badge. A post that
- *   fails stays visible, because an unproven claim is not abuse.
- *
- *   **Moderation** — *may this be published at all?* Outcome: visibility. A post that fails is
- *   hidden, and that says nothing about whether the paperwork behind it is real.
- *
- *   **Group applications** — the same moderation axis over a third resource, alongside a status
- *   that belongs to the owner and that this desk may never write.
- *
- * A single merged status column would be a screen that cannot tell a host "we could not verify your
- * agreement" apart from "we took your post down". Those are different things to be told.
- *
- * ## What changed at wave 2c
- *
- * This page used to read a `localStorage` review store the consumer flow wrote into. It could model
- * the verification queue's happy path and nothing else: no moderation axis at all — so the D72
- * backlog, the thing that makes "invisible until moderated" defensible, had **no UI in the product**
- * — no group applications, and no notion of the `flatmates:read` / `flatmates:write` split that
- * decides whether the account looking at this queue is allowed to work it.
- */
-import { useState } from 'react';
-import { BedDouble, ShieldCheck, Users } from 'lucide-react';
-import { classNames } from '../../lib/format.js';
+import { useCallback, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader.jsx';
-import VerificationBoard from './flatmate/VerificationBoard.jsx';
-import ModerationBoard from './flatmate/ModerationBoard.jsx';
-import ApplicationsBoard from './flatmate/ApplicationsBoard.jsx';
+import { Chips, ClearFilters, DATE_CHIPS, QueuePanel, QueueTabs, SearchBox } from '../../components/admin/WorkQueue.jsx';
+import { QueueState } from './flatmate/board.jsx';
+import useFlatmateQueue, { QUEUE_TABS } from './flatmate/useFlatmateQueue.js';
+import FlatmateQueueCard, { entryKind, entrySummary } from './flatmate/FlatmateQueueCard.jsx';
+import FlatmateReviewModal from './flatmate/FlatmateReviewModal.jsx';
 
-const TITLE = 'Flatmate Moderation';
-const SUBTITLE = 'Verify what hosts claim, and decide what the board is allowed to show.';
+const EMPTY = {
+  pending: 'Nothing waiting — every flatmate post has been reviewed ✅',
+  published: 'Nothing published yet.',
+  hidden: 'Nothing hidden or removed.',
+};
 
-const BOARDS = [
-  { id: 'verification', label: 'Verification', icon: ShieldCheck, Panel: VerificationBoard },
-  { id: 'moderation', label: 'Moderation', icon: BedDouble, Panel: ModerationBoard },
-  { id: 'applications', label: 'Group applications', icon: Users, Panel: ApplicationsBoard },
+const NOTES = {
+  pending: 'Open only: posts awaiting publish, edits since review, badge claims and group applications. An item leaves once you decide it. Oldest first.',
+  published: 'Everything the city can see, plus cleared group applications. Open one to hide or remove it. Newest first.',
+  hidden: 'Flagged, removed and rejected posts. Open one to read why, or publish it again. Newest first.',
+};
+
+const TYPE_CHIPS = [
+  { value: 'all', label: 'All' },
+  { value: 'room', label: 'Room' },
+  { value: 'group', label: 'Group' },
+  { value: 'post', label: 'Seeker post' },
 ];
 
+const SORT_CHIPS = [{ value: 'oldest', label: 'Oldest' }, { value: 'newest', label: 'Newest' }];
+
+const typeOf = (entry) => (entryKind(entry) === 'application' ? 'group' : entryKind(entry));
+
+const haystack = (entry) => {
+  const s = entrySummary(entry);
+  return [s.title, s.locality, s.author, entry.post?.snippet, entry.key].join(' ').toLowerCase();
+};
+
+function filterQueue(items, { type, q, days, order }) {
+  const needle = q.trim().toLowerCase();
+  const cutoff = days ? Date.now() - Number(days) * 86400000 : 0;
+  const dir = order === 'oldest' ? 1 : -1;
+  return items
+    .filter((e) => (type === 'all' || typeOf(e) === type)
+      && (!needle || haystack(e).includes(needle))
+      // An entry with no timestamp survives every cutoff rather than vanishing from the queue.
+      && (!cutoff || !e.since || e.since >= cutoff))
+    .sort((a, b) => dir * ((a.since || 0) - (b.since || 0)));
+}
+
 export default function OpsFlatmateReview() {
-  const [board, setBoard] = useState('verification');
-
-  /* A "this desk needs the live API" panel stood here, for the case where `flatmate` was left out
-     of the domain allow-list. The mock store behind it could model about a third of this desk — no
-     moderation axis, no group applications, no read-versus-write permission split — so an empty
-     queue would have been indistinguishable from a cleared backlog (D72). Both the allow-list and
-     the store are gone; the three boards below each render their own failure. */
-
-  const active = BOARDS.find((b) => b.id === board) || BOARDS[0];
+  const [tab, setTab] = useState('pending');
+  const [type, setType] = useState('all');
+  const [q, setQ] = useState('');
+  const [days, setDays] = useState('');
+  const [sort, setSort] = useState('');
+  const [open, setOpen] = useState(null);
+  const loaded = useFlatmateQueue(tab);
+  const order = sort || (tab === 'pending' ? 'oldest' : 'newest');
+  const queue = { ...loaded, items: filterQueue(loaded.items, { type, q, days, order }) };
+  const filtered = loaded.items.length > 0;
+  const dirty = type !== 'all' || q !== '' || days !== '' || sort !== '';
+  const clear = () => { setType('all'); setQ(''); setDays(''); setSort(''); };
+  const close = useCallback(() => setOpen(null), []);
+  const ready = loaded.status === 'ready';
 
   return (
-    <div>
-      <PageHeader title={TITLE} subtitle={SUBTITLE} />
+    <div className="pb-20">
+      <PageHeader
+        title="Flatmate Moderation"
+        subtitle="Publish, hide and badge flatmate rooms, groups and seeker posts."
+        actions={<button type="button" onClick={loaded.reload} className="dz-btn dz-btn-ghost"><RefreshCw className="h-4 w-4" /> Refresh</button>}
+      />
 
-      <div role="group" aria-label="Flatmate boards" className="mb-5 flex flex-wrap gap-2">
-        {BOARDS.map((b) => (
-          <button
-            key={b.id}
-            type="button"
-            aria-pressed={board === b.id}
-            onClick={() => setBoard(b.id)}
-            className={classNames(
-              'inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition',
-              board === b.id
-                ? 'border-brand-teal/40 bg-brand-teal/15 text-brand-teal'
-                : 'border-white/10 text-gray-300 hover:bg-white/5',
-            )}
-          >
-            <b.icon className="h-4 w-4" />{b.label}
-          </button>
-        ))}
-      </div>
+      <QueueTabs
+        label="Flatmate queues"
+        idPrefix="fm"
+        countTestId="fm-count"
+        active={tab}
+        onChange={setTab}
+        tabs={QUEUE_TABS.map((t) => ({
+          key: t.id,
+          label: t.label,
+          count: ready && loaded.counts ? String(loaded.counts[t.id])
+            : t.id === tab && ready ? `${loaded.items.length}${loaded.truncated ? '+' : ''}` : null,
+        }))}
+      />
 
-      {/* Keyed so switching boards remounts rather than reusing the previous board's row state. */}
-      <active.Panel key={active.id} />
+      <QueuePanel
+        idPrefix="fm"
+        active={tab}
+        note={NOTES[tab]}
+        toolbar={(
+          <>
+            <SearchBox value={q} onChange={setQ} placeholder="Title, author or locality" label="Search the queue" />
+            <Chips label="Post type" options={TYPE_CHIPS} value={type} onChange={setType} />
+            <Chips label="Sort" options={SORT_CHIPS} value={order} onChange={setSort} />
+            <Chips label="Posted" options={DATE_CHIPS} value={days} onChange={setDays} />
+            {dirty ? <ClearFilters onClick={clear} /> : null}
+            {queue.status === 'ready' ? (
+              <p role="status" className="ml-auto text-xs tabular-nums text-gray-400">
+                {queue.items.length} {queue.items.length === 1 ? 'item' : 'items'}
+                {queue.truncated ? ' · first 100 of each list — decide some to see the rest' : ''}
+              </p>
+            ) : null}
+          </>
+        )}
+      >
+        <QueueState state={queue} onRetry={queue.reload} empty={filtered ? 'Nothing matches these filters.' : EMPTY[tab]} />
+
+        {queue.status === 'ready' && queue.items.length ? (
+          <ul className="space-y-3 p-3">
+            {queue.items.map((e) => <FlatmateQueueCard key={e.key} entry={e} onReview={setOpen} />)}
+          </ul>
+        ) : null}
+      </QueuePanel>
+
+      {open ? <FlatmateReviewModal entry={open} onClose={close} onChanged={queue.reload} /> : null}
     </div>
   );
 }

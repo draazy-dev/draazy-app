@@ -2,7 +2,7 @@
 
 This is the foundation document for Draazy. It defines the patterns that are reused across
 every feature so that individual flow docs can link here instead of re-explaining them. Whenever
-a flow doc mentions auth, an approval/verification step, the contact or Aadhaar gate, soft-delete,
+a flow doc mentions auth, an approval/verification step, the contact gate, soft-delete,
 audit, pagination, the provider seam, or notifications, it points back to the relevant section
 below.
 
@@ -32,10 +32,10 @@ The session user carries a `role`. The **canonical auth roles are defined by the
 - `buyer` - property seekers (the default; also covers tenants — "Buyer / Tenant").
 - `owner` - property owners / landlords.
 - `admin` - platform super-admin; bypasses team scoping and module scoping.
+- `manager` - back-office lead below the single admin; bypasses team scoping, opens only modules allowed
+  by its permission atoms, and can create/manage staff accounts only.
 - `staff` - internal ops team member, scoped to one or more `teams` (`rental`, `legal`, `interior`,
   `packers`, `valuation` — the `Team` schema in the spec).
-- `manager` / `member` are **admin-RBAC permission labels, not auth roles** (see `roleLabel` in
-  `src/lib/auth.js`); they never appear in the JWT `role` claim.
 
 `isInternal(user)` (in `src/lib/auth.js`) treats `admin`, `manager`, and `staff` as back-office.
 
@@ -125,7 +125,7 @@ There are two separate login doors, wired into the route guards:
 
 - **Consumer `/signin`** - buyers and owners. Unauthenticated access to a protected consumer
   route redirects here with a `?next=` return path.
-- **Back-office `/staff-login`** - admin/staff. Role and team guards redirect here.
+- **Back-office `/staff-login`** - admin, manager and staff. Role and team guards redirect here.
 
 ### Route guards
 
@@ -141,15 +141,15 @@ permission atom, so a hand-edited client reaches a 403 rather than data.
 | `FlagRoute flag="x"` | admin tab feature flag enabled | `/admin` |
 | `AppFlagRoute flag="x"` | consumer feature flag enabled | `/` |
 
-Examples in `src/App.jsx`: the admin console is `RoleRoute roles={['admin']}`; consumer-only
+Examples in `src/App.jsx`: the admin console is `RoleRoute roles={['manager', 'admin']}`; consumer-only
 pages (`/saved`, `/schedule-visit`, `/pay-rent`, ...) are `ProtectedRoute`, some nested inside
 `AppFlagRoute`.
 
-**`manager` is gone (D209).** It was never one of the contract's roles (`buyer|owner|staff|admin`) -
-only a console label on a custom-role bundle whose storage V61 deleted, so it granted nothing. The
-admin console is administrator-only; an ops account's atoms widen what the API does for it inside
-`/ops`, not which shell it may load. `ModuleRoute` no longer resolves anything itself: the server
-returns the caller's own atoms and the console tests membership.
+**`manager` is real again after D209.** D209 removed a dead console label that granted nothing; Phase 2
+adds a schema role with hierarchy `admin > manager > staff`. Managers can load the admin shell and
+open modules only when the server returns the needed atom. Admin-only routes still use
+`hasRole('ADMIN')`; staff/admin guards admit managers through the Spring role hierarchy. When managers
+create or change staff accounts, the existing in-app `Notifier` writes a notification to the admin.
 
 **`TeamRoute` is gone.** It gated the five per-team ops desks (`/ops/rent-agreement`, `/ops/legal`,
 `/ops/interior`, `/ops/packers`, `/ops/valuation`) on `x ∈ teams[]` and redirected to
@@ -164,27 +164,15 @@ staffer their own desk and nothing else — an empty queue and a forbidden queue
 > authenticate via Bearer JWT (see the [OpenAPI spec](../../backend/src/main/resources/static/openapi/draazy-api.yaml)) and authorize every
 > request by role and team server-side. The client role/team is a hint, never a grant.
 
-### Where a permission atom is deliberately *not* the guard
+### Where a permission atom shares a guard
 
-`PATCH /societies/{slug}/residents/{id}` guards on `isStaff` rather than on the `societies:write`
-atom, and this is an accepted exception rather than an oversight.
+`PATCH /societies/{slug}/residents/{id}` admits staff only with `societies:write`; the committee
+member path remains a separate society-ownership guard because residents hold no back-office atoms.
 
 The reason is that the endpoint has two legitimate callers with nothing in common. One is an ops
 account working the residency queue, which is what the atom describes. The other is a **committee
 member of that society** approving a neighbour's residency claim — a resident, holding no
-back-office permissions at all, who would fail any atom check by construction. Gating on
-`societies:write` would lock out the caller the feature exists for.
-
-The cost is real and worth stating plainly: an ops account granted `societies:read` and *not*
-`societies:write` can still approve and reject residents, because `isStaff` does not distinguish
-them. A read-only ops account therefore keeps one write it was never granted.
-
-That is accepted for now because the alternative — an `isStaff OR isCommitteeMemberOf(slug)`
-disjunction — needs a committee-membership relation that does not exist yet, and the same missing
-relation is what blocks several other society guards (see `ListingEditRules.requireSociety` on why
-an owner can still name a society they have nothing to do with). When that relation lands, this
-guard becomes the disjunction and the atom starts meaning what it says. Until then the exception is
-documented here rather than left to be rediscovered from the code.
+back-office permissions at all, who would fail any atom check by construction.
 
 ---
 
@@ -225,42 +213,40 @@ top-level stages.
 
 ### 2.3 Canonical example in real code: property verification
 
-Grounded in `src/lib/data/properties-admin.js` and `src/pages/admin/AdminProperties.jsx`.
+Grounded in `moderation.verification.PropertyVerificationService` / `ApprovalGate` and
+`src/pages/admin/AdminProperties.jsx`. Full contract:
+[`../flows/admin/property-verification.md`](../flows/admin/property-verification.md) §5–§7.
 
-- **Maker = owner.** Creating a listing (`addListing` in `src/lib/mockApi/properties.js`) stamps
-  `status: 'pending'`. The listing is not live.
-- **Checker = admin / manager.** The admin Properties queue
-  (`src/pages/admin/AdminProperties.jsx`, guarded by `RoleRoute roles={['admin','manager']}`)
-  reviews each listing.
-- **Review record.** `ensureReview(listing)` creates a `propertyReviews[id]` record with
-  `status: 'in_review'`, a per-document checklist (`docs`, each `status: 'pending'`), a `messages`
-  thread, `decision: null`, and `createdAt`/`updatedAt`.
-- **Per-document verification.** `setDocStatus` / `setDocVerified` mark each required document
-  `verified`. `addReviewMessage` supports owner<->admin clarification; an admin message flips the
-  review to `clarification` unless already decided.
-- **Decision.** `decideReview(id, 'approved'|'rejected', reason)` sets the review `status`, writes
-  `decision = { type, reason, at }`, and appends a system message to the owner.
-- **Side-effects on approval.** The admin handler pairs the decision with the listing status:
-  `decideReview(id, 'approved')` + `setListingStatus(id, 'approved')` (listing goes live) and
-  clears any `flagReason`. Rejection pairs `decideReview(id, 'rejected', reason)` with
-  `setListingStatus(id, 'rejected')`. See `bulkApprove` / `submitBulkReject` in
-  `AdminProperties.jsx`.
-- **Audit.** Each action calls `logAudit('Listing'|'Listings', '...')` (section 4).
+- **Maker = owner.** Creating a listing stamps `status: 'pending'`. The listing is not live.
+- **Checker = staff or admin**, never the listing's owner (`ApprovalGate`, every approve path,
+  bulk included).
+- **Checklist.** Three facts — photos real, not a duplicate, details and location right — each
+  ticked by the checker; approve refuses `409 checklist_incomplete` until all three are ticked. An
+  edit that sends the listing back to `pending` unticks them.
+- **Decision.** `approve | needs_info | reject`, one server transaction with the listing status,
+  guarded by `expectedStatus` (`409 stale_decision`). `needs_info` and `reject` need a reason code;
+  reject is final. A duplicate or hard broker signal needs a second staff member through the
+  override request (`second_approver_required`).
+- **Audit.** Every decision, checklist tick and override writes an `audit_log` row (section 4).
 
 ### 2.4 The same pattern in other contexts
 
 | Context | Maker (proposes) | Checker (approves/rejects) | Approval side-effect | Code |
 |---------|------------------|----------------------------|----------------------|------|
-| Listing verification | owner submits listing | admin/manager | listing `status -> approved`, goes live | `properties-admin.js` `decideReview`, `mockApi/properties.js` `setListingStatus` |
+| Listing verification | owner submits listing | staff/admin, never the owner; a second staff member for a flagged override | listing `status -> approved`, goes live | `moderation.verification.PropertyVerificationService` |
 | Deal finalization | buyer requests finalize | owner accepts/declines | accept closes the deal (`closeDeal`) and auto-declines the other pending requests for that property | `src/lib/store/deals.js` `requestFinalize` / `acceptFinalize` / `declineFinalize` |
 | Contact reveal | buyer requests contact | owner approves/declines | owner phone unmasks for that buyer (subject to owner privacy prefs) | `src/lib/contact.js` `requestContact` / `setContactStatus` |
 | Document access | buyer requests a doc category | owner grants/declines | on grant, matching uploaded docs are shared (`sharedDocIds`) | `src/lib/data/documents.js` `addDocRequest` / `respondDocRequest` |
 | Visit request | buyer requests a visit slot | owner confirms/cancels | slot confirmed | see `visitProvider` / `PATCH /visit-requests/:id/status` |
 | Offer / negotiation | buyer submits an offer | owner responds (accept/counter/decline) | accepted offer feeds finalization | `src/lib/store/deals.js` `addOffer` / `respondOffer` |
 | Society claim | resident claims a society role | admin moderates | claim approved | `src/pages/admin/societies/ClaimsTab.jsx` |
+| Identity badge (earned) | user submits document + selfie | identity reviewer (`identity:write`), never the subject | `users.verified = true`, listings back-filled; revocable with reason | `identity.verification.IdentityReviewService` |
 
 In every row the record starts `pending`, is decided by the checker, and only then does the
 side-effect fire. Reject-then-resubmit returns the record to `pending`.
+
+The hand-granted Verified badge is not maker-checker: with one administrator a second approval could
+never complete, so a manager or the admin grants it in one step with a reason, audited as `user.badge`.
 
 > **MUST be server-enforced later.** Today the maker and checker operate on the same editable
 > `localStorage`. The backend must (a) verify the maker's identity, (b) verify the checker is
@@ -270,28 +256,69 @@ side-effect fire. Reject-then-resubmit returns the record to `pending`.
 
 ---
 
-## 3. Contact and Aadhaar / verification gate
+### 2.5 Foundation edits: which edits earn re-review, and at what price
 
-Lead contact information (owner phone numbers) is never exposed by default. It is gated behind two
+`ListingEditRules` decides; `ListingService` acts on the answer. The split is along a real seam —
+everything in the rules class *decides* and nothing *acts* — which is what stops the moderator path
+(`updateAsModerator`, which deliberately reacts to nothing) drifting into the owner rule.
+
+**What counts as a foundation field.** Exactly the set a buyer can *search on*: `price`, `bhk`,
+`propertyType`, `locality`, `deal`, `furnishing` and `possession` — one per facet accepted by
+`GET /properties`. Re-moderation exists to stop bait-and-switch, and bait-and-switch is specifically
+the act of being approved into one set of search results and then editing your way into a different,
+more valuable one. Any facet an owner can change without review is a hole of exactly that shape, so
+deriving the rule from the facet list rather than curating it by hand keeps the two in step: a new
+facet that is not also a foundation field is a new hole, and `ListingFoundationTest` fails until
+someone has decided which it is.
+
+**Why it is not one price.** Every foundation edit is re-checked; the split is only over whether the
+listing keeps earning while it waits.
+
+- **Off search** — `locality`, `propertyType`, `bhk`, `deal`. These change *what the listing
+  fundamentally is*, so a stale index entry actively misleads: a 2BHK appearing under 3BHK, or a
+  rental under sale, is a wrong answer rather than a slightly stale one.
+- **Stays live** — `price`, `furnishing`, `possession`. These change an attribute of a listing that
+  is still the same property, so the worst case is a briefly out-of-date number. The same moderator
+  work item is raised without touching `status`. Price is the most-edited field on any marketplace
+  and the one an owner is most often asked to move; a rule that takes the listing dark for a day
+  every time it moves teaches owners not to move it.
+- **`address`** also stays live, for a different reason: it is what `AddressKey` derives the
+  duplicate signal from, so an edit to it is how a listing moves onto an address somebody else
+  already holds. The probe files a note only when the collision exists, and a moderator reading
+  "possible duplicate" cannot tell an honest correction from an owner who typed their way onto a
+  neighbour's flat. The re-check names the field and is raised either way.
+
+`ListingEditRules.apply` is the one place either set is written down — which set a field belongs to
+*is* which flag its block sets, so a field cannot be in both nor silently in neither. The two blocks
+are kept first, contiguous and in that order. `frontend/scripts/check-listing-foundation.mjs` parses
+them back out of that source **by path** and matches the `apply` signature as a literal, so moving
+either is a two-file change.
+
+---
+
+## 3. Contact gate
+
+Lead contact information (owner phone numbers) is masked by default. It is gated behind two
 layers, implemented in `src/lib/contact.js` and consumed by
 `src/pages/consumer/property/ContactBox.jsx` / `ContactOwnerModal.jsx`.
 
-### Layer 1 - Aadhaar identity gate (before a buyer may even ask)
+### Layer 1 - being signed in (and nothing more)
 
-`requestContact(ownerMobile, propId)` refuses to create a request unless the signed-in buyer has a
-verified Aadhaar record in `localStorage` under `draazyAadhaar:<mobile>` with `verified: true`.
-Return values:
+`requestContact(ownerMobile, propId)` needs an account, not a badge. **Identity verification is not
+consulted here** — contact is L1 mobile, per ADR-019 ("badge, not gate"). Return values:
 
 - `'login'` - no signed-in user.
-- `'aadhaar_required'` - signed in but Aadhaar not verified. The UI routes to the Aadhaar OTP
-  gate (`src/pages/consumer/list-property/AadhaarGate.jsx`), which confirms the mobile and verifies
-  an OTP before setting the verified flag. The same gate protects listing creation (an owner must
-  verify Aadhaar before posting).
+- `'unavailable'` - no usable owner identity to address a request to (for example the API returned
+  an already-masked number), so we refuse rather than fake a sent request.
+- `'verification_required'` - **the single exception, and it belongs to the owner, not to us.** An
+  owner who switched on *accept verified contacts only* (`verifiedContactOnly`) narrows their own
+  inbox; an unverified requester is then pointed at the badge funnel (`/verify-identity`). Every
+  other owner's listings stay open to any signed-in user.
 
 ### Layer 2 - Owner approval (maker-checker, section 2)
 
-Once past the Aadhaar gate, the buyer's request is created with `status: 'pending'` and the owner's
-number stays **masked** (`maskPhone`, for example `+91 98xxx xxxx02`). Status progression via
+Once a request exists, it is created with `status: 'pending'` and the owner's
+number stays **masked** (`maskPhone`, for example `+91 98xxx xxxx02`) until approval. Status progression via
 `contactStatus`:
 
 - `'owner'` - the viewer is the owner themselves (`isOwnerViewer`); always sees the full number.
@@ -309,11 +336,40 @@ number stays **masked** (`maskPhone`, for example `+91 98xxx xxxx02`). Status pr
 - **Storage keys are shared with the HTML prototype** (`draazyContactReq:<ownerDigits>`), so the
   two prototypes stay compatible.
 
-> **MUST be server-enforced later.** The Aadhaar verification, the mask, and the approval check all
-> run client-side today. The backend must own KYC/Aadhaar verification, return the number **only**
-> after it confirms an approved request (see `POST /contacts/request` returning
-> `403 { "error": "aadhaar_required" }` in the [OpenAPI spec](../../backend/src/main/resources/static/openapi/draazy-api.yaml)), and never
-> ship the raw number to an unapproved client.
+> **Server-enforced.** The backend returns the raw owner number only after it confirms an approved
+> request and `hideNumber=false`; it never ships the raw number to an unapproved client.
+
+---
+
+### Private listing fields on the detail response
+
+`PropertyResponse` carries fields that are withheld by audience rather than merely unused, and
+each is absent (`NON_NULL`) rather than null so the response shape does not advertise that something
+is being withheld.
+
+- **`address`** — owner and staff only. It carries the flat number because `AddressKey` needs the
+  unit token to tell one flat from its neighbour; an address that stops at the building flags a whole
+  tower, which nobody can act on. That makes it useful to the duplicate probe and dangerous to
+  publish: the contact gate exists so a stranger cannot reach an owner uninvited, and a stranger
+  holding "A-902, Rohan Nilay" does not need a phone number, they can knock. The exposure is worst
+  for shared accommodation (flatmates), where the occupant is often a single woman living alone in that
+  unit. Nothing renders it — the public detail page is built from `society` and `locality` — so it
+  is emitted only to round-trip the owner's edit form and to let the desk adjudicate a duplicate.
+- **`electricityMeterNo`** — owner and staff only, for the same two reasons: the owner typed it and
+  must be able to correct it, and it is the evidence behind a duplicate flag. A meter number names a
+  live utility account, one of the few things here a stranger could *act* on rather than merely read.
+- **`flagReason`** — back office only. Gated rather than left mechanical, because three separate
+  places clear the column (approval through `setStatus`, lowering a flag, the verification service)
+  and a public listing carries no reason only for as long as all three keep doing so; one missed
+  `setFlagReason(null)` puts a moderator's private note — often quoting a report or naming a
+  suspicion about the poster — on the public detail read, where nothing renders it and nobody would
+  notice. Withheld from the owner too: the moderator's shorthand is written for the desk, and handing
+  it back also hands back whatever the reporter said about them. What an owner is owed is an
+  explanation, and that has its own surface in the verification thread.
+- **Listing internal state** — `recheckPending/Reason/RequestedAt`, `archived`, `featured`,
+  `qualityScore`, `societyId`, `pincode`: owner and staff only (`PrivateFieldVisibility`).
+  The public detail page draws none of them, and together they tell a scraper which listings the desk
+  is re-checking or promoting.
 
 ---
 
@@ -321,10 +377,10 @@ number stays **masked** (`maskPhone`, for example `+91 98xxx xxxx02`). Status pr
 
 ### Soft-delete (status flags and archive, not hard delete)
 
-Draazy prefers reversible archival over destructive deletes. The generic helpers live in
-`src/lib/mockApi/core.js`:
+Draazy prefers reversible archival over destructive deletes. The shape is the same wherever it is
+applied:
 
-- `archiveRecord(collection, id, reason)` sets `archived: true`, `archivedAt` (ISO-8601), and
+- Archiving sets `archived: true`, `archivedAt` (ISO-8601), and
   `archiveReason`. The record stays in the store; list views filter out `archived` items.
 - `restoreRecord(collection, id, statusOverride)` sets `archived: false`, stamps `restoredAt`, and
   can reset `status` (listings restore to `pending`, so they re-enter verification).
@@ -347,21 +403,19 @@ add `archivedAt` / `restoredAt`. The future schema standardizes on `created_at` 
 
 ### Audit trail (who / when / what)
 
-`src/lib/mockApi/audit.js`:
+An audit entry is `{ id, at (ISO-8601), who, action, detail }`, `who` resolved from the signed-in
+staff user.
 
-- `logAudit(action, detail)` prepends an entry `{ id, at (ISO-8601), who, action, detail }` to a
-  capped list (`auditLog`, max 200). `who` is resolved from the signed-in user via
-  `currentStaffInfo()`. `listAudit()` / `clearAudit()` read/reset it.
-- `addInternalNote` / `editInternalNote` / `getInternalNotes` are the **mock** half of the
-  `note` domain, reached only through `services/providers/mock/noteProvider.js`. Live, notes are a
-  table of their own (`internal_notes`) behind `GET|POST /admin/notes/{entityType}/{entityId}` and
-  `PATCH /admin/notes/{id}`, gated on `notes:read` / `notes:write`. They are **mutable on purpose**
-  — a note is retained customer information that goes stale, not a signature — and an edit records
-  the previous wording on the audit row while leaving the original author on the note. There is no
-  delete route, deliberately. See `docs/system/frontend-data-seam.md` for the domain registry.
+- Internal notes are a table of their own (`internal_notes`) behind
+  `GET|POST /admin/notes/{entityType}/{entityId}`, gated on `notes:read` / `notes:write`. They are
+  append-only: a correction is a newer note. See `docs/system/frontend-data-seam.md` for the domain registry.
 
 Admin handlers fire `logAudit(...)` after every mutation (feature toggle, flag, archive, restore,
-edit, bulk approve/reject, pipeline move) - see `src/pages/admin/AdminProperties.jsx`.
+edit, approve/reject) - see `src/pages/admin/AdminProperties.jsx`.
+
+Owner-side decisions from the dashboard (contact accept/decline, document grant/decline including
+grant all, photo resolve/decline, visit status changes, flatmate accept/decline) write their
+`audit_log` row server-side, attributed to the session user; a repeated identical decision writes none.
 
 > **MUST be server-enforced later.** Audit and soft-delete are the record of who did what. The
 > backend must write audit rows server-side (client-supplied `who` is not trustworthy), enforce
@@ -399,19 +453,15 @@ Components never talk to `localStorage` or `fetch` directly. They import from a 
 `src/services/config.js`:
 
 ```
-component  ->  services/xService.js  ->  createProvider('x')  ->  mock | http provider
+component  ->  services/xService.js  ->  createProvider('x')  ->  providers/http/xProvider.js
 ```
 
-- `VITE_API_MODE` selects the backend: `mock` (default, `src/services/providers/mock/*Provider.js`,
-  localStorage) or `http` (`src/services/providers/http/*Provider.js`, future Spring Boot).
-- Swapping mock <-> http is **one env variable**; no component changes. `createProvider(domain)`
+- There is one data source: the live API. `createProvider(domain)`
   resolves and caches the provider via a **lazy** `import.meta.glob`, so it returns a *Promise* of
   the provider module and services await it: `(await provider()).foo(...)`. The glob must stay lazy
   — an eager one reinstates an import cycle that blanks the app at bootstrap (tech-debt D208), and
   `scripts/check-provider-cycle.mjs` fails the build if it comes back.
-- **All service functions return Promises** regardless of provider, so the mock's synchronous
-  localStorage wrappers and the future async HTTP calls are interchangeable (mock providers wrap
-  sync helpers in `Promise.resolve(...)`).
+- **All service functions return Promises**, so a caller never depends on when the answer arrives.
 
 Domains wired today: `property`, `auth`, `deal`, `contact`, `finance` (barrel:
 `src/services/index.js`).
@@ -420,7 +470,7 @@ Domains wired today: `property`, `auth`, `deal`, `contact`, `finance` (barrel:
 
 The HTTP provider must surface failures in the canonical shape defined by the `Error` schema in the
 [OpenAPI spec](../../backend/src/main/resources/static/openapi/draazy-api.yaml): a stable machine
-`error` code (for example `aadhaar_required`), a user-facing `message`, and the HTTP `status`.
+`error` code (for example `verification_required`), a user-facing `message`, and the HTTP `status`.
 Callers branch on `error`; UIs show `message`.
 
 ### Loading / empty / error UI states
@@ -438,20 +488,18 @@ Because every call is a Promise, each data-driven view handles three states:
 
 ## 7. Notifications
 
-In-app notifications are read from the server through `src/services/notificationService.js`.
+In-app notifications are read from the server through `src/services/notificationService.js`; the
+frontend no longer derives inbox rows or stores notification state in `localStorage`.
+`GET /notifications/unread-count` returns `{ "count": n }`, using the same unread + deliverable
+filter as the list. Each row carries a stable `id`, `read` flag, timestamp and link; those server
+rows drive both `/notifications` and the header bell. Read rows leave the list after 30 days; all
+notification rows are purged after 90 days by the nightly `notification-retention` job.
 
-> **Historical.** The bullets below describe `src/lib/store/notifications.js`, a per-user seed-once
-> `localStorage` list that **no longer exists** — it was deleted with the mock provider lane. They are
-> kept because the *shape* they describe (stable `id`, `read` flag, `at` timestamp, one list feeding
-> both the page and the bell badge) is still the shape the server returns, and because the seed-once
-> rule explains why a revisit never duplicated entries in the old demo build.
-
-- Stored under `dzNotifications:<mobile>` (falls back to `anon`).
-- `getNotifications()` returns the list; `seedNotifsIfEmpty(defaults)` stamps a stable `id`, an
-  unread flag (`read: false`), and an `at` timestamp exactly once, so a revisit never duplicates
-  seed entries.
-- Each entry drives both the `/notifications` page and the header bell unread badge (one source of
-  truth).
+The bell's count is pushed, not polled: when a row becomes deliverable, or `markRead` changes one,
+`NotificationPublisher` sends an id-free `notification` event on the caller's `/messages/stream`
+(through the `LiveUpdates` port), and `NotificationContext` re-reads the count. A row held for quiet
+hours is not pushed. The stream hub is per instance, so the client still polls every 5 minutes while
+the stream is open, and every 60s while it is not.
 
 Notifications are the natural delivery channel for maker-checker outcomes (contact approved, deal
 finalized, listing verified/rejected). The review thread in property verification
@@ -462,8 +510,8 @@ Related store events: `src/lib/contact.js` dispatches a `pn:store` `CustomEvent`
 changes so open tabs can react without a reload - a lightweight in-app pub/sub the real backend
 would replace with push/websockets.
 
-> **MUST be server-enforced later.** Notification generation belongs on the server as a side-effect
-> of approvals and state changes, not something the client seeds for itself.
+Notification generation belongs on the server as a side-effect of approvals and state changes, not
+something the client seeds for itself.
 
 ---
 
@@ -480,12 +528,16 @@ One stateless resource-server chain. No sessions, no CSRF token, default posture
 
 Three filters are added and **the order is load-bearing**:
 
+0. `OriginGateFilter`, only when `draazy.security.origin-secret` is set, runs ahead of all of them.
+   See §8.8.
 1. `JwtAuthFilter` — resolves the bearer token.
 2. `WriteRateLimitFilter` — counts the request against whoever that turned out to be. The reverse
    order would leave every authenticated caller sharing an address-keyed bucket.
 3. `BotDefenceFilter` — challenges the small set of writes anyone on the internet may post to. Last
    of the three because it is the only one that can make a network call, so a flood should already
-   have been refused by the counter.
+   have been refused by the counter. `POST /auth/login` is challenged by `AuthController` instead, on
+   its send step only: the filter cannot see which step a body is, and the verify step must not need
+   a second single-use token.
 
 `MaintenanceModeFilter` is added after `BotDefenceFilter`: the two cheap in-memory defences refuse a
 flood before this one asks the database anything, and it has to sit after the JWT filter because it
@@ -547,8 +599,7 @@ Three rules hold across the whole `permitAll` block:
   path-only `permitAll` would silently open the write side.
 - **Exact-path and single-segment.** `ANY_SINGLE` matchers are deliberately one segment, which is
   what keeps `/{id}/archive` and the society residency queue authenticated. Any public two-segment
-  child therefore needs its own line — `Routes.Properties.ROOMS`, `Societies.MEMBERSHIP`,
-  `Societies.QUESTIONS/BOARD/CONTRIBUTIONS/PROPOSALS`. `TRUST_STATS` is named explicitly even though
+  child therefore needs its own line — `Routes.Properties.ROOMS`, `Societies.HUB`. `Properties.FEATURED` is named explicitly even though
   `ANY_SINGLE` would already match it, so that a public endpoint is public by decision rather than
   by accident of path depth.
 - **Narrow the payload, not just the route.** `GET /owners/{id}` is the only public route that reads
@@ -561,12 +612,12 @@ Why each public family is public:
 | Family | Why anonymous |
 |---|---|
 | `/auth/login`, `/auth/staff-login`, `/auth/refresh`, `/auth/staff-invite/redeem` | The caller holds no session; for the invite redeem, the single-use token **is** the credential, verified in `StaffInviteService`. |
-| Catalogue reads (properties, cities, localities, societies, reels, fees) | The pages a visitor sees before deciding whether to sign up at all. |
-| `/flags`, `/pricing`, `/plans`, `/boosts/packs`, `/services`, `/move-pack`, `/geo` | These toggles and prices decide what a logged-out visitor sees, so an admin-only reader cannot be the client's source for them. Each is scoped to one block of the settings document, so the rest of `/admin/settings` (fees, permissions, `adminFlags`, the referral auto-qualify threshold, blacklist reasons) stays admin-only. `/move-pack` is separate from `/flags` because the latter's contract is map-of-boolean and would have to drop the prices; the switch travels with the prices it gates so configuration that must be consistent cannot arrive half-applied. |
-| `POST /cities/waitlist`, `POST /society-leads`, `POST /service-waitlist` | The people these exist for are not users and may never become any — a 400-flat society's secretary should not have to create an account to say hello. POST-only; reading the leads back is staff/admin, because each row is a name and a mobile number. Each is additionally rate-limited per mobile in its service, and the waitlist is challenged in `BotDefenceFilter`. |
+| Catalogue reads (properties, cities, localities, societies, fees) | The pages a visitor sees before deciding whether to sign up at all. |
+| `GET /bootstrap` | Its sections (`flags`, `geo`, `cities`, `pricing`, `listingPolicy`, `movePack`, `plans`) decide what a logged-out visitor sees, so an admin-only reader cannot be the client's source for them. Each section is scoped to one block of the settings document, so the rest of `/admin/settings` (fees, permissions, `adminFlags`, the referral auto-qualify threshold, blacklist reasons) stays admin-only. `movePack` is separate from `flags` because the latter is map-of-boolean and would have to drop the prices; the switch travels with the prices it gates so configuration that must be consistent cannot arrive half-applied. |
+| `POST /cities/waitlist`, `POST /service-waitlist` | The people these exist for are not users and may never become any. POST-only; reading the leads back is staff/admin, because each row is a name and a mobile number. Each is additionally rate-limited per mobile in its service, and the waitlist is challenged in `BotDefenceFilter`. |
 | `POST /demand-signals`, `POST /page-views` | The two high-volume kinds fire on public surfaces, and the demand most worth measuring belongs to the visitor who left without signing up. Write-only by design: the aggregate is on `/admin/supply-gap`, because a public read would hand a competitor a locality-by-locality map of what Draazy is short of. |
 | `GET /documents/shared` | The link is forwarded to a lawyer or banker with no Draazy account; the unguessable, expiring share token **is** the credential, checked in `DocumentRequestService.shared`. |
-| Cashfree DigiLocker / payment webhooks | Server-to-server, no user session; authenticity is an HMAC over the raw body, verified in the handler. |
+| Cashfree payment webhooks | Server-to-server, no user session; authenticity is an HMAC over the raw body, verified in the handler. |
 
 ### 8.5 Write rate limiting
 
@@ -589,6 +640,11 @@ silently; `WriteRateLimitTest.dataExportIsLimited` drives a real request through
 Membership is tested on path and not method, because Spring MVC dispatches HEAD to `@GetMapping`
 handlers and merely suppresses the body — allowing HEAD through unlimited would make the enumeration
 defence bypassable by a one-character change.
+
+**Anonymous listing reads** (`GET`/`HEAD` on `/properties` and below) have their own per-address
+bucket, `draazy.security.rate-limit.property-reads-per-window` (default 600 a minute), so a scraper
+walking the catalogue is refused while a person browsing never meets it. Signed-in callers are not
+metered here.
 
 **Provider callbacks get their own budget rather than an exemption.** They cannot share the ordinary
 bucket: they arrive from a handful of provider addresses, and a refused callback is a customer who
@@ -658,7 +714,7 @@ added.
   can fall behind the routes.
 - *Everything under `/auth/`*, or the maintenance page's link to `/staff-login` is a dead end and the
   only way back in is a hand-edited row. Nothing under that prefix mutates consumer data.
-- *Signed provider callbacks.* A payment or DigiLocker callback is a fact that already happened
+- *Signed provider callbacks.* A payment callback is a fact that already happened
   elsewhere; refusing it discards a write rather than preventing one, and money the customer has paid
   goes uncredited once the provider's retries run out. Listed by route constant rather than by prefix:
   a hole in a maintenance gate should be exactly two paths wide.
@@ -671,6 +727,79 @@ whole value of the switch is that it takes effect now. If the settings table can
 **503 and not 403:** a 403 makes every client offer to sign in as somebody permitted, which does not
 end a maintenance window. No `Retry-After` — nobody knows how long the window is, and an invented
 number is a false statement in a header clients act on.
+
+### 8.7 Uploads: why photos and documents have separate validators
+
+`PhotoUploads` and `DocumentUploads` guard opposite kinds of object. A document is private, served
+behind a signed URL, so the vault can afford to accept PDFs. A photo is world-readable: `PhotoService`
+routes it through `storePublic` to a CDN URL anyone can open with no signature. That raises the stakes
+on exactly one thing — active content. An SVG or HTML file served from a Draazy-looking CDN origin is
+stored XSS, so the photo allowlist is raster images only: no PDF, and above all no SVG, which is XML
+the browser will execute. Sharing one validator would mean widening the document allowlist or
+narrowing the photo one at every call site. Only signature detection is shared; each surface owns its
+allowed types.
+
+**The declared type is a claim; the leading bytes are evidence.** The declared `Content-Type` must be
+on the allowlist *and* the file's own signature must independently resolve to the same image family —
+a `text/html` payload sent as `image/png` passes the first check and fails the second. The stored
+content type is the one the bytes prove, never the one the client sent, so a mislabelled file cannot
+come back out of the CDN with a `Content-Type` that makes a browser render it as something dangerous.
+
+**What this deliberately does not do:** it does not decode the image. The threat is a file that is not
+an image at all. Leading signatures identify the family; they do not prove the image is well-formed.
+
+**`PhotoService` is stateless and the key is server-minted.** It writes no row and touches no
+`Property` — in the create-listing wizard the photos are chosen before the property exists, and the
+listing contract already persists whatever image URLs it is given. The key is
+`photos/{tag}/{uuid}[-{pHash}]`, so the client's filename decides nothing: traversal and overwriting
+another owner's object are impossible by construction rather than by sanitising. `tag` is 16 hex of
+HMAC(owner, uuid) (`PhotoKeys`): a public photo URL names no user, yet `ListingPhotoSources` can still
+prove the uploader. Keys minted before the tag (`photos/{ownerId}/?`) stay valid and were not backfilled.
+
+**`DocumentScanner` is a list, not a bean.** The caller injects `List<DocumentScanner>` because the
+implementations are not alternatives — the built-in structural checker and a clamd daemon answer
+different questions, and a deployment with both wants both. Every registered implementation runs in
+registration order and any one may refuse, so adding one only ever narrows what is accepted.
+Implementations must be side-effect free and must not mutate the byte array several of them share.
+An implementation that cannot reach a verdict throws: an undecidable upload must fail, never pass.
+
+The verdict carries three outcomes rather than a boolean, because two are already different HTTP
+answers (413 too large, 415 unacceptable content) and collapsing them would force the caller to parse
+the detail string. That string is shown to the uploader, so it must describe the *file* and never the
+scanner's internals — a clamd signature name is a fingerprint of our configuration.
+
+The seam is shared kernel and cannot see the vault's own `DocumentUploads` allowlist. The caller runs
+that first and passes in the type it *proved* from the bytes, so a scanner is told the answer rather
+than re-deriving it. OCR-based validation ("does this scan of an Index II read like one") is intended
+to arrive as another implementation on this seam, not as a branch inside an existing one.
+
+### 8.8 Origin gate
+
+On a deploy the API is reached through the Cloudflare Pages Function, but Cloud Run's `*.run.app` URL
+is public too (`ingress: all`, `allUsers` invoker), because a Worker calls it from the public
+internet. A proxy in front protects nothing while the origin behind it answers anyone, so
+`OriginGateFilter` refuses any request whose `X-Proxy-Auth` header does not equal
+`draazy.security.origin-secret`. The Function sets that header and overwrites any value the client
+sent.
+
+- **Why a shared secret.** Restricted ingress needs a paid Google load balancer. Cloudflare's
+  Authenticated Origin Pulls need an origin that verifies client certificates, and Cloud Run does not.
+  A secret costs nothing and also makes a leaked Cloud Run URL harmless.
+- **Why first in the chain.** A request that skipped the proxy has no trustworthy address to
+  rate-limit on, and it is owed no token parse. It still sits behind Spring Security's firewall,
+  which rejects `..` and encoded separators before the probe exemption is matched.
+- **The probe exemption** is `GET`/`HEAD` on three exact paths (`/actuator/health`, `/liveness`,
+  `/readiness`), because Cloud Run's probes and CI's smoke test reach the container directly. Health
+  is already public, so the exemption exposes nothing new. It is method-bound because the write rate
+  limiter runs after the gate: an ungated `POST` there would be charged to a forged
+  `X-Forwarded-For` address once `INTERNAL_PROXIES` is widened.
+- **Fail-closed configuration.** A blank value fails the boot, and so does a value under 32
+  characters. `none` turns the gate off, and it is the base-file value because nothing proxies a
+  developer machine. The deploy profiles read `${ORIGIN_SHARED_SECRET}` with no default, and
+  `ProdProfileContractTest` pins that.
+- **What it unlocks.** With the gate on, only the Function can write the left-most `X-Forwarded-For`
+  entry, so `INTERNAL_PROXIES` can be widened safely. Without the gate the same value is spoofable.
+  See `docs/DEPLOY.md` §4.
 
 ## 9. Client-side seams: caching, commit-on-release, and shared overlays
 
@@ -828,6 +957,17 @@ inline offset parks the pill on top of the mobile tab bar.
 Restore-on-mount only lets fields the user actually filled override the form's defaults; empty draft
 values must not wipe smart defaults.
 
+**Changing a form's field shape means renaming its `dzDraft:*` key.** A deploy replaces the code but
+not the browser's storage, so the next visit parses yesterday's draft with today's reader: a
+renamed, retyped or re-scaled field is spread back into the form unchallenged, and — because
+restore only skips *empty* values — a stale one wins over the new default and can be submitted.
+Nothing heals this the way the server heals a stale session, since a draft exists precisely because
+no server has seen it yet. Rename rather than version in place — suffix the key and let the old one
+become unreadable by construction, the way `dz_pob_draft_v1` and `draazyDB_v5` already spell it
+elsewhere. A wrapper would be the alternative, and a worse one: the rent-agreement redaction pass
+reads the raw draft to strip PAN and Aadhaar before `useFormDraft` ever sees it, and would have to
+learn to read through the box. The old blob is left behind for the browser to evict.
+
 ### `lib/useSocietyCatalogue.js`
 
 A **completeness** gate, not a loading gate. `data/societies.js` answers synchronously with 28
@@ -837,3 +977,369 @@ never corrects itself. The first render still paints from the curated rows. It c
 and zero bytes, because every accessor calls `ensureSocietyCatalogue()` anyway. A failed load stays
 `false` and does not rethrow: `ensureSocietyCatalogue` has dropped its cached promise so the next
 read retries, and resolving `true` would tell a surface its partial 28-row view is complete.
+
+### Public reference reads — memory, browser and edge (`PublicReadCacheFilter`)
+
+Every page render reads the same answers that do not vary by caller: `/bootstrap` (flags, geo,
+cities, pricing, listing policy, Move-in Pack, plans, the live listing `counts` and the `trustStats`
+headline in one body), `/fees`, `/localities`, `/faqs`, `/properties/featured`,
+`/properties/search-index` and `/societies/top`. Answering each from
+Postgres every time spends the 20-connection budget (4 instances × pool 5) on a constant. Three free
+layers absorb them instead, without Redis:
+
+1. **Backend memory.** `PublicReadCacheFilter` keeps the 200 body per URL and query for
+   `draazy.cache.public-reads.ttl` (`PUBLIC_READ_CACHE_TTL`, default 30s). It holds at most 256
+   entries, evicting least-recently-used first. It runs after Spring Security, so a hit still passes
+   the origin gate, CORS and the security headers. Non-200 answers are never stored.
+2. **Browser.** It answers `Cache-Control: max-age=<seconds left>, public` with a weak `ETag` (Tomcat
+   will not gzip a response carrying a strong one; `server.compression.enabled` gzips JSON over 2 KB),
+   and answers `304` to a matching `If-None-Match`. Because max-age counts down to the entry's expiry, memory and
+   browser together never exceed one TTL.
+3. **Edge.** The Pages proxy (`functions/api/[[path]].js`) stores an anonymous GET in the Cloudflare
+   Cache API only when the backend marked the 200 `public` with a positive max-age and set no cookie.
+   The edge's copy can then live one more TTL in a browser, so **an anonymous visitor sees an edit at
+   most 2 × TTL (60s) late**.
+
+**Staff and the editing admin see changes instantly; signed-in consumers within one TTL.** `http.js`
+sends every read by a staff or admin user as `cache: 'no-cache'`, which makes the browser add
+`Cache-Control: max-age=0`. The edge and the filter both treat that as a bypass. The filter also
+recomputes and refreshes its entry, so the next anonymous read on that instance is fresh too. A
+`Cache-Control` the browser adds does not trigger a CORS preflight.
+
+A successful `/admin/**` write clears the filter's entries on the instance that took it; the other
+instances serve out their TTL. Property writers are too many, and bulk or native queries skip
+entity listeners, so for everything else the TTL is the contract. Add a path to `PATHS` only if its
+answer is identical for every caller: anything personalised would leak between users.
+`ANONYMOUS` holds the public catalogue reads (search, listing detail, cards, reviews, owner, locality,
+society and flatmate pages) whose answer varies only for a signed-in viewer; they are cached only
+for a request with no `Authorization` header and answer `Vary: Authorization`, so a browser never
+replays the anonymous copy after sign-in.
+`PermissionMap` stays uncached on purpose.
+
+In the browser, `http.js` shares one fetch between concurrent identical GETs, keeps `/bootstrap` for
+the same 30s, and drops every kept read on any successful write or `draazy-settings-change`. The
+signed-in shell's five reads (profile, plan state, saved keys, both unread counts) arrive as one
+`GET /me/bootstrap`, which seeds those reads at boot and sign-in
+(`services/meBootstrapService.js`); a section that failed comes back `null` and the client re-reads
+it from its own endpoint. Identity, saved searches and followed societies are read only when a screen
+that draws them mounts. The owner dashboard and hub do the same with `GET /me/dashboard` (`services/meDashboardService.js`):
+ `X-Draazy-Build`. A replayed stamp from before a deploy would raise a false
+"new version" banner, and every other response still carries the stamp.
+
+Tests and the e2e profile set the TTL to `0s`, which makes the filter inert. Specs reset the database
+under live JVMs and expect an anonymous page to see an admin edit immediately.
+`PublicReadCacheFilterTest` proves the cache's behaviour instead.
+
+### Platform settings rows — `SettingsCache`
+
+Staff bypass the filter above, and the commission, flag, geo and Move-in Pack reads behind
+`/bootstrap` and many write paths each read a `platform_settings` row. `SettingsCache` keeps each row
+for `draazy.cache.settings.ttl` (`SETTINGS_CACHE_TTL`, default 30s), so a hit borrows no pool
+connection. `AdminSettingsService.update` clears it after commit on the instance that took the write;
+other instances catch up within one TTL. Kill switches (`PlatformSettings.flag`: maintenance mode,
+signups, staff login) and `PermissionMap` always read fresh: a stale "off" there is a security
+failure, not a display lag. Tests and e2e run with `0s`; `SettingsCacheTest` proves the cache.
+
+### Listing photos — card copies and an immutable CDN
+
+Photos never pass through Spring on the way to a browser: the JSON carries URLs and the browser
+fetches them from R2. So the saving is in what is fetched, not in a server cache.
+
+- **Card copies.** `PhotoService.upload` stores `{key}.w960.jpg` and `{key}.w480.jpg`
+  (`PhotoVariants`, JPEG q0.8, never upscaled) *before* the original, so a returned URL always has
+  them. `PropertyImage` uses them by default via `cardSrcSet` (`lib/imgSrcSet.js`), with
+  `sizes="240px"` unless the caller passes a wider one; so cards, thumbnails, map popups and admin
+  queues all get them. Only the property gallery and lightbox load the original. An undecodable
+  image is stored without copies rather than refused.
+- **Immutable.** Keys are never reused, so `R2FileStorage.storePublic` sets
+  `Cache-Control: public, max-age=31536000, immutable`.
+- **Service worker.** `dz-images` caches only the copies. Originals are also fetched with CORS for
+  the wizard's canvas hash, and a cached opaque response would break that read.
+- **Older uploads have no copies.** `PropertyImage` drops the srcset on the first error and shows the
+  original, at the cost of one 404 per render.
+
+## JWT auth filter
+
+Rationale relocated from `JwtAuthFilter` Javadoc.
+
+A valid token yields an `AuthPrincipal` with a single `ROLE_<role>` authority (so
+`@PreAuthorize("hasRole('ADMIN')")` works); anything invalid is left unauthenticated and the entry
+point returns 401 for protected routes. The filter never throws - a bad token is simply "no auth",
+not a 500.
+
+**The role comes from the database, not from the token.** The token says who the caller was when it
+was minted; `RoleSource` says what they are now, and this is the one place both the route guards
+and the two capability resolvers read it from, so resolving it here fixes all of them at once and
+adds no second mechanism to keep in step. Otherwise a permission taken away in the back office lands
+on the caller's next request while a role change taken away in the same screen does not land until
+their token expires - two gestures that sit side by side in the console behaving differently.
+
+Read per request rather than cached, for the same reason `PermissionMap` and `AccountPermissions`
+are: a cache is a window during which a revocation has visibly been made and is not yet true. Only
+the role is re-resolved; `team` is a staff account's desk rather than a privilege level, and every
+guard that reads it is already gated on a role the filter has just confirmed. No row means the
+database has nothing to say and the claim stands.
+
+**A failure to read it is not caught.** `PermissionMap` swallows a malformed document because a
+typo in a hand-edited config row must not be an outage; this is not that. The only way this lookup
+fails is the database being unreachable, and a request whose authorisation could not be established
+must not proceed as though it had - every controller behind the filter needs the same database
+anyway, so falling back would trade a 500 for a 500 and grant whatever the token asked for on the
+way.
+
+## Permission map
+
+Rationale relocated from `PermissionMap` Javadoc.
+
+### Does editing this map change access control, and by how much?
+
+**Yes, and only downwards.** Every capability check in this codebase is `and`-ed onto the
+`@PreAuthorize` role guard that was already there; none replaces one, and none is ever the only
+guard on a route. So the map can take capabilities away from a role, and can hand a capability to a
+team *within* a role that already reaches the route - but there is no value an administrator can
+write into it that lets a buyer reach a staff route, or staff reach an admin-only one. Widening the
+four-role baseline requires editing Java, which is the point: this document is edited through a web
+form by whoever currently holds the admin password.
+
+**It governs the ops population, keyed the way the document is keyed.** An admin resolves to the
+literal key `admin`; a staff member resolves to their team. Those are the only keys the seeded
+document has, and the only two things the JWT carries that could address a group of people. The key
+is read off the signature-verified principal and nothing else - no request parameter, header or body
+field can influence which bundle applies, because a key the client could choose would be an
+allow-list the client could opt out of.
+
+### The two ways it answers "yes" without consulting anything
+
+Both are a deliberate refusal to invent policy, and both land exactly on the existing role baseline
+rather than above it. Each is about the *document* being absent or unusable, a global state in which
+"the compiled-in policy applies" is the honest reading; neither exempts one account while governing
+its colleagues.
+
+1. **No `permissions` row.** The honest reading of "no policy is configured" is "the compiled-in
+   policy applies", not "nobody may do anything". This mirrors `PlatformSettings`, which resolves
+   every missing or malformed config value to its compiled-in default rather than failing the
+   request: a config store an operator edits by hand must not be able to take the platform down by
+   being absent.
+2. **The row is unparseable, or is not a JSON object.** `AdminSettings` declares `permissions` as
+   `additionalProperties: true`, so an admin can store an array or a string there and the settings
+   endpoint will accept it. A document whose shape cannot be an allow-list is not a restrictive
+   allow-list, it is a broken one, and treating a typo as a lockout of the entire back office would
+   make this class the outage.
+
+### And the ways it answers "no" on silence
+
+Once the document *is* a well-formed object and the caller *does* have a key, an absent key or a
+non-array value is a **denial**. That is what makes this an allow-list rather than a suggestion: if
+omission meant "allow", an administrator could never remove access by editing the map.
+
+**A staff caller with no team is denied for the same reason**, and this is the largest omission of
+all. `users.team` is nullable, so such an account is legal at the column and the document has no
+key that addresses it. Granting invents a policy too, and it is the one an administrator cannot undo:
+every edit they make leaves that account untouched, while a team that *is* named but emptied holds
+nothing. The way to give a colleague the most authority would be to give them no desk, which inverts
+the whole document, and silently, because the console reports a narrowed platform either way. The
+lockout this would ordinarily risk is closed at the other end: `UserAdminService.addStaff` refuses
+to create a staff account without a known team, so the state is unreachable going forward rather than
+merely punished on arrival. Per-account scoping remains a separate, still-open item, and denying an
+unnameable caller is not a scoping rule - it is the allow-list declining to guess. The `admin` role
+is unaffected: it resolves to the literal key `admin`, so it is nameable without a team.
+
+The obvious hazard of deny-on-omission is a partial map locking out teams the author never thought
+about, so `R__DML_seed_permission_map.sql` seeds a *complete* one (every team, plus `admin`) and
+merges the defaults into whatever a deployment already had; the settings endpoint's merge semantics
+mean a key cannot subsequently be deleted at all, only emptied. An administrator therefore edits one
+team's bundle without silently changing five others.
+
+### What it does not do
+
+It does not read `settings.customRoles`, and nothing can store one: the key is deleted by `V61`
+and refused with 422 by `AdminSettingsService`. It was keyed by a `roleId` no user row, JWT claim
+or endpoint has ever carried, it spoke the admin client's module vocabulary rather than
+`Capabilities`, and it composed by *union* where this class may only ever narrow - so honouring it
+would have widened access on the strength of a document written while it granted nothing.
+
+The SpEL entry point refuses anything that is not one of our own authenticated principals rather than
+waving it through. That case is unreachable today (every call site `and`s it onto a role check
+anonymous cannot pass), so the branch is not load-bearing - but a SpEL fragment is a string, and the
+day somebody uses one of these constants on its own the failure should be a 403 rather than a silent
+grant.
+
+## Back office permissions
+
+Rationale relocated from `BackOfficePermissions` Javadoc.
+
+### Functions are stored; atoms are enforced
+
+Operators grant function names such as `kyc`, `listingModeration` and `desk:rental`. The server
+derives permission atoms such as `identity:write`, `properties:moderate` and `services:read` from
+that function catalogue, then intersects the atom set with the account role ceiling. Any
+back-office account also keeps `dashboard:read`.
+
+### Every name here guards a real route
+
+**The catalogue contains exactly what is enforced, and nothing else.** That is the lesson of `V61`:
+`settings.customRoles` held a vocabulary (`enquiries`, stale module keys) that no server code
+mapped onto anything, so an administrator populated an access-control document that granted nothing,
+and the day somebody wired it, it would have started granting whatever had accumulated. A name is
+added in the same change that annotates the route it guards, never before - and
+`BackOfficeAccessService` refuses to store a name outside the catalogue, which stops the console's
+module keys reappearing in the database under a different roof. `Capabilities` keeps one unenforced
+name (`export_csv`) only because it is *stored data* predating the guard that cannot be renamed
+without a migration; this vocabulary ships with its guards, so it holds the stricter rule.
+
+### The role ceiling and defaults
+
+Each atom records which roles may *ever* hold it, taken from the `@PreAuthorize` role guard already
+on the route. `baselineFor` turns that into the set an unscoped account of that role holds, and
+`AccountPermissions` resolves a stored document by intersecting it with that set. So an
+administrator who writes `settings:write` into a staff account's document changes nothing: the atom
+is not in the staff baseline, the intersection drops it, and the route's own `hasRole('ADMIN')`
+would have refused it anyway. Two independent fences, deliberately - if the ceiling were ever
+mis-declared too generously, the role guard on the route is still there. Roles outside the back
+office (`buyer`, `owner`) get an empty baseline, an unreachable but fail-closed answer.
+
+The administrator always holds the full technical baseline: any stored document is ignored and
+`PUT /users/{id}/permissions` refuses an admin target (422), so the single admin can never be
+narrowed. With no stored document, a manager gets every function plus `users:write` and
+`audit:read`, and staff gets only `dashboard:read` (fail-closed). Staff desk scope comes from
+`desk:*` functions, not from the legacy `users.team` column.
+
+Managers watch staff through `/admin/staff-activity` (feed + leaderboard) and
+`/admin/team-performance` (per-staff counts by function, open items, oldest waiting and median
+time-to-decision per queue); both are `audit:read` and scoped to staff rows.
+
+The SpEL fragments are spelled out as concatenations of constants because an annotation argument must
+be a compile-time constant expression, and they are always `and`-ed onto the role guard already on
+the route, never used alone. That is the mechanism, not a convention: this document may narrow what a
+role can do and may never be the thing that decides whether the caller is ops.
+
+### Individual atom decisions
+
+- **`identity_reviews:read`** is split out of `users:read`, which also opens the whole account
+  directory. Reviewing captured ID photos is a desk job with its own shift, and a queue that can only
+  be granted together with the directory is one an ops lead grants the directory for.
+  `identity_reviews:write` is admin only, narrowing a grant without widening an audience: deciding
+  a badge and minting an admin colleague were the same checkbox and are not the same job.
+- **`notes:read`** is deliberately not folded into the atom of the queue the note hangs off. Notes
+  span four families; granting them through `properties:read` would mean an account cleared to
+  browse listings could also read every staff observation about every person, because the notes are
+  one table and the read is one route. `notes:write` is separate again, because more people should
+  read a case file than add to it.
+- **`properties:verify` / `properties:moderate`** split property trust decisions from listing
+  moderation actions such as approve, reject, feature, flag, review and locality filing.
+- **`enquiries`** has no `write`, and that is a product decision. Every row the demand board shows
+  belongs to two other people - a contact request is the owner's to approve, a visit the
+  participants' to confirm or move, a deal the owner's to close. Ops watching demand health is a
+  different job from ops answering on somebody's behalf, and the console's old "mark responded" /
+  "close" buttons wrote the owner's decision field with the operator's opinion. A write atom would
+  have to name a route that does that, so there is neither; the console offers an internal note under
+  `notes:write` instead - the operator's opinion recorded as the operator's opinion, beside the row
+  rather than inside it. Nor is there an `enquiries:reveal`: the detail routes that unmask one
+  contact number are guarded by this same atom with the *role* term raised to `admin`, the way
+  `users:read` guards both the masked directory and the audited user detail. Unmasking is a
+  narrower audience for one capability rather than a separate one, and a grid that grows a row per
+  shade of the same permission stops being read.
+- **`postOnBehalf:write`** is a write with no matching read, uniquely. The module is a single form
+  with nothing to list, and a `postOnBehalf:read` would guard no route. It is its own module rather
+  than `properties:write` because the route names another user as the owner of what it creates - an
+  operator who can post as anyone can manufacture a listing under a consumer's name - so separating
+  it lets an ops lead grant the supply console without it. Spelled `POSTONBEHALF` rather than
+  `POST_ON_BEHALF` because `AccountPermissionsGuardTest` derives the `REQUIRE_` fragment
+  mechanically from the wire name, and a hand-prettified constant is one the sweep cannot find.
+
+The catalogue is a `List` rather than a `Set` because the order is part of what is served: the
+grid an administrator ticks reads top to bottom, and "modules in the order they appear in the back
+office, read before write" is a decision worth making once here rather than in each client. Each
+entry's `adminOnly` flag is advisory to the UI and authoritative in `baselineFor` - the same field
+precisely so a screen cannot offer a checkbox the server would ignore.
+
+---
+
+## Document vault: allowlist, sniff, scan, store
+
+Owner-scoped by lookup, 404 never 403: every operation resolves the property through
+`owner_id` first, so somebody else's paperwork is invisible on the read and a 404 on the write.
+A 403 would confirm that a particular property — and therefore a particular sale deed — exists.
+Personal (KYC) vault is scoped directly by `owner_id`; managed-record vault by `managed_id`.
+
+Storage keys are server-minted: `documents/{propertyId}/{uuid}`, `personal/{ownerId}/{uuid}`,
+`managed/{managedId}/{uuid}`. The client's filename is stored for display and never used as a
+path, so a traversal or an overwrite of somebody else's object is impossible by construction.
+
+**Uploaded content type is the one the bytes prove, not the one the client sent.** Every upload
+runs `DocumentUploads.validate` (allowlist check on both the declared `Content-Type` and the
+magic-byte sniff of the leading bytes — both must agree, both must be in the allowlist) then every
+registered `DocumentScanner`, and only then calls `FileStorage.store`. The client's declared
+string is used to reject and then discarded so it can never come back out as a response header.
+The order is the control: a file scanned after it is stored has already been given a signed URL,
+and a rejected upload that leaves an object behind is a rejected upload that can still be served.
+
+Allowlist, never a blocklist: PDF, JPEG, PNG, HEIC. A vault serving whatever it is handed under
+a Draazy-looking URL is a free hosting service for phishing pages and malware. The code does not
+parse the file — a real PDF parser or image decoder would be a far larger attack surface than the
+one it closes, and the threat here is a file that is not a PDF at all.
+
+Bytes are written to the object store **before** the row: the other order leaves rows pointing
+at nothing on a storage failure. Delete is a hard delete of the row; the object is left in the
+store, because a delete we cannot make transactional with the row would trade a tidy bucket for
+the possibility of a row pointing at a deleted object. **Exception (D190/Q15):** if the file is
+the artefact behind a live Ownership Verified badge, delete refuses with 409; without this the
+owner could destroy the only evidence and keep the badge. `ownership_evidence.document_id` is
+`ON DELETE SET NULL` so a cited-but-lapsed badge still lets the file go, with an audit line.
+
+Service-request files are excluded from the vault read, and from the share read, deliberately.
+A service request names its property in the body and is raised by whoever needs the service, so
+its `property_id` is not proof of any relationship to that listing — allowing them here would
+let anyone push a file into a stranger's vault by quoting a property id. Share matching is exact
+and case-insensitive, not fuzzy: `like` could only widen a grant ("Deed" pulling in "Sale Deed"
+and "Mortgage Deed" alike is precisely what the owner did not share).
+
+The service-request upload path is deliberately unscoped: `ServiceRequestService` supplies an
+already-authorised `propertyId` because a staff member uploading the registered agreement does
+not own the flat. Storage-key minting, allowlist and store-then-write ordering stay here rather
+than being duplicated in the services context; authorisation stays where the workflow is.
+
+## Feature-to-feature ports in the shared kernel
+
+`package-structure.md` §5 forbids a feature context from importing another at the same or a
+higher layer (`ArchitectureBoundaryTest` fails the build over it). Where two features must
+communicate synchronously, an interface is declared in the shared kernel and the higher-layer
+feature implements it — the arrow points down. Signatures are ids only, never entities or DTOs.
+
+- **`OwnerBadgeSink`** — `identity` (layer 0) telling `catalog` (layer 1) that an owner's
+  badge changed, so their listings can back-fill or clear the denormalised column. Synchronous
+  because the write must land in the same transaction as the flag flip on the user; an event
+  delivered later (or dropped) would leave a listing telling buyers the owner is verified when
+  the profile no longer says so. Both directions exist: verification-earned badges are stamped
+  on success, hand-granted badges are cleared when an administrator revokes them.
+
+- **`BadgeEvidenceLookup`** — `documents` (layer 2) asking `moderation` (layer 6) whether
+  a file it is about to destroy is the artefact behind an Ownership Verified badge. Rationale
+  above under "Document vault".
+
+- **`ContactGate`** — mirror-image inversion, listed here as reference for the direction rule.
+
+## Outbound messaging: why `MessageSender` returns a `Prepared` record
+
+`MessageSender` is the port through which this platform reaches somebody outside it (WhatsApp,
+SMS, email). Same inversion as `Notifier`: contexts that need to chase an owner (moderation,
+services, deals) depend on the abstraction; the implementation lives in `engagement.messaging`
+below all of them. Distinct from `Notifier`, which writes an in-app inbox row for an existing
+user — this reaches a person where they already are, the only channel that works for an owner
+who has never signed in.
+
+Returns `Prepared`, not a boolean, because the first implementation cannot transmit. What ships
+today is WhatsApp click-to-chat: the server renders the message and hands back a `wa.me` link,
+the staff member's own WhatsApp opens with the text typed out, and they press send. A boolean
+would have to answer "did it go" and every honest implementation would have to answer "I don't
+know". The record carries the composed body (stored as well as returned, because re-rendering
+later from an edited template would show a colleague a message the owner never received), the
+ledger row id, the status, and — when the transport needs a human to finish the job — the
+handoff link. A count of rows means "chasers written", not "chasers delivered"; every surface
+that renders one is obliged to say so. The renderer resolves `{placeholder}` keys from
+`variables`; an unknown key is left standing as literal text rather than blanked, so a typo
+surfaces in the preview a staff member reads instead of silently deleting a sentence.
+
+Browser push uses a separate `PushSender` seam. The dev implementation only logs the conversation
+id, and `message.received` push payloads are fixed to `Draazy`, `You have a new message`, and
+`/messages?c=<id>`: no name, mobile, listing title, or message text leaves the server.

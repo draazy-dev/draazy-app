@@ -3,24 +3,15 @@ package com.draazy.api.engagement.flatmate;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
-/**
- * Contract schema {@code FlatmateRoom}.
- *
- * <p>Three of these fields are <strong>derived, never stored</strong> — {@link #flatCommitted},
- * {@link #flatMax} and {@link #shareMax}. They answer "how many more people can move in?", which is
- * a question about the whole flat rather than this row: storing them would mean every sibling room
- * had its own copy of one shared truth, and the copies would disagree the first time two rooms were
- * edited concurrently. The contract marks them {@code readOnly} for the same reason.
- *
- * <p>{@link #ownerMobile} is null on the anonymous feed and populated only for the host's own view.
- * A room's host is reachable through {@code POST /flatmates/rooms/&#123;id&#125;/interest}, where
- * the enquirer volunteers their own number — contact never travels outwards from a public read.
- */
+/** Contract schema {@code FlatmateRoom}; {@code ownerMobile} is host-only. Rationale:
+ * docs/flows/consumer/flatmates.md#supply-side-rationale-moved-from-backend-javadoc. */
 public record FlatmateRoomDto(
         UUID id,
         String type,
+        String title,
         UUID propertyId,
         String roomKind,
         String roomType,
@@ -28,6 +19,10 @@ public record FlatmateRoomDto(
         String priceBasis,
         Long budget,
         Long deposit,
+        Integer noticePeriodDays,
+        Integer lockInMonths,
+        String maintenanceBilling,
+        String electricityBilling,
         String occupancy,
         int occupants,
         int maxOccupants,
@@ -56,15 +51,26 @@ public record FlatmateRoomDto(
         String homeTypeLabel,
         boolean gatedCommunity,
         String furnishing,
+        String facing,
+        String overlooking,
         String moveIn,
         LocalDate availableFrom,
         String gender,
         String food,
         List<String> tags,
         String note,
+        String cover,
         List<String> photos,
         String owner,
         String ownerMobile,
         String status,
-        Instant createdAt) {
+        Instant createdAt,
+        Host host) {
+
+    public record Host(
+            FlatmateRoomDetails details,
+            Map<String, Object> agreementDoc,
+            LocalDate agreementValidTill,
+            String ownerConsentMobile) {
+    }
 }

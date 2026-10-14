@@ -1,10 +1,5 @@
-// Temporary product-market-fit (PMF) test instrumentation.
-//
-// Everything here is gated behind VITE_PMF_MODE. When the flag is off — which is
-// the default, including all local development — every export is a no-op: no GA
-// script is loaded, no banner renders, no lead is captured. The normal dev flow
-// is therefore completely untouched. The overlay only activates on the Netlify
-// PMF build where VITE_PMF_MODE=on.
+import { CONSENT_CHANGE, hasAnalyticsConsent } from '../components/CookieConsent.jsx';
+import { capture } from './productAnalytics.js';
 
 const ON = import.meta.env.VITE_PMF_MODE === 'on';
 const GA_ID = import.meta.env.VITE_GA_ID || '';
@@ -14,7 +9,7 @@ export const pmfEnabled = ON;
 let gaLoaded = false;
 
 function ensureGA() {
-  if (!ON || !GA_ID || gaLoaded || typeof window === 'undefined') return;
+  if (!ON || !GA_ID || gaLoaded || typeof window === 'undefined' || !hasAnalyticsConsent()) return;
   gaLoaded = true;
   const s = document.createElement('script');
   s.async = true;
@@ -31,22 +26,33 @@ function ensureGA() {
 export function initPmf() {
   if (!ON) return;
   ensureGA();
+  window.addEventListener(CONSENT_CHANGE, () => {
+    const granted = hasAnalyticsConsent();
+    // GA keeps sending cookieless pings under consent 'denied'; the disable flag stops it entirely.
+    if (GA_ID) window[`ga-disable-${GA_ID}`] = !granted;
+    window.gtag?.('consent', 'update', { analytics_storage: granted ? 'granted' : 'denied' });
+    ensureGA();
+  });
 }
 
-// Fire a GA4 event for the PMF funnel (landing / view_listing / contact_click /
-// notify_submit). No-op when the flag is off.
+// Product-analytics event (PostHog, and GA4 in the PMF build). Both are no-ops without analytics consent.
 export function track(event, params = {}) {
-  if (!ON) return;
+  capture(event, params);
+  if (!ON || !hasAnalyticsConsent()) return;
   ensureGA();
   try { window.gtag?.('event', event, params); } catch { /* analytics must never break the app */ }
 }
 
-// Capture a fake-door lead via Netlify Forms — no backend. A hidden static form
-// named "pmf-lead" in index.html lets Netlify's deploy bot register the form;
-// here we POST url-encoded to the site root (same-origin, allowed by CSP).
+/** A hidden static form named "pmf-lead" in index.html lets Netlify's deploy bot register the form; here we POST
+ * url-encoded to the site root (same-origin, allowed by CSP). */
 export async function captureLead(fields = {}) {
   if (!ON) return { ok: false, skipped: true };
-  const body = new URLSearchParams({ 'form-name': 'pmf-lead', ...fields });
+  const body = new URLSearchParams({
+    'form-name': 'pmf-lead',
+    context: fields.context || fields.leadType || '',
+    property: fields.property || fields.propertyId || '',
+    ts: String(Date.now()),
+  });
   try {
     const res = await fetch('/', {
       method: 'POST',

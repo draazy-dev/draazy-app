@@ -1,32 +1,5 @@
-/**
- * HTTP rent provider.
- *
- * Eighteen endpoints across four controllers, one domain:
- *
- * ```
- *   tenancy    GET /me/tenancies · GET /tenancies · GET/PUT /me/tenant-profile
- *              GET /tenant-profiles/{mobile} · POST /tenant-profiles/verified
- *   agreements GET /me/rent-agreements
- *   finances   GET/POST /me/finances/{propId}/transactions · PATCH/DELETE .../{txnId}
- *              GET/PUT .../basis · GET .../summary · GET .../cashflow · GET .../dues
- *   rentals    GET/POST /me/rentals · PATCH/DELETE /me/rentals/{rentalId}
- * ```
- *
- * Every route is caller-scoped: the tenant's own tenancies, the owner's own ledger. Nothing here
- * takes a mobile or an owner id to say *whose* data to read — with one deliberate exception,
- * `getTenantProfile(mobile)`, which is a screening read the owner is entitled to make.
- *
- * ## No rent moves through here
- *
- * `/me/rent-payments`, `/me/rent-ledger`, `/me/rent-mandate` and `/me/payout-account` used to. That
- * rail was withdrawn and those routes no longer exist on the server, so calling them would 404 —
- * they are absent here rather than kept as a dormant branch. `/pay-rent` is a static page now.
- *
- * `/me/rentals` is not that rail returning under a new name. It is a note the tenant writes about
- * a home they rent somewhere else: nothing on it moves money, nothing on it is evidence, and
- * nothing it returns may reach the Rent Passport, which claims to be verified.
- */
-import { del, get, patch, post, put, unwrapPage } from '../../http.js';
+/** Server has no payment rail yet; `/pay-rent` stays a static page. */
+import { PAGE_LOAD_TTL, del, get, patch, post, put, unwrapPage } from '../../http.js';
 import { readAccessToken } from '../../../lib/auth.js';
 import {
   toBasisViewModel,
@@ -46,51 +19,29 @@ const signedIn = () => !!readAccessToken();
 
 const toList = (rows, fn) => (Array.isArray(rows) ? rows : []).map(fn);
 
-/**
- * Unwrap a `PageResponse` and map its rows in one step.
- *
- * The envelope reading itself lives in `http.js` as `unwrapPage` — this is only the mapping half.
- * It used to be a second local function *also* called `unwrapPage`, with a different signature, so
- * importing the shared one here would have silently shadowed it (D106).
- */
+/** The envelope reading itself lives in `http.js` as `unwrapPage` — this is only the mapping half, under a different
+ * name so it cannot shadow the shared one. */
 const unwrapMapped = (res, fn, requested = 0) => {
   const { items, ...rest } = unwrapPage(res, { page: requested });
   return { items: toList(items, fn), ...rest };
 };
 
-/* ─── Tenancies ─────────────────────────────────────────────────────────────────────────────── */
-
 /** `GET /me/tenancies` — tenancies where the caller is the **tenant**. */
 export async function myTenancies() {
   if (!signedIn()) return [];
-  return toList(await get('/me/tenancies'), toTenancyViewModel);
+  return toList(await get('/me/tenancies', undefined, { ttl: PAGE_LOAD_TTL }), toTenancyViewModel);
 }
 
-/** `GET /tenancies` — tenancies on the caller's own listings, where they are the **owner**. */
-export async function ownerTenancies() {
-  if (!signedIn()) return [];
-  return toList(await get('/tenancies'), toTenancyViewModel);
+export async function confirmTenancy(id) {
+  return toTenancyViewModel(await post(`/me/tenancies/${encodeURIComponent(id)}/confirm`, {}));
 }
 
-/* ─── Tenancy declarations (D194) ───────────────────────────────────────────────────────────── */
+export async function declineTenancy(id) {
+  return toTenancyViewModel(await post(`/me/tenancies/${encodeURIComponent(id)}/decline`, {}));
+}
 
-/**
- * `GET /properties/{propId}/tenancy-declarations` — stays claimed on one listing.
- *
- * The server decides what comes back: every claim if the caller owns the listing, their own
- * otherwise. The client does not filter, and must not — a client-side filter over a list the server
- * was willing to hand out is not a rule, it is a rendering preference.
- *
- * `propId` must be the listing's **UUID**, exactly as the review routes require: this path binds
- * `@PathVariable UUID propId` and the seam's `p.id` is the slug. Callers resolve that with
- * `p.uuid || p.id` — see `ReviewsSection.jsx`.
- *
- * The route is paged server-side (an owner's inbox is written by strangers, one row each), but this
- * returns a bare array to match the mock and to keep the caller — a listing page that renders every
- * claim it is given — from having to know. A claimant's own view is a single row on page 0; an
- * owner with more claims than one page holds is the case that needs a UI, and does not have one
- * yet, so the first page is what the section shows.
- */
+/** The server decides what comes back: every claim if the caller owns the listing, their own otherwise. The client
+ * does not filter, and must not. */
 export async function listTenancyDeclarations(propId) {
   if (!signedIn()) return [];
   return unwrapMapped(await get(`/properties/${encodeURIComponent(propId)}/tenancy-declarations`),
@@ -137,31 +88,8 @@ export async function saveTenantProfile(profile = {}) {
   }));
 }
 
-/**
- * `GET /tenant-profiles/{mobile}` — someone else's profile, by mobile.
- *
- * The one read in this domain that names a person rather than the caller, and it is deliberate: an
- * owner screening an applicant is exactly what a tenant profile is *for*. The server decides what a
- * stranger may see; this passes the answer through rather than second-guessing it.
- *
- * 404 for a mobile with no profile is a normal answer, not an error — most people have never
- * written one.
- */
-export async function tenantProfileFor(mobile) {
-  const digits = String(mobile || '').replace(/\D/g, '');
-  if (!signedIn() || digits.length !== 10) return null;
-  try {
-    return toTenantProfileViewModel(await get(`/tenant-profiles/${digits}`));
-  } catch (err) {
-    if (err?.status === 404) return null;
-    throw err;
-  }
-}
-
-/**
- * The server's own cap on one batch. Mirrored here so a long list is *paged* rather than refused —
- * a 400 in the middle of a render would cost every row its badge, including the earned ones.
- */
+/** The server's own cap on one batch. Mirrored here so a long list is *paged* rather than refused — a 400 in the
+ * middle of a render would cost every row its badge, including the earned ones. */
 const VERIFIED_BATCH_SIZE = 50;
 
 /** Last ten digits, or `''`. A masked number (`98XXXXX210`) yields five, and is therefore dropped. */
@@ -170,20 +98,8 @@ const tenDigits = (mobile) => {
   return d.length === 10 ? d : '';
 };
 
-/**
- * `POST /tenant-profiles/verified` — the Verified Tenant badge for a whole list at once (D114).
- *
- * A `POST` that reads: the input is a list of mobile numbers, and putting those in a query string
- * would write the identifier the contact gate exists to protect into access logs and proxy caches.
- *
- * Junk is filtered here rather than sent. The important case is a **masked** number — live offer
- * and finalization rows arrive with `98XXXXX210` until the owner approves contact (D5), and five
- * digits is not a question worth asking. Those rows simply get no badge, which is the same answer
- * the mask itself is making.
- *
- * Duplicates are collapsed before sending: the caller's list is one row per offer, not one row per
- * person, and a buyer with three offers is one question.
- */
+/** A `POST` that reads: the input is a list of mobile numbers, and putting those in a query string would write the
+ * identifier the contact gate exists to protect into access logs and proxy caches. */
 export async function tenantsVerified(mobiles = []) {
   const wanted = [...new Set((Array.isArray(mobiles) ? mobiles : []).map(tenDigits).filter(Boolean))];
   const verified = new Set();
@@ -201,17 +117,8 @@ export async function tenantsVerified(mobiles = []) {
   return verified;
 }
 
-/* ─── Property finances (owner, per property) ───────────────────────────────────────────────── */
-
-/** `GET /me/rentals` — the homes the caller says they rent, most recent lease first.
- *
- * A bare array, not a page: a person rents a handful of homes in a lifetime, and the tenant
- * finance tab totals all of them, so paging would only introduce a way for the total to be wrong.
- *
- * `monthsPaid`, `totalPaid` and `fyPaid` come from the server rather than being recomputed here.
- * The April–March financial year has one definition, on the server, so the figure a tenant reads
- * on screen and the figure an export shows cannot drift apart by a month.
- */
+/** A bare array, not a page: a person rents a handful of homes in a lifetime, and the tenant finance tab totals all
+ * of them, so paging would only introduce a way for the total to be wrong. */
 export async function myRentals() {
   if (!signedIn()) return [];
   return toList(await get('/me/rentals'), toRentalViewModel);
@@ -221,7 +128,6 @@ export async function myRentals() {
 export async function addRental(rental = {}) {
   return toRentalViewModel(await post('/me/rentals', {
     address: rental.address,
-    landlordName: rental.landlordName || undefined,
     monthlyRent: Number(rental.monthlyRent) || 0,
     deposit: rental.deposit === undefined || rental.deposit === '' ? undefined : Number(rental.deposit),
     leaseStart: rental.leaseStart,
@@ -229,17 +135,11 @@ export async function addRental(rental = {}) {
   }));
 }
 
-/**
- * `PATCH /me/rentals/{rentalId}` — partial by design: send only what changed.
- *
- * An absent key leaves the stored value alone; an empty string clears `landlordName`. That is the
- * same contract the transaction ledger uses, and it is why `undefined` is filtered out here rather
- * than coerced — sending `landlordName: undefined` as `""` would silently wipe a name the form
- * never showed.
- */
+/** That is the same contract the transaction ledger uses, and it is why `undefined` is filtered out here rather than
+ * coerced — sending `landlordName: undefined` as `""` would silently wipe a name the form never showed. */
 export async function updateRental(rentalId, patchBody = {}) {
   const body = {};
-  ['address', 'landlordName', 'leaseStart', 'leaseEnd', 'status'].forEach((k) => {
+  ['address', 'leaseStart', 'leaseEnd', 'status'].forEach((k) => {
     if (patchBody[k] !== undefined) body[k] = patchBody[k];
   });
   ['monthlyRent', 'deposit'].forEach((k) => {
@@ -277,7 +177,7 @@ export async function addTransaction(propId, txn = {}) {
   );
 }
 
-/** `PATCH .../transactions/{txnId}` — partial by design: send only what changed. */
+/** `PATCH .../transactions/{txnId}` — partial by design: only dirty fields cross the seam. */
 export async function updateTransaction(propId, txnId, patchBody = {}) {
   const body = {};
   ['type', 'category', 'note', 'recurring', 'date'].forEach((k) => {
@@ -294,10 +194,12 @@ export async function deleteTransaction(propId, txnId) {
   await del(`/me/finances/${encodeURIComponent(propId)}/transactions/${encodeURIComponent(txnId)}`);
 }
 
-/** `GET /me/finances/{propId}/basis` — purchase price, loan, current value. `null` when unrecorded. */
+const financeOverview = (propId) => get(`/me/finances/${encodeURIComponent(propId)}/overview`);
+
+/** `basis` of `GET /me/finances/{propId}/overview` — purchase price, loan, current value. `null` when unrecorded. */
 export async function getBasis(propId) {
   if (!signedIn() || !propId) return null;
-  return toBasisViewModel(await get(`/me/finances/${encodeURIComponent(propId)}/basis`));
+  return toBasisViewModel((await financeOverview(propId))?.basis);
 }
 
 /** `PUT /me/finances/{propId}/basis`. */
@@ -311,18 +213,7 @@ export async function setBasis(propId, basis = {}) {
   }));
 }
 
-/**
- * `GET /me/finances/{propId}/summary` — income, expense, net and occupancy.
- *
- * Server-computed, and that is the point. The client's version reduced over the transaction list it
- * happened to have downloaded, and that list is paged — so it was a summary of page one, wearing
- * the label of a summary.
- *
- * `period` is forwarded rather than defaulted here: the server's `SummaryPeriods` owns what each
- * window means (its `year` is the Indian FY, 1 April), and re-deciding that on this side is exactly
- * how the card and the table came to disagree (D178). A null/`all` period is dropped from the query
- * string and the server applies its own `all`.
- */
+/** Finance summary is server-computed, not inferred from a paged transaction list. */
 export async function financeSummary(propId, period) {
   if (!signedIn() || !propId) return toSummaryViewModel(null);
   return toSummaryViewModel(await get(
@@ -331,26 +222,33 @@ export async function financeSummary(propId, period) {
   ));
 }
 
-/** `GET /me/finances/{propId}/cashflow` — the monthly series the chart draws. */
+/** `cashflow` of `GET /me/finances/{propId}/overview` — the monthly series the chart draws. */
 export async function cashflow(propId) {
   if (!signedIn() || !propId) return [];
-  return toList(await get(`/me/finances/${encodeURIComponent(propId)}/cashflow`), toCashflowPoint);
+  return toList((await financeOverview(propId))?.cashflow, toCashflowPoint);
 }
 
-/** `GET /me/finances/{propId}/dues` — what is coming, with a server-computed `daysUntil`. */
+/** `dues` of `GET /me/finances/{propId}/overview` — what is coming, with a server-computed `daysUntil`. */
 export async function dues(propId) {
   if (!signedIn() || !propId) return [];
-  return toList(await get(`/me/finances/${encodeURIComponent(propId)}/dues`), toDueViewModel);
+  return toList((await financeOverview(propId))?.dues, toDueViewModel);
 }
 
-/**
- * `GET /me/rent-agreements` — the caller's agreements on either side, newest first.
- *
- * The server answers for both signatories, so this needs no `party` argument: a landlord who also
- * rents a home elsewhere is one person, and the pages that read the list already narrow it by the
- * property they are showing.
- */
 export async function myRentAgreements() {
   if (!signedIn()) return [];
   return toList(await get('/me/rent-agreements'), toRentAgreementViewModel);
+}
+
+/** `GET /me/rent-agreements/{id}/renewal` — what a renewal starts from; the owner and the tenant may both read it. */
+export async function rentAgreementRenewal(id) {
+  const r = await get(`/me/rent-agreements/${encodeURIComponent(id)}/renewal`);
+  const party = (p) => ({ name: p?.name || '', mobile: String(p?.mobile || '') });
+  return {
+    rent: Number(r?.rent) || 0,
+    deposit: Number(r?.deposit) || 0,
+    months: Number(r?.months) || 0,
+    startDate: r?.startDate || null,
+    owner: r?.owner ? party(r.owner) : null,
+    tenants: Array.isArray(r?.tenants) ? r.tenants.map(party) : [],
+  };
 }

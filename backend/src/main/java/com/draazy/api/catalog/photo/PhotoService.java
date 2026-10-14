@@ -1,60 +1,62 @@
 package com.draazy.api.catalog.photo;
 
+import com.draazy.api.catalog.property.PhotoHash;
 import com.draazy.api.common.error.PayloadTooLargeException;
+import com.draazy.api.common.validation.MediaSignatures;
 import com.draazy.api.provider.FileStorage;
+import java.io.IOException;
+import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-/**
- * Uploads a listing photo to the <strong>public</strong> bucket and hands back its CDN URL.
- *
- * <p><strong>Stateless by design.</strong> Unlike the document vault, this writes no row and touches
- * no {@link com.draazy.api.catalog.property.Property}. In the create-listing wizard the photos are
- * chosen before the property exists, so there is nothing to attach them to yet; and the listing
- * create/update contract already persists whatever image URLs it is given. This service's whole job
- * is to turn bytes into a hosted URL — the URL then rides along with the listing like any other.
- *
- * <p><strong>The key is server-minted.</strong> {@code photos/{ownerId}/{uuid}} — the client's
- * filename decides nothing, so a traversal or an overwrite of someone else's object is impossible by
- * construction rather than by sanitising. Scoping the prefix by {@code ownerId} keeps one owner's
- * uploads from colliding with another's even before a listing ties them together.
- *
- * <p><strong>The stored content type is the one the bytes prove.</strong> {@link PhotoUploads}
- * sniffs the file and returns the type its signature actually describes; that is what reaches the
- * bucket, so the CDN can never be coaxed into serving a mislabelled file as active content.
- */
 @Service
 public class PhotoService {
 
-    private final FileStorage storage;
+    private static final Logger log = LoggerFactory.getLogger(PhotoService.class);
 
-    public PhotoService(FileStorage storage) {
+    private final FileStorage storage;
+    private final PhotoKeys keys;
+
+    public PhotoService(FileStorage storage, PhotoKeys keys) {
         this.storage = storage;
+        this.keys = keys;
     }
 
-    /**
-     * Validate an uploaded image and store it world-readable, returning its CDN URL.
-     *
-     * @param ownerId the authenticated uploader; scopes the storage key
-     * @param file    the multipart image
-     * @return the public CDN URL of the stored photo
-     * @throws com.draazy.api.common.error.UnsupportedMediaTypeException for a non-image (or SVG/HTML)
-     * @throws com.draazy.api.common.error.PayloadTooLargeException      for an oversized file
-     */
     public PhotoDto upload(UUID ownerId, MultipartFile file) {
-        // Reject oversize before pulling the whole upload into the heap. The container's multipart cap
-        // still bounds the request, but this keeps a 5-6 MB file from being fully buffered only to be
-        // thrown away — the declared size is trustworthy enough for a cheap early-out, and PhotoUploads
-        // re-checks against the real byte count once the bytes are in hand.
-        if (file.getSize() > PhotoUploads.MAX_BYTES) {
-            throw new PayloadTooLargeException("That photo is too large to upload (max 5 MB)");
+
+        // Reject a known oversized upload before buffering; validation also checks the actual bytes.
+        if (file.getSize() >= PhotoUploads.MAX_BYTES) {
+            throw new PayloadTooLargeException("Photos must be smaller than 1,000,000 bytes (1 MB)");
         }
         byte[] bytes = readBytes(file);
         String type = PhotoUploads.validate(file.getContentType(), file.getSize(), bytes);
+        bytes = ImageMetadataStripper.strip(type, bytes);
+        PhotoUploads.validate(type, bytes.length, bytes);
 
-        String key = "photos/" + ownerId + "/" + UUID.randomUUID();
+        String key = keys.newKey(ownerId);
+        Long hash = PhotoHash.compute(bytes);
+        if (hash != null) {
+            key += "-" + PhotoHash.toHex(hash);
+        }
+        storeVariants(key, bytes);
         return new PhotoDto(storage.storePublic(key, bytes, type));
+    }
+
+    // Copies first, so a URL this returns never has a missing copy. Best effort: a card whose copy is
+    // missing (an older or undecodable photo) falls back to the original in PropertyImage.jsx.
+    private void storeVariants(String key, byte[] bytes) {
+        Map<Integer, byte[]> variants;
+        try {
+            variants = PhotoVariants.of(bytes);
+        } catch (IOException | RuntimeException e) {
+            log.warn("No card-size copies for {}: {}", key, e.toString());
+            return;
+        }
+        variants.forEach((width, jpeg) ->
+                storage.storePublic(PhotoVariants.key(key, width), jpeg, MediaSignatures.JPEG));
     }
 
     private static byte[] readBytes(MultipartFile file) {

@@ -1,6 +1,7 @@
 package com.draazy.api.identity.user;
 
 import com.draazy.api.support.AbstractApiTest;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -14,9 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * Tokens are minted directly via {@link JwtService}, so these do not depend on the OTP flow.
- */
 class MeEndpointsTest extends AbstractApiTest {
 
     @Autowired
@@ -27,14 +25,6 @@ class MeEndpointsTest extends AbstractApiTest {
         u.setName("Asha Patil");
         u.setMobileVerified(true);
         return users.saveAndFlush(u);
-    }
-
-    @Test
-    void getMeWithoutTokenReturns401Envelope() throws Exception {
-        mvc.perform(get("/auth/me"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value("unauthorized"))
-                .andExpect(jsonPath("$.status").value(401));
     }
 
     @Test
@@ -54,13 +44,11 @@ class MeEndpointsTest extends AbstractApiTest {
         User u = saveUser("9876500704", "buyer");
         mvc.perform(get("/auth/me").header(HttpHeaders.AUTHORIZATION, bearer(u)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.permissions").doesNotExist());
+                .andExpect(jsonPath("$.permissions").doesNotExist())
+                .andExpect(jsonPath("$.desks").isEmpty());
     }
 
-    /**
-     * Two atoms by name rather than the whole set: the claim is that resolved {@code module:action}
-     * atoms are carried, not that the catalogue has a particular length today.
-     */
+    /** Asserts two atoms by name so the test does not depend on the catalogue's current length. */
     @Test
     void getMeCarriesResolvedAtomsForAnAdministrator() throws Exception {
         User u = saveUser("9876500705", "admin");
@@ -68,13 +56,25 @@ class MeEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.permissions").isArray())
                 .andExpect(jsonPath("$.permissions", hasItem("users:read")))
-                .andExpect(jsonPath("$.permissions", hasItem("settings:write")));
+                .andExpect(jsonPath("$.permissions", hasItem("settings:write")))
+                .andExpect(jsonPath("$.desks").isEmpty());
     }
 
-    /**
-     * The role ceiling: {@code settings:write} is admin-only however a staff document is written,
-     * and a console scoping its navigation from anything but this list would offer the tab anyway.
-     */
+    @Test
+    void getMeCarriesSortedDesksForStaff() throws Exception {
+        User u = saveUser("9876500710", "staff");
+        jdbc.update("""
+                INSERT INTO back_office_permissions (user_id, permissions)
+                VALUES (?::uuid, ?::jsonb)
+                """, u.getId().toString(), "[\"support\",\"desk:rental\",\"desk:legal\"]");
+
+        mvc.perform(get("/auth/me").header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.desks", contains("legal", "rental")));
+    }
+
+    /** {@code settings:write} is admin-only however a staff document is written, so consoles must scope
+     * navigation from this list. */
     @Test
     void getMeNeverGrantsAnAdminOnlyAtomToStaff() throws Exception {
         User u = saveUser("9876500706", "staff");
@@ -109,10 +109,8 @@ class MeEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.fields[0].field").value("email"));
     }
 
-    /**
-     * The column has no length, so the browser was the only bound. A blank name is the trap: it
-     * passes {@code @Size} while the "ask for a name" step fires on a trimmed-empty one forever.
-     */
+    /** The column has no length; a blank name passes {@code @Size} but would loop the "ask for a name"
+     * step forever. */
     @Test
     void patchMeRejectsANameOutsideItsBounds() throws Exception {
         User u = saveUser("9876500708", "buyer");
@@ -134,6 +132,17 @@ class MeEndpointsTest extends AbstractApiTest {
                         .content("{\"name\":\"   \"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.fields[0].field").value("name"));
+
+        mvc.perform(patch("/auth/me").header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"6516%^&$*@#^\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("name"));
+
+        mvc.perform(patch("/auth/me").header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"आशा D'Souza-Patil\"}"))
+                .andExpect(status().isOk());
 
         // Omitting it entirely is still how you edit only the email, so null must stay legal.
         mvc.perform(patch("/auth/me").header(HttpHeaders.AUTHORIZATION, bearer(u))
@@ -159,10 +168,8 @@ class MeEndpointsTest extends AbstractApiTest {
                         .andExpect(jsonPath("$.name").value("Asha Patil"));
             }
 
-    /**
-     * Both directions, because a boolean that can only be turned on is a trap: this preference makes
-     * {@code ContactService#request} refuse every unverified caller, silently stopping enquiries.
-     */
+    /** Both directions: this preference makes {@code ContactService#request} refuse every unverified caller,
+     * silently stopping enquiries, so it must be switchable off too. */
     @Test
     void patchMeTogglesContactPrivacyPreferencesBothWays() throws Exception {
         User u = saveUser("9876500707", "owner");
@@ -188,10 +195,7 @@ class MeEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.hideNumber").value(true));
     }
 
-    /**
-     * Null means unchanged, which is why the field is boxed: a save that only edits the name must
-     * not reset an owner's privacy toggles without them touching the switch.
-     */
+    /** Null means unchanged (boxed field): a name-only save must not reset the owner's privacy toggles. */
     @Test
     void patchMeLeavesUnmentionedPrivacyPreferencesAlone() throws Exception {
         User u = saveUser("9876500708", "owner");

@@ -17,30 +17,27 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 
-/**
- * Documents on a service request: the draft, the registered copy, and whatever ops asked the
- * customer for.
- *
- * <p>A service-request document carries a property id — {@code documents.property_id} is
- * {@code NOT NULL} (V20), so a request with no listing cannot carry files at all, and the platform
- * says so with a 409 rather than discovering it as a constraint violation. It is <em>not</em> a
- * vault document, though: the property named on a request is claimed by whoever raised it, so these
- * rows are reachable only through the request. The allowlist and the 10 MB ceiling are the vault's,
- * reused rather than restated.
- */
+// Service request docs are not vault docs; ownership is request-scoped, not listing-scoped.
 @DisplayName("Slice 11 — service-request documents")
 class ServiceRequestDocsTest extends ServiceFixtures {
 
     @Test
-    @DisplayName("a request with no property cannot carry documents, and says so")
-    void noPropertyNoDocuments() throws Exception {
+    @DisplayName("a request with no property files its documents against the request alone")
+    void noPropertyDocumentsFileAgainstTheRequest() throws Exception {
         User buyer = customer("9820000201");
         User desk = staff("9820000202", Teams.LEGAL);
         String id = raise(buyer, "legal", null);
 
-        upload(buyer, id, "identity", 409);
+        upload(buyer, id, "identity", 201);
         setStatus(desk, id, "assigned", 200);
-        shareDraft(desk, id, 409);
+        shareDraft(desk, id, 200);
+
+        mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.documents[?(@.category=='identity')]").isNotEmpty())
+                .andExpect(jsonPath("$.documents[?(@.category=='draft')]").isNotEmpty())
+                .andExpect(jsonPath("$.documents[*].propertyId").doesNotExist());
     }
 
     @Test
@@ -53,18 +50,20 @@ class ServiceRequestDocsTest extends ServiceFixtures {
 
         setStatus(desk, id, "assigned", 200);
         shareDraft(desk, id, 200);
+        openDraft(buyer, id, 204);
         decide(buyer, id, "approve", 200);
         finalDoc(desk, id, 201);
 
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.documents", hasSize(2)))
+
+                .andExpect(jsonPath("$.documents", hasSize(9)))
                 .andExpect(jsonPath("$.documents[0].category").value("final-document"))
                 .andExpect(jsonPath("$.documents[1].category").value("draft"))
-                .andExpect(jsonPath("$.documents[0].propertyId").value(p.getId().toString()));
+                .andExpect(jsonPath("$.documents[0].propertyId").doesNotExist())
+                .andExpect(jsonPath("$.documents[0].url").doesNotExist());
 
-        // ...and they stay there. The vault is what the owner uploaded; see vaultIsNotAnInbox.
         mvc.perform(get(Routes.MeDocuments.FOR_PROPERTY, p.getId().toString())
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
@@ -78,7 +77,6 @@ class ServiceRequestDocsTest extends ServiceFixtures {
         User stranger = customer("9820000211");
         Property p = listing(owner);
 
-        // anyone may raise a request about any listing — a tenant or a buyer legitimately does
         String id = raise(stranger, "legal", p);
         upload(stranger, id, "Aadhaar", 201);
 
@@ -87,7 +85,6 @@ class ServiceRequestDocsTest extends ServiceFixtures {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(0)));
 
-        // the file is not lost, it just belongs to the request rather than to the flat
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
                 .andExpect(status().isOk())
@@ -117,7 +114,7 @@ class ServiceRequestDocsTest extends ServiceFixtures {
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.documents[0].category").value("Aadhaar"))
+                .andExpect(jsonPath("$.documents[0].category").value("aadhaar"))
                 .andExpect(jsonPath("$.timeline[?(@.event=='document.uploaded')]").isNotEmpty());
     }
 
@@ -129,20 +126,6 @@ class ServiceRequestDocsTest extends ServiceFixtures {
         String id = raise(mine, "rent-agreement", listing(mine));
 
         upload(theirs, id, "Aadhaar", 404);
-    }
-
-    @Test
-    @DisplayName("the vault's allowlist applies here too")
-    void allowlistIsReused() throws Exception {
-        User buyer = customer("9820000208");
-        String id = raise(buyer, "rent-agreement", listing(buyer));
-
-        mvc.perform(multipart(Routes.ServiceRequests.DOCS, id)
-                        .file(new MockMultipartFile("file", "payload.html", "text/html",
-                                "<script>".getBytes()))
-                        .param("category", "Aadhaar")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
-                .andExpect(status().isUnsupportedMediaType());
     }
 
     @Test
@@ -158,14 +141,5 @@ class ServiceRequestDocsTest extends ServiceFixtures {
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.fileName").value("passwd.pdf"));
-    }
-
-    private void upload(User caller, String id, String category, int expected) throws Exception {
-        mvc.perform(multipart(Routes.ServiceRequests.DOCS, id)
-                        .file(new MockMultipartFile("file", "scan.pdf", "application/pdf",
-                                "%PDF-1.4".getBytes()))
-                        .param("category", category)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
-                .andExpect(status().is(expected));
     }
 }

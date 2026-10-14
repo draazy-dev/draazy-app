@@ -42,7 +42,7 @@
   `financeService` (`getTenant`/`getDues`) keyed to the owner's properties. **There is no owner-side
   view of `tenant_rentals` at all** — an owner who wants to know what their tenant believes the rent
   to be has to ask them.
-- **Platform:** earns nothing here. There is no fee, no GST and no revenue ledger on this flow.
+- **Platform:** earns nothing here. There is no fee and no revenue ledger on this flow.
 - **Guards:** `/pay-rent` is a `ProtectedRoute`; the tenancy write is cross-actor and server-authorized
   ([`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 1).
 
@@ -50,9 +50,9 @@
 Link to [`../../system/data-model.md`](../../system/data-model.md).
 - **Tenant rental (the tenant's own record)** - `tenant_rentals` (V128), read and written through
   `GET|POST /me/rentals` and `PATCH|DELETE /me/rentals/{rentalId}` (soft delete). Columns: `address`,
-  `landlord_name`, `monthly_rent`, `deposit`, `lease_start`, `lease_end`, `status`
+  `monthly_rent`, `deposit`, `lease_start`, `lease_end`, `status`
   (`active`/`ended`), plus soft-delete and audit. **No `property_id`, deliberately** — the home a
-  tenant rents is usually not a Draazy listing. `address` and `landlord_name` are personal data,
+  tenant rents is usually not a Draazy listing. `address` is personal data,
   so the table is wired into DSAR export (`DataExportScope`) and account erasure (`ErasureService`).
 - **Tenancy** - `tenancies`, written cross-actor when a rent deal is finalized on this platform.
   A relationship, not a schedule: it carries no instalments.
@@ -61,9 +61,9 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
 - **HRA receipt** - `generateSingle(...)` receipt doc (downloadable, `receiptId`).
 - **Tenant profile** - `tenant_profiles` (occupation/income/occupants/prior landlord/about). Read
   and written through `GET|PUT /me/tenant-profile`; the score is computed server-side from these
-  fields (section 5.5). The `dzTenantProfile:<mobile>` key is the mock provider's store only.
-- **Fees config** - `getFees()` -> `gstPercent` (18). There is no rent-payment percentage: the key
-  `fees.rentPayPercent` was deleted with the rail.
+  fields (section 5.5).
+- **Fees config** - there is no rent-payment percentage: the key `fees.rentPayPercent` was deleted
+  with the rail.
 
 ## 5. Business rules & logic  *(the meat)*
 
@@ -144,7 +144,7 @@ Any network request originating from that route is a regression.
 Online rent payment was first ruled **concept-only**: the flag stayed off, the route's real behaviour
 was already the coming-soon page, and the engine behind the flag existed to demonstrate an idea
 rather than to move money. That state was unstable — wired-but-dormant code has to be kept honest by
-tests, parity harnesses and reviewers, and it earns nothing while it waits. So it went: the
+tests and reviewers, and it earns nothing while it waits. So it went: the
 controller, the fee calculator, the payment/mandate/payout DTOs and the three tables
 (`rent_payments`, `rent_mandates`, `payout_accounts`) were deleted, along with `fees.rentPayPercent`,
 the `onlineRentPayment` app flag, the `finance.rentPay` admin flag and every admin-finance figure
@@ -207,3 +207,49 @@ Tenant rental:  (none) --POST /me/rentals--> active --PATCH status--> ended
 - **Cross-actor writes:** the tenancy is written server-side on deal close and authorized there. The
   tenant's rental has no cross-actor write at all — `tenant_id` is the caller, always.
 
+
+---
+
+## Tenant screening: score, badge batch reads
+
+`TenantProfile` is keyed by `user_id` (a surrogate id would permit two profiles per user, and
+"which of your two profiles did the owner see" is not a question this product should be able to
+ask). `score` and `verified` are server-owned (spec fix S17): a tenant who could set them
+would be grading the very signal owners rely on. `score` is recomputed on every save from the
+stored fields; `verified` mirrors the identity badge from `identity.verification` and is
+never written from this feature.
+
+Score weights preserve exactly the formula the UI used to compute client-side, so a tenant's number
+did not move when the server took the calculation over. Verified identity is worth more than every
+other field except occupation because it is the one fact a third party confirmed; everything
+else is self-reported.
+
+**Owner-side read (`GET /rent/tenant-profile/{mobile}`, spec fix S10).** 404 for every
+failure — unregistered mobile, no profile saved, no relationship — all the same answer. The
+endpoint is keyed by the exact identifier the contact gate protects, so any response that
+distinguishes "no such number" from "that number exists but you may not see it" turns it into
+the mobile-enumeration oracle the guard was added to close. A relationship means an existing
+tenancy in either direction, or an approved contact request from that person against one of the
+caller's listings.
+
+**Batch badge read by mobile (`tenantsVerified`, tech-debt D114).** The verified tick renders
+beside every row of a list; asking the single read per row is an N+1 on a render path. This
+returns one bit per entry, never a reason: "no such number", "registered but not verified" and
+"not your business" are all `false`, the same refusal shape spec fix S10 chose for the single
+read. Callers cannot use this to discover whether a number is registered at all. The
+relationship guard is preserved — a batch that skipped it would be a strictly cheaper way to ask
+a question the single read refuses. Reads the stored `verified` column, not a live badge
+lookup, so the two endpoints cannot disagree about the same person; a tenant who verifies after
+their last save is briefly stale, and stale here means no badge, never a badge nobody earned.
+Cap: `MAX_VERIFIED_BATCH = 50`, sized for the longest list any screen renders at once. An
+unbounded list is an amplification primitive; the 400 says so rather than silently truncating,
+because an answer for half a list wearing the shape of an answer for the whole would blank
+badges nobody would notice. Each distinct mobile is resolved once regardless of repeats.
+
+**Batch badge read by user id (`verifiedAmong`, same D114 bug).** Callers projecting offers or
+finalizations hold the user id and only a masked mobile (D5, `98XXXXX210`). Masking is lossy,
+so the mobile-keyed question there is guaranteed to answer `false` for every party — the bug
+D114 records: a badge that could never appear against the server. No
+relationship guard here, and that is deliberate: the ids come from rows the caller is already a
+participant on, so the server chose the subject and entitlement was settled upstream. Adding a
+guard would only blank the badge on the one screen it exists for.

@@ -2,6 +2,7 @@ package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.persistence.AuditedEntity;
 import jakarta.persistence.Column;
+import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -14,41 +15,16 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-/**
- * A room inside a flat that actually exists — the {@code move-in} feed (V27 {@code flatmate_rooms}).
- *
- * <p><strong>Two creation paths, one table, two irreconcilable ledgers.</strong> A seeker browsing
- * rooms does not care where a room came from, so both land here; but how "can I still move in?" is
- * answered differs, and the difference is not cosmetic:
- *
- * <ul>
- *   <li><strong>Seat model</strong> ({@link #seatsTotal}/{@link #seatsOpen}) — a standalone spare
- *       room from the list-property flow. Seats are abstract vacancies on this one post.</li>
- *   <li><strong>Occupancy model</strong> ({@link #occupants}/{@link #maxOccupants}) — a room from
- *       splitting a rent listing. Counts real people, and the ceiling belongs to the whole
- *       <em>flat</em>, so it is enforced across every sibling room sharing {@link #propertyId}.</li>
- * </ul>
- *
- * <p>They are never mixed: a split room carrying a seat count would be a second, disagreeing answer
- * to the only question the card exists to answer. Both the DB (two CHECK constraints) and the
- * service ({@code not_seat_based}) refuse it.
- *
- * <p>{@link #verificationTier} is derived server-side by {@link FlatmateGuardrails} and never read
- * from a request body — a client that could name its own tier could award itself the badge the
- * whole trust model rests on.
- */
 @Entity
 @Table(name = "flatmate_rooms")
 @Getter
-public class FlatmateRoom extends AuditedEntity {
+public class FlatmateRoom extends AuditedEntity implements FlatmateSupplyPost {
 
     @Column(name = "host_id", nullable = false, updatable = false)
     private UUID hostId;
 
-    /**
-     * The parent rent listing when this room came from a split; null for a standalone spare room.
-     * This is the key that ties sibling rooms into one occupancy ledger and one joint agreement.
-     */
+    /** The parent rent listing when this room came from a split; null for a standalone spare room.
+     * This key ties sibling rooms into one occupancy ledger and one joint agreement. */
     @Column(name = "property_id")
     @Setter
     private UUID propertyId;
@@ -65,11 +41,6 @@ public class FlatmateRoom extends AuditedEntity {
     @Setter
     private String attachedBath = "shared";
 
-    /**
-     * Whether {@link #budget} is what one person pays or what the whole room costs. Mixing the two
-     * silently makes a shared bed look pricier than a private room, which is the one pricing error
-     * a seeker cannot detect by eye.
-     */
     @Column(name = "price_basis", nullable = false)
     @Setter
     private String priceBasis = "person";
@@ -81,6 +52,23 @@ public class FlatmateRoom extends AuditedEntity {
     @Column(name = "deposit")
     @Setter
     private Long deposit;
+
+    /** Null means the host did not state it, which is not the same as a term of zero. */
+    @Column(name = "notice_period_days")
+    @Setter
+    private Integer noticePeriodDays;
+
+    @Column(name = "lock_in_months")
+    @Setter
+    private Integer lockInMonths;
+
+    @Column(name = "maintenance_billing")
+    @Setter
+    private String maintenanceBilling;
+
+    @Column(name = "electricity_billing")
+    @Setter
+    private String electricityBilling;
 
     /** People living in THIS room. Emergent — the tenants decide, the host only records it. */
     @Column(name = "occupants", nullable = false)
@@ -108,17 +96,18 @@ public class FlatmateRoom extends AuditedEntity {
     @Setter
     private String verificationTier = FlatmateVocabulary.TIER_IDENTITY;
 
-    /**
-     * The Verified pill. On a split room this tracks the <em>parent</em> listing's Ops approval, so
-     * a badge can never appear on a flat nobody has checked.
-     */
-    @Column(name = "verified", nullable = false)
-    @Setter
-    private boolean verified = false;
-
     @Column(name = "agreement_declared", nullable = false)
     @Setter
     private boolean agreementDeclared = false;
+
+    /** True only once the flat's owner confirmed by OTP — the twin of {@link FlatmateGroup}'s. */
+    @Column(name = "owner_consent", nullable = false)
+    @Setter
+    private boolean ownerConsent = false;
+
+    @Column(name = "owner_consent_mobile")
+    @Setter
+    private String ownerConsentMobile;
 
     @Column(name = "address_fingerprint")
     @Setter
@@ -132,9 +121,19 @@ public class FlatmateRoom extends AuditedEntity {
     @Setter
     private String modStatus = FlatmateVocabulary.MOD_PENDING;
 
+    @Embedded
+    private ModerationRecheck recheck = new ModerationRecheck();
+
+    @Embedded
+    private FlatmateExpiry expiry = new FlatmateExpiry();
+
     @Column(name = "society_id")
     @Setter
     private UUID societyId;
+
+    @Column(name = "title")
+    @Setter
+    private String title;
 
     @Column(name = "society")
     @Setter
@@ -161,7 +160,6 @@ public class FlatmateRoom extends AuditedEntity {
     @Setter
     private Double lng;
 
-    /** {@code "4"} means 4+, matching the contract's enum. */
     @Column(name = "bhk")
     @Setter
     private String bhk;
@@ -181,6 +179,14 @@ public class FlatmateRoom extends AuditedEntity {
     @Column(name = "furnishing")
     @Setter
     private String furnishing;
+
+    @Column(name = "facing")
+    @Setter
+    private String facing;
+
+    @Column(name = "overlooking")
+    @Setter
+    private String overlooking;
 
     @Column(name = "move_in")
     @Setter
@@ -211,6 +217,11 @@ public class FlatmateRoom extends AuditedEntity {
     @Column(name = "photos", nullable = false)
     @Setter
     private List<String> photos = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "details")
+    @Setter
+    private FlatmateRoomDetails details;
 
     @Column(name = "status", nullable = false)
     @Setter
@@ -243,6 +254,14 @@ public class FlatmateRoom extends AuditedEntity {
 
     public boolean isVisible() {
         return !archived && FlatmateVocabulary.isPublic(modStatus);
+    }
+
+    /** Hibernate materialises an all-null {@code @Embedded} as null, which is every unedited row. */
+    public ModerationRecheck getRecheck() {
+        if (recheck == null) {
+            recheck = new ModerationRecheck();
+        }
+        return recheck;
     }
 
     /** True when this room came from splitting a parent listing, and so uses the occupancy ledger. */

@@ -4,24 +4,56 @@ slug: contacting-owners
 category: renting
 audience: tenant
 order: 1
-updated: 2026-07-27
-summary: How to reach an owner, how many contacts you get, and how to write an enquiry that gets a reply.
-tags: [enquiry, contact, owner, messaging]
+updated: 2026-10-12
+summary: How owner approval, masked contact details, contact allowance and in-app chat work.
+tags: [enquiry, contact, owner, messaging, quota]
 ---
 
 ## How contact works
 
-On a verified listing, tap **Contact owner**. You need to be signed in — this is how the owner knows your number is verified.
+Open a listing and tap **Contact Owner** (or **Request number** next to the masked number). You need to be signed in with a verified mobile number — that is the only requirement, and it is the same floor everywhere on Draazy.
 
-You then get the owner's number and an in-app message thread. Most owners prefer a call, but a written enquiry first tends to get a better response because they can read it at their convenience.
+Tapping does not hand you a phone number. Sending an enquiry, starting a chat or tapping **Request number** all send the owner a **contact request**, and their number stays partly masked (`+91 98xxx xxxx02`) until they say yes. A request sits in one of these states:
+
+| State | What you see |
+| --- | --- |
+| Pending | Request sent. The owner has not answered yet. |
+| Approved | The contact path opens. You can message in-app, and any phone action shown for that owner appears only after approval. Some owners keep their number hidden even after approving — you then see "Approved — listing contact prefers in-app chat" and talk in the app. |
+| Contact returned | The owner declined, or did not reply in 7 days. The contact goes back to your allowance — nothing is used. |
+
+Tapping again on the same listing does not send a second request — it shows you where the first one stands. If the owner does not reply within 7 days the request lapses and your contact comes back; you can ask again then, and the new request uses a contact like any other.
+
+Too many requests waiting at once? Draazy limits how many unanswered requests and visits you can have open. You will see a message, and can send more once owners reply or requests lapse.
+
+The owner's number is never shown before approval. For many listings the safe next step is in-app chat rather than taking the conversation off-platform.
+
+## Messages
+
+[Messages](/messages) has **Chats** for approved conversations and **Requests** for pending ones. You can archive or mute a thread, and block or report a person from the thread menu.
+
+## Do I need to be identity-verified?
+
+No. The **Verified** badge is a trust signal, not a gate — you can search, enquire, schedule visits and post without one.
+
+The single exception is an owner who has switched on **verified enquirers only**. On those listings you are sent to [identity verification](/verify-identity) first: one government ID and one live selfie, reviewed by a person. Submitting is not the same as passing, so allow for the review before you plan around it.
 
 ## How many owners can I contact?
 
-Contacting owners is **free**. There is a fair-use cap of 20 new owner contacts per day, which exists to stop scraping, not to sell you a plan. If you hit it legitimately, contact [Support](/support).
+Owner contacts are counted per account, not per day:
+
+| Source | Owner contacts |
+| --- | --- |
+| Free | 15, usable within 30 days of your first contact |
+| Contact Pack | 15 more, valid 30 days; packs stack |
+| Referral reward | Extra contacts for each qualified referral (see [Refer](/refer)) |
+
+A contact is used when you ask, and comes back if the owner declines or does not reply in 7 days. An approved request keeps it used. One listing costs one contact however many times you open it, and booking a visit there uses that same contact rather than a second one. A visit on a listing you have not contacted uses one.
+
+The listing shows "N owner contacts left" beside **Request number**, and the same line shows when your free contacts expire. When the allowance runs out the app says so and offers a referral link (while referral rewards are on) or a [Contact Pack](/plans).
 
 ## Writing an enquiry that gets answered
 
-Owners get many enquiries and reply to the ones that look serious. A good first message answers the three things they are silently asking:
+Owners get many enquiries and approve the ones that look serious. Your message is attached to the request, so it is the thing they decide on. A good first message answers the three things they are silently asking:
 
 1. **Who are you?** Occupation, family or flatmate composition.
 2. **When do you need it?** A specific date, not "soon".
@@ -32,13 +64,15 @@ A workable template:
 > Hi, I'm interested in your 2 BHK in Baner. I work at a product company in Hinjawadi, moving with my wife, and we're looking to shift by 15 August. The rent and deposit work for us. Could we visit this weekend — Saturday morning or Sunday afternoon?
 
 > [!TIP]
-> Fill in your [tenant profile](/tenant-profile) before you enquire. Owners see it attached to your enquiry, and it answers most of their questions before they have to ask.
+> Owners see only your name, a masked mobile number and a Serious Buyer badge if you are ID-verified. Your [tenant profile](/tenant-profile) is not shared, so use a short first message to say who will live in the home.
 
-## If the owner does not respond
+## If the request stays pending
 
-- Give it 24 hours before following up — most owners are not full-time landlords.
-- Check the listing's freshness badge; a stale listing may already be rented.
+- Give it 24 hours — most owners are not full-time landlords.
+- Check the listing's freshness badge; an unconfirmed listing may already be rented.
 - Use [Report this listing](/help/a/report-a-listing) if it is clearly gone, so other tenants do not waste time on it.
+
+A declined request cannot be re-sent. That is deliberate: it stops a refusal being worn down by repetition. Your contact is returned, so you lose nothing by moving on.
 
 ## Staying safe
 
@@ -47,4 +81,5 @@ Keep negotiations in the app's message thread where possible. If a conversation 
 ## Related
 
 - [Scheduling a site visit](/help/a/schedule-a-visit)
-- [Managing your profile](/help/a/manage-profile)
+- [How we verify owners and listings](/help/a/how-we-verify)
+- [Plans explained](/help/a/plans-explained)

@@ -1,13 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { jsPDF } from 'jspdf';
 import '../../styles/routes/compare.css';
 import Icon from '../../components/Icon.jsx';
 import PropertyImage from '../../components/ui/PropertyImage.jsx';
-import { getPropertiesByIds, listProperties } from '../../services/propertyService.js';
-import { fmtINR } from '../../lib/format.js';
+import { compareProperties, listProperties } from '../../services/propertyService.js';
+import { fmtArea, fmtINR, isSqftUnit } from '../../lib/format.js';
 import { useCompare } from '../../context/CompareContext.jsx';
+import useModalDialog from '../../hooks/useModalDialog.js';
+import useScrollLock from '../../hooks/useScrollLock.js';
 import { cityLabelFor } from '../../lib/geoConfig.js';
 
 const MAX = 4;
@@ -48,7 +50,11 @@ function metric(p, t) {
     type: p.type,
     bhk: p.bhkNum ? p.bhkNum + ' BHK' : p.type === 'Plot' ? 'Plot' : '—',
     area: p.area || 0,
-    psf: p.area ? Math.round(p.price / p.area) : 0,
+    areaUnit: p.areaUnit || 'sqft',
+    areaLabel: fmtArea(p.area, p.areaUnit),
+    /* Only when the area is in sq.ft.: dividing a price by an acreage gives a per-acre figure, and
+       the row that shows it is captioned per sq.ft. A plot compares on its own unit's area row. */
+    psf: p.area && isSqftUnit(p.areaUnit) ? Math.round(p.price / p.area) : 0,
     furnish: FURNISH_MAP[p.furnishing] ? t('compare.' + FURNISH_MAP[p.furnishing]) : (p.furnishing || '—'),
     possession: POSSESSION[p.construction] ? t('compare.' + POSSESSION[p.construction]) : '—',
     rera: p.rera,
@@ -63,7 +69,7 @@ const ROWS = [
   { label: 'Property Type', tk: 'rowType', icon: 'building-2', get: (m) => m.type },
   { label: 'Listing', tk: 'rowListing', icon: 'tag', get: (m) => m.deal },
   { label: 'Configuration', tk: 'rowConfig', icon: 'bed-double', get: (m) => m.bhk },
-  { label: 'Area (sq.ft.)', tk: 'rowArea', icon: 'maximize', best: 'max', get: (m) => (m.area ? m.area.toLocaleString('en-IN') + ' sq.ft.' : '—'), cmp: (m) => m.area },
+  { label: 'Area', tk: 'rowArea', icon: 'maximize', best: 'max', get: (m) => m.areaLabel || '—', cmp: (m) => m.area, sameUnit: true },
   { label: 'Price / sq.ft.', tk: 'rowPsf', icon: 'ruler', best: 'min', get: (m) => (m.psf ? '₹' + m.psf.toLocaleString('en-IN') : '—'), cmp: (m) => m.psf },
   { label: 'Furnishing', tk: 'rowFurnishing', icon: 'sofa', get: (m) => m.furnish },
   { label: 'Possession', tk: 'rowPossession', icon: 'calendar', get: (m) => m.possession },
@@ -78,13 +84,17 @@ export default function Compare() {
   const [pickFailed, setPickFailed] = useState(false);
   const [modal, setModal] = useState(false);
   const [q, setQ] = useState('');
+  useScrollLock(modal);
+  const closeModal = useCallback(() => setModal(false), []);
+  const modalRef = useModalDialog(modal, closeModal);
 
-  // Resolve exactly the compared ids rather than downloading the catalogue to find them. Ids that
-  // fail to resolve stay in the list as `available: false`.
+  // Ids that fail to resolve stay in the list as `available: false`.
   useEffect(() => {
     let alive = true;
     if (!ids.length) { setCompared([]); return () => { alive = false; }; }
-    getPropertiesByIds(ids).then((list) => { if (alive) setCompared(list); });
+    compareProperties(ids)
+      .catch(() => [])
+      .then((list) => { if (alive) setCompared(list); });
     return () => { alive = false; };
   }, [ids]);
 
@@ -112,14 +122,17 @@ export default function Compare() {
   const items = useMemo(() => {
     if (!compared) return [];
     return ids.map((id) => {
-      const p = compared.find((x) => x.id === id);
-      return p ? metric(p, t) : { id, available: false };
+      const p = compared.find((x) => x.id === id || x.uuid === id);
+      return p ? { ...metric(p, t), id } : { id, available: false };
     });
   }, [ids, compared, t]);
   const liveItems = useMemo(() => items.filter((m) => m.available), [items]);
 
   const bestIds = (row) => {
     if (!row.best || !row.cmp || liveItems.length < 2) return [];
+    // 2 acres is not smaller than 900 sq.ft. Without a shared unit the figures are not comparable,
+    // so the row shows them and names no winner.
+    if (row.sameUnit && new Set(liveItems.map((m) => m.areaUnit)).size > 1) return [];
     const vals = liveItems.map(row.cmp).filter((v) => v > 0);
     if (vals.length < 2) return [];
     const target = row.best === 'min' ? Math.min(...vals) : Math.max(...vals);
@@ -369,7 +382,7 @@ export default function Compare() {
 
       {modal ? (
         <div className="fixed inset-0 z-[60] modal-overlay flex items-center justify-center p-4" onClick={() => setModal(false)}>
-          <div className="dz-modal-panel rounded-2xl border border-white/10 w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
+          <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('compare.modalTitle')} className="dz-modal-panel rounded-2xl border border-white/10 w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl outline-none" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-5 border-b border-white/10">
               <h3 className="text-lg font-bold text-white">{t('compare.modalTitle')}</h3>
               <button type="button" onClick={() => setModal(false)} aria-label={t('compare.close')} className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5"><Icon name="x" className="w-5 h-5" /></button>
