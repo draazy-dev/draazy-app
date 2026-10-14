@@ -294,15 +294,6 @@ class ErasureCoverageTest extends AbstractApiTest {
         map.put("flatmate_seeker_posts.lng",
                 "The area the poster is searching in, not where they live. No identity on its own.");
 
-        String retired = "Retired society community feature; V94 emptied the table and the contract "
-                + "migration drops it, so no row exists and no code path writes one.";
-        for (String column : List.of("society_claims.name", "society_claims.email",
-                "society_proposals.lat", "society_proposals.lng",
-                "society_contributions.photo_url", "society_contributions.referral_name",
-                "society_contributions.referral_contact")) {
-            map.put(column, retired);
-        }
-
         map.put("flatmate_rooms.gender",
                 "A preference vocabulary — 'any' / 'male' / 'female', defaulting to 'any' (V27). Who "
                         + "the room is offered to, not the gender of a person on file.");

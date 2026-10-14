@@ -24,26 +24,21 @@ class MigrationSeedGuardTest {
 
     private static final Path REFERENCE_SEED = MIGRATIONS.resolve("R__DML_seed_reference_data.sql");
 
-    private static final Map<String, String> BACKFILLS = Map.of(
-            "V71", "Re-seeds open review cases with the four-fact checklist the approval gate now requires;"
-                    + " a reset DB has no open cases to re-seed.",
-            "V90", "Converts stored per-account atom documents to function documents; a reset DB has no"
-                    + " stored documents, and accounts without one fall back to the role default.",
-            "V120", "Issues tax invoices for orders paid before invoice numbering existed; a reset DB has no paid"
-                    + " orders, and the invoice sequence restarts with it.");
+    // Versions whose inserts are one-time backfills, each with why losing them to the reset costs nothing.
+    private static final Map<String, String> BACKFILLS = Map.of();
 
     // Tables whose rows a versioned migration once seeded, and which the repeatable seed now owns alone.
     // Keyed by table because the seed owns these rows with no version to point at.
     private static final Map<String, String> RE_HOMED_INTO_REFERENCE_SEED = Map.of(
             "message_template",
-            "V78 created this table and seeded its ten WhatsApp templates in the same file, so the live "
-                    + "reset destroyed them on every machine and GET /admin/message-templates answered [] "
-                    + "for months. The rows now live in R__DML_seed_reference_data.sql with "
+            "A versioned migration once created this table and seeded its ten WhatsApp templates in the same "
+                    + "file, so the live reset destroyed them on every machine and GET /admin/message-templates "
+                    + "answered [] for months. The rows now live in R__DML_seed_reference_data.sql with "
                     + "ON CONFLICT (id) DO UPDATE.");
 
     private static final Pattern INSERT = Pattern.compile("insert\\s+into\\s+([\\w.\"]+)", Pattern.CASE_INSENSITIVE);
 
-    private static final Pattern VERSION = Pattern.compile("^(V\\d+)__");
+    private static final Pattern VERSION = Pattern.compile("^(\\d+(?:\\.\\d+)*)__");
 
     // A table listed as re-homed must still be seeded.
     // The comment on `#RE_HOMED_INTO_REFERENCE_SEED` claims the rows moved to the repeatable seed.
@@ -66,7 +61,7 @@ class MigrationSeedGuardTest {
                 .as(
                         """
                         These versioned migrations insert rows. The live reset truncates every table and \
-                        replays only the R__ seeds, and flyway_schema_history survives it -- so a V__ \
+                        replays only the R__ seeds, and flyway_schema_history survives it -- so a versioned \
                         migration's rows are deleted by the first live run and never restored, on any \
                         machine, silently.
 
@@ -120,7 +115,7 @@ class MigrationSeedGuardTest {
 
     private static List<Path> versionedMigrations() {
         try (Stream<Path> files = Files.list(MIGRATIONS)) {
-            return files.filter(p -> p.getFileName().toString().matches("^V\\d+__.*\\.sql$"))
+            return files.filter(p -> VERSION.matcher(p.getFileName().toString()).find())
                     .sorted()
                     .toList();
         } catch (IOException e) {
@@ -135,8 +130,13 @@ class MigrationSeedGuardTest {
     }
 
     private static List<String> insertedTables(String sql) {
-        Matcher m = INSERT.matcher(stripComments(sql));
+        Matcher m = INSERT.matcher(stripFunctionBodies(stripComments(sql)));
         return m.results().map(r -> r.group(1)).distinct().toList();
+    }
+
+    // A trigger function's INSERT runs on later writes, not at migrate time, so it seeds nothing.
+    private static String stripFunctionBodies(String sql) {
+        return sql.replaceAll("(?is)(create\\s+(?:or\\s+replace\\s+)?function\\b.*?)\\$(\\w*)\\$.*?\\$\\2\\$", "$1");
     }
 
     // Remove `--` line comments and `/* *``/` blocks before looking for inserts. Otherwise a migration that explains

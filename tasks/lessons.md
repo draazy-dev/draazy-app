@@ -79,7 +79,7 @@
 - **An allowlist duplicated across Java and JS drifts silently** (`transactionType` dropped by `pickListingFormDetails`; `DETAIL_KEYS` vs Java `TEXT`). `npm run check:enums` compares the sets; grep BOTH tables.
 - **A field scoped on the way out must be cleared on the way back** (rental carried `possession: 'ready'` from a hidden control): enumerate what each branch hides.
 - **`400 "Request body could not be read"` is a Jackson parse failure naming no field** (e.g. comma-joined string for `List<String>`); if the plainest listing fails too, it is the shared write path.
-- **Editing an applied `V__` migration (comments too) breaks Flyway checksums**; correct with a new one. Re-read edited migrations in full (a deleted newline can comment out the next statement).
+- **Editing an applied migration (comments too) breaks Flyway checksums**; correct with a new `<yy>.<mm>.<seq>__` one. Re-read edited migrations in full (a deleted newline can comment out the next statement).
 - **A repeatable `R__` migration re-applies only on checksum change**: force with `delete from flyway_schema_history where script = 'R__...'`. Reference data belongs in `R__` (e2e reset replays only `R__`).
 - **`DELETE` a personal-data row rather than null its identifier** (half-erased rows leak free text).
 

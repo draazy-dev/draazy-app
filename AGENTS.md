@@ -71,7 +71,7 @@ Never write:
 
 Scan the **whole file** you touched, not just your diff, and fix both rots below in the same change. Scope is the files already in your diff — never open new files to clean.
 
-1. **Comments — hold existing ones to the rule above**, and delete changelog prose (dates, ticket ids, "previously / now / was", before-after narration, docblocks git history already holds). **Do not touch:** an already-applied Flyway `V*.sql` (checksummed — a comment edit alone breaks the next boot); security rationale protected by `docs/system/code-quality.md`; docblocks a script greps by path. Grep the file's bare name before deleting anything a tool may read.
+1. **Comments — hold existing ones to the rule above**, and delete changelog prose (dates, ticket ids, "previously / now / was", before-after narration, docblocks git history already holds). **Do not touch:** an already-applied Flyway migration (`db/migration/<yy>.<mm>.<seq>__*.sql` — checksummed, a comment edit alone breaks the next boot); security rationale protected by `docs/system/code-quality.md`; docblocks a script greps by path. Grep the file's bare name before deleting anything a tool may read.
 2. **Redundancy scan.** Apply the simplicity rule to code already there: reinvented stdlib/native behaviour, dead flexibility, predicates duplicated across a seam, unreachable branches, wrappers with one caller. Remove only what is **provably behaviour-preserving**; anything larger goes to `tasks/todo.md` as a note, not into the diff.
 
 Shrinking a Java service that holds a `ServiceSizeGuardTest` `BASELINE` entry to at-or-under the limit fails `baselineStaysHonest` — delete its entry in the same commit.

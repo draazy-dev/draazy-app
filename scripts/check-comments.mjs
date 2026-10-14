@@ -6,8 +6,8 @@ import fs from 'node:fs';
 const MAX_LINES = 2;
 const MAX_LEN = 120;
 const EXT = /\.(java|jsx?|mjs|cjs|css|sql|ya?ml|properties)$/;
-// Comments here are checksummed (Flyway), protected by docs/system/code-quality.md, or parsed by a script.
-const EXEMPT = /\/db\/migration\/V[^/]*\.sql$|(?:^|\/)(FileStorage|DevObjectStore|TestDatabaseIsolationTest|AbstractApiTest|Routes)\.java$/;
+// Comments here are protected by docs/system/code-quality.md or parsed by a script.
+const EXEMPT = /(?:^|\/)(FileStorage|DevObjectStore|TestDatabaseIsolationTest|AbstractApiTest|Routes)\.java$/;
 const CHANGELOG = /\bD\d{2,}\b|\bS\d{2}\b|\bpreviously\b|\bno longer\b|\bused to\b|\b20\d\d-\d\d-\d\d\b/i;
 
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 1 << 28 });

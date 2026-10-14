@@ -41,32 +41,35 @@ regenerate it (tech-debt D81, now closed).
 The rules, in the order they bite:
 
 1. **Never edit a migration that has been applied anywhere.** Flyway records a checksum per file. A
-   one-character edit to an applied `V__` script means every existing database refuses to boot with
+   one-character edit to an applied versioned script means every existing database refuses to boot with
    `Migration checksum mismatch`. This is not theoretical — it is exactly what happened on
    2026-08-04, and repairing it was impossible because the database was also twenty versions behind.
-2. **New change → new script.** `V15__…`, `V16__…`. Never renumber, never reuse. Note Flyway strips
-   leading zeros, so `V01` and `V1` are the *same* version and collide — keep the two-digit form.
+2. **New change → new script, named `<yy>.<mm>.<seq>__<description>.sql`** — e.g.
+   `26.11.01__DDL_add_x.sql`, then `26.11.02__…`; the sequence restarts at `01` each month. There is
+   no `V` prefix (`spring.flyway.sql-migration-prefix` is empty). Never renumber, never reuse, and keep
+   every part two digits: Flyway compares versions numerically, so `26.10.1` and `26.10.01` collide.
 3. **Never truncate or drop the schema to get out of trouble.** If a migration is wrong, write the
    next one that corrects it.
 4. **`R__` (repeatable) is for content, not structure** — the two seeds. They re-run whenever their
-   checksum changes and always after every `V__`, which is what makes editing the demo catalogue a
-   one-file change rather than a new migration.
+   checksum changes and always after every versioned script, which is what makes editing the demo
+   catalogue a one-file change rather than a new migration.
 
-The flatten this section used to reserve for later **has now happened**. On 2026-09-01 the 127-file
-`V1..V128` chain was consolidated into 14 domain-grouped files (`V01__DDL_foundation.sql` …
-`V14__DDL_analytics.sql`), and the filename convention gained a `DDL`/`DML` tag. Both preconditions
-held: every environment was rebuilt from empty, and it was done as a deliberate reset rather than an
-edit-in-place, which is rule 1 again.
+The chain has been flattened twice. On 2026-09-01 the 127-file `V1..V128` chain became 14
+domain-grouped files. On 2026-10-13 the `V01..V129` chain (15 domain files plus 110 deltas, and the
+pending society-community drop) was folded into the 14 files `26.10.01__DDL_foundation.sql` …
+`26.10.14__DDL_flatmate_search.sql`, and the naming moved to `<yy>.<mm>.<seq>__`. Both times every
+environment was rebuilt from empty, which is rule 1 again.
 
 Equivalence was proved rather than assumed — the old chain and the new one were each replayed into a
-scratch database and compared on columns, constraints, indexes, triggers, comments and routines
-(1,253 / 509 / 344 / 76 / 471 / 38, identical on every axis). The 197 `ALTER TABLE`s are folded into
-the `CREATE TABLE`s, objects the chain created and later dropped are simply never created, and the
-backfill DML is gone: every statement of it repaired rows that only exist in an already-populated
-database, so none of it can fire on a fresh one.
+scratch database and their `pg_dump --schema-only` and seeded reference data compared: identical
+except five `trg_set_updated_at` triggers the old chain never installed on tables it created late
+(`identity_verifications`, `conversation_user_state`, `property_verification_override_requests`,
+`service_request_draft_approvals`, `service_request_draft_checks`). Every `ALTER TABLE` is folded into its `CREATE TABLE` (columns in the same physical
+order), objects the chain created and later dropped are never created, and the backfill DML is gone:
+every statement of it repaired rows that only exist in an already-populated database.
 
 What this does **not** change: rule 1 still binds. The 14 files are applied everywhere now, so they
-are as frozen as the 127 were. A future squash is possible on the same two preconditions.
+are as frozen as the old chain was. A future squash is possible on the same precondition.
 
 Two build-time guards, because both mistakes above are invisible in review:
 
@@ -242,10 +245,10 @@ o.f.core.internal.command.DbValidate : Successfully validated 17 migrations
 c.draazy.api.DraazyApiApplication : Started DraazyApiApplication
 ```
 
-That count is 14 versioned `V__DDL_*` files plus the two `R__DML_*` reference seeds, and on the
-`local`/`e2e` profiles a third repeatable from `db/seed`. On a database that is already at v14 the
-line reads *validated*; on an empty one you get `Migrating schema "public" to version "14 - DDL
-analytics"` followed by `Successfully applied 17 migrations`.
+That count is the 14 versioned `26.10.*__DDL_*` files plus the two `R__DML_*` reference seeds, and on the
+`local`/`e2e` profiles the repeatables from `db/seed` and friends. On a database that is already at
+26.10.14 the line reads *validated*; on an empty one you get `Migrating schema "public" to version
+"26.10.14 - DDL flatmate search"` followed by `Successfully applied N migrations`.
 
 If Flyway logs *nothing at all*, the `spring-boot-flyway` autoconfiguration module is missing from
 `pom.xml`. Under Spring Boot 4, `flyway-core` alone is not enough.

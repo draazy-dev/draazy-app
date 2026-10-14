@@ -319,7 +319,7 @@ simultaneous submissions are invisible to each other inside one transaction.
 ### Edit policy (`editPolicy.js`) - the anti bait-and-switch rules
 - **Saved answers:** private owner/staff `formDetails` stores supplementary split address,
   landmark, ownership, rental terms and type-specific answers in `properties.form_details`
-  (JSONB, [V21 migration](../../../backend/src/main/resources/db/migration/V21__DDL_property_edit_details.sql)).
+  (JSONB, [catalog listings migration](../../../backend/src/main/resources/db/migration/26.10.04__DDL_catalog_listings.sql)).
   The server validates an allowlist, types and size bounds; media, credentials and verification
   flags do not belong in it. Pincode and headline/carpet/built-up areas stay in canonical columns.
   Prefill preserves saved types, including `false` flags and zero-valued answers, rather than

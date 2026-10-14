@@ -32,12 +32,11 @@ patch the spec, then update here.
 ## Flyway migrations
 
 - Location: `backend/src/main/resources/db/migration/`.
-- Naming: `V1__init.sql`, `V2__add_saved_searches.sql`, ... Never edit a migration once it has run;
-  add a new one.
-- `V1__init.sql` creates the core + cross-cutting tables, then each feature slice adds its own
-  `V{n}` migration (`V2__identity_access`, `V3__catalog_listings`, `V4__leads_contact_visits`,
-  `V5__deals_offers_finalization`, `V6__documents_rent_finance`, … already past `V30`). Never edit a
-  migration that has run; add the next `V{n}`.
+- Naming: `<yy>.<mm>.<seq>__<description>.sql`, no `V` prefix (`spring.flyway.sql-migration-prefix`
+  is empty) — e.g. `26.11.01__DDL_add_saved_searches.sql`; the sequence restarts at `01` each month,
+  every part two digits. `MigrationChainTest` enforces the shape and unique versions.
+- The schema is 14 domain files, `26.10.01__DDL_foundation.sql` … `26.10.14__DDL_flatmate_search.sql`.
+  Never edit a migration that has run; add the next `<yy>.<mm>.<seq>`.
 - Enable `pgcrypto` (or `uuid-ossp`) for UUID generation in the first migration.
 - Repeatable migrations (`R__seed_reference_data.sql`) for reference/seed data (localities, plans,
   platform fees) so dev/demo has content.

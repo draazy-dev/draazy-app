@@ -285,7 +285,7 @@ The single decision point every supply path calls - group create, single-room po
 ### Moderation (`mod_status`, D72)
 - Rooms and **groups with a flat** are created **`mod_status = 'pending'`** and are invisible on the
   public board until a moderator publishes them (`approved`). Backend default is set in the entity
-  *and* in the column default (`V13__DDL_flatmates.sql`, folded from the old `V41`), so a row
+  *and* in the column default (`26.10.12__DDL_flatmates.sql`, folded from the old `V41`), so a row
   inserted by any route - API, migration, manual SQL - is held.
 - **Owner tier skips the wait.** `FlatmatePublication.stateFor` makes an unflagged room or
   group whose host demonstrably owns the flat (an approved listing they own) `live` at create:

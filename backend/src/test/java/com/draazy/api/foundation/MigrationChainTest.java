@@ -33,6 +33,11 @@ class MigrationChainTest {
     private static final Pattern DROP_TABLE = Pattern.compile(
             "(?im)^\\s*DROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(?:public\\.)?([a-z_][a-z0-9_]*)");
 
+    private static final Pattern VERSIONED = Pattern.compile("^(\\d+(?:\\.\\d+)*)__");
+
+    private static final Pattern NAMED = Pattern.compile("^\\d{2}\\.(0[1-9]|1[0-2])\\.\\d{2}__[a-z0-9_]+\\.sql$",
+            Pattern.CASE_INSENSITIVE);
+
     private static Stream<Path> sqlFiles() {
         try {
             return Files.list(MIGRATIONS).filter(p -> p.toString().endsWith(".sql"));
@@ -108,18 +113,20 @@ class MigrationChainTest {
         return value.toLowerCase(java.util.Locale.ROOT);
     }
 
-    /** Flyway refuses to start on a duplicate version; catching it at build time is cheaper,
-     *  because the natural way to produce one is two branches whose merge looks clean. */
+    /** Flyway refuses to start on a duplicate version, and reads {@code 26.10.1} and {@code 26.10.01} as the
+     *  same one; catching it at build time is cheaper, because two branches' merge looks clean. */
     @Test
     @DisplayName("no two migrations claim the same version")
     void versionsAreUnique() {
-        Pattern versioned = Pattern.compile("^V(\\d+)__");
         Map<String, List<String>> byVersion = new TreeMap<>();
         sqlFiles().forEach(file -> {
             String name = file.getFileName().toString();
-            Matcher m = versioned.matcher(name);
+            Matcher m = VERSIONED.matcher(name);
             if (m.find()) {
-                byVersion.computeIfAbsent(m.group(1), k -> new java.util.ArrayList<>()).add(name);
+                String version = Stream.of(m.group(1).split("\\."))
+                        .map(part -> String.valueOf(Integer.parseInt(part)))
+                        .collect(java.util.stream.Collectors.joining("."));
+                byVersion.computeIfAbsent(version, k -> new java.util.ArrayList<>()).add(name);
             }
         });
 
@@ -132,6 +139,17 @@ class MigrationChainTest {
 
         assertThat(clashes)
                 .as("two migrations share a version number — renumber the later one")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("every file is a <yy>.<mm>.<seq>__ versioned migration or an R__ repeatable")
+    void filesFollowTheNamingConvention() {
+        assertThat(sqlFiles().map(p -> p.getFileName().toString())
+                        .filter(name -> !name.startsWith("R__") && !NAMED.matcher(name).matches()))
+                .as("name versioned migrations <yy>.<mm>.<seq>__<description>.sql, e.g. 26.10.01__create_table.sql; "
+                        + "the sequence restarts at 01 each month. Flyway runs with an empty versioned "
+                        + "prefix, so any other name is either ignored or read as a version")
                 .isEmpty();
     }
 }

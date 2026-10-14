@@ -90,7 +90,7 @@ each keeping shapes byte-compatible with the contract. Recommended order (value-
 
 For each slice:
 - [ ] Re-read that domain in the OpenAPI spec and the matching `providers/mock/` / `providers/http/`.
-- [ ] Migration `V{n}` for any new tables/columns (if not already in V1).
+- [ ] Migration `<yy>.<mm>.<seq>__<description>.sql` for any new tables/columns.
 - [ ] Entity + repository (public queries exclude archived).
 - [ ] Service with the business rules (gating, status transitions, masking, audit-log writes).
 - [ ] Controller under `/api/...`, thin, role-guarded, `@Valid` on inputs.
