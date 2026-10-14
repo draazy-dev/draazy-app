@@ -282,9 +282,8 @@ jobs:
     name: Publish to Cloudflare Pages
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Plain `needs:` already means "only if that succeeded"; the skip is handled earlier.
     needs: frontend-build
-    # Backend and frontend environments stay separate because GCP trusts only `sandbox`.
+    if: !cancelled() && needs.frontend-build.result == 'success'
     environment: sandbox-web
     permissions:
       contents: read
