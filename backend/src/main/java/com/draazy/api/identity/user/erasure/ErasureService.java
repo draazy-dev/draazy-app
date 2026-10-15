@@ -37,9 +37,7 @@ public class ErasureService {
     /** Serializer for the two {@code jsonb} documents; must not corrupt or forge fields from a quoted note. */
     private static final ObjectMapper DOCUMENT_JSON = JsonMapper.builder().build();
 
-    private static final long MOBILE_BLOCK = 9_000_000_000L;
-
-    private static final long MOBILE_BLOCK_SIZE = 1_000_000_000L;
+    private static final long MOBILE_BLOCK_SIZE = 100_000_000L;
 
     private final ErasureRequestRepository requests;
     private final UserRepository users;
@@ -278,12 +276,10 @@ public class ErasureService {
                 .executeUpdate();
     }
 
-    /** A stand-in for {@code users.mobile} derived from the row id: ten digits beginning {@code 9},
-     * taken from SHA-256(id) — a pseudonym, not a reserved range, so never treated as contactable. */
     static String pseudonymMobile(UUID subjectId) {
         BigInteger hash = new BigInteger(1, sha256("mobile:" + subjectId));
         long tail = hash.mod(BigInteger.valueOf(MOBILE_BLOCK_SIZE)).longValueExact();
-        return String.valueOf(MOBILE_BLOCK + tail);
+        return String.format("00%08d", tail);
     }
 
     /** Surviving reference to an erased subject — {@code SHA-256(pepper || uuid)}, lowercase hex.
