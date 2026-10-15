@@ -41,7 +41,7 @@ export function toCaseFile(res) {
   return {
     propertyId: res.propertyId ?? '',
     status: res.status ?? 'pending',
-    /* Reviewer is a user id despite the contract name, so the UI resolves it against team data. */
+    propertyStatus: res.propertyStatus ?? '',
     reviewer: res.reviewer ?? null,
     checklist: list(res.checklist).map(toChecklistItem),
     messages: list(res.messages).map(toMessage),

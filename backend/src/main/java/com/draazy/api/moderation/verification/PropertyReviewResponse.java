@@ -9,6 +9,7 @@ import java.util.List;
 public record PropertyReviewResponse(
         String propertyId,
         String status,
+        String propertyStatus,
         String reviewer,
         List<ChecklistEntry> checklist,
         List<MessageEntry> messages,

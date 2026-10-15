@@ -135,7 +135,7 @@ public class PropertyModerationService {
         if (PropertyStatus.APPROVED.equals(status) && !clearingApprovedRecheck) {
             lifecycle.announceApproval(property);
         } else if (PropertyStatus.REJECTED.equals(status)) {
-            String ownerMessage = ReviewReasonCodes.ownerMessage(reasonCode, reason);
+            String ownerMessage = ReviewReasonCodes.rejectionMessage(reasonCode, reason);
             notifier.notify(ownerId, "listing.rejected",
                     "Your listing was not approved",
                     "A moderator could not approve it: " + ownerMessage,
@@ -160,6 +160,10 @@ public class PropertyModerationService {
         referralTriggers.listingTakenDown(property.getId());
         audit.record(actor, "property.flag", "property", id, "from", from, "reason", reason,
                 "owner", String.valueOf(property.getOwner().getId()));
+        notifier.notify(property.getOwner().getId(), "listing.flagged",
+                "Your listing has been taken down",
+                "A moderator took down your listing: " + (reason == null || reason.isBlank() ? "Flagged for review." : reason.trim()),
+                "/dashboard");
         return property;
     }
 

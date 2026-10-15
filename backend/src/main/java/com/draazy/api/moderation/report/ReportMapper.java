@@ -11,6 +11,7 @@ import org.mapstruct.ReportingPolicy;
 public interface ReportMapper {
 
     @Mapping(target = "targetReportCount", ignore = true)
+    @Mapping(target = "targetTitle", ignore = true)
     ReportResponse toResponse(Report entity);
 
     default String map(UUID value) {

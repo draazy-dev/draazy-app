@@ -41,4 +41,19 @@ public final class ReviewReasonCodes {
         };
         return note == null || note.isBlank() ? message : message + " " + note.trim();
     }
+
+    public static String rejectionMessage(String reasonCode, String note) {
+        String message = switch (reasonCode) {
+            case "photos_not_real" -> "The photos do not appear to be authentic.";
+            case "duplicate" -> "This listing was identified as a duplicate of an existing listing.";
+            case "broker" -> "Draazy is strictly owner-only.";
+            case "wrong_details" -> "The listing contains inaccurate details.";
+            case "locality_unclear" -> "The property locality could not be verified.";
+            case "document_unreadable" -> "Ownership documents could not be verified.";
+            case "name_mismatch" -> "Ownership documents show an unverified name mismatch.";
+            default -> "The listing does not meet moderation guidelines.";
+        };
+        String base = note == null || note.isBlank() ? message : message + " " + note.trim();
+        return base + " This decision is final. The listing cannot be resubmitted.";
+    }
 }

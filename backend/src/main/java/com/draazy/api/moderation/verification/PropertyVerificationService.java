@@ -173,7 +173,7 @@ public class PropertyVerificationService {
         } else {
             review.decide(PropertyStatus.REJECTED, actor.userId().toString(), note, normalizedReason);
             review.addMessage(actor.userId(), decisionMessage(false,
-                    ReviewReasonCodes.ownerMessage(normalizedReason, note)));
+                    ReviewReasonCodes.rejectionMessage(normalizedReason, note)));
             property.setStatus(PropertyStatus.REJECTED);
         }
         reviews.saveAndFlush(review);
@@ -196,7 +196,7 @@ public class PropertyVerificationService {
             notifier.notify(property.getOwner().getId(), "listing.rejected",
                     "Your listing was not approved",
                     "A reviewer could not approve it: "
-                            + ReviewReasonCodes.ownerMessage(reasonCode, note), "/dashboard");
+                            + ReviewReasonCodes.rejectionMessage(reasonCode, note), "/dashboard");
         }
     }
 
@@ -292,6 +292,7 @@ public class PropertyVerificationService {
         return new PropertyReviewResponse(
                 review.getPropertyId().toString(),
                 PropertyReviewStatuses.wire(review),
+                property.getStatus(),
                 review.getReviewer(),
                 showChecklist
                         ? VerificationCases.ordered(review).stream()

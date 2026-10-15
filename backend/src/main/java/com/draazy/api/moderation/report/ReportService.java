@@ -1,5 +1,7 @@
 package com.draazy.api.moderation.report;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
@@ -16,6 +18,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -35,16 +38,18 @@ public class ReportService {
     private final PropertyModerationService propertyModeration;
     private final UserAdminService userAdmin;
     private final FlatmateModerationService flatmateModeration;
+    private final PropertyRepository properties;
 
     public ReportService(ReportRepository reports, ReportMapper mapper, AuditService audit,
             PropertyModerationService propertyModeration, UserAdminService userAdmin,
-            FlatmateModerationService flatmateModeration) {
+            FlatmateModerationService flatmateModeration, PropertyRepository properties) {
         this.reports = reports;
         this.mapper = mapper;
         this.audit = audit;
         this.propertyModeration = propertyModeration;
         this.userAdmin = userAdmin;
         this.flatmateModeration = flatmateModeration;
+        this.properties = properties;
     }
 
     /** Target is deliberately not resolved: a scammer deleting the listing must not also delete the complaint. */
@@ -102,7 +107,10 @@ public class ReportService {
                     since == null ? Instant.EPOCH : since, pageable);
         }
         Map<String, Long> perTarget = targetTallies(page.getContent());
-        return page.map(r -> mapper.toResponse(r).withTargetReportCount(perTarget.getOrDefault(r.getTargetId(), 1L)));
+        Map<String, String> titles = resolveTitles(page.getContent());
+        return page.map(r -> mapper.toResponse(r)
+                .withTargetReportCount(perTarget.getOrDefault(r.getTargetId(), 1L))
+                .withTargetTitle(titles.get(r.getTargetId())));
     }
 
     /** Undecided per target type for the tab badges, and per status within {@code targetType} for the chips. */
@@ -187,7 +195,44 @@ public class ReportService {
         audit.record(actor, "report.triage", "report", id, "from", from, "to", body.status(),
                 "enforcement", enforcement, "target", report.getTargetType(),
                 "targetId", report.getTargetId(), "note", body.note());
-        return mapper.toResponse(report);
+        return mapper.toResponse(report).withTargetTitle(resolveTitle(report.getTargetType(), report.getTargetId()));
+    }
+
+    private Map<String, String> resolveTitles(List<Report> rows) {
+        Map<String, String> out = new HashMap<>();
+        List<UUID> propertyUuids = rows.stream()
+                .filter(r -> ReportTargetTypes.PROPERTY.equals(r.getTargetType()))
+                .map(Report::getTargetId)
+                .map(Ids::parseUuid)
+                .flatMap(Optional::stream)
+                .toList();
+        if (!propertyUuids.isEmpty()) {
+            for (Property p : properties.findAllById(propertyUuids)) {
+                if (p.getTitle() != null && !p.getTitle().isBlank()) {
+                    out.put(p.getId().toString(), p.getTitle());
+                }
+            }
+        }
+        rows.stream()
+                .filter(r -> ReportTargetTypes.PROPERTY.equals(r.getTargetType()))
+                .map(Report::getTargetId)
+                .filter(id -> Ids.parseUuid(id).isEmpty() && !out.containsKey(id))
+                .forEach(slug -> properties.findBySlug(slug).ifPresent(p -> {
+                    if (p.getTitle() != null && !p.getTitle().isBlank()) {
+                        out.put(slug, p.getTitle());
+                    }
+                }));
+        return out;
+    }
+
+    private String resolveTitle(String targetType, String targetId) {
+        if (!ReportTargetTypes.PROPERTY.equals(targetType) || targetId == null) {
+            return null;
+        }
+        return Ids.parseUuid(targetId).flatMap(properties::findById)
+                .or(() -> properties.findBySlug(targetId))
+                .map(Property::getTitle)
+                .orElse(null);
     }
 
     /** Delegates to the moderation services that own these transitions so their self-dealing guards and audit rows

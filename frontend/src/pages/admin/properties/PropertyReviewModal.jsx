@@ -267,12 +267,16 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     }
     setBusy(true);
     try {
-      await decidePropertyReview(pid(review), 'approve', { expectedStatus: review.status });
+      const res = await decidePropertyReview(pid(review), 'approve', { expectedStatus: review.status });
       const noted = await saveNoteIfAny('listing', review.id, internalNote, 'Approved');
       handleClose();
+      const heldPaused = res?.propertyStatus === 'paused';
+      const successMsg = heldPaused
+        ? 'Approved \u2014 held as paused (owner on free tier limit)'
+        : 'Approved & published \u2014 owner notified';
       toast(noted.error
-        ? 'Approved & published \u2014 but the internal note could not be saved'
-        : 'Approved & published \u2014 owner notified', noted.error ? 'error' : 'success');
+        ? `${heldPaused ? 'Approved (held as paused)' : 'Approved & published'} \u2014 but the internal note could not be saved`
+        : successMsg, noted.error ? 'error' : 'success');
       onRefresh();
     } catch (err) {
       await handleDecisionError(err, 'Could not approve this listing');

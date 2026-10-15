@@ -85,9 +85,7 @@ export function toViewModel(r) {
     id: r.id,
     kind: TARGET_TO_KIND[r.targetType] || r.targetType,
     targetId: r.targetId || '',
-    // Not on the wire. The id is the honest fallback — see the module note on why a resolved title
-    // would be a stale one.
-    targetTitle: '',
+    targetTitle: r.targetTitle || '',
     targetOwner: '',
     reportedBy: '',
     reason: r.reason || '',

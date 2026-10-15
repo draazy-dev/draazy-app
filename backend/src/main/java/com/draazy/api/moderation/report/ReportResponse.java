@@ -9,6 +9,7 @@ public record ReportResponse(
         String id,
         String targetType,
         String targetId,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String targetTitle,
         String reason,
         String details,
         String status,
@@ -17,6 +18,10 @@ public record ReportResponse(
 
     /** Only {@code GET /reports} rows carry the tally of reports on the same target. */
     ReportResponse withTargetReportCount(long count) {
-        return new ReportResponse(id, targetType, targetId, reason, details, status, createdAt, count);
+        return new ReportResponse(id, targetType, targetId, targetTitle, reason, details, status, createdAt, count);
+    }
+
+    ReportResponse withTargetTitle(String targetTitle) {
+        return new ReportResponse(id, targetType, targetId, targetTitle, reason, details, status, createdAt, targetReportCount);
     }
 }

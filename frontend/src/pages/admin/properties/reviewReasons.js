@@ -3,41 +3,49 @@ export const REVIEW_REASONS = [
     code: 'photos_not_real',
     label: 'Photos not real',
     ownerMessage: 'Please upload clear, real photos of this home so we can verify the listing.',
+    rejectionMessage: 'This listing was rejected because the photos are not authentic.',
   },
   {
     code: 'duplicate',
     label: 'Duplicate',
     ownerMessage: 'This looks like another listing already on Draazy. Please confirm the correct listing.',
+    rejectionMessage: 'This listing was rejected as a duplicate of an existing listing.',
   },
   {
     code: 'broker',
     label: 'Broker',
     ownerMessage: 'Draazy is owner-only. Please confirm that you are the owner or an immediate family member.',
+    rejectionMessage: 'This listing was rejected because Draazy is strictly owner-only.',
   },
   {
     code: 'wrong_details',
     label: 'Wrong details',
     ownerMessage: 'Some listing details do not match what was submitted. Please correct the details and resubmit.',
+    rejectionMessage: 'This listing was rejected due to inaccurate details.',
   },
   {
     code: 'locality_unclear',
     label: 'Locality unclear',
     ownerMessage: 'Please update the locality and address details so we can verify the exact property.',
+    rejectionMessage: 'This listing was rejected because the property locality could not be verified.',
   },
   {
     code: 'document_unreadable',
     label: 'Document unreadable',
     ownerMessage: 'Please upload a clearer document photo or scan so the details can be read.',
+    rejectionMessage: 'This listing was rejected because ownership documents could not be verified.',
   },
   {
     code: 'name_mismatch',
     label: 'Name mismatch',
     ownerMessage: 'The name on the submitted document does not match the lister. Please clarify or upload the right proof.',
+    rejectionMessage: 'This listing was rejected due to an unverified name on ownership documents.',
   },
   {
     code: 'other',
     label: 'Other',
     ownerMessage: 'Please check the note below and update the listing so we can complete verification.',
+    rejectionMessage: 'This listing was not approved following moderation review.',
   },
 ];
 
@@ -45,11 +53,12 @@ export const REVIEW_REASON_BY_CODE = Object.fromEntries(REVIEW_REASONS.map((reas
 
 export const ownerMessagePreview = (decision, reasonCode, note = '') => {
   const reason = REVIEW_REASON_BY_CODE[reasonCode];
-  const base = reason?.ownerMessage || 'Please update the listing so we can complete verification.';
   const suffix = note.trim() ? `\n\nReviewer note: ${note.trim()}` : '';
   if (decision === 'reject') {
+    const base = reason?.rejectionMessage || 'This listing was not approved.';
     return `${base}${suffix}\n\nThis decision is final. The listing cannot be resubmitted.`;
   }
+  const base = reason?.ownerMessage || 'Please update the listing so we can complete verification.';
   return `${base}${suffix}`;
 };
 
