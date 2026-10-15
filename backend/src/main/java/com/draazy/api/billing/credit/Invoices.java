@@ -41,4 +41,8 @@ public class Invoices {
         return Optional.of(invoices.save(new Invoice(number, userId, sourceType, sourceId, orderRef, amount,
                 documents.taxablePart(amount, taxable), now)));
     }
+
+    public boolean issued(String sourceType, UUID sourceId) {
+        return invoices.findBySourceTypeAndSourceId(sourceType, sourceId).isPresent();
+    }
 }

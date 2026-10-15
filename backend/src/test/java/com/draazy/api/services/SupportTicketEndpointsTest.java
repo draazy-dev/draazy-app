@@ -388,7 +388,7 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
     class DeskRead {
 
         @Test
-        @DisplayName("the staff GET clears the desk flag in the same round trip; the raiser's GET does not")
+        @DisplayName("reading a ticket does not answer it: only a staff reply clears the desk flag")
         void staffGetMarksRead() throws Exception {
             User asha = customer("9840000161");
             User desk = staff("9840000162", Teams.RENTAL);
@@ -405,7 +405,12 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
                     .andExpect(jsonPath("$.messages[0].authorId").doesNotExist())
                     .andExpect(jsonPath("$.messages[0].attachments").doesNotExist());
 
+            expectAwaitingReply(desk, id, true);
+            replyTicket(desk, id, "on it", 201);
             expectAwaitingReply(desk, id, false);
+            assertThat(jdbc.queryForObject("select link from notifications where user_id = ?::uuid "
+                    + "and type = 'support.reply'", String.class, asha.getId().toString()))
+                    .isEqualTo("/support?open=" + id);
         }
 
         @Test

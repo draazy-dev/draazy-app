@@ -173,7 +173,7 @@ class ErasureBoundaryTest extends AbstractApiTest {
         assertThat(after.getPasswordHash()).isNull();
         assertThat(after.isMobileVerified()).isFalse();
         assertThat(after.isArchived()).isTrue();
-        assertThat(after.getMobile()).isNotEqualTo(originalMobile).matches("^00[0-9]{8}$");
+        assertThat(after.getMobile()).isNotEqualTo(originalMobile).matches("^[0-5][0-9]{9}$");
 
         assertThat(jdbc.queryForObject("select count(*) from otp_codes where mobile = ?",
                 Integer.class, originalMobile)).isZero();
@@ -261,6 +261,6 @@ class ErasureBoundaryTest extends AbstractApiTest {
         assertThat(ErasureService.pseudonymMobile(a))
                 .isEqualTo(ErasureService.pseudonymMobile(a))
                 .isNotEqualTo(ErasureService.pseudonymMobile(b))
-                .matches("^00[0-9]{8}$");
+                .matches("^[0-5][0-9]{9}$");
     }
 }

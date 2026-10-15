@@ -106,15 +106,18 @@ export default function OpsSupportQueue() {
       const msg = await replyToTicket(detail.id, text);
       if (msg) setDetail((d) => ({ ...d, messages: [...(d.messages || []), msg] }));
       setReply('');
-      setState((s) => ({
-        ...s,
-        items: s.items.map((r) => (r.id === detail.id ? { ...r, awaitingReply: false } : r)),
-      }));
-      setCounts((c) => ({
-        ...c,
-        awaiting: c.awaiting > 0 ? c.awaiting - 1 : c.awaiting,
-        answered: c.answered != null ? c.answered + 1 : c.answered,
-      }));
+      const wasAwaiting = state.items.some((r) => r.id === detail.id && r.awaitingReply);
+      if (wasAwaiting) {
+        setState((s) => ({
+          ...s,
+          items: s.items.map((r) => (r.id === detail.id ? { ...r, awaitingReply: false } : r)),
+        }));
+        setCounts((c) => ({
+          ...c,
+          awaiting: c.awaiting > 0 ? c.awaiting - 1 : c.awaiting,
+          answered: c.answered != null ? c.answered + 1 : c.answered,
+        }));
+      }
       toast('Reply sent', 'success');
     } catch {
       toast('That reply could not be sent. Try again.', 'error');

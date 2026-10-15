@@ -199,6 +199,24 @@ class BillingEndpointsTest extends AbstractApiTest {
         assertThat(order.getRefundDueAt()).isNull();
     }
 
+    @Test
+    void aPaymentLandingAfterTheUserCancelledIsRefundedNotLost() throws Exception {
+        User u = user("9855500009", "owner");
+        String orderId = orderFor(u);
+        mvc.perform(post(Routes.Plans.CANCEL_SUBSCRIPTION).header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(status().isNoContent());
+
+        deliverSigned(orderId, "SUCCESS");
+        deliverSigned(orderId, "SUCCESS");
+
+        Subscription order = subscriptions.findByPaymentRef(orderId).orElseThrow();
+        assertThat(order.getStatus()).isEqualTo(SubscriptionStatuses.CANCELLED);
+        assertThat(order.getRefundDueAt()).isNotNull();
+        assertThat(jdbc.queryForObject("select count(*) from audit_log where action = ? and entity_id = ?",
+                Integer.class, "subscription.passRefundDue", order.getId().toString())).isEqualTo(1);
+        jdbc.update("delete from audit_log where entity_id = ?", order.getId().toString());
+    }
+
     private String orderFor(User u) throws Exception {
         String created = mvc.perform(post(Routes.Plans.SUBSCRIPTION)
                         .header(HttpHeaders.AUTHORIZATION, bearer(u))

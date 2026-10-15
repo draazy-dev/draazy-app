@@ -123,6 +123,7 @@ export default function Checkout() {
         setPhase('paid');
         try { sessionStorage.removeItem(attemptKey); } catch { /* ignore */ }
       } else if (Date.now() - started >= POLL_MAX_MS) {
+        try { sessionStorage.removeItem(attemptKey); } catch { /* ignore */ }
         setPhase('timeout');
       } else {
         timer = setTimeout(tick, POLL_MS);
@@ -133,15 +134,20 @@ export default function Checkout() {
   }, [phase, needsProperty, propertyId, attemptKey]);
 
   const [cancelling, setCancelling] = useState(false);
+  const [orderOpen, setOrderOpen] = useState(false);
+  const rotateAttempt = () => {
+    const fresh = newAttemptId();
+    setAttemptId(fresh);
+    try { sessionStorage.setItem(attemptKey, fresh); } catch { /* ignore */ }
+  };
   const cancelOpenOrder = async () => {
     setCancelling(true);
     try {
       await cancelPending();
       setSession(null);
-      const fresh = newAttemptId();
-      setAttemptId(fresh);
-      try { sessionStorage.setItem(attemptKey, fresh); } catch { /* ignore */ }
+      rotateAttempt();
       setError('');
+      setOrderOpen(false);
     } catch {
       setError(t('misc.coPaymentFailed'));
     } finally {
@@ -153,11 +159,14 @@ export default function Checkout() {
     if (paying || phase) return;
     setPaying(true);
     setError('');
+    setOrderOpen(false);
     try {
       let order = session;
       if (!order) {
         if (!needsProperty) packExpiryBefore.current = (await getEntitlements().catch(() => null))?.contacts?.packExpiresAt ?? null;
         const sub = await subscribeToPlan(planId, method.toLowerCase(), { propertyId: needsProperty ? propertyId : undefined, attemptId });
+        // No session means the key replayed a settled order, so the next Pay must be a new purchase.
+        if (!sub?.paymentSessionId) rotateAttempt();
         setOrderRef(sub?.paymentRef || sub?.subscriptionId || '');
         order = { sessionId: sub?.paymentSessionId ?? null };
         setSession(order);
@@ -169,7 +178,9 @@ export default function Checkout() {
       }
       setPhase('verifying');
     } catch (err) {
-      setError(err?.status === 409 ? t(needsProperty ? 'misc.coPassConflict' : 'misc.coOrderAlreadyOpen') : err?.code === 'purchases_paused' ? t('misc.coPausedBody') : t('misc.coPaymentFailed'));
+      const open = err?.code === 'order_already_open';
+      setOrderOpen(open);
+      setError(open ? t('misc.coOrderAlreadyOpen') : err?.status === 409 ? t(needsProperty ? 'misc.coPassConflict' : 'misc.coOrderAlreadyOpen') : err?.code === 'purchases_paused' ? t('misc.coPausedBody') : t('misc.coPaymentFailed'));
     } finally {
       setPaying(false);
     }
@@ -268,7 +279,7 @@ export default function Checkout() {
             {error && (
               <div className="mt-3 text-center space-y-2">
                 <p role="alert" className="text-rose-300 text-xs">{error}</p>
-                {error === t('misc.coOrderAlreadyOpen') && (
+                {orderOpen && (
                   <button
                     type="button"
                     onClick={cancelOpenOrder}

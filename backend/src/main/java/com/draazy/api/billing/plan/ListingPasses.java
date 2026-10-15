@@ -118,7 +118,7 @@ class ListingPasses {
         if (SubscriptionStatuses.CANCELLED.equals(pass.getStatus())) {
             return true;
         }
-        return SubscriptionStatuses.PENDING.equals(pass.getStatus())
+        return pass.getPropertyId() != null && SubscriptionStatuses.PENDING.equals(pass.getStatus())
                 && properties.findById(pass.getPropertyId())
                         .map(p -> p.isArchived() || PropertyStatus.RENTED.equals(p.getStatus())
                                 || PropertyStatus.SOLD.equals(p.getStatus()))
@@ -128,6 +128,8 @@ class ListingPasses {
     /** Records the refund as due and tells the owner. The gateway call is {@link #sendDueRefunds}'s, so no
      * HTTP happens inside the webhook's transaction. */
     void refund(Subscription pass, Instant now) {
+        boolean listingGone = pass.getPropertyId() != null
+                && !SubscriptionStatuses.CANCELLED.equals(pass.getStatus());
         pass.abandonCheckout();
         if (pass.markRefundDue(now)) {
             audit.record("system", "admin", "subscription.passRefundDue", "subscription",
@@ -135,9 +137,11 @@ class ListingPasses {
                     "{\"amount\":" + pass.getAmount() + ",\"order\":\"" + pass.getPaymentRef() + "\"}");
             notifier.notify(pass.getUserId(), "subscription.refund",
                     Notifier.rupees(pass.getAmount()) + " will be refunded",
-                    "That listing is no longer live, so the pass was not activated and your payment goes back"
-                            + " to the account you paid from.", "/dashboard");
-            alertStaff(pass, pass.refundable(), "its listing is no longer live");
+                    (listingGone ? "That listing is no longer live" : "That order was cancelled before the payment"
+                            + " arrived") + ", so nothing was activated and your payment goes back to the account"
+                            + " you paid from.", "/dashboard");
+            alertStaff(pass, pass.refundable(), listingGone ? "its listing is no longer live"
+                    : "the order was cancelled before the payment arrived");
         }
     }
 

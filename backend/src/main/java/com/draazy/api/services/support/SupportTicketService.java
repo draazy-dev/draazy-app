@@ -101,7 +101,7 @@ public class SupportTicketService {
             notifier.notify(ticket.getUserId(), "support.reply",
                     "New reply on your support ticket",
                     preview,
-                    "/support?ticket=" + ticket.getId());
+                    "/support?open=" + ticket.getId());
         }
         tickets.saveAndFlush(ticket);
         User author = users.findById(caller.userId()).orElse(null);

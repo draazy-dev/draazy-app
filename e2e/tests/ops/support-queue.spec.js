@@ -92,20 +92,22 @@ test.describe('Ops → Support queue (live)', () => {
     await page.goto('/ops/support');
     await expect(page.getByRole('heading', { name: 'Support queue' })).toBeVisible();
 
-    /* `?awaitingReply=false` is genuinely empty here; this separates that from a `.catch(() => [])` hiding a broken request. */
+    // `?awaitingReply=false` is genuinely empty here; this tells that apart from a `.catch(() => [])`
+    // hiding a broken request.
     await page.getByRole('tab', { name: /^Answered/ }).click();
     await expect(page.getByText('No tickets in this view.')).toBeVisible();
     await expect(page.getByText('This is not an empty queue')).toHaveCount(0);
     await expect(page.getByTestId('queue-range').first()).toHaveText('0–0 of 0');
   });
 
-  test('opening a ticket shows the thread and clears the desk’s side of the read model, not the customer’s', async ({ page, login }) => {
+  test('opening a ticket shows the thread and leaves it awaiting a reply, the customer’s side untouched', async ({ page, login }) => {
     await seedConsent(page);
     await login.asStaff('rental');
     await page.goto('/ops/support');
     await page.getByTestId('queue-row').filter({ hasText: SEEDED.subject }).getByRole('button', { name: 'Reply' }).click();
 
-    /* The row omits the thread (`AdminSupportTicket` keeps pages bounded), so the modal fetches `GET /support/tickets/{id}`; success is the staff read right (`readable()` admits ops). */
+    // The row omits the thread, so the modal fetches `GET /support/tickets/{id}`; success proves the staff
+    // read right (`readable()` admits ops).
     const dialog = page.getByRole('dialog');
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(SEEDED.customerLine)).toBeVisible();
@@ -114,12 +116,12 @@ test.describe('Ops → Support queue (live)', () => {
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
 
-    // Reading cleared `staff_unread`; assert via **Answered** first, because clicking the tab you are on refetches
-    // nothing, while coming back to Awaiting from another tab is a genuine second read.
+    // Only a staff reply clears `staff_unread`, so a read alone keeps the ticket in Awaiting. Coming back from
+    // another tab forces a genuine second read; clicking the tab you are on refetches nothing.
     await page.getByRole('tab', { name: /^Answered/ }).click();
-    await expect(page.getByTestId('queue-row').filter({ hasText: SEEDED.subject })).toBeVisible();
-    await page.getByRole('tab', { name: /^Awaiting reply/ }).click();
     await expect(page.getByTestId('queue-row').filter({ hasText: SEEDED.subject })).toHaveCount(0);
+    await page.getByRole('tab', { name: /^Awaiting reply/ }).click();
+    await expect(page.getByTestId('queue-row').filter({ hasText: SEEDED.subject })).toBeVisible();
 
     /* The customer's side is untouched: a desk clearing its own signal must not mark the customer's reply as seen. */
     const mine = await asCustomer('f1c70005-0000-4000-8000-000000000001', SEEDED_RAISER);

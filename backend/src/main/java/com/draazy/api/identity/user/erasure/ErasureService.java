@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -37,7 +38,8 @@ public class ErasureService {
     /** Serializer for the two {@code jsonb} documents; must not corrupt or forge fields from a quoted note. */
     private static final ObjectMapper DOCUMENT_JSON = JsonMapper.builder().build();
 
-    private static final long MOBILE_BLOCK_SIZE = 100_000_000L;
+    // Ten digits starting 0-5: never a real Indian mobile (6-9), and wide enough that clashes stay rare.
+    private static final long MOBILE_BLOCK_SIZE = 6_000_000_000L;
 
     private final ErasureRequestRepository requests;
     private final UserRepository users;
@@ -45,12 +47,15 @@ public class ErasureService {
     private final EntityManager entityManager;
     private final IdentityVerificationService identity;
     private final IdentityFilePurgeService filePurge;
+    private final ApplicationEventPublisher events;
 
     private final String pepper;
 
     public ErasureService(ErasureRequestRepository requests, UserRepository users,
             AuditService audit, EntityManager entityManager, IdentityVerificationService identity,
-            IdentityFilePurgeService filePurge, @Value("${draazy.erasure.pepper:}") String pepper) {
+            IdentityFilePurgeService filePurge, ApplicationEventPublisher events,
+            @Value("${draazy.erasure.pepper:}") String pepper) {
+        this.events = events;
         this.requests = requests;
         this.users = users;
         this.audit = audit;
@@ -232,6 +237,8 @@ public class ErasureService {
 
         erased.put("personal_documents", erasePersonalDocuments(subjectId));
 
+        events.publishEvent(new AccountErased(subjectId));
+
         erased.put("service_request_draft_approvals", entityManager
                 .createNativeQuery("delete from service_request_draft_approvals"
                         + " where user_id = :id or mobile_hash = :mobileHash")
@@ -241,7 +248,7 @@ public class ErasureService {
 
         // 10. Identity root, last: earlier steps key off mobile or row-existing, so replacing the
         //    number first would orphan the OTP and pending-invite deletes.
-        subject.erasePersonalData(pseudonymMobile(subjectId));
+        subject.erasePersonalData(freePseudonym(subjectId));
         erased.put("users", 1);
 
         String erasedJson = DOCUMENT_JSON.writeValueAsString(erased);
@@ -276,10 +283,24 @@ public class ErasureService {
                 .executeUpdate();
     }
 
+    // users.mobile is UNIQUE, so a clash with an earlier erasure probes the next salt instead of failing for ever.
+    private String freePseudonym(UUID subjectId) {
+        for (int salt = 0; ; salt++) {
+            String candidate = pseudonymMobile(subjectId, salt);
+            if (!users.existsByMobile(candidate)) {
+                return candidate;
+            }
+        }
+    }
+
     static String pseudonymMobile(UUID subjectId) {
-        BigInteger hash = new BigInteger(1, sha256("mobile:" + subjectId));
+        return pseudonymMobile(subjectId, 0);
+    }
+
+    private static String pseudonymMobile(UUID subjectId, int salt) {
+        BigInteger hash = new BigInteger(1, sha256("mobile:" + subjectId + (salt == 0 ? "" : ":" + salt)));
         long tail = hash.mod(BigInteger.valueOf(MOBILE_BLOCK_SIZE)).longValueExact();
-        return String.format("00%08d", tail);
+        return String.format("%010d", tail);
     }
 
     /** Surviving reference to an erased subject — {@code SHA-256(pepper || uuid)}, lowercase hex.

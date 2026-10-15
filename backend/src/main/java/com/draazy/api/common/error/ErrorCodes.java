@@ -30,6 +30,8 @@ public final class ErrorCodes {
 
     public static final String PURCHASES_PAUSED = "purchases_paused";
 
+    public static final String ORDER_ALREADY_OPEN = "order_already_open";
+
     // 403 on /auth/login: back-office accounts sign in with password + authenticator only.
     public static final String STAFF_SIGN_IN_REQUIRED = "staff_sign_in_required";
 
@@ -58,6 +60,10 @@ public final class ErrorCodes {
     public static final String IDENTITY_POSE_UNCONFIRMED = "identity_pose_unconfirmed";
 
     public static final String IDENTITY_NUMBER_MISMATCH = "identity_number_mismatch";
+    public static final String IDENTITY_APPEAL_OPEN = "identity_appeal_open";
+    public static final String IDENTITY_APPEAL_NOT_ALLOWED = "identity_appeal_not_allowed";
+    public static final String IDENTITY_APPEAL_NONE = "identity_appeal_none";
+    public static final String IDENTITY_APPEAL_SAME_REVIEWER = "identity_appeal_same_reviewer";
 
     public static final String OWNER_CONSENT_SELF = "owner_consent_self";
 

@@ -198,7 +198,17 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     // The mock gateway hands back a `mock_session_*`, which the checkout lib short-circuits, so the
     // page settles on the pending screen without a real hosted checkout being opened.
     await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
+    const orderRef = page.getByText(/Order reference/);
+    const firstRef = await orderRef.textContent();
 
+    // Same tab: the saved attempt key resumes that order rather than tripping the one-open-order cap.
+    await page.goto('/checkout?plan=contact-pack');
+    await page.getByRole('button', { name: /^Pay ₹/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
+    await expect(orderRef).toHaveText(firstRef);
+
+    // Another tab has no saved key, so it asks for a second order and meets the cap.
+    await page.evaluate(() => Object.keys(sessionStorage).filter((k) => k.startsWith('dz_co_')).forEach((k) => sessionStorage.removeItem(k)));
     await page.goto('/checkout?plan=contact-pack');
     await page.getByRole('button', { name: /^Pay ₹/ }).first().click();
 
@@ -207,6 +217,12 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     // The regression itself: the generic copy is what shipped, and it reads as though one more tap
     // would work. Asserting the new message alone would still pass if both were rendered.
     await expect(alert).not.toContainText('please try again');
+
+    // The way out is server-coded, so it shows for any order kind; cancelling frees the cap for a new order.
+    await page.getByRole('button', { name: 'Cancel open order and start fresh' }).click();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await page.getByRole('button', { name: /^Pay ₹/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
   });
 
   test('a payment that clears while the pending screen is open turns into the success screen once the entitlement shows', async ({ page }) => {

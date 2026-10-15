@@ -268,7 +268,10 @@ public class SubscriptionService {
                 && passes.refundIfMismatched(subscription, paidAt, paidAmount, currency)) {
             return true;
         }
-        if (paid && subscription.getPropertyId() != null && passes.isDead(subscription)) {
+        // A paid callback can land after the user cancelled or the sweep closed the order; the invoice check keeps
+        // a replay after a lost dispute (also cancelled) from paying out twice.
+        if (paid && passes.isDead(subscription)
+                && !invoices.issued(Invoices.SUBSCRIPTION, subscription.getId())) {
             passes.refund(subscription, paidAt);
             return true;
         }
@@ -322,7 +325,8 @@ public class SubscriptionService {
     }
 
     private ConflictException openUnpaidConflict() {
-        return new ConflictException("You already have a subscription order waiting for payment. "
+        return new ConflictException(ErrorCodes.ORDER_ALREADY_OPEN,
+                "You already have a subscription order waiting for payment. "
                 + "Finish paying for it, or wait for it to expire — an unpaid order is cancelled "
                 + "automatically once its checkout has run out.");
     }
