@@ -11,6 +11,7 @@ import { POSSESSION, AMEN_ICON, amenLabel } from './tileMeta.js';
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme } from '../../lib/mapsConfig.js';
 import { getActiveCityGeo, cityLabelFor } from '../../lib/geoConfig.js';
 import MapUnavailable from './MapUnavailable.jsx';
+import ErrorBoundary from '../ErrorBoundary.jsx';
 
 const mapLabel = (m) => (m.deal === 'rent' ? '₹' + Math.round(m.price / 1000) + 'k' : m.price >= 1e7 ? '₹' + (m.price / 1e7).toFixed(2) + 'Cr' : '₹' + Math.round(m.price / 1e5) + 'L');
 const MAX_AMEN_CHIPS = 5;
@@ -161,6 +162,7 @@ export default function PropertyMap({ properties, locName, focus = [], activeId,
   const wrapStyle = wrapStyleProp || (single ? { height: '100%' } : { height: '72dvh', minHeight: 'min(520px, 70dvh)' });
   if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={wrapStyle} />;
   return (
+    <ErrorBoundary scope="property-map" fallback={<MapUnavailable style={wrapStyle} />}>
     <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
       <div className="w-full rounded-2xl overflow-hidden border border-white/10 isolate relative" style={wrapStyle}>
         <Map
@@ -211,5 +213,6 @@ export default function PropertyMap({ properties, locName, focus = [], activeId,
         </Map>
       </div>
     </APIProvider>
+    </ErrorBoundary>
   );
 }

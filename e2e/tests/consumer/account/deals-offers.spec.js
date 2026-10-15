@@ -92,7 +92,7 @@ test('a buyer offer is countered, agreed and accepted through the real deal API'
   await page.goto(`/property/${listing.id}`);
   await expect(page.getByRole('heading', { name: 'Negotiate the price' })).toBeVisible();
   await page.getByRole('button', { name: 'Make an offer', exact: true }).click();
-  await page.getByPlaceholder('e.g. 32000').fill('25000');
+  await page.getByLabel('Offer amount').fill('25000');
 
   const createdOffer = page.waitForResponse((response) =>
     new URL(response.url()).pathname === '/api/offers'
@@ -177,4 +177,107 @@ test('an owner can decline a real finalization request and later accept the buye
   const closed = await api('GET', `/properties/${listing.id}`, owner.headers);
   expect(closed.status, 'reading the closed listing').toBe(200);
   expect(closed.body.dealStatus).toBe('closed');
+});
+
+test('an offer far below asking is refused, a typed minus is not stripped, and nothing sends', async ({ page }) => {
+  const owner = await newActor(`Zztest Floor Owner ${letterTag()}`);
+  const buyer = await newActor(`Zztest Floor Buyer ${letterTag()}`);
+  const listing = await createApprovedListing(owner);
+
+  const tooLow = await api('POST', '/offers', buyer.headers, { propertyId: listing.id, amount: 1 });
+  expect(tooLow.status, 'a ₹1 offer on a ₹28,000 listing').toBe(422);
+  expect(tooLow.body.message).toContain('half the asking price');
+
+  await signedInAs(page, buyer.mobile);
+  await page.goto(`/property/${listing.id}`);
+  await page.getByRole('button', { name: 'Make an offer', exact: true }).click();
+  const offerInput = page.getByLabel('Offer amount');
+  let offerPosts = 0;
+  page.on('request', (req) => { if (new URL(req.url()).pathname === '/api/offers' && req.method() === 'POST') offerPosts += 1; });
+
+  await offerInput.fill('-5');
+  await page.getByRole('button', { name: 'Send offer' }).click();
+  await expect(page.getByText('Use numbers only, with no minus sign or symbols.')).toBeVisible();
+  await expect(offerInput).toHaveValue('-5');
+  expect(offerPosts).toBe(0);
+
+  await offerInput.fill('100');
+  await page.getByRole('button', { name: 'Send offer' }).click();
+  await expect(page.getByText(/half the asking price/)).toBeVisible();
+  expect((await contentFrom(buyer, '/offers/mine?size=50', 'reading the buyer offer book')).length).toBe(0);
+});
+
+test('after the owner accepts: no Revise button, the finalize price is the offer, and the deal opens a tenancy', async ({ page }) => {
+  const owner = await newActor(`Zztest Agreed Owner ${letterTag()}`);
+  const buyer = await newActor(`Zztest Agreed Buyer ${letterTag()}`);
+  const listing = await createApprovedListing(owner);
+  await approveContact(owner, buyer, listing.id);
+
+  const noRequestYet = await api('GET', `/finalization/${listing.id}/status`, buyer.headers);
+  expect(noRequestYet.status, 'nothing requested is not an error').toBe(204);
+
+  const offered = await api('POST', '/offers', buyer.headers, { propertyId: listing.id, amount: 25000 });
+  expect(offered.status).toBe(201);
+  const accepted = await api('POST', `/offers/${offered.body.id}/respond`, owner.headers, { action: 'accept' });
+  expect(accepted.status).toBe(200);
+  const counterAfter = await api('POST', `/offers/${offered.body.id}/respond`, buyer.headers, { action: 'counter', counterAmount: 26000 });
+  expect(counterAfter.status).toBe(409);
+  expect(counterAfter.body.message).toBe('This offer has already been accepted.');
+
+  const statusErrors = [];
+  page.on('response', (res) => {
+    if (res.url().includes('/finalization/') && res.status() >= 400) statusErrors.push(res.status());
+  });
+  await signedInAs(page, buyer.mobile);
+  await page.goto(`/property/${listing.id}`);
+  await expect(page.getByRole('heading', { name: 'Your offer' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /revise offer/i })).toHaveCount(0);
+  expect(statusErrors, 'no failing finalization probe on a normal view').toEqual([]);
+
+  const requested = await api('POST', `/finalization/${listing.id}/request`, buyer.headers, {
+    propertyId: listing.id,
+    counterpartyMobile: owner.mobile,
+    agreedPrice: 28000,
+  });
+  expect(requested.status).toBe(200);
+  expect(requested.body.agreedPrice, 'the accepted offer, not the listing price').toBe(25000);
+
+  const first = await api('POST', `/finalization/requests/${requested.body.id}/accept`, owner.headers, {});
+  expect(first.status).toBe(200);
+  const second = await api('POST', `/finalization/requests/${requested.body.id}/accept`, owner.headers, {});
+  expect(second.status, 'a repeat accept is a clean conflict').toBe(409);
+
+  const tenancies = await api('GET', '/me/tenancies', buyer.headers);
+  expect(tenancies.body.map((t) => t.status)).toEqual(['pending']);
+});
+
+test('Finalize rental explains a bad mobile, defaults to the local date and fires once on a double-click', async ({ page }) => {
+  const owner = await newActor(`Zztest Modal Owner ${letterTag()}`);
+  const tenant = await newActor(`Zztest Modal Tenant ${letterTag()}`);
+  await createApprovedListing(owner);
+
+  await signedInAs(page, owner.mobile);
+  await page.goto('/dashboard#properties');
+  await page.getByRole('button', { name: /Finalize rental/ }).first().click();
+  const modal = page.getByRole('dialog');
+  await modal.getByPlaceholder('Full name').fill('Asha');
+  await modal.getByRole('button', { name: /Confirm & Finalize/ }).click();
+  await expect(modal.getByText('Enter the 10-digit mobile number of the tenant.')).toBeVisible();
+  await modal.getByPlaceholder('10-digit mobile').fill('12345');
+  await modal.getByRole('button', { name: /Confirm & Finalize/ }).click();
+  await expect(modal.getByText('Enter the 10-digit mobile number of the tenant.')).toBeVisible();
+
+  const today = await page.evaluate(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+  const closes = [];
+  page.on('request', (req) => {
+    if (/\/api\/me\/deals\/[^/]+\/close$/.test(new URL(req.url()).pathname)) closes.push(req.postData());
+  });
+  await modal.getByPlaceholder('10-digit mobile').fill(tenant.mobile);
+  await modal.getByRole('button', { name: /Confirm & Finalize/ }).dblclick();
+  await expect(modal).toHaveCount(0);
+  expect(closes).toHaveLength(1);
+  expect(closes[0]).toContain(`on ${today}`);
 });

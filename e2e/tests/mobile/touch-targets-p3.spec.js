@@ -129,8 +129,11 @@ test.describe('Admin shell on a field phone', () => {
     const rail = page.locator('aside');
     const nav = rail.locator('nav');
     await expect(nav.getByRole('link').first()).toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, 2000));
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
+    // Retried inside the poll: the report content arrives after the rail, and a short page cannot scroll yet.
+    await expect.poll(() => page.evaluate(() => {
+      window.scrollTo({ top: 2000, behavior: 'instant' });
+      return window.scrollY;
+    })).toBeGreaterThan(0);
     expect((await rail.boundingBox()).y, 'rail must not scroll away with the page').toBe(0);
 
     const last = nav.getByRole('link').last();

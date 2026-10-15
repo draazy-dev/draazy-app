@@ -88,7 +88,7 @@ test.describe('Messages inbox — live API', () => {
     await page.goto(`/messages?c=${thread.conversation.id}`);
     await detail;
 
-    await expect(page.locator('.pc-list-head h2')).toHaveText('Messages');
+    await expect(page.locator('.pc-list-head h1')).toHaveText('Messages');
     // The list first renders a real row, then the deliberately unmatched query reaches its empty state.
     await expect(page.locator('.pc-conv').first()).toBeVisible();
     await expect(page.locator('.pc-bubble.them', { hasText: OWNER_MESSAGE })).toBeVisible();
@@ -210,7 +210,7 @@ test.describe('Messages inbox — live API', () => {
 
     await page.waitForURL(/\/messages/);
     await inbox;
-    await expect(page.locator('.pc-list-head h2')).toHaveText('Messages');
+    await expect(page.locator('.pc-list-head h1')).toHaveText('Messages');
     await expect(page.locator('.pc-conv', { hasText: thread.propertyTitle })).toBeVisible();
   });
 });
