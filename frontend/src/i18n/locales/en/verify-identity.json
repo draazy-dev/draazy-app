@@ -156,6 +156,20 @@
       "done": "Done",
       "cancel": "Cancel"
     },
+    "appeal": {
+      "button": "Ask for a second look",
+      "title": "Ask for a second look",
+      "hint": "Tell us why this ID should be accepted. A different reviewer will check it.",
+      "noteLabel": "Your note",
+      "send": "Send",
+      "sending": "Sending…",
+      "statusLabel": "Second look",
+      "open": "Under review. A different reviewer will check your ID.",
+      "upheld": "Reviewed. The rejection stands. You can’t appeal this again.",
+      "reopened": "Reviewed. Your ID is back in the queue for a fresh check.",
+      "notAllowed": "This check can’t be appealed any more.",
+      "alreadyOpen": "A second look is already under review."
+    },
     "errors": {
       "unreachable": "That did not send. Check your connection and try again.",
       "updated": "Draazy was updated while this page was open. Reload and start again.",

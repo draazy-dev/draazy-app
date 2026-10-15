@@ -43,7 +43,10 @@ public record IdentityReviewResponse(
         boolean awaitingQa,
         Instant filesPurgedAt,
         Images images,
-        List<Warning> warnings) {
+        List<Warning> warnings,
+        IdentityAppealInfo appeal,
+        boolean appealCanDecide,
+        boolean appealCanReopen) {
 
     /** The OCR claim as stored: {@code number} is the last 4 only, the full number never lands. */
     public record Claims(String number, String name, LocalDate dob) {

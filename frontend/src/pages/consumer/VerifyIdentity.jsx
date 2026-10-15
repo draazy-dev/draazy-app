@@ -381,6 +381,10 @@ export default function VerifyIdentity() {
     }
   }
 
+  async function submitAppeal(note) {
+    setLiveResult(await verification.appealVerification({ note }));
+  }
+
   function retryFromStatus() {
     setRetrying(true);
     setConsented(false);
@@ -429,15 +433,6 @@ export default function VerifyIdentity() {
     })),
   };
 
-  if (needsPhone) {
-    return (
-          /* Headed by the questions people actually ask, not by policy labels. */
-      <VerifyShell title={t('verifyIdentity.shell.verifyTitle')} stepIndex={STEP_INDEX.start} onClose={leave}>
-        <PhoneHandoffScreen qrCode={qrCode} />
-      </VerifyShell>
-    );
-  }
-
   if (showStatus) {
     return (
       <VerifyShell title={t('verifyIdentity.shell.statusTitle')} stepIndex={STEP_INDEX.status} onClose={leave}>
@@ -448,10 +443,20 @@ export default function VerifyIdentity() {
           withdrawError={withdrawError}
           onDone={leave}
           onRetry={retryFromStatus}
+          onAppeal={submitAppeal}
           onWithdraw={() => setWithdrawing(true)}
           onCancelWithdraw={() => setWithdrawing(false)}
           onConfirmWithdraw={withdraw}
         />
+      </VerifyShell>
+    );
+  }
+
+  // After the status card: reading a decision or appealing it needs no camera, only a new capture does.
+  if (needsPhone) {
+    return (
+      <VerifyShell title={t('verifyIdentity.shell.verifyTitle')} stepIndex={STEP_INDEX.start} onClose={leave}>
+        <PhoneHandoffScreen qrCode={qrCode} />
       </VerifyShell>
     );
   }

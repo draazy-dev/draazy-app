@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { REJECTION_COPY } from '../../lib/identity-verification/documents.js';
+import { AppealForm, AppealStatus } from './IdentityAppeal.jsx';
 
-export default function StatusScreen({ status, verifiedName, withdrawing, withdrawError, onDone, onRetry, onWithdraw, onCancelWithdraw, onConfirmWithdraw }) {
+export default function StatusScreen({ status, verifiedName, withdrawing, withdrawError, onDone, onRetry, onAppeal, onWithdraw, onCancelWithdraw, onConfirmWithdraw }) {
   const { t, i18n } = useTranslation();
   const copy = statusCopy(status, t, verifiedName);
   const rejected = status.status === 'rejected';
   const revoked = status.status === 'revoked';
   const retryable = Boolean(status.canRetry);
+  const [appealing, setAppealing] = useState(false);
   const [busy, setBusy] = useState(false);
   const cancelRef = useRef(null);
   const confirmRef = useRef(null);
@@ -50,6 +52,11 @@ export default function StatusScreen({ status, verifiedName, withdrawing, withdr
     }
   }
 
+  async function submitAppeal(note) {
+    await onAppeal(note);
+    setAppealing(false);
+  }
+
   return (
     <div className="flex flex-1 flex-col">
       <div className="flex-1 px-6 pb-4 pt-6">
@@ -66,6 +73,8 @@ export default function StatusScreen({ status, verifiedName, withdrawing, withdr
             )}
           </div>
         )}
+        <AppealStatus appeal={status.appeal} />
+        {appealing && <AppealForm onSubmit={submitAppeal} onCancel={() => setAppealing(false)} />}
         {(status.docLast4 || status.revokedAt || status.retryAfter) && (
           <dl className="mt-5 border-t border-white/10 pt-4 text-xs">
             {status.docLast4 && <MetaRow label={t('verifyIdentity.status.document')} value={`•••• ${status.docLast4}`} />}
@@ -79,6 +88,11 @@ export default function StatusScreen({ status, verifiedName, withdrawing, withdr
         <button type="button" onClick={retryable ? onRetry : onDone} className="btn btn-primary btn-lg w-full">
           {retryable ? t('verifyIdentity.actions.tryAgain') : t('verifyIdentity.actions.done')}
         </button>
+        {rejected && status.canAppeal && !appealing && (
+          <button type="button" data-testid="verify-appeal-open" onClick={() => setAppealing(true)} className="btn btn-secondary btn-lg mt-3 w-full">
+            {t('verifyIdentity.appeal.button')}
+          </button>
+        )}
         {status.status !== 'none' && (
           <button type="button" data-testid="verify-withdraw-link" onClick={onWithdraw} className="mt-3 min-h-[44px] w-full cursor-pointer text-sm text-[var(--text-subtle)] underline-offset-4 hover:text-white hover:underline">
             {t('verifyIdentity.withdraw.link')}

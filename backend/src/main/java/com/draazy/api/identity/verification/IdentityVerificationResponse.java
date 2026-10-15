@@ -15,7 +15,9 @@ public record IdentityVerificationResponse(
         Instant revokedAt,
         String revocationReason,
         int attemptsRemaining,
-        Instant retryAfter) {
+        Instant retryAfter,
+        IdentityAppealInfo appeal,
+        boolean canAppeal) {
 
     public record Claims(String number, String name, LocalDate dob) {
     }

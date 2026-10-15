@@ -18,6 +18,7 @@ const TABS = [
   { key: 'needs', label: 'Needs review', status: 'pending', count: (s) => s.pending, empty: 'All caught up — no KYC cases waiting.', note: 'Pending cases, oldest first. Opening one claims it for 30 minutes, so nobody else can decide it.' },
   { key: 'qa', label: 'QA sample', status: 'qa', count: (s) => s.qa, empty: 'No approvals waiting for a QA check.', note: 'Approvals picked at random for a second check by a different reviewer. Your own approvals are not listed.' },
   { key: 'decided', label: 'Decided', status: 'decided', count: (s) => s.decided, empty: 'Nothing decided yet.', note: 'Verified, rejected and revoked cases — open one to revoke a badge or read its history.' },
+  { key: 'appeal', label: 'Appeals', status: 'appeal', count: (s) => s.appeals, empty: 'No identity appeals waiting.', note: 'Rejected cases the applicant asked to have checked again. Someone other than the original reviewer decides: uphold the rejection or reopen it for a fresh review.' },
 ];
 const TAB_KEYS = TABS.map((t) => t.key);
 const EMPTY_FILTERS = { q: '', docType: '', claim: '', overdue: false, outcome: '', sort: 'oldest' };
@@ -202,7 +203,10 @@ function QueueRow({ row, tab, onOpen }) {
     <li className="border-b border-white/[0.06] last:border-b-0">
       <button type="button" onClick={onOpen} data-testid="kyc-row" className={classNames(GRID, 'w-full cursor-pointer px-4 py-3 text-left transition-colors hover:bg-white/[0.03]', lockedByOther && 'opacity-60')}>
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-white">{row.userName || 'Unknown user'}</div>
+          <div className="truncate text-sm font-semibold text-white">
+            {row.userName || 'Unknown user'}
+            {row.appeal ? <span data-testid="kyc-appeal-tag" className="ml-2 rounded-full border border-sky-400/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-200">Appeal</span> : null}
+          </div>
           <div className="truncate text-xs tabular-nums text-gray-500">{row.userMobile || '—'}</div>
         </div>
         <div className="truncate text-sm text-gray-300">{docLabel(row.docType)}</div>

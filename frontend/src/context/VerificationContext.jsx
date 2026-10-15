@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { getAadhaarStatus, submitIdentityVerification, withdrawIdentityVerification } from '../services/verificationService.js';
+import { appealIdentityVerification, getAadhaarStatus, submitIdentityVerification, withdrawIdentityVerification } from '../services/verificationService.js';
 import { NONE_VERIFICATION } from '../services/providers/http/verificationMapper.js';
 import { useAuth } from './AuthContext.jsx';
 
@@ -15,6 +15,7 @@ const EMPTY = {
   refresh: async () => NONE,
   submitVerification: async () => NONE,
   withdrawVerification: async () => NONE,
+  appealVerification: async () => NONE,
 };
 
 export function VerificationProvider({ children }) {
@@ -63,6 +64,11 @@ export function VerificationProvider({ children }) {
     return next;
   }, []);
 
+  const appealVerification = useCallback(async (details) => {
+    await appealIdentityVerification(details);
+    return refresh();
+  }, [refresh]);
+
   const value = useMemo(() => ({
     verified: badge.verified,
     status: badge.status,
@@ -83,12 +89,15 @@ export function VerificationProvider({ children }) {
     mobileMatch: badge.mobileMatch,
     verifiedAt: badge.verifiedAt,
     aadhaarMobile: badge.aadhaarMobile,
+    appeal: badge.appeal,
+    canAppeal: badge.canAppeal,
     loading: loading || (isIn && !settled),
     want,
     refresh,
     submitVerification,
     withdrawVerification,
-  }), [badge, loading, isIn, settled, want, refresh, submitVerification, withdrawVerification]);
+    appealVerification,
+  }), [badge, loading, isIn, settled, want, refresh, submitVerification, withdrawVerification, appealVerification]);
 
   return <VerificationContext.Provider value={value}>{children}</VerificationContext.Provider>;
 }

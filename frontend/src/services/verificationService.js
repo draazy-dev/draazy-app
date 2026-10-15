@@ -13,6 +13,8 @@ export const submitIdentityVerification = async (details) => (await provider()).
 
 export const disputeIdentityVerification = async (details) => (await provider()).disputeIdentityVerification(details);
 
+export const appealIdentityVerification = async (details) => (await provider()).appealIdentityVerification(details);
+
 export const withdrawIdentityVerification = async () => (await provider()).withdrawIdentityVerification();
 
 /** Local-only simulation for tests and dev flows. */

@@ -2362,6 +2362,66 @@ paths:
         # failure, "id does not exist" is undefined behaviour.
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /properties/{id}/photos/takedown:
+    parameters: [ { $ref: '#/components/parameters/PropertyId' } ]
+    post:
+      tags: [Moderation]
+      summary: Take one photo off a listing (moderation desk)
+      description: >
+        Removes the photo from the gallery and cover, re-indexes the duplicate-photo hashes, deletes the
+        stored file when no other listing uses it, audits `listing.photo.takedown` and tells the owner
+        in-app. When no photo is left the listing goes back to needs-info. Refused on the caller's own listing.
+      operationId: takedownPropertyPhoto
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [photo, reason]
+              properties:
+                photo: { type: string, description: The photo URL exactly as it appears in the gallery. }
+                reason: { type: string, enum: [not_the_property, people_visible, contact_info, other] }
+      responses:
+        '200':
+          description: The listing without the photo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Property' }
+        '400': { description: Reason is not one of the listed codes }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /properties/{id}/rera-check:
+    parameters: [ { $ref: '#/components/parameters/PropertyId' } ]
+    post:
+      tags: [Moderation]
+      summary: Record the MahaRERA lookup for a listing's RERA ID (verification or moderation desk)
+      description: >
+        Sets the result, audits `property.rera.check` and ticks the derived "RERA ID checked on MahaRERA"
+        checklist line only for `verified`. `not_found` or `mismatch` blocks approval (409
+        `rera_check_failed`). Refused on the caller's own listing and when the listing quotes no RERA ID (409).
+      operationId: recordPropertyReraCheck
+      x-roles: [staff, admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [result]
+              properties:
+                result: { type: string, enum: [verified, not_found, mismatch] }
+      responses:
+        '200':
+          description: Updated case file
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PropertyReview' }
+        '400': { description: Result is not one of the listed values }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: The listing quotes no RERA ID, or is not under review }
   /users:
     get:
       tags: [Moderation]
@@ -2936,6 +2996,38 @@ paths:
                   value: { error: identity_no_recent_conflict, message: No recent identity conflict is available to dispute, status: 409 }
                 openDispute:
                   value: { error: identity_dispute_open, message: An identity dispute is already open, status: 409 }
+  /me/verification/identity/appeal:
+    post:
+      tags: [Moderation]
+      summary: Appeal a rejected identity check
+      operationId: openIdentityAppeal
+      description: >
+        Lets a signed-in caller ask for a second look at their own rejected identity check. Opens an
+        `identity_appeal` support ticket (routed to the ops queue) and a staff appeal; a different
+        reviewer than the one who rejected decides it. Only one appeal can be open at a time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IdentityAppealRequest' }
+      responses:
+        '201':
+          description: Appeal opened.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdentityAppeal' }
+        '400': { description: '`note` is missing or longer than 500 characters.' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: The identity check is not rejected, its photos are gone, it was already reviewed on appeal, or an appeal is already open.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              examples:
+                notAllowed:
+                  value: { error: identity_appeal_not_allowed, message: Only a rejected identity check can be appealed, status: 409 }
+                open:
+                  value: { error: identity_appeal_open, message: An appeal is already open, status: 409 }
   /moderation/identity-reviews:
     get:
       tags: [Moderation]
@@ -2946,10 +3038,11 @@ paths:
         Submitted cases filtered by `status` (default `pending`, oldest first). `status=qa` lists
         approved cases sampled for second-staff review, oldest sample first, excluding cases the
         caller approved. `status=decided` lists verified, rejected and revoked cases, newest decision
-        first, narrowed by `outcome`. Every filter is applied in the database before paging. Rows
+        first, narrowed by `outcome`. `status=appeal` lists rejected cases with an open appeal, oldest
+        first. Every filter is applied in the database before paging. Rows
         carry only what a queue line shows; claims, images and warnings are the detail read.
       parameters:
-        - { name: status, in: query, schema: { type: string, enum: [pending, verified, rejected, revoked, qa, decided] } }
+        - { name: status, in: query, schema: { type: string, enum: [pending, verified, rejected, revoked, qa, decided, appeal] } }
         - { name: q, in: query, description: Applicant name contains, or mobile contains the typed digits (3+), schema: { type: string } }
         - { name: docType, in: query, schema: { type: string, enum: [aadhaar, pan, driving_licence, passport, voter_id] } }
         - { name: claim, in: query, description: Fresh (30-minute) claim held by the caller, by nobody, or by someone else, schema: { type: string, enum: [mine, unclaimed, others] } }
@@ -2985,13 +3078,14 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [pending, overdue, mine, qa, decided]
+                required: [pending, overdue, mine, qa, decided, appeals]
                 properties:
                   pending: { type: integer, format: int64 }
                   overdue: { type: integer, format: int64, description: Pending for more than 48 hours }
                   mine: { type: integer, format: int64, description: Pending cases the caller currently holds }
                   qa: { type: integer, format: int64, description: Open QA samples the caller may check }
                   decided: { type: integer, format: int64 }
+                  appeals: { type: integer, format: int64, description: Rejected cases with an open appeal }
   /moderation/identity-reviews/{id}:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     get:
@@ -3125,6 +3219,47 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { description: Case is not pending, or another reviewer has a fresh claim }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /moderation/identity-reviews/{id}/appeal/uphold:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Moderation]
+      summary: Uphold a rejection that was appealed (staff)
+      operationId: upholdIdentityAppeal
+      x-roles: [staff, admin]
+      description: >
+        Keeps the case rejected, closes the appeal ticket and tells the applicant in-app and on
+        WhatsApp. Needs the same permission as the other identity decisions, and the caller must be
+        neither the applicant nor the reviewer who rejected the case (`403 identity_appeal_same_reviewer`).
+      responses:
+        '200':
+          description: Upheld
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdentityAppeal' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'The case has no open appeal (`identity_appeal_none`).' }
+  /moderation/identity-reviews/{id}/appeal/reopen:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Moderation]
+      summary: Reopen a rejected case for a fresh review after an appeal (staff)
+      operationId: reopenIdentityAppeal
+      x-roles: [staff, admin]
+      description: >
+        Returns the case to `pending` with its decision, claim and rejection reason cleared and its
+        submit time restarted, so it re-enters the queue. The user's attempt counters are untouched.
+        Same decider rule as uphold. Refused with `409 identity_appeal_not_allowed` once the photos
+        were purged.
+      responses:
+        '200':
+          description: Reopened
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IdentityAppeal' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'The case has no open appeal (`identity_appeal_none`), or its photos were purged (`identity_appeal_not_allowed`).' }
   /moderation/identity-reviews/{id}/revoke:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -4400,6 +4535,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Report' }
+        '404': { description: A `user` report whose target is not a user }
   /me/erasure:
     post:
       tags: [Account]
@@ -5406,6 +5542,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FinalizationRequest' }
+        '204': { description: No finalization request has ever been made on this property }
     delete:
       tags: [Leads & Contact]
       summary: Cancel my finalization request (buyer)
@@ -5419,11 +5556,8 @@ paths:
       summary: Accept finalization (owner, checker step)
       description: >
         Accepting closes the property's deal and auto-declines every other pending
-        finalization request on it, in one transaction.
-
-        NOT YET IMPLEMENTED: for rent deals this should also create a tenancy record.
-        Deferred to the rent/tenancy slice, which owns the tenancy invariants -- writing
-        tenancy rows from here would mean retrofitting rules onto rows this slice created.
+        finalization request on it, in one transaction. For rent deals it also proposes
+        the tenancy to the tenant, exactly as closing the deal directly does.
       operationId: acceptFinalization
       responses:
         '200': { description: Accepted }
@@ -7815,6 +7949,17 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
       callbacks:
         paymentResult: { $ref: '#/components/callbacks/PaymentResult' }
+  /me/subscription/cancel:
+    post:
+      tags: [Billing & Growth]
+      summary: Cancel my open unpaid order
+      operationId: cancelPendingSubscription
+      description: >
+        Cancels the caller's own pending orders so a fresh checkout can start. A payment that still lands
+        on a cancelled order grants nothing and is refunded automatically.
+      responses:
+        '204': { description: Cancelled, or nothing was pending }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /me/entitlements:
     get:
       tags: [Billing & Growth]
@@ -9037,6 +9182,7 @@ paths:
       responses:
         '201': { description: Sent }
         '409': { description: Interest already expressed (`already_interested`) }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /flatmates/groups/{id}/join:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -9056,6 +9202,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FlatmateRequest' }
         '409': { description: Group is full (`group_full`), already requested (`already_interested`), or the caller is already in or waiting on `settings.flatmates.maxGroupsPerPerson` groups (`group_limit`, 2 by default) }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /flatmates/groups/{id}/membership:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     delete:
@@ -11456,7 +11603,7 @@ components:
         reasonCode:
           type: string
           nullable: true
-          enum: [photos_not_real, duplicate, broker, wrong_details, locality_unclear, document_unreadable, name_mismatch, other, null]
+          enum: [photos_not_real, duplicate, broker, wrong_details, locality_unclear, document_unreadable, name_mismatch, rera_not_found, rera_mismatch, other, null]
           description: Required for needs_info and reject. `other` also requires note.
         expectedStatus:
           type: string
@@ -11687,6 +11834,7 @@ components:
       properties:
         id: { type: string }
         kind: { type: string, enum: [direct, group] }
+        counterpartyId: { type: [string, 'null'], description: User id of the other participant; null on a group thread }
         counterpartyName: { type: [string, 'null'] }
         counterpartyRole: { $ref: '#/components/schemas/Role' }
         # Masking is listing-bound: approval reveals the owner to the buyer (unless hidden) and the requester
@@ -11694,6 +11842,7 @@ components:
         counterpartyMobile: { $ref: '#/components/schemas/Mobile' }
         youAre: { type: string, enum: [owner, buyer, member] }
         propertyId: { type: [string, 'null'] }
+        propertySlug: { type: [string, 'null'] }
         propertyTitle: { type: [string, 'null'] }
         propertyPrice: { type: [integer, 'null'], format: int64 }
         propertyDeal: { type: [string, 'null'], enum: [rent, sale, null] }
@@ -11710,6 +11859,7 @@ components:
         archived: { type: boolean }
         muted: { type: boolean }
         blocked: { type: boolean, description: The caller has blocked the counterparty }
+        blockedYou: { type: boolean, description: The counterparty has blocked the caller, so sending is refused }
         awaitingReply: { type: boolean, description: The last message was authored by someone else }
         presence:
           type: [object, 'null']
@@ -11733,6 +11883,7 @@ components:
         counterpartyMobile: { $ref: '#/components/schemas/Mobile' }
         propertyId: { type: string, description: 'Listing the chat is about; required when counterpartyMobile is omitted' }
         body: { type: string, maxLength: 4000 }
+        clientId: { type: string, maxLength: 120, description: Optional idempotency key; a repeat with the same key delivers the first message once }
 
     LoginRequest:
       type: object
@@ -11954,6 +12105,7 @@ components:
         flagged: { type: boolean }
         flagReason: { type: string }
         badgeSource: { type: string, enum: [identity, manual] }
+        archived: { type: boolean, description: The soft-delete flag, independent of `status`. }
     AdminEnquirySummary:
       type: object
       properties:
@@ -12107,6 +12259,7 @@ components:
         ownershipDeclinedReason: { type: string }
         featured: { type: boolean }
         archived: { type: boolean }
+        archivedNote: { type: string, description: Why staff took the listing down, when the owner may be told. }
         recheckPending: { type: boolean }
         recheckReason: { type: string }
         ownerVerified: { type: boolean }
@@ -12423,6 +12576,9 @@ components:
               description: Furniture and appliances explicitly selected by the owner.
               items: { type: string }
             reraId: { type: string }
+            reraChecked:
+              type: boolean
+              description: Present and true only when staff verified the RERA ID on MahaRERA; never says who checked.
             carpetArea: { type: number }
             builtUpArea: { type: number }
             superBuiltUpArea: { type: number }
@@ -13674,7 +13830,7 @@ components:
         reasonCode:
           type: string
           nullable: true
-          enum: [photos_not_real, duplicate, broker, wrong_details, locality_unclear, document_unreadable, name_mismatch, other, null]
+          enum: [photos_not_real, duplicate, broker, wrong_details, locality_unclear, document_unreadable, name_mismatch, rera_not_found, rera_mismatch, other, null]
           description: Required when status is rejected. `other` also requires reason.
         expectedStatus:
           type: string
@@ -13720,11 +13876,14 @@ components:
       properties:
         id: { type: string }
         propertyId: { type: string }
+        propertyTitle: { type: [string, 'null'], description: Null if the listing is gone }
+        propertySlug: { type: [string, 'null'] }
         visitor: { $ref: '#/components/schemas/Party' }
         slot: { type: string, format: date-time }
         mode: { type: string, enum: [in-person] }
         status: { type: string, enum: [scheduled, confirmed, completed, cancelled, no-show] }
         createdAt: { type: string, format: date-time }
+        note: { type: string, nullable: true, description: The visitor's message with the booking. }
     VisitCreate:
       type: object
       required: [propertyId, slot]
@@ -13977,6 +14136,23 @@ components:
         revocationReason: { type: [string, 'null'], description: User-visible reason for a revoked badge. }
         attemptsRemaining: { type: integer, minimum: 0, description: Submissions left in the rolling 24-hour window (3 per window). }
         retryAfter: { type: [string, 'null'], format: date-time, description: When the next submission is allowed; null while attempts remain. }
+        appeal: { oneOf: [ { $ref: '#/components/schemas/IdentityAppeal' }, { type: 'null' } ], description: The appeal still describing this case (open, or its outcome while the case sits in that state); null otherwise. }
+        canAppeal: { type: boolean, description: The case is rejected, its photos are still stored and no appeal has been reviewed since. }
+    IdentityAppealRequest:
+      type: object
+      required: [note]
+      properties:
+        note: { type: string, minLength: 1, maxLength: 500, description: Why the rejection was wrong. Anything shaped like an ID or phone number is redacted server-side. }
+    IdentityAppeal:
+      type: object
+      required: [id, status, note, openedAt]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [open, upheld, reopened, superseded] }
+        note: { type: string }
+        ticketId: { type: [string, 'null'], format: uuid, description: The `identity_appeal` support ticket carrying the conversation. }
+        openedAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
     IdentityRejectionReason:
       type: string
       enum: [blurry, cropped, mismatch, expired, not_holder, unsupported, other, not_reviewed]
@@ -14000,6 +14176,7 @@ components:
         claimedByName: { type: [string, 'null'], description: Fresh claim holder; null when unclaimed or stale. }
         claimedByMe: { type: boolean }
         qaSampledAt: { type: [string, 'null'], format: date-time, description: Hidden from the original approver. }
+        appeal: { type: boolean, description: An appeal against this rejection is open — the queue's "Appeal" tag. }
     IdentityClaimState:
       type: object
       description: Who holds the case after a claim; the caller already has the case from the detail read.
@@ -14062,6 +14239,9 @@ components:
               userId: { type: string, format: uuid }
               userName: { type: string }
               reviewId: { type: string, format: uuid }
+        appeal: { oneOf: [ { $ref: '#/components/schemas/IdentityAppeal' }, { type: 'null' } ], description: The appeal still describing this case; null when none. }
+        appealCanDecide: { type: boolean, description: An appeal is open and the caller is neither the applicant nor the reviewer who rejected the case. }
+        appealCanReopen: { type: boolean, description: appealCanDecide and the photos are still stored; a purged case can only be upheld. }
     IdentityApproveRequest:
       type: object
       required: [number, name]
@@ -14137,6 +14317,7 @@ components:
       properties:
         progress: { $ref: '#/components/schemas/ListingProgress' }
         propertyId: { type: string }
+        propertyStatus: { $ref: '#/components/schemas/PropertyStatus' }
         status: { $ref: '#/components/schemas/PropertyReviewStatus' }
         reviewer: { type: string }
         checklist:
@@ -14152,6 +14333,10 @@ components:
         notes: { type: string }
         reasonCode: { $ref: '#/components/schemas/PropertyReviewReasonCode' }
         reasonNote: { type: [string, 'null'] }
+        reraCheck:
+          type: [string, 'null']
+          enum: [verified, not_found, mismatch, null]
+          description: Staff-only MahaRERA lookup result; null until checked or when no RERA ID is quoted.
         overrideRequest:
           type: ['null', object]
           description: Staff-only pending second-approver request, null otherwise.
@@ -14172,7 +14357,7 @@ components:
       enum: [in_review, needs_info, approved, rejected]
     PropertyReviewReasonCode:
       type: [string, 'null']
-      enum: [photos_not_real, duplicate, broker, wrong_details, locality_unclear, document_unreadable, name_mismatch, other, null]
+      enum: [photos_not_real, duplicate, broker, wrong_details, locality_unclear, document_unreadable, name_mismatch, rera_not_found, rera_mismatch, other, null]
     ListingProgress:
       type: [object, 'null']
       description: >
@@ -14320,6 +14505,9 @@ components:
           type: integer
           format: int64
           description: Reports ever filed against the same target; present on `GET /reports` rows only.
+        targetName: { type: string, description: Name of the reported person; `GET /reports` rows about a user only }
+        targetMobile: { type: string, description: Masked mobile of the reported person; `GET /reports` rows about a user only }
+        targetTitle: { type: string, description: Title of the reported listing, or the reported person's name }
     ReportTriage:
       type: object
       description: >
@@ -16719,6 +16907,7 @@ components:
       properties:
         share: { $ref: '#/components/schemas/ShareIntent', description: Rooms only — how many people are moving in. }
         message: { type: string, maxLength: 4000, description: Optional override; the server generates a share-intent-appropriate opener when absent. }
+        gender: { type: string, enum: [any, male, female], description: Rooms and groups restricted to women or men only. Ignored when the caller's own seeker post states a gender; without either the request is refused with 422. }
     FlatmateRoomCard:
       type: object
       description: >

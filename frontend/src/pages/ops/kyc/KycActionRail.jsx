@@ -7,6 +7,7 @@ import {
 } from '../../../services/identityReviewService.js';
 import { classNames } from '../../../lib/format.js';
 import DateField from '../../../components/ui/DateField.jsx';
+import KycAppealPanel from './KycAppealPanel.jsx';
 import {
   NOTE_REQUIRED_REASONS,
   STAFF_REASONS,
@@ -216,7 +217,9 @@ export default function KycActionRail({ detail, kase, user, canWrite, checklistL
         </section>
       ) : null}
 
-      {(detail.status === 'rejected' || detail.status === 'revoked') ? (
+      <KycAppealPanel detail={detail} kase={kase} canWrite={canWrite} onSettled={onSettled} />
+
+      {(detail.status === 'rejected' || detail.status === 'revoked') && detail.appeal?.status !== 'open' ? (
         <p className="px-1 text-xs text-gray-500">Closed {dateLabel(detail.revokedAt || detail.decidedAt)} — nothing left to decide.</p>
       ) : null}
     </div>

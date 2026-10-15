@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,13 +61,18 @@ public class IdentityVerificationService {
     private final AuditService audit;
     private final LivenessCheck livenessCheck;
     private final Clock clock;
+    private final IdentityStatusMapper statusMapper;
+    private final ApplicationEventPublisher events;
 
     public IdentityVerificationService(IdentityVerificationRepository verifications,
             IdentityVerificationFileRepository files, UserRepository users, FileStorage storage,
             List<DocumentScanner> scanners, IdentityHasher hasher, ObjectMapper json,
             OwnerBadgeSink ownerBadge, Notifier notifier, DecisionMessenger decisionMessenger,
             AuditService audit, IdentityFilePurgeService filePurge, IdentityConflictService conflicts,
-            LivenessCheck livenessCheck, Clock clock) {
+            LivenessCheck livenessCheck, Clock clock, IdentityStatusMapper statusMapper,
+            ApplicationEventPublisher events) {
+        this.statusMapper = statusMapper;
+        this.events = events;
         this.verifications = verifications;
         this.files = files;
         this.filePurge = filePurge;
@@ -87,9 +93,8 @@ public class IdentityVerificationService {
     @Transactional(readOnly = true)
     public IdentityVerificationResponse status(UUID userId) {
         return verifications.findByUserId(userId)
-                .map(v -> toStatus(v, Instant.now(clock)))
-                .orElse(new IdentityVerificationResponse(VerificationStatuses.NONE, null, null, null,
-                        null, null, null, null, null, MAX_ATTEMPTS_PER_WINDOW, null));
+                .map(v -> statusMapper.toStatus(v, Instant.now(clock)))
+                .orElseGet(statusMapper::none);
     }
 
     @Transactional(readOnly = true)
@@ -154,6 +159,7 @@ public class IdentityVerificationService {
         if (v == null) {
             v = verifications.save(new IdentityVerification(userId, docType, now));
         } else {
+            events.publishEvent(new IdentityCaseReset(v.getId()));
             filePurge.purgeFiles(v);
             v.resetForResubmission(docType, now);
         }
@@ -165,7 +171,7 @@ public class IdentityVerificationService {
         for (PreparedImage image : images) {
             storeImage(v, image);
         }
-        return toStatus(v, now);
+        return statusMapper.toStatus(v, now);
     }
 
     private static String normaliseConsentLanguage(String consentLanguage) {
@@ -314,30 +320,6 @@ public class IdentityVerificationService {
         };
     }
 
-    private IdentityVerificationResponse toStatus(IdentityVerification v, Instant now) {
-        if (VerificationStatuses.WITHDRAWN.equals(v.getStatus())) {
-            return new IdentityVerificationResponse(VerificationStatuses.NONE, null, null, null,
-                    null, null, null, null, null, MAX_ATTEMPTS_PER_WINDOW, null);
-        }
-        Instant windowEnd = v.getAttemptWindowStart().plus(ATTEMPT_WINDOW);
-        int used = now.isBefore(windowEnd) ? v.getAttemptCount() : 0;
-        int remaining = Math.max(0, MAX_ATTEMPTS_PER_WINDOW - used);
-        boolean open = VerificationStatuses.REJECTED.equals(v.getStatus())
-                || VerificationStatuses.REVOKED.equals(v.getStatus());
-        return new IdentityVerificationResponse(
-                v.getStatus(),
-                v.getDocType(),
-                v.getDocLast4(),
-                v.getSubmittedAt(),
-                v.getDecidedAt(),
-                v.getRejectionReason(),
-                v.getRejectionNote(),
-                v.getRevokedAt(),
-                v.getRevocationReason(),
-                open ? remaining : 0,
-                open && remaining == 0 ? windowEnd : null);
-    }
-
     @Transactional
     public int purgeExpiredFiles(int retentionDays) {
         Instant cutoff = Instant.now(clock).minus(Duration.ofDays(retentionDays));
@@ -395,6 +377,7 @@ public class IdentityVerificationService {
             return;
         }
         String previousStatus = v.getStatus();
+        events.publishEvent(new IdentityCaseReset(v.getId()));
         if (VerificationStatuses.VERIFIED.equals(v.getStatus())) {
             clearBadge(actor.userId());
         }

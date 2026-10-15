@@ -4,7 +4,7 @@ import { API, authHeaders, identityChallengeToken, uniqueMobile } from '../../he
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAARElEQVR4AeyROw0AIAxEL5WADzSw4AcRaGLBDzqKg7uhS4c2eVOTy33snemMtrYzDMErASBBB/0OMNTKCSIoi+pfEYAPAAD//68o26gAAAAGSURBVAMAR8QwUeUtYucAAAAASUVORK5CYII=', 'base64');
 
 const ROW_KEYS = ['id', 'status', 'userName', 'userMobile', 'docType', 'submittedAt', 'decidedAt', 'revokedAt',
-  'approvedByName', 'claimedByName', 'claimedByMe', 'qaSampledAt'];
+  'approvedByName', 'claimedByName', 'claimedByMe', 'qaSampledAt', 'appeal'];
 const REVIEW_PATH = /\/api\/moderation\/identity-reviews(\/[^/]+)?(\/claim)?$/;
 
 async function submitPan(request) {

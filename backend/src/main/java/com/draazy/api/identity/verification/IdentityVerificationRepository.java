@@ -1,6 +1,7 @@
 package com.draazy.api.identity.verification;
 
 import jakarta.persistence.LockModeType;
+import jakarta.persistence.QueryHint;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -10,6 +11,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.QueryHints;
 
 public interface IdentityVerificationRepository extends JpaRepository<IdentityVerification, UUID>,
         JpaSpecificationExecutor<IdentityVerification> {
@@ -61,7 +63,15 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
         long getDecided();
     }
 
-    @Query("select v from IdentityVerification v where v.decidedAt < :cutoff and v.filesPurgedAt is null")
+    // An open appeal pins the photos; a decided one restarts the retention clock from its own decision.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @QueryHints(@QueryHint(name = "jakarta.persistence.lock.timeout", value = "-2"))
+    @Query("""
+            select v from IdentityVerification v
+             where v.decidedAt < :cutoff and v.filesPurgedAt is null
+               and not exists (select 1 from IdentityAppeal a where a.verificationId = v.id
+                                and (a.status = 'open' or a.decidedAt >= :cutoff))
+            """)
     List<IdentityVerification> findPurgeCandidates(Instant cutoff, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

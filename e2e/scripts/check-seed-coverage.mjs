@@ -28,6 +28,7 @@ const WAIVED = new Map([
   ['admin_bootstrap_runs', 'written by the single-admin recovery bootstrap'],
   ['property_verification_override_requests', 'written by the property verification override maker-checker flow'],
   ['identity_conflicts', 'written when an identity submit hits the dedup 409'],
+  ['identity_appeals', 'written when a user asks for a second look at a rejected identity check'],
   ['identity_storage_deletes', 'holds only storage deletes that failed and await retry'],
   ['document_requests', 'written when staff request a document'],
   ['finalization_requests', 'written by the finalisation flow'],

@@ -55,6 +55,8 @@ class RoleGuardSweepTest extends AbstractApiTest {
                 new Guarded(HttpMethod.DELETE, id(Routes.Moderation.PROPERTY_FLAG), "staff"),
                 new Guarded(HttpMethod.POST, id(Routes.Moderation.VERIFICATION_DECISION), "staff"),
                 new Guarded(HttpMethod.PATCH, id(Routes.Moderation.VERIFICATION_CHECKLIST), "staff"),
+                new Guarded(HttpMethod.POST, id(Routes.Moderation.PROPERTY_PHOTO_TAKEDOWN), "staff"),
+                new Guarded(HttpMethod.POST, id(Routes.Moderation.PROPERTY_RERA_CHECK), "staff"),
 
                 new Guarded(HttpMethod.GET, Routes.Moderation.REPORTS, "staff"),
                 new Guarded(HttpMethod.PATCH, id(Routes.Moderation.REPORT_BY_ID), "staff"),
@@ -154,6 +156,12 @@ class RoleGuardSweepTest extends AbstractApiTest {
         }
         if (path.endsWith("/checklist")) {
             return "{\"item\":\"Photos are real and match the listing\",\"pass\":true}";
+        }
+        if (path.endsWith("/photos/takedown")) {
+            return "{\"photo\":\"probe\",\"reason\":\"other\"}";
+        }
+        if (path.endsWith("/rera-check")) {
+            return "{\"result\":\"verified\"}";
         }
         if (path.equals(Routes.Users.STAFF)) {
             return "{\"name\":\"Probe\",\"mobile\":\"9123456780\","

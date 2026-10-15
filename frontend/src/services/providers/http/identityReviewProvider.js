@@ -71,6 +71,11 @@ export async function qaIdentityReview(id, payload) {
   return mapReview(await post(`${reviewPath(id)}/qa`, payload));
 }
 
+export async function decideIdentityAppeal(id, outcome) {
+  await post(`${reviewPath(id)}/appeal/${outcome === 'reopen' ? 'reopen' : 'uphold'}`);
+  return getIdentityReview(id);
+}
+
 export async function updateKycProfile(userId, { name, email }) {
   return patch(`/users/${encodeURIComponent(userId)}/kyc-profile`, { name: name || undefined, email: email || undefined });
 }

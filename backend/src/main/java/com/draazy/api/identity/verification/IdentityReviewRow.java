@@ -16,5 +16,6 @@ public record IdentityReviewRow(
         String approvedByName,
         String claimedByName,
         boolean claimedByMe,
-        Instant qaSampledAt) {
+        Instant qaSampledAt,
+        boolean appeal) {
 }

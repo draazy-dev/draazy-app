@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import org.springframework.data.domain.Page;
@@ -29,16 +31,18 @@ public class IdentityReviewReadService {
     private final FileStorage storage;
     private final AuditService audit;
     private final Clock clock;
+    private final IdentityAppeals appeals;
 
     public IdentityReviewReadService(IdentityVerificationRepository verifications,
             IdentityVerificationFileRepository files, UserRepository users, FileStorage storage,
-            AuditService audit, Clock clock) {
+            AuditService audit, Clock clock, IdentityAppeals appeals) {
         this.verifications = verifications;
         this.files = files;
         this.users = users;
         this.storage = storage;
         this.audit = audit;
         this.clock = clock;
+        this.appeals = appeals;
     }
 
     @Transactional(readOnly = true)
@@ -61,7 +65,8 @@ public class IdentityReviewReadService {
     Page<IdentityReviewRow> toRowPage(AuthPrincipal actor, Page<IdentityVerification> page) {
         Map<UUID, User> byId = usersFor(page.getContent());
         UUID actorId = actor == null ? null : actor.userId();
-        return page.map(v -> toRow(v, byId::get, actorId));
+        Set<UUID> appealing = appeals.openAmong(page.getContent().stream().map(IdentityVerification::getId).toList());
+        return page.map(v -> toRow(v, byId::get, actorId, appealing.contains(v.getId())));
     }
 
     private void recordAudit(AuthPrincipal actor, String action, IdentityVerification v, Object... context) {
@@ -94,7 +99,8 @@ public class IdentityReviewReadService {
         return byId;
     }
 
-    private IdentityReviewRow toRow(IdentityVerification v, Function<UUID, User> lookup, UUID actorId) {
+    private IdentityReviewRow toRow(IdentityVerification v, Function<UUID, User> lookup, UUID actorId,
+            boolean appeal) {
         User user = lookup.apply(v.getUserId());
         User reviewer = v.getReviewerId() == null ? null : lookup.apply(v.getReviewerId());
         boolean freshClaim = isFreshClaim(v);
@@ -112,7 +118,8 @@ public class IdentityReviewReadService {
                 reviewer == null ? null : reviewer.getName(),
                 claimedBy == null ? null : claimedBy.getName(),
                 freshClaim && actorId != null && actorId.equals(v.getClaimedBy()),
-                hideQa ? null : v.getQaSampledAt());
+                hideQa ? null : v.getQaSampledAt(),
+                appeal);
     }
 
     private IdentityReviewResponse toReview(IdentityVerification v, Function<UUID, User> lookup, UUID actorId,
@@ -125,6 +132,11 @@ public class IdentityReviewReadService {
         User qaReviewedBy = v.getQaReviewedBy() == null ? null : lookup.apply(v.getQaReviewedBy());
         boolean claimedByMe = freshClaim && actorId != null && actorId.equals(v.getClaimedBy());
         boolean hideQa = actorId != null && actorId.equals(v.getReviewerId());
+        Optional<IdentityAppealInfo> appeal = appeals.current(v);
+        boolean canDecideAppeal = appeal.filter(a -> IdentityAppeal.OPEN.equals(a.status())).isPresent()
+                && actorId != null
+                && !actorId.equals(v.getUserId())
+                && !actorId.equals(v.getReviewerId());
         return new IdentityReviewResponse(
                 v.getId(),
                 v.getUserId(),
@@ -163,7 +175,10 @@ public class IdentityReviewReadService {
                 v.getQaSampledAt() != null && v.getQaReviewedAt() == null,
                 v.getFilesPurgedAt(),
                 images(stored),
-                warnings(v));
+                warnings(v),
+                appeal.orElse(null),
+                canDecideAppeal,
+                canDecideAppeal && v.getFilesPurgedAt() == null);
     }
 
     private boolean isFreshClaim(IdentityVerification v) {
