@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.web.server.context.WebServerApplicationContext;
 import org.springframework.context.ConfigurableApplicationContext;
 
-@DisplayName("--migrate-only — the Cloud Run Job's entry point")
+@DisplayName("--migrate-only — the pre-deploy migrate job's entry point")
 class MigrateOnlyModeTest {
 
     @Test

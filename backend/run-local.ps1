@@ -62,7 +62,9 @@ Push-Location $scriptDir
 try {
     # Its own output directory: a JVM running from `target-cli` breaks the moment any CLI build or
     # test run recompiles that directory underneath it (classes loaded after the rewrite mismatch).
-    $mvnArgs = @('-DbuildDirName=target-local', 'spring-boot:run', '-Dspring-boot.run.profiles=local')
+    # The app runs in a forked JVM that ignores MAVEN_OPTS; Windows-ROOT holds the corporate TLS proxy's root.
+    $mvnArgs = @('-DbuildDirName=target-local', 'spring-boot:run', '-Dspring-boot.run.profiles=local',
+        '-Dspring-boot.run.jvmArguments=-Djavax.net.ssl.trustStoreType=Windows-ROOT')
     if ($PSBoundParameters.ContainsKey('Port')) {
         $mvnArgs += "-Dspring-boot.run.arguments=--server.port=$Port"
         Write-Host "Starting backend on port $Port ..." -ForegroundColor Green

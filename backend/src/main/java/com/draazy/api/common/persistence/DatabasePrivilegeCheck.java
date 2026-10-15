@@ -67,7 +67,7 @@ public class DatabasePrivilegeCheck {
         }
         String message = "Runtime database role " + problems + "; point DB_USER at the DML-only role "
                 + "(docs/DEPLOY.md §2.1)";
-        // Until the owner splits the roles both users are still postgres, and refusing would block that deploy.
+        // The single-user dev database cannot split the roles, so refusing there would block every deploy.
         if (runtimeUser.equals(flywayUser)) {
             log.warn(message);
             return;

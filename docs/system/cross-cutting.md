@@ -775,21 +775,20 @@ to arrive as another implementation on this seam, not as a branch inside an exis
 
 ### 8.8 Origin gate
 
-On a deploy the API is reached through the Cloudflare Pages Function, but Cloud Run's `*.run.app` URL
-is public too (`ingress: all`, `allUsers` invoker), because a Worker calls it from the public
-internet. A proxy in front protects nothing while the origin behind it answers anyone, so
+On a deploy the API is reached through the Cloudflare Pages Function, but the App Platform default
+ingress URL is public too, because a Pages Function calls it from the public internet. A proxy in front protects nothing while the origin behind it answers anyone, so
 `OriginGateFilter` refuses any request whose `X-Proxy-Auth` header does not equal
 `draazy.security.origin-secret`. The Function sets that header and overwrites any value the client
 sent.
 
-- **Why a shared secret.** Restricted ingress needs a paid Google load balancer. Cloudflare's
-  Authenticated Origin Pulls need an origin that verifies client certificates, and Cloud Run does not.
-  A secret costs nothing and also makes a leaked Cloud Run URL harmless.
+- **Why a shared secret.** Restricting ingress to Cloudflare needs infrastructure we do not run: a
+  fronting load balancer, or an origin that verifies Cloudflare's client certificates (Authenticated
+  Origin Pulls). A secret costs nothing and also makes a leaked app URL harmless.
 - **Why first in the chain.** A request that skipped the proxy has no trustworthy address to
   rate-limit on, and it is owed no token parse. It still sits behind Spring Security's firewall,
   which rejects `..` and encoded separators before the probe exemption is matched.
 - **The probe exemption** is `GET`/`HEAD` on three exact paths (`/actuator/health`, `/liveness`,
-  `/readiness`), because Cloud Run's probes and CI's smoke test reach the container directly. Health
+  `/readiness`), because App Platform's health check and CI's smoke test reach the container directly. Health
   is already public, so the exemption exposes nothing new. It is method-bound because the write rate
   limiter runs after the gate: an ungated `POST` there would be charged to a forged
   `X-Forwarded-For` address once `INTERNAL_PROXIES` is widened.

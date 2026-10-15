@@ -134,7 +134,7 @@ on MoA/AoA and authorized capital; keep authorized capital modest, e.g., ₹1–
 ### Tax
 - **Corporate tax options:** **25%** (turnover <= ₹400 Cr) under normal regime **with** exemptions, **or 22% (Sec 115BAA)** without exemptions (also removes MAT). **Strategy:** if DPIIT-recognised, stay in normal regime to use the **80-IAC 100% profit deduction for 3 of first 10 years**, then evaluate 115BAA.
 - **Angel tax:** **Abolished for all investors from FY 2024-25** (Finance Act 2024 scrapped Sec 56(2)(viib)) — major de-risking for future raises. DPIIT recognition still valuable for the tax holiday.
-- **GST:** Output **18%** on subscriptions, service fees and platform/brokerage fees; **claim input credit** on Razorpay fees, cloud (GCP/Cloudflare - note reverse-charge on some foreign SaaS), SMS/WhatsApp vendors. Watch **TDS you must deduct:** **194-H** (commission), **194-I/194-IB** (rent), **194-J** (professional fees).
+- **GST:** Output **18%** on subscriptions, service fees and platform/brokerage fees; **claim input credit** on Razorpay fees, cloud (DigitalOcean/Cloudflare - note reverse-charge on some foreign SaaS), SMS/WhatsApp vendors. Watch **TDS you must deduct:** **194-H** (commission), **194-I/194-IB** (rent), **194-J** (professional fees).
 - **Entity comparison:** Pvt Ltd's **22–25%** (with holiday -> effectively lower early) beats Partnership/LLP's flat **30% + surcharge/cess**; Sole Prop taxed at individual slabs (up to 30%) with unlimited liability. **Pvt Ltd wins on rate and reliefs.**
 
 ### Funding readiness

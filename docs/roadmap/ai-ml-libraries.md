@@ -15,13 +15,13 @@
 
 | Constraint | Consequence |
 |---|---|
-| **Hosting budget ~$25/mo** (Cloud Run + Supabase sandbox, DO candidate — ADR-021) | No always-on GPU. Server-side inference is CPU-only, small models, and runs in a **background job**, never on the request path. |
+| **Hosting budget ~$17/mo + 18% GST** (DigitalOcean App Platform 1 vCPU / 1 GB + dev database — ADR-021) | No always-on GPU. Server-side inference is CPU-only, small models, and runs in a **background job**, never on the request path. |
 | **Provider-seam pattern, zero paid keys in dev** | Any model/LLM call sits behind an interface with a deterministic dev stub, like the OTP/storage/payments seams. |
 | **Mobile-first India** — mid-range Android, metered data | Nothing over ~10 MB on a consumer route. Models load lazily (dynamic `import()`, as [face.js](../../frontend/src/lib/identity-verification/face.js) already does), run in a worker, and are cached by the PWA service worker. |
 | **DPDP Act 2023** — photos, ID documents, chats are personal data | They never go to a third-party AI API. Self-hosted models only. |
 | **Badge-not-gate + maker-checker** (ADR-019) | AI **flags and suggests**; a human approves, rejects, or hides. No auto-reject. |
 | **CSP** | `'wasm-unsafe-eval'` is already allowed and guarded by `check-csp.mjs` (MediaPipe needs it). Models are self-hosted under `public/models/` via [fetch-models.mjs](../../frontend/scripts/fetch-models.mjs) — no runtime model CDN. |
-| **Postgres portability** | `pg_trgm`, `unaccent` and `pgvector` are available on both Supabase and DO Managed Postgres, so they don't add lock-in. |
+| **Postgres portability** | `pg_trgm`, `unaccent` and `pgvector` are available on DO Managed Postgres and other standard hosts, so they don't add lock-in. |
 
 ---
 
@@ -166,8 +166,8 @@ Ranked by value ÷ effort. **S** ≈ days, **M** ≈ 1–2 weeks, **L** ≈ 3+ w
 - **Rank:** hybrid — A1's trigram/FTS score and vector distance fused with Reciprocal Rank Fusion in
   SQL — inside the existing `publicSearch` floor and ahead of the existing `relevanceFirst` boosts.
   `SimilarListings` keeps its hard geo/BHK/price filters and re-ranks the pool by cosine.
-- **Prerequisite:** A1. **Cold start:** the JVM loads the model only in the job runner, not in the
-  web instance, so Cloud Run cold starts don't grow.
+- **Prerequisite:** A1. **Startup:** the JVM loads the model only inside the job runner, not at boot, so
+  startup time doesn't grow.
 
 ### B5. Fair-price signal
 - **Step 1 (no ML):** extend `marketRate` to `percentile_cont` by locality × BHK × deal over live
@@ -216,8 +216,8 @@ canned dev stub — no AI framework needed for a handful of prompts. **Models:**
    `runtimeCaching` rule in `vite-plugin-pwa` for `/models/*` so a model downloads once per device.
 4. **Keep models out of the consumer critical path.** No model on the home, search or detail routes'
    initial load. Back-office routes can afford more (desktop, Wi-Fi).
-5. **Keep the web instance lean.** ONNX Runtime and tokenizers load only in the job runner, so the
-   Cloud Run cold start and memory limit are unaffected.
+5. **Keep the API container lean.** ONNX Runtime and tokenizers load only in the job runner, so
+   startup time and the 1 GB container's memory headroom are unaffected.
 6. **Every feature ships its metric** (named per item above) through PostHog or `recordSignal`, and
    is dropped if it doesn't move it.
 

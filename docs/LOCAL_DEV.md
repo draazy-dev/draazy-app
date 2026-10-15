@@ -301,8 +301,9 @@ Then create a staff account (or reissue an invite) at `/admin/team` with an inbo
 off the backend logs `[MOCK EMAIL] to=***@domain subject=...` and never the link.
 
 On the corporate network the send logs `PKIX path building failed`: TLS is intercepted and Zulu's
-`cacerts` lacks the corporate root. Start the JVM with `-Djavax.net.ssl.trustStoreType=Windows-ROOT`
-so it trusts the Windows certificate store, the same one `curl.exe` uses. Production is unaffected.
+`cacerts` lacks the corporate root. `run-local.ps1` starts the app JVM with
+`-Djavax.net.ssl.trustStoreType=Windows-ROOT` so it trusts the Windows certificate store, the same one
+`curl.exe` uses; add that flag yourself if you start the backend any other way. Production is unaffected.
 
 ## 3. Frontend
 
@@ -322,7 +323,7 @@ to?" was a question about a build, and a green run was only evidence about one s
 
 `run-dev.ps1` at the repository root starts both in separate windows, waits for
 `/api/actuator/health`, and opens the browser. It also clears any `DB_URL` / `FLYWAY_DB_URL` left in
-the shell from a deploy session, which would otherwise point the local backend at Supabase.
+the shell from a deploy session, which would otherwise point the local backend at a deployed database.
 
 ```powershell
 .\run-dev.ps1                                       # backend 9090, UI 3322

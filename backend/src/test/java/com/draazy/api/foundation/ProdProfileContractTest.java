@@ -251,7 +251,7 @@ class ProdProfileContractTest {
 
         assertThat(prod.getProperty("management.endpoints.web.exposure.include"))
                 .as("anything beyond health is an unauthenticated information leak — `info` "
-                        + "publishes build, git and Java-version detail, and Cloud Run's probes "
+                        + "publishes build, git and Java-version detail, and the platform's probes "
                         + "never ask for it")
                 .isEqualTo("health");
         assertThat(prod.getProperty("management.endpoint.health.probes.enabled")).isEqualTo("true");
@@ -264,7 +264,7 @@ class ProdProfileContractTest {
     @DisplayName("the app listens on the port its platform assigns it")
     void theListenPortIsTakenFromTheEnvironment() throws IOException {
         assertThat(mainResource("application.properties").getProperty("server.port"))
-                .as("Cloud Run health-checks the port it injected; a fixed port never gets traffic")
+                .as("the platform health-checks the port it injects; a fixed port never gets traffic")
                 .isEqualTo("${PORT:8080}");
     }
 

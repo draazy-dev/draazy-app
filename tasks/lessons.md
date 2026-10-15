@@ -87,7 +87,7 @@
 ## Backend — Spring, JPA, Postgres
 
 - **Spring 6.2+ hands a `TaskScheduler` an OutcomeTrackingRunnable, not a `ScheduledMethodRunnable`**; test scheduler wrappers through a real `@Scheduled` bean.
-- **A session advisory lock leaks behind a transaction pooler (Supavisor :6543)**; hold `pg_try_advisory_xact_lock` in an open transaction.
+- **A session advisory lock leaks behind a transaction pooler (PgBouncer / DO connection pool)**; hold `pg_try_advisory_xact_lock` in an open transaction.
 - **`@Transactional` goes on the outermost reachable method**; self-invoked/`private` helpers never cross the proxy.
 - **`:param is null` in JPQL fails on Postgres**: use `cast(:from as LocalDate) is null`.
 - **A multi-column `@Query` returning `Object[]` silently nests**: use a projection interface with `as` aliases.
@@ -151,7 +151,6 @@
 - **A visibility blacklist leaks on the next state**: moderation is a whitelist; hidden-from-list but reachable by id is an unlisted page.
 - **`pending ≠ active`**: a priced plan is granted by the payment webhook, not by buying.
 - **A nullable limit means "no number stated"** — resolve to the safe floor (`plans.listing_limit` NULL → free tier); unlimited needs its own boolean (`unlimited_contacts`).
-- **Cloud Run scales to zero, so `@Scheduled` cron is unreliable**: use an external trigger.
 - **Never store a raw Aadhaar number**: use the aggregator's entity-scoped UID token. Login OTP proves the SIM; OKYC OTP proves identity.
 - **Set the data-caching boundary before data exists** (`/api/* → NetworkOnly` in `vite.config.js`); a service-worker `urlPattern` must match `url.pathname`.
 - **An unassigned `manualChunks` module folds into whichever chunk references it** (3 KB module pulled 189 KB charting): verify `dist/index.html`.

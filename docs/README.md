@@ -41,16 +41,13 @@ Operational, not part of the reading order above — reach for these when you ar
 - [`system/profiles.md`](./system/profiles.md) — the four tiers (`local` → `local,e2e` → `sandbox` → `prod`), what each turns on, and how the deployed ones are kept from drifting apart.
 - [`system/notifications.md`](./system/notifications.md) — every in-app, WhatsApp, email and push message we send (consumer and back office), with its copy, cost and trigger.
 - [`LOCAL_DEV.md`](./LOCAL_DEV.md) — both halves on one machine.
-- [`DEPLOY.md`](./DEPLOY.md) — the deploy **contract**: the same-site cookie rule, every environment variable, and which mistakes fail silently. Read it to understand a value.
-- [`MANUAL_VERIFICATION.md`](./MANUAL_VERIFICATION.md) — what to check by hand in sandbox (full regression) and production (smoke) after a deploy, and the production never-do list.
-- [`DEPLOY_WALKTHROUGH.md`](./DEPLOY_WALKTHROUGH.md) — the **sequence**: Supabase → container → GCP → GitHub → Cloud Run → Cloudflare Pages → `sandbox.draazy.com`, in order, for macOS and Windows. Read it to perform a deploy. Where the two disagree on a value, `DEPLOY.md` wins; where they disagree on order, the walkthrough does.
+- [`DEPLOY.md`](./DEPLOY.md) — the single deployment document: the same-site cookie rule, the DigitalOcean database and App Platform setup, every environment variable, the GitHub deploy pipeline, first-time setup order for macOS and Windows, logs and alerts, and the manual verification checklists (sandbox regression, production smoke, never-do list).
 
 ## Map
 
 ```
 docs/
-  DEPLOY.md   deploy contract · DEPLOY_WALKTHROUGH.md ordered runbook · LOCAL_DEV.md
-              MANUAL_VERIFICATION.md sandbox regression + prod smoke
+  DEPLOY.md   deployment, first-time setup and manual verification · LOCAL_DEV.md
   system/     platform-architecture, package-structure, data-model, cross-cutting, api-standards,
               design-system, frontend-data-seam, profiles, notifications, code-quality,
               legal-entity-and-compliance, tech-debt, open-questions, fixture-registry

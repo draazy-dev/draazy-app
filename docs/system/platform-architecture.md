@@ -140,24 +140,25 @@ diagrams are added in §5 as decisions firm up.*
 
 ---
 
-## 4.1 Free-tier-first cost map (target: no spend at MVP)
+## 4.1 Free-tier-first cost map (hosting excepted)
 
-Founder constraint: spend nothing until real usage forces it. Every component must justify any
-non-zero cost. Only one need has no free production tier anywhere: login OTP. Identity
+Founder constraint: spend only where no free tier exists, and make every component justify its cost.
+Hosting is the fixed floor: sandbox ≈ $17/mo + 18% GST (App Platform $10 + dev database $7, §4.3).
+The one other need with no free production tier is login OTP. Identity
 verification costs nothing per check — capture is in the browser,
 and the decision is made by our own reviewer (§6.4).
 
-| Need | Free-tier choice | Free allowance | First cost trigger |
+| Need | Choice | Free allowance | First cost trigger |
 | --- | --- | --- | --- |
-| Compute / API | Google Cloud Run | 2M req/mo, scale-to-zero | sustained traffic / min-instances > 0 |
-| Database | Supabase Postgres (Mumbai) | 500 MB Postgres | storage / row growth |
+| Compute / API | DigitalOcean App Platform (BLR1), 1 vCPU / 1 GB, always-on | none — ~$10/mo | instance size or count |
+| Database | DO dev database, PostgreSQL 17 (sandbox); DO Managed PostgreSQL (prod) | none — $7/mo dev, from ~$15/mo managed | storage, backups, standby nodes |
 | Media + CDN | Cloudflare R2 + Pages | 10 GB, zero egress | > 10 GB stored |
 | Push | Firebase FCM | unlimited | never |
 | Email | Brevo / Resend | 300/day or 3K/mo | volume |
 | WhatsApp — notifications (utility) | Meta WhatsApp Cloud API | free only inside an open 24h customer-service window (until Oct 1 2026) | any alert sent outside a reply window |
-| Secrets | GCP Secret Manager | 6 active versions | many secrets |
+| Secrets | GitHub `sandbox` environment secrets, injected as App Platform `SECRET` env vars | free | never |
 | CI/CD | GitHub Actions | 2,000 min/mo | build minutes |
-| Background jobs | Cloud Scheduler | 3 jobs free | > 3 scheduled jobs |
+| Background jobs | In-process `@Scheduled` under a Postgres advisory lock | included in compute | never |
 | Cache (Tier 2) | Upstash Redis | pay-per-request free tier | volume |
 | Payments | Cashfree PG (₹0 fixed + free sandbox) (ADR-017) | no free usage tier; pay-per-successful-txn ~2% | first real payment (UPI fee applies despite 0% MDR) |
 | Login OTP (WhatsApp, ADR-020) | none free in prod — `AUTHENTICATION` templates bill per delivered message | dev mock + Meta **test number** (5 verified recipients) | first real OTP |
@@ -178,64 +179,41 @@ grows, aggregated across the whole business portfolio.
 
 ## 4.2 Free-tier capacity — which limit we hit first
 
-How much product the pure free tiers actually hold. The useful answer is not one number but
+How much product the sandbox stack actually holds. The useful answer is not one number but
 **which ceiling binds first**. Assumptions (adjust as reality lands): ~6-10 photos/listing,
 client-side compressed to ~200-300 KB each = **~1.5-2.5 MB images/listing**; a listing row +
 FTS `tsvector` + amenities JSONB + b-tree indexes = **~2-4 KB**; a user row ~0.5-1 KB.
 
-| Free tier | Allowance | What consumes it | Ceiling |
+| Resource | Allowance | What consumes it | Ceiling |
 | --- | --- | --- | --- |
 | **Cloudflare R2** | 10 GB · 1M writes/mo · 10M reads/mo · **egress free** | listing photos, identity captures, property docs, reels | **~3,000-6,000 photo-backed listings** (10 GB ÷ ~2 MB). **Reels fill this fastest** — video is MBs *per clip* |
-| **Cloud Run** | 2M req/mo (~66k/day) | every API call | **~1,500-3,000 active sessions/day** (20-50 calls/session) — a *traffic* wall, independent of stored volume |
-| **Supabase Postgres** | 500 MB DB · 5 GB egress/mo | all rows + FTS indexes + audit/outbox/notifications | content is cheap (~15k listings + ~100k users ≈ 125 MB); the real risk is **write-amplifying tables** (audit, otp_codes, notifications/outbox) growing unbounded |
+| **App Platform** | one always-on 1 vCPU / 1 GB container, no request quota | every API call and the `@Scheduled` sweeps | CPU and heap under sustained concurrent traffic — a plan change (`instance_size_slug` / `instance_count`), independent of stored volume |
+| **DO dev database** | 512 MiB · no backups | all rows + FTS indexes + audit/outbox/notifications | content is cheap (~15k listings + ~100k users ≈ 125 MB); the real risk is **write-amplifying tables** (audit, otp_codes, notifications/outbox) growing unbounded |
 
 **Binding order.** (1) **R2 storage** is the tightest hard wall (~5k photo-backed listings; reels
-fill it faster). (2) **Cloud Run requests** is the traffic wall on a busy day. (3) **Postgres 500 MB**
-is the *last* wall for content **only if** audit/otp/notification retention is enforced — left
-unpruned it becomes the *first* wall instead.
+fill it faster). (2) **Postgres 512 MiB** is the *last* wall for content **only if**
+audit/otp/notification retention is enforced — left unpruned it becomes the *first* wall instead.
+(3) **Compute** binds on sustained concurrent traffic and is solved by a larger instance, not a rewrite.
 
-**Bottom line.** The free tiers comfortably carry a **Pune neighbourhood-scale MVP**: a few thousand
-live photo-backed listings, **tens of thousands of registered users**, ~1.5-3k sessions/day. Scaling
-past that is a **~USD 25/mo Supabase Pro upgrade + pennies-per-GB R2 overage** (R2 zero-egress ⇒
-storage-only overage ~USD 0.015/GB-mo), **not a re-architecture** — the "clear path to millions
-without rewrite" the ADRs target.
+**Bottom line.** The sandbox stack comfortably carries a **Pune neighbourhood-scale MVP**: a few thousand
+live photo-backed listings and **tens of thousands of registered users**. Scaling
+past that is a **DO Managed PostgreSQL upgrade (from ~$15/mo) + a larger instance + pennies-per-GB R2 overage** (R2
+zero-egress ⇒ storage-only overage ~USD 0.015/GB-mo), **not a re-architecture** — the "clear path to
+millions without rewrite" the ADRs target.
 
-**Two caveats that are not capacity but bite in prod.** (a) **The first paid dollar is R2, not the
-DB** — the moment photo-backed listings cross ~5k or reels get popular; it scales gracefully because
-egress is free. (b) **Supabase free pauses after 7 days of *no DB connections* and offers only shared
-CPU + a small direct-connection cap** — so a real prod app should move off the pausing tier early;
-Pro (~USD 25/mo) is the first upgrade actually *needed*, well before the 500 MB fills (see §6.2).
+**Two caveats that bite in prod.** (a) **The first usage-driven cost is R2** — the moment photo-backed
+listings cross ~5k or reels get popular; it scales gracefully because egress is free. (b) **The dev
+database has no backups and is App Platform only** — so production data belongs on DO Managed
+PostgreSQL, the first upgrade actually *needed*, well before the 512 MiB fills (see §6.2).
 
 ---
 
-## 4.3 DigitalOcean re-evaluation (ADR-021) — the numbers
+## 4.3 DigitalOcean sizing and cost (ADR-021)
 
-Recorded 2026-09-05, prompted by the reasonable worry that GCP is expensive past its free tier.
-Prices read from DigitalOcean's published pricing pages that day; **re-check before acting**, and
-treat the Cloud Run figures as estimates rather than quotes.
-
-**First, the scope of the worry.** Exactly one component of this platform is GCP: Cloud Run. Secret
-Manager is free at our size and Cloud Scheduler was never built. Supabase runs on AWS; R2 and Pages
-are Cloudflare; FCM is free forever. So "GCP cost" has one place to bite. Where the worry is
-genuinely right is not the unit price but the *shape*: GCP has no hard spend cap, so its failure mode
-is a bill you did not choose, whereas DigitalOcean's is a service that stops scaling. Those are not
-equivalent risks for a solo founder even when the average price matches — and it very nearly does.
-
-> **Correction, 2026-09-06 — the shape argument is now weaker than when this was written.** GCP has
-> since added **spend cap budgets** (preview), and Cloud Run is one of the four eligible services.
-> A spend cap scoped to one project and one service *does* stop: at 100% of the target amount new
-> requests are blocked until the cap is manually lifted, enforcement runs on gross estimated costs so
-> free-trial credit does not mask it, and nothing is deleted. That converts GCP's failure mode from
-> "a bill you did not choose" into "a service that stops" — which is precisely the property this
-> section credited DigitalOcean with. It does not change the decision, since Option A was already
-> chosen and the deferral trigger is a *scale* event rather than a *risk* one, but it removes the
-> main non-price reason to revisit. Caveats: preview, one service per budget (Artifact Registry and
-> Secret Manager still need a separate alerts-only budget), monthly periods only, enforcement is not
-> instantaneous so lag overage is still billed, and an alerts-only budget cannot be converted into
-> one. Set up in `DEPLOY_WALKTHROUGH.md` §4.4.
+Prices read from DigitalOcean's published pricing pages; **re-check before acting**.
 
 **DigitalOcean has no free tier we can use.** App Platform's free tier is **3 apps with static
-sites**, 1 GiB transfer each — a Cloudflare Pages substitute, not a Cloud Run one, and Pages is
+sites**, 1 GiB transfer each — a Cloudflare Pages substitute, not a compute one, and Pages is
 already free *and* runs the `/api` proxy Function that §5.7.1's cookie topology requires. Managed
 Postgres, Spaces and container instances have no free tier at all. The $200/60-day new-account credit
 is a trial; pricing a platform against an expiring credit is how the surprise arrives in month three.
@@ -243,34 +221,19 @@ is a trial; pricing a platform against an expiring credit is how the surprise ar
 | Component | DigitalOcean | Note |
 |---|---|---|
 | App Platform, 1 vCPU / 512 MiB | $5.00/mo | **Unusable for this app** — see below |
-| App Platform, 1 vCPU / 1 GiB | $10.00/mo | the real floor |
-| Managed Postgres, 1 GiB / 10 GiB disk | $15.15/mo | + $0.215/GiB/mo; PgBouncer included |
-| Dev database, 512 MiB | $7.00/mo | App Platform only, no backups — **not for production data** |
-| Spaces | $5.00/mo | 250 GiB + 1 TiB egress, then $0.01/GiB |
+| App Platform, 1 vCPU / 1 GiB (`apps-s-1vcpu-1gb-fixed`) | $10.00/mo | the real floor; the sandbox `api` service |
+| Dev database, 512 MiB | $7.00/mo | App Platform only, no backups, single DB user — **sandbox, not production data** |
+| Managed Postgres, 1 GiB / 10 GiB disk | $15.15/mo | + $0.215/GiB/mo; PgBouncer and backups included; production |
+| Spaces | $5.00/mo | 250 GiB + 1 TiB egress, then $0.01/GiB — not used |
 
-**Why the $5 tier is a trap, specifically here.** It is the same arithmetic as the `memory` limit
-in `backend/deploy/cloudrun-sandbox.yaml`: `-XX:MaxRAMPercentage=70.0` on 512 MiB leaves a ~358 MB heap
-and ~154 MB for everything else, and Spring Boot 4 plus Hibernate across ~99 repositories spends
-~250 MB outside the heap (metaspace ~100 MB, code cache, symbols, threads). It does not OOM under load — it OOMs *during startup*, after the health
-check has begun waiting, which reads as a failed deploy rather than an undersized plan.
+**Budget.** Sandbox ≈ **$17/mo + 18% GST** ($10 `api` + $7 dev database). Production swaps the dev
+database for Managed Postgres: ≈ $25/mo + GST before storage overage.
 
-**The comparison that matters is not free-vs-paid, it is working-vs-working.**
-
-| | Sandbox today | Configured to actually work |
-|---|---|---|
-| **Cloud Run + Supabase** | **$0** — but no sweep has ever run (ADR-011) and the DB pauses after 7 days idle (§4.2) | ~$35-40 (always-on Cloud Run ~$10-25 + Supabase Pro $25) |
-| **DigitalOcean** | ~$25 | **~$25** — nothing to fix |
-
-DO is *cheaper* at the configuration that works, and identical in behaviour to the expensive GCP one.
-The reason is that both of GCP's remedies cost money that DO's baseline already includes: always-on
-CPU to make `@Scheduled` fire, and Supabase Pro to stop the pause.
-
-**Why the sandbox stays on Cloud Run anyway.** It is $0, the config is written and security-reviewed,
-and the broken sweeps genuinely do not matter yet — nobody can sign in until Meta verifies the
-business account (ADR-020), which is weeks out. Paying $25/mo to expire subscriptions for zero users
-is spending money to no effect. **The trigger for revisiting is whichever comes first: the first
-paying user, or the moment Supabase Pro becomes necessary** — at that point the GCP option costs more
-than the DO one and the comparison above stops being hypothetical.
+**Why the $5 tier is a trap, specifically here.** `-XX:MaxRAMPercentage=70.0` (`backend/Dockerfile`)
+on 512 MiB leaves a ~358 MB heap and ~154 MB for everything else, and Spring Boot 4 plus Hibernate
+across ~99 repositories spends ~250 MB outside the heap (metaspace ~100 MB, code cache, symbols,
+threads). It does not OOM under load — it OOMs *during startup*, after the health check has begun
+waiting, which reads as a failed deploy rather than an undersized plan.
 
 **What is kept regardless.** R2 (zero-egress is the property ADR-013 relies on; Spaces would cost
 $5/mo to buy storage headroom we will not need for years and to give that property up) and Cloudflare
@@ -300,13 +263,12 @@ graph TB
         R2[(Cloudflare R2<br/>media - zero egress)]
     end
 
-    subgraph GCP[Google Cloud -- free tier]
-        RUN[Cloud Run<br/>Spring Boot API<br/>scale-to-zero - asia-south1]
-        SCHED[Cloud Scheduler<br/>jobs + warming ping]
-        SEC[Secret Manager]
+    subgraph DO[DigitalOcean App Platform -- BLR1]
+        RUN[API container<br/>Spring Boot - always-on<br/>in-process jobs]
+        MIG[migrate pre-deploy job<br/>Flyway]
     end
 
-    DB[(Managed Postgres<br/>Supabase Postgres (Mumbai)<br/>+ outbox, audit, counters)]
+    DB[(DigitalOcean Postgres<br/>BLR1<br/>+ outbox, audit, counters)]
     FCM[Firebase FCM<br/>push - free]
 
     subgraph Seams[External providers -- behind seams, pay-per-use]
@@ -327,8 +289,7 @@ graph TB
     RUN --> MAIL
     RUN --> PAY
     RUN -.geocode + commute.-> MAPS
-    SEC -.secrets.-> RUN
-    SCHED -->|OIDC /internal/jobs/run| RUN
+    MIG --> DB
     RUN -.pg_dump backup.-> R2
 ```
 
@@ -343,7 +304,7 @@ graph TB
         HTTP[http provider<br/>credentials: include + CSRF]
     end
 
-    subgraph API[Spring Boot modular monolith - Cloud Run]
+    subgraph API[Spring Boot modular monolith - App Platform]
         subgraph XC[Cross-cutting foundation]
             SEC[Security filter chain<br/>JWT cookie verify + roles]
             CSRF[CSRF filter<br/>double-submit]
@@ -361,7 +322,7 @@ graph TB
             SVC[services / tickets]
             ADMIN[admin / analytics / CMS]
             NOTIF[notifications + outbox]
-            JOBS[jobs runner /internal/jobs/run]
+            JOBS[jobs runner - @Scheduled]
         end
 
         subgraph SEAMS[Provider seams -- interface + mock/real impl]
@@ -373,7 +334,7 @@ graph TB
         end
     end
 
-    DB[(PostgreSQL<br/>Supabase Mumbai)]
+    DB[(PostgreSQL<br/>DigitalOcean BLR1)]
     EXT[External providers<br/>Meta / Cashfree / R2 / Google]
 
     HTTP -->|HTTPS /api| SEC --> CSRF --> GATE --> FEAT
@@ -397,7 +358,7 @@ the cross-cutting chain before it reaches domain logic.
 ```mermaid
 flowchart TD
     A[SPA http provider] -->|HTTPS + auth cookie + X-CSRF-Token| B[Cloudflare<br/>WAF + rate limit + TLS]
-    B --> C[Cloud Run ingress]
+    B --> C[App Platform ingress]
     C --> D{JWT cookie valid?}
     D -- no --> D1[401 -> SPA calls /auth/refresh<br/>rotate tokens] --> A
     D -- yes --> E{CSRF token matches?}
@@ -418,7 +379,7 @@ flowchart TD
 
 ### 5.5 Data Flow Diagram
 
-How data moves and where PII lives. **Rule:** PII stays in the Mumbai DB; only the minimum leaves to a
+How data moves and where PII lives. **Rule:** PII stays in the India-region DB (BLR1); only the minimum leaves to a
 seam; a raw document number is **never** stored (only the identity_hash + masked last four, ADR-009b),
 and the captured images are deleted seven days after a decision.
 
@@ -428,7 +389,7 @@ flowchart LR
         U[User input:<br/>mobile, OTP, filters, listing, media]
     end
 
-    subgraph Store[PostgreSQL -- Mumbai, India residency]
+    subgraph Store[PostgreSQL -- BLR1, India residency]
         PII[(PII: users, identity_verifications<br/>identity_hash, masked last four)]
         DOMAIN[(Domain: properties, deals,<br/>finance, audit, notifications/outbox)]
         EPH[(Ephemeral: otp, refresh_token,<br/>rate counters)]
@@ -467,8 +428,8 @@ flowchart LR
 sequenceDiagram
     participant U as Browser (React SPA)
     participant P as Vite proxy / Cloudflare (/api)
-    participant API as Cloud Run (Spring Boot)
-    participant DB as Postgres (Supabase)
+    participant API as API (Spring Boot)
+    participant DB as Postgres
     participant SMS as OtpSender seam (WhatsApp Cloud API)
 
     U->>P: POST /auth/otp {mobile}
@@ -501,7 +462,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as Buyer (SPA)
-    participant API as Cloud Run API
+    participant API as API
     participant DB as Postgres
     participant N as Notify (owner)
 
@@ -525,23 +486,21 @@ sequenceDiagram
     API-->>U: 201 created
 ```
 
-**Scheduled alert / reminder via Cloud Scheduler + outbox (ADR-010/011).**
+**Scheduled alert / reminder via in-process `@Scheduled` + outbox (ADR-010/011).**
 
 ```mermaid
 sequenceDiagram
-    participant CS as Cloud Scheduler (free cron)
-    participant API as Cloud Run API
+    participant JR as JobRunner (@Scheduled cron group)
     participant DB as Postgres (+ outbox)
     participant NC as NotifierClient seam
 
-    CS->>API: POST /internal/jobs/run (OIDC) - warming + due jobs
-    API->>DB: find due saved-search alerts / rent reminders
-    API->>DB: write notification + outbox rows (same txn)
-    API->>DB: read pending outbox batch
-    API->>NC: send (WhatsApp default / email)
-    NC-->>API: delivered / failed
-    API->>DB: mark sent, or retry++ (dead-letter after N)
-    API-->>CS: 200
+    JR->>DB: take the group's advisory lock (one instance runs it)
+    JR->>DB: find due saved-search alerts / rent reminders
+    JR->>DB: write notification + outbox rows (same txn)
+    JR->>DB: read pending outbox batch
+    JR->>NC: send (WhatsApp default / email)
+    NC-->>JR: delivered / failed
+    JR->>DB: mark sent, or retry++ (dead-letter after N)
 ```
 
 **Identity verification: capture on the device, decided by a person (ADR-009b/019, §6.4).**
@@ -549,7 +508,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as Browser (React)
-    participant API as Cloud Run API
+    participant API as API
     participant R2 as R2 private bucket
     participant DB as Postgres
     participant S as Staff reviewer (ops queue)
@@ -584,7 +543,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     participant U as Browser (React)
-    participant API as Cloud Run (PaymentClient)
+    participant API as API (PaymentClient)
     participant PG as Cashfree PG
 
     U->>API: POST /payments/order {purpose, amount}
@@ -602,16 +561,18 @@ sequenceDiagram
     API->>DB: persist settlement row for reconciliation
 ```
 
-### 5.7 Deployment Diagram (MVP, no spend)
+### 5.7 Deployment Diagram (sandbox)
 
 ```mermaid
 graph LR
-    DEV[GitHub repo] -->|Actions: build + push image| IMG[Container image]
-    IMG -->|deploy revision| RUN[Cloud Run API<br/>autoscale 0..N]
+    DEV[GitHub repo] -->|Actions: build + push image| IMG[Container image - GHCR]
+    IMG -->|doctl apps update --spec| MIG[migrate job<br/>Flyway pre-deploy]
+    MIG --> RUN[API service<br/>always-on]
     USER([Browser]) --> PAGES[Cloudflare Pages + CDN]
-    USER -->|REST /api| RUN
+    PAGES -->|REST /api Function| RUN
     USER -.signed URL.-> R2[(Cloudflare R2)]
-    RUN --> PG[(Managed Postgres - asia region)]
+    RUN --> PG[(DO Postgres - BLR1)]
+    MIG --> PG
     RUN --> R2
 ```
 
@@ -629,7 +590,7 @@ Two arrangements satisfy it, and the code supports both without modification:
 
 | Arrangement | Example | Cross-origin? | What it needs |
 | --- | --- | --- | --- |
-| **Path proxy** (simplest) | `draazy.com` serves the SPA and forwards `/api/*` to Cloud Run | No | Nothing. No CORS involved at all |
+| **Path proxy** (simplest) | `draazy.com` serves the SPA and forwards `/api/*` to the App Platform API | No | Nothing. No CORS involved at all |
 | **Sibling subdomains** | `www.draazy.com` → `api.draazy.com` | Yes, but same-*site* | `WEB_ORIGINS` listing the UI origin exactly; `CorsConfig` already sets `allowCredentials` |
 
 The two are not equivalent, and the path proxy is the one to choose. The readable
@@ -672,52 +633,53 @@ support surprise.
 ### 6.1 Cloud platform and compute
 
 - **Purpose.** Where the backend API runs and how it scales.
-- **Why required.** The SPA needs a hosted REST API that costs nothing when idle, scales on demand,
-  and avoids server toil for a tiny team.
+- **Why required.** The SPA needs a hosted REST API that stays running for the scheduled sweeps and
+  avoids server toil for a tiny team.
 - **Options considered.**
-  - DigitalOcean Droplet/App Platform + managed PG - predictable, low lock-in, but no free tier.
-  - AWS ECS/Fargate + RDS - broad, but no true scale-to-zero and RDS has a monthly floor.
-  - Google Cloud Run + managed Postgres - genuine free tier, scale-to-zero, runs our container.
+  - DigitalOcean App Platform + managed PG - always-on container, flat pricing, Bangalore region, low
+    lock-in. **Chosen (ADR-021).**
+  - AWS ECS/Fargate + RDS - broad, but heavier to operate and RDS has a monthly floor.
   - Full Firebase/Firestore BaaS - rejected (ADR-006): wrong for a relational, filter-heavy domain.
-- **Recommendation.** Cloud Run (asia-south1 Mumbai) running the Spring Boot container, with a
-  managed Postgres free tier. Portable container + standard Postgres keep lock-in low (escape hatch
-  to any container host).
-- **Container contract.** Cloud Run injects `PORT` and routes traffic only to a container listening
-  on it, so the app binds `server.port=${PORT:8080}` rather than a fixed port. Getting this wrong
-  fails the health check while the process itself looks healthy, so the revision never receives
-  traffic and the logs show nothing wrong. The `8080` default keeps local `spring-boot:run` and the
-  Vite proxy working unchanged. Pinned by `ProdProfileContractTest`.
-- **Security.** Managed TLS, no SSH surface, per-service IAM, secrets injected from a secret store,
-  private egress to the database.
-- **Performance.** Autoscale 0->N; watch cold starts (raise min-instances to 1 once traffic
-  justifies). Mumbai region = low latency for Pune users.
-- **Cost.** Zero within free tier (2M req/mo, scale-to-zero); pay only past free limits.
-- **Future scale.** Raise min/max instances; add revisions/canary; if ever needed, lift the same
-  container to GKE or another host with no code change.
-- **Score - Performance 8 | Security 8 | Cost 9 | Ops simplicity 9.**
+- **Recommendation.** DigitalOcean App Platform (BLR1) running the Spring Boot container from GHCR
+  (`apps-s-1vcpu-1gb-fixed`, one always-on instance) against a DO PostgreSQL database. A PRE_DEPLOY
+  `migrate` job runs Flyway before every deploy (`docs/DEPLOY.md` §5). Portable container + standard
+  Postgres keep lock-in low (escape hatch to any container host).
+- **Container contract.** App Platform routes traffic to the service's `http_port` (8080), and the app
+  binds `server.port=${PORT:8080}`, so the two agree. Getting this wrong fails the health check while
+  the process itself looks healthy, so the deploy never receives traffic and the logs show nothing
+  wrong. The `8080` default keeps local `spring-boot:run` and the Vite proxy working unchanged. Pinned
+  by `ProdProfileContractTest`.
+- **Security.** Managed TLS, no SSH surface, secrets injected as `SECRET` env vars from the GitHub
+  `sandbox` environment, database reached over TLS (`sslmode=require`).
+- **Performance.** One always-on 1 vCPU / 1 GB container: no cold starts, and the in-process scheduler
+  runs on time. Bangalore region = low latency for Pune users.
+- **Cost.** $10/mo for the 1 GB container; the 512 MiB tier OOMs at startup (§4.3).
+- **Future scale.** Raise the instance size or count (advisory-locked jobs make more than one instance
+  safe); add canary deploys; if ever needed, lift the same container to another host with no code change.
+- **Score - Performance 8 | Security 8 | Cost 7 | Ops simplicity 9.**
 ### 6.2 Database (managed Postgres)
 
 - **Purpose.** Primary system of record for all relational domain data.
 - **Why required.** The domain is relational and transactional (properties, deals, offers, finance,
   audit, maker-checker); needs strong filtering/search and integrity guarantees.
 - **Options considered.**
-  - Supabase Postgres (Mumbai, ap-south-1) - real Postgres, India region, free tier.
+  - DigitalOcean dev database (PostgreSQL 17, $7/mo, 512 MiB, no backups) - sandbox only.
+  - DigitalOcean Managed PostgreSQL (from ~$15/mo, backups, PgBouncer) - production.
   - Neon (Singapore) - scale-to-zero + branching, but no India region (offshore PII).
-  - Cloud SQL for Postgres - great with Cloud Run, but no free tier (monthly floor).
   - Self-managed Postgres on a VM - cheapest raw, but ops toil + backups on us.
-- **Recommendation.** Supabase Postgres in Mumbai, used strictly as a Postgres host: our own Flyway
-  migrations, our own JWT auth (Supabase Auth/Realtime/Edge unused) to keep lock-in low. Connect via
-  the Supabase pooler (Supavisor/PgBouncer, transaction mode) because Cloud Run is serverless and
-  spins many short-lived connections; keep the HikariCP pool small per instance.
-- **Security.** TLS in transit; PII stays in an India region (DPDP posture); least-privilege
-  DB user; credentials in Secret Manager; daily automated backups; app-level authz (no public API).
-- **Performance.** Co-located with Cloud Run in Mumbai for low latency; pooler prevents connection
-  exhaustion; targeted indexes for search filters; JSONB for flexible/array fields.
-- **Cost.** Free tier (500 MB, shared compute) at MVP; move to Supabase Pro (~USD 25/mo) only when
-  storage/connections/PITR are needed.
-- **Future scale.** Read replicas, larger compute, PITR; if ever needed, migrate to Cloud SQL/RDS
-  (standard Postgres = portable, no app rewrite); partition hot tables.
-- **Score - Performance 8 | Security 8 | Cost 9 | Ops simplicity 9.**
+- **Recommendation.** DO dev database for the sandbox and DO Managed PostgreSQL for production, both in
+  BLR1, used strictly as a Postgres host: our own Flyway migrations, our own JWT auth, so lock-in stays
+  low. Keep the HikariCP pool small per instance.
+- **Security.** TLS in transit; PII stays in an India region (DPDP posture); credentials bound by App
+  Platform (`${db.USERNAME}`, `${db.PASSWORD}`); least-privilege runtime role where the plan allows
+  one (`docs/DEPLOY.md` §2.1 - the dev database has a single user, so `FLYWAY_DB_USER` equals `DB_USER`
+  and `DatabasePrivilegeCheck` only warns); managed backups in production; app-level authz (no public API).
+- **Performance.** Co-located with the API in BLR1 for low latency; targeted indexes for search
+  filters; JSONB for flexible/array fields.
+- **Cost.** $7/mo dev database (sandbox); Managed PostgreSQL from ~$15/mo (production).
+- **Future scale.** Standby nodes/read replicas, larger compute, PITR; standard Postgres = portable, no
+  app rewrite; partition hot tables.
+- **Score - Performance 8 | Security 8 | Cost 7 | Ops simplicity 9.**
 ### 6.3 Authentication and session security
 
 - **Purpose.** Prove who a user is (passwordless mobile OTP) and carry that identity + role on every
@@ -727,7 +689,7 @@ support surprise.
 - **Login model.** Consumers: passwordless mobile OTP (`/auth/login`). Staff and admin: email +
   password + TOTP authenticator (`/auth/staff-login`, then `/verify` or `/enrol`); the OTP route refuses them.
   OTP is generated server-side and stored **hashed** in Postgres (`otp` table: mobile, hash,
-  expires_at, attempts) so verification works across scale-to-zero Cloud Run instances (no in-memory
+  expires_at, attempts) so verification works across instances and restarts (no in-memory
   state). Rate-limited and attempt-capped.
 - **Options considered.**
   - **A. Both tokens in `localStorage` (Bearer).** Simplest, but readable by any XSS payload. Rejected.
@@ -857,10 +819,10 @@ support surprise.
   survives with only last-4, name and DOB.
 - **Security.** Capture happens on the applicant's device; only the images cross the wire. Images are never public — reviewers read them through short-lived signed URLs, and
   the review panel withdraws its own links before the shortest server-side lifetime expires. PII stays
-  in the Mumbai DB; `IDENTITY_HASH_SECRET` lives in Secret Manager.
+  in the India-region DB; `IDENTITY_HASH_SECRET` is a `SECRET` env var injected at deploy (`docs/DEPLOY.md` §3).
 - **Performance.** One-time per user and entirely off the hot path. The badge check on a render is a
   cheap boolean on `users.verified`; `identity_hash` is indexed for dedup. There is no outbound call,
-  no redirect hop and no webhook, so nothing here is hostile to Cloud Run scale-to-zero.
+  no redirect hop and no webhook.
 - **Cost.** **Zero per check.** Capture is the user's camera and the decision
   is our reviewer. What it does cost is *reviewer minutes* and the object storage holding images for
   their seven-day window — both of which scale with real verifications rather than with attempts,
@@ -880,7 +842,7 @@ support surprise.
 - **Purpose.** Deliver saved-search alerts (UI default channel = WhatsApp), rent/visit reminders,
   contact-request updates, and the in-app notification bell.
 - **Why required.** Alerts/reminders/bell are core engagement, and most are **schedule-triggered**,
-  not click-triggered - which collides with scale-to-zero compute (below).
+  not click-triggered - so the compute has to stay running.
 - **Channels (all behind one `NotifierClient` seam, mock in dev).**
   - **WhatsApp - Meta WhatsApp Cloud API direct** (~1,000 conversations/mo free; needs a Meta business
     account + template approval). A BSP (Twilio/Gupshup) is rejected for MVP: paid markup + lock-in.
@@ -889,28 +851,22 @@ support surprise.
   - **Push - FCM** (ratified, free), later.
 - **Delivery reliability - transactional outbox.** A mutation writes a `notification`/`outbox` row in
   the **same DB transaction**; a drainer job sends via the seam and retries on failure, so a
-  scaled-to-zero/cold instance never loses a message. Upgrade path: a real queue (Pub/Sub) + worker.
-- **Background jobs under scale-to-zero.**
-  - **Trigger - Cloud Scheduler** (free, 3 jobs) -> a secured internal endpoint
-    `POST /internal/jobs/run` (OIDC/shared secret). Fires reliably even when the app is at zero
-    instances, and there is **no duplicate-send** problem (single external trigger).
-  - **Rejected** for $0 MVP: in-process `@Scheduled` (skips when scaled to zero; double-fires when
-    scaled out -> would need ShedLock).
-  - **Cold-start strategy.** Enable Cloud Run **startup CPU boost** + `spring.main.lazy-initialization`,
-    and add a Cloud Scheduler **warming ping** (~5 min) to keep one instance warm during active hours at
-    **~$0** (default request-based billing charges CPU only during requests). First visitor after long
-    idle waits ~2-4s; everyone hitting a warm instance gets millisecond responses.
+  restart or redeploy never loses a message. Upgrade path: a real queue + worker.
+- **Background jobs on an always-on container.**
+  - **Trigger - in-process `@Scheduled`.** `JobRunner` runs every job in four IST cron groups (every
+    15 min, hourly, 00:00 cleanup, 10:00 user-facing), each group under a Postgres advisory lock
+    (`JobRunScheduler`) and each job behind `draazy.jobs.<name>.enabled`. The container is always on, so
+    crons fire on time; the lock means a second instance never double-sends, so no ShedLock.
+  - No external scheduler, warming ping or internal jobs endpoint is needed.
 - **Recommendation (ratified).** Meta WhatsApp Cloud API + Brevo + Postgres in-app behind the seam,
-  with a transactional outbox; jobs via Cloud Scheduler -> internal endpoint + warming ping. Move to
-  **`min-instances=1` + native `@Scheduled` + ShedLock** only when traffic/revenue justify ~$10-20/mo
-  (also removes cold starts); GraalVM native image later for ~100ms starts.
-- **Security.** Internal jobs endpoint via Scheduler->Run OIDC/IAM or shared secret; WhatsApp/email
-  keys in Secret Manager; templated messages; per-user notification prefs / opt-out respected.
+  with a transactional outbox; jobs via in-process `@Scheduled` under advisory locks (ADR-011).
+- **Security.** Jobs have no HTTP entry point; WhatsApp/email keys are `SECRET` env vars; templated
+  messages; per-user notification prefs / opt-out respected.
 - **Performance.** Alerts/reminders run as batch off the hot path; in-app bell is a cheap indexed
   query; the outbox drains in small batches.
-- **Cost.** $0 within free tiers (Scheduler 3 jobs, WhatsApp ~1,000 conv, Brevo 300/day, Postgres
-  outbox); channel costs only past volume.
-- **Future scale.** Pub/Sub + dedicated worker; websockets/FCM realtime bell; per-channel rate
+- **Cost.** $0 within free tiers (WhatsApp ~1,000 conv, Brevo 300/day, Postgres
+  outbox); channel costs only past volume. Jobs run inside the compute already paid for.
+- **Future scale.** A queue + dedicated worker; websockets/FCM realtime bell; per-channel rate
   limiting; dead-letter queue for poison messages.
 - **Score - Performance 8 | Security 8 | Cost 9 | Ops simplicity 7.**
 ### 6.6 Search and discovery
@@ -948,8 +904,8 @@ support surprise.
 - **Ratified store.** Cloudflare R2 (ADR-005) - 10 GB free, **zero egress**, S3-compatible.
 - **Upload path.**
   - **A. Pre-signed PUT (direct-to-R2, chosen)** - API issues a short-lived signed URL; the browser
-    uploads **straight to R2**. The API never touches the bytes -> saves Cloud Run compute/bandwidth,
-    dodges the ~32 MB request cap (vital for reels).
+    uploads **straight to R2**. The API never touches the bytes -> saves API compute/bandwidth and
+    avoids request-size caps (vital for reels).
   - B. Proxy through the API - simpler, but burns compute/bandwidth and hits the request-size cap.
 - **Access model.** **Split buckets**: listing **photos -> public bucket via CDN** (cacheable);
   **Identity captures & property documents -> private bucket**, served only via **short-lived signed GET** after an
@@ -1012,7 +968,7 @@ support surprise.
   - 18% GST - settlement_charge/tax(instant only) + adjustment`. **TDS 194-O (1% e-commerce operator)
   may apply to us** - confirm with a CA and wire into recon (`POST /pg/settlement/recon`).
 - **Security.** Never trust the client for success; **verify webhook HMAC-SHA256 on the raw body**;
-  idempotent event handling (dedupe by event id); secrets in Secret Manager; **no card data on our
+  idempotent event handling (dedupe by event id); secrets as `SECRET` env vars; **no card data on our
   servers** (hosted checkout -> PCI SAQ-A); audit every money event. PG uses `x-client-id/secret` +
   **domain whitelisting** (no IP-whitelist needed, unlike Payouts - see ADR-018).
 - **Performance.** Off the hot path; async webhook reconciliation; backend verify is sub-second.
@@ -1027,7 +983,7 @@ support surprise.
 ### 6.9 Caching, rate limiting and abuse protection
 
 - **Purpose.** Protect the API (OTP abuse, credential brute-force, scraping) and speed hot reads.
-- **The MVP question.** On scale-to-zero + multi-instance Cloud Run, in-process counters are not shared;
+- **The MVP question.** With more than one instance, in-process counters are not shared;
   but MVP volume is low and we already sit behind Cloudflare.
 - **Caching (kept at MVP, no Redis needed).**
   - **Cloudflare CDN edge cache** - static assets + public GETs (photos, public pages) at the edge.
@@ -1035,7 +991,7 @@ support surprise.
   - **In-process (Caffeine) `@Cacheable`** - per-instance fixed facts, short TTL.
   - **HTTP cache headers** (ETag/Cache-Control) - browser + CDN reuse.
 - **Rate limiting / abuse (MVP).**
-  - **Cloudflare edge rate limit + WAF** in front of Cloud Run - blocks floods before compute.
+  - **Cloudflare edge rate limit + WAF** in front of the API - blocks floods before compute.
   - **Postgres counters** for OTP throttle / login attempts (the `otp` table already has attempts+TTL).
   - **Cloudflare Turnstile** (free CAPTCHA) on OTP/login.
 - **Recommendation (ratified).** **Defer the dedicated Redis server.** Keep CDN + Postgres cache-at-write
@@ -1045,7 +1001,7 @@ support surprise.
 - **Security.** Edge WAF stops common attacks pre-compute; Turnstile blocks bots; Postgres throttle caps
   OTP abuse.
 - **Performance.** Postgres handles MVP read volume; introduce Redis cache-aside for fixed facts when
-  measured (shared across instances + survives scale-to-zero, unlike in-process).
+  measured (shared across instances + survives restarts, unlike in-process).
 - **Cost.** $0 (Cloudflare free + existing Postgres); Upstash free tier only when needed.
 - **Future scale.** Upstash/Redis cache-aside + distributed rate limiting; move OTP/session counters to
   Redis.
@@ -1053,29 +1009,31 @@ support surprise.
 ### 6.10 Operational foundation (secrets, CI/CD, observability, DR, audit)
 
 - **Purpose.** The run-and-operate spine: manage secrets, ship code, see what's happening, and recover
-  from failure - all at $0 for MVP.
-- **Secrets - GCP Secret Manager** (free: 6 active versions). All keys (JWT secret, Razorpay, WhatsApp,
-  identity-hash secret, DB creds) injected into Cloud Run at runtime; nothing in the repo. (Implied by ADR-005.)
-- **CI/CD - GitHub Actions** (free 2,000 min): build + push container -> deploy Cloud Run revision;
-  Cloudflare Pages auto-deploys the SPA on push; **Flyway** runs migrations in a Cloud Run Job
-  before each revision (`docs/DEPLOY.md` §2.1).
+  from failure - with no paid tooling beyond hosting.
+- **Secrets - GitHub `sandbox` environment secrets** (free). Deploy substitutes them into the app spec
+  as App Platform `SECRET` env vars (JWT secret, Cashfree, WhatsApp, identity-hash secret, ...); nothing
+  in the repo (`docs/DEPLOY.md` §3, §5.1). (Implied by ADR-005.)
+- **CI/CD - GitHub Actions** (free 2,000 min): build + push the image to GHCR, then
+  `doctl apps update --spec`; Cloudflare Pages auto-deploys the SPA on push; **Flyway** runs in the
+  PRE_DEPLOY `migrate` job before each deploy (`docs/DEPLOY.md` §2.1, §5.1).
 - **Observability.**
-  - Logs -> structured JSON to **Cloud Logging** (free tier).
-  - Metrics -> **Cloud Monitoring** + Cloud Run built-in dashboards.
-  - Error tracking -> **Sentry free tier** or GCP Error Reporting.
-  - Uptime -> **UptimeRobot / Cloudflare health checks** (free) - doubles as the warming ping.
-  - Tracing -> deferred (Cloud Trace later).
-- **Disaster recovery.** Supabase free tier has **limited backups and no PITR**, so add a **scheduled
-  `pg_dump` -> Cloudflare R2** (via the Cloud Scheduler we already run) as portable, off-provider
-  insurance; media already durable in R2. MVP targets: **RPO ~24h, RTO a few hours**. Upgrade path:
-  Supabase Pro PITR when data value justifies it.
+  - Logs -> structured JSON on stdout, every line carrying `traceId`, in App Platform Runtime Logs
+    (`docs/DEPLOY.md` §8).
+  - Metrics -> App Platform built-in CPU/memory/restart charts and free alert policies.
+  - Error tracking -> in-app `error_event` (Admin ▸ Error log), deduplicated and PII-scrubbed.
+  - Uptime -> **UptimeRobot / Cloudflare health checks** (free).
+  - Tracing -> `traceId` correlation only; distributed tracing deferred.
+- **Disaster recovery.** The DO dev database has **no backups**, so production runs on DO Managed
+  PostgreSQL (daily backups) and adds a **scheduled `pg_dump` -> Cloudflare R2** as portable,
+  off-provider insurance; media already durable in R2. MVP targets: **RPO ~24h, RTO a few hours**.
+  Upgrade path: managed PITR when data value justifies it.
 - **Audit trail.** `AuditEntry` in Postgres (append-only, indexed, retention policy); every
   maker-checker + money event audited. (Domain-defined; Postgres-backed.)
-- **Security.** Secrets never in code; least-privilege service accounts; audit + backups support
+- **Security.** Secrets never in code; least-privilege DB roles; audit + backups support
   incident response; health checks catch outages early.
-- **Cost.** $0 within free tiers; pay only for Supabase Pro/PITR or higher log/metric volume later.
-- **Future scale.** Cloud Trace + distributed tracing; log-based alerting; PITR; blue/green or canary
-  deploys; separate staging project.
+- **Cost.** $0 within free tiers; pay only for managed-database PITR or higher log volume later.
+- **Future scale.** Distributed tracing; log-based alerting; PITR; blue/green or canary
+  deploys; separate staging app.
 - **Score - Performance 8 | Security 8 | Cost 9 | Ops simplicity 8.**
 ## 7. Architecture Decision Record (ADR) log
 
@@ -1085,25 +1043,25 @@ support surprise.
 | ADR-002 | Primary datastore | **PostgreSQL**; MySQL; MongoDB | PostgreSQL | Relational domain, JSONB for flexible fields, strong FTS, mature managed options | Schema via Flyway; snake_case; soft-delete columns |
 | ADR-003 | AuthN/Z | Server sessions; **Stateless JWT**; 3rd-party IdP | Stateless JWT | Horizontal scale, no session store; matches SPA + provider-swap design | Roles in claims; token delivery + rotation decided in ADR-008 |
 | ADR-004 | External integrations | Direct SDK calls; **Provider-seam interfaces** | Provider-seam (mock in dev, real `@Primary` in prod) | Zero-key dev/demo; swap vendors without touching callers; testable | Every external dep sits behind an interface |
-| ADR-005 | Cloud platform and compute | DigitalOcean; AWS Fargate/RDS; Cloud Run + managed Postgres; Full Firebase BaaS | Free-tier-native: Cloud Run + managed Postgres + Cloudflare Pages/R2 + FCM | $0 start, scale-to-zero, keeps Spring Boot + relational + OpenAPI; low lock-in (portable container + standard Postgres) | Defines MVP hosting; WhatsApp OTP and Aadhaar stay pay-per-use behind seams. **Re-opened and re-costed for production by ADR-021** — the scale-to-zero that makes this $0 is also what breaks background jobs, and DigitalOcean was rejected here on a free-tier comparison that stops applying the moment always-on is required |
+| ADR-005 | Cloud platform and compute | DigitalOcean App Platform + managed Postgres; AWS Fargate/RDS; Full Firebase BaaS | DigitalOcean App Platform (BLR1) + DO PostgreSQL + Cloudflare Pages/R2 + FCM | Always-on compute (the in-process scheduler needs it), flat pricing, India region; keeps Spring Boot + relational + OpenAPI; low lock-in (portable container + standard Postgres) | Defines hosting (detail in ADR-021); WhatsApp OTP and Aadhaar stay pay-per-use behind seams |
 | ADR-006 | Firebase/Firestore as core backend | Full Firebase BaaS; keep Spring Boot + Postgres and use Firebase only for FCM | Rejected Firestore core; use FCM push only | Firestore is a poor fit for filter-heavy search, transactions and audit; per-read cost cliff; highest lock-in; would discard the matured OpenAPI/data-model | Firebase limited to free push (FCM); core stays relational |
-| ADR-007 | Managed Postgres provider + data residency | Supabase (Mumbai); Neon (Singapore); Cloud SQL (no free tier); self-managed on VM | Supabase Postgres, ap-south-1 Mumbai, used as pure Postgres (BaaS extras unused) | India data residency for Aadhaar-adjacent PII; co-located with Cloud Run for low latency; free tier; standard Postgres keeps lock-in low | Serverless connections via Supavisor/PgBouncer pooler; our own JWT retained (not Supabase Auth) |
+| ADR-007 | Managed Postgres provider + data residency | DO dev database (sandbox) / DO Managed PostgreSQL (prod); Neon (Singapore); self-managed on VM | DigitalOcean PostgreSQL, BLR1 Bangalore, used as pure Postgres: dev database for the sandbox, Managed PostgreSQL for production | India data residency for Aadhaar-adjacent PII; co-located with the API for low latency; standard Postgres keeps lock-in low | Direct TLS connection with a small Hikari pool; our own JWT auth; the dev database has no backups, so production data goes on Managed PostgreSQL |
 | ADR-008 | Session / token storage model | A: both tokens in localStorage (Bearer); B: access in memory + refresh in httpOnly cookie; **C: both tokens in httpOnly cookies + CSRF** | Option C - httpOnly+Secure+SameSite=Lax cookies; short access JWT + rotating refresh (reuse-detection); double-submit CSRF | Token never in JS (XSS-safe); stays stateless (ADR-003); dev feasible via Vite proxy; only the http provider changes, components unchanged | Adds `/auth/refresh` + `otp`/`refresh_token` tables + CSRF filter; **OTP delivery channel decided separately in ADR-020 (WhatsApp, no DLT)** |
 | ADR-009 | Identity verification | A: hosted e-KYC via a licensed vendor; B: offline document XML; C: paid OKYC/OTP aggregator; D: licensed AUA e-KYC (not permitted); **E: in-house capture + on-device OCR + staff review** | **Option E, built in-house (§6.4); third-party e-KYC is permanently out of scope.** Government document (Aadhaar / PAN / driving licence / passport / voter ID) photographed in the browser, live selfie with liveness stages, Tesseract wasm OCR on the device, decided by a staff reviewer | A vendor was charging per check on an **opt-in** funnel, which is the funnel you can least afford to meter. A badge needs "a person on our team looked at this card and this face", not UIDAI-grade authentication — so the licence we could never hold stopped being on the critical path. Zero marginal cost, no redirect, no webhook, no second entity onboarding | The cost moved from a vendor invoice to **reviewer minutes** — a staffing commitment, and the real trade. Images sit in the private bucket for **7 days** after a decision. Weaker anti-forgery than a UIDAI read: mitigated by camera-only capture, a 3-per-24h attempt cap, and the fact that claims are never believed (§6.4) |
 | ADR-009a | Mobile-match policy (registration mobile vs document-linked mobile) | Enforce A==B for all; don't enforce; prefer+soft-flag | **Withdrawn.** The vendor webhook that carried the document-linked `mobile` is gone with ADR-009, and a photographed card does not reveal one. There is nothing left to compare Mobile A against | The policy only ever existed because a vendor e-KYC payload happened to include the number. Nothing in the in-house flow reproduces it, and inventing a proxy for it would be guessing | Login OTP (ADR-008) still proves control of Mobile A; one-document-one-badge is enforced by ADR-009b. If a document-linked mobile is ever needed, it is a **new** decision, not this one |
 | ADR-009b | Identity uniqueness / dedup anchor | Raw document-number hash; a vendor per-request id; composite identity fingerprint; **keyed HMAC of the canonical number** | **`identity_hash = HMAC-SHA256(docType \| canonical_number)` under `IDENTITY_HASH_SECRET`, stored UNIQUE, written at approval** | The reviewer reads the real number off the image, so unlike the masked-UID era there *is* a stable per-document value — it just must never be stored. HMAC not a plain digest: an Aadhaar number's input space is ~10¹¹, so an unkeyed hash is brute-forceable from a leaked dump. Namespacing by type stops a PAN colliding with a licence | `409 identity_already_registered` (fires **only in the opt-in badge flow — ADR-019 — never gates posting or browsing**). Set at **approval, not submit**, or a forged claim could permanently block the real holder. Rotating the key orphans every hash → **set-once** in the deploy guide. `person_key` (name+DOB) is a reviewer signal only and never rejects on its own |
-| ADR-017 | Primary provider consolidation | Split (Razorpay PG + separate KYC aggregator); **Cashfree for KYC + Payments (+ Payouts later)** | **Amended by ADR-009 — Cashfree is now the payments vendor only.** PG (fee collection) today; Payouts deferred behind a `PayoutClient` seam. Secure ID dropped when identity verification moved in-house. Supersedes Razorpay in ADR-014 (Razorpay = documented fallback) | The consolidation argument (one onboarding, one HMAC pattern, one dashboard) was half about KYC; with KYC in-house what survives is competitive PG pricing and an India-first rail | Vendor concentration is now *lower*, not higher; **pricing not in skill - get written quote** before final sign-off; 2 credential sets (PG / Payouts) in Secret Manager |
-| ADR-018 | Cloud Run 2FA for Cashfree Payouts (prod) | IP whitelisting (needs static egress IP); Cloud NAT static IP; **RSA public-key signature** | **RSA public-key signature `X-Cf-Signature`** (5-min validity) for Payouts prod calls. Scope narrowed by ADR-009 — Secure ID is no longer a caller | Cloud Run egress IP is **dynamic**; the signature avoids Cloud NAT cost/complexity; skill provides Java RSA code. (PG API needs no IP-whitelist - uses client-id/secret + domain whitelist) | Dormant until Payouts is built. Manage RSA private key in Secret Manager; watch 5-min clock skew; can switch to Cloud NAT + IP allowlist at higher volume if preferred |
+| ADR-017 | Primary provider consolidation | Split (Razorpay PG + separate KYC aggregator); **Cashfree for KYC + Payments (+ Payouts later)** | **Amended by ADR-009 — Cashfree is now the payments vendor only.** PG (fee collection) today; Payouts deferred behind a `PayoutClient` seam. Secure ID dropped when identity verification moved in-house. Supersedes Razorpay in ADR-014 (Razorpay = documented fallback) | The consolidation argument (one onboarding, one HMAC pattern, one dashboard) was half about KYC; with KYC in-house what survives is competitive PG pricing and an India-first rail | Vendor concentration is now *lower*, not higher; **pricing not in skill - get written quote** before final sign-off; 2 credential sets (PG / Payouts) in GitHub environment secrets |
+| ADR-018 | 2FA for Cashfree Payouts (prod) | IP whitelisting (needs a static egress IP); dedicated egress IP add-on; **RSA public-key signature** | **RSA public-key signature `X-Cf-Signature`** (5-min validity) for Payouts prod calls. Scope narrowed by ADR-009 — Secure ID is no longer a caller | The container's egress IP is **not static** by default; the signature avoids a dedicated-IP add-on's cost/complexity; skill provides Java RSA code. (PG API needs no IP-whitelist - uses client-id/secret + domain whitelist) | Dormant until Payouts is built. Hold the RSA private key as a `SECRET` env var; watch 5-min clock skew; can switch to a dedicated egress IP + allowlist at higher volume if preferred |
 | ADR-019 | Verification posture: gate vs badge | A: mandatory KYC to post/contact (hard gate both sides); **B: progressive trust - opt-in badge, never a wall**; C: no verification | **Option B - "verification is a badge, not a gate."** L0 browse / L1 mobile post+contact / L2 reviewed Verified badge (ranking + faster response). The badge blocks nothing, anywhere. Amends ADR-009a/009b to soft-at-MVP | Hard KYC on both sides at posting is supply-side-suicidal cold-start (empty-marketplace risk); the real market lives in free, frictionless Pune FB/Telegram groups - we must match their liquidity and win on **freshness + trust badges + ranking**, not walls (see §6.4, BUSINESS_PLAN §2) | Verification effort falls only on users who opt in at L2; ranking/badge + the freshness engine do the policing; seams (`PaymentClient`/`NotifierClient`) unchanged; **guardrail: no verification nudge may precede a value moment** |
-| ADR-010 | Notification channels + delivery | WhatsApp: Meta Cloud API direct vs BSP (Twilio/Gupshup); Email: Brevo/Resend; In-app: Postgres table; delivery: inline vs transactional outbox | Meta WhatsApp Cloud API direct + Brevo email + Postgres in-app, all behind `NotifierClient` seam, with a transactional outbox | Free tiers; low lock-in (direct APIs); outbox guarantees delivery under scale-to-zero; seam keeps vendors swappable | Adds `notifications`/`outbox` tables + drainer job; WhatsApp needs Meta business account + template approval |
-| ADR-011 | Background jobs + cold-start strategy | A: Cloud Scheduler -> internal endpoint (+warming ping); B: GitHub Actions cron; C: min-instances=1 + native @Scheduled | Option A - Cloud Scheduler -> secured `/internal/jobs/run` + warming ping + startup CPU boost | Fires reliably at scale-to-zero, no duplicate sends, ~$0; warming ping avoids most cold starts | Native @Scheduled + ShedLock deferred to when we adopt min-instances=1 (~$10-20/mo) for zero cold start. **VIOLATED IN CODE (found 2026-09-05).** `/internal/jobs/run` was never built; eight sweeps use native `@Scheduled` instead — Option C's *mechanism* without either of its preconditions (min-instances=1, ShedLock). Under default CPU throttling the scheduler thread is frozen between requests, so `fixedDelay` never advances and **no sweep has ever run on Cloud Run**; nothing logs the absence. Turning CPU on without ShedLock trades that for every instance running every billing sweep concurrently. Resolve by building Option A as ratified, or by adopting Option C **whole**. See ADR-021. **Resolved toward C:** production moves to an always-on host (ADR-021); `JobRunner` runs every job in four IST cron groups (every 15 min, hourly, 00:00 cleanup, 10:00 user-facing), each group under a Postgres advisory lock (`JobRunScheduler`) instead of ShedLock, each job behind `draazy.jobs.<name>.enabled`. The `/internal/jobs/run` endpoint is not built; see DEPLOY.md §5 |
+| ADR-010 | Notification channels + delivery | WhatsApp: Meta Cloud API direct vs BSP (Twilio/Gupshup); Email: Brevo/Resend; In-app: Postgres table; delivery: inline vs transactional outbox | Meta WhatsApp Cloud API direct + Brevo email + Postgres in-app, all behind `NotifierClient` seam, with a transactional outbox | Free tiers; low lock-in (direct APIs); outbox guarantees delivery across restarts and redeploys; seam keeps vendors swappable | Adds `notifications`/`outbox` tables + drainer job; WhatsApp needs Meta business account + template approval |
+| ADR-011 | Background jobs | A: external scheduler -> internal endpoint; B: GitHub Actions cron; C: always-on container + native @Scheduled | Option C - always-on single container with in-process `@Scheduled` | Fires on time with no external trigger, no warming ping and no cold starts; no cost beyond the compute already paid | `JobRunner` runs every job in four IST cron groups (every 15 min, hourly, 00:00 cleanup, 10:00 user-facing), each group under a Postgres advisory lock (`JobRunScheduler`) so a second instance never double-sends (no ShedLock), each job behind `draazy.jobs.<name>.enabled`. No internal jobs endpoint; see DEPLOY.md §5 |
 | ADR-012 | Search strategy | **PostgreSQL** (indexes + `tsvector` + `pg_trgm` + PostGIS); Meilisearch/Typesense; OpenSearch/Elastic; Algolia | PostgreSQL behind a search seam | Domain is structured filters + geo, not free-text relevance; Places handles autocomplete; $0, one datastore, no sync lag | Add PostGIS for map radius; keyset pagination; swap to Meilisearch/Typesense (via outbox/CDC) when relevance/volume grows |
-| ADR-013 | Media storage + upload path | Pre-signed direct-to-R2 vs proxy-through-API; single vs split buckets | Pre-signed direct-to-R2 (S3-compatible) behind `StorageClient` seam; split public (photos/CDN) + private (KYC/docs, signed GET) | Offloads bytes from Cloud Run; zero-egress R2; PII stays private with short-lived scoped URLs | Client-side resize at MVP; EXIF strip + MIME/size allow-list; malware scan + transcoding deferred |
+| ADR-013 | Media storage + upload path | Pre-signed direct-to-R2 vs proxy-through-API; single vs split buckets | Pre-signed direct-to-R2 (S3-compatible) behind `StorageClient` seam; split public (photos/CDN) + private (KYC/docs, signed GET) | Offloads bytes from the API; zero-egress R2; PII stays private with short-lived scoped URLs | Client-side resize at MVP; EXIF strip + MIME/size allow-list; malware scan + transcoding deferred |
 | ADR-014 | Payment gateway + rent-fund scope | Razorpay; Cashfree; PhonePe PG; PayU; Stripe. Rent: fee-only vs move funds (Route/escrow). UPI: aggregator (Route A) vs direct collection (Route B) | Razorpay behind `PaymentClient` seam; **fee-only at MVP**, rent settles off-platform; **Route A (aggregator) now, Route B UPI-direct as documented cost-reduction upgrade** | No gateway has a free usage tier, but all are ₹0 fixed + pay-per-txn (fits $0-until-revenue); zero-MDR does NOT make UPI free through an aggregator (their service fee applies); Route A's webhooks/reconciliation are worth more than the tiny MVP-volume fee | **Provider superseded by ADR-017 (Cashfree primary; Razorpay = fallback)** - fee-only scope, Route A/B and seam design unchanged; server-side verify + idempotent webhooks + audit; confirm live per-txn rates before signing |
 | ADR-015 | Cache + rate limiting + abuse | Defer Redis (CDN + Postgres + in-process + Cloudflare edge) vs Upstash Redis from day one | Defer dedicated Redis; CDN + Postgres cache-at-write + in-process caching; Cloudflare edge WAF/rate-limit/Turnstile + Postgres OTP counters | Caching capability stays at $0 without a new server; shared-cache benefit marginal at MVP volume; add Redis only when measured | Behind `Cache`/`RateLimiter` seam; Upstash Redis is the upgrade for cross-instance cache + distributed limits |
-| ADR-016 | Operational foundation | Secret Manager; GitHub Actions; Cloud Logging/Monitoring + Sentry; DR: Supabase backups only vs + scheduled pg_dump->R2 | GCP Secret Manager + GitHub Actions + Cloud Logging/Monitoring + Sentry/Error Reporting + uptime checks; **DR = Supabase backups + scheduled pg_dump->R2** | All free tier; pg_dump->R2 gives portable off-provider insurance since free-tier Supabase lacks PITR | RPO ~24h / RTO hours at MVP; audit in Postgres; upgrade to PITR + tracing + canary later |
+| ADR-016 | Operational foundation | GitHub environment secrets vs a cloud secret store; GitHub Actions; App Platform logs/alerts + in-app error log vs Sentry; DR: provider backups only vs + scheduled pg_dump->R2 | GitHub environment secrets + GitHub Actions + App Platform Runtime Logs/alerts + in-app `error_event` log + uptime checks; **DR = managed-database backups + scheduled pg_dump->R2** | All free; pg_dump->R2 gives portable off-provider insurance, and the dev database has no backups | RPO ~24h / RTO hours at MVP; audit in Postgres; upgrade to PITR + tracing + canary later |
 | ADR-020 | Login-OTP delivery channel | A: SMS via an Indian aggregator (MSG91/Cashfree) - needs DLT/TRAI; B: **WhatsApp `AUTHENTICATION` template via Meta Cloud API direct**; C: WhatsApp via a BSP (Gupshup/Twilio); D: WhatsApp primary + SMS fallback | **Option B - WhatsApp Cloud API direct, WhatsApp-only, no fallback**, behind the existing `OtpSender` seam. Consolidates with ADR-010, which already chose Meta Cloud API direct for notifications | **Deletes DLT/TRAI from the critical path** (weeks of registration, sender-ID + template approval) and reuses one vendor, one WABA, one credential set and one webhook pattern we need for notifications anyway. WhatsApp penetration in the Pune consumer market is effectively universal, and an OTP arriving in the same app the contact flow already uses is a coherent product story. Rejected D because a fallback requires consuming delivery-status webhooks and a stateful seam - real work for a tail we chose not to serve at MVP | **Accepted risk: a user without WhatsApp on their registration number cannot sign in at all, and the failure is silent.** Mitigation is UI copy at the OTP screen ("sent on WhatsApp") + a support path, not a second channel - revisit if drop-off shows up. Prereqs: Meta business verification, a dedicated number not already registered on any WhatsApp app, and an approved `AUTHENTICATION` template with a **copy-code** button (one-tap/zero-tap autofill is Android-native only; we are a web SPA). Billed per delivered message - see §4.1. **Set Primary Business Location = India in Business Manager**: an India-based sender to Indian users is charged the plain `authentication` rate, never `authentication_international`. Spend/abuse control is unchanged and still outstanding - see the `UnconfiguredOtpSender` docblock: per-recipient throttling does not stop number-walking, and on WhatsApp that also burns the number's quality rating (an availability failure, not just a bill) |
-| ADR-021 | Production and sandbox compute + database provider (revisits ADR-005/007) | A: stay on Cloud Run + Supabase; B: **DigitalOcean App Platform + DO Postgres**; C: hybrid (DO compute, Supabase DB) | **Option B adopted: DigitalOcean App Platform (BLR) + DO Postgres + GHCR.** | DO App Platform provides always-on compute and non-pausing Postgres in region `blr`, running the standard container image with GHCR and native `@Scheduled` sweeps. Option C rejected due to latency between BLR compute and external DB. Cloudflare Pages Function proxies `/api` to the DO default ingress via `API_ORIGIN`. R2 is kept for zero-egress object storage. | Backend deploy definition lives in `backend/deploy/do-app-sandbox.yaml`. |
+| ADR-021 | Production and sandbox compute + database provider (detail for ADR-005/007) | A: **DigitalOcean App Platform + DO PostgreSQL**; B: hybrid (DO compute, external DB) | **Option A adopted: DigitalOcean App Platform (BLR) + DO PostgreSQL + GHCR.** | DO App Platform provides always-on compute and non-pausing Postgres in region `blr`, running the standard container image from GHCR with native `@Scheduled` sweeps. The hybrid is rejected due to latency between BLR compute and an external DB. Cloudflare Pages Function proxies `/api` to the DO default ingress via `API_ORIGIN`. R2 is kept for zero-egress object storage. | Backend deploy definition lives in `backend/deploy/do-app-sandbox.yaml`. Sandbox ≈ $17/mo + 18% GST; sizing in §4.3. |
 
 _ADR-001..004 are inherited/ratified from existing docs. ADR-005+ are decided as we proceed._
 
@@ -1125,23 +1083,23 @@ record that answers *who approved this* after the fact.
 ## 8. Assumptions & open questions
 
 **Resolved:**
-- **A-Q1 -> Cloud platform = Cloud Run + managed Postgres free tier (ADR-005).** Firebase limited to FCM (ADR-006).
-- **A-Q3 -> Data residency = India; Postgres = Supabase (Mumbai) (ADR-007).**
+- **A-Q1 -> Cloud platform = DigitalOcean App Platform + DO PostgreSQL (ADR-005, ADR-021).** Firebase limited to FCM (ADR-006).
+- **A-Q3 -> Data residency = India; Postgres = DigitalOcean PostgreSQL, BLR1 (ADR-007).**
 - **A-Q6 -> Session security = httpOnly-cookie token model + rotation + CSRF (ADR-008).**
 - **A-Q5 -> Identity verification = in-house: camera capture of a government document + live selfie, OCR on the device, decided by a staff reviewer; dedup via a keyed `identity_hash` (never the number); **verification = badge not gate (progressive trust)** (ADR-009, ADR-009b, ADR-019). ADR-009a withdrawn with the vendor webhook that carried it.**
 - **A-Q15 -> Verification posture = progressive trust ("badge, not gate"): L0 browse / L1 mobile post+contact / L2 reviewed Verified badge. The badge blocks nothing, anywhere (ADR-019; §6.4).**
 - **A-Q7 -> Notifications = WhatsApp Cloud API + Brevo + Postgres in-app, transactional outbox, `NotifierClient` seam (ADR-010).**
 - **A-Q16 -> Login-OTP channel = WhatsApp `AUTHENTICATION` template via Meta Cloud API direct, WhatsApp-only with no SMS fallback, behind the existing `OtpSender` seam; DLT/TRAI drops off the critical path (ADR-020).**
-- **A-Q8 -> Background jobs = Cloud Scheduler -> internal endpoint + warming ping; native @Scheduled later at min-instances=1 (ADR-011).**
+- **A-Q8 -> Background jobs = always-on container + in-process @Scheduled under Postgres advisory locks (ADR-011).**
 - **A-Q9 -> Search = PostgreSQL (indexes + FTS + pg_trgm + PostGIS) behind a swap seam (ADR-012).**
 - **A-Q10 -> Media = pre-signed direct-to-R2, split public/private buckets, `StorageClient` seam (ADR-013).**
 - **A-Q11 -> Payments = Cashfree PG (Razorpay = fallback), fee-only at MVP (rent off-platform), `PaymentClient` seam (ADR-014, ADR-017).**
 - **A-Q14 -> Provider consolidation = Cashfree primary for Payments now, Payouts later behind a `PayoutClient` seam; prod 2FA via RSA public-key signature (ADR-017, ADR-018). Identity verification left the vendor entirely (ADR-009).**
 - **A-Q12 -> Cache/limits = defer Redis; CDN + Postgres + in-process + Cloudflare edge; Upstash later (ADR-015).**
-- **A-Q13 -> Ops = Secret Manager + GitHub Actions + Cloud Logging/Monitoring/Sentry; DR = Supabase backups + pg_dump->R2 (ADR-016).**
+- **A-Q13 -> Ops = GitHub environment secrets + GitHub Actions + App Platform logs/alerts + in-app error log; DR = managed-database backups + pg_dump->R2 (ADR-016).**
 
 **Principle locked by the founder:** free-tier-first - spend nothing until real usage forces it.
-Every component must justify any non-zero cost. The only unavoidable early cost is login OTP
+Every component must justify any non-zero cost. Hosting is the fixed floor: sandbox ≈ $17/mo + 18% GST (§4.3). The only unavoidable early usage cost is login OTP
 (WhatsApp authentication templates, ADR-020), which stays behind a provider seam and is free in dev.
 Identity verification used to be the second, and stopped being one when it came in-house (ADR-009).
 
@@ -1150,7 +1108,7 @@ Identity verification used to be the second, and stopped being one when it came 
 - A-Q4 Team size / ops maturity.
 
 **Assumptions (provisional, flagged):**
-- Compute + DB co-located in an asia region near Pune for latency.
+- Compute + DB co-located in Bangalore (BLR1) near Pune for latency.
 - MVP traffic modest (low-thousands MAU); free tiers suffice initially.
 
 ---
@@ -1181,13 +1139,12 @@ Identity verification used to be the second, and stopped being one when it came 
 
 | Component | ADR | Note |
 | --- | --- | --- |
-| Cloud Run / GCP | ADR-005 | Personal Google account + card; needs a billing account, not a company |
+| DigitalOcean (App Platform + PostgreSQL) | ADR-005/007/021 | Personal signup + card; needs a billing account, not a company |
 | Google Maps Platform | - | Billing account + card (India invoice adds GST; no entity required) |
-| Supabase Postgres | ADR-007 | Personal signup |
 | Cloudflare Pages / R2 | ADR-005/013 | Personal signup |
 | Firebase FCM | ADR-006 | Free, personal Google account |
 | Email - Brevo / Resend | ADR-010 | Personal signup (domain verification for deliverability, not an entity) |
-| Sentry / UptimeRobot / GitHub Actions | ADR-016 | Personal signup |
+| UptimeRobot / GitHub Actions | ADR-016 | Personal signup |
 | Upstash Redis | ADR-015 | Personal signup |
 
 ### 9.3 Go-live sequencing (entity is a launch dependency, not a build dependency)

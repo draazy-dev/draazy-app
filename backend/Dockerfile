@@ -1,4 +1,4 @@
-# Container image for draazy-api (platform-architecture.md §6.1: Cloud Run, asia-south1).
+# Container image for draazy-api (platform-architecture.md §6.1: DigitalOcean App Platform, BLR1).
 #
 # Why a Dockerfile and not `spring-boot:build-image`. Buildpacks need a Docker daemon on whatever
 # machine runs the build, which rules out the hosted CI runners and the "push a repo, we build it"
@@ -13,7 +13,7 @@
 #      free to change for reasons that have nothing to do with the deploy — and the failure mode of
 #      guessing wrong is a COPY that matches no jar.
 #
-#   2. `server.port=${PORT:8080}` (application.properties) is the Cloud Run contract. Nothing here
+#   2. `server.port=${PORT:8080}` (application.properties) is the container-host contract. Nothing here
 #      hardcodes a port; EXPOSE is documentation only and the host's PORT wins.
 
 # ---------------------------------------------------------------------------------------------
@@ -65,7 +65,7 @@ USER app
 # insecure configuration has to be asked for by name. Override it (e.g. `sandbox`) deliberately.
 ENV SPRING_PROFILES_ACTIVE=prod
 
-# Heap at 70% of the container limit (the 25% default wastes a small Cloud Run instance); the rest
+# Heap at 70% of the container limit (the 25% default wastes a small instance); the rest
 # covers metaspace, thread stacks, malloc arenas and the S3 client's direct buffers.
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError"
 

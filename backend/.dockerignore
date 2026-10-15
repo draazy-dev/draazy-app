@@ -16,10 +16,8 @@ target-*/
 .env
 .env.*
 
-# Key material, excluded by shape rather than by name. Nothing here is expected to exist — the point
-# is that `docs/DEPLOY.md` §5 tells an operator to run `gcloud iam service-accounts keys create
-# key.json`, which lands in whatever directory they happen to be standing in. A deny rule that only
-# lists files someone remembered to think of is a deny rule that fails on the one nobody did.
+# Key material, excluded by shape rather than by name: nothing here is expected to exist, and a deny
+# rule that only lists remembered filenames fails on the one nobody thought of.
 *.pem
 *.p12
 *.jks

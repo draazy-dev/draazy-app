@@ -6,8 +6,8 @@ Four tiers, in the order a change travels from a keyboard to a stranger's phone.
 |---|---|---|---|---|
 | 1 | `local` | a developer's machine | `draazy`, schema + demo seed | `.env.local`, git-ignored |
 | 2 | `local,e2e` | the Playwright suite | `draazy_e2e`, schema + seed, wiped freely | none needed |
-| 3 | `sandbox` | the shared test environment | Supabase sandbox, schema + demo seed | GCP Secret Manager |
-| 4 | `prod` | real users | Supabase production, schema only | GCP Secret Manager |
+| 3 | `sandbox` | the shared test environment | DigitalOcean dev database, schema + demo seed | GitHub `sandbox` environment secrets |
+| 4 | `prod` | real users | DigitalOcean Managed PostgreSQL, schema only | GitHub environment secrets |
 
 Each tier has a file: `application-local.properties`, `application-e2e.properties`,
 `application-sandbox.properties`, `application-prod.properties`. All four layer on
@@ -15,8 +15,8 @@ Each tier has a file: `application-local.properties`, `application-e2e.propertie
 
 Every deployed tier names **exactly one** profile, and its file is self-contained: its own
 datasource, its own secret lookups, its own cookie flags, throttles and proxy CIDR. Sandbox and
-production read the same variable *names* and completely different *values* — separate Supabase
-projects, separate Secret Manager entries, separate Cashfree credentials.
+production read the same variable *names* and completely different *values* — separate
+databases, separate environment secrets, separate Cashfree credentials.
 
 ## The rule that makes the rest make sense
 
@@ -220,8 +220,8 @@ SPRING_PROFILES_ACTIVE=sandbox
 
 The shared test environment on DigitalOcean App Platform, at `sandbox.draazy.com`. Production configuration —
 env-only secrets, `Secure` cookies, real TLS, real rate limits — with demo inventory so there is
-something to look at. It reaches its own Supabase project through its own
-`draazy-sandbox-*` secrets, and its own Cashfree account; nothing about the values is shared with
+something to look at. It reaches its own DigitalOcean database through its own
+`SANDBOX_*` GitHub environment secrets, and its own Cashfree account; nothing about the values is shared with
 production.
 
 Because it no longer names `prod`, it is named explicitly in `LocalProfileGuard.DEPLOYMENT_PROFILES`
@@ -232,7 +232,7 @@ a public environment holding real credentials would have been treated as local.
 
 The seed is a *repeatable* Flyway migration (`R__zz_DML_dev_demo_data.sql`), which means it re-runs
 whenever its checksum changes. **A database that has been seeded can never be promoted to
-production.** Sandbox and production are separate Supabase projects for that reason, and nothing
+production.** Sandbox and production are separate databases for that reason, and nothing
 copies one to the other.
 
 Back-office access starts through the single-admin bootstrap variables in `DEPLOY.md`
@@ -270,7 +270,7 @@ report itself healthy.
 | `backend/run-e2e-backend.ps1`, `run-lane-*.ps1` | `local,e2e` |
 | `backend/src/test/resources/application.properties` | `local` (the Java suite) |
 | `backend/Dockerfile` | `prod` |
-| `backend/deploy/cloudrun-sandbox.yaml` | `sandbox` |
+| `backend/deploy/do-app-sandbox.yaml` | `sandbox` |
 
 The Java suite runs under `local` because that is what wires the keyless providers its ~880 tests
 assert against. It is exempt from the `DRAAZY_DEV_MACHINE` check, and the exemption keys on

@@ -1,105 +1,77 @@
-## Workflow Orchestration
+## Workflow
 
-### Attachments
-An attached image is the **source of truth** — if it contradicts the code, the code is wrong; say so. Inspect it before answering or editing and state what you see and what you're changing because of it; never ask the user to re-describe it. Workspace image → `view_image`, not `read_file`; referenced but missing → say so and stop.
+**Attachments.** An attached image is the source of truth: if the code contradicts it, the code is wrong; say so. Inspect it first and state what you see and what you'll change. Referenced but missing → say so and stop.
 
-### Skill Routing (load on demand)
-Default: **read no skill file** — answering, explaining, and mechanical edits need none. Otherwise match a trigger, **max two per turn** (tie → the one matching the artifact asked for, else the lower row).
+**Skills, on demand.** Default: none (answers, explanations, mechanical edits). Otherwise at most two per turn (tie → the one matching the artifact asked for, else the lower row):
 
-| Trigger | Read |
+| Trigger | Skill |
 |---|---|
-| Frontend code — conventions, file map, auth guards, Playwright harness | `draazy-frontend` |
-| Backend code — Spring Boot + PostgreSQL conventions, data model, Flyway, JWT/role guards, contact gate, provider seams, frontend `http` wiring | `draazy-backend` |
-| Listing/search/filter/map/wizard/contact-gate/alert **behaviour**; SEO for property pages | `real-estate-expert` |
+| Frontend code: conventions, file map, auth guards, Playwright harness | `draazy-frontend` |
+| Backend code: Spring Boot + PostgreSQL, data model, Flyway, JWT/role guards, contact gate, provider seams, frontend `http` wiring | `draazy-backend` |
+| Listing/search/filter/map/wizard/contact-gate/alert **behaviour**; property-page SEO | `real-estate-expert` |
 | Scope, priority, tradeoffs, success metrics for a new feature | `senior-product-manager-realestate` |
-| Mobile/touch UI — phone viewport, bottom sheet, carousel, tap/scroll feel, safe areas, PWA | `mobile-native` |
+| Mobile/touch UI: phone viewport, bottom sheet, carousel, tap/scroll, safe areas, PWA | `mobile-native` |
 | New UI surface or visual redesign | `ui-ux-pro-max`, then `frontend-design` |
 | Render/data/bundle performance | `react-performance` |
 | A skill named by the user | that skill |
-| Writing new code beyond a one-line fix (doesn't count toward the two-skill cap) | `ponytail` |
+| New code beyond a one-line fix (outside the two-skill cap) | `ponytail` |
 
-Conflicts: `draazy-*` wins on implementation, `real-estate-expert` on domain, `senior-product-manager-realestate` on scope, `mobile-native` on touch/viewport behaviour (`ui-ux-pro-max` still owns layout, density and colour). Every skill named above is versioned in **`.agents/skills/`** in this repo — edit it there, never a personal copy in `~/.copilot` or `~/.claude`. Named but not in `.agents/skills/` → report it rather than guessing.
+Conflicts: `draazy-*` wins on implementation, `real-estate-expert` on domain, `senior-product-manager-realestate` on scope, `mobile-native` on touch/viewport (`ui-ux-pro-max` owns layout, density, colour). Skills live in `.agents/skills/`; edit them there, never in `~/.copilot` or `~/.claude`. A named skill missing there → report it.
 
-**Simplicity rule — applies while writing, not just in review.** Prefer no change > existing code > stdlib/native > one-line addition > new dependency > new abstraction; ship the shortest diff that fully solves it. Before writing code, ask whether it needs to exist (YAGNI): no speculative abstractions, config, or flexibility for hypothetical needs. When writing new code beyond a one-line fix, read `ponytail` before you start. Read `ponytail-review` for an over-engineering audit ("what can we delete").
+**Simplicity.** No change > existing code > stdlib/native > one-line addition > new dependency > new abstraction. YAGNI: no speculative abstractions, config or flexibility. `ponytail-review` for an over-engineering audit.
 
-**Mobile-first UI.** Design for the phone viewport first, then scale up. Keep tiles, forms and screens clutter-free — critical info (price, BHK, locality, primary CTA) first, secondary detail behind a tap. Keep on-screen notes, hints and help text to a minimum — one short line, to the point.
+**Mobile-first UI.** Phone viewport first. Critical info (price, BHK, locality, primary CTA) up front, the rest behind a tap. Hints and help text: one short line at most.
 
-### Check-ins
-On conflict, rules rank: safety/correctness > task-type routing > planning/check-in > elegance > lessons capture.
+**Check-ins.** Bug fix / scoped task → proceed autonomously. New feature / architectural change → plan and confirm with the user first. Ambiguous scope → ask one question. Ask via the ask-user tool with options and a recommended default, keep executing whatever the answer can't invalidate, never end a turn on a prose question. Spawning a subagent is not a check-in.
 
-| Situation | Action |
-|-----------|--------|
-| Bug fix / clearly scoped task | Proceed autonomously, even across multiple files |
-| New feature / architectural change | Plan first, verify with user before implementing |
-| Ambiguous scope | Ask one clarifying question first |
-| Spawning a subagent | Not a check-in — never pause, spawn silently |
+**Execution**
+- Session start: read only `tasks/NOW.md`. Open `tasks/todo.md`, `tasks/lessons.md`, `tasks/DECISIONS-NEEDED.md` only when it points there, and grep them rather than reading whole.
+- Session end: run `/now` before context fills (not ECC's `/save-session`, which other sessions can't see).
+- Plans go in `tasks/todo.md` as checkboxes; a finished slice gets one index line, since git is the archive.
+- Record every user correction as one line in `tasks/lessons.md`. This file beats a conflicting lesson: quote both, follow this file.
+- Subagents only for >150 new lines, >3 files, or independent parallel workstreams. One responsibility each; on failure stop and report, never apply partial output (mark PARTIAL in `tasks/todo.md`).
+- **Subagent model: always `claude-sonnet-5.5`.** Custom agents pin it in `~/.copilot/agents/*.agent.md`; for built-ins (`explore`, `task`, `general-purpose`, `rubber-duck`, `code-review`) pass `model: claude-sonnet-5.5`.
+- Fix root causes, no temporary hacks, touch only what's necessary.
 
-**Ask via `vscode_askQuestions`, never by halting** — options + a recommended default. Questions are non-blocking: ask, then keep executing anything the answer cannot invalidate. Stop only if *every* remaining path depends on the answer, and say so. Never end a turn with a prose question and no tool call.
+## Comments: the default is NONE
 
-### Execution
-- **Session start** — read `tasks/NOW.md` (capped at 60 lines) and nothing else to orient. It names the lane, the queue, the open-work pointers with their sizes, and the standing constraints. Open `tasks/todo.md`, `tasks/lessons.md` or `tasks/DECISIONS-NEEDED.md` only once a pointer sends you there, and grep them rather than reading whole.
-- **Session end** — run `/now` before the context fills, not after. It rewrites `tasks/NOW.md` so the next session starts cold. Do not use ECC's `/save-session`: it writes to a global `~/.claude/session-data` file that the second session sharing this repo cannot see.
-- **Planning** — plan mode for features/architectural changes with real tradeoffs. If it goes sideways, STOP and re-plan; if a full re-plan also fails, report the specific obstacle. Bug fixes: just fix it from the logs/errors/failing tests.
-- **Elegance** — any change touching more than one function or adding an abstraction: ask whether something simpler works. Skip for mechanical edits.
-- **Subagents** — only when >150 new lines, >3 files, or independent parallel workstreams AND no single targeted fix solves it. One responsibility each; on failure, stop and report — never apply partial output, record it in `tasks/todo.md` as PARTIAL.
-- **Subagent model** — planning, architecture and review/verification → `claude-opus-5.5`; execution (writing code, builds, tests, exploration) → `claude-sonnet-5.5`. Custom agents pin this in `~/.copilot/agents/*.agent.md` frontmatter; for built-ins pass `model`: `rubber-duck`/`code-review` → opus, `general-purpose`/`task`/`explore` → sonnet.
-- **Lessons** — record every user correction in `tasks/lessons.md`. It is one line per rule, so grep it for the symptom rather than reading it whole; `tasks/NOW.md` carries the pointer. This file beats a conflicting lesson: quote both, then follow this file.
-- **Tasks** — plan to `tasks/todo.md` as checkable items, tick them as you go. Create either file with a header if missing. A finished slice gets **one index line** there, never a narrative — git is the archive.
-- **Principles** — simplest change that fully solves it · fix root causes, no temporary hacks · touch only what's necessary.
+Write one only for a non-obvious WHY (workaround, ordering constraint, library quirk, deliberate deviation), a coupling invisible from here, or a required marker (`TODO`, `eslint-disable`/`@ts-expect-error` with the reason, docblocks a script greps). Never restate the code, write section banners, narrate your edit ("now uses", "previously", dates, ticket ids), docblock a self-evident function, or leave commented-out code. Budget 1–2 lines, above the code. Applies to config, SQL and YAML too.
 
-## Comments You Write — the default is NONE
+`node scripts/check-comments.mjs --staged` must exit 0 before every commit, amend or history rewrite. Before handing back unpushed work also run `node scripts/check-comments.mjs origin/<branch>..HEAD`.
 
-**Write zero comments unless the code genuinely cannot carry the meaning.** Names, small functions, and types are the explanation; a comment is what you reach for *after* those fail, not alongside them. Every comment is a claim you commit to keeping true, so adding one must be defensible, never a reflex. Applies to every language, and to config, SQL, and YAML alike.
+## File-Touch Hygiene: every file in your diff
 
-Write one ONLY for:
-- a **non-obvious WHY** — a workaround, an ordering constraint, a library/spec quirk, a deliberate deviation a reader would otherwise "fix"
-- a **coupling invisible from here** — this value must match X; this must run before Y
-- a **required marker** — `TODO`, `eslint-disable`/`@ts-expect-error` (with the reason), and docblocks a script greps
+1. Hold existing comments to the rule above and delete changelog prose. **Do not touch:** an applied Flyway migration (`db/migration/<yy>.<mm>.<seq>__*.sql`, checksummed, so any edit breaks the next boot); security rationale protected by `docs/system/code-quality.md`; docblocks a script greps by path (grep the file's name before deleting).
+2. Remove provably behaviour-preserving redundancy: reinvented stdlib, dead flexibility, predicates duplicated across a seam, unreachable branches, one-caller wrappers. Anything bigger → a note in `tasks/todo.md`.
 
-Never write:
-- a restatement of the code below it (`// increment counter`, `// fetch the user`)
-- section banners (`// ---- helpers ----`, `// State`, `// Handlers`)
-- narration of your own edit — "now uses", "previously", "added for", dates, ticket ids. That belongs in the commit message.
-- a docblock on a self-evident function, or `@param`/`@returns` repeating the signature
-- commented-out code — delete it
+Shrinking a Java service with a `ServiceSizeGuardTest` `BASELINE` entry to at-or-under the limit → delete its entry in the same commit, or `baselineStaysHonest` fails.
 
-**Budget: 1–2 lines, above the code.** If a block seems to need a paragraph, it needs a better name or a split instead. Unsure → leave it out: an absent comment costs nothing, a stale one misleads for years.
+## Finding code
 
-**Enforced, not remembered.** `node scripts/check-comments.mjs --staged` must exit 0 before every commit, amend or history rewrite — no exceptions, no "only my lines". It checks whole touched files (blocks over 2 lines, comment lines over 120 chars, changelog wording) and skips the Do-not-touch files below. Before handing back unpushed work, also run it over the range: `node scripts/check-comments.mjs origin/<branch>..HEAD`.
-
-## File-Touch Hygiene — every file you edit
-
-Scan the **whole file** you touched, not just your diff, and fix both rots below in the same change. Scope is the files already in your diff — never open new files to clean.
-
-1. **Comments — hold existing ones to the rule above**, and delete changelog prose (dates, ticket ids, "previously / now / was", before-after narration, docblocks git history already holds). **Do not touch:** an already-applied Flyway migration (`db/migration/<yy>.<mm>.<seq>__*.sql` — checksummed, a comment edit alone breaks the next boot); security rationale protected by `docs/system/code-quality.md`; docblocks a script greps by path. Grep the file's bare name before deleting anything a tool may read.
-2. **Redundancy scan.** Apply the simplicity rule to code already there: reinvented stdlib/native behaviour, dead flexibility, predicates duplicated across a seam, unreachable branches, wrappers with one caller. Remove only what is **provably behaviour-preserving**; anything larger goes to `tasks/todo.md` as a note, not into the diff.
-
-Shrinking a Java service that holds a `ServiceSizeGuardTest` `BASELINE` entry to at-or-under the limit fails `baselineStaysHonest` — delete its entry in the same commit.
-
-## Context Cost Rules
-
-### Query the graph before searching
-`graphify-out/` graphs `backend`, `frontend` and the Flyway migrations. To locate code from a symptom, screenshot, or concept rather than a known filename, **query it first** — right files with line numbers for ~600 tokens vs ~40k for semantic search plus reads. Fall back to `grep_search`/`semantic_search` only if a query returns nothing useful. Run from the repo root (the CLI isn't on PATH):
+`graphify-out/` graphs `backend`, `frontend` and the migrations. To locate code from a symptom, screenshot or concept, query it first; fall back to grep only if it returns nothing useful. Run from the repo root:
 
 ```powershell
 .\scripts\graphify.ps1 query "mobile bottom navigation bar" --budget 700
 .\scripts\graphify.ps1 path "BottomNav" "AuthContext"
 .\scripts\graphify.ps1 explain "ConsumerLayout"
-.\scripts\graphify.ps1 update      # adds/renames/deletes — incremental, idempotent
-.\scripts\graphify.ps1 rebuild     # large refactors; the only full re-index
+.\scripts\graphify.ps1 update    # after adds/renames/deletes
+.\scripts\graphify.ps1 rebuild   # large refactors only
 ```
 
-Stale if `git rev-parse HEAD` ≠ the commit in `graphify-out/GRAPH_REPORT.md` — `update` first, or it points at moved files. Never commit `graphify-out/` (git-ignored, regenerable). **Never `graphify extract`** — it loses relative paths and named communities and drops ~300 nodes.
+Stale if `git rev-parse HEAD` ≠ the commit in `graphify-out/GRAPH_REPORT.md` → `update` first. Never commit `graphify-out/`; never run `graphify extract` (loses paths and ~300 nodes).
 
-### Reading files
-Prefer `grep_search` over `semantic_search` when you know the identifier; over ~400 lines, grep the symbol then read a narrow range — never whole. Worst offenders: `frontend/src/data/societies-rera.js` (182 KB minified on 4 lines — grep only), `frontend/src/styles/index.css` (~3,570 lines — grep a class; its section map and tier rules live in the `draazy-frontend` skill), `e2e/COVERAGE.md` (grep the feature's row), `e2e/helpers/app.js` (grep its exports). `e2e` is deliberately **not** in the graph — specs reach the app via `page.goto()` strings, so there are no edges; find one by filename (`Get-ChildItem e2e/tests -Recurse -Filter *bottom-nav*`) or a COVERAGE.md row.
+Files over ~400 lines: grep the symbol, read a narrow range. Grep only, never read whole: `frontend/src/data/societies-rera.js` (182 KB minified), `frontend/src/styles/index.css` (~3,570 lines; section map in `draazy-frontend`), `e2e/COVERAGE.md`, `e2e/helpers/app.js`. `e2e` is not in the graph; find specs by filename or a COVERAGE.md row.
 
-## Post-Change Verification (in order)
-**user-data change** = code that reads/writes/transmits/displays PII, credentials, session tokens, contact-gate logic, or per-user data.
+## Verification
 
-1. **Review** — `react-reviewer` (`.jsx`) → `code-reviewer` (general) → `security-reviewer` (auth or user-data only). Agent unavailable → review manually and mark PENDING AGENT REVIEW in `tasks/todo.md`.
-2. **Simplify — every commit, no size threshold** — confirm File-Touch Hygiene ran on every file in the diff and `check-comments.mjs --staged` passes, then `ponytail-review` and `code-simplifier` over the staged diff, STRICT no-behavior-change; apply the cuts before committing, not in a later cleanup pass. Unavailable → note the skip in `tasks/todo.md`.
-3. **Playwright** — per fix, run `e2e\run-fast.ps1` (the specs its changes reach; `-Files <paths>` when the tree holds another session's work, `-Failed` to rerun failures). Before a commit, run `e2e\run-fast.ps1 -Full`, which runs the whole suite in parallel across isolated shards. Not complete until green, and fix root causes, not tests. A failure not already in `tasks/todo.md` → flag as potentially pre-existing before proceeding; record confirmed ones there and don't count them against the task.
-4. **Specs** — every completed feature or behaviour change ships a new or updated `e2e/*.spec.js` plus an `e2e/COVERAGE.md` entry. No coverage → document the gap in `tasks/todo.md` and mark PENDING VERIFICATION.
-5. **Re-index the graph** — file added, renamed, or deleted under `backend/`, `frontend/src` or the migrations → `.\scripts\graphify.ps1 update`. Skip if only contents changed.
-6. **Clean up** — last step, once the task is verified. Remove everything **this task created** and list it in the final summary: extra build dirs (`backend\target-<name>`), scratch databases (`DROP DATABASE IF EXISTS draazy_test_<name> WITH (FORCE)`, same for `draazy_e2e_<name>`), logs and console captures (`$env:TEMP\draazy-*.log`, `backend\*.txt`, `e2e\*.txt`, `*.log`), `tmp-*.spec.js`, scratch files, and any server/JVM you started (`Stop-Process -Id`). Other sessions share this machine: never touch what you didn't create or what is still in use (live connections in `pg_stat_activity`, a running process holding the dir). Always keep `backend\target` (owned by the VS Code Java language server), `target-cli`, `target-shard`, `e2e\.shards`, and the long-lived databases `draazy`, `draazy_test`, `draazy_e2e`, `draazy_e2e_sh1`–`sh8`.
+**Per fix**
+1. `e2e\run-fast.ps1` (the specs the change reaches; `-Files <paths>` if the tree holds another session's work, `-Failed` to rerun). Green before moving on; fix root causes, not tests. A failure not in `tasks/todo.md` → flag as possibly pre-existing; record confirmed ones there.
+2. Feature or behaviour change → new or updated `e2e/*.spec.js` plus an `e2e/COVERAGE.md` row. No coverage → note it in `tasks/todo.md` as PENDING VERIFICATION.
+3. File added/renamed/deleted under `backend/`, `frontend/src` or the migrations → `.\scripts\graphify.ps1 update`.
+
+**Before each commit** (once, over the staged diff; never after individual fixes)
+1. Review: `react-reviewer` (`.jsx`) → `code-reviewer` → `security-reviewer` only for auth or user-data changes (PII, credentials, session tokens, contact gate, per-user data). Unavailable → review manually, mark PENDING AGENT REVIEW in `tasks/todo.md`.
+2. Simplify: File-Touch Hygiene done and `check-comments.mjs --staged` passes, then `ponytail-review` + `code-simplifier`, strictly no behaviour change; apply the cuts before committing.
+3. `e2e\run-fast.ps1 -Full` green.
+
+**Clean up** (last): remove only what this task created and list it: `backend\target-<name>`, scratch DBs (`DROP DATABASE IF EXISTS draazy_test_<name> WITH (FORCE)`, same for `draazy_e2e_<name>`), logs (`$env:TEMP\draazy-*.log`, `backend\*.txt`, `e2e\*.txt`, `*.log`), `tmp-*.spec.js`, servers/JVMs you started (`Stop-Process -Id`). Never touch what isn't yours or is still in use (`pg_stat_activity`, a process holding the dir). Always keep `backend\target`, `target-cli`, `target-shard`, `e2e\.shards` and DBs `draazy`, `draazy_test`, `draazy_e2e`, `draazy_e2e_sh1`–`sh8`.

@@ -1,23 +1,48 @@
 # Deploying Draazy
 
 The local counterpart is [`LOCAL_DEV.md`](./LOCAL_DEV.md). The *shape* of the deployment — DigitalOcean
-App Platform in `blr`, dev Postgres, Cloudflare R2 — is decided in
-[`system/platform-architecture.md`](./system/platform-architecture.md) §6 and ADR-007/ADR-013/ADR-021. This
-file is the runbook: what to set, in what order, and which mistakes are silent.
+App Platform in `blr`, a dev Postgres, Cloudflare Pages and R2 — is decided in
+[`system/platform-architecture.md`](./system/platform-architecture.md) §6 and ADR-007/ADR-013/ADR-021.
+This file is the single deployment document: the contract (what to set and which mistakes are silent),
+the order for a fresh environment (§6) and the checks after a deploy (§9).
 
 > **Source of truth for the variable list is `ProdProfileContractTest`**, not this page. That test
 > loads the real `application-prod.properties` and fails if a `${ENV}` lookup appears without being
 > added to its checklist. If this page and that test disagree, the test is right.
 
-> **Performing a deploy rather than reading about one?** Go to
-> [`DEPLOY_WALKTHROUGH.md`](./DEPLOY_WALKTHROUGH.md) — the same ground as a single ordered sequence
-> across all six components (Supabase, container, GCP, GitHub, Cloud Run, Cloudflare Pages + the
-> GoDaddy domain), with macOS and Windows commands side by side. It links back here for the *why* of
-> any individual value. Where the two disagree about a value, this page wins; about order, it does.
+Commands are given for macOS and Windows PowerShell where they differ; run them from the repository root
+unless stated otherwise. The repository is `draazy-dev/draazy-app`.
+
+| § | Covers |
+|---|---|
+| 1 | Topology and the same-site cookie rule |
+| 2 | Database (DigitalOcean dev database), roles and migrations |
+| 3 | Environment variables, OTP, storage, identity, email, push |
+| 4 | `INTERNAL_PROXIES`, the origin gate, Cloudflare edge controls |
+| 5 | DigitalOcean App Platform, the GitHub deploy pipeline, scheduled jobs |
+| 6 | First-time setup of a fresh environment, in order |
+| 7 | Known blockers |
+| 8 | Logs, errors and alerts |
+| 9 | Manual verification |
 
 ---
 
-## 1. The one rule that governs the whole topology
+## 1. Topology and the same-site/cookie rule
+
+```
+              https://sandbox.draazy.com
+                         │
+               ┌─────────┴─────────┐
+               │  Cloudflare Pages │
+               └─────────┬─────────┘
+          /api/*  │                 │  everything else
+                  ▼                 ▼
+    functions/api/[[path]].js    the built SPA (dist/)
+                  │
+                  │  fetch(API_ORIGIN + /api/...)
+                  ▼
+   https://draazy-api-sandbox-466hx.ondigitalocean.app   (DigitalOcean App Platform, blr)
+```
 
 **The SPA and `/api` must be same-*site*.** The refresh token rides a `SameSite=Lax`, `__Host-`
 prefixed cookie, so a browser only returns it when the page and the API share a registrable domain.
@@ -35,149 +60,159 @@ indistinguishable from a visitor who was never signed in. `CookieDeliveryCheck` 
 that shape, which is the only reason it is caught at all — no test can reach it, because dev and e2e
 go through the Vite proxy where everything is same-origin by construction.
 
-Note that this rules out running the sandbox on its `*.pages.dev` preview URL. The custom domain has
-to be attached before anyone can stay signed in.
+Consequences, all easy to get wrong:
 
-The path proxy was chosen because it is the only one of the two that can also deliver the readable
+- **Never test login on the `*.pages.dev` URL.** Every Pages deployment gets one and it is cross-site
+  with `/api`. Browsing works there; sessions do not. The custom domain has to be attached before
+  anyone can stay signed in.
+- **Do not create `api.draazy.com`.** Pointing a subdomain at the backend is the *other* shape and needs
+  different `WEB_ORIGINS` / `API_PUBLIC_ORIGIN` values. Mixing the two gives a service that boots and
+  cannot hold a session. The browser never learns the DigitalOcean URL: it is the Pages variable
+  `API_ORIGIN`, read server-side at request time, with no DNS record.
+- **`VITE_API_BASE` stays unset (`/api`).** Relative, by design: an absolute value is the cross-origin
+  topology, and the CSP ships `connect-src 'self'`.
+
+The path proxy was chosen because it is the only shape that can also deliver the readable
 `__Host-draazy_session` marker, without which the Safari/ITP session recovery is inert.
 
 ### How the proxy is implemented
 
 `frontend/functions/api/[[path]].js` — a Cloudflare Pages Function, not a `_redirects` rule.
 **Cloudflare Pages does not proxy `_redirects` to an external origin**; it redirects to it, which
-lands the browser on the backend's origin and loses the cookie exactly as described above. Netlify
-did proxy such a rule, which is why `scripts/gen-redirects.mjs` existed and why it was deleted
-rather than carried over — kept, it would have produced a deploy that looked configured and was not.
+lands the browser on the backend's origin and loses the cookie exactly as described above.
 
 Pages resolves Functions before static assets and before `_redirects`, so the SPA rewrites cannot
 shadow `/api`. `_redirects` is generated at build time by `frontend/scripts/vite-plugin-spa-fallback.mjs`:
-one rewrite per `App.jsx` route to the shell (prerendered pages rewrite to themselves first), which ships as `dist/404.html` so unknown paths answer a
-real 404. A `/*` rewrite cannot be used: Pages ignores `/* /index.html`, and any other `/*` target
-would be matched before the asset lookup and serve `/assets/*.js` as HTML. The `/api` prefix is forwarded verbatim because
-the backend runs with `server.servlet.context-path=/api`. The Function's own configuration is a
-single Pages environment variable, `API_ORIGIN` (scheme + host of the backend service e.g. DigitalOcean default ingress, no path);
-unset, it answers 502 rather than falling through — a fall-through would return the HTML shell with
-a 200, which `http.js` reads as success and renders as an affirmative "no results" on every
-catalogue.
+one rewrite per `App.jsx` route to the shell (prerendered pages rewrite to themselves first), which
+ships as `dist/404.html` so unknown paths answer a real 404. A `/*` rewrite cannot be used: Pages
+ignores `/* /index.html`, and any other `/*` target would be matched before the asset lookup and serve
+`/assets/*.js` as HTML. Security headers and the CSP live in `frontend/public/_headers`.
 
-Security headers and the CSP moved to `frontend/public/_headers`, values unchanged from the Netlify
-config.
+The `/api` prefix is forwarded verbatim because the backend runs with `server.servlet.context-path=/api`.
+The Function reads two Pages settings:
 
-**Release note (L2):** the first deploy carrying the `__Host-` cookie names signs every
-already-signed-in user out once. Nothing is lost; the next sign-in is normal.
+| Setting | Value |
+|---|---|
+| `API_ORIGIN` | Scheme + host of the backend, no path, no trailing slash: the App Platform default ingress |
+| `ORIGIN_SHARED_SECRET` | Pages **secret**; same value as the backend's (§4) |
+
+Unset, either answers 502 rather than falling through — a fall-through would return the HTML shell with
+a 200, which `http.js` reads as success and renders as an affirmative "no results" on every catalogue.
+The Function also sets `X-Forwarded-For` from `CF-Connecting-IP`, overwriting anything the client sent,
+and refuses to forward at all when that header is absent.
 
 ---
 
-## 2. Database — Supabase (ADR-007)
+## 2. Database — DigitalOcean dev database
 
-Supabase is used as **plain Postgres**. Its Auth, Realtime and Edge Functions are unused, we run our
-own Flyway migrations and our own JWTs, and that is what keeps the lock-in low enough to leave.
+The sandbox database is the dev database declared in the app spec (`databases: db`, PostgreSQL 17,
+`production: false`): 512 MB RAM, about 1 GB of storage, a single user, in the app's region (it cannot be
+moved to another region). It carries no credentials in GitHub: the spec binds `${db.HOSTNAME}`,
+`${db.PORT}`, `${db.DATABASE}`, `${db.USERNAME}` and `${db.PASSWORD}`, and DigitalOcean fills them at deploy.
 
-You need **two** connection strings, and this is the part that costs a day if it is guessed:
-
-| Variable | Supabase connection | Port | Why |
-|---|---|---|---|
-| `DB_URL` | Supavisor pooler, **transaction** mode | `6543` | Cloud Run scales to zero and back; every cold start would otherwise open fresh backends against a free-tier connection ceiling measured in dozens |
-| `FLYWAY_DB_URL` | Supavisor pooler, **session** mode | `5432` | Flyway locks concurrent deploys out with `pg_advisory_lock`, which is *session*-scoped. Transaction pooling moves the session between statements, so the lock is taken on one backend and released against another — Flyway's own docs call PgBouncer transaction mode unsupported |
-
-Flyway and the running app log in as different roles. `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` are the
-schema owner `postgres.<project-ref>`, and `DB_USER` / `DB_PASSWORD` are the DML-only runtime role
-(§2.1). Only the migration job (§2.1) reads the Flyway pair. Spring Boot's dedicated Flyway DataSource
-does not inherit credentials from `spring.datasource` when `spring.flyway.url` is set, which is why both
-pairs are bound explicitly. If
-you use the *direct* connection for migrations instead (username `postgres`, and IPv4 is a paid add-on
-on new projects), point `FLYWAY_DB_URL` / `FLYWAY_DB_USER` at it.
-
-Getting `FLYWAY_DB_URL` wrong does not fail cleanly. The migration hangs holding a lock nobody owns,
-the job runs until its 15-minute timeout, and nothing in the log names Flyway.
-
-Append `?sslmode=require` to both. `application-prod.properties` already pins
-`prepareThreshold=0` (the transaction pooler cannot keep server-side prepared statements alive; the
-symptom is an intermittent `prepared statement "S_1" does not exist` on the busiest endpoints only)
-and a small, drainable HikariCP pool.
+- **Direct connection, no pooler.** `DB_URL` and `FLYWAY_DB_URL` are the same JDBC URL
+  (`...?sslmode=require`), so Flyway's session-scoped `pg_advisory_lock` works and prepared statements
+  are not an issue. `application-sandbox.properties` still pins `prepareThreshold=0`, which is harmless
+  here. It also pins `sslmode=require` as a floor, since pgjdbc's default `prefer` falls back to plaintext
+  silently, and a small, drainable Hikari pool (`maximum-pool-size=5`, `minimum-idle=0`).
+- **When it outgrows 512 MB, or needs a standby,** upgrade the dev database to a DigitalOcean Managed
+  Database from the app's database settings. Then split the roles as in §2.1.
 
 **The sandbox carries the demo seed, and it takes a named profile to get it.**
-`spring.flyway.locations` is migration-only under `prod`, deliberately —
-`R__zz_DML_dev_demo_data.sql` is *repeatable*, so it would re-seed 38 fabricated listings and 78
-fabricated users on every deploy whose checksum moved, indistinguishable from real inventory to a
-buyer. `application-sandbox.properties` is a standalone profile activated as
-`SPRING_PROFILES_ACTIVE=sandbox` — a self-contained copy of the prod configuration whose one
-declared difference is that it adds the seed location back. A seeded database can never be promoted
-to production: point production at its own Supabase project.
+`spring.flyway.locations` is migration-only under `prod`, deliberately — `R__zz_DML_dev_demo_data.sql`
+is *repeatable*, so it would re-seed 38 fabricated listings and 78 fabricated users on every deploy whose
+checksum moved, indistinguishable from real inventory to a buyer. `application-sandbox.properties` is a
+standalone profile activated as `SPRING_PROFILES_ACTIVE=sandbox` — a self-contained copy of the prod
+configuration whose one declared difference is that it adds the seed location back. A seeded database can
+never be promoted to production: point production at its own database.
 
 Sandbox and production read the same variable *names* and entirely different *values* — separate
-Supabase projects, separate Secret Manager entries, separate Cashfree credentials.
-`SandboxProfileContractTest` asserts the two files stay identical apart from the declared
-divergence, so hardening prod without hardening sandbox fails the build.
+databases, separate GitHub environment secrets, separate Cashfree credentials.
+`SandboxProfileContractTest` asserts the two files stay identical apart from the declared divergence, so
+hardening prod without hardening sandbox fails the build. All four tiers are in
+[`system/profiles.md`](./system/profiles.md).
 
-All four tiers are in [`system/profiles.md`](./system/profiles.md).
+### 2.1 Database roles and migrations
 
-### 2.1 Database roles, and the order to switch them
+**Flyway runs only in the `migrate` PRE_DEPLOY job.** The job runs the same image with
+`java -jar /app/app.jar --migrate-only`, which boots Flyway alone and exits
+(`backend/src/main/java/com/draazy/api/DraazyApiApplication.java`). The serving app sets
+`spring.flyway.enabled=false` and `ddl-auto=validate`, so a boot that completes has also proved the
+entities match the schema. A failed `migrate` aborts the deploy and the old version keeps serving.
+Migrations apply while that version is still serving, so each one must stay compatible with the code
+before it (expand/contract).
 
-Supabase leaves two holes that the app never needs: the Data API serves `public` to `anon` and
-`authenticated` with full grants, and `postgres` (the owner of every table) is a single credential for
-both migrations and every request. Close them in this order, per project. Each step deploys green on
-its own, so the rollout can stop at any point.
+Two credential pairs exist, and Spring Boot's dedicated Flyway DataSource does not inherit credentials
+from `spring.datasource` when `spring.flyway.url` is set, so both are bound explicitly:
 
-1. Run [`backend/deploy/sql/supabase-revoke-data-api.sql`](../backend/deploy/sql/supabase-revoke-data-api.sql)
-   and switch the Data API off (Project Settings → Data API). Both verify queries must return no rows.
-2. Copy today's values into the new Flyway inputs: `SANDBOX_FLYWAY_DB_USER` = the current
-   `SANDBOX_DB_USER`, and secret `draazy-sandbox-flyway-db-password` = the current
-   `draazy-sandbox-db-password`. Deploy. Nothing changes yet.
-3. Run [`backend/deploy/sql/app-runtime-role.sql`](../backend/deploy/sql/app-runtime-role.sql), set
-   the password with `\password draazy_app`, and check the verify output.
-4. Point `SANDBOX_DB_USER` at `draazy_app.<project-ref>` and add the new password as a version of
-   `draazy-sandbox-db-password`. Deploy. `DatabasePrivilegeCheck` refuses to boot if the runtime role can
-   still run DDL.
+| Variable | Read by | Role |
+|---|---|---|
+| `FLYWAY_DB_URL` / `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` | the `migrate` job | schema owner |
+| `DB_URL` / `DB_USER` / `DB_PASSWORD` | the serving app | runtime role |
+| `FLYWAY_DB_USER` | the serving app, for `DatabasePrivilegeCheck` only | — |
 
-Rollback for step 4: point `SANDBOX_DB_USER` back at `postgres.<project-ref>`, re-add the old password
-version, and redeploy.
+The service must never carry `FLYWAY_DB_PASSWORD`; `SandboxDeploymentManifestTest` asserts it.
 
-Migrations never run in the serving container. The deployed profiles set `spring.flyway.enabled=false`,
-and `deploy.yml` first runs the Cloud Run Job
-[`cloudrun-migrate-sandbox.yaml`](../backend/deploy/cloudrun-migrate-sandbox.yaml) to completion. The
-job runs the same image with `--migrate-only`, which boots Flyway alone and exits. It runs as
-`draazy-migrator-sandbox`, the only identity granted `draazy-sandbox-flyway-db-password`. The runtime
-account gets per-secret grants that leave that secret out, so code execution in the app can no longer
-reach the owner role. A failed job stops the deploy before the service is replaced. Migrations still
-apply while the previous revision serves, so each one must stay compatible with the code before it.
+**On the dev database both pairs are the same user**, so `DatabasePrivilegeCheck`
+(`backend/src/main/java/com/draazy/api/common/persistence/DatabasePrivilegeCheck.java`) only logs a
+warning that the runtime role is not DML-only. That also means code execution in the app reaches the
+owner role; the split below removes that.
 
-Moving an existing project over takes two steps. The order matters, because any revision built before
-this change still reads the Flyway password as the runtime account:
+**On a managed database with a separate DML-only role** the check refuses to boot if the runtime role is
+a superuser, can `CREATE` in `public`, or owns tables. [`backend/deploy/sql/app-runtime-role.sql`](../backend/deploy/sql/app-runtime-role.sql)
+creates `draazy_app` (rows only, 60 s statement timeout, no access to `flyway_schema_history`) with
+default privileges for tables that later migrations create as the schema owner, `doadmin`. In order, and
+each step deploys green on its own:
 
-1. Re-run `bootstrap-project.sh`. It creates the migrator and grants every secret individually, then
-   deploy.
-2. Once a revision from this change is serving, drop the old project-wide grant:
-   `gcloud projects remove-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:draazy-api-sandbox@$PROJECT_ID.iam.gserviceaccount.com" --role=roles/secretmanager.secretAccessor --condition=None`.
-   Rolling back past this change afterwards needs that grant restored first, or the old revision cannot
-   start.
+1. Make sure the `migrate` job connects as `doadmin` (`FLYWAY_DB_*`), and deploy.
+2. Run the SQL as `doadmin`, set the password with `\password draazy_app`, and check the verify output:
+   every flag false, `can_create` false, `owned_tables` 0.
+3. Point the service's `DB_USER` / `DB_PASSWORD` at `draazy_app` (as app-spec secrets), keep the job on
+   `doadmin`, and deploy.
 
-Run locally with `java -jar app.jar --migrate-only` and the three `FLYWAY_*` variables set.
+Rollback for step 3: point `DB_USER` / `DB_PASSWORD` back at `doadmin` and redeploy.
+
+Run migrations locally with `java -jar app.jar --migrate-only` and the three `FLYWAY_*` variables set.
 
 ---
 
-## 3. Environment
+## 3. Environment variables
 
 Every variable below is declared with **no default**, so a deploy that omits one fails to start
 rather than inheriting the developer values in `application.properties` (local Postgres credentials,
 a committed JWT secret, `trusted-proxies=none`). That is the design, not an inconvenience.
 
+Secrets live in the GitHub `sandbox` environment (§5.1). The deploy workflow substitutes them into
+`backend/deploy/do-app-sandbox.yaml`, and DigitalOcean stores the `type: SECRET` entries encrypted. There
+is no separate secret store.
+
 | Variable | Notes |
 |---|---|
-| `DB_URL` | transaction pooler, `:6543`, `sslmode=require` |
-| `DB_USER` / `DB_PASSWORD` | runtime role `draazy_app.<project-ref>` (§2.1) |
-| `FLYWAY_DB_USER` / `FLYWAY_DB_PASSWORD` | schema owner `postgres.<project-ref>`, migration job only; the service reads just the user name, for `DatabasePrivilegeCheck` |
-| `FLYWAY_DB_URL` | session pooler, `:5432` — see §2 |
-| `JWT_SECRET` | HS256, ≥ 32 bytes, generated per environment |
-| `REFERRAL_SIGNAL_SALT` | any long random string; **never** shared with dev. Rotating it is safe — stored digests simply stop matching, and they are discarded after 180 days anyway |
-| `IDENTITY_HASH_SECRET` | any long random string; **never** shared with dev. Keys the one-way digest of verified ID-document numbers used for "one document = one badge". Rotating it makes every existing badge's digest stop matching new submissions, so rotate only with a re-verification plan |
-| `IDENTITY_ENCRYPTION_KEY` / `IDENTITY_ENCRYPTION_KEY_ID` | base64 of 32 random bytes (`openssl rand -base64 32`) and a short id (`[a-z0-9-]`, e.g. `2026a`); **never** shared with dev. AES-256-GCM for PAN/Aadhaar in `service_request_identities` (D283). To rotate, issue a new key and id, and set `IDENTITY_RETIRED_KEYS=oldId:oldKey` so existing rows still decrypt. Losing a key makes its rows unreadable |
-| `STAFF_TOTP_KEY` | base64 of 32 random bytes (`openssl rand -base64 32`); **never** shared with dev. AES-256-GCM for staff and admin authenticator (TOTP) secrets in `staff_credentials`. There is no retired-key list: rotating it makes every enrolled authenticator unreadable, so each account must be reset (admin **Reset 2FA**) and re-enrol |
-| `CASHFREE_WEBHOOK_SECRET` | Cashfree signs callbacks with `x-client-secret` and issues no separate webhook secret, so this **is** `CASHFREE_SECRET_KEY`. `cloudrun-sandbox.yaml` therefore points both at one Secret Manager entry: two entries holding one credential drift the moment either is rotated alone, and a drifted-but-non-blank value passes every startup check and rejects every callback. A blank value makes every forged signature valid |
-| `WEB_ORIGINS` | see §1 |
-| `API_PUBLIC_ORIGIN` | see §1 |
-| `INTERNAL_PROXIES` | see §4 |
-| `ORIGIN_SHARED_SECRET` | see §4; ≥ 32 characters, and the **same** value as the Pages secret of that name. `none` turns the gate off, which is right only for an instance nothing proxies |
+| `SPRING_PROFILES_ACTIVE` | `sandbox`, **alone**. The Dockerfile bakes `prod` because Spring does not complain about an absent profile — a deploy that forgot it would boot on the developer defaults and report itself healthy. Left at `prod`, or `prod,sandbox`, the boot fails on the sandbox OTP key (§3.1) |
+| `DB_URL`, `DB_USER`, `DB_PASSWORD` | rendered from the `${db.*}` bindables (§2) |
+| `FLYWAY_DB_URL`, `FLYWAY_DB_USER`, `FLYWAY_DB_PASSWORD` | the `migrate` job; the service reads only `FLYWAY_DB_USER` (§2.1) |
+| `JWT_SECRET` | HS256, ≥ 32 bytes, generated per environment. Rotating it invalidates every issued token |
+| `REFERRAL_SIGNAL_SALT` | any long random string; **never** shared with dev. An unsalted or publicly-salted digest of an IPv4 address is reversed by enumerating 2^32 values. Rotating it is safe — stored digests simply stop matching, and they are discarded after 180 days anyway |
+| `IDENTITY_HASH_SECRET` | any long random string; **never** shared with dev. Keys the one-way digest of verified ID-document numbers used for "one document = one badge". Set-once: a new value turns every existing badge holder into a stranger the uniqueness check has never seen, so rotate only with a re-verification plan |
+| `IDENTITY_ENCRYPTION_KEY` / `IDENTITY_ENCRYPTION_KEY_ID` | base64 of 32 random bytes and a short id (`[a-z0-9-]`; the spec carries `s1`); **never** shared with dev. AES-256-GCM for PAN/Aadhaar in `service_request_identities` (D283). To rotate, issue a new key and id, and set `IDENTITY_RETIRED_KEYS=oldId:oldKey` so existing rows still decrypt. Losing a key makes its rows unreadable |
+| `STAFF_TOTP_KEY` | base64 of 32 random bytes; **never** shared with dev. AES-256-GCM for staff and admin authenticator (TOTP) secrets in `staff_credentials`. There is no retired-key list: rotating it makes every enrolled authenticator unreadable, so each account must be reset (admin **Reset 2FA**) and re-enrol |
+| `CASHFREE_ENABLED` / `CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` | payments and KYC. Sandbox holds the real `TEST_` / `cfsk_` values: a placeholder is non-blank, so the service boots normally and every order creation 401s |
+| `CASHFREE_WEBHOOK_SECRET` | Cashfree signs callbacks with `x-client-secret` and issues no separate webhook secret, so this **is** `CASHFREE_SECRET_KEY`; the spec points both at one value so they cannot drift when one is rotated. A drifted-but-non-blank value passes every startup check and rejects every callback; a blank one makes every forged signature valid. That one credential therefore also carries order-creation and refund authority |
+| `CASHFREE_NOTIFY_URL` | `https://sandbox.draazy.com/api/webhooks/cashfree/payment`. Blank falls back to the endpoint registered in the Cashfree dashboard, which holds one address across every environment, so each deployment sets its own |
+| `WEB_ORIGINS`, `API_PUBLIC_ORIGIN` | see §1; public literals in the spec |
+| `APP_BASE_URL` | the SPA origin, or the logged bootstrap link points at `draazy.com` |
+| `INTERNAL_PROXIES`, `ORIGIN_SHARED_SECRET` | see §4; the secret is ≥ 32 characters and the **same** value as the Pages secret. `none` turns the gate off, which is right only for an instance nothing proxies |
+| `ZEPTOMAIL_*`, `WHATSAPP_*`, `TURNSTILE_*`, `PUSH_VAPID_*` | §3.1 and §3.3 |
+| `STORAGE_ENABLED`, `R2_ENDPOINT`, `R2_BUCKET_PRIVATE`, `R2_BUCKET_PUBLIC`, `R2_PUBLIC_BASE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | photo and document upload. Without them `R2FileStorage` is not wired and uploads throw. With `STORAGE_ENABLED=true` all six `R2_*` must be non-blank (the workflow checks), because a blank one makes `R2FileStorage`'s all-six constructor check refuse to boot |
+| `GOOGLE_PLACES_SERVER_KEY` | server-side Places lookups; must have no IP-address application restriction (App Platform has no fixed egress IP) |
+
+Generate random values once, per environment:
+
+| macOS | Windows PowerShell |
+|---|---|
+| `openssl rand -base64 48` | `$b = New-Object byte[] 48; [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); [Convert]::ToBase64String($b)` |
+
+Use 32 bytes instead of 48 for the AES keys (`IDENTITY_ENCRYPTION_KEY`, `STAFF_TOTP_KEY`).
 
 Optional first-admin bootstrap variables:
 
@@ -187,39 +222,37 @@ Optional first-admin bootstrap variables:
 | `BOOTSTRAP_ADMIN_NAME` | Defaults to `Administrator` |
 | `BOOTSTRAP_ADMIN_RECOVER` | Break-glass nonce. Set a fresh random value and redeploy to reset the configured admin's 2FA, revoke sessions and log a fresh one-hour invite. If no admin holds the email, it adopts the live admin with the configured mobile and **no** email — how the seeded sandbox admin (`9000000000`) gets one |
 
-The sandbox deploy reads them from the `sandbox` GitHub environment: **secrets**
-`SANDBOX_BOOTSTRAP_ADMIN_EMAIL` and `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` (vars would print in the public
-run log), and **variable** `SANDBOX_BOOTSTRAP_ADMIN_RECOVER`; blank = off. Set them there, not with
-`gcloud run services update` — `services replace` wipes it.
-`APP_BASE_URL` must be the SPA origin, or the logged link points at `draazy.com`.
+The deploy reads them from the `sandbox` GitHub environment: **secrets** `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`
+and `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` (variables would print in the public run log), and **variable**
+`SANDBOX_BOOTSTRAP_ADMIN_RECOVER`; blank = off. Set them there: the spec is rendered from them on every deploy,
+so a value added by hand in the DigitalOcean console is overwritten.
 
-First deploy:
-1. Set `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_MOBILE` and optionally `BOOTSTRAP_ADMIN_NAME`.
-2. Deploy, then open the `[ADMIN BOOTSTRAP]` link from the API logs within 1 hour and set the password.
-3. Sign in at `/staff-login`, scan the QR code and save the recovery codes.
-
-Break glass: set `BOOTSTRAP_ADMIN_RECOVER` to a new random value and redeploy; open the new logged
-link within 1 hour, then sign in and re-enrol the authenticator.
+First deploy: set the email and mobile, deploy, open the `[ADMIN BOOTSTRAP]` link from the `api` runtime
+logs within 1 hour and set the password, then sign in at `/staff-login`, scan the QR code and save the
+recovery codes. Break glass: change `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` to a new random value, redeploy and
+open the new logged link within 1 hour.
 
 Staff/manager invites need no SMS or email sender. The Team screen returns the one-time link to the
 creator, who shares it privately; manager-created staff invites also notify the administrator in-app.
-
-`SPRING_PROFILES_ACTIVE=prod` is baked into the image (`backend/Dockerfile`) rather than left to the
-deploy, because Spring does not complain about an absent profile — a deploy that forgot it would
-boot on the developer defaults and report itself healthy.
 
 ### 3.1 Sandbox OTP — real WhatsApp codes
 
 Sandbox sends real, random OTPs through WhatsApp exactly like prod: `do-app-sandbox.yaml` sets
 `WHATSAPP_ENABLED=true`, the business number's `WHATSAPP_PHONE_NUMBER_ID` and the approved
-`draazy_login_otp` / `draazy_identity_decision` templates, and the deploy workflow passes the
-System User token from the GitHub `sandbox` environment secret **`SANDBOX_WHATSAPP_ACCESS_TOKEN`**
-(the deploy fails fast while it is empty). Every send is billed to the Meta prepaid balance and only
-reaches mobiles registered on WhatsApp, so seeded demo mobiles cannot sign in — use your own number.
+`draazy_login_otp` / `draazy_identity_decision` templates, and the deploy workflow passes the System User
+token from the GitHub `sandbox` environment secret **`SANDBOX_WHATSAPP_ACCESS_TOKEN`** (the deploy fails
+fast while it is empty). Every send is billed to the Meta prepaid balance and only reaches mobiles
+registered on WhatsApp, so seeded demo mobiles cannot sign in — use your own number.
 
-`draazy.otp.sandbox-code` is pinned empty, as in prod. It remains a break-glass only: exporting
-`DRAAZY_OTP_SANDBOX_CODE` on the sandbox app pins every code to that value for anyone who knows a
-mobile, so set it only for a disposable database and remove it afterwards.
+`draazy.otp.sandbox-code` is pinned empty, as in prod. It remains a break-glass only: setting
+`DRAAZY_OTP_SANDBOX_CODE` on the app pins every code to that value for anyone who knows a mobile, so set
+it only for a disposable database and remove it afterwards. It is a key of its own rather than a reuse of
+`DRAAZY_OTP_FIXED_CODE` on purpose: that one is refused on *every* deployment profile by
+`OtpService.rejectFixedCodeInProduction`, and sandbox counts as one, so reusing it would disarm the guard
+that also covers prod. `OtpService.rejectSandboxCodeOutsideSandbox` is the matching lock: the boot fails
+unless `sandbox` is the *only* deployment profile active, so neither a copied properties file nor a
+`prod,sandbox` activation can carry it into production. `application-prod.properties` also pins the key
+empty.
 
 Sandbox also enforces Turnstile on the code send and both waitlists (`TURNSTILE_ENABLED=true`). Create a
 widget in Cloudflare → Turnstile for the sandbox hostname, then add its secret key as the `sandbox`
@@ -227,28 +260,6 @@ environment secret **`SANDBOX_TURNSTILE_SECRET_KEY`** and its site key as the re
 **`VITE_TURNSTILE_SITE_KEY`**. The deploy stops before anything ships while either is empty, because the
 API would refuse every sign-in from a bundle without the widget. Sign in once by hand after the first
 rollout: the health check cannot catch a mismatched key pair or a widget missing the sandbox hostname.
-
-It is a key of its own rather than a reuse of `DRAAZY_OTP_FIXED_CODE` on purpose. That one is refused
-on *every* deployment profile by `OtpService.rejectFixedCodeInProduction`, and sandbox counts as one,
-so reusing it would have disarmed the guard that also covers prod.
-`OtpService.rejectSandboxCodeOutsideSandbox` is the matching lock on the new key: the boot fails
-unless `sandbox` is the *only* deployment profile active, so neither a copied properties file nor a
-`prod,sandbox` activation can carry it into production. `application-prod.properties` also pins the
-key empty, so a properties-only mistake never reaches that check.
-
-One deploy consequence: the Dockerfile bakes in `SPRING_PROFILES_ACTIVE=prod`, so a sandbox deploy
-has to override it to `sandbox` — and to `sandbox` alone. Left at `prod`, or set to `prod,sandbox`,
-the boot fails on this key, which is the intended way to discover the mistake.
-
-Optional, all off by default in `application.properties`: `STORAGE_ENABLED` + `R2_*` (photo and
-document upload — without them `R2FileStorage` is not wired and uploads throw), `CASHFREE_ENABLED` +
-`CASHFREE_APP_ID` / `CASHFREE_SECRET_KEY` (payments and KYC), `CASHFREE_NOTIFY_URL` (blank falls back
-to the endpoint registered in the Cashfree dashboard, which holds one address across every
-environment — so each deployment sets its own), `APP_BASE_URL`, `RATELIMIT_STORE`. Sandbox turns the
-first two families on in `cloudrun-sandbox.yaml`; "off by default" describes the base file, not that
-deployment.
-
----
 
 ### 3.2 The public photo bucket must send `Access-Control-Allow-Origin`
 
@@ -260,7 +271,7 @@ The failure is silent by construction: the client degrades to no hashes, the lis
 and the only symptom is that duplicate listings sharing photographs stop being flagged. Nothing in
 the repository can assert it — the URL is R2's, the header is bucket configuration, and the dev
 stand-in is same-origin (`DevObjectStore.publicUrl`), so no test will ever go red if the rule is
-missing. It is written down because that is the only control available.
+missing. The CORS policy is in §6.2.
 
 The same bucket should sit behind a **proxied custom domain**, not `r2.dev`, which Cloudflare does
 not cache. On that domain the `.w480.jpg`/`.w960.jpg` card copies are edge-cached by default, but
@@ -288,7 +299,7 @@ the browser flow is `frontend/src/pages/consumer/VerifyIdentity.jsx`.
 | MediaPipe Face Landmarker | `frontend/src/lib/identity-verification/face.js` loads `/models/face_landmarker.task`; file at `frontend/public/models/face_landmarker.task` | `@mediapipe/tasks-vision` `1.0.1`, Apache-2.0 in `frontend/node_modules/@mediapipe/tasks-vision/package.json`; model card publishes Apache-2.0, verify against the model card at release |
 
 Face checks run in the browser. Only the captured front/back/selfie images are uploaded,
-to the private R2 bucket (`SANDBOX_R2_BUCKET_PRIVATE`, §5). The identity badge stores document
+to the private R2 bucket (`SANDBOX_R2_BUCKET_PRIVATE`, §5.1). The identity badge stores document
 number HMACs and last-4 values only (`IdentityHasher.java`, `IdentityVerificationService.java`);
 the raw document number is not stored by this badge flow.
 
@@ -305,14 +316,13 @@ notice/consent evidence, not a legal-compliance claim.
 | Resubmission / withdrawal / erasure | Existing identity files are queued and purged immediately in the transaction path |
 | Storage delete failure | `identity_storage_deletes` keeps the key; the nightly `identity-delete-retry` job tries each due key once, up to 2,000 a night, least-tried first so a stuck key never blocks newer ones |
 
-These are `JobRunner` jobs (§5) and inherit the Cloud Run CPU-throttling caveat there; an always-on
-host (DigitalOcean, ADR-021) runs them as scheduled.
+These are `JobRunner` jobs (see Scheduled jobs in §5).
 
 **WhatsApp identity decision template.**
 
 The template sender is
 `backend/src/main/java/com/draazy/api/provider/whatsapp/WhatsAppDecisionMessenger.java`; the property
-binding is `WhatsAppProperties.java` and `application.properties` lines 111-124.
+binding is `WhatsAppProperties.java`.
 
 | Setting | Value |
 |---|---|
@@ -330,14 +340,14 @@ Lines the backend sends:
 | Rejected by a reviewer / stale pending | `Your Draazy identity verification could not be completed. Open the app to see the reason and retake your photos.` |
 | Revoked | `Your Draazy verified badge was withdrawn. Open the app to see the reason and submit again.` |
 
-Approvals and the automatic check's rejects send no WhatsApp (in-app only). If `WHATSAPP_ENABLED=false`, `LoggingDecisionMessenger` logs a mock send. If WhatsApp is enabled but
-the identity template name or language is blank, `WhatsAppDecisionMessenger` logs and skips only the
-WhatsApp leg. Vendor failures are logged and swallowed; the decision is already committed and visible
-in-app. Meta business verification and approved templates remain the gate before useful WhatsApp
-delivery; see ADR-020 notes in §7.
+Approvals and the automatic check's rejects send no WhatsApp (in-app only). If `WHATSAPP_ENABLED=false`,
+`LoggingDecisionMessenger` logs a mock send. If WhatsApp is enabled but the identity template name or
+language is blank, `WhatsAppDecisionMessenger` logs and skips only the WhatsApp leg. Vendor failures are
+logged and swallowed; the decision is already committed and visible in-app. Meta business verification
+and approved templates remain the gate before useful WhatsApp delivery; see §7.
 
-**WhatsApp waiting-on-you digest template.** Sent by the `waiting-digest` job (10:00 IST, daily; it inherits the
-Cloud Run CPU-throttling caveat in §5) through the same `WhatsAppDecisionMessenger`. Rules are in
+**WhatsApp waiting-on-you digest template.** Sent by the `waiting-digest` job (10:00 IST, daily) through
+the same `WhatsAppDecisionMessenger`. Rules are in
 [`notifications.md`](./system/notifications.md#waiting-on-you-digest--utility-template).
 
 | Setting | Value |
@@ -353,30 +363,26 @@ Cloud Run CPU-throttling caveat in §5) through the same `WhatsAppDecisionMessen
 
 | Setting | Value |
 |---|---|
-| `PUSH_VAPID_PRIVATE_KEY` | Secret. Boot fails if it is set without the public key or is not a P-256 key |
-| `PUSH_VAPID_PUBLIC_KEY` | The matching public key |
+| `PUSH_VAPID_PRIVATE_KEY` | Secret (`SANDBOX_PUSH_VAPID_PRIVATE_KEY`). Boot fails if it is set without the public key or is not a P-256 key |
+| `PUSH_VAPID_PUBLIC_KEY` | The matching public key (`SANDBOX_PUSH_VAPID_PUBLIC_KEY`) |
 | `PUSH_VAPID_SUBJECT` | Contact the push services may use; `mailto:` or https. Default `mailto:noreply@draazy.com` |
-| `VITE_VAPID_PUBLIC_KEY` | Frontend build-time variable carrying the **same public key**, so browsers subscribe to it |
+| `VITE_VAPID_PUBLIC_KEY` | Repository variable consumed by the frontend build, carrying the **same public key**, so browsers subscribe to it |
 
-On Cloud Run both keys are Secret Manager references (`draazy-sandbox-push-vapid-private-key` and
-`draazy-sandbox-push-vapid-public-key` in `backend/deploy/cloudrun-sandbox.yaml`); create the secrets and grant the
-runtime service account access before deploy, or the revision will not start. Rotating the pair invalidates every stored subscription: they are removed as the push
-service answers 404/410 or they re-subscribe.
+Rotating the pair invalidates every stored subscription: they are removed as the push service answers
+404/410 or they re-subscribe.
 
-**Email (Zoho ZeptoMail via CPaaS).** Sender: `provider/zeptomail/ZeptoMailEmailSender.java`. Today it
-only emails staff invite and password-reset links (`StaffInviteMailer`) to the account's own address;
-the admin's copy-link dialog is unchanged and stays the fallback.
+**Email (Zoho ZeptoMail via CPaaS).** Sender: `provider/zeptomail/ZeptoMailEmailSender.java`. It only
+emails staff invite and password-reset links (`StaffInviteMailer`) to the account's own address; the
+admin's copy-link dialog is unchanged and stays the fallback.
 
 | Setting | Value |
 |---|---|
 | `ZEPTOMAIL_ENABLED` | `true` to send; off logs `[MOCK EMAIL]` with recipient domain + subject |
-| `ZEPTOMAIL_API_KEY` | The agent's **Send Mail token** (CPaaS → Agents → agent → SMTP/API). Secret; with or without the `Zoho-enczapikey ` prefix |
+| `ZEPTOMAIL_API_KEY` | The agent's **Send Mail token** (CPaaS → Agents → agent → SMTP/API). Secret (`SANDBOX_ZEPTOMAIL_API_KEY`); with or without the `Zoho-enczapikey ` prefix |
 | `ZEPTOMAIL_FROM_ADDRESS` | Default `noreply@draazy.com`; must be on a domain whose DKIM **and** CNAME show Verified |
-| `ZEPTOMAIL_FROM_NAME` | Default `Draazy` |
+| `ZEPTOMAIL_FROM_NAME` | Default `Draazy`; the spec sets `Draazy Sandbox` |
 | `ZEPTOMAIL_BASE_URL` | Default `https://cpaas.zoho.in` (India DC; the account lives on `cpaas.zoho.in`) |
 
-Sandbox has it on in `cloudrun-sandbox.yaml`, reading the key from Secret Manager entry
-`draazy-sandbox-zeptomail-api-key` with from-name `Draazy Sandbox`; the secret must exist before deploy.
 The boot fails if the flag is on and the key or from-address is blank. Send failures log
 `ZeptoMail send to ***@domain failed: <status> code=TM_xxxx SERR_xxx`; `SERR_157` is a bad token.
 
@@ -404,6 +410,8 @@ Hardware checks live in
 | Purge path | Files disappear under the retention rules above; failed deletes remain in `identity_storage_deletes` until retried |
 | Reject the case (reviewer) | The decision message arrives with the exact line in the table above; an approval sends none |
 
+---
+
 ## 4. `INTERNAL_PROXIES` and the origin gate
 
 `WriteRateLimitFilter` keys anonymous callers on the client address, and `POST /page-views` is
@@ -420,67 +428,59 @@ It must be a **Java regex** matching the actual egress of whatever sits in front
 literal `none` for a directly-exposed instance. `TrustedProxyConfig` validates it at boot and names
 the property when it is wrong.
 
-On the chosen Cloudflare Pages → Cloud Run shape there are **two** hops. `frontend/functions/api/[[path]].js`
-sets `X-Forwarded-For` from `CF-Connecting-IP`, overwriting anything the client sent and refusing to
-forward at all if that header is absent; then Cloud Run's own front end appends the caller's address
-before Tomcat sees the request. So the regex has to match Google's internal proxy range at minimum.
+On the Cloudflare Pages → App Platform shape there are at least two hops.
+`frontend/functions/api/[[path]].js` sets `X-Forwarded-For` from `CF-Connecting-IP`, overwriting
+anything the client sent; then App Platform's ingress appends the caller's address before Tomcat sees
+the request.
 
-**And that is not yet enough, which is why this variable is still unset.** Adding Cloudflare's
-egress ranges makes the value spoofable, because those addresses are **shared with every other
-Cloudflare account**: anyone who learns the `*.run.app` URL can deploy their own free Worker,
-`fetch` the origin directly with a forged `X-Forwarded-For`, and have `RemoteIpValve` pop the
-Cloudflare hop and adopt the attacker's chosen address. That buys unlimited rotation of the
-anonymous write budget, satisfies `BotDefenceFilter.verify` for arbitrary addresses, and — run the
-other way — lets one address be pinned to a victim's IP to 429 them off the platform. Leaving
-Cloudflare out instead collapses all anonymous traffic into the single Cloudflare-egress bucket.
-Neither option is safe on its own.
-
-The exit is to make the origin able to tell *this* proxy apart from any other Cloudflare tenant.
-Three ways were weighed:
-
-1. **Shared secret** — chosen (2026-09-27). Free, and it also makes a leaked Cloud Run URL stop
-   mattering.
-2. **Restricted ingress** — needs a Google external HTTPS load balancer in front of Cloud Run,
-   roughly $18/month before Cloud Armor. Not free, so not for the sandbox.
-3. **Cloudflare Authenticated Origin Pulls** (mTLS) — Cloud Run cannot verify a client certificate,
-   so there is nothing at the origin to check it with.
+**Adding Cloudflare's egress ranges alone makes the value spoofable**, because those addresses are
+shared with every other Cloudflare account: anyone who learns the `*.ondigitalocean.app` URL can deploy
+their own free Worker, `fetch` the origin directly with a forged `X-Forwarded-For`, and have
+`RemoteIpValve` pop the Cloudflare hop and adopt the attacker's chosen address. That buys unlimited
+rotation of the anonymous write budget, satisfies `BotDefenceFilter.verify` for arbitrary addresses and —
+run the other way — lets one address be pinned to a victim's IP to 429 them off the platform. Leaving
+Cloudflare out instead collapses all anonymous traffic into the single Cloudflare-egress bucket. Neither
+is safe on its own, so the origin must be able to tell *this* proxy apart from any other Cloudflare
+tenant. A shared secret does that for free.
 
 ### How the gate works
 
 The Function sends `X-Proxy-Auth: <ORIGIN_SHARED_SECRET>`, overwriting anything the client sent.
-`OriginGateFilter` runs ahead of the JWT filter, the rate limiter and bot defence, and answers
-**403** to any request whose header does not match (constant-time compare). The only exemptions are
-`GET`/`HEAD` on the three health paths, `/api/actuator/health`, `/health/liveness` and
-`/health/readiness`, because Cloud Run's probes and the backend job's smoke test reach the container
-directly. Writes to those paths are gated too: they would otherwise reach the write rate limiter
-without the secret, charged to whatever address the caller put in `X-Forwarded-For`.
+`OriginGateFilter` runs ahead of the JWT filter, the rate limiter and bot defence, and answers **403**
+to any request whose header does not match (constant-time compare). The only exemptions are `GET`/`HEAD`
+on the three health paths, `/api/actuator/health`, `/health/liveness` and `/health/readiness`, because
+App Platform's health check and the deploy smoke test reach the container directly. Writes to those
+paths are gated too: they would otherwise reach the write rate limiter without the secret, charged to
+whatever address the caller put in `X-Forwarded-For`.
 
-Both halves must hold the same value:
+A leaked `*.ondigitalocean.app` URL is therefore harmless: every other route answers 403 without the
+secret. Both halves must hold the same value:
 
 | Where | How |
 |---|---|
-| Backend | Secret Manager entry `draazy-sandbox-origin-shared-secret`, mounted by `cloudrun-sandbox.yaml` |
-| Pages Function | `npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=<project>` |
+| Backend | GitHub `sandbox` environment secret `SANDBOX_ORIGIN_SHARED_SECRET`, rendered into the spec as `ORIGIN_SHARED_SECRET` |
+| Pages Function | `npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=draazy` |
 
-Generate it once, e.g. `openssl rand -base64 48`. The backend refuses to boot on a blank value or on
-one shorter than 32 characters; the Function answers 502 `api_proxy_misconfigured` when its copy is
-unset. A **mismatch** fails differently: every `/api` call 403s while `/api/actuator/health` stays
-green, so the frontend job's smoke test passes. Check a real route after changing either side.
+Generate it once (§3). The backend refuses to boot on a blank value or on one shorter than 32
+characters; the Function answers 502 `api_proxy_misconfigured` when its copy is unset. A **mismatch**
+fails differently: every `/api` call 403s while `/api/actuator/health` stays green, so the frontend
+job's health smoke test passes. Check a real route after changing either side.
 
-**Rotation** has a short outage window: add the new Secret Manager version and Pages secret, then run
-the deploy with `target: both`. Calls 403 between the backend going live and the Pages publish.
+**Rotation** has a short outage window: update the GitHub secret and the Pages secret, then run the
+deploy with `target: both`. Calls 403 between the backend going live and the Pages publish.
 
 ### `INTERNAL_PROXIES`, now that the gate is on
 
-`none` is still the committed value, so all anonymous traffic still shares one bucket. With the gate
-on, the chain Tomcat sees is `<client>, <Cloudflare egress>` from a Google front-end peer, and only
-the Function can have written the left-most entry of any request that reaches an address-sensitive
-filter (the ungated health reads are never counted). So a pattern matching every hop — `.*` —
-resolves the real client and cannot be forged. **Never set it while `ORIGIN_SHARED_SECRET` is `none`**: without
-the gate that same value lets any caller choose their own address.
+`none` is still the committed value, so all anonymous traffic shares one bucket. With the gate on, the
+chain Tomcat sees is `<client>, <Cloudflare egress>` plus whatever App Platform's ingress adds, and only
+the Function can have written the left-most entry of any request that reaches an address-sensitive filter
+(the ungated health reads are never counted). So a pattern matching every hop — `.*` — would resolve the
+real client and cannot be forged. **Never set it while `ORIGIN_SHARED_SECRET` is `none`**: without the
+gate that same value lets any caller choose their own address.
 
-Set it **last**, after confirming the gate is live (a direct `curl` of the `*.run.app` URL for any
-non-health route must answer 403) and checking the `X-Forwarded-For` a real proxied request produces.
+Set it **last**, after confirming the gate is live (a direct `curl` of the `*.ondigitalocean.app` URL for
+any non-health route must answer 403) and checking the `X-Forwarded-For` a real proxied request produces.
+The check in §9.4 — two devices on different networks showing different client IPs — is the proof.
 
 ### Free Cloudflare edge controls
 
@@ -496,273 +496,137 @@ the `draazy.com` zone, free plan:
 
 ---
 
-## 5. Google Cloud — one-time bootstrap
+## 5. DigitalOcean App Platform
 
-Run once per environment, by a human, from a machine with `gcloud` authenticated as a project owner.
-Deliberately **not** scripted: half of it creates secrets whose values only you know, and a bootstrap
-script that dies in the middle leaves a project in a state nobody can read.
+The app is defined by `backend/deploy/do-app-sandbox.yaml`, rendered through `envsubst` by the deploy
+job and submitted with `doctl apps create|update --spec`. The `${…}` tokens are the only per-environment
+inputs and everything else is a deliberate literal, reviewable here rather than guessed at deploy time.
+The spec is the whole truth: anything a console click added out of band is removed on the next deploy.
+The `${db.*}` tokens are DigitalOcean bindables and must survive `envsubst`, which is why the workflow
+passes it an explicit variable list.
 
-The service definition itself is `backend/deploy/cloudrun-sandbox.yaml`, rendered through `envsubst`
-by the backend job — the `${…}` tokens are the only per-environment inputs and everything else is a
-deliberate literal, reviewable here rather than guessed at deploy time. `replace` makes that file the
-whole truth: anything a console click added out of band is removed on the next deploy.
+| Item | Value |
+|---|---|
+| App / URL | `draazy-api-sandbox`, id `e1837855-3a21-4c51-a08e-99fd4f33d594`, `https://draazy-api-sandbox-466hx.ondigitalocean.app` |
+| Region / project | `blr` (Bangalore, BLR1); DigitalOcean project `draazy-sandbox` |
+| Service `api` | GHCR image `ghcr.io/<owner>/draazy-api:<commit SHA>`, port 8080, 1 instance, `apps-s-1vcpu-1gb-fixed` |
+| Job `migrate` | `PRE_DEPLOY`, same image and size, `run_command: java -jar /app/app.jar --migrate-only` (§2.1) |
+| Database `db` | dev PostgreSQL 17 (§2) |
+| Ingress | one rule, prefix `/` → `api` |
+| Readiness | `GET /api/actuator/health/readiness`, 30 s initial delay, every 10 s, 18 failures allowed |
+| Alerts | `DEPLOYMENT_FAILED`, `DOMAIN_FAILED`; service CPU > 85 % and memory > 90 % for 10 min; more than 2 restarts in 5 min |
 
-Six settings in it encode consequences that are invisible from the console:
+Settings that encode consequences invisible from the console:
 
-| Setting | Value | Why not the default |
+- **1 GB, not 512 MB.** The Dockerfile sets `-XX:MaxRAMPercentage=70.0` and `-XX:+ExitOnOutOfMemoryError`,
+  so 1 GB is a ~717 MB heap with ~300 MB for metaspace, code cache and thread stacks. Measured: 40
+  concurrent requests peak at ~650 MB resident and steady state sits near 800 MB RSS. At 512 MB the
+  non-heap no longer fits and the container is OOM-killed during startup. The migration job uses the same
+  size.
+- **Single container, always on.** `instance_count: 1` and no autoscaling: the $10 fixed size includes
+  100 GB of outbound bandwidth. There is no scale-to-zero, so the JVM boot cost is paid on deploys only.
+- **The probe path carries `/api`** because `server.servlet.context-path` moves the actuator too, and it
+  uses the `readiness` group. A probe on `/actuator/health` returns 404 and fails every deployment while
+  the application underneath is healthy.
+- **`SPRING_PROFILES_ACTIVE=sandbox`** is set on both components, overriding the `prod` baked into the
+  image. `application-sandbox.properties` is standalone rather than a delta — its own datasource, secrets,
+  cookie flags, OTP throttle and proxy CIDR — and `SandboxProfileContractTest` asserts it agrees with prod
+  on every security-critical key. `CookieDeliveryCheck` refuses to boot if `WEB_ORIGINS` and
+  `API_PUBLIC_ORIGIN` describe a cross-site shape.
+- **Secrets** (`type: SECRET`) are encrypted by DigitalOcean after the workflow renders them; the rendered
+  spec exists only in the runner's temp directory and is deleted at the end of the job. A secret rotation
+  reaches the service on the next deploy, and a redeployed old image still picks up today's secrets:
+  redeploying a known commit is a rollback for **code**, not for **secrets** (yesterday's image with
+  today's `JWT_SECRET` invalidates every issued token).
+- **The GHCR package `draazy-api` must be public**, because the spec carries no registry credentials. A new
+  package is created private, so the first deploy fails once at the image pull until it is made public
+  (§6.4).
+
+**Cost.** About **$17/month** plus 18 % GST, billed in USD on the 1st:
+
+| Item | $/month |
+|---|---|
+| App Platform service, 1 vCPU / 1 GB | 10 (plus a few cents per `migrate` run) |
+| Dev database | 7 |
+| GHCR (public package) | 0 |
+
+Set a billing alert in Billing → Billing alerts.
+
+### 5.1 GitHub deploy pipeline
+
+`.github/workflows/deploy.yml` — **manual only.** Actions → Deploy (sandbox) → Run workflow, pick any
+branch or tag in "Use workflow from", type `sandbox`, choose `both` / `backend` / `frontend`. Nothing
+deploys on a push. One concurrency group serialises runs, so a second dispatch's frontend cannot overtake
+the first's backend.
+
+| Job | What it does |
+|---|---|
+| `gate` | Rejects a mistyped confirmation; decides which halves run; requires `VITE_TURNSTILE_SITE_KEY` |
+| `backend` (env `sandbox`) | Builds `backend/Dockerfile` on an amd64 runner and pushes it to GHCR tagged with the commit SHA; fails if any required secret is empty; renders the spec with `envsubst`; `doctl apps create --spec … --wait` (or `update <id>` when an app named `draazy-api-sandbox` exists); requires the latest deployment to be `ACTIVE`; smoke-tests `/api/actuator/health` on the default ingress (12 attempts); deletes the rendered spec |
+| `frontend-build` | `npm ci` and `npm run build` with the `VITE_*` inputs below; verifies `dist/index.html`, `404.html`, `_redirects`, `_headers`, `functions/api/[[path]].js` and the face model exist; uploads `dist/` and `functions/` as a one-day artifact |
+| `frontend-publish` (env `sandbox-web`) | `wrangler pages deploy dist --project-name draazy --branch main`, tagged with the same SHA; then a smoke test through `sandbox.draazy.com` (deep links, security headers, no CORS grant, `/api/actuator/health` returns JSON `UP`) |
+
+The deploy **ships both halves from one commit, backend first**; the frontend runs unless the backend
+job failed or was cancelled. API changes are additive (expand/contract), so an old UI always works against
+a new backend, and a new UI does not work against an old one. During the backend deploy the `migrate`
+PRE_DEPLOY job runs first; if it fails, the deployment fails and the previous version keeps serving.
+
+**The frontend is two jobs, and the split is a security boundary.** `frontend-build` runs dependency and
+project scripts and holds no deploy credential and no environment. `frontend-publish` checks out nothing,
+so `npx wrangler` cannot be redirected by an `.npmrc` or a shadowing `node_modules/wrangler` planted
+during the build, and its separate environment, `sandbox-web`, holds only the Cloudflare credentials — it
+can reach neither the DigitalOcean token nor any app secret.
+
+**Two build-time hazards live in the frontend half.** Every `VITE_*` value is inlined by Vite at build
+time and every read in `src/` has a fallback, so a missing one produces a bundle that boots and is quietly
+broken in one feature; the build fails closed on `VITE_GOOGLE_MAPS_API_KEY` for that reason. And
+`wrangler pages deploy` finds `functions/` by convention beside the working directory, so run anywhere else
+it uploads the static assets alone, succeeds, and ships a site whose `/api` calls fall through to the SPA
+rule and return `index.html` with a **200**, which `http.js` reads as a successful empty response. The final
+smoke test asserts the *content type* of `/api/actuator/health` precisely because the status code cannot
+tell those apart.
+
+**Inputs.** The deploy reads these:
+
+| Scope | Secrets | Variables |
 |---|---|---|
-| `autoscaling.knative.dev/minScale` | `1` | The only setting here that costs money whether or not anyone uses the service: one instance held warm is ~₹1,300/month at `1Gi` (₹42/day on the Sep 2026 bill), billed at the *idle* rate because `cpu-throttling` stays on. Bought to remove the JVM boot plus Spring context refresh from the first request after an idle period, and from every redeploy cutover. The trap is reading it as "the backend is now running": CPU is still throttled to ~0 between requests, so the `@Scheduled` sweeps remain frozen. It satisfies one of ADR-011 Option C's two preconditions; the advisory-lock job runs (no ShedLock needed) and `cpu-throttling: 'false'` are the other half, and that half is the 6× bill. |
-| `autoscaling.knative.dev/maxScale` | `4` | Each instance opens up to 5 Postgres connections (`spring.datasource.hikari.maximum-pool-size`), so the ceiling multiplies straight into Supabase's budget: 4 × 5 = 20, which the free-tier pooler absorbs. At the default of 100 the same arithmetic gives 500 and the database refuses connections under a spike — arriving as scattered 500s on unrelated endpoints, never as anything naming the pool. It is also the runaway-cost stop: a crawler cannot cost more than four instances' compute. |
-| `containerConcurrency` | `40` | Tomcat accepts 200 by default and then parks 195 of them on Hikari until its 30-second connection timeout expires, which surfaces as slow 500s rather than honest backpressure. Forty keeps the queue short enough that Cloud Run scales out instead. |
-| `timeoutSeconds` | `3600` | The Cloud Run maximum. The messages SSE stream (`MessageEventHub`) is a single long request, so any shorter timeout cuts it mid-stream and reconnects every client on that period (it did at `120`); the hub's own 5-minute stream timeout and 25-second heartbeat bound it instead. The other slow request is a 13 MB multipart upload (`spring.servlet.multipart.max-request-size`) over a slow mobile uplink. A hung ordinary request now holds its thread for longer than the old `120`. |
-| `resources.limits.memory` | `1Gi` | The Dockerfile sets `-XX:MaxRAMPercentage=70.0`, so this is a ~717 Mi heap with ~300 Mi for metaspace, code cache and thread stacks. Measured under these limits: 40 concurrent requests peak at ~650 MB resident, and the live heap after GC is ~130 MB. The migration job uses the same size; applying every migration plus the seed peaked at ~560 MB. At 512 Mi the non-heap no longer fits and the container is OOM-killed during startup. With `minScale: 1` each extra GiB is billed around the clock. |
-| `startupProbe` | HTTP, `60 × 5s` | A TCP probe passes the moment Tomcat binds, so Cloud Run would route traffic to a context that is not finished refreshing. The path carries `/api` because `server.servlet.context-path` moves the actuator too. Migrations run in the job before this revision starts (§2.1), so the 300 seconds of grace now only covers a cold JVM on a throttled CPU. A warm deploy is ready in about 45 s. `livenessProbe` watches the `liveness` group, which deliberately excludes the database indicator: restarting the container is no part of the remedy for Supabase being down. |
+| `sandbox` environment | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
+| `sandbox-web` environment | `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages → Edit, nothing else) | `CLOUDFLARE_ACCOUNT_ID` |
+| repository (frontend build) | `VITE_GOOGLE_MAPS_API_KEY`, `VITE_GA_ID` | `VITE_GOOGLE_MAPS_MAP_ID`, `VITE_CASHFREE_MODE`, `VITE_PMF_MODE`, `VITE_VAPID_PUBLIC_KEY`, `VITE_TURNSTILE_SITE_KEY` |
 
-`SPRING_PROFILES_ACTIVE=sandbox` is set on the service, overriding the `prod` baked into the image.
-`application-sandbox.properties` is standalone rather than a delta — its own datasource, secrets,
-cookie flags, OTP throttle and proxy CIDR — and `SandboxProfileContractTest` asserts it agrees with
-prod on every security-critical key. `WEB_ORIGINS` and `API_PUBLIC_ORIGIN` are public literals;
-`CookieDeliveryCheck` refuses to boot if they describe a cross-site shape. `DB_URL`, `FLYWAY_DB_URL`
-and `DB_USER` are rendered from repository secrets because the repository is public and they name the
-Supabase project — that is about not committing them, not about confidentiality afterwards: as
-plaintext env values they are readable by any project viewer and recorded in the Admin Activity audit
-log for 400 days.
-
-Secrets use `key: latest` rather than a pinned version, so a rotation reaches the next revision
-without editing the file — and so a bad rotation reaches it the same way. The consequence worth
-knowing: the SHA-tagged image makes *redeploy a known tag* a complete rollback for **code** and not
-for **secrets**. Yesterday's image still picks up today's `latest` `JWT_SECRET`, which invalidates
-every issued token. The two Cashfree secrets are referenced unconditionally and must **exist** before
-the first deploy — a `secretKeyRef` to a missing secret is a hard error, not an empty string. Sandbox
-now runs with `CASHFREE_ENABLED=true`, so they must hold the real `TEST_` / `cfsk_` values rather than
-a placeholder: a placeholder is non-blank, so the service boots normally and every order creation 401s.
-There is deliberately no `cashfree-webhook-secret` entry — see the table in §3.1.
-
-```bash
-PROJECT_ID=draazy-sandbox          # your project
-REGION=asia-south1                 # Mumbai, co-located with Supabase (ADR-007). NOT CHANGEABLE LATER.
-SERVICE=draazy-api-sandbox
-
-gcloud config set project "$PROJECT_ID"
-gcloud services enable run.googleapis.com artifactregistry.googleapis.com secretmanager.googleapis.com
-
-# Image registry, in the same region as the service. A cross-region pull adds latency to the cold
-# start, which is already the slowest request the platform serves.
-gcloud artifacts repositories create draazy --repository-format=docker --location="$REGION"
-
-# Runtime identity. One role. Cloud Run's default is the Compute Engine service account, which
-# carries project Editor — a container compromise there is a compromise of the whole project.
-gcloud iam service-accounts create "$SERVICE" --display-name="Draazy API (sandbox) runtime"
-RUNTIME="$SERVICE@$PROJECT_ID.iam.gserviceaccount.com"
-
-# Every secret `cloudrun-sandbox.yaml` names with a secretKeyRef. Miss one and `services replace`
-# is a hard boot error, so create them all even where the feature behind them is off — an unused
-# placeholder version costs nothing. Ten is past Secret Manager's free six; the overage is cents.
-for s in db-password jwt-secret referral-signal-salt identity-hash-secret staff-totp-key \
-         cashfree-app-id cashfree-secret-key \
-         r2-access-key-id r2-secret-access-key origin-shared-secret; do
-  gcloud secrets create "draazy-sandbox-$s" --replication-policy=automatic
-  gcloud secrets add-iam-policy-binding "draazy-sandbox-$s" \
-    --member="serviceAccount:$RUNTIME" --role=roles/secretmanager.secretAccessor
-done
-
-# The schema-owner password goes to the migration job's identity only, never the runtime (§2.1).
-gcloud iam service-accounts create draazy-migrator-sandbox --display-name="Draazy schema migrations"
-gcloud secrets create draazy-sandbox-flyway-db-password --replication-policy=automatic
-gcloud secrets add-iam-policy-binding draazy-sandbox-flyway-db-password \
-  --member="serviceAccount:draazy-migrator-sandbox@$PROJECT_ID.iam.gserviceaccount.com" \
-  --role=roles/secretmanager.secretAccessor
-```
-
-Then add each value — **piped, never as an argument**, because a command line lands in shell history
-and in the process table:
-
-```bash
-printf '%s' "$THE_VALUE" | gcloud secrets versions add draazy-sandbox-jwt-secret --data-file=-
-```
-
-`JWT_SECRET` is HS256 and must be at least 32 bytes, generated per environment —
-`openssl rand -base64 48`. `REFERRAL_SIGNAL_SALT` is any long random string and must never be the dev
-one. An unsalted or publicly-salted digest of an IPv4 address is reversed by enumerating 2^32 values,
-which turns a fraud signal into a stored address — so prod carries no default, though the base file
-does for local runs. `CASHFREE_WEBHOOK_SECRET` needs no entry of its own: it reads
-`draazy-sandbox-cashfree-secret-key`, because that is the key Cashfree signs callbacks with. Note
-what that means for the blast radius — that one entry now carries order-creation and refund
-authority as well as signing, so grant it accordingly. `IDENTITY_HASH_SECRET` is the one secret
-here that is **set-once rather than rotatable**: it keys the digest that makes one document grant one
-badge, so a new value silently turns every existing holder into a stranger the uniqueness check has
-never seen.
-
-### The deploy identity
-
-The backend job in `.github/workflows/deploy.yml` authenticates by **Workload Identity Federation**,
-so no GCP credential is stored anywhere in the repository: GitHub mints a short-lived OIDC token and
-GCP exchanges it for an access token that expires in about an hour. §5.1 below defines the trust, and
-the whole of it rests on the provider's attribute condition — a pool created without one mints tokens
-for any repository on earth that knows the provider's resource name, and that name is public.
-
-The deployer service account therefore has **no key to rotate**. If one was ever created, delete it
-(`gcloud iam service-accounts keys list --iam-account="$DEPLOYER"`) and delete the `GCP_SA_KEY`
-secret with it; a key that still exists is a permanent credential regardless of whether the workflow
-uses it. Keep its roles to these three.
-
-```bash
-gcloud iam service-accounts create github-deployer --display-name="GitHub Actions deployer"
-DEPLOYER="github-deployer@$PROJECT_ID.iam.gserviceaccount.com"
-
-# Scoped to the runtime service account, NOT the project. This is the grant that decides whether a
-# leaked deploy key is a deploy-path compromise or a project takeover: at project level,
-# serviceAccountUser confers actAs on EVERY service account in the project, including the default
-# Compute Engine one — which carries Editor. The holder would deploy a container running as it and
-# own the project, defeating the whole point of giving the runtime identity a single role.
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME" \
-  --member="serviceAccount:$DEPLOYER" --role=roles/iam.serviceAccountUser
-
-# Scoped to the one repository. The deployer pushes images; it has no business reading or deleting
-# any other repository the project acquires later.
-gcloud artifacts repositories add-iam-policy-binding draazy --location="$REGION" \
-  --member="serviceAccount:$DEPLOYER" --role=roles/artifactregistry.writer
-
-# The one grant that stays project-wide, and knowingly. Cloud Run IAM cannot be scoped to a service
-# that does not exist yet, and this role creates it. `run.admin` rather than `run.developer` because
-# the workflow's "Allow public invocation" step calls setIamPolicy, which developer lacks.
-#
-# THE COST: on this project the deploy key can describe every Cloud Run service and read its
-# plaintext environment. Tighten it after the first successful deploy by swapping the binding for a
-# service-scoped one — `gcloud run services add-iam-policy-binding "$SERVICE" --region "$REGION"
-# --member="serviceAccount:$DEPLOYER" --role=roles/run.admin` — and removing the project binding.
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:$DEPLOYER" --role=roles/run.admin
-
-gcloud iam service-accounts keys create key.json --iam-account="$DEPLOYER"
-```
-
-The deployer needs **no** Secret Manager role. Cloud Run checks the *runtime* identity's
-`secretAccessor` grant when it starts the container, not the caller's when it deploys.
-
-Paste `key.json` into the GitHub **environment** `sandbox` as `GCP_SA_KEY`, then **delete the local
-file** — `shred -u key.json`. Also on that environment:
-
-| Kind | Name | Value |
-|---|---|---|
-| variable | `GCP_PROJECT_ID` | the project id |
-| secret | `SANDBOX_DB_URL` | transaction pooler, `:6543` (§2) |
-| secret | `SANDBOX_FLYWAY_DB_URL` | session pooler, `:5432` (§2) |
-| secret | `SANDBOX_DB_USER` | `draazy_app.<project-ref>` (§2.1) |
-| secret | `SANDBOX_FLYWAY_DB_USER` | `postgres.<project-ref>` |
-| variable | `SANDBOX_R2_ENDPOINT` | `https://<accountId>.r2.cloudflarestorage.com` |
-| variable | `SANDBOX_R2_BUCKET_PRIVATE` | bucket for identity captures, never public |
-| variable | `SANDBOX_R2_BUCKET_PUBLIC` | bucket for listing photos |
-| variable | `SANDBOX_R2_PUBLIC_BASE_URL` | public read origin for the public bucket |
-
-The four R2 entries are variables, not secrets: they are identifiers, and the key pair that actually
-opens the bucket lives in Secret Manager. With `STORAGE_ENABLED=true` the workflow requires all four
-to be non-blank, because a blank one reaches the container empty and `R2FileStorage`'s all-six
-constructor check refuses to boot — a crash loop rather than a bad upload. Leaving one out of the
-`envsubst` list would be worse: the literal `${R2_ENDPOINT}` is non-blank, so that check would pass
-and the loud refusal would become a quiet failure on the first upload.
-
-The connection strings are repository secrets rather than variables for one reason only: **this
-repository is public, and they name the Supabase project.** That is about not committing them, not
-about confidentiality after deploy — they reach Cloud Run as plaintext environment values, readable
-by any project viewer and recorded verbatim in the Admin Activity audit log for 400 days. Treat the
-project ref as known to anyone with access to the GCP project; the password, which is the thing that
-matters, never leaves Secret Manager.
+The workflow fails fast when any `sandbox` value except the three bootstrap ones is empty. The four R2
+values and `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` are variables because they are identifiers; the R2 key pair
+that opens the bucket is a secret. Everything sensitive is an environment secret, never a repository
+variable, because the repository is public and a variable would print in the run log.
+`DIGITALOCEAN_ACCESS_TOKEN` needs custom scopes **app: create, read, update** and nothing else.
 
 **Decide the deployment branch policy on the `sandbox` and `sandbox-web` environments.**
-`workflow_dispatch` accepts any ref, and the workflow's confirmation input checks the environment
-name rather than `github.ref` — so under "All branches", anyone with write access can deploy an
-unreviewed branch, including one that edits `cloudrun-sandbox.yaml` to name a different runtime
-service account, or one that edits `frontend-publish` to exfiltrate the Cloudflare token. Restricting
-the policy to `main` closes that and costs the ability to deploy a feature branch — which is the
-reason the trigger is manual in the first place. Sandbox keeps "All branches" deliberately; a
-production environment must not. Either way the environment setting is the right place for the
-decision, because it cannot be changed by the same pull request that would abuse it.
+`workflow_dispatch` accepts any ref, and the workflow's confirmation input checks the environment name
+rather than `github.ref` — so under "All branches", anyone with write access can deploy an unreviewed
+branch, including one that edits `do-app-sandbox.yaml` or `frontend-publish` to exfiltrate a credential.
+Restricting the policy to `main` closes that and costs the ability to deploy a feature branch, which is the
+reason the trigger is manual in the first place. Sandbox keeps "All branches" deliberately; a production
+environment must not. The environment setting is the right place for the decision, because it cannot be
+changed by the same pull request that would abuse it.
 
-**If the organisation enforces `constraints/iam.allowedPolicyMemberDomains`**, the workflow's
-"Allow public invocation" step fails: `allUsers` cannot be granted. Either exempt the project from
-the policy or accept that Cloudflare must authenticate to the origin, which is remediation 2 in §4
-arriving early — in which case §4 stops being deferred and the Pages Function needs to mint an
-identity token.
+**The deploy is manual, and that moves the boundary.** There is no push or `workflow_run` trigger, so no
+event an outsider can cause starts a job holding these credentials (`workflow_run` hands the triggered
+workflow secrets and a write token even when the triggering run had neither — "Preventing pwn requests",
+GitHub Security Lab). It also removes every automatic gate: **the workflow ships the ref you point it at
+and does not read its CI result**, because a feature branch has no CI run to read, and nothing checks that
+the commit is the head of anything. Dispatching an old ref deploys old code against a schema that only
+moves forward. Read the checks on the commit before dispatching.
 
-### 5.1 Workload Identity Federation, and the gates in front of it
-
-`bootstrap-project.sh` wires the deploy identity with Workload Identity Federation instead of the
-JSON key above: GitHub mints a short-lived OIDC token for the deploy job and GCP exchanges it for an
-access token valid about an hour, so the repository stores no permanent credential. `GCP_WIF_PROVIDER`
-and `GCP_DEPLOYER_SA` are environment **variables**, not secrets — a provider resource name and a
-service-account email are identifiers, and holding them as secrets would imply the exchange is gated
-on knowing them.
-
-**The provider's attribute condition is the whole security boundary.** The provider resource name is
-printed in a public workflow file. Without a condition, any repository on GitHub that reads it can
-mint a token against the pool. `bootstrap-project.sh` pins two claims:
-
-- `assertion.repository == 'owner/repo'` — checked against a claim the subject template cannot rewrite.
-- `assertion.sub == 'repo:OWNER@OWNER-ID/REPO@REPO-ID:environment:sandbox'` — narrows the grant from
-  the repository to **one job in it**. `assertion.repository` alone is satisfied by any workflow here
-  holding `id-token: write`, including one added later by a pull request. GitHub only puts
-  `environment` in the subject for a job that declares one, so requiring it makes `environment:
-  sandbox` load-bearing for credential *issuance* rather than bookkeeping — and puts that
-  environment's reviewer and branch policies genuinely in front of GCP.
-
-Two ways to get that string wrong, both of which fail every deploy with a permission error that names
-neither cause:
-
-- **The environment name is compared as a string, including case.** Creating it in the UI as
-  "Sandbox", or renaming `jobs.deploy.environment` in the workflow alone, breaks the exchange. Change
-  both sides together and re-run the bootstrap script, which re-applies the trust.
-- **The subject carries numeric IDs.** Repositories created after 2026-07-15 use GitHub's immutable
-  subject format (`repo:OWNER@OWNER-ID/REPO@REPO-ID:...`); this one was created 2026-07-25. The
-  `repo:OWNER/REPO:...` shape most tutorials show matches nothing here. The IDs are the point: they
-  survive a rename or a transfer. Verify with `github/actions-oidc-debugger` if a deploy fails on it.
-
-The service-account binding uses `principal://...subject/`, not
-`principalSet://...attribute.repository/`, so both halves agree on the same scope — binding on the
-repository attribute would grant deploy rights to every job in the repo and leave the provider
-condition as the only thing refusing them.
-
-**The deploy is manual, and that moves the second boundary.** `deploy.yml` has no push trigger and
-no `workflow_run` trigger: nothing reaches Cloud Run or Cloudflare until someone opens Actions →
-Deploy (sandbox) → Run workflow, picks a ref, and types `sandbox`. That removes the `workflow_run`
-fork-pull-request problem outright — `workflow_run` hands the triggered workflow secrets and a write
-token even when the triggering run had neither, and `branches: [main]` never guarded it because a
-fork can name a branch `main` ("Preventing pwn requests", GitHub Security Lab). With the trigger
-gone, no event an outsider can cause starts a job holding these credentials.
-
-It also removes every automatic gate. **The workflow ships the ref you point it at and does not read
-its CI result**, because a feature branch has no CI run to read — `ci.yml` runs on `push` to `main`
-and on `pull_request`, so a branch pushed without a PR has none at all. Nothing checks that the
-commit is the head of anything, either: dispatching an old ref will roll Cloud Run and its migrations
-backwards without a warning. Read the checks on the commit before dispatching; the confirmation input
-and the environment branch policy are the only things between the form and a live
-`gcloud run services replace`.
-
-### 5.2 Moving to a new GCP project or account
-
-Project ids are globally unique and never reused, so a move is a new project, not a rename. Supabase,
-R2 and Cloudflare are separate vendors and stay as they are; only the GCP half is rebuilt.
-
-```bash
-gcloud auth login                     # once per account; keep the old one logged in too
-PROJECT_ID=<new-id> OLD_PROJECT_ID=<old-id> OLD_ACCOUNT=<old-email> bash backend/deploy/bootstrap-project.sh
-```
-
-`OLD_PROJECT_ID` copies every secret instead of prompting. **That is mandatory while the database is
-kept**: `identity-hash-secret`, `identity-encryption-key` and `staff-totp-key` are set-once, and fresh
-values orphan every stored hash, make stored PAN/Aadhaar unreadable and force all staff to re-enrol 2FA.
-API keys created *in* the old project (`google-places-server-key`, the browser Maps key and Map ID)
-die with it — recreate them in the new project and add a new secret version before deleting the old one.
-
-Then set the three variables the script prints on the `sandbox` environment, dispatch the backend
-deploy, point Pages `API_ORIGIN` at the new `*.run.app` URL, and only then delete the old project —
-`minScale: 1` keeps billing it until you do.
+**Pages does not rebuild on a push.** The project is a direct-upload project; if a git integration is
+connected (Pages → Settings → Builds & deployments), disconnect it, because it would quietly replace what
+you deployed on purpose with the head of whatever branch was pushed.
 
 ### Scheduled jobs
 
 `com.draazy.api.jobs.JobRunner` runs every background job in four cron groups, all in IST. Each job
 runs in its own try, so one failure is logged and the rest of the group carries on; the group's
-advisory lock (`JobRunScheduler`) keeps it on one instance.
+advisory lock (`JobRunScheduler`) keeps it on one instance, so more than one instance is safe and no
+ShedLock is needed.
 
 | Group | Cron property (default) | Jobs |
 |---|---|---|
@@ -771,9 +635,10 @@ advisory lock (`JobRunScheduler`) keeps it on one instance.
 | Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
 | Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `waiting-digest` |
 
-Switches: `draazy.jobs.enabled=false` turns off all of them (the test suite does), and
-`draazy.jobs.<name>.enabled=false` (env `DRAAZY_JOBS_<NAME>_ENABLED`) turns off one. Daily jobs that
-read a capped page (200–500 rows) repeat until a page comes back empty, up to ten pages a run.
+The app is always on, so the `@Scheduled` cron runs in-process at the times above with no external
+trigger. Switches: `draazy.jobs.enabled=false` turns off all of them (the test suite does), and
+`draazy.jobs.<name>.enabled=false` (env `DRAAZY_JOBS_<NAME>_ENABLED`) turns off one. Daily jobs that read a
+capped page (200–500 rows) repeat until a page comes back empty, up to ten pages a run.
 
 `spring.task.scheduling.pool.size=2` is a connection budget, not a throughput setting. A group run holds
 one connection for its lock transaction and the work checks out a second. With
@@ -781,77 +646,210 @@ one connection for its lock transaction and the work checks out a second. With
 threads let a long nightly run overlap the 15-minute and hourly ticks and starve requests. Raise both
 together. A run that finds both threads busy starts late; it isn't skipped.
 
-**On Cloud Run they do nothing.** CPU is allocated only while a request is in flight, so the
-scheduler thread is frozen between requests and no cron fires. Nothing logs the non-execution. On
-the sandbox this is accepted; production runs on an always-on host (ADR-021).
-
 ---
 
-## 6. Order of operations
+## 6. Order of operations — first-time setup of a fresh environment
 
-1. **Container builds and boots.** `docker build -t draazy-api backend/` then run it against the
-   Supabase sandbox project with the §3 variables and `SPRING_PROFILES_ACTIVE=sandbox`.
-   Success is `GET /api/actuator/health` returning `UP` — note the `/api` prefix,
-   `server.servlet.context-path=/api` moves the probes too. Migrations having run is implied:
-   `spring.jpa.hibernate.ddl-auto=validate` means a boot that completes has proved the entities
-   still match the schema.
-2. **Cloudflare Pages**, building `frontend/` (`npm run build`, output `dist`), with `API_ORIGIN`
-   set to the Cloud Run URL. Attach `sandbox.draazy.com` — the `*.pages.dev` URL cannot be used for
-   anything requiring a session (§1). Then the only verification that exists for the cookie
-   topology: sign in, wait past the 15-minute access-token expiry, make one authenticated request.
-   If it survives, the refresh cookie is being delivered *and* the edge forwards `Cookie` to the
-   proxy target. Playwright structurally cannot cover this.
+Only needed once per environment. Everything after is a workflow dispatch (§5.1). Accounts that cannot be
+created from a terminal: **DigitalOcean** (card attached), **Cloudflare** (free plan), **GoDaddy** (holding
+`draazy.com`), **GitHub** access to `draazy-dev/draazy-app`, plus the vendor accounts in §3 (Meta
+WhatsApp, Cashfree, ZeptoMail, and the Google Maps/Places API keys).
 
-   **Then disconnect the git integration** (Pages → Settings → Builds & deployments). From step 4
-   the frontend is published by direct upload from CI, and that deploy is manual — so an integration
-   left connected is the only thing still building on a push, and it will quietly replace whatever
-   you deployed on purpose with the head of whatever branch was pushed. If the project refuses to
-   disconnect, create a Direct Upload project and move the custom domain to it.
+Tools (`wrangler` runs through `npx`; no install):
 
-   `API_ORIGIN` stays configured **on the project**, not in the workflow. Direct uploads do not
-   touch project environment variables, so it survives every deploy — and it names the Cloud Run
-   service, which is infrastructure rather than build input. `ORIGIN_SHARED_SECRET` (§4) lives
-   there too, as a secret.
-3. **R2 keys**, then one photo upload end-to-end. R2 is cross-origin from the SPA and must supply
-   `Access-Control-Allow-Origin` itself, or browser-side perceptual hashing fails on the canvas read.
-4. **Deploy pipeline.** `.github/workflows/deploy.yml` — **manual only.** Actions → Deploy (sandbox)
-   → Run workflow, pick any branch or tag in "Use workflow from", type `sandbox`, choose `both` /
-   `backend` / `frontend`. Nothing deploys on a push. It requires the §5 bootstrap to exist first.
+| | macOS | Windows |
+|---|---|---|
+| GitHub CLI | `brew install gh` | `winget install --id GitHub.cli -e` |
+| `doctl` | `brew install doctl` | `winget install --id DigitalOcean.Doctl -e` |
+| Node 20+ | `brew install node` | `winget install --id OpenJS.NodeJS.LTS -e` |
 
-   It ships **both halves from one commit, backend first**. The backend job builds the image,
-   pushes it to Artifact Registry tagged with the commit SHA, and applies the service definition
-   with `gcloud run services replace` rather than `deploy`: `replace` makes the file the whole
-   truth, so a setting deleted from the repo is deleted from the service instead of lingering
-   forever. `frontend-build` then builds `frontend/` and `frontend-publish` ships it with
-   `wrangler pages deploy`, tagged with the same SHA so both dashboards name one commit.
+### 6.1 DNS: GoDaddy → Cloudflare
 
-   The order is not arbitrary. API changes here are additive (expand/contract), which makes the
-   asymmetry total: an old UI always works against a new backend, and a new UI does not work
-   against an old one. The frontend will not start until the backend's smoke test is green.
+> **This does not move the domain off GoDaddy.** GoDaddy stays the *registrar*; what moves is *DNS
+> hosting*. Cloudflare DNS is free, and registrar-at-GoDaddy / DNS-at-Cloudflare is an ordinary
+> arrangement, reversible in minutes by pasting GoDaddy's original nameservers back.
 
-   Nothing is gated on CI, because the ref you pick need not have one — see §5.1. The `target`
-   input is the whole decision: there is no path diff and no test-result lookup.
+Do the full nameserver move even though a lone subdomain could keep GoDaddy DNS:
 
-   **The frontend is two jobs, and the split is a security boundary.** `frontend-build` runs
-   `npm ci` and `npm run build` — which execute dependency and project scripts — and holds no
-   deploy credential and declares no environment. It hands `dist/` and `functions/` to
-   `frontend-publish` as an artifact; that job checks out nothing, so `npx wrangler` cannot be
-   redirected by an `.npmrc` or a shadowing `node_modules/wrangler` planted during the build. It
-   uses a **separate environment, `sandbox-web`**, holding only the Cloudflare credentials: GitHub
-   writes the environment name into the OIDC subject and the GCP provider is pinned to
-   `:environment:sandbox`, so the publish job cannot mint Cloud Run credentials even if it is later
-   granted `id-token: write`.
+1. `draazy.com` at the apex — wanted for production — **requires** the zone to be on Cloudflare. Pages
+   cannot attach an apex domain otherwise, and GoDaddy does not support CNAME flattening.
+2. ADR-015 chose Cloudflare edge WAF / rate-limit / Turnstile as the abuse strategy instead of Redis.
+   Those are *zone* features.
+3. The free edge controls in §4 assume the same.
 
-   **Two build-time hazards live in the frontend half.** Every `VITE_*` value is inlined by Vite at
-   build time and every read in `src/` has a fallback, so a missing one produces a bundle that
-   boots and is quietly broken in one feature; the build fails closed on `VITE_GOOGLE_MAPS_API_KEY`
-   for that reason. And `wrangler pages deploy` finds `functions/` by convention relative to the
-   working directory, so it must run from a directory where `functions/` sits beside `dist/` —
-   run anywhere else it uploads the static assets alone, succeeds, and ships a site whose `/api`
-   calls fall through to the SPA rule and return `index.html` with a **200**, which `http.js` reads
-   as a successful empty response. The final smoke test asserts the *content type* of
-   `/api/actuator/health` through `sandbox.draazy.com` precisely because the status code cannot
-   tell those apart.
+Steps:
+
+1. **Screenshot the GoDaddy DNS panel first.** Cloudflare's import is best-effort, and the records you
+   will miss are the ones nothing on the website depends on — MX, SPF/DKIM `TXT`, an `autodiscover`
+   CNAME.
+2. Cloudflare dashboard → **Add a site** → `draazy.com` → **Free**. Compare the imported records against
+   the screenshot.
+3. Cloudflare shows two nameservers, e.g. `xxx.ns.cloudflare.com`.
+4. GoDaddy → **My Products** → `draazy.com` → **DNS** → **Nameservers** → **Change** → **I'll use my own
+   nameservers** → paste both → save. If GoDaddy refuses, it is **Domain Protection** — disable it, change
+   nameservers, re-enable.
+
+Three GoDaddy features break on the move because they run on GoDaddy's own infrastructure; none applies to
+a domain that has only served a website:
+
+| Feature | After the move | Replacement |
+|---|---|---|
+| GoDaddy **email forwarding** | stops | Cloudflare Email Routing (free) |
+| GoDaddy **domain / website forwarding** | stops | a Cloudflare Redirect Rule |
+| **Microsoft 365 mail bought via GoDaddy** | survives *only* if MX, the `autodiscover` CNAME and the SPF/DKIM `TXT` records are all copied | copy them, then send yourself a test mail |
+
+Propagation is usually under an hour. Check:
+
+| macOS | Windows |
+|---|---|
+| `dig NS draazy.com +short` | `Resolve-DnsName draazy.com -Type NS` |
+
+**Checkpoint:** the answer names `*.ns.cloudflare.com`. You create no DNS record by hand; Pages creates the
+`sandbox` record itself in §6.5.
+
+### 6.2 Cloudflare R2
+
+The deploy workflow requires all four `SANDBOX_R2_*` variables and both key secrets to be non-empty, so this comes before the first deploy.
+
+R2 → **Create bucket**, twice — ADR-013 splits them because the access rules differ:
+
+| Bucket | Holds | Public? |
+|---|---|---|
+| `draazy-sandbox-public` | listing photos | yes — attach a proxied custom domain (§3.2) |
+| `draazy-sandbox-private` | KYC and ownership documents | **no** — served only through pre-signed URLs |
+
+Then R2 → **Manage API tokens** → **Create API token**, permission **Object Read & Write**, scoped to those
+two buckets. It shows an **Access Key ID** and a **Secret Access Key** once; record both (they become
+`SANDBOX_R2_ACCESS_KEY_ID` / `SANDBOX_R2_SECRET_ACCESS_KEY`). The **S3 API endpoint**,
+`https://<account-id>.r2.cloudflarestorage.com`, is `SANDBOX_R2_ENDPOINT` and is not the public base URL
+(`SANDBOX_R2_PUBLIC_BASE_URL`), which is the custom domain of the *public* bucket only.
+
+**R2 must send its own CORS headers.** It is cross-origin from the SPA by design and does not inherit the
+API's CORS config. On the public bucket → **Settings** → **CORS policy**:
+
+```json
+[{ "AllowedOrigins": ["https://sandbox.draazy.com"],
+   "AllowedMethods": ["GET", "PUT"],
+   "AllowedHeaders": ["*"],
+   "MaxAgeSeconds": 3600 }]
+```
+
+Without it the browser-side perceptual hashing fails at the canvas read (§3.2) and nothing surfaces as a
+CORS error, so it reads as a flaky uploader. **Checkpoint:** after §6.4, upload a listing photo and reload
+the listing; it must render from the public bucket URL.
+
+### 6.3 DigitalOcean account and GitHub environments
+
+1. cloud.digitalocean.com → enable 2FA, add a billing alert, and create the project `draazy-sandbox`
+   (Environment: Development).
+2. API → Tokens → **Generate new token**: name `github-deploy-sandbox`, custom scopes **app: create, read,
+   update**. Store it as `DIGITALOCEAN_ACCESS_TOKEN` below.
+3. Create the environments and set every `sandbox` value from §5.1. Pipe secrets in so they never reach shell
+   history as arguments:
+
+   ```bash
+   # macOS
+   gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox
+   gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox-web
+   printf '%s' "$VALUE" | gh secret set SANDBOX_JWT_SECRET --env sandbox -R draazy-dev/draazy-app
+   gh variable set SANDBOX_R2_BUCKET_PUBLIC --env sandbox -R draazy-dev/draazy-app --body 'draazy-sandbox-public'
+   ```
+
+   ```powershell
+   # Windows
+   gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox
+   gh api --method PUT repos/draazy-dev/draazy-app/environments/sandbox-web
+   $env:VALUE | gh secret set SANDBOX_JWT_SECRET --env sandbox -R draazy-dev/draazy-app
+   gh variable set SANDBOX_R2_BUCKET_PUBLIC --env sandbox -R draazy-dev/draazy-app --body 'draazy-sandbox-public'
+   ```
+
+4. `sandbox-web`: secret `CLOUDFLARE_API_TOKEN` and variable `CLOUDFLARE_ACCOUNT_ID`. Repository: the
+   `VITE_*` secrets and variables. Then decide the branch policy (§5.1).
+5. Set `SANDBOX_ORIGIN_SHARED_SECRET` once and reuse the same value for the Pages secret in §6.5.
+6. Cloudflare → Turnstile: create the sandbox widget and set `SANDBOX_TURNSTILE_SECRET_KEY` /
+   `VITE_TURNSTILE_SITE_KEY` (§3.1).
+
+### 6.4 First backend deploy
+
+Actions → Deploy (sandbox) → Run workflow → branch, `sandbox`, target **backend**.
+
+- **Expect one failure at the image pull.** The image push succeeds, but a new GHCR package is private. Make
+  it public (github.com/orgs/draazy-dev/packages → `draazy-api` → Package settings → Change visibility →
+  Public), then re-run the workflow or run `doctl apps create-deployment <app-id> --wait`.
+- In the DigitalOcean console, move the app into the `draazy-sandbox` project (Projects → Move resources).
+- If the deploy fails at `migrate`, read the job's deploy logs; a migration error aborts the rollout and
+  leaves nothing serving on a first deploy.
+
+Check it:
+
+```bash
+id=$(doctl apps list --output json | jq -r '.[] | select(.spec.name=="draazy-api-sandbox") | .id')
+doctl apps list-deployments "$id" --format ID,Phase,Created | head -3        # latest ACTIVE
+doctl apps logs "$id" migrate --type deploy | tail -30                        # Flyway summary
+URL=$(doctl apps get "$id" --output json | jq -r '.[0].default_ingress'); echo "$URL"
+curl -fsS "$URL/api/actuator/health"                                          # {"status":"UP"}
+curl -s -o /dev/null -w '%{http_code}\n' "$URL/api/properties"               # 403: the origin gate
+```
+
+Note the `/api` prefix on every path: `/actuator/health` is a 404 on a healthy service. The commands need `jq`
+(`brew install jq` / `winget install --id jqlang.jq -e`). If the service never becomes ready, in order of likelihood: a memory limit below 1 GB (OOM during startup, §5), a missing or empty
+environment value (`Could not resolve placeholder 'X'` — the fail-fast working), or schema drift
+(`Schema-validation: missing table/column`).
+
+Then follow the first-admin steps in §3.
+
+### 6.5 Cloudflare Pages and the custom domain
+
+The CI publishes by `wrangler` direct upload, so create a **direct-upload** project (the dashboard's
+drag-and-drop upload is not supported with Functions and silently omits `api/[[path]].js`):
+
+```bash
+cd frontend
+npx wrangler login
+npx wrangler pages project create draazy --production-branch=main
+npx wrangler pages secret put API_ORIGIN --project-name=draazy
+# paste https://draazy-api-sandbox-466hx.ondigitalocean.app — scheme + host, no path, no trailing slash
+npx wrangler pages secret put ORIGIN_SHARED_SECRET --project-name=draazy
+# paste the value of SANDBOX_ORIGIN_SHARED_SECRET (§4)
+```
+
+`API_ORIGIN` and `ORIGIN_SHARED_SECRET` are runtime values on the Pages **project**, not build input: direct
+uploads do not touch them, so they survive every deploy. `VITE_*` values are the opposite — they are inlined
+at build time, so set them as GitHub variables and secrets (§5.1), not in the Pages dashboard.
+`VITE_GOOGLE_MAPS_API_KEY` is in the bundle by necessity; it is not a secret, so restrict it by HTTP
+referrer and set a quota cap. Leave `VITE_PMF_MODE` unset unless it is deliberately on.
+
+Dispatch the workflow with target **frontend**, then attach the domain — order matters:
+
+1. Pages project → **Custom domains** → **Set up a domain** → `sandbox.draazy.com`. Because the zone is on
+   Cloudflare (§6.1), the CNAME is created for you; confirm it.
+2. Creating the DNS record before registering the domain on the Pages project produces a **522** that looks
+   like an origin outage.
+
+**Manual Pages deploy (fallback)**, when CI is unavailable. Build locally with the same `VITE_*` names as the
+build step of `deploy.yml`, then, **from `frontend/`** (wrangler looks for `functions/` beside the working
+directory; from the repository root it uploads a Function-less site):
+
+```bash
+VITE_DEPLOY_ENV=sandbox VITE_GOOGLE_MAPS_API_KEY='<key>' VITE_TURNSTILE_SITE_KEY='<site key>' npm run build
+npx wrangler pages deploy dist --project-name=draazy --branch=main --commit-dirty=true
+```
+
+```powershell
+$env:VITE_DEPLOY_ENV='sandbox'; $env:VITE_GOOGLE_MAPS_API_KEY='<key>'; $env:VITE_TURNSTILE_SITE_KEY='<site key>'
+npm run build
+npx wrangler pages deploy dist --project-name=draazy --branch=main --commit-dirty=true
+```
+
+`--branch=main` matches the production branch, which is what the custom domain serves; any other value
+creates a preview deployment nobody points at. `curl -fsS https://<project>.pages.dev/api/actuator/health`:
+`UP` means the Function shipped and `API_ORIGIN` is right; **404** means it was deployed from the wrong
+directory; **502** means `API_ORIGIN` or `ORIGIN_SHARED_SECRET` is unset or malformed.
+
+### 6.6 Verification
+
+Run §9.3 against `https://sandbox.draazy.com`, then the cookie test in §9.3 and one sign-in by hand
+(§3.1). Add the monitoring in §8.
 
 ---
 
@@ -859,28 +857,28 @@ the sandbox this is accepted; production runs on an always-on host (ADR-021).
 
 - **Nobody can log in on `prod` until WhatsApp is configured.** `UnconfiguredOtpSender` — selected on
   every profile except `local` and `sandbox` while `draazy.providers.whatsapp.enabled` is false —
-  throws on every send. (Sandbox already sends through WhatsApp, §3.1.) Set
-  the flag plus the `WHATSAPP_*` credentials (ADR-020: `WHATSAPP_PHONE_NUMBER_ID`,
-  `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_OTP_TEMPLATE_NAME`, `WHATSAPP_OTP_TEMPLATE_LANG`) before the
-  first useful deploy. The token must be a **System User** token; the one the App Dashboard offers
-  expires in 24 hours. **Before turning the flag on, add a spend cap on the Meta billing account**:
-  `OtpService` throttles per *recipient*, so walking thousands of valid-looking numbers gets a fresh
-  budget for each one. On WhatsApp that is worse than a bill — sends to non-WhatsApp numbers drag
-  the sending number's quality rating down, which cuts the daily messaging limit and takes sign-in
-  itself offline days later.
-- **Scheduled jobs do not run on Cloud Run.** CPU throttling freezes the scheduler thread between
-  requests — see §5. Accepted on the sandbox; production needs an always-on host (ADR-021). Each run
-  takes a Postgres advisory lock per job, so more than one instance is safe and no ShedLock is needed.
-- **Backups.** Supabase's free tier has limited backups and no PITR. A scheduled logical dump to R2
-  is the stopgap until Pro is justified.
-- **The anonymous rate limiter is bypassable until §4 is decided.** Not a boot failure and not
-  visible in any log — it simply does not do what it looks like it does.
-- **Postgres TLS is `require`, not `verify-full`.** `application-prod.properties` pins `sslmode` so
-  pgjdbc's default `prefer` cannot silently fall back to plaintext on the Cloud Run → Supabase hop,
-  but `require` does not authenticate the server, so an active MITM is still possible. Raising it
-  means baking the Supabase CA into the image and adding `sslrootcert`; `FLYWAY_DB_URL` needs the
-  same, in the URL itself, because Flyway builds its own DataSource and the Hikari property does not
-  reach it.
+  throws on every send. (Sandbox already sends through WhatsApp, §3.1.) Set the flag plus the `WHATSAPP_*`
+  credentials (ADR-020: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_OTP_TEMPLATE_NAME`,
+  `WHATSAPP_OTP_TEMPLATE_LANG`) before the first useful deploy. The token must be a **System User** token;
+  the one the App Dashboard offers expires in 24 hours. **Before turning the flag on, add a spend cap on the
+  Meta billing account**: `OtpService` throttles per *recipient*, so walking thousands of valid-looking
+  numbers gets a fresh budget for each one. On WhatsApp that is worse than a bill — sends to non-WhatsApp
+  numbers drag the sending number's quality rating down, which cuts the daily messaging limit and takes
+  sign-in itself offline days later.
+- **Backups.** The dev database is a lightweight, single-node database; do not rely on it for recovery. A
+  scheduled logical dump to R2 is the stopgap until the database is upgraded to a Managed Database.
+- **The anonymous rate limiter is bypassable until `INTERNAL_PROXIES` is set (§4).** Not a boot failure and
+  not visible in any log — it simply does not do what it looks like it does.
+- **Postgres TLS is `require`, not `verify-full`.** `application-sandbox.properties` pins `sslmode` so pgjdbc's
+  default `prefer` cannot silently fall back to plaintext, but `require` does not authenticate the server, so
+  an active MITM is still possible. Raising it means baking the database CA into the image and adding
+  `sslrootcert`; `FLYWAY_DB_URL` needs the same in the URL itself, because Flyway builds its own DataSource
+  and the Hikari property does not reach it.
+- **The `*.ondigitalocean.app` URL stays public.** It is safe only while `ORIGIN_SHARED_SECRET` is set (§4).
+- **Rollback.** Redeploying an earlier ref restores earlier code (secrets are not versioned, §5); Pages keeps
+  prior deployments and rolls back from the dashboard. Neither reverses a Flyway migration — the database
+  only moves forward.
+- **GitHub Actions are tag-pinned, not SHA-pinned.**
 
 ---
 
@@ -903,24 +901,213 @@ Nothing here costs money; non-critical logs are not worth paying to keep.
 **Do not enable log forwarding.** OpenSearch and Datadog are paid; Better Stack's free plan keeps
 3 days, which adds nothing the error table does not already hold for 30.
 
-**Free alert policies** — add to the app spec (`alerts` at app level, the rest under the service):
+**Free alert policies** are in the app spec (§5): `DEPLOYMENT_FAILED`, `DOMAIN_FAILED`, CPU > 85 % and
+memory > 90 % over 10 minutes, and more than 2 restarts in 5 minutes. They only reach someone once an email
+destination is set: App Platform → Insights → alerts.
 
-```yaml
-alerts:
-  - rule: DEPLOYMENT_FAILED
-  - rule: DOMAIN_FAILED
-services:
-  - name: api
-    alerts:
-      - { rule: RESTART_COUNT, operator: GREATER_THAN, value: 2, window: TEN_MINUTES }
-      - { rule: MEM_UTILIZATION, operator: GREATER_THAN, value: 85, window: FIVE_MINUTES }
-      - { rule: CPU_UTILIZATION, operator: GREATER_THAN, value: 85, window: TEN_MINUTES }
-    health_check:
-      http_path: /api/actuator/health/liveness
+**One free Uptime check** (DO credits one per month): Monitoring → Uptime, HTTPS
+`GET https://sandbox.draazy.com/api/actuator/health`, alerts on downtime and SSL expiry to the owner's
+email. A second check is $1/month — not needed.
+
+---
+
+## 9. Manual verification
+
+How to prove a deployed environment works. The Playwright suite already proves the app's logic
+against mocks; this section covers only what it cannot reach:
+
+- **Real vendors** — WhatsApp OTP, Cashfree payments and webhooks, R2 storage, Google Maps,
+  Cashfree Secure ID, Turnstile.
+- **Deployed wiring** — the Pages proxy, `ORIGIN_SHARED_SECRET`, cookies, CORS on R2.
+- **Real devices** — camera capture, touch, Android back, iOS Safari.
+
+| Environment | What to run | When |
+|---|---|---|
+| local | `e2e\run-fast.ps1 -Full` green | Before any deploy. A red suite does not go to sandbox. |
+| sandbox | §9.3 + §9.4 (full regression) | Before every production release |
+| prod | §9.3 + §9.5 (smoke) | After every production deploy, ~20 minutes |
+| both | §9.6 (logs) | After every run |
+
+### 9.1 Ground rules
+
+- **Every login is a real WhatsApp OTP.** The fixed OTP code, the "any code works" sender and the
+  self-grant Verified badge are `@LocalOnly` and do not exist outside `local`
+  ([`system/profiles.md`](./system/profiles.md#local-only)). There is no shortcut, and adding one to
+  a deployed environment would be a login bypass.
+- **Maker-checker needs two operators.** Rent-agreement refund approval and hard-signal listing
+  co-approval refuse the same person on both sides, so each environment needs a second back-office
+  account with the relevant permission, not a second administrator.
+- **Production never-do list** — these touch real people:
+  - Never **approve** a test listing. It goes public, into search, sitemaps and alerts.
+  - Never **unlock a real owner's contact** from a test account. That discloses a real person's
+    number for no purpose (DPDP).
+  - Never **message, offer on, or book a visit** to a real user's listing.
+  - Never create a **deal or tenancy** against a real user.
+
+### 9.2 Test accounts
+
+Mobile numbers live in the team password manager, never in this repo.
+
+| Actor | Role | Sandbox | Prod |
+|---|---|---|---|
+| Buyer, free tier | `buyer` | team member's number | company SIM |
+| Buyer, paid plan | `buyer` | team member's number | company SIM (see §9.7) |
+| Tenant | `buyer` holding a tenancy | team member's number | sandbox only — a tenancy needs a counterparty |
+| Owner, free tier | `owner` | team member's number | company SIM |
+| Owner, paid plan | `owner` | team member's number | company SIM (see §9.7) |
+| Staff, one per team in use | `staff` | team member's number | company SIM |
+| Admin × 2 | `admin` | team members' numbers | company SIMs |
+
+Keep free-tier accounts even once paid ones exist: an unlimited account never hits a gate, so it
+cannot tell you the gate works.
+
+### 9.3 Wiring — both environments, no login
+
+Set `HOST` to `https://sandbox.draazy.com` or the production origin, and `API_URL` to the App Platform
+default ingress of that environment.
+
+```bash
+curl -fsS "$HOST/api/actuator/health"                                      # {"status":"UP"}
+curl -fsS "$HOST/" | grep -c '<div id="root"'                              # 1
+curl -fsS -D - -o /dev/null "$HOST/api/properties" | grep -i content-type  # application/json
+curl -s -o /dev/null -w '%{http_code}\n' "$HOST/api/me"                    # 401, not 500
+curl -s -o /dev/null -w '%{http_code}\n' "$API_URL/api/properties"         # 403
 ```
 
-**One free Uptime check** (DO credits one per month): HTTPS `GET https://draazy.com/api/actuator/health`,
-alerts on downtime and SSL expiry to the owner's email. A second check is $1/month — not needed.
+Health alone proves nothing: a mismatched `ORIGIN_SHARED_SECRET` keeps health green while every real
+`/api` call answers 403. The third line is the real check — an HTML content type means the SPA shell
+answered instead of the API. Reading the results:
 
-**Scaling out is safe for the jobs.** Every cron-scheduled run takes a Postgres advisory lock keyed
-on the job name and skips if another instance holds it, so two instances never run the same job group.
+| Result | Meaning |
+|---|---|
+| `/api/properties` is 200 with an empty list where the seed should be 38 listings | The request never reached the backend: `API_ORIGIN` is wrong and something answers with the SPA shell |
+| 502 | `API_ORIGIN` or `ORIGIN_SHARED_SECRET` is unset on Pages |
+| 403 through `$HOST` | The two copies of `ORIGIN_SHARED_SECRET` differ |
+| 200 from `$API_URL/api/properties` | The origin gate is off: anyone with the URL is served |
+
+Then in a browser: the catalogue renders cards, a listing detail page opens, and the map appears. A blank
+map with a console error is `VITE_GOOGLE_MAPS_API_KEY` — missing from the build or referrer-restricted to
+the wrong hostname.
+
+**Cookie topology — the only test that proves it** (§1; Playwright structurally cannot perform it): sign
+in at `$HOST`, wait past the 15-minute access-token expiry without refreshing or navigating, then make one
+authenticated request. If it survives, the refresh cookie is being delivered *and* the edge forwards
+`Cookie` to the proxy target. If the session dies, the cookie is being withheld silently — check that
+nothing points a second hostname at the backend.
+
+### 9.4 Sandbox — full regression
+
+Test **journeys across roles**, not pages: most production bugs sit at the hand-off between two
+actors. Each journey links the flow doc that defines the expected behaviour. Run the ones marked 📱 on
+one Android phone (Chrome) and one iPhone (Safari) as well as desktop.
+
+**A. Sign-in** 📱 — [auth](./flows/consumer/auth.md)
+- [ ] Consumer signs up by mobile; the OTP arrives on WhatsApp within a minute
+- [ ] Wrong OTP is refused with a clear message; resend works
+- [ ] Session survives a refresh; sign-out ends it
+- [ ] Staff and admin sign in at `/staff-login` and land in their own console, not the consumer app
+- [ ] Two devices on different networks show two different client IPs in the back-office audit/rate-limit
+      views (proves `X-Forwarded-For` survives the proxy chain; relevant before widening `INTERNAL_PROXIES`)
+
+**B. Owner lists a property** 📱 — [list-property-wizard](./flows/consumer/list-property-wizard.md)
+- [ ] Free owner completes the wizard with photos taken on the phone
+- [ ] Photos load back from R2 (a broken image here is R2 CORS)
+- [ ] Map pin and locality are right
+- [ ] Listing lands as pending; a second listing is refused at the free-tier limit
+
+**C. Verification** — [property-verification](./flows/admin/property-verification.md)
+- [ ] Staff sees the listing in the queue; approve stays disabled until every check is ticked
+- [ ] Approve publishes it; the owner is notified
+- [ ] Reject on a second listing: the owner sees the reason
+
+**D. Discovery** 📱 — [search-listings](./flows/consumer/search-listings.md), [property-detail](./flows/consumer/property-detail.md), [societies](./flows/consumer/societies.md), [saved-alerts](./flows/consumer/saved-alerts.md)
+- [ ] The listing from C appears in search, with filters and on the map
+- [ ] Property page, society page and locality page render
+- [ ] Save the property and a search; a matching new listing raises an alert
+
+**E. Contact gate** 📱 — [contact-gate-leads](./flows/consumer/contact-gate-leads.md)
+- [ ] Free buyer reveals contacts up to the free allowance, then hits the gate
+- [ ] The owner sees the enquiry in their inbox
+
+**F. Payments** 📱 — [plans-billing-refer](./flows/consumer/plans-billing-refer.md)
+- [ ] Buy a plan with a Cashfree sandbox test card; the plan activates **from the webhook**, not
+      from the browser redirect (close the tab before returning and it must still activate)
+- [ ] The buyer from E is no longer gated; `/me/entitlements` agrees
+- [ ] An abandoned checkout grants nothing; a second checkout while one is unpaid names the first
+- [ ] The payment appears in admin finance
+
+**G. Visit → offer → deal** — [schedule-visit](./flows/consumer/schedule-visit.md), [deals-offers-finalization](./flows/consumer/deals-offers-finalization.md)
+- [ ] Buyer books a visit; owner confirms and completes it
+- [ ] Buyer offers, owner counters, buyer accepts
+- [ ] Buyer requests finalization, owner accepts; the deal closes (and a rental creates a tenancy)
+
+**H. Tenancy** — [rent-tenancy](./flows/consumer/rent-tenancy.md)
+- [ ] The tenant sees the tenancy; the owner's rent ledger records a payment
+
+**I. Identity verification** 📱 — [contact-gate-leads §9](./flows/consumer/contact-gate-leads.md#9-identity-verification-hardware-checklist), [users-kyc](./flows/admin/users-kyc.md)
+- [ ] Capture front, back and selfie on a real phone camera
+- [ ] Staff sees all three images; approval requires confirming the server-chosen pose
+- [ ] The badge appears on the user and on their listings; the WhatsApp decision message arrives
+
+**J. Rent agreement** — [rent-agreement](./flows/consumer/rent-agreement.md), [service-queues](./flows/ops/service-queues.md)
+- [ ] Pay for an agreement; it reaches the drafting desk
+- [ ] Draft is shared, the customer accepts, the final document is delivered
+- [ ] Refund: one operator requests, a different one approves; the refund shows in Cashfree
+
+**K. Everything else**
+- [ ] Flatmates: post a room and a seeker post; ops moderates them — [flatmates](./flows/consumer/flatmates.md), [flatmate-moderation](./flows/ops/flatmate-moderation.md)
+- [ ] Support ticket raised, answered by ops, closed — [support-tickets](./flows/consumer/support-tickets.md)
+- [ ] Report a listing; it reaches trust & safety — [trust-safety-reports](./flows/admin/trust-safety-reports.md)
+- [ ] Referral link signs up a new user and credits the referrer — [plans-billing-refer](./flows/consumer/plans-billing-refer.md), [referrals-fraud](./flows/ops/referrals-fraud.md)
+- [ ] Calculators and services hub — [services-calculators](./flows/consumer/services-calculators.md)
+- [ ] Admin analytics, finance and enquiries reflect A–J — [analytics](./flows/admin/analytics.md), [finance](./flows/admin/finance.md), [enquiries-funnel](./flows/admin/enquiries-funnel.md)
+- [ ] Notifications and chat live updates (SSE) keep flowing for 2+ minutes
+- [ ] Scheduled jobs log their runs in the runtime logs, with no repeating errors
+
+### 9.5 Production — smoke
+
+Short, mostly read-only, and restricted to test accounts. Respect the never-do list in §9.1.
+
+- [ ] §9.3 wiring, against the production origin
+- [ ] Consumer sign-in: OTP arrives on WhatsApp
+- [ ] Staff sign-in at `/staff-login`: password, then an authenticator code (first time: scan the QR, save the recovery codes); the right console loads
+- [ ] Browse without signing in: search with a filter, the map, one property page, one society page, `/plans`
+- [ ] Test owner submits a listing with a photo → it reaches the verification queue → staff **rejects** it
+- [ ] Test buyer opens a real listing and sees the contact gate — **stop there, do not unlock**
+- [ ] Test buyer raises a support ticket; staff answers and closes it
+- [ ] Payment — only when payment code changed since the last check; see §9.7
+
+### 9.6 After every run — logs
+
+- [ ] Admin ▸ Error log (§8): no new `ERROR` since the deploy started (runtime logs keep nothing, so use
+      `doctl apps logs <app> --type run` only for a live look)
+- [ ] Admin ▸ Error log: no `Refund or reconcile` entry — it means money was taken and nothing was
+      granted (subscription, service-request and amendment settlement each log it)
+- [ ] Cashfree dashboard → webhooks: every delivery in the window answered 200
+- [ ] WhatsApp Manager: OTP messages delivered, not failed on template or token
+- [ ] DigitalOcean → app → Insights: the spec's alerts exist and have an email destination
+
+### 9.7 Production payments today
+
+Plan purchases have **no refund path** in the platform: admin finance reports refunds as a literal
+zero ([finance §5.11](./flows/admin/finance.md), D63). So a real purchase followed by a Cashfree-dashboard
+refund leaves the subscription active and finance overstating revenue by that amount.
+
+Until §9.8 lands: buy the cheapest real plan on the test owner once, when payment code first ships to
+production and again whenever it changes, and **keep it** rather than refunding. That account then
+doubles as the paid test owner. Record each purchase in the team finance sheet so it can be excluded
+from reported revenue.
+
+### 9.8 Not built yet
+
+Each of these moves a production check from "avoid" to "safe to run every deploy":
+
+- **Hidden internal plan** — unlimited contacts and listings, never listed on `/plans`, granted only
+  by an admin with an audit row. Entitlements already derive from the subscribed plan
+  (`EntitlementService`), so this needs no bypass flag.
+- **Test-account marker** — listings, leads, payments and page views from marked accounts excluded
+  from public search, sitemaps, alerts, analytics and finance. Unblocks approving a test listing and
+  the full contact-gate journey in production.
+- **₹1 internal price** — a server-side price override for marked accounts only, never taken from
+  the client, so a live payment can be checked on every deploy.
+- **Plan refunds (D63)** — so a test purchase can be returned without leaving the ledger wrong.
