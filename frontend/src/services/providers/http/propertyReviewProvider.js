@@ -74,6 +74,10 @@ export async function setPropertyReviewChecklistItem(propertyId, item, pass) {
   return toCaseFile(await patch(`${caseFilePath(propertyId)}/checklist`, body));
 }
 
+export async function recordPropertyReraCheck(propertyId, result) {
+  return toCaseFile(await post(`/properties/${encodeURIComponent(propertyId)}/rera-check`, { result }));
+}
+
 export async function decidePropertyReview(propertyId, decision, options) {
   const input = String(decision ?? '').toLowerCase();
   const verb = input.startsWith('approve') ? 'approve'

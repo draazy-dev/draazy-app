@@ -36,12 +36,15 @@ public class PropertyVerificationController {
     private final PropertyVerificationService service;
     private final PropertyVerificationOverrideService overrides;
     private final PropertyReviewQueue queue;
+    private final PropertyReraCheckService reraChecks;
 
     public PropertyVerificationController(PropertyVerificationService service,
-            PropertyVerificationOverrideService overrides, PropertyReviewQueue queue) {
+            PropertyVerificationOverrideService overrides, PropertyReviewQueue queue,
+            PropertyReraCheckService reraChecks) {
         this.service = service;
         this.overrides = overrides;
         this.queue = queue;
+        this.reraChecks = reraChecks;
     }
 
     /** {@code GET /properties/{id}/verification} (contract {@code getPropertyVerification}). */
@@ -117,6 +120,13 @@ public class PropertyVerificationController {
         return service.setChecklistItem(principal, id, body.item(), Boolean.TRUE.equals(body.pass()));
     }
 
+    @PostMapping(Routes.Moderation.PROPERTY_RERA_CHECK)
+    @PreAuthorize(PROPERTIES_VERIFY)
+    public PropertyReviewResponse recordReraCheck(@CurrentUser AuthPrincipal principal,
+            @PathVariable String id, @Valid @RequestBody ReraCheckRequest body) {
+        return reraChecks.record(principal, id, body.result());
+    }
+
     public record MessageRequest(@NotBlank @Size(max = 4000) String body, Boolean clarificationRequested) {
     }
 
@@ -127,6 +137,9 @@ public class PropertyVerificationController {
 
     // Boxed pass lets omission bind distinctly; controller collapses null to false.
     public record ChecklistUpdate(@NotBlank String item, Boolean pass) {
+    }
+
+    public record ReraCheckRequest(@NotBlank String result) {
     }
 
     public record OverrideRequest(@NotBlank @Size(max = 300) String reason) {

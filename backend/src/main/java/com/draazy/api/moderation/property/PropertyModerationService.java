@@ -93,7 +93,7 @@ public class PropertyModerationService {
                 lifecycle.reenterPending(actor, property);
             }
             PropertyReview review = cases.ensure(property.getId(), property.getDeal());
-            ApprovalGate.require(review);
+            ApprovalGate.require(review, property);
             if (clearingApprovedRecheck) {
                 requireSignalAlreadyOverridden(property);
             } else {
@@ -162,7 +162,7 @@ public class PropertyModerationService {
                 "owner", String.valueOf(property.getOwner().getId()));
         notifier.notify(property.getOwner().getId(), "listing.flagged",
                 "Your listing has been taken down",
-                "A moderator took down your listing: " + (reason == null || reason.isBlank() ? "Flagged for review." : reason.trim()),
+                "A moderator took down your listing. Contact support if you think this is a mistake.",
                 "/dashboard");
         return property;
     }

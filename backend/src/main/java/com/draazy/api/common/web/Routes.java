@@ -452,6 +452,8 @@ public final class Routes {
 
         public static final String IDENTITY_DISPUTE = IDENTITY + "/dispute";
 
+        public static final String IDENTITY_APPEAL = IDENTITY + "/appeal";
+
         public static final String IDENTITY_CHALLENGE = IDENTITY + "/challenge";
 
         /** Authenticated, {@code local} profile only ({@code @LocalOnly}) — approves the caller's case
@@ -913,6 +915,10 @@ public final class Routes {
 
         public static final String PROPERTY_ADMIN_UPDATE = Properties.BY_ID + "/admin";
 
+        public static final String PROPERTY_PHOTO_TAKEDOWN = Properties.BY_ID + "/photos/takedown";
+
+        public static final String PROPERTY_RERA_CHECK = Properties.BY_ID + "/rera-check";
+
         /** Authenticated, participant-scoped. No {@code x-roles}: the owner is a participant, so
          * role-gating it would lock them out of their own review. */
         public static final String PROPERTY_VERIFICATION = Properties.BY_ID + "/verification";
@@ -1012,6 +1018,10 @@ public final class Routes {
         public static final String IDENTITY_REVIEW_REJECT = IDENTITY_REVIEW_BY_ID + "/reject";
 
         public static final String IDENTITY_REVIEW_REVOKE = IDENTITY_REVIEW_BY_ID + "/revoke";
+
+        public static final String IDENTITY_REVIEW_APPEAL_UPHOLD = IDENTITY_REVIEW_BY_ID + "/appeal/uphold";
+
+        public static final String IDENTITY_REVIEW_APPEAL_REOPEN = IDENTITY_REVIEW_BY_ID + "/appeal/reopen";
 
         public static final String FLATMATE_MODERATION = "/admin/flatmates/{id}/moderation";
 

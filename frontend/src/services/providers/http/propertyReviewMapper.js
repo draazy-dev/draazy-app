@@ -48,6 +48,7 @@ export function toCaseFile(res) {
     notes: res.notes ?? null,
     reasonCode: res.reasonCode ?? null,
     reasonNote: res.reasonNote ?? null,
+    reraCheck: res.reraCheck ?? null,
     overrideRequest: toOverrideRequest(res.overrideRequest),
     signals: toSignals(res.signals),
     decidedAt: res.decidedAt ?? null,

@@ -127,6 +127,8 @@ export const resumeListing = async (id) => (await provider()).resumeListing(id);
 // listing to `pending`.
 export const updateListingAsModerator = async (id, patch) => (await provider()).updateListingAsModerator(id, patch);
 
+export const removeListingPhoto = async (id, photo, reason) => (await provider()).removeListingPhoto(id, photo, reason);
+
 // Admin/owner: soft-delete. Backed by PATCH /properties/{id}/archive|restore in http mode.
 export const archiveListing = async (id, reason) => (await provider()).archiveListing(id, reason);
 export const restoreListing = async (id) => (await provider()).restoreListing(id);

@@ -7,7 +7,7 @@ import {
 import {
   startPropertyReview,
   setPropertyReviewChecklistItem, addPropertyReviewMessage, decidePropertyReview,
-  requestPropertyReviewOverride, approvePropertyReviewOverride,
+  requestPropertyReviewOverride, approvePropertyReviewOverride, recordPropertyReraCheck,
 } from '../../../services/propertyReviewService.js';
 import { setListingStatus } from '../../../services/propertyService.js';
 import { chaseOwner, listOutreachTemplates, listOwnerOutreach, markOutreachSent } from '../../../services/outreachService.js';
@@ -31,6 +31,8 @@ import OwnershipEvidencePanel from './review-modal/OwnershipEvidencePanel.jsx';
 import BadgeRequestBanner from './review-modal/BadgeRequestBanner.jsx';
 import { OWNERSHIP_REVIEW_ITEM, seeksOwnershipBadge } from '../../../lib/recheckFields.js';
 import { SubmittedPhotos, SubmittedDescription, SubmittedLocation } from './review-modal/SubmittedContent.jsx';
+import ReraCheckRow, { RERA_REVIEW_ITEM } from './review-modal/ReraCheckRow.jsx';
+import { hasPermission } from '../../../lib/adminModules.js';
 
 // Verification routes require UUIDs; the display id may be a public slug.
 const pid = (listing) => listing?.uuid || listing?.id;
@@ -206,6 +208,24 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   };
 
   const checklistComplete = Boolean(thread?.checklist?.length) && thread.checklist.every((line) => line.pass);
+
+  const reraFailedReason = { not_found: 'rera_not_found', mismatch: 'rera_mismatch' }[thread?.reraCheck] ?? '';
+
+  const recordRera = async (result) => {
+    try {
+      setThread(await recordPropertyReraCheck(pid(review), result));
+    } catch (err) {
+      toast(err?.message || 'Could not save the RERA check', 'error');
+    }
+  };
+
+  const photoRemoved = (updated) => {
+    const gallery = updated?.gallery ?? [];
+    setReview((current) => current
+      ? { ...current, gallery, image: updated?.image ?? null, ...(gallery.length ? {} : { status: 'needs_info' }) }
+      : current);
+    onRefresh?.();
+  };
 
   const reloadCase = async () => {
     const caseFile = await startPropertyReview(pid(review));
@@ -535,7 +555,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
           <div id="review-panel" role="tabpanel" aria-labelledby={`review-tab-${activeSection}`} className="space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2">
             {activeSection === 'overview' ? (
               <>
-                <SubmittedPhotos listing={review} />
+                <SubmittedPhotos listing={review} onPhotoRemoved={hasPermission(user, 'properties:moderate') ? photoRemoved : undefined} />
                 <SubmittedDescription listing={review} />
               </>
             ) : null}
@@ -704,7 +724,9 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
               </span>
             </div>
             <div className="space-y-2" role="group" aria-labelledby="review-checklist-title">
-              {thread.checklist.map((c) => (
+              {thread.checklist.map((c) => (c.item === RERA_REVIEW_ITEM ? (
+                <ReraCheckRow key={c.item} reraId={review.reraId} result={thread.reraCheck} onRecord={recordRera} />
+              ) : (
                 <label key={c.item} className={classNames('flex min-h-[44px] cursor-pointer flex-wrap items-center gap-2.5 rounded-xl border px-3 py-2 transition-colors', c.pass
                   ? 'border-emerald-400/30 bg-emerald-500/10'
                   : 'border-white/10 bg-white/[0.02] hover:bg-white/[0.05]')}>
@@ -723,7 +745,7 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                     </span>
                   ))}
                 </label>
-              ))}
+              )))}
             </div>
           </div>
 
@@ -738,10 +760,10 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                 <button onClick={reviewApprove} disabled={busy || !checklistComplete} title={checklistComplete ? 'Approve this listing' : 'Tick every check'} className="dz-btn dz-btn-success min-h-[44px] disabled:opacity-50">
                   <CheckCircle className="h-4 w-4" /> Approve
                 </button>
-                <button onClick={() => { setDecisionMode('needs_info'); setReasonCode(''); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-ghost min-h-[44px]">
+                <button onClick={() => { setDecisionMode('needs_info'); setReasonCode(reraFailedReason); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-ghost min-h-[44px]">
                   <HelpCircle className="h-4 w-4" /> Needs info
                 </button>
-                <button onClick={() => { setDecisionMode('reject'); setReasonCode(''); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-danger min-h-[44px]">
+                <button onClick={() => { setDecisionMode('reject'); setReasonCode(reraFailedReason); setReasonNote(''); }} disabled={busy} className="dz-btn dz-btn-danger min-h-[44px]">
                   <XCircle className="h-4 w-4" /> Reject
                 </button>
                 {!checklistComplete ? <span className="self-center text-xs font-semibold text-amber-300">Tick every check</span> : null}

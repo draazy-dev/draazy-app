@@ -404,8 +404,9 @@ class VerificationThreadTest extends AbstractApiTest {
         mvc.perform(get(path(rejected, "")).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.messages[0].body").value(
-                        "\u26D4 Your property could not be approved.\nReason: Please upload a readable document."
-                                + " The Index II is illegible."));
+                        "\u26D4 Your property could not be approved.\nReason: Ownership documents could not be verified."
+                                + " The Index II is illegible. This decision is final."
+                                + " The listing cannot be resubmitted."));
     }
 
     @Test

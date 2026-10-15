@@ -22,6 +22,10 @@ public interface FileStorage {
 
     String storePublic(String key, byte[] content, String contentType);
 
+    /** Removes an object written by {@link #storePublic}; a missing key is not an error. */
+    default void deletePublic(String key) {
+        throw new UnsupportedOperationException("This storage cannot delete public objects");
+    }
     String publicUrlPrefix();
     }
 
@@ -68,6 +72,11 @@ class MockFileStorage implements FileStorage {
         // canvas hash sees a same-origin image rather than a tainted one.
         store(DevObjectStore.PUBLIC_PREFIX + key, content, contentType);
         return objects.publicUrl(DevObjectStore.PUBLIC_PREFIX + key);
+    }
+
+    @Override
+    public void deletePublic(String key) {
+        objects.delete(DevObjectStore.PUBLIC_PREFIX + key);
     }
 
     @Override

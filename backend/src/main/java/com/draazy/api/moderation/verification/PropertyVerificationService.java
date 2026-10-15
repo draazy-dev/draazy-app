@@ -142,7 +142,7 @@ public class PropertyVerificationService {
         Property property = loadForWrite(propertyId);
         lifecycle.requireChecker(actor, property);
         lifecycle.requireActive(property);
-        PropertyReview review = requireCase(property);
+        PropertyReview review = requireFreshCase(property);
         requireExpected(property.getStatus(), PropertyReviewStatuses.wire(review), expectedStatus);
         boolean publishingVerifiedApproval = approve
                 && PropertyStatus.APPROVED.equals(review.getStatus())
@@ -153,7 +153,7 @@ public class PropertyVerificationService {
                     "Listing status changed; refresh before deciding");
         }
         if (approve) {
-            ApprovalGate.require(review);
+            ApprovalGate.require(review, property);
             requireNoSecondApproverBlock(property);
 
                 // Checked before the verdict is written, not left to `publish` below: the rollback would
@@ -209,7 +209,10 @@ public class PropertyVerificationService {
         }
         Property property = loadForWrite(propertyId);
         lifecycle.requireChecker(actor, property);
-        PropertyReview review = requireCase(property);
+        if (VerificationCases.RERA_ITEM.equals(item)) {
+            throw new BadRequestException("rera_item_derived", "Record the RERA result instead of ticking it");
+        }
+        PropertyReview review = requireFreshCase(property);
         ReviewChecklistItem line = review.getChecklist().stream()
                 .filter(entry -> entry.getItem().equals(item))
                 .findFirst()
@@ -250,6 +253,12 @@ public class PropertyVerificationService {
     private PropertyReview requireCase(Property property) {
         return reviews.findByPropertyId(property.getId())
                 .orElseThrow(() -> new NotFoundException("No verification review for this listing"));
+    }
+
+    private PropertyReview requireFreshCase(Property property) {
+        PropertyReview review = requireCase(property);
+        cases.reconcile(review);
+        return review;
     }
 
     private Property load(String propertyId) {
@@ -317,7 +326,7 @@ public class PropertyVerificationService {
                 showsReason(review) ? review.getNotes() : null,
                 staff ? pendingOverride(property.getId()) : null,
                 listingSignals,
-                review.getDecidedAt(), ListingProgress.of(property, staff));
+                review.getDecidedAt(), ListingProgress.of(property, staff), staff ? property.getReraCheck() : null);
     }
 
     private PropertyReviewResponse.OverrideRequest pendingOverride(UUID propertyId) {

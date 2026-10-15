@@ -309,6 +309,11 @@ export async function updateListingAsModerator(id, patchBody) {
   return toViewModel(await patch(`/properties/${encodeURIComponent(id)}/admin`, toListingUpdate(patchBody)));
 }
 
+/** Staff pull one photo; the server deletes the stored file, tells the owner and may send the listing back. */
+export async function removeListingPhoto(id, photo, reason) {
+  return toViewModel(await post(`/properties/${encodeURIComponent(id)}/photos/takedown`, { photo, reason }));
+}
+
 /** Soft-delete. Nothing is destroyed — "delete" is the owner's word for archiving. */
 export const deleteListing = (id) => archiveListing(id);
 

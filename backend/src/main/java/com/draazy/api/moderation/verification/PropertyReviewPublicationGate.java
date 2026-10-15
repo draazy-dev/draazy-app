@@ -12,10 +12,13 @@ public class PropertyReviewPublicationGate implements PropertyPublicationGate {
 
     private final PropertyReviewRepository reviews;
     private final ListingSignalService signals;
+    private final VerificationCases cases;
 
-    public PropertyReviewPublicationGate(PropertyReviewRepository reviews, ListingSignalService signals) {
+    public PropertyReviewPublicationGate(PropertyReviewRepository reviews, ListingSignalService signals,
+            VerificationCases cases) {
         this.reviews = reviews;
         this.signals = signals;
+        this.cases = cases;
     }
 
     @Override
@@ -23,7 +26,8 @@ public class PropertyReviewPublicationGate implements PropertyPublicationGate {
         PropertyReview review = reviews.findByPropertyId(property.getId())
                 .orElseThrow(() -> new ConflictException("checklist_incomplete",
                         "Open the review and tick every check first"));
-        ApprovalGate.require(review);
+        cases.reconcile(review);
+        ApprovalGate.require(review, property);
         if (!secondApprovalSatisfied && signals.hasHardSignal(property.getId())) {
             throw new ConflictException("second_approver_required",
                     "A hard broker signal requires a second staff approver.");

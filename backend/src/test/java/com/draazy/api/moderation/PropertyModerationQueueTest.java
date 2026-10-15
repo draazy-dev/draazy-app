@@ -262,6 +262,24 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].id").value(wanted.getId().toString()));
     }
 
+    @Test
+    @DisplayName("free-text search matches the short listing code in either case")
+    void freeTextMatchesShortCode() throws Exception {
+        User owner = user("9850000040", "owner");
+        User staff = user("9850000041", "staff");
+        Property coded = listing(owner, "Coded flat", PropertyStatus.PENDING);
+        coded.setSlug("p5013");
+        properties.saveAndFlush(coded);
+        listing(owner, "Other flat", PropertyStatus.PENDING);
+
+        for (String q : new String[] {"p5013", "P5013", "5013"}) {
+            mvc.perform(get("/admin/properties").param("q", q)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].id").value(coded.getId().toString()));
+        }
+    }
+
     // An ordinary account reaching it would be a disclosure, not a UI bug.
     @Test
     @DisplayName("an ordinary user cannot read the queue")

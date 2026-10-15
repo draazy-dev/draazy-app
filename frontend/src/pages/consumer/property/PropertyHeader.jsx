@@ -46,6 +46,7 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
               {p.reraId ? (
                 <a href="https://maharera.maharashtra.gov.in/" target="_blank" rel="noopener noreferrer" className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15">
                   <Icon name="badge-check" className="h-3.5 w-3.5" /> {tr('property.mahaReraId', { id: p.reraId })}
+                  {p.reraChecked ? <span data-testid="rera-checked" className="border-l border-emerald-500/30 pl-1.5">{tr('property.reraChecked')}</span> : null}
                 </a>
               ) : null}
 

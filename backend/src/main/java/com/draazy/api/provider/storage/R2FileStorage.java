@@ -123,6 +123,11 @@ class R2FileStorage implements FileStorage, DisposableBean {
     }
 
     @Override
+    public void deletePublic(String key) {
+        s3.deleteObject(DeleteObjectRequest.builder().bucket(publicBucket).key(key).build());
+    }
+
+    @Override
     public String publicUrlPrefix() {
         return publicBaseUrl + "/";
     }

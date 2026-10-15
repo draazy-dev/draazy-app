@@ -19,7 +19,8 @@ public record PropertyReviewResponse(
         OverrideRequest overrideRequest,
         ListingSignals signals,
         Instant decidedAt,
-        ListingProgress progress) {
+        ListingProgress progress,
+        String reraCheck) {
 
     public record ChecklistEntry(String item, boolean pass) {
     }

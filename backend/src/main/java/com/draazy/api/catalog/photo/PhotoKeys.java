@@ -33,6 +33,10 @@ public class PhotoKeys {
         return "photos/" + tag(ownerId, id) + "/" + id;
     }
 
+    public boolean isPhotoKey(String key) {
+        return KEY.matcher(key).matches();
+    }
+
     public boolean uploadedBy(String key, Collection<UUID> owners) {
         var match = KEY.matcher(key);
         if (!match.matches()) {

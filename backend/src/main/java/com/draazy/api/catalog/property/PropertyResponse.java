@@ -83,6 +83,10 @@ public record PropertyResponse(
         String bestTimeToCall,
         List<String> furniture,
         String reraId,
+
+        /** True only once staff confirmed the RERA ID on MahaRERA; absent otherwise, so the page shows the
+         * badge for the one outcome and never reveals a failed or pending check. */
+        Boolean reraChecked,
         BigDecimal carpetArea,
         BigDecimal builtUpArea,
         BigDecimal superBuiltUpArea,

@@ -231,6 +231,26 @@ class ModerationBehaviourTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("the owner's takedown notice never carries the back-office flag reason")
+    void flagNoticeWithholdsTheFlagReason() throws Exception {
+        User owner = user("9800000174", "owner", "Owner");
+        User staff = user("9800000175", "staff", "Ops");
+        Property listing = listing(owner);
+
+        mvc.perform(post("/properties/{id}/flag", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Reported: spam \\u2014 moderator thinks the owner is a broker\"}"))
+                .andExpect(status().is2xxSuccessful());
+
+        String body = jdbc.queryForObject(
+                "select body from notifications where user_id = ? and type = 'listing.flagged'",
+                String.class, owner.getId());
+        assertThat(body).startsWith("A moderator took down your listing")
+                .doesNotContain("spam").doesNotContain("broker").doesNotContain("Reported");
+    }
+
+    @Test
     @DisplayName("queue rejection requires a reason code")
     void queueRejectionRequiresReasonCode() throws Exception {
         User owner = user("9800000153", "owner", "Owner");
@@ -626,10 +646,12 @@ class ModerationBehaviourTest extends AbstractApiTest {
     @DisplayName("a reason valid for one target type is refused for another")
     void reasonVocabularyIsPerTargetType() throws Exception {
         User reporter = user("9800000111", "buyer", "Reporter");
+        User offender = user("9800000116", "owner", "Offender");
 
         mvc.perform(post("/reports").header(HttpHeaders.AUTHORIZATION, bearer(reporter))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"targetType\":\"user\",\"targetId\":\"u-1\",\"reason\":\"brokerage\"}"))
+                        .content("{\"targetType\":\"user\",\"targetId\":\"" + offender.getId()
+                                + "\",\"reason\":\"brokerage\"}"))
                 .andExpect(status().isCreated());
 
         mvc.perform(post("/reports").header(HttpHeaders.AUTHORIZATION, bearer(reporter))

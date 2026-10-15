@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { Archive, ExternalLink, Flag, MapPin, Save, XCircle } from 'lucide-react';
 import { classNames } from '../../../lib/format.js';
@@ -10,11 +10,32 @@ import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import InternalNote from '../../../components/ui/InternalNote.jsx';
 import { EDIT_DEAL_OPTS, EDIT_STATUS_OPTS, dealLabel, perSqftLabel, liveHref, detailKvs, fmtAgo, statusLabel } from './constants.js';
 import { REVIEW_REASONS, ownerMessagePreview } from './reviewReasons.js';
+import { SubmittedPhotos } from './review-modal/SubmittedContent.jsx';
+import { getModerationProperty } from '../../../services/propertyService.js';
+
+// Queue rows carry no gallery, so the photos come from the whole listing.
+function EditPhotos({ id, onStatus }) {
+  const [full, setFull] = useState(null);
+  useEffect(() => {
+    let live = true;
+    getModerationProperty(id).then((listing) => { if (live) setFull(listing); }).catch(() => {});
+    return () => { live = false; };
+  }, [id]);
+  if (!full) return null;
+  const removed = (updated) => {
+    setFull({ ...full, gallery: updated?.gallery ?? [], image: updated?.image ?? null });
+    onStatus(updated?.status);
+  };
+  return <SubmittedPhotos listing={full} onPhotoRemoved={removed} />;
+}
 
 export function PropertyEditModal({ edit, setEdit, onClose, onSubmit, saving, canSetStatus }) {
   const [picking, setPicking] = useState(false);
   if (!edit) return null;
   const rejected = edit._ref?.status === 'rejected';
+  const syncStatus = (status) => (status && status !== edit._ref.status
+    ? setEdit({ ...edit, status, _ref: { ...edit._ref, status } })
+    : undefined);
   return (
     <Modal
       open={!!edit}
@@ -80,6 +101,7 @@ export function PropertyEditModal({ edit, setEdit, onClose, onSubmit, saving, ca
             )}
           </label>
         ) : null}
+        {canSetStatus ? <EditPhotos id={edit.id} onStatus={syncStatus} /> : null}
       </div>
     </Modal>
   );

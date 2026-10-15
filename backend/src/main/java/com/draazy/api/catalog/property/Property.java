@@ -19,6 +19,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
@@ -272,8 +273,16 @@ public class Property extends SoftDeleteEntity {
     private Map<String, Object> formDetails;
 
     @Column(name = "rera_id")
-    @Setter
     private String reraId;
+
+    @Column(name = "rera_check")
+    private String reraCheck;
+
+    @Column(name = "rera_checked_at")
+    private Instant reraCheckedAt;
+
+    @Column(name = "rera_checked_by")
+    private UUID reraCheckedBy;
 
     @Column(name = "description")
     @Setter
@@ -346,6 +355,24 @@ public class Property extends SoftDeleteEntity {
     public void requestInfo() {
         startReview();
         infoRequestedAt = Instant.now();
+    }
+
+    // A result is about one ID, so changing the ID voids it.
+    public void setReraId(String reraId) {
+        if (!Objects.equals(this.reraId, reraId)) {
+            recordReraCheck(null, null);
+        }
+        this.reraId = reraId;
+    }
+
+    public void recordReraCheck(String result, UUID checkedBy) {
+        this.reraCheck = result;
+        this.reraCheckedAt = result == null ? null : Instant.now();
+        this.reraCheckedBy = result == null ? null : checkedBy;
+    }
+
+    public boolean isReraVerified() {
+        return ReraCheck.VERIFIED.equals(reraCheck);
     }
 
     public void provideInfo() {

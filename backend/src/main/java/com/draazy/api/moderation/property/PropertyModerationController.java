@@ -82,12 +82,14 @@ public class PropertyModerationController {
     private final ListingSignalService signals;
     private final PropertyReviewQueue reviewQueue;
     private final PropertyQueueRowMapper rows;
+    private final PropertyPhotoTakedownService photoTakedowns;
 
     public PropertyModerationController(PropertyModerationService service, ListingModerationService listings,
             PropertyService propertyService, PropertyMapper propertyMapper,
             OnBehalfListingService onBehalf, PropertyModerationSummaryRepository summaries,
             OwnerOutreachService outreach, ListingDuplicateClusterService duplicateClusters,
-            ListingSignalService signals, PropertyReviewQueue reviewQueue, PropertyQueueRowMapper rows) {
+            ListingSignalService signals, PropertyReviewQueue reviewQueue, PropertyQueueRowMapper rows,
+            PropertyPhotoTakedownService photoTakedowns) {
         this.service = service;
         this.listings = listings;
         this.propertyService = propertyService;
@@ -99,6 +101,7 @@ public class PropertyModerationController {
         this.signals = signals;
         this.reviewQueue = reviewQueue;
         this.rows = rows;
+        this.photoTakedowns = photoTakedowns;
     }
 
     // Queue rationale: docs/flows/admin/property-verification.md#moderation-controller.
@@ -184,6 +187,17 @@ public class PropertyModerationController {
     @PreAuthorize(PROPERTIES_MODERATE)
     public void clearFlag(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         service.clearFlag(principal, id);
+    }
+
+    /** {@code POST /properties/{id}/photos/takedown}: one photo out, the listing's other state untouched. */
+    @PostMapping(Routes.Moderation.PROPERTY_PHOTO_TAKEDOWN)
+    @PreAuthorize(PROPERTIES_MODERATE)
+    public PropertyResponse takedownPhoto(@CurrentUser AuthPrincipal principal,
+            @PathVariable String id, @Valid @RequestBody PhotoTakedownRequest body) {
+        Property updated = photoTakedowns.takedown(principal, id, body.photo(), body.reason());
+        return propertyMapper.toResponse(updated, ContactVisibility.REVEALED,
+                BackOfficeVisibility.VISIBLE, outreach.countsFor(List.of(updated)),
+                PrivateFieldVisibility.VISIBLE);
     }
 
     // Returns a body because field mapping lives in ListingModerationService.
@@ -272,5 +286,8 @@ public class PropertyModerationController {
     }
 
     public record ReasonRequest(String reason) {
+    }
+
+    public record PhotoTakedownRequest(@NotBlank String photo, @NotBlank String reason) {
     }
 }

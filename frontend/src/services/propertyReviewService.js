@@ -67,6 +67,11 @@ export async function setPropertyReviewChecklistItem(propertyId, item, pass) {
   return (await provider()).setPropertyReviewChecklistItem(propertyId, item, pass);
 }
 
+/** Staff record the MahaRERA lookup: `verified`, `not_found` or `mismatch`. Returns the case file. */
+export async function recordPropertyReraCheck(propertyId, result) {
+  return (await provider()).recordPropertyReraCheck(propertyId, result);
+}
+
 export async function decidePropertyReview(propertyId, decision, options) {
   return (await provider()).decidePropertyReview(propertyId, decision, options);
 }

@@ -86,6 +86,7 @@ export function toViewModel(p) {
     bhk: p.bhk == null ? '' : Number(p.bhk) === 0 ? '1 RK' : Number(p.bhk) >= 5 ? '5+ BHK' : `${p.bhk} BHK`,
     rera: Boolean(p.reraId),
     reraId: p.reraId ?? '',
+    reraChecked: p.reraChecked === true,
     // Unknown amounts must not become an owner's explicit zero when reopening an edit.
     deposit: p.deposit ?? null,
     maintenance: p.maintenance ?? null,
@@ -167,6 +168,7 @@ export function toViewModel(p) {
     qualityScore: p.qualityScore ?? null,
     amenities: p.amenities ?? [],
     archived: p.archived ?? false,
+    archivedNote: p.archivedNote ?? '',
     // Back-office fields are withheld server-side; absence means no visible concierge involvement.
     postedByAdmin: p.adminPipeline?.postedByAdmin ?? false,
     postedByStaff: p.adminPipeline?.postedByStaff ?? null,

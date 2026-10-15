@@ -42,6 +42,18 @@ export const REVIEW_REASONS = [
     rejectionMessage: 'This listing was rejected due to an unverified name on ownership documents.',
   },
   {
+    code: 'rera_not_found',
+    label: 'RERA ID not found',
+    ownerMessage: 'We could not find your RERA ID on MahaRERA. Please send the correct one.',
+    rejectionMessage: 'This listing was rejected because the RERA ID could not be found on MahaRERA.',
+  },
+  {
+    code: 'rera_mismatch',
+    label: 'RERA ID mismatch',
+    ownerMessage: 'Your RERA ID on MahaRERA does not match this project. Please correct it.',
+    rejectionMessage: 'This listing was rejected because the RERA ID on MahaRERA does not match this project.',
+  },
+  {
     code: 'other',
     label: 'Other',
     ownerMessage: 'Please check the note below and update the listing so we can complete verification.',

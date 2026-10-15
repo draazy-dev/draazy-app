@@ -56,6 +56,16 @@ public interface PropertyRepository
     @Query("select p from Property p where p.id = :id")
     Optional<Property> findForVerificationDecision(@Param("id") UUID id);
 
+    /** Whether any other listing or flatmate room still shows this photo file. */
+    @Query(nativeQuery = true, value = """
+            select exists (
+                select 1 from properties
+                 where id <> :id and (cover_image = :url or floor_plan = :url
+                       or images @> jsonb_build_array(cast(:url as text)))
+                union all
+                select 1 from flatmate_rooms where photos @> jsonb_build_array(cast(:url as text)))""")
+    boolean photoUsedElsewhere(@Param("id") UUID id, @Param("url") String url);
+
     /** Serialises deal state changes on one listing so a concurrent second caller sees the committed state. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from Property p where p.id = :id and p.owner.id = :ownerId")

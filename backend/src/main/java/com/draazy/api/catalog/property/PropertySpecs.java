@@ -201,7 +201,9 @@ final class PropertySpecs {
                 Predicate fieldRecheck = cb.and(
                         cb.isNotNull(root.get("recheckRequestedAt")),
                         cb.notEqual(cb.coalesce(root.get("recheckReason"), ""), Property.OWNERSHIP_REVIEW_ITEM));
-                where.add(mod.recheck() ? fieldRecheck : cb.not(fieldRecheck));
+                where.add(mod.recheck()
+                        ? cb.and(fieldRecheck, cb.not(root.get("status").in(PropertyStatus.SOLD, PropertyStatus.RENTED)))
+                        : cb.not(fieldRecheck));
             }
             if (mod.badge() != null) {
                 where.add(mod.badge()
@@ -346,7 +348,8 @@ final class PropertySpecs {
                 .toArray(Predicate[]::new));
     }
 
-    /** Adds owner name, mobile and the id as text; the id cast must be {@link HibernateCriteriaBuilder#cast}. */
+    /** Adds owner name, mobile, the short code (slug) and the id as text; the id cast must be
+     * {@link HibernateCriteriaBuilder#cast}. */
     private static void adminTextSearch(PropertySearchQuery filters, Root<Property> root,
             CriteriaBuilder cb, List<Predicate> where) {
         if (!StringUtils.hasText(filters.q())) {
@@ -363,6 +366,7 @@ final class PropertySpecs {
                 cb.like(cb.lower(root.get("locality")), like, LIKE_ESCAPE),
                 cb.like(cb.lower(root.get("owner").get("name")), like, LIKE_ESCAPE),
                 cb.like(root.get("owner").get("mobile"), like, LIKE_ESCAPE),
+                cb.like(cb.lower(root.get("slug")), like, LIKE_ESCAPE),
                 cb.like(idAsText, like, LIKE_ESCAPE)));
     }
 

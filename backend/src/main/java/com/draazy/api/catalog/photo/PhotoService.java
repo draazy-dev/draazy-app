@@ -45,6 +45,22 @@ public class PhotoService {
         return new PhotoDto(storage.storePublic(key, bytes, type));
     }
 
+    /** Removes an uploaded photo and its card-size copies. Anything that is not one of our photo URLs is left alone. */
+    public void delete(String url) {
+        String prefix = storage.publicUrlPrefix();
+        if (url == null || !url.startsWith(prefix)) {
+            return;
+        }
+        String key = url.substring(prefix.length());
+        if (!keys.isPhotoKey(key)) {
+            return;
+        }
+        storage.deletePublic(key);
+        for (int width : PhotoVariants.WIDTHS) {
+            storage.deletePublic(PhotoVariants.key(key, width));
+        }
+    }
+
     // Copies first, so a URL this returns never has a missing copy. Best effort: a card whose copy is
     // missing (an older or undecodable photo) falls back to the original in PropertyImage.jsx.
     private void storeVariants(String key, byte[] bytes) {

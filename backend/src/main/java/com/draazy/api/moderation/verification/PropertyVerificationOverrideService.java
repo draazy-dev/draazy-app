@@ -56,7 +56,7 @@ public class PropertyVerificationOverrideService {
         if (PropertyOverrideRequest.APPROVE.equals(action)) {
             lifecycle.requireActive(property);
             lifecycle.requireFiled(property);
-            ApprovalGate.require(review);
+            ApprovalGate.require(review, property);
             if (!signals.hasHardSignal(property.getId())) {
                 throw new ConflictException("override_not_required",
                         "This listing does not require a second approver.");
@@ -101,7 +101,7 @@ public class PropertyVerificationOverrideService {
             String note) {
         lifecycle.requireActive(property);
         lifecycle.requireFiled(property);
-        ApprovalGate.require(review);
+        ApprovalGate.require(review, property);
         review.decide(PropertyStatus.APPROVED, actor.userId().toString(), null, null);
         if (note != null && !note.isBlank()) {
             review.addInternalNote(note.trim());
