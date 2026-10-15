@@ -50,7 +50,7 @@ Dev/e2e staff creds live in `db/seed-staff` (local + e2e only): admin `900000000
 
 | Fact | Value | Taken |
 |---|---|---|
-| Next free Flyway slot | **`26.10.15__…`** (no `V`; `<yy>.<mm>.<seq>`, sequence restarts at 01 each month — `26.11.01` in November). Chain squashed to 14 files on 2026-10-13: every DB must be rebuilt from empty | 2026-10-13 |
+| Next free Flyway slot | **`26.10.16__…`** (no `V`; `<yy>.<mm>.<seq>`, sequence restarts at 01 each month — `26.11.01` in November). Chain squashed to 14 files on 2026-10-13: every DB must be rebuilt from empty | 2026-10-15 |
 | e2e spec files | 387 under `e2e` | 2026-10-10 |
 | Backend suite (full) | 2,766 run, 0 failed (361 classes, ~4 min) | 2026-10-10 |
 | Full e2e sweep | ~40 red in `-Full` (Vite reloads from concurrent edits); all 115 green on targeted rerun | 2026-10-10 |

@@ -920,6 +920,11 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   50% { transform: translate(-15px, 15px); }
 }
 
+.cta-float-1 { animation: ctaFloat1 8s ease-in-out infinite; }
+.cta-float-2 { animation: ctaFloat2 6s ease-in-out infinite; }
+.cta-float-3 { animation: ctaFloat1 10s ease-in-out infinite reverse; }
+.cta-float-4 { animation: ctaFloat2 12s ease-in-out infinite; }
+
 /* ── Glass (with fallback for browsers without backdrop-filter support) ── */
 .glass {
   background: var(--glass);
@@ -1796,10 +1801,16 @@ select option:checked {
 /* The shimmer is an INFINITE loop, and a loading state is when someone who asked for less motion
    is least able to look away. Kept beside the animation, not in the allowlist 3,500 lines down. */
 @media (prefers-reduced-motion: reduce) {
-  .skeleton::after { animation: none; }
+  .skeleton::after,
+  .animate-pulse {
+    animation: none !important;
+  }
 }
 
-html.dz-reduce-motion .skeleton::after { animation: none; }
+html.dz-reduce-motion .skeleton::after,
+html.dz-reduce-motion .animate-pulse {
+  animation: none !important;
+}
 
 @keyframes dzShimmer {
   100% { transform: translateX(100%); }
@@ -3336,7 +3347,12 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
   .cat-card:hover { transform: none; }
 
   /* CTA floating shapes */
-  [class*="ctaFloat"] { animation: none; }
+  [class*="ctaFloat"],
+  [class*="cta-float"],
+  .animate-pulse,
+  [class*="animate-pulse"] {
+    animation: none !important;
+  }
 
   /* Scroll reveal — show immediately */
   .reveal {
@@ -3370,7 +3386,12 @@ html.dz-reduce-motion .shape-5,
 html.dz-reduce-motion .ticker-ping,
 html.dz-reduce-motion .heart-pop,
 html.dz-reduce-motion .svc-pop,
-html.dz-reduce-motion [class*="ctaFloat"] { animation: none; }
+html.dz-reduce-motion [class*="ctaFloat"],
+html.dz-reduce-motion [class*="cta-float"],
+html.dz-reduce-motion .animate-pulse,
+html.dz-reduce-motion [class*="animate-pulse"] {
+  animation: none !important;
+}
 
 html.dz-reduce-motion .hero-word,
 html.dz-reduce-motion .hero-sub,
@@ -3489,6 +3510,7 @@ html.dz-reduce-motion .list-reveal {
 
 /* useKeyboardOpen: the soft keyboard is up, so bottom-pinned chrome would sit on top of the field being typed in. */
 .dz-kbd-open [data-kbd-hide] { display: none !important; }
+html[data-scroll-locked] .dz-assistant-layer:not(.dz-assistant-layer--open) { display: none !important; }
 /* ===== Mobile bottom-chrome consumers (see the --dz-bottom-inset block near the top) ===== */
 
 /* Appended to <body>, so it cannot read the inset .has-bottom-nav sets on the layout wrapper and

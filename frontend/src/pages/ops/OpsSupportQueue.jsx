@@ -93,11 +93,6 @@ export default function OpsSupportQueue() {
       if (!full) { setDetailStatus('error'); return; }
       setDetail(full);
       setDetailStatus('ready');
-      // The staff read clears the desk's side of the read model; the customer's flag is theirs to clear.
-      if (row.awaitingReply) {
-        setState((s) => ({ ...s, items: s.items.map((r) => (r.id === row.id ? { ...r, awaitingReply: false } : r)) }));
-        setCounts((c) => ({ ...c, awaiting: c.awaiting > 0 ? c.awaiting - 1 : c.awaiting, answered: c.answered != null ? c.answered + 1 : c.answered }));
-      }
     } catch {
       setDetailStatus('error');
     }
@@ -108,10 +103,18 @@ export default function OpsSupportQueue() {
     if (!text || sending.current || !detail) return;
     sending.current = true;
     try {
-      // The server's own message, not an optimistic echo: id, author and time are its to decide.
       const msg = await replyToTicket(detail.id, text);
       if (msg) setDetail((d) => ({ ...d, messages: [...(d.messages || []), msg] }));
       setReply('');
+      setState((s) => ({
+        ...s,
+        items: s.items.map((r) => (r.id === detail.id ? { ...r, awaitingReply: false } : r)),
+      }));
+      setCounts((c) => ({
+        ...c,
+        awaiting: c.awaiting > 0 ? c.awaiting - 1 : c.awaiting,
+        answered: c.answered != null ? c.answered + 1 : c.answered,
+      }));
       toast('Reply sent', 'success');
     } catch {
       toast('That reply could not be sent. Try again.', 'error');

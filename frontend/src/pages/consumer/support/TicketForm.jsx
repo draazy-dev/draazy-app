@@ -20,10 +20,11 @@ export default function TicketForm({ form, set, fld, submit, faqs }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label htmlFor="ticket-name" className="block text-sm font-medium text-gray-300 mb-2">
             {t('misc.tfYourName')} <span className="text-rose-400">*</span>
           </label>
           <input
+            id="ticket-name"
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
             type="text"
@@ -32,17 +33,17 @@ export default function TicketForm({ form, set, fld, submit, faqs }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label htmlFor="ticket-mobile" className="block text-sm font-medium text-gray-300 mb-2">
             {t('misc.tfMobile')} <span className="text-rose-400">*</span>
           </label>
-          <MobileField value={form.mobile} onChange={(v) => set('mobile', v)} placeholder={t('misc.tfMobilePlaceholder')} disabled />
+          <MobileField id="ticket-mobile" value={form.mobile} onChange={(v) => set('mobile', v)} placeholder={t('misc.tfMobilePlaceholder')} disabled />
           <p className="text-gray-500 text-xs mt-1.5">{t('misc.tfMobileLocked')}</p>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label htmlFor="ticket-category" className="block text-sm font-medium text-gray-300 mb-2">
             {t('misc.tfCategory')} <span className="text-rose-400">*</span>
           </label>
-          <NativeSelect value={form.category} onChange={(e) => set('category', e.target.value)} className={fld}>
+          <NativeSelect id="ticket-category" value={form.category} onChange={(e) => set('category', e.target.value)} className={fld}>
             {CATEGORIES.map((c) => (
               <option key={c.key} value={c.key}>
                 {getCatLabel(c.key)}
@@ -51,10 +52,11 @@ export default function TicketForm({ form, set, fld, submit, faqs }) {
           </NativeSelect>
         </div>
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label htmlFor="ticket-subject" className="block text-sm font-medium text-gray-300 mb-2">
             {t('misc.tfSubject')} <span className="text-rose-400">*</span>
           </label>
           <input
+            id="ticket-subject"
             value={form.subject}
             onChange={(e) => set('subject', e.target.value)}
             maxLength={120}
@@ -78,10 +80,11 @@ export default function TicketForm({ form, set, fld, submit, faqs }) {
           )}
         </div>
         <div className="sm:col-span-2">
-          <label className="block text-sm font-medium text-gray-300 mb-2">
+          <label htmlFor="ticket-message" className="block text-sm font-medium text-gray-300 mb-2">
             {t('misc.tfDescribe')} <span className="text-rose-400">*</span>
           </label>
           <textarea
+            id="ticket-message"
             value={form.message}
             onChange={(e) => set('message', e.target.value)}
             rows={4}

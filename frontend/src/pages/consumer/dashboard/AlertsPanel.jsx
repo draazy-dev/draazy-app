@@ -104,9 +104,10 @@ export default function AlertsPanel() {
                 </div>
 
                 <div className="flex items-center justify-between gap-4 sm:justify-end">
-                  <label className="flex items-center gap-2 text-xs text-gray-400">
+                  <label htmlFor={`alert-freq-${a.id}`} className="flex items-center gap-2 text-xs text-gray-400">
                     <span className={a.alerts ? 'text-teal-300' : ''}>Alerts</span>
                     <select
+                      id={`alert-freq-${a.id}`}
                       value={a.alertFrequency || (a.alerts === false ? 'off' : DEFAULT_ALERT_FREQUENCY)}
                       onChange={(e) => onFrequency(a.id, e.target.value)}
                       data-testid="alert-frequency"

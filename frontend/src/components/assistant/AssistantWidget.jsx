@@ -235,12 +235,16 @@ export default function AssistantWidget() {
   // Ops can hide the assistant via settings.flags.assistant (defaults on). Kept
   // after all hooks so the hook order stays stable.
 
+  if (pathname.startsWith('/messages')) return null;
   if (!flagEnabled('assistant')) return null;
 
+  const positionClass = pathname.startsWith('/property/') && !open
+    ? 'right-4 sm:right-6 lg:left-6 lg:right-auto'
+    : 'right-4 sm:right-6';
+  const zClass = open ? 'z-[1300] dz-assistant-layer--open' : 'z-[50]';
+
   return (
-    /* `pointer-events-none` on the layer, `-auto` on each control: this fixed layer covers a 240px column of the
-       corner and was swallowing the smart-search submit on a 360px phone. */
-    <div className={`dz-assistant-layer pointer-events-none fixed right-4 sm:right-6 z-[1300] ${anchorClass} ${hideClass} ${centerClass}`}>
+    <div className={`dz-assistant-layer pointer-events-none fixed ${positionClass} ${zClass} ${anchorClass} ${hideClass} ${centerClass}`}>
       {open ? (
         <Panel
           msgs={msgs}

@@ -36,7 +36,7 @@ export default function MobileNav({ groups = [], activeTab, onSelect, attentionC
       <div
         role="tablist"
         aria-label="Dashboard sections"
-        className="grid gap-1.5"
+        className="grid gap-1 sm:gap-1.5"
         style={{ gridTemplateColumns: `repeat(${groups.length}, minmax(0, 1fr))` }}
       >
         {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, */}
@@ -55,7 +55,7 @@ export default function MobileNav({ groups = [], activeTab, onSelect, attentionC
               data-dashboard-group={group.id}
               onClick={() => onSelect(firstSection.tab)}
               className={
-                'relative flex min-h-[48px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-1 py-1.5 text-center text-[11px] font-semibold leading-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 ' +
+                'relative flex min-h-[48px] min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 sm:px-1 py-1.5 text-center text-[10px] sm:text-[11px] font-semibold leading-tight tracking-tight transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 ' +
                 (isActive ? 'bg-brand-teal/15 text-brand-teal ring-1 ring-inset ring-brand-teal/35' : 'bg-white/[0.04] text-gray-300 hover:bg-white/[0.07] hover:text-white')
               }
             >

@@ -161,28 +161,31 @@ export default function ServiceLanding({
                       </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {(quote?.fields || []).map((f) => (
-                        <div key={f.name} className={f.full ? 'sm:col-span-2' : ''} data-err={f.name}>
-                          <label className="block text-xs font-medium text-gray-300 mb-1.5">{f.label}{f.required ? <span className="text-rose-400"> *</span> : null}</label>
-                          {f.type === 'select' ? (
-                            <NativeSelect value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} className="field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm" invalid={err.has(f.name)}>
-                              <option value="">{f.placeholder || 'Select'}</option>
-                              {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                            </NativeSelect>
-                          ) : f.type === 'locality' ? (
-                            <LocalitySelect value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} nameOnly unrestricted={f.unrestricted} placeholder={f.placeholder || 'Select locality'} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="w-full" />
-                          ) : f.type === 'date' ? (
-                            <DateField value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm" />
-                          ) : f.type === 'textarea' ? (
-                            <textarea rows={2} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 resize-none' + err.cx(f.name)} />
-                          ) : f.type === 'money' ? (
-                            <input type="text" inputMode="numeric" value={form[f.name]} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); const formatted = raw ? raw.replace(/\B(?=(\d{2})+(\d)(?!\d))/g, ',') : ''; set(f.name, formatted); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
-                          ) : (
-                            <input type={f.type || 'text'} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
-                          )}
-                          <FieldError show={err.has(f.name)}>{err.msg(f.name)}</FieldError>
-                        </div>
-                      ))}
+                      {(quote?.fields || []).map((f) => {
+                        const fieldId = `svc-${desk}-${f.name}`;
+                        return (
+                          <div key={f.name} className={f.full ? 'sm:col-span-2' : ''} data-err={f.name}>
+                            <label htmlFor={fieldId} className="block text-xs font-medium text-gray-300 mb-1.5">{f.label}{f.required ? <span className="text-rose-400"> *</span> : null}</label>
+                            {f.type === 'select' ? (
+                              <NativeSelect id={fieldId} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} className="field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm" invalid={err.has(f.name)}>
+                                <option value="">{f.placeholder || 'Select'}</option>
+                                {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                              </NativeSelect>
+                            ) : f.type === 'locality' ? (
+                              <LocalitySelect id={fieldId} value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} nameOnly unrestricted={f.unrestricted} placeholder={f.placeholder || 'Select locality'} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="w-full" />
+                            ) : f.type === 'date' ? (
+                              <DateField id={fieldId} value={form[f.name]} onChange={(v) => { set(f.name, v); err.clear(f.name); }} ariaLabel={f.label} dataErr={f.name} invalid={err.has(f.name)} className="field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm" />
+                            ) : f.type === 'textarea' ? (
+                              <textarea id={fieldId} rows={2} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 resize-none' + err.cx(f.name)} />
+                            ) : f.type === 'money' ? (
+                              <input id={fieldId} type="text" inputMode="numeric" value={form[f.name]} onChange={(e) => { const raw = e.target.value.replace(/[^\d]/g, ''); const formatted = raw ? raw.replace(/\B(?=(\d{2})+(\d)(?!\d))/g, ',') : ''; set(f.name, formatted); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
+                            ) : (
+                              <input id={fieldId} type={f.type || 'text'} value={form[f.name]} onChange={(e) => { set(f.name, e.target.value); err.clear(f.name); }} placeholder={f.placeholder} className={'field w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500' + err.cx(f.name)} />
+                            )}
+                            <FieldError show={err.has(f.name)}>{err.msg(f.name)}</FieldError>
+                          </div>
+                        );
+                      })}
                     </div>
                     {status === 'failed' ? (
                       <div role="alert" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">

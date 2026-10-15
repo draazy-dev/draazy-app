@@ -86,13 +86,13 @@ export default function CookieConsent() {
   if (mode === 'hidden') return null;
 
   return (
-    <div data-kbd-hide className="dz-safe-x fixed inset-x-0 bottom-[var(--dz-bottom-inset)] z-[1400] flex justify-center p-3 sm:p-4 pointer-events-none">
+    <div data-kbd-hide className="dz-safe-x fixed inset-x-0 bottom-[var(--dz-bottom-inset)] z-[1400] flex justify-center items-end p-3 sm:p-4 pointer-events-none max-h-[100dvh]">
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="false"
         aria-label="Cookie preferences"
-        className="pointer-events-auto w-full max-w-4xl rounded-2xl border border-white/10 bg-ink-card/95 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgb(var(--dz-c-black)/0.7)] overflow-hidden"
+        className="pointer-events-auto w-full max-w-4xl rounded-2xl border border-white/10 bg-ink-card/95 backdrop-blur-xl shadow-[0_20px_60px_-15px_rgb(var(--dz-c-black)/0.7)] overflow-hidden max-h-[calc(100dvh-var(--dz-bottom-inset,0px)-24px)] flex flex-col"
       >
         {mode === 'banner' ? (
           /* ── Sleek landscape bar: message left, actions right ── */
@@ -134,7 +134,7 @@ export default function CookieConsent() {
           </div>
         ) : (
           /* ── Customize: compact toggle grid, still landscape ── */
-          <div className="p-4 sm:p-5">
+          <div className="p-4 sm:p-5 overflow-y-auto">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-8 h-8 rounded-lg bg-teal-500/10 flex items-center justify-center shrink-0">
                 <Icon name="shield-check" className="w-4 h-4 text-teal-400" />

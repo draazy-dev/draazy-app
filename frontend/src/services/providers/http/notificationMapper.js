@@ -41,6 +41,7 @@ const TYPE_PREFIXES = [
   ['tenancy', 'service'],
   ['referral', 'referral'],
   ['refund', 'refund'],
+  ['support', 'system'],
 ];
 
 /** UI types that already mean what they say — passed through untouched. */

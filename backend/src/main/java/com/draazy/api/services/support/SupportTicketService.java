@@ -2,6 +2,7 @@ package com.draazy.api.services.support;
 
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.common.web.Pageables;
 import com.draazy.api.identity.user.User;
@@ -27,15 +28,17 @@ public class SupportTicketService {
     private final SupportTicketMapper mapper;
     private final UserRepository users;
     private final AccountPermissions permissions;
+    private final Notifier notifier;
 
     public SupportTicketService(SupportTicketRepository tickets,
             SupportTicketMessageRepository messages, SupportTicketMapper mapper,
-            UserRepository users, AccountPermissions permissions) {
+            UserRepository users, AccountPermissions permissions, Notifier notifier) {
         this.tickets = tickets;
         this.messages = messages;
         this.mapper = mapper;
         this.users = users;
         this.permissions = permissions;
+        this.notifier = notifier;
     }
 
     @Transactional(readOnly = true)
@@ -78,15 +81,9 @@ public class SupportTicketService {
         return mapper.toDto(ticket);
     }
 
-    // A desk member opening a ticket clears the desk's side; the raiser's own flag is cleared by markRead.
-    @Transactional
+    @Transactional(readOnly = true)
     public SupportTicketDto get(AuthPrincipal caller, String id) {
         SupportTicket ticket = readable(caller, id, BackOfficePermissions.TICKETS_READ);
-        if (ticket.isStaffUnread() && !ticket.getUserId().equals(caller.userId())
-                && permissions.granted(caller, BackOfficePermissions.TICKETS_WRITE)) {
-            ticket.setStaffUnread(false);
-            tickets.saveAndFlush(ticket);
-        }
         return mapper.toDto(ticket);
     }
 
@@ -97,7 +94,14 @@ public class SupportTicketService {
         if (ticket.getUserId().equals(caller.userId())) {
             ticket.setStaffUnread(true);
         } else {
+            ticket.setStaffUnread(false);
             ticket.setUnread(true);
+            String snippet = body == null ? "" : body.strip();
+            String preview = snippet.length() > 100 ? snippet.substring(0, 97) + "..." : snippet;
+            notifier.notify(ticket.getUserId(), "support.reply",
+                    "New reply on your support ticket",
+                    preview,
+                    "/support?ticket=" + ticket.getId());
         }
         tickets.saveAndFlush(ticket);
         User author = users.findById(caller.userId()).orElse(null);

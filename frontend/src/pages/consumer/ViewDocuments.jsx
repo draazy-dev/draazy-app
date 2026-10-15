@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router';
 import { Trans, useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
+import LogoMark from '../../components/brand/LogoMark.jsx';
 import HScroll from '../../components/ui/HScroll.jsx';
 import { classNames } from '../../lib/format.js';
 import { cssColour } from '../../lib/themeColour';
@@ -451,13 +452,9 @@ export default function ViewDocuments({ shared: byToken = false }) {
       <nav className="glass-nav sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
-            <div
-              className="w-9 h-9 rounded-xl bg-gradient-to-br from-teal-600 to-teal-500 flex items-center justify-center"
-            >
-              <Icon name="home" className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-lg font-extrabold tracking-tight">
-              Pune<span className="gradient-text">Nest</span>
+            <LogoMark className="w-8 h-8 shrink-0 text-teal-400" />
+            <span className="text-lg font-extrabold tracking-tight text-white">
+              Draazy
             </span>
           </Link>
           <span className="flex items-center gap-2">

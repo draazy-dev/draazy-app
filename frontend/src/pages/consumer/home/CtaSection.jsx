@@ -7,10 +7,10 @@ export default function CtaSection({ navigate }) {
     <section className="relative section-pb">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="reveal relative rounded-3xl overflow-hidden p-8 sm:p-12 md:p-16" style={{ background: 'var(--cta-bg)' }}>
-          <div className="absolute top-6 right-10 w-28 h-28 rounded-full border border-white/10" style={{ animation: 'ctaFloat1 8s ease-in-out infinite' }} />
-          <div className="absolute bottom-8 right-1/4 w-16 h-16 rounded-full bg-white/5" style={{ animation: 'ctaFloat2 6s ease-in-out infinite' }} />
-          <div className="absolute top-1/2 left-8 w-10 h-10 rounded-xl bg-white/5 rotate-45" style={{ animation: 'ctaFloat1 10s ease-in-out infinite reverse' }} />
-          <div className="absolute bottom-4 left-1/3 w-20 h-20 rounded-full border border-white/5" style={{ animation: 'ctaFloat2 12s ease-in-out infinite' }} />
+          <div className="absolute top-6 right-10 w-28 h-28 rounded-full border border-white/10 cta-float-1" />
+          <div className="absolute bottom-8 right-1/4 w-16 h-16 rounded-full bg-white/5 cta-float-2" />
+          <div className="absolute top-1/2 left-8 w-10 h-10 rounded-xl bg-white/5 rotate-45 cta-float-3" />
+          <div className="absolute bottom-4 left-1/3 w-20 h-20 rounded-full border border-white/5 cta-float-4" />
           <div className="relative z-10 text-center max-w-2xl mx-auto">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/10 text-sm font-medium text-white/80 mb-4 sm:mb-6">
               <Icon name="sparkles" className="w-4 h-4 text-orange-300" /> {t('home.cta.badge')}
