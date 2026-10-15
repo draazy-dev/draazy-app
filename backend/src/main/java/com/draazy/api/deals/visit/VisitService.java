@@ -86,7 +86,7 @@ public class VisitService {
                             + ". Confirm it or suggest another time.",
                     "/dashboard#visits");
         }
-        return VisitMapper.toDto(visit, visitor, ContactVisibility.REVEALED);
+        return VisitMapper.toDto(visit, property, visitor, ContactVisibility.REVEALED);
     }
 
     // The caller must be either the visitor or the listing owner.
@@ -218,10 +218,15 @@ public class VisitService {
                         rows.stream().map(Visit::getVisitorId).distinct().toList())
                 .stream().collect(Collectors.toMap(User::getId, Function.identity()));
 
+        Map<UUID, Property> propertyMap = properties.findAllById(
+                        rows.stream().map(Visit::getPropertyId).distinct().toList())
+                .stream().collect(Collectors.toMap(Property::getId, Function.identity()));
+
         return rows.stream().map(visit -> {
             User visitor = visitorMap.get(visit.getVisitorId());
+            Property property = propertyMap.get(visit.getPropertyId());
             ContactVisibility visibility = visitorMobileVisibility(viewerId, visit, viewerOwnedPropertyIds);
-            return VisitMapper.toDto(visit, visitor, visibility);
+            return VisitMapper.toDto(visit, property, visitor, visibility);
         }).toList();
     }
 

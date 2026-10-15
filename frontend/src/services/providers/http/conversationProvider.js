@@ -1,5 +1,6 @@
 import { del, get, openEventStream, patch, post, postMultipart } from '../../http.js';
 import { readUser } from '../../../lib/auth.js';
+import { fmtINR } from '../../../lib/format.js';
 import {
   stagedToViewModel,
   toConversationCreate,
@@ -19,8 +20,10 @@ export async function listConversations() {
   const page = await get('/messages', { size: PAGE_SIZE });
   warnIfTruncated(page);
   const live = toViewModelList(page);
-  // Staged rows sort in with the real ones so the Requests tab is one list, not a special case.
-  const staged = readQueue().map(stagedToViewModel);
+  const livePropIds = new Set(live.flatMap((c) => [c.propertyId, c.propertySlug].filter(Boolean)));
+  const staged = readQueue()
+    .filter((q) => !livePropIds.has(q.propertyId) && (!q.propertySlug || !livePropIds.has(q.propertySlug)))
+    .map(stagedToViewModel);
   return [...live, ...staged].sort((a, b) => (b.at || 0) - (a.at || 0));
 }
 
@@ -114,9 +117,9 @@ export async function unreadCount() {
 export async function queuePendingChat(property, { firstMessage, active = false } = {}) {
   if (!property?.id || active) return;
   const queue = readQueue();
-  // One staged chat per listing — pressing the button twice is not two requests, but a typed message still
-  // has to land, since the second press usually carries what the buyer actually wanted to say.
-  const staged = queue.find((q) => q.propertyId === String(property.id));
+  const idStr = String(property.uuid || property.id);
+  const slugStr = property.slug || (property.uuid ? String(property.id) : null);
+  const staged = queue.find((q) => q.propertyId === idStr || (slugStr && (q.propertySlug === slugStr || q.propertyId === slugStr)));
   if (staged) {
     if (firstMessage) { staged.firstMessage = firstMessage; writeQueue(queue); }
     return;
@@ -124,16 +127,15 @@ export async function queuePendingChat(property, { firstMessage, active = false 
   queue.push({
     kind: 'chat',
     userId: viewerId(),
-    propertyId: String(property.id),
+    propertyId: idStr,
+    propertySlug: slugStr,
     at: Date.now(),
     property: {
       title: property.title || 'Property',
-      price: property.priceStr || (property.price ? `₹${property.price}` : ''),
+      price: property.priceStr || (property.price ? (property.deal === 'rent' ? `${fmtINR(property.price)}/mo` : fmtINR(property.price)) : ''),
       loc: property.locality ? `${property.locality}, Pune` : 'Pune',
       img: property.image || property.img || '',
     },
-    // The owner's mobile is deliberately NOT copied: the raw number is revealed only to the owner,
-    // so it is masked here in every state. The drain addresses the thread by `propertyId` instead.
     party: { name: property.owner || 'Owner', role: 'Owner' },
     firstMessage: firstMessage
       || `Hi, I'm interested in "${property.title || 'this property'}" on Draazy. Is it still available?`,

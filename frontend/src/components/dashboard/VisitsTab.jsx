@@ -193,7 +193,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
         <div className="w-10 h-10 rounded-xl bg-teal-500/15 flex items-center justify-center flex-shrink-0"><Icon name="calendar-clock" className="w-5 h-5 text-teal-400" /></div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-white text-sm font-medium truncate">{v.listing}</p>
+            <p className="text-white text-sm font-medium truncate">{v.listing || t('visits.propertyFallback')}</p>
             <StatusBadge status={v.status} t={t} />
           </div>
           <p className="text-gray-500 text-xs mt-0.5 flex items-center gap-1.5 flex-wrap">
@@ -202,8 +202,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
             <span className={tag ? 'text-teal-300 font-semibold' : ''}>{tag || dateStr}</span>
             {p.timeLabel && <><span>·</span><span>{p.timeLabel}</span></>}
           </p>
-        {/* Action buttons meet the 44px tap-target minimum on phones (the same standard as CallBtn/WhatsAppBtn) then
-           relax to their compact size from `sm` up, so the desktop row stays exactly as before. */}
         </div>
         <div className="flex items-center gap-1.5 flex-wrap [&>*]:min-h-[44px] sm:[&>*]:min-h-0">
           {(() => {
@@ -222,7 +220,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
           {v.status === 'confirmed' && hostedByMe && isPast && <button onClick={() => updateVisit(v.id, 'completed')} className={btnConfirm}><Icon name="check-circle" className="w-3.5 h-3.5" /> {t('visits.markVisited')}</button>}
           <button onClick={() => openReschedule(v)} className={btnGhost}><Icon name="calendar" className="w-3.5 h-3.5" /> {t('visits.reschedule')}</button>
           <button onClick={() => updateVisit(v.id, 'cancelled')} className={btnCancel}><Icon name="x" className="w-3.5 h-3.5" /> {t('visits.cancel')}</button>
-          <Link to={`/property/${v.listingId}`} className={btnGhost}><Icon name="arrow-right" className="w-3.5 h-3.5" /> {t('visits.property')}</Link>
+          <Link to={`/property/${v.propertySlug || v.listingId}`} className={btnGhost}><Icon name="arrow-right" className="w-3.5 h-3.5" /> {t('visits.property')}</Link>
         </div>
       </div>
     );
@@ -263,10 +261,10 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
               <div key={v.id} className="flex items-center gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
                 <div className={`w-10 h-10 rounded-xl ${iconCls.includes('emerald') ? 'bg-emerald-500/15' : 'bg-rose-500/15'} flex items-center justify-center flex-shrink-0`}><Icon name={icon} className={`w-5 h-5 ${iconCls}`} /></div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{v.listing}</p>
+                  <p className="text-white text-sm font-medium truncate">{v.listing || t('visits.propertyFallback')}</p>
                   <p className="text-gray-500 text-xs">{isVisitHost(v, user?.id) ? v.visitorName : t('visits.yourVisit')} · {dateStr}</p>
                 </div>
-                <Link to={`/property/${v.listingId}`} className="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 font-semibold hover:bg-white/10">{t('visits.viewProperty')}</Link>
+                <Link to={`/property/${v.propertySlug || v.listingId}`} className="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 text-gray-300 font-semibold hover:bg-white/10">{t('visits.viewProperty')}</Link>
               </div>
             );
           })}
@@ -380,8 +378,8 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
                         const p = parsed.get(v.id) || {};
                         const colors = v.status === 'completed' ? 'bg-emerald-500/15 text-emerald-200 border-emerald-400/30' : (v.status === 'cancelled' || v.status === 'no-show') ? 'bg-rose-500/12 text-rose-300 border-rose-400/25' : v.status === 'confirmed' ? 'bg-emerald-500/12 text-emerald-200 border-emerald-400/25' : 'bg-amber-500/12 text-amber-200 border-amber-400/25';
                         return (
-                          <Link key={v.id} to={`/property/${v.listingId}`} className={'block rounded-lg border px-2 py-1.5 ' + colors}>
-                            <p className="text-[11px] font-bold truncate leading-tight">{v.listing.split(' in ')[0]}</p>
+                          <Link key={v.id} to={`/property/${v.propertySlug || v.listingId}`} className={'block rounded-lg border px-2 py-1.5 ' + colors}>
+                            <p className="text-[11px] font-bold truncate leading-tight">{(v.listing || t('visits.propertyFallback')).split(' in ')[0]}</p>
                             <p className="text-[10px] opacity-80 truncate">{p.timeLabel || t('visits.timeTbd')} · {isVisitHost(v, user?.id) ? v.visitorName : t('visits.you')}</p>
                           </Link>
                         );

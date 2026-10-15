@@ -40,4 +40,4 @@ export async function canRevealParty(conv) {
   return !!conv && isFullMobile(conv.party?.mobile);
 }
 
-export const messagesLinkForProp = (p) => `/messages?openProp=${encodeURIComponent(String(p?.id || ''))}`;
+export const messagesLinkForProp = (p) => `/messages?openProp=${encodeURIComponent(String(p?.uuid || p?.id || ''))}`;

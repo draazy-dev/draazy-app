@@ -125,12 +125,15 @@ public class ConversationOpeningService {
     }
 
     private Started openOrResume(AuthPrincipal caller, ConversationCreate body) {
-        UUID propertyId = body.propertyId() == null || body.propertyId().isBlank()
-                ? null
-                : Ids.parseUuid(body.propertyId()).orElseThrow(ConversationOpeningService::refuse);
-        Property listing = propertyId == null ? null : properties.findById(propertyId)
-                .filter(p -> !p.isOwnerSuspended())
-                .orElseThrow(ConversationOpeningService::refuse);
+        Property listing = null;
+        if (body.propertyId() != null && !body.propertyId().isBlank()) {
+            listing = Ids.parseUuid(body.propertyId())
+                    .flatMap(properties::findById)
+                    .or(() -> properties.findBySlug(body.propertyId()))
+                    .filter(p -> !p.isOwnerSuspended())
+                    .orElseThrow(ConversationOpeningService::refuse);
+        }
+        UUID propertyId = listing == null ? null : listing.getId();
 
         User counterparty = body.counterpartyMobile() == null || body.counterpartyMobile().isBlank()
                 ? ownerOf(listing, caller)

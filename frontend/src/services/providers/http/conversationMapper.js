@@ -1,5 +1,4 @@
-/** Where the view model wants more than the wire carries, each divergence is handled by degrading visibly rather than
- * by inventing data. */
+import { fmtINR } from '../../../lib/format.js';
 
 /** Wire `Message` → the view model's message shape. */
 export function toMessage(m) {
@@ -26,6 +25,7 @@ export function toViewModel(c) {
   return {
     id: c.id,
     propertyId: c.propertyId ?? undefined,
+    propertySlug: c.propertySlug ?? undefined,
     // A flatmate group's thread: many members, no counterparty and no listing.
     group,
 
@@ -66,11 +66,18 @@ export const toViewModelList = (payload) =>
 /* Staged chats share the server row shape so the page renders queued messages identically. */
 export function stagedToViewModel(item) {
   const name = item?.party?.name || 'Owner';
+  const prop = item.property || { title: 'Conversation', price: '', loc: '', img: '' };
+  let price = prop.price || '';
+  if (typeof price === 'string' && /^₹\d{5,}$/.test(price)) {
+    const n = Number(price.slice(1));
+    price = prop.deal === 'rent' ? `${fmtINR(n)}/mo` : fmtINR(n);
+  }
   return {
     id: `staged:${item.propertyId}`,
     staged: true,
     propertyId: item.propertyId,
-    property: item.property || { title: 'Conversation', price: '', loc: '', img: '' },
+    propertySlug: item.propertySlug ?? undefined,
+    property: { ...prop, price },
     party: { online: false, avatar: initialsOf(name), role: 'Owner', mobile: '', ...item.party, name },
     youAre: 'buyer',
     at: item.at || Date.now(),
@@ -107,6 +114,7 @@ function propertyOf(c, group) {
     : '';
   return {
     title: c.propertyTitle || 'Conversation',
+    slug: c.propertySlug ?? undefined,
     price,
     deal: c.propertyDeal || null,
     bhk: c.propertyBhk || '',

@@ -3,9 +3,18 @@ import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
 import { lastAt, relTime } from '../../../lib/chatFormat.js';
+import { fmtINR } from '../../../lib/format.js';
 import ActionSheet from './ActionSheet.jsx';
 
-const lineOf = (c) => [c.property?.bhk, c.property?.loc, c.property?.price].filter(Boolean).join(' · ');
+const displayPrice = (p) => {
+  if (!p?.price) return '';
+  if (typeof p.price === 'string' && (p.price.includes('Cr') || p.price.includes('L') || p.price.includes('/mo') || p.price.includes(' '))) return p.price;
+  const num = typeof p.price === 'number' ? p.price : parseInt(String(p.price).replace(/[^\d]/g, ''), 10);
+  if (!num) return String(p.price);
+  return p.deal === 'rent' ? `${fmtINR(num)}/mo` : fmtINR(num);
+};
+
+const lineOf = (c) => [c.property?.bhk, c.property?.loc, displayPrice(c.property)].filter(Boolean).join(' · ');
 const isServerId = (id) => id && !String(id).startsWith('staged:');
 
 export default function Inbox({
@@ -62,7 +71,7 @@ export default function Inbox({
   return (
     <aside className="pc-list relative">
       <div className="pc-list-head">
-        <h2>{archived ? 'Archived' : t('misc.msgMessages')}</h2>
+        <h1>{archived ? 'Archived' : t('misc.msgMessages')}</h1>
         <div className="pc-tabs" role="tablist" aria-label={t('misc.msgFilters')}>
           <button role="tab" aria-selected={tab === 'chats'} className={'pc-tab' + (tab === 'chats' ? ' active' : '')} onClick={() => setTab('chats')}>Chats</button>
           <button role="tab" aria-selected={tab === 'requests'} className={'pc-tab' + (tab === 'requests' ? ' active' : '')} onClick={() => setTab('requests')}>Requests {requests > 0 && <span className="pc-reqbadge">{requests}</span>}</button>

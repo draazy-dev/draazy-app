@@ -12,6 +12,7 @@ public record ConversationDto(
         @JsonInclude(JsonInclude.Include.NON_NULL) String counterpartyMobile,
         String youAre,
         String propertyId,
+        @JsonInclude(JsonInclude.Include.NON_NULL) String propertySlug,
         String propertyTitle,
         Long propertyPrice,
         String propertyDeal,

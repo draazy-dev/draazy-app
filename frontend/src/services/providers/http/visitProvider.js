@@ -12,11 +12,9 @@ function toViewModel(row) {
   return {
     id: row.id,
     propertyId: row.propertyId || '',
-    // Same value under the name the dashboard calendar's property links already use.
     listingId: row.propertyId || '',
-    // The wire carries no listing title; the dashboard falls back to a generic label. Resolving it
-    // here would mean a property fetch per visit, which is the N+1 this seam exists to avoid.
-    listing: row.listing || '',
+    propertySlug: row.propertySlug || '',
+    listing: row.listing || row.propertyTitle || '',
     when: whenFromSlot(row.slot, mode),
     slot: row.slot || '',
     mode,
@@ -44,12 +42,14 @@ export async function myVisitRequests() {
 
 export async function scheduleVisit(req = {}) {
   const slot = req.slot || (req.dateIso ? slotFromParts(req.dateIso, req.time) : null);
-  return toViewModel(await post('/visits', {
+  const vm = toViewModel(await post('/visits', {
     propertyId: req.propertyId,
     slot,
     mode: 'in-person',
     note: req.note || undefined,
   }));
+  if (req.listing && !vm.listing) vm.listing = req.listing;
+  return vm;
 }
 
 /** Returns 200 with no body, so the caller gets the id and target status back rather than a row. */

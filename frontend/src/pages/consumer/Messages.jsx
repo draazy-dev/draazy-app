@@ -189,7 +189,12 @@ export default function Messages() {
     const params = new URLSearchParams(window.location.search);
     const want = params.get('c');
     const openProp = params.get('openProp');
-    const target = (want && convs.find((c) => c.id === want)) || (openProp && convs.find((c) => c.propertyId === openProp && c.youAre === 'buyer'));
+    const matchProp = (c) =>
+      c.youAre === 'buyer' &&
+      (c.propertyId === openProp || c.propertySlug === openProp || c.property?.slug === openProp);
+    const target =
+      (want && convs.find((c) => c.id === want)) ||
+      (openProp && (convs.find((c) => !c.staged && matchProp(c)) || convs.find(matchProp)));
     if (target && target.id !== activeId && !autoOpened.current) {
       autoOpened.current = true;
       openConv(target.id);

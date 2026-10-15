@@ -121,6 +121,7 @@ public class ConversationMapper {
                             other == null || !detail ? null : MobileMask.applyTo(other.getMobile(), visibility),
                             youAre(readerId, c, listing),
                             c.getPropertyId() == null ? null : c.getPropertyId().toString(),
+                            listing == null ? null : listing.getSlug(),
                             listing == null ? null : listing.getTitle(),
                             available ? listing.getPrice() : null,
                             available ? listing.getDeal() : null,
