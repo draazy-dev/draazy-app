@@ -70,18 +70,20 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
       <section className="fade-in mb-6 sm:mb-10">
         {/* On a phone the old 230px letterbox read as a thumbnail; a full-bleed 4:3 hero gives them the weight they
            deserve. */}
-        <div className="relative main-image-wrapper -mx-4 sm:mx-0 rounded-none sm:rounded-2xl overflow-hidden" style={{ maxHeight: 400 }}>
-          <PropertyImage src="" alt="" className="w-full aspect-[4/3] sm:h-[320px] lg:h-[360px]" />
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 px-8 text-center">
-            <p className="text-white text-base font-bold leading-snug [text-shadow:0_1px_8px_rgb(var(--dz-c-black)/.6)]">{t('property.requestPhotosSlideTitle')}</p>
+        <div className="relative main-image-wrapper -mx-4 sm:mx-0 rounded-none sm:rounded-2xl overflow-hidden bg-white/[0.04] border border-white/10 flex flex-col items-center justify-center gap-2.5 px-8 text-center w-full aspect-[4/3] sm:aspect-auto sm:h-[320px] lg:h-[360px]" style={{ maxHeight: 400 }}>
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-400">
+            <Icon name="image-off" className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <p className="text-slate-300 text-sm font-semibold">{t('common.noPhotos.placeholder')}</p>
+          {requestPhotos ? (
             <button
               type="button"
               onClick={requestPhotos}
-              className="inline-flex items-center gap-2 h-11 px-5 rounded-full bg-brand-teal-2 text-slate-950 text-sm font-bold active:scale-[0.98] transition-transform"
+              className="mt-1 inline-flex items-center gap-2 h-10 px-5 rounded-full bg-brand-teal-2 text-slate-950 text-sm font-bold active:scale-[0.98] transition-transform"
             >
               <Icon name="image-plus" className="w-4 h-4" /> {t('property.requestPhotosShort')}
             </button>
-          </div>
+          ) : null}
           {priceStr ? (
             <>
               <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/85 via-black/45 to-transparent" />

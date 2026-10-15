@@ -24,10 +24,17 @@ function upsert(tag, match, attr, value) {
   return () => (created || !prev ? el.remove() : el.setAttribute(attr, prev));
 }
 
-/** Mirrors the prerendered head (scripts/vite-plugin-blog.mjs) after client-side navigation. */
-export default function usePageHead({ title, description, path, noindex = false }) {
+export default function usePageHead({
+  title,
+  description,
+  path,
+  image,
+  imageAlt,
+  type = 'website',
+  noindex = false,
+  jsonLd,
+}) {
   useEffect(() => {
-    // Nothing to say yet (a page still loading its record): leave the head as it is.
     if (!title) return undefined;
     const titleEl = document.querySelector('title');
     const prevTitle = (titleEl && titleEl.getAttribute('data-shell')) ?? document.title;
@@ -37,10 +44,30 @@ export default function usePageHead({ title, description, path, noindex = false 
       description && upsert('meta', { name: 'description' }, 'content', description),
       path && upsert('link', { rel: 'canonical' }, 'href', `${SITE}${path}`),
       noindex && upsert('meta', { name: 'robots' }, 'content', 'noindex'),
+      title && upsert('meta', { property: 'og:title' }, 'content', title),
+      description && upsert('meta', { property: 'og:description' }, 'content', description),
+      path && upsert('meta', { property: 'og:url' }, 'content', `${SITE}${path}`),
+      type && upsert('meta', { property: 'og:type' }, 'content', type),
+      image && upsert('meta', { property: 'og:image' }, 'content', image),
+      imageAlt && upsert('meta', { property: 'og:image:alt' }, 'content', imageAlt),
+      title && upsert('meta', { name: 'twitter:title' }, 'content', title),
+      description && upsert('meta', { name: 'twitter:description' }, 'content', description),
+      image && upsert('meta', { name: 'twitter:image' }, 'content', image),
     ].filter(Boolean);
+
+    let jsonLdEl = null;
+    if (jsonLd) {
+      jsonLdEl = document.createElement('script');
+      jsonLdEl.type = 'application/ld+json';
+      jsonLdEl.setAttribute('data-page-head', '');
+      jsonLdEl.textContent = typeof jsonLd === 'string' ? jsonLd : JSON.stringify(jsonLd);
+      document.head.appendChild(jsonLdEl);
+    }
+
     return () => {
       document.title = prevTitle;
       restores.forEach((restore) => restore());
+      jsonLdEl?.remove();
     };
-  }, [title, description, path, noindex]);
+  }, [title, description, path, image, imageAlt, type, noindex, jsonLd]);
 }

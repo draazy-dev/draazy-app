@@ -107,9 +107,9 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
 
                       <div className="mb-6 grid grid-cols-2 gap-4">
                         <div>
-                          <label className={lbl3}>{areaLabel} *</label>
+                          <label htmlFor="lp-carpet-area" className={lbl3}>{areaLabel} *</label>
                           <div className="relative">
-                            <input inputMode="decimal" maxLength={9} value={form.carpetArea} onChange={(e) => set('carpetArea', toDecimal(e.target.value))} data-err="carpetArea"
+                            <input id="lp-carpet-area" inputMode="decimal" maxLength={9} value={form.carpetArea} onChange={(e) => set('carpetArea', toDecimal(e.target.value))} data-err="carpetArea"
                               placeholder={tr('listProperty.ph.eg1050')} className={`${fld} pr-14 ${errors.carpetArea ? 'dz-invalid' : ''}`} />
 
                             <div className={unitSuffix}>{unitLabel}</div>
@@ -135,9 +135,9 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                           </div>
                         ) : isCommercial() ? null : (
                           <div>
-                            <label className={lbl3}>{tr('listProperty.fields.builtUpArea')}</label>
+                            <label htmlFor="lp-built-up" className={lbl3}>{tr('listProperty.fields.builtUpArea')}</label>
                             <div className="relative">
-                              <input inputMode="decimal" maxLength={9} value={form.builtUp} onChange={(e) => set('builtUp', toDecimal(e.target.value))}
+                              <input id="lp-built-up" inputMode="decimal" maxLength={9} value={form.builtUp} onChange={(e) => set('builtUp', toDecimal(e.target.value))}
                                 data-err="builtUp" placeholder={tr('listProperty.ph.eg1200')} className={`${fld} pr-12 ${errors.builtUp ? 'dz-invalid' : ''}`} />
                               <div className={unitSuffix}>sq.ft.</div>
                             </div>
@@ -149,9 +149,9 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                       {/* Optional, because only a builder-sold flat has one. */}
                       {!isLand() && !isCommercial() && (
                         <div className="mb-6">
-                          <label className={lbl3}>{tr('listProperty.fields.superBuiltUpArea')}</label>
+                          <label htmlFor="lp-super-built-up" className={lbl3}>{tr('listProperty.fields.superBuiltUpArea')}</label>
                           <div className="relative">
-                            <input inputMode="decimal" maxLength={9} value={form.superBuiltUp} onChange={(e) => set('superBuiltUp', toDecimal(e.target.value))}
+                            <input id="lp-super-built-up" inputMode="decimal" maxLength={9} value={form.superBuiltUp} onChange={(e) => set('superBuiltUp', toDecimal(e.target.value))}
                               data-err="superBuiltUp" placeholder={tr('listProperty.ph.eg1400')} className={`${fld} pr-12 ${errors.superBuiltUp ? 'dz-invalid' : ''}`} />
                             <div className={unitSuffix}>sq.ft.</div>
                           </div>
@@ -162,9 +162,9 @@ export default function PropertyDetailsWhole({ form, set, onPropertyType, onComm
                       {isHouse() && (
                         <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div>
-                            <label className={lbl3}>{tr('listProperty.fields.plotArea')}</label>
+                            <label htmlFor="lp-plot-area" className={lbl3}>{tr('listProperty.fields.plotArea')}</label>
                             <div className="relative">
-                              <input inputMode="decimal" maxLength={9} value={form.plotArea} onChange={(e) => set('plotArea', toDecimal(e.target.value))}
+                              <input id="lp-plot-area" inputMode="decimal" maxLength={9} value={form.plotArea} onChange={(e) => set('plotArea', toDecimal(e.target.value))}
                                 placeholder={tr('listProperty.ph.eg2400')} className={`${fld} pr-12`} />
                               <div className={unitSuffix}>sq.ft.</div>
                             </div>

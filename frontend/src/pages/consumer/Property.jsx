@@ -14,7 +14,7 @@ import PropertyTabs from './property/PropertyTabs.jsx';
 import PropertyModals from './property/PropertyModals.jsx';
 import ListingUnavailable from './property/ListingUnavailable.jsx';
 import usePageHead from '../../lib/usePageHead.js';
-import { listingHead, propertyHref } from '../../lib/listingSeo.js';
+import { listingHead, listingJsonLd, propertyHref } from '../../lib/listingSeo.js';
 
 export default function Property() {
   const location = useLocation();
@@ -25,7 +25,16 @@ export default function Property() {
   const { tr } = ctx;
   const { p, isIn, setVisitOpen, visitOpen, flagEnabled } = ctx;
   const head = p ? listingHead({ bhk: p.bhkNum, type: p.type, deal: p.deal, locality: p.locality, price: p.price, area: p.area, areaUnit: p.areaUnit }) : {};
-  usePageHead({ ...head, path: p ? propertyHref(p) : undefined, noindex: Boolean(p) && (p.status !== 'approved' || p.dealStatus === 'closed') });
+  const href = p ? propertyHref(p) : undefined;
+  const image = p ? (p.coverImage || p.images?.[0] || 'https://draazy.com/og-image.jpg') : undefined;
+  const jsonLd = p ? listingJsonLd(p, { path: href }) : undefined;
+  usePageHead({
+    ...head,
+    path: href,
+    image,
+    jsonLd,
+    noindex: Boolean(p) && (p.status !== 'approved' || p.dealStatus === 'closed'),
+  });
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.get('visit') !== '1') return;

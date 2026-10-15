@@ -1,7 +1,7 @@
 /* Edge rendering for the API-backed public pages (functions/property, functions/society, functions/sitemaps).
    Pure string work so it runs in Node tests and Pages Functions alike; the handlers only do the I/O. */
 import { esc, headTags, jsonLd, renderPage } from '../scripts/seo-html.mjs';
-import { listingHead, listingPrice, listingTitle, propertyPath, societyHead } from '../src/lib/listingSeo.js';
+import { crumbs, listingHead, listingJsonLd, listingPrice, listingTitle, propertyPath, societyHead } from '../src/lib/listingSeo.js';
 import { fmtArea } from '../src/lib/format.js';
 import { GUIDE_LOCALITIES, guideSlugFor } from '../src/lib/guideLocalities.js';
 
@@ -24,10 +24,7 @@ export const NOINDEX = '<meta data-shell="" name="robots" content="noindex" />';
 const HTTPS = /^https:\/\//;
 const sentence = (s) => (s ? String(s)[0].toUpperCase() + String(s).slice(1) : '');
 const day = (iso) => (iso ? String(iso).slice(0, 10) : null);
-export const crumbs = (site, trail) => ({
-  '@type': 'BreadcrumbList',
-  itemListElement: trail.map(([name, path], i) => ({ '@type': 'ListItem', position: i + 1, name, item: `${site}${path}` })),
-});
+export { crumbs } from '../src/lib/listingSeo.js';
 const amenityFeature = (list) => list?.length && { amenityFeature: list.map((a) => ({ '@type': 'LocationFeatureSpecification', name: sentence(a), value: true })) };
 const facts = (rows) => {
   const items = rows.filter(([, v]) => v !== '' && v != null).map(([k, v]) => `<li><span class="text-gray-400">${esc(k)}:</span> ${esc(v)}</li>`);
@@ -46,19 +43,7 @@ ${parts.filter(Boolean).join('\n')}
 /** Unknown or not public: the app draws its own "not found" over this shell. */
 export const notFoundPage = (shell) => ({ status: 404, html: shell.replace('</head>', () => `    ${NOINDEX}\n  </head>`) });
 
-function residenceType(type) {
-  const t = String(type || '').toLowerCase();
-  if (/flat|apartment|studio|penthouse/.test(t)) return 'Apartment';
-  if (/villa/.test(t)) return 'SingleFamilyResidence';
-  if (/house/.test(t)) return 'House';
-  return null;
-}
 
-function floorSize(area, unit) {
-  if (!area) return null;
-  const code = { sqft: 'FTK', sqm: 'MTK', sqyd: 'YDK', acre: 'ACR', hectare: 'HAR' }[unit || 'sqft'];
-  return { '@type': 'QuantitativeValue', value: Number(area), ...(code ? { unitCode: code } : { unitText: unit }) };
-}
 
 /** `p` is the anonymous `GET /properties/{id}` body (PropertyResponse.java). */
 export function propertyPage(shell, p, { pathname, search = '', site = SITE }) {
@@ -75,56 +60,15 @@ export function propertyPage(shell, p, { pathname, search = '', site = SITE }) {
   const rent = p.deal === 'rent';
   const images = [...new Set([p.coverImage, ...(p.images || [])].filter((s) => HTTPS.test(s || '')))];
   const image = images[0] || `${site}/og-image.jpg`;
-  const kind = residenceType(p.propertyType);
-  const size = kind && floorSize(p.area, p.areaUnit);
   const society = p.societySlug && p.societyName && [p.societyName, `/society/${p.societySlug}`];
   const trail = [['Home', '/'], [rent ? 'Rent' : 'Buy', `/listings?deal=${rent ? 'rent' : 'buy'}`], [p.locality || 'Pune', p.localitySlug ? `/locality/${p.localitySlug}` : '/listings'],
     ...(society ? [society] : []), [name, path]];
-
-  const listing = {
-    '@type': 'RealEstateListing',
-    '@id': `${url}#listing`,
-    url,
-    name,
-    description: (p.description || description).slice(0, 500),
-    ...(day(p.createdAt) && { datePosted: day(p.createdAt) }),
-    ...(images.length && { image: images.slice(0, 6) }),
-    ...(price && {
-      offers: {
-        '@type': 'Offer',
-        price: Number(p.price),
-        priceCurrency: 'INR',
-        availability: `https://schema.org/${live ? 'InStock' : 'SoldOut'}`,
-        businessFunction: `http://purl.org/goodrelations/v1#${rent ? 'LeaseOut' : 'Sell'}`,
-        ...(rent && { priceSpecification: { '@type': 'UnitPriceSpecification', price: Number(p.price), priceCurrency: 'INR', unitText: 'MONTH' } }),
-      },
-    }),
-    mainEntity: {
-      '@type': kind || 'Place',
-      name,
-      address: { '@type': 'PostalAddress', ...(p.locality && { addressLocality: p.locality }), addressRegion: 'Maharashtra', addressCountry: 'IN' },
-      // Rounded to about 100 m: a crawler needs the neighbourhood, not the owner's door.
-      ...(p.lat != null && p.lng != null && { geo: { '@type': 'GeoCoordinates', latitude: +Number(p.lat).toFixed(3), longitude: +Number(p.lng).toFixed(3) } }),
-      ...(kind && Number(p.bhk) > 0 && { numberOfBedrooms: Number(p.bhk) }),
-      ...(size && { floorSize: size }),
-      ...amenityFeature(p.amenities),
-      ...(society && { containedInPlace: { '@type': 'ApartmentComplex', name: society[0], url: `${site}${society[1]}` } }),
-    },
-  };
-  const video = HTTPS.test(p.video || '') && {
-    '@type': 'VideoObject',
-    name: `Video tour: ${name}`,
-    description,
-    contentUrl: p.video,
-    thumbnailUrl: image,
-    ...(day(p.createdAt) && { uploadDate: day(p.createdAt) }),
-  };
 
   const head = headTags({
     title, description, url, image, type: 'website',
     extra: [
       ...(live ? [] : [NOINDEX]),
-      jsonLd({ '@context': 'https://schema.org', '@graph': [listing, crumbs(site, trail), video].filter(Boolean) }),
+      jsonLd(listingJsonLd(p, { site, path })),
     ],
   });
   const guide = guideSlugFor(p);

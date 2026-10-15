@@ -271,6 +271,7 @@
     "updateYourOffer": "Update your offer",
     "offerModalSub": "Owner can accept or counter — no brokerage.",
     "enterOfferAmount": "Enter an offer amount.",
+    "offerAmountLabel": "Offer amount",
     "offerPlaceholder": "e.g. 32000",
     "preferredMoveInDate": "Preferred move-in date",
     "targetPossessionDate": "Target possession / registration date",

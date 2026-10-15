@@ -65,3 +65,95 @@ export function societyHead(s) {
     thin: !s.listingCount && !s.year && !s.towers && !s.units && !s.amenities?.length,
   };
 }
+
+function residenceType(type) {
+  const t = String(type || '').toLowerCase();
+  if (/flat|apartment|studio|penthouse/.test(t)) return 'Apartment';
+  if (/villa/.test(t)) return 'SingleFamilyResidence';
+  if (/house/.test(t)) return 'House';
+  return null;
+}
+
+function floorSize(area, unit) {
+  if (!area) return null;
+  const code = { sqft: 'FTK', sqm: 'MTK', sqyd: 'YDK', acre: 'ACR', hectare: 'HAR' }[unit || 'sqft'];
+  return { '@type': 'QuantitativeValue', value: Number(area), ...(code ? { unitCode: code } : { unitText: unit }) };
+}
+
+const sentence = (s) => (s ? String(s)[0].toUpperCase() + String(s).slice(1) : '');
+const day = (iso) => (iso ? String(iso).slice(0, 10) : null);
+const amenityFeature = (list) => (list?.length ? { amenityFeature: list.map((a) => ({ '@type': 'LocationFeatureSpecification', name: sentence(a), value: true })) } : {});
+
+export function crumbs(site, trail) {
+  return {
+    '@type': 'BreadcrumbList',
+    itemListElement: trail.map(([name, path], i) => ({ '@type': 'ListItem', position: i + 1, name, item: `${site}${path}` })),
+  };
+}
+
+export function listingJsonLd(p, { site = 'https://draazy.com', path } = {}) {
+  const l = { bhk: p.bhkNum ?? p.bhk, type: p.type ?? p.propertyType, deal: p.deal, locality: p.locality, price: p.price, area: p.area, areaUnit: p.areaUnit };
+  const href = path || propertyHref(p);
+  const url = `${site}${href}`;
+  const name = listingTitle(l);
+  const price = listingPrice(l);
+  const { description } = listingHead(l);
+  const live = p.status === 'approved' && p.dealStatus !== 'closed';
+  const rent = p.deal === 'rent';
+  const images = [...new Set([p.coverImage, ...(p.images || [])].filter((s) => /^https:\/\//.test(s || '')))];
+  const image = images[0] || `${site}/og-image.jpg`;
+  const kind = residenceType(l.type);
+  const size = kind && floorSize(p.area, p.areaUnit);
+  const society = p.societySlug && p.societyName && [p.societyName, `/society/${p.societySlug}`];
+  const trail = [
+    ['Home', '/'],
+    [rent ? 'Rent' : 'Buy', `/listings?deal=${rent ? 'rent' : 'buy'}`],
+    [p.locality || 'Pune', p.localitySlug ? `/locality/${p.localitySlug}` : '/listings'],
+    ...(society ? [society] : []),
+    [name, href],
+  ];
+
+  const listing = {
+    '@type': 'RealEstateListing',
+    '@id': `${url}#listing`,
+    url,
+    name,
+    description: (p.description || description).slice(0, 500),
+    ...(day(p.createdAt) && { datePosted: day(p.createdAt) }),
+    ...(images.length && { image: images.slice(0, 6) }),
+    ...(price && {
+      offers: {
+        '@type': 'Offer',
+        price: Number(p.price),
+        priceCurrency: 'INR',
+        availability: `https://schema.org/${live ? 'InStock' : 'SoldOut'}`,
+        businessFunction: `http://purl.org/goodrelations/v1#${rent ? 'LeaseOut' : 'Sell'}`,
+        ...(rent && { priceSpecification: { '@type': 'UnitPriceSpecification', price: Number(p.price), priceCurrency: 'INR', unitText: 'MONTH' } }),
+      },
+    }),
+    mainEntity: {
+      '@type': kind || 'Place',
+      name,
+      address: { '@type': 'PostalAddress', ...(p.locality && { addressLocality: p.locality }), addressRegion: 'Maharashtra', addressCountry: 'IN' },
+      ...(p.lat != null && p.lng != null && { geo: { '@type': 'GeoCoordinates', latitude: +Number(p.lat).toFixed(3), longitude: +Number(p.lng).toFixed(3) } }),
+      ...(kind && Number(l.bhk) > 0 && { numberOfBedrooms: Number(l.bhk) }),
+      ...(size && { floorSize: size }),
+      ...amenityFeature(p.amenities),
+      ...(society && { containedInPlace: { '@type': 'ApartmentComplex', name: society[0], url: `${site}${society[1]}` } }),
+    },
+  };
+
+  const video = /^https:\/\//.test(p.video || '') && {
+    '@type': 'VideoObject',
+    name: `Video tour: ${name}`,
+    description,
+    contentUrl: p.video,
+    thumbnailUrl: image,
+    ...(day(p.createdAt) && { uploadDate: day(p.createdAt) }),
+  };
+
+  return {
+    '@context': 'https://schema.org',
+    '@graph': [listing, crumbs(site, trail), video].filter(Boolean),
+  };
+}
