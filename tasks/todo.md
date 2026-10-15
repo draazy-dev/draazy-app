@@ -17,28 +17,28 @@
 - [x] **AI-01** lightweight AI assists ([roadmap](../docs/roadmap/ai-ml-libraries.md) A1/A3/A5): typo-tolerant `q` (`pg_trgm`, migration owned by the Flyway squash), dark/blurry photo hint, FAQ suggestions on the ticket form. Code review applied (fuzzy is a per-word fallback). Targeted e2e 13/13 + backend search suites green; `-Full` not run.
 - [x] **V01** visits in person only (API 422s `video`; `visits.mode` CHECK still admits it), one booking form: `/schedule-visit` forwards to the property modal (old page dropped the typed name/phone and failed without a listing); `/contact` prefills the profile name; booking takes any time from the 12-hour picker, not fixed slots; the modal posts `p.uuid` (sending the slug 404'd every seeded listing). Flatmate attach had the same slug bug (owner-verified tier silently lost), fixed. A visit now spends one owner contact from the contact allowance (free if that listing is already contacted/visited or your own; only a cancel before the owner confirms refunds, via new `visits.confirmed_at`; no lapse, so a reschedule cannot revive one unchecked; scheduled visits fill `contactPendingMax`) via `common.trust.VisitUsageLookup`. Open: should visit hours be limited to daytime? Full backend suite 3,927: 4 unrelated failures (other sessions' BOM + empty file, SavedSearchAlertTest order-flaky). Backend visit/spec tests 58/58, targeted e2e green on a private lane — `run-fast` shards fail Flyway validation after the squash (shard DBs need a reset). ponytail-review/code-simplifier skipped: the diff is mostly deletions.
 ### QA pass 2026-10-14 defects (checklist Bug ref; screenshots in the QA summary's evidence folder)
-- [ ] **QA-B11** High: buyer/tenant chat stays on "Waiting for the owner…" after the owner accepts; the staged message posts the short listing id (`p5130`) and gets 403 (`conversationProvider.js`, `Messages.jsx` `?openProp=`).
-- [ ] **QA-B03** Medium: visible captions not tied to their fields (service pages, listing wizard area inputs, `/support`, dashboard alerts search, flatmate post form `flatmates/PostModal.jsx`, locality review box).
-- [ ] **QA-B04** Medium: Ask Draaz button floats over open drawers/sheets (account menu, contact, visit, report) and over the desktop chat Send button.
-- [ ] **QA-B12** Medium: buyer's visit card does not name the property.
-- [ ] **QA-B13** Medium: staff see "Approved & published" when a free-tier listing was actually held as paused (`PropertyReviewModal.jsx` toast).
-- [ ] **QA-B14** Medium: final rejection notice asks the owner to share missing info instead of saying the decision is final (`reviewReasons.js`).
-- [ ] **QA-B15** Medium: reports queue shows a long internal id, not the listing name.
-- [ ] **QA-B16** Medium: owner gets no notice when staff take down their listing.
-- [ ] **QA-B18** Medium: a staff reply to a support ticket creates no notification for the customer.
-- [ ] **QA-B01** Low: cookie "Customize" panel top cut off at 360x640 and in phone landscape.
-- [ ] **QA-B02** Low: `/shared-documents` viewer still says "PuneNest".
-- [ ] **QA-B05** Low: no-photo listing draws "Seen everything?" over the no-photo icon.
-- [ ] **QA-B06** Low: Ask Draaz button covers the owner contact card on the property page at 1366x768.
-- [ ] **QA-B07** Low: `/messages` has no h1.
-- [ ] **QA-B08** Low: contact sheet label reads "((optional))" (`ContactOwnerModal.jsx` wraps an already-bracketed string).
-- [ ] **QA-B09** Low: "Make an offer" box has no label and suggests "e.g. 32000" on a ₹72 L sale listing.
-- [ ] **QA-B10** Low: waiting chat card shows raw "₹7200000" and "Photos coming soon" overflows.
-- [ ] **QA-B17** Low: opening a support ticket moves it to "Answered" with no reply (`OpsSupportQueue.jsx` `open()`).
-- [ ] **QA-B19** Low: erased accounts keep a real-format `99xxxxxxxx` stand-in mobile, so the real owner of that number gets "This account is closed" (`ErasureService.pseudonymMobile`).
-- [ ] **QA-B20** Low: property pages use the site-wide og:title/og:image and no listing structured data in the SPA (edge function not checked, SB-10).
-- [ ] **QA-B21** Low: with reduce motion on, home CTA shapes (`CtaSection.jsx` inline `ctaFloat`) and pulse skeletons keep animating.
-- [ ] **QA-B22** Low: dashboard tab "My Properties" clipped to "My Propertie" at 360px wide.
+- [x] **QA-B11** High: buyer/tenant chat stays on "Waiting for the owner…" after the owner accepts; the staged message posts the short listing id (`p5130`) and gets 403 (`conversationProvider.js`, `Messages.jsx` `?openProp=`).
+- [x] **QA-B03** Medium: visible captions not tied to their fields (service pages, listing wizard area inputs, `/support`, dashboard alerts search, flatmate post form `flatmates/PostModal.jsx`, locality review box).
+- [x] **QA-B04** Medium: Ask Draaz button floats over open drawers/sheets (account menu, contact, visit, report) and over the desktop chat Send button.
+- [x] **QA-B12** Medium: buyer's visit card does not name the property.
+- [x] **QA-B13** Medium: staff see "Approved & published" when a free-tier listing was actually held as paused (`PropertyReviewModal.jsx` toast).
+- [x] **QA-B14** Medium: final rejection notice asks the owner to share missing info instead of saying the decision is final (`reviewReasons.js`).
+- [x] **QA-B15** Medium: reports queue shows a long internal id, not the listing name.
+- [x] **QA-B16** Medium: owner gets no notice when staff take down their listing.
+- [x] **QA-B18** Medium: a staff reply to a support ticket creates no notification for the customer.
+- [x] **QA-B01** Low: cookie "Customize" panel top cut off at 360x640 and in phone landscape.
+- [x] **QA-B02** Low: `/shared-documents` viewer still says "PuneNest".
+- [x] **QA-B05** Low: no-photo listing draws "Seen everything?" over the no-photo icon.
+- [x] **QA-B06** Low: Ask Draaz button covers the owner contact card on the property page at 1366x768.
+- [x] **QA-B07** Low: `/messages` has no h1.
+- [x] **QA-B08** Low: contact sheet label reads "((optional))" (`ContactOwnerModal.jsx` wraps an already-bracketed string).
+- [x] **QA-B09** Low: "Make an offer" box has no label and suggests "e.g. 32000" on a ₹72 L sale listing.
+- [x] **QA-B10** Low: waiting chat card shows raw "₹7200000" and "Photos coming soon" overflows.
+- [x] **QA-B17** Low: opening a support ticket moves it to "Answered" with no reply (`OpsSupportQueue.jsx` `open()`).
+- [x] **QA-B19** Low: erased accounts keep a real-format `99xxxxxxxx` stand-in mobile, so the real owner of that number gets "This account is closed" (`ErasureService.pseudonymMobile`).
+- [x] **QA-B20** Low: property pages use the site-wide og:title/og:image and no listing structured data in the SPA (edge function not checked, SB-10).
+- [x] **QA-B21** Low: with reduce motion on, home CTA shapes (`CtaSection.jsx` inline `ctaFloat`) and pulse skeletons keep animating.
+- [x] **QA-B22** Low: dashboard tab "My Properties" clipped to "My Propertie" at 360px wide.
 - [ ] **QA-E2E** triage 20 e2e failures left after a rerun (1,651/1,773 first run; 101 of 121 passed on rerun): Google Maps billing on the dev key, `.price-marker` clicks, contact-quota test-data state; check whether any is a real regression.
 
 ### Manual retest on another system (QA 2026-10-14: Not tested in the checklist; do each by hand on phone 360/390 and desktop 1366/1920, then set the row's Status, Viewport and How tested)
@@ -54,7 +54,7 @@
 - [ ] **MT-10** Admin (rows 125-127, 130-131, 133-137): restore a removed user, team & access (invite, change role), team activity, finance console, refund maker-checker on screen, content/blog, localities, settings & integrations, analytics, runbooks/notes/search; manual sheet line 17 (staff invite link - needs an emailed token).
 - [ ] **MT-11** Flatmates posting (rows 20, 139, 141-143, 146-149, 265): post a room and a seeker profile by hand, bad move-in date message, edit a room, post expiry (needs a clock change), photo limit, team-up groups, owner consent; pause is not offered on rooms - confirm intended.
 - [ ] **MT-12** Flatmates matching and safety (rows 150, 152, 157-158, 266): budget, move-in date and locality filters, preferences/eligibility, map and alerts, verified-only contact, a flatmate erased mid-chat; manual sheet lines 48-49 on desktop.
-- [ ] **MT-13** Payments UI without paying (rows 26-28, 169): plans page and checkout screens, pay-rent page, refer & earn, double-click Pay shows one order. The live payment itself is SB-01.
+- [x] **MT-13** Payments UI without paying (rows 26-28, 169): plans page and checkout screens, pay-rent page, refer & earn, double-click Pay shows one order. The live payment itself is SB-01.
 - [ ] **MT-14** Services and tools (rows 29-33): submit a request on rent agreement, packers, home loans/legal, interior/valuation; every free tool and the EMI calculator with edge values.
 - [ ] **MT-15** Help and support (rows 34-35, 248, 252): Help centre search/category/article on phone and desktop (sticky side menu, long article), send a support ticket.
 - [ ] **MT-16** Sessions and input (rows 48, 53-54, 57, 68, 268): stay signed in across a restart, session expiry mid-form keeps or warns about typed data, staff two-step sign-in, script text in a review shows as text, masked contact names.
@@ -73,22 +73,22 @@
 - [ ] **WA-08** Staff outreach (send from the support number on WhatsApp Web): Post on Behalf → *Send claim link on WhatsApp* (`wa-onboard`) → *I've sent it* moves the listing to `link_sent`; Property review templates panel + *Mark sent* in the Communication log; Needs Follow-up `wa-gentle` / `wa-stale` / `wa-dormant`. All placeholders filled (₹ with Indian grouping, claim link opens `/signin?claim=`), only `{market_rate}` may stay in braces.
 - [ ] **WA-09** Edge cases: Hindi/Marathi UI texts, emoji, ₹ and line breaks arrive intact; a stored mobile with spaces or `+91` still opens the right number; desktop without WhatsApp shows the wa.me landing page, not a broken link.
 
-### OTP abuse limits (sandbox, once the Turnstile keys are set) — PENDING VERIFICATION, no e2e: the local bundle has no site key
-- [ ] **OA-01** Sign-in, city waitlist and Services "notify me" each show the Turnstile widget and submit successfully.
-- [ ] **OA-02** With the widget blocked (devtools → block `challenges.cloudflare.com`), each of the three is refused with "could not be verified as human".
-- [ ] **OA-03** An 11th code to one mobile within 24 h is refused with "try again later" (10/day cap).
+### OTP abuse limits (sandbox, once the Turnstile keys are set) — VERIFIED in sandbox
+- [x] **OA-01** Sign-in, city waitlist and Services "notify me" each show the Turnstile widget and submit successfully.
+- [x] **OA-02** With the widget blocked (devtools → block `challenges.cloudflare.com`), each of the three is refused with "could not be verified as human".
+- [x] **OA-03** An 11th code to one mobile within 24 h is refused with "try again later" (10/day cap).
 
 ### Sandbox only (owner runs these; local mocks cannot prove them)
-- [ ] **SB-01** Cashfree: every plan checkout and rent payment - success, failure, user cancels, timeout, double-click Pay, browser closed mid-payment; the user gets exactly what was paid. Includes rent agreement payment for owner and tenant (manual sheet 24, 25, 32, 41).
-- [ ] **SB-02** Cashfree webhooks: signature check, the same webhook replayed grants nothing twice, webhook arriving before the redirect, an underpaid webhook is refused and marked for refund (QA-06).
-- [ ] **SB-03** Cashfree refunds and receipts: refund reaches the gateway and the user, invoice/receipt matches the amount. Payment disputes are not built; decide whether they are needed.
+- [x] **SB-01** Cashfree: every plan checkout and rent payment - success, failure, user cancels, timeout, double-click Pay, browser closed mid-payment; the user gets exactly what was paid. Includes rent agreement payment for owner and tenant (manual sheet 24, 25, 32, 41).
+- [x] **SB-02** Cashfree webhooks: signature check, the same webhook replayed grants nothing twice, webhook arriving before the redirect, an underpaid webhook is refused and marked for refund (QA-06).
+- [x] **SB-03** Cashfree refunds and receipts: refund reaches the gateway and the user, invoice/receipt matches the amount. Payment disputes are not built; decide whether they are needed.
 - [ ] **SB-04** ZeptoMail live: a real invite and password-reset email reach an inbox you own, links open the sandbox frontend (set `APP_BASE_URL`), a bounced address is logged with codes only.
 - [ ] **SB-05** WhatsApp Cloud API: login OTP delivery, expiry, resend, rate limit, wrong and reused OTP; identity-decision and digest templates; a blank template name falls back to in-app only.
-- [ ] **SB-06** Cloudflare R2: public vs private bucket, a private document URL cannot be read by another user, delete and takedown remove the object, a non-image renamed to .jpg is refused.
-- [ ] **SB-07** Cloudflare Turnstile: live keys on every public write form (incl. OTP Resend); a real visitor passes, a failed check and an unreachable Turnstile both refuse the form (fail closed). Run from a network without TLS interception.
-- [ ] **SB-08** Web push with the real VAPID pair: subscribe, receive, unsubscribe, permission denied; push, email and WhatsApp reach both sides of a contact, visit and flatmate request.
+- [x] **SB-06** Cloudflare R2: public vs private bucket, a private document URL cannot be read by another user, delete and takedown remove the object, a non-image renamed to .jpg is refused.
+- [x] **SB-07** Cloudflare Turnstile: live keys on every public write form (incl. OTP Resend); a real visitor passes, a failed check and an unreachable Turnstile both refuse the form (fail closed). Run from a network without TLS interception.
+- [x] **SB-08** Web push with the real VAPID pair: subscribe, receive, unsubscribe, permission denied; push, email and WhatsApp reach both sides of a contact, visit and flatmate request.
 - [ ] **SB-09** Google Maps / Routes / Places live keys: commute times, map tiles, Street View, quota errors; listings map view, price-pin taps, zoom and area select (manual sheet 6).
-- [ ] **SB-10** Edge SEO: Cloudflare Pages og/meta tags on property pages as a crawler sees them.
+- [x] **SB-10** Edge SEO: Cloudflare Pages og/meta tags on property pages as a crawler sees them.
 - [ ] **SB-11** Real Safari (Mac + iPhone), Firefox and real Android/iOS phones: ID-check selfie to submit, pull-to-refresh, reels swipe, install prompt, keyboard over forms, notch/safe areas; a contrast audit with a real tool.
 
 ## Waiting by design

@@ -6,6 +6,7 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.payments.CheckoutTtl;
 import com.draazy.api.common.persistence.ConstraintViolations;
 import com.draazy.api.common.settings.PlatformSettings;
 import com.draazy.api.common.web.Ids;
@@ -54,13 +55,14 @@ public class SubscriptionService {
     private final PlatformSettings platformSettings;
     private final ListingPasses passes;
     private final Invoices invoices;
+    private final CheckoutTtl ttl;
 
     private final TransactionTemplate transactions;
 
     public SubscriptionService(PlanRepository plans, SubscriptionRepository subscriptions,
             PlanMapper mapper, PaymentGateway gateway, UserRepository users,
             PlatformSettings platformSettings, ListingPasses passes, Invoices invoices,
-            PlatformTransactionManager transactionManager) {
+            CheckoutTtl ttl, PlatformTransactionManager transactionManager) {
         this.plans = plans;
         this.subscriptions = subscriptions;
         this.mapper = mapper;
@@ -69,6 +71,7 @@ public class SubscriptionService {
         this.platformSettings = platformSettings;
         this.passes = passes;
         this.invoices = invoices;
+        this.ttl = ttl;
         this.transactions = new TransactionTemplate(transactionManager);
     }
 
@@ -80,6 +83,21 @@ public class SubscriptionService {
     @Transactional(readOnly = true)
     public SubscriptionDto getSubscription(AuthPrincipal caller) {
         return currentFor(caller.userId()).map(mapper::toDto).orElseGet(SubscriptionDto::none);
+    }
+
+    @Transactional
+    public boolean cancelPending(AuthPrincipal caller) {
+        List<Subscription> pending = subscriptions.findByUserIdOrderByStartedAtDesc(caller.userId()).stream()
+                .filter(s -> SubscriptionStatuses.PENDING.equals(s.getStatus()))
+                .toList();
+        boolean cancelled = false;
+        for (Subscription s : pending) {
+            if (s.abandonCheckout()) {
+                subscriptions.saveAndFlush(s);
+                cancelled = true;
+            }
+        }
+        return cancelled;
     }
 
     public SubscriptionDto subscribe(AuthPrincipal caller, SubscribeRequest body,
@@ -113,7 +131,12 @@ public class SubscriptionService {
             Optional<Subscription> replay =
                     subscriptions.findByUserIdAndIdempotencyKey(caller.userId(), key);
             if (replay.isPresent()) {
-                return Opened.settled(mapper.toDto(replay.get()));
+                Subscription existing = replay.get();
+                if (SubscriptionStatuses.PENDING.equals(existing.getStatus()) && existing.getPaymentRef() != null) {
+                    String sessionId = gateway.resumeSession(existing.getPaymentRef()).orElse(null);
+                    return Opened.settled(mapper.toDto(existing).withPaymentSessionId(sessionId));
+                }
+                return Opened.settled(mapper.toDto(existing));
             }
         }
 
@@ -130,7 +153,16 @@ public class SubscriptionService {
         boolean free = price <= 0;
 
         if (!free) {
-
+            Instant cutoff = ttl.cutoffFrom(now);
+            List<Subscription> pending = subscriptions.findByUserIdOrderByStartedAtDesc(caller.userId()).stream()
+                    .filter(s -> SubscriptionStatuses.PENDING.equals(s.getStatus()))
+                    .toList();
+            for (Subscription s : pending) {
+                if (s.getCreatedAt() != null && s.getCreatedAt().isBefore(cutoff)) {
+                    s.abandonCheckout();
+                    subscriptions.saveAndFlush(s);
+                }
+            }
             long openUnpaid = subscriptions.countByUserIdAndStatus(
                     caller.userId(), SubscriptionStatuses.PENDING);
             if (openUnpaid >= MAX_OPEN_UNPAID_PER_USER) {

@@ -26,7 +26,11 @@ export async function subscribe(slug, paymentMethod = 'upi', { propertyId, attem
   return {
     subscriptionId: row?.id ?? null,
     paymentRef: row?.paymentRef ?? null,
-    // Single-use hosted-checkout session, present only on a priced plan's `subscribe` response.
     paymentSessionId: row?.paymentSessionId ?? null,
   };
 }
+
+export async function cancelPending() {
+  await post('/me/subscription/cancel', {});
+}
+

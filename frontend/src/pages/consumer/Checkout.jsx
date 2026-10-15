@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import { openCashfreeCheckout } from '../../lib/cashfree.js';
-import { listPlans, subscribe as subscribeToPlan } from '../../services/planService.js';
+import { cancelPending, listPlans, subscribe as subscribeToPlan } from '../../services/planService.js';
 import { getEntitlements } from '../../services/entitlementService.js';
 import { myListingCard } from '../../services/propertyService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -65,8 +65,20 @@ export default function Checkout() {
   const [listing, setListing] = useState(null);
   const [expiresAt, setExpiresAt] = useState(null);
   const packExpiryBefore = useRef(null);
-  // One key per checkout attempt: a double-tapped Pay returns the same order, a second pack is a new purchase.
-  const [attemptId, setAttemptId] = useState(newAttemptId);
+  const attemptKey = `dz_co_${planId}_${propertyId || ''}`;
+  const [attemptId, setAttemptId] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem(attemptKey);
+      if (saved) return saved;
+    } catch {
+      // ignore storage access errors
+    }
+    const id = newAttemptId();
+    try { sessionStorage.setItem(attemptKey, id); } catch {
+      // ignore storage access errors
+    }
+    return id;
+  });
 
   useEffect(() => {
     let alive = true;
@@ -109,6 +121,7 @@ export default function Checkout() {
       if (at) {
         setExpiresAt(at);
         setPhase('paid');
+        try { sessionStorage.removeItem(attemptKey); } catch { /* ignore */ }
       } else if (Date.now() - started >= POLL_MAX_MS) {
         setPhase('timeout');
       } else {
@@ -117,7 +130,24 @@ export default function Checkout() {
     };
     tick();
     return () => { alive = false; clearTimeout(timer); };
-  }, [phase, needsProperty, propertyId]);
+  }, [phase, needsProperty, propertyId, attemptKey]);
+
+  const [cancelling, setCancelling] = useState(false);
+  const cancelOpenOrder = async () => {
+    setCancelling(true);
+    try {
+      await cancelPending();
+      setSession(null);
+      const fresh = newAttemptId();
+      setAttemptId(fresh);
+      try { sessionStorage.setItem(attemptKey, fresh); } catch { /* ignore */ }
+      setError('');
+    } catch {
+      setError(t('misc.coPaymentFailed'));
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const pay = async () => {
     if (paying || phase) return;
@@ -128,24 +158,17 @@ export default function Checkout() {
       if (!order) {
         if (!needsProperty) packExpiryBefore.current = (await getEntitlements().catch(() => null))?.contacts?.packExpiresAt ?? null;
         const sub = await subscribeToPlan(planId, method.toLowerCase(), { propertyId: needsProperty ? propertyId : undefined, attemptId });
-        /* The reference the customer quotes at support: `paymentRef` is the gateway's order id and appears on
-           their bank statement; the subscription id is the fallback. */
         setOrderRef(sub?.paymentRef || sub?.subscriptionId || '');
         order = { sessionId: sub?.paymentSessionId ?? null };
         setSession(order);
       }
-      // The modal closing is not payment: poll for this purchase's own entitlement instead.
       const outcome = order.sessionId ? await openCashfreeCheckout(order.sessionId) : null;
       if (outcome?.error) {
-        setSession(null);
-        setAttemptId(newAttemptId());
         setError(t('misc.coPaymentFailed'));
         return;
       }
       setPhase('verifying');
     } catch (err) {
-      // 409: the one-open-unpaid-order cap, or a listing that already has a pass or cannot take one.
-      // Branch on status, never `err.message` — this page is localised.
       setError(err?.status === 409 ? t(needsProperty ? 'misc.coPassConflict' : 'misc.coOrderAlreadyOpen') : err?.code === 'purchases_paused' ? t('misc.coPausedBody') : t('misc.coPaymentFailed'));
     } finally {
       setPaying(false);
@@ -242,7 +265,21 @@ export default function Checkout() {
               ))}
             </div>
             <button onClick={pay} disabled={paying} className="btn-teal w-full py-3 rounded-xl font-semibold hidden md:inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">{paying ? <><Icon name="loader-2" className="w-4 h-4 animate-spin" /> {t('misc.coProcessing')}</> : <><Icon name="lock" className="w-4 h-4" /> {t('misc.coPay')} {inr(P.price)}</>}</button>
-            {error && <p role="alert" className="text-rose-300 text-xs text-center mt-3">{error}</p>}
+            {error && (
+              <div className="mt-3 text-center space-y-2">
+                <p role="alert" className="text-rose-300 text-xs">{error}</p>
+                {error === t('misc.coOrderAlreadyOpen') && (
+                  <button
+                    type="button"
+                    onClick={cancelOpenOrder}
+                    disabled={cancelling}
+                    className="text-xs text-teal-400 hover:text-teal-300 underline font-medium cursor-pointer"
+                  >
+                    {cancelling ? t('misc.coProcessing') : t('misc.coCancelPending')}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

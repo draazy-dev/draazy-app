@@ -15,14 +15,14 @@ Things code can't close: secrets, deploy steps, real-device checks, human fact-c
 - [ ] Cloudflare Cache Rule for extensionless photo originals; check the R2 cache header on a real upload
 - [ ] Anonymous `/api/flags` on the Pages host should not reach Cloud Run
 - [ ] Cashfree: real `TEST…`/`cfsk_…` in `draazy-sandbox-cashfree-app-id`/`-secret-key`; one RA payment + one subscription with the console open (order, modal, callback, signature, settlement, CSP `form-action`)
-- [ ] R2: startup line, one identity submit, one listing photo, bucket `Access-Control-Allow-Origin`
+- [x] R2: startup line, one identity submit, one listing photo, bucket `Access-Control-Allow-Origin`
 - [ ] `draazy-sandbox-google-places-server-key`; read Google's lat/lng caching terms
 - [ ] Google Cloud: the **production** browser key (`VITE_GOOGLE_MAPS_API_KEY`) must allow **Maps Embed API** (the dev key already does), or the property Street View tile shows Google's error frame; check a FC Road listing's Location tab after deploy
 - [ ] ZeptoMail: secret `draazy-sandbox-zeptomail-api-key` (Send Mail token) before the next deploy, or the revision won't start; `draazy.com` DKIM + CNAME Verified; then create one staff account and check the invite lands
-- [ ] VAPID key pair (`npx web-push generate-vapid-keys`): secrets `draazy-sandbox-push-vapid-private-key` / `-public-key`, and repo var `VITE_VAPID_PUBLIC_KEY` (same public key) — web push is wired (B41), deploy fails without the secrets
+- [x] VAPID key pair (`npx web-push generate-vapid-keys`): secrets `draazy-sandbox-push-vapid-private-key` / `-public-key`, and repo var `VITE_VAPID_PUBLIC_KEY` (same public key) — web push is wired (B41), deploy fails without the secrets
 - [ ] WhatsApp daily digest template: submit to Meta as `UTILITY` (body in `docs/DEPLOY.md` §3), then set `WHATSAPP_DIGEST_TEMPLATE_NAME` — until approved no digest is sent
 - [ ] GitHub → Settings → Environments → `sandbox`: add secret `SANDBOX_WHATSAPP_ACCESS_TOKEN` (the System User token from `backend/.env.local`) before the next sandbox deploy, or it fails fast — sandbox now sends real WhatsApp OTPs (`docs/DEPLOY.md` §3.1)
-- [ ] Cloudflare → Turnstile: create a widget for the sandbox hostname; add its secret as `sandbox` environment secret `SANDBOX_TURNSTILE_SECRET_KEY` and its site key as repository variable `VITE_TURNSTILE_SITE_KEY` — the next deploy fails fast without them (`docs/DEPLOY.md` §3.1)
+- [x] Cloudflare → Turnstile: create a widget for the sandbox hostname; add its secret as `sandbox` environment secret `SANDBOX_TURNSTILE_SECRET_KEY` and its site key as repository variable `VITE_TURNSTILE_SITE_KEY` — the next deploy fails fast without them (`docs/DEPLOY.md` §3.1)
 - [ ] Rotate `backend/.env.local` secrets if in doubt (surfaced 2026-08-09)
 - [ ] DigitalOcean: add the alert policies and the one free Uptime check from `docs/DEPLOY.md` §8; leave log forwarding off
 - [ ] Optional: `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY` for graphify community labels

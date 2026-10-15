@@ -28,12 +28,17 @@ public class PlansController {
         return SubscriptionState.of(service.getSubscription(principal));
     }
 
-    /** A repeated {@code Idempotency-Key} returns the original row. */
     @PostMapping(Routes.Plans.SUBSCRIPTION)
     @ResponseStatus(HttpStatus.CREATED)
     public SubscriptionDto subscribe(@CurrentUser AuthPrincipal principal,
             @Valid @RequestBody SubscribeRequest body,
             @RequestHeader(name = "Idempotency-Key", required = false) String idempotencyKey) {
         return service.subscribe(principal, body, idempotencyKey);
+    }
+
+    @PostMapping(Routes.Plans.CANCEL_SUBSCRIPTION)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelPending(@CurrentUser AuthPrincipal principal) {
+        service.cancelPending(principal);
     }
 }

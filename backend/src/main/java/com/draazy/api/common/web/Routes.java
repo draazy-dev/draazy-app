@@ -850,8 +850,8 @@ public final class Routes {
         private Plans() {
         }
 
-        /** Authenticated — {@code GET} the caller's current plan, {@code POST} to change it. */
         public static final String SUBSCRIPTION = "/me/subscription";
+        public static final String CANCEL_SUBSCRIPTION = SUBSCRIPTION + "/cancel";
 
         /** Authenticated — what the caller is entitled to do: owner contacts and listing slots. */
         public static final String ENTITLEMENTS = "/me/entitlements";

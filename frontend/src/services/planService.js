@@ -6,5 +6,5 @@ const provider = createProvider('plan');
 /** Public: the pricing page must render for the signed-out visitors it exists to convert. */
 export const listPlans = async () => (await provider()).listPlans();
 
-/** `attemptId` makes one checkout attempt idempotent; `propertyId` binds a listing pass to its listing. */
 export const subscribe = async (slug, paymentMethod, opts) => (await provider()).subscribe(slug, paymentMethod, opts);
+export const cancelPending = async () => (await provider()).cancelPending();
