@@ -2,6 +2,7 @@ import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { approveListingWithFetch } from '../../../helpers/moderation.js';
+import { sql } from '../../../helpers/monetisation.js';
 
 async function api(method, path, headers, body) {
   const res = await fetch(`${API}${path}`, {
@@ -194,6 +195,22 @@ test.describe('Scheduled visits (live)', () => {
     // The row is on screen and fully rendered — and carries no route to the owner's number.
     await expect(page.getByRole('link', { name: /WhatsApp/i })).toHaveCount(0);
     await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+  });
+
+  test('the owner marks a past confirmed visit as a no-show', async ({ page }) => {
+    const { owner, visitors } = await scene(['No Show Visitor']);
+    const [visitor] = visitors;
+    const confirmed = await api('PATCH', `/visit-requests/${visitor.visitId}/status`, owner.headers, { status: 'confirmed' });
+    expect(confirmed.status).toBe(200);
+    // A slot cannot be booked in the past, so age the confirmed row in place.
+    sql(`UPDATE visits SET slot = now() - interval '2 days' WHERE id = '${visitor.visitId}'`);
+
+    await signedInAs(page, owner.mobile);
+    await page.goto('/dashboard#visits');
+    await page.getByRole('button', { name: "Didn't come" }).click();
+    await expect(page.getByText('Marked as a no-show')).toBeVisible();
+    await expect(page.getByRole('button', { name: "Didn't come" })).toHaveCount(0);
+    expect((await visitRowsOnMine(owner)).find((r) => r.id === visitor.visitId).status).toBe('no-show');
   });
 
   test('a slot in the past is refused at booking and at reschedule', async () => {

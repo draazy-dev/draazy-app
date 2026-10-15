@@ -98,7 +98,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
   const updateVisit = async (id, status) => {
     const ok = await onUpdate?.(id, { status });
     if (!ok) return;
-    const msg = status === 'confirmed' ? t('visits.confirmedToast') : status === 'cancelled' ? t('visits.cancelledToast') : status === 'completed' ? t('visits.visitedToast') : t('visits.updatedToast');
+    const msg = status === 'confirmed' ? t('visits.confirmedToast') : status === 'cancelled' ? t('visits.cancelledToast') : status === 'completed' ? t('visits.visitedToast') : status === 'no-show' ? t('visits.noShowToast') : t('visits.updatedToast');
     toast(msg, 'success');
   };
   // Reschedule uses the shared Modal + a date field, then rewrites the visit's
@@ -218,6 +218,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
           {v.status === 'scheduled' && hostedByMe && <button onClick={() => updateVisit(v.id, 'confirmed')} className={btnConfirm}><Icon name="check" className="w-3.5 h-3.5" /> {t('visits.confirm')}</button>}
           {v.status === 'scheduled' && !hostedByMe && <span className="inline-flex min-h-[44px] items-center rounded-lg bg-amber-500/15 px-2.5 py-1.5 text-xs font-semibold text-amber-300">{t('visits.awaitingOwner')}</span>}
           {v.status === 'confirmed' && hostedByMe && isPast && <button onClick={() => updateVisit(v.id, 'completed')} className={btnConfirm}><Icon name="check-circle" className="w-3.5 h-3.5" /> {t('visits.markVisited')}</button>}
+          {v.status === 'confirmed' && hostedByMe && isPast && <button onClick={() => updateVisit(v.id, 'no-show')} className={btnCancel}><Icon name="x-circle" className="w-3.5 h-3.5" /> {t('visits.markNoShow')}</button>}
           <button onClick={() => openReschedule(v)} className={btnGhost}><Icon name="calendar" className="w-3.5 h-3.5" /> {t('visits.reschedule')}</button>
           <button onClick={() => updateVisit(v.id, 'cancelled')} className={btnCancel}><Icon name="x" className="w-3.5 h-3.5" /> {t('visits.cancel')}</button>
           <Link to={`/property/${v.propertySlug || v.listingId}`} className={btnGhost}><Icon name="arrow-right" className="w-3.5 h-3.5" /> {t('visits.property')}</Link>

@@ -191,7 +191,6 @@ Match it; it is why the codebase is navigable.
 - **Specs:** deltas not absolutes for append-only ledgers; never guess a UI anchor or wrap an assertion in `if (await x.isVisible())`; locate by role and name; assert the write's status, not the control; prove a write with a reload.
 - **Register items:** `## N. <claim>`, `**Where:**`, `### What happens today`, `### Options` (recommendation bolded); when resolved, a `> **RESOLVED — …**` blockquote under the heading.
 - **Commit messages:** long-form with reasoning, "Deliberately not done" and `Verified:`; keep a corrected wrong conclusion beside the correction (models: `26129a2`, `368ad4f`, `48386b2`).
-- **`tasks/todo.md` D-entries:** `## D<N> — <commit subject>`, `###` sections, `**Verified:**`, commit hash, `### Deliberately not done`.
 - **When a claim in a Javadoc, comment, spec header or doc proves false, quote and correct it in place** (also for docs written minutes earlier); when it proves right, quote it.
 - **Name specs for the feature, not the backend**: `playwright.config.js` refuses `live-*.spec.js`; when a convention outlives its reason, remove it and add a guard.
 - **The comment rule is a gate, not a memory**: >2-line and changelog comments reached commits three times. Run `node scripts/check-comments.mjs --staged` and ponytail-review on the staged diff before every commit; it only reports, so fix by hand.
