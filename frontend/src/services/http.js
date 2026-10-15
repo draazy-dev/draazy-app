@@ -2,7 +2,7 @@
 // docs/system/frontend-data-seam.md
 import { API_BASE } from './config.js';
 import {
-  isInternal, localStorageWritable, logoutUser, readAccessToken, readUser, sessionRemembered, writeTokens,
+  isInternal, localStorageWritable, logoutUser, readAccessToken, readUser, sessionHinted, sessionRemembered, writeTokens,
 } from '../lib/auth.js';
 import { deviceId } from '../lib/deviceId.js';
 
@@ -10,6 +10,7 @@ const TRACE_HEADER = 'X-Trace-Id';
 /** Opaque id of the build that answered. Set by the backend's `BuildStampFilter`. */
 const BUILD_HEADER = 'X-Draazy-Build';
 const REFRESH_PATH = '/auth/refresh';
+const LOGOUT_PATH = '/auth/logout';
 // Sign-in, refresh, referral and refund calls only: the id is a fraud signal, so the rest of the API never sees it.
 const DEVICE_ID_PATH = /^\/(auth\/|referrals\/|me\/referrals|me\/payments)/;
 /** Name of the cross-tab Web Lock that serialises token refreshes. */
@@ -98,12 +99,17 @@ async function exchange(path, opts) {
 
   // Refresh and replay once (never for `/auth/refresh` itself: docs/flows/consumer/auth.md). A wrong-code
   // 401 carries `attemptsRemaining` and is not replayed, since that would spend a second guess.
-  if (res.status === 401 && auth && path !== REFRESH_PATH && readAccessToken() && !(await isWrongCode(res))) {
-    const token = await refreshAccessToken();
-    if (token) return toResult(await send(path, opts, token), withStatus);
-    // Reached only when the server actually refused; an unreachable server throws instead, so this
-    // sign-out always follows an answer rather than the absence of one.
-    endSession();
+  if (res.status === 401 && auth && path !== REFRESH_PATH && !(await isWrongCode(res))) {
+    const signedIn = Boolean(readAccessToken());
+    // A cached user with no access token may only have lost storage (Safari ITP, a reply that raced a
+    // wipe), so the refresh cookie gets its say before the UI is told the session is over.
+    if (signedIn || readUser()) {
+      const token = signedIn || sessionHinted() ? await refreshAccessToken() : null;
+      if (token) return toResult(await send(path, opts, token), withStatus);
+      // Reached only when the server actually refused; an unreachable server throws instead, so this
+      // sign-out always follows an answer rather than the absence of one.
+      endSession(path !== LOGOUT_PATH);
+    }
   }
 
   return toResult(res, withStatus);
@@ -119,9 +125,13 @@ function clearReads() {
   readGeneration += 1;
 }
 
-function endSession() {
+export const SESSION_ENDED_EVENT = 'draazy-session-ended';
+
+// `announce` is false for a deliberate sign-out, which must not read as a surprise.
+function endSession(announce = true) {
   clearReads();
   logoutUser();
+  if (announce) globalThis.dispatchEvent?.(new Event(SESSION_ENDED_EVENT));
 }
 
 // Registered at module load, so it runs before every listener that re-reads on this signal.

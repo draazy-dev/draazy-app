@@ -124,6 +124,32 @@ test.describe('LIVE — unavailable listings and visit leads', () => {
     expect(row?.visitor?.name, 'the owner sees the name the visitor set on their profile').toBe(name);
   });
 
+  test('Esc inside the time picker closes only the picker, and the owner then sees the visitor note', async ({ page, flags }) => {
+    await flags.enable('scheduleVisit');
+    const { owner: host, id } = await listing();
+    await setStatus(id, 'approved');
+
+    await signedInAs(page, uniqueMobile());
+    await page.goto(`/property/${id}`);
+    await page.getByRole('button', { name: /schedule a visit/i }).click();
+    const dialog = page.getByRole('dialog', { name: /schedule a visit/i });
+    await dialog.getByPlaceholder(/any specific requirements/i).fill('Will come with family');
+
+    await dialog.getByRole('button', { name: /select a time/i }).click();
+    const picker = page.locator('.dz-timepicker');
+    await expect(picker).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(picker).toHaveCount(0);
+    await expect(dialog, 'the sheet and its typed message survive Esc').toBeVisible();
+    await expect(dialog.getByPlaceholder(/any specific requirements/i)).toHaveValue('Will come with family');
+
+    await dialog.getByRole('button', { name: /confirm visit/i }).click();
+    await expect(dialog.getByText(/visit requested/i)).toBeVisible();
+
+    const rows = await api('GET', '/me/visit-requests?size=100', host.headers);
+    expect(rows.body.content.find((r) => r.propertyId === id)?.note).toBe('Will come with family');
+  });
+
   test('a listing opened by its slug books with its UUID, not the slug', async ({ page, flags }) => {
     await flags.enable('scheduleVisit');
     const { id } = (await api('GET', '/properties/p5021')).body;

@@ -11,12 +11,12 @@ const toRow = (u) => ({
   city: u?.city || '',
   listings: u?.listingsCount ?? 0,
   joinedAt: u?.joinedAt || u?.createdAt || null,
-  status: u?.status,
+  status: u?.archived ? 'archived' : u?.status,
   verified: Boolean(u?.verified),
   badgeSource: u?.badgeSource || null,
   flagged: Boolean(u?.flagged),
   flagReason: u?.flagReason || '',
-  archived: u?.status === 'archived',
+  archived: Boolean(u?.archived),
 });
 
 /** One page of the directory. `archived` and `status` are separate query parameters because they are separate

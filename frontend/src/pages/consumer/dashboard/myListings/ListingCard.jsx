@@ -34,7 +34,7 @@ export default function ListingCard({
   const qMeta = !l.flatmate ? qualityColor(qScore) : null;
   const qTone = qScore >= 80 ? 'emerald' : qScore >= 60 ? 'amber' : 'rose';
   const specs = [
-    l.bhk && `${l.bhk} BHK`,
+    l.bhk && (/BHK|RK/i.test(l.bhk) ? l.bhk : `${l.bhk} BHK`),
     l.furnishing && (FURNISH_LABEL[String(l.furnishing).toLowerCase()] || l.furnishing),
   ].filter(Boolean).join(' · ');
   // Keep lifecycle primary, with the same pill opening its verification thread.
@@ -60,6 +60,7 @@ export default function ListingCard({
   const passTill = !l.flatmate && quota?.passes ? fmtDate(quota.passes[String(listingId)]) : '';
   const needsPass = !l.flatmate && l.status === 'paused' && !passTill && quota?.full;
   const flatmateKind = l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : null;
+  const splitRoom = flatmateKind === 'room' && !!l.propertyId;
   const editHref = `/list-property?edit=${l.id}`;
   const viewHref = flatmateKind ? detailPath(flatmateKind, l.id) : `/property/${l.id}`;
   const editAction = l.flatmateGroup
@@ -67,7 +68,7 @@ export default function ListingCard({
     : l.flatmatePost
       ? { icon: 'edit', label: 'Edit', onClick: () => onEditPost(l.id) }
       : flatmateKind === 'room'
-        ? (l.propertyId ? null : { icon: 'edit', label: 'Edit', to: roomEditHref(l.id) })
+        ? (splitRoom ? null : { icon: 'edit', label: 'Edit', to: roomEditHref(l.id) })
         : { icon: 'edit', label: 'Edit', to: editHref };
   // One prominent primary action, chosen by what the owner most needs to do next.
 
@@ -108,9 +109,10 @@ export default function ListingCard({
     (!l.flatmate && !closed && !reserved && l.status === 'approved') && { icon: 'handshake', label: 'Mark under offer', onClick: () => onMarkUnderOffer(l) },
     (!l.flatmate && !closed && (reserved || l.status === 'approved')) && { icon: 'check-circle', label: `Finalize ${isSale ? 'sale' : 'rental'}`, onClick: () => onFinalize(l) },
     (!l.flatmate && !closed && !reserved && l.status === 'approved') && { icon: 'pause-circle', label: t('listingLifecycle.pause'), onClick: () => onPause(l) },
-    (l.flatmate || l.flatmatePost || l.flatmateGroup
-      ? { icon: 'trash-2', label: 'Delete', tone: 'danger', onClick: () => onDelete(l) }
-      : withdrawAction),
+    splitRoom ? null
+      : (l.flatmate || l.flatmatePost || l.flatmateGroup
+        ? { icon: 'trash-2', label: 'Delete', tone: 'danger', onClick: () => onDelete(l) }
+        : withdrawAction),
   ];
   const recheckReason = l.recheckReason || 'Core details you edited are being re-checked. Your listing stays live.';
 
@@ -130,6 +132,7 @@ export default function ListingCard({
             {l.flatmate && (
               <div className="mt-1.5">
                 <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 font-semibold inline-flex items-center gap-1"><Icon name="users-round" className="w-3 h-3" /> {l.flatmateGroup ? 'Flatmate group' : l.flatmatePost ? 'Flatmate request' : 'Flatmate'}</span>
+                {splitRoom && <p className="text-xs text-gray-500 mt-1">Part of a flat let room by room. To remove it, open the flat's listing and choose "Stop letting room by room".</p>}
               </div>
             )}
             {/* An occupied room prevents offering the whole flat. */}
@@ -155,6 +158,7 @@ export default function ListingCard({
                 {statusPill.onClick && unread ? <span aria-hidden="true" className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] flex items-center justify-center font-bold">{unread}</span> : null}
               </StatusTag>
             )}
+            {l.archived && l.archivedNote && <p className="w-full text-xs leading-snug text-gray-400 sm:max-w-[16rem] sm:text-right">{l.archivedNote}</p>}
             {/* Rechecking an edit does not take the original listing offline. */}
             {((l.recheckPending && !onlySeeksOwnershipBadge(l)) || l.reReview) && (
               <div className="w-full sm:max-w-[16rem]">
@@ -224,7 +228,7 @@ export default function ListingCard({
            owner could have made at the time — not a second upload surface. */}
         {/* edit */}
       {/* Action row keeps rental management beside the verification entry point. */}
-      <CardActions primary={primary} items={cardActions} />
+      <CardActions primary={l.archived ? null : primary} items={l.archived ? [] : cardActions} />
       {needsPass && <p className="px-3 pb-3 text-[11px] text-gray-400 sm:px-4">{t('listingLifecycle.orPauseOther')}</p>}
       {!l.flatmate && qScore < 80 && (
         <div className="px-3 pb-3 sm:px-4 sm:pb-4">

@@ -152,6 +152,10 @@ test('splitting writes rooms the server can see, then the split flat is not offe
     expect(rows).toHaveLength(2);
     expect(rows.every((r) => Number(r.occupants) === 0)).toBe(true);
     expect(rows.map((r) => r.budget).sort((a, b) => a - b)).toEqual([13000, 15000]);
+    await page.reload();
+    await expect(page.getByText(/Part of a flat let room by room/).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('button', { name: 'Delete', exact: true }), 'a split room has no dead Delete').toHaveCount(0);
+    await expect(page.getByText(/split_room/)).toHaveCount(0);
     for (const r of rows) {
       const detail = await api('GET', `/flatmates/rooms/${r.id}`, auth(flat.accessToken));
       expect(detail.json.item.priceBasis).toBe('room');

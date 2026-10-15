@@ -9,7 +9,8 @@ public record ConversationCreate(
         @IndianMobile
         String counterpartyMobile,
         @Size(max = 64) String propertyId,
-        @NotBlank @Size(max = 4000) String body) {
+        @NotBlank @Size(max = 4000) String body,
+        @Size(max = 120) String clientId) {
 
     // Blank mobiles still fail validation; callers should omit the field instead.
     // "You addressed nobody" is request shape, not a trust decision.

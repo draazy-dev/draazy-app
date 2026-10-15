@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import { getFeedback, saveFeedback } from '../../lib/help.js';
 import { submitHelpFeedback } from '../../services/contentService.js';
+
+const TAP_GUARD_MS = 800;
 
 /* localStorage is the widget's own memory (a returning reader sees "thanks"); the POST is the measurement. */
 export default function ArticleFeedback({ slug, title }) {
@@ -12,6 +14,7 @@ export default function ArticleFeedback({ slug, title }) {
   const [choice, setChoice] = useState(() => remembered()?.helpful ?? null);
   const [comment, setComment] = useState('');
   const [sent, setSent] = useState(() => !!remembered());
+  const sentAt = useRef(0);
   // Fire-and-forget on purpose: the reader has answered and been thanked, and there is nothing
   // they could do about an upload failure. Loud in dev only.
 
@@ -28,6 +31,7 @@ export default function ArticleFeedback({ slug, title }) {
     if (helpful) {
       saveFeedback(slug, true);
       report(true);
+      sentAt.current = Date.now();
       setSent(true);
     } else {
       // Reported before the reason is typed: a negative that only counts when explained biases the
@@ -42,7 +46,13 @@ export default function ArticleFeedback({ slug, title }) {
     const reason = comment.trim();
     saveFeedback(slug, false, reason);
     report(false, reason);
+    sentAt.current = Date.now();
     setSent(true);
+  };
+
+  // The thanks copy renders where the buttons were, so a second tap of a double-tap would land on this link.
+  const ignoreEarlyTap = (e) => {
+    if (Date.now() - sentAt.current < TAP_GUARD_MS) e.preventDefault();
   };
 
   return (
@@ -55,7 +65,7 @@ export default function ArticleFeedback({ slug, title }) {
             <p className="mt-1 text-xs text-gray-500">
               {choice ? t('help.thanksPositive') : t('help.thanksNegative')}
               {' '}{t('help.stillStuck')}{' '}
-              <Link to={`/support?cat=other&ref=${encodeURIComponent(slug)}`} className="text-teal-400 hover:underline">
+              <Link to={`/support?cat=other&ref=${encodeURIComponent(slug)}`} onClick={ignoreEarlyTap} className="text-teal-400 hover:underline">
                 {t('help.raiseTicket')}
               </Link>.
             </p>

@@ -404,7 +404,7 @@ export default function Owner() {
 
       {reported && (
         <ReportModal
-          target={{ id: '', title: owner.name, ownerName: owner.name, ownerMobile: owner.mobile }}
+          target={{ id, title: owner.name, ownerName: owner.name, ownerMobile: owner.mobile }}
           kind="user"
           reasons={OWNER_REPORT_REASONS}
           title={t('owner.reportTitle')}

@@ -65,7 +65,7 @@ async function readBack(token, requestId) {
    here is minted fresh and files exactly one request, so there is nothing to disambiguate. */
 
 const tracker = (page) =>
-  page.locator('section').filter({ hasText: 'Track progress, review the draft we prepare' });
+  page.locator('section').filter({ hasText: 'Track progress, review any draft we share' });
 
 test.describe('Service draft review — the customer is the checker', () => {
   test('sharing a draft tells the customer, the bell links to the tracker, and the customer approves only after opening the draft', async ({ page }) => {

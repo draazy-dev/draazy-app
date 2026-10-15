@@ -7,8 +7,11 @@ import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.LikePatterns;
+import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.engagement.flatmate.FlatmateModerationService;
+import com.draazy.api.identity.user.User;
+import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.moderation.property.PropertyModerationService;
 import com.draazy.api.moderation.user.UserAdminService;
 import com.draazy.api.security.AuthPrincipal;
@@ -39,10 +42,11 @@ public class ReportService {
     private final UserAdminService userAdmin;
     private final FlatmateModerationService flatmateModeration;
     private final PropertyRepository properties;
+    private final UserRepository users;
 
     public ReportService(ReportRepository reports, ReportMapper mapper, AuditService audit,
             PropertyModerationService propertyModeration, UserAdminService userAdmin,
-            FlatmateModerationService flatmateModeration, PropertyRepository properties) {
+            FlatmateModerationService flatmateModeration, PropertyRepository properties, UserRepository users) {
         this.reports = reports;
         this.mapper = mapper;
         this.audit = audit;
@@ -50,9 +54,11 @@ public class ReportService {
         this.userAdmin = userAdmin;
         this.flatmateModeration = flatmateModeration;
         this.properties = properties;
+        this.users = users;
     }
 
-    /** Target is deliberately not resolved: a scammer deleting the listing must not also delete the complaint. */
+    /** Target is deliberately not resolved for listings and posts: a scammer deleting the listing must not also
+     * delete the complaint. A person must exist, or "suspend" would later have nobody to act on. */
     @Transactional
     public ReportResponse create(UUID reporterId, ReportCreateRequest body) {
         String targetType = body.targetType();
@@ -62,6 +68,10 @@ public class ReportService {
         if (!ReportReasons.isValid(targetType, body.reason())) {
             throw new BadRequestException("Reason '%s' is not a valid complaint about a %s. Expected one of %s"
                     .formatted(body.reason(), targetType, ReportReasons.forTarget(targetType)));
+        }
+        if (ReportTargetTypes.USER.equals(targetType)
+                && Ids.parseUuid(body.targetId()).filter(users::existsById).isEmpty()) {
+            throw NotFoundException.of("User");
         }
         if (reports.existsByReporterIdAndTargetTypeAndTargetIdAndStatusIn(
                 reporterId, targetType, body.targetId(), ReportStatuses.LIVE)) {
@@ -108,9 +118,24 @@ public class ReportService {
         }
         Map<String, Long> perTarget = targetTallies(page.getContent());
         Map<String, String> titles = resolveTitles(page.getContent());
-        return page.map(r -> mapper.toResponse(r)
-                .withTargetReportCount(perTarget.getOrDefault(r.getTargetId(), 1L))
-                .withTargetTitle(titles.get(r.getTargetId())));
+        Map<String, User> people = reportedPeople(page.getContent());
+        return page.map(r -> {
+            ReportResponse row = mapper.toResponse(r)
+                    .withTargetReportCount(perTarget.getOrDefault(r.getTargetId(), 1L))
+                    .withTargetTitle(titles.get(r.getTargetId()));
+            User person = people.get(r.getTargetId());
+            return person == null ? row : row.withTargetPerson(person.getName(), MobileMask.mask(person.getMobile()));
+        });
+    }
+
+    private Map<String, User> reportedPeople(List<Report> rows) {
+        List<UUID> ids = rows.stream()
+                .filter(r -> ReportTargetTypes.USER.equals(r.getTargetType()))
+                .map(r -> Ids.parseUuid(r.getTargetId()))
+                .flatMap(Optional::stream)
+                .distinct()
+                .toList();
+        return users.findAllById(ids).stream().collect(Collectors.toMap(u -> u.getId().toString(), u -> u));
     }
 
     /** Undecided per target type for the tab badges, and per status within {@code targetType} for the chips. */

@@ -337,6 +337,29 @@ class ConversationEndpointsTest extends AbstractApiTest {
         }
 
         @Test
+        @DisplayName("the same clientId on the first message is delivered once, and the thread names its counterparty")
+        void firstMessageWithClientIdIsIdempotent() throws Exception {
+            User owner = user("9830000191", Roles.Wire.OWNER, "Owner");
+            User buyer = user("9830000192", Roles.Wire.BUYER, "Buyer");
+            Property p = listing(owner);
+            approve(buyer, p);
+            String json = "{\"propertyId\":\"" + p.getId() + "\",\"body\":\"hi\",\"clientId\":\"c-1\"}";
+
+            String first = mvc.perform(post(Routes.Conversations.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON).content(json))
+                    .andExpect(status().isCreated())
+                    .andReturn().getResponse().getContentAsString();
+            mvc.perform(post(Routes.Conversations.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                            .contentType(MediaType.APPLICATION_JSON).content(json))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.counterpartyId").value(owner.getId().toString()))
+                    .andExpect(jsonPath("$.messages", hasSize(1)));
+            assertThat(id(first)).isNotBlank();
+        }
+
+        @Test
         @DisplayName("the other party opening the same thread does not create a second one")
         void flippedPairFindsTheSameRow() throws Exception {
             User owner = user("9830000133", Roles.Wire.OWNER, "Owner");
@@ -690,7 +713,12 @@ class ConversationEndpointsTest extends AbstractApiTest {
             reply(buyer, id, "blocked", 403);
             mvc.perform(get(Routes.Conversations.BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                    .andExpect(jsonPath("$.blocked").value(true));
+                    .andExpect(jsonPath("$.blocked").value(true))
+                    .andExpect(jsonPath("$.blockedYou").value(false));
+            mvc.perform(get(Routes.Conversations.BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(jsonPath("$.blocked").value(false))
+                    .andExpect(jsonPath("$.blockedYou").value(true));
             mvc.perform(delete(Routes.Conversations.BLOCK, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                     .andExpect(status().isNoContent());

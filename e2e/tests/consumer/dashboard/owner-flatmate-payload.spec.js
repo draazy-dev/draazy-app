@@ -77,7 +77,7 @@ test.describe('Owner flatmate lists and inbox (live API)', () => {
     const masked = `${seeker.mobile.slice(0, 2)}XXXXX${seeker.mobile.slice(-3)}`;
 
     const join = await fetch(`${API}/flatmates/groups/${group.id}/join`, {
-      method: 'POST', headers: auth(seeker.accessToken), body: JSON.stringify({}),
+      method: 'POST', headers: auth(seeker.accessToken), body: JSON.stringify({ gender: 'female' }),
     });
     expect(join.status, await join.clone().text()).toBe(201);
 

@@ -91,17 +91,45 @@ test('adding an FAQ writes it through the API, not into this browser', async ({ 
   expect(archived.ok(), 'the FAQ this test created must not outlive it').toBeTruthy();
 });
 
-test('an FAQ with no question is refused, and the desk says which field', async ({ page, login }) => {
+test('an FAQ with no question is refused before anything is sent, and the desk says which field', async ({ page, login }) => {
+  const sent = [];
+  page.on('request', (r) => { if (r.method() === 'POST' && r.url().includes('/admin/content/faqs')) sent.push(r.url()); });
   await openContent(page, login);
   await page.getByRole('button', { name: 'Add FAQ' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Add faq' });
-  await dialog.getByRole('textbox').nth(1).fill(`E2E refused answer ${Date.now()}`);
   await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Enter the question.' })).toBeVisible();
 
-  await expect(page.getByRole('alert')).toContainText("needs 'question'");
+  await dialog.getByRole('textbox').nth(0).fill(`E2E refused question ${Date.now()}`);
+  await dialog.getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Enter the answer.' })).toBeVisible();
+
   // The dialog stays open on a refusal so the operator can fix the one field the message named.
   await expect(dialog).toBeVisible();
+  expect(sent).toEqual([]);
+});
+
+test('a double-clicked Save creates one FAQ, and the edit button has an accessible name', async ({ page, login, request }) => {
+  const question = `E2E double save ${Date.now()}`;
+  await openContent(page, login);
+  await page.getByRole('button', { name: 'Add FAQ' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Add faq' });
+  await dialog.getByRole('textbox').nth(0).fill(question);
+  await dialog.getByRole('textbox').nth(1).fill('Answer written by the e2e run.');
+  await dialog.getByRole('button', { name: 'Save' }).dblclick();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Edit FAQ' }).first()).toBeVisible();
+
+  const made = (await contentRows(request, 'faqs')).filter((f) => f.question === question);
+  try {
+    expect(made).toHaveLength(1);
+  } finally {
+    for (const f of made) {
+      await request.post(`${API}/admin/content/faqs/${f.id}/archive`, { headers: await admin() });
+    }
+  }
 });
 
 test('an FAQ added in the CMS leads the Home page FAQ block', async ({ page, request }) => {

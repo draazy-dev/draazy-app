@@ -280,7 +280,7 @@ export default function Messages() {
   }, [activeId, flushQueue, hydrate, reload]);
 
   const sendText = (text, replyTo = null, retryId = null) => {
-    if (!active || active.staged || active.blocked) return;
+    if (!active || active.staged || active.blocked || active.blockedYou) return;
     setSendError('');
     const body = String(text || '').trim();
     if (!body) return;
@@ -312,6 +312,11 @@ export default function Messages() {
         return;
       }
       const message = err?.message || t('misc.msgSendFailed');
+      if (err?.status === 403 && /can't message/i.test(message)) {
+        setSendError('');
+        patchConv(active.id, (c) => ({ ...c, blockedYou: true, messages: c.messages.filter((m) => m.clientId !== id) }));
+        return;
+      }
       setSendError(err?.status === 403 || err?.status === 429 ? message : '');
       markFailed(active.id, id, message);
     });
@@ -441,7 +446,7 @@ export default function Messages() {
           title={t('misc.msgReportTitle', { name: active.party.name })}
           subtitle={t('misc.msgReportSubtitle')}
           success={t('misc.msgReportSuccess')}
-          target={{ id: active.propertyId || active.id, title: active.property.title, ownerName: active.party.name, ownerMobile: active.party.mobile && active.party.mobile.replace(/\D/g, '').length === 10 ? active.party.mobile : '' }}
+          target={{ id: active.party.id, title: active.party.name, ownerName: active.party.name, ownerMobile: active.party.mobile && active.party.mobile.replace(/\D/g, '').length === 10 ? active.party.mobile : '' }}
           onClose={() => setReportOpen(false)}
           toast={toast}
         />

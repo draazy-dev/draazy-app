@@ -22,6 +22,7 @@ function toViewModel(row) {
     visitorName: row.visitor?.name || 'Visitor',
     visitorMobile: row.visitor?.mobile || '',
     visitorId: row.visitor?.id || '',
+    note: row.note || '',
     ownerId: row.owner?.id || row.host?.id || ownerParty?.id || '',
     parties,
     createdAt: row.createdAt ? Date.parse(row.createdAt) : Date.now(),

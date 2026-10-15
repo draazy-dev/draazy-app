@@ -103,8 +103,8 @@ export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation,
           {lead.requestedAt ? (
             <p className="flex items-center gap-2 text-gray-500"><Icon name="clock" className="h-4 w-4 flex-shrink-0" /> Requested {timeAgo(lead.requestedAt)}</p>
           ) : null}
-          {lead.contactMobile ? (
-            <p className="flex items-center gap-2 text-gray-500"><Icon name="phone" className="h-4 w-4 flex-shrink-0" /> +91 {lead.contactMobile}</p>
+          {lead.contactMobile || lead.maskedMobile ? (
+            <p className="flex items-center gap-2 text-gray-500"><Icon name="phone" className="h-4 w-4 flex-shrink-0" /> +91 {lead.contactMobile || lead.maskedMobile}</p>
           ) : null}
         </div>
 

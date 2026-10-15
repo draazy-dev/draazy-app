@@ -5,7 +5,7 @@ import { API, authHeaders } from '../../helpers/liveAuth.js';
 const MASKED = /^\d{2}X{5}\d{3}$/;
 const USER_ROW_KEYS = new Set([
   'id', 'name', 'mobile', 'role', 'status', 'verified', 'city', 'listingsCount', 'joinedAt',
-  'flagged', 'flagReason', 'badgeSource',
+  'flagged', 'flagReason', 'badgeSource', 'archived',
 ]);
 
 function recordGets(page) {

@@ -1,36 +1,10 @@
 import { useEffect, useId, useRef, useState } from 'react';
 
-/**
- * Cloudflare Turnstile widget (tech-debt D130).
- *
- * Renders the challenge and hands the resulting token to `onToken`. It is deliberately
- * self-contained and wired into nothing: the token is passed upward, never stored, and the
- * component knows nothing about any particular form.
- *
- * The backend reads the token from the `CF-Turnstile-Response` header on the three public,
- * unauthenticated writes (`POST /auth/login`, `POST /cities/waitlist`, `POST /society-leads`).
- * Sending it as a header rather than a body field is what keeps every request DTO and the OpenAPI
- * contract unchanged.
- *
- * With no site key configured the component renders nothing and calls `onToken(null)` once, so a
- * form that gates its submit button on a token must treat "no widget" as "not required" — matching
- * the backend, which passes every request through when the challenge is switched off. Failing the
- * other way would make an unconfigured dev machine unable to submit anything.
- *
- * @param {object} props
- * @param {string} [props.siteKey] Turnstile site key. Public by design — it is safe in the bundle;
- *   the secret it pairs with lives only on the server. Defaults to `VITE_TURNSTILE_SITE_KEY`.
- * @param {(token: string | null) => void} props.onToken Called with a fresh token, or `null` when
- *   the token expires, the challenge fails, or no site key is configured.
- * @param {'light' | 'dark' | 'auto'} [props.theme='auto']
- * @param {'normal' | 'compact' | 'flexible'} [props.size='normal']
- * @param {string} [props.className]
- */
+// Hidden unless Cloudflare needs a click; the token goes up via onToken(null when absent) for the
+// CF-Turnstile-Response header. No site key → renders nothing, matching a backend with Turnstile off.
 export default function TurnstileWidget({
   siteKey = import.meta.env?.VITE_TURNSTILE_SITE_KEY,
   onToken,
-  theme = 'auto',
-  size = 'normal',
   className = '',
 }) {
   const containerRef = useRef(null);
@@ -38,9 +12,7 @@ export default function TurnstileWidget({
   const [failed, setFailed] = useState(false);
   const instanceId = useId();
 
-  // Held in a ref so that a parent passing an inline arrow function does not re-render the widget
-  // on every keystroke. Turnstile issues single-use tokens, so a re-render is not free: it discards
-  // a solved challenge and asks the user to solve another.
+  // A ref, so an inline onToken doesn't re-render the widget and discard a solved single-use challenge.
   const onTokenRef = useRef(onToken);
   useEffect(() => {
     onTokenRef.current = onToken;
@@ -52,9 +24,7 @@ export default function TurnstileWidget({
       return undefined;
     }
 
-    // Re-armed in the effect body rather than only cleared in cleanup: under StrictMode the
-    // mount → cleanup → re-mount cycle would otherwise leave this false forever, and every
-    // callback after the first script load would be silently swallowed.
+    // Re-armed per effect run: StrictMode's mount → cleanup → re-mount would otherwise leave it false.
     let active = true;
 
     const render = () => {
@@ -64,12 +34,11 @@ export default function TurnstileWidget({
       try {
         widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
-          theme,
-          size,
+          theme: 'light',
+          size: 'flexible',
+          appearance: 'interaction-only',
           callback: (token) => active && onTokenRef.current?.(token),
-          // A token is single-use and short-lived. Clearing it on expiry is what stops a form
-          // submitting a token the server will reject, which would surface to the user as an
-          // unexplained failure on a form they filled in correctly.
+          // Clearing an expired token stops a form submitting one the server will reject.
           'expired-callback': () => active && onTokenRef.current?.(null),
           'timeout-callback': () => active && onTokenRef.current?.(null),
           'error-callback': () => {
@@ -87,8 +56,7 @@ export default function TurnstileWidget({
     if (window.turnstile) {
       render();
     } else {
-      // One script tag for the whole app, keyed by id: two copies of the Turnstile API on a page
-      // fight over the same global and the second render silently does nothing.
+      // One script tag app-wide: two copies fight over window.turnstile and the second render does nothing.
       const SCRIPT_ID = 'cf-turnstile-script';
       let script = document.getElementById(SCRIPT_ID);
       if (!script) {
@@ -99,8 +67,7 @@ export default function TurnstileWidget({
         script.defer = true;
         document.head.appendChild(script);
       }
-      // Attached even when the tag already exists but has not finished loading — a second widget
-      // mounting during that window would otherwise never render.
+      // Also attached when the tag exists but is still loading, or a second widget would never render.
       script.addEventListener('load', render);
       script.addEventListener('error', () => {
         if (!active) return;
@@ -120,13 +87,13 @@ export default function TurnstileWidget({
       }
       widgetIdRef.current = null;
     };
-  }, [siteKey, theme, size]);
+  }, [siteKey]);
 
   if (!siteKey) return null;
 
   return (
     <div className={className}>
-      <div ref={containerRef} data-testid="turnstile-widget" id={`turnstile-${instanceId}`} />
+      <div ref={containerRef} data-testid="turnstile-widget" id={`turnstile-${instanceId}`} className="w-full" />
       {failed && (
         <p role="alert" className="text-sm text-red-600">
           The verification check could not load. Please refresh the page and try again.

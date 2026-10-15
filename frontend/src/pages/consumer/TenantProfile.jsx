@@ -13,6 +13,13 @@ import { myTenantProfile, saveTenantProfile } from '../../services/rentService.j
 import { useVerification } from '../../context/VerificationContext.jsx';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
+// Mirrors @Size on TenantProfileUpdateRequest.about.
+const ABOUT_MAX = 2000;
+
+const FIELD_LABEL_KEY = {
+  name: 'misc.tpFullName', occupation: 'misc.tpOccupation', income: 'misc.tpIncome', occupants: 'misc.tpWhoLives',
+  moveIn: 'misc.tpMoveInBy', priorLandlord: 'misc.tpPriorLandlord', about: 'misc.tpAbout',
+};
 
 export default function TenantProfile() {
   const { t } = useTranslation();
@@ -101,7 +108,14 @@ export default function TenantProfile() {
     } catch (err) {
       // `ApiError` carries `code`/`message`/`status`/`traceId`/`fields` and never a `body`, so the
       // old `err.body.error` read undefined and every save failure fell through to the generic copy.
-      toast(err?.message || t('misc.tpProfileSaveFailed'), 'error');
+      const first = err?.isValidation ? err.fields?.[0]?.field : null;
+      const labelKey = FIELD_LABEL_KEY[first];
+      toast(
+        first === 'about' ? t('misc.tpAboutTooLong', { max: ABOUT_MAX })
+          : labelKey ? t('misc.tpFieldInvalid', { field: t(labelKey) })
+            : err?.message || t('misc.tpProfileSaveFailed'),
+        'error',
+      );
       return false;
     }
   };
@@ -190,10 +204,10 @@ export default function TenantProfile() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="lbl" htmlFor="tp-name">{t('misc.tpFullName')}</label>
-              <input ref={nameRef} id="tp-name" autoComplete="name" value={form.name} onChange={(e) => set('name', e.target.value)} className={'fld' + (errors.name ? ' !border-red-400/60' : '')} placeholder={t('misc.tpFullNamePlaceholder')} aria-invalid={!!errors.name} />
+              <input ref={nameRef} id="tp-name" autoComplete="name" value={form.name} maxLength={120} onChange={(e) => set('name', e.target.value)} className={'fld' + (errors.name ? ' !border-red-400/60' : '')} placeholder={t('misc.tpFullNamePlaceholder')} aria-invalid={!!errors.name} />
               {errors.name && <p className="text-xs text-red-400 mt-1">{t('misc.tpNameRequired')}</p>}
             </div>
-            <div><label className="lbl" htmlFor="tp-occ">{t('misc.tpOccupation')}</label><input id="tp-occ" value={form.employment} onChange={(e) => set('employment', e.target.value)} className="fld" placeholder={t('misc.tpOccupationPlaceholder')} /></div>
+            <div><label className="lbl" htmlFor="tp-occ">{t('misc.tpOccupation')}</label><input id="tp-occ" value={form.employment} maxLength={120} onChange={(e) => set('employment', e.target.value)} className="fld" placeholder={t('misc.tpOccupationPlaceholder')} /></div>
             <div>
               <label className="lbl" htmlFor="tp-income">{t('misc.tpIncome')}</label>
               <div className="relative">
@@ -204,12 +218,16 @@ export default function TenantProfile() {
             </div>
             <div>
               <label className="lbl">{t('misc.tpWhoLives')}</label>
-              <NativeSelect value={form.occupants} onChange={(e) => set('occupants', e.target.value)} className="fld"><option value="">{t('misc.tpSelect')}</option><option>Family</option><option>Bachelor (Male)</option><option>Bachelor (Female)</option><option>Company lease</option></NativeSelect>
+              <NativeSelect value={form.occupants} onChange={(e) => set('occupants', e.target.value)} className="fld"><option value="">{t('misc.tpSelect')}</option><option value="family">{t('misc.tpOccFamily')}</option><option value="bachelor_male">{t('misc.tpOccBachelorMale')}</option><option value="bachelor_female">{t('misc.tpOccBachelorFemale')}</option><option value="company_lease">{t('misc.tpOccCompany')}</option></NativeSelect>
             </div>
             <div><label className="lbl">{t('misc.tpMoveInBy')}</label><DateField value={form.moveIn} onChange={(v) => set('moveIn', v)} min={todayISO()} className="fld" ariaLabel={t('misc.tpMoveInAria')} /></div>
-            <div><label className="lbl" htmlFor="tp-landlord">{t('misc.tpPriorLandlord')}</label><input id="tp-landlord" value={form.priorLandlord} onChange={(e) => set('priorLandlord', e.target.value)} className="fld" placeholder={t('misc.tpPriorLandlordPlaceholder')} /></div>
+            <div><label className="lbl" htmlFor="tp-landlord">{t('misc.tpPriorLandlord')}</label><input id="tp-landlord" value={form.priorLandlord} maxLength={200} onChange={(e) => set('priorLandlord', e.target.value)} className="fld" placeholder={t('misc.tpPriorLandlordPlaceholder')} /></div>
           </div>
-          <div><label className="lbl" htmlFor="tp-about">{t('misc.tpAbout')}</label><textarea id="tp-about" value={form.about} onChange={(e) => set('about', e.target.value)} rows={3} className="fld" placeholder={t('misc.tpAboutPlaceholder')} /></div>
+          <div>
+            <label className="lbl" htmlFor="tp-about">{t('misc.tpAbout')}</label>
+            <textarea id="tp-about" value={form.about} onChange={(e) => set('about', e.target.value)} rows={3} maxLength={ABOUT_MAX} className="fld" placeholder={t('misc.tpAboutPlaceholder')} />
+            <p className="text-xs text-gray-500 mt-1 text-right tabular-nums">{form.about.length}/{ABOUT_MAX}</p>
+          </div>
 
           <div className="rounded-xl border border-emerald-500/25 p-4" style={{ background: 'rgb(var(--dz-c-emerald-500) / .06)' }}>
             <div className="flex items-center justify-between gap-3">

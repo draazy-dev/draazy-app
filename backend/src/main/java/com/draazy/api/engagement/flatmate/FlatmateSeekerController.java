@@ -115,7 +115,7 @@ public class FlatmateSeekerController {
         service.withdraw(principal, kind, id);
     }
 
-    public record InterestRequest(String share, @Size(max = 4000) String message) {
+    public record InterestRequest(String share, @Size(max = 4000) String message, String gender) {
     }
 
     public record DecisionRequest(@NotBlank String decision) {

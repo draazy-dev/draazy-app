@@ -92,6 +92,18 @@ class AdminSettingsEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void aNullFieldRemovesItAndKeepsItsSiblings() throws Exception {
+        String token = bearer("9877710011", Roles.Wire.ADMIN);
+        save(token, "{\"geo\":{\"cities\":{\"Pune\":{\"center\":{\"lat\":1}},\"Mumbai\":{\"center\":{\"lat\":2}}}}}");
+        save(token, "{\"geo\":{\"cities\":{\"Pune\":null}}}");
+
+        mvc.perform(get(Routes.Admin.SETTINGS).header(HttpHeaders.AUTHORIZATION, token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.geo.cities.Pune").doesNotExist())
+                .andExpect(jsonPath("$.geo.cities.Mumbai.center.lat").value(2));
+    }
+
+    @Test
     void theResponseIsTheMergedBlockNotThePatch() throws Exception {
         String token = bearer("9877710005", Roles.Wire.ADMIN);
         save(token, "{\"flags\":{\"w\":true}}");

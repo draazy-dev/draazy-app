@@ -9,11 +9,15 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.deals.deal.DealService;
+import com.draazy.api.deals.offer.Offer;
+import com.draazy.api.deals.offer.OfferRepository;
+import com.draazy.api.deals.offer.OfferStatuses;
 import com.draazy.api.finance.tenancy.TenantProfileService;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
@@ -40,17 +44,20 @@ public class FinalizationService {
     private final UserRepository users;
     private final DealService dealService;
     private final TenantProfileService tenantProfiles;
+    private final OfferRepository offers;
 
     public FinalizationService(FinalizationRequestRepository finalizationRequests,
                                PropertyRepository properties,
                                UserRepository users,
                                DealService dealService,
-                               TenantProfileService tenantProfiles) {
+                               TenantProfileService tenantProfiles,
+                               OfferRepository offers) {
         this.finalizationRequests = finalizationRequests;
         this.properties = properties;
         this.users = users;
         this.dealService = dealService;
         this.tenantProfiles = tenantProfiles;
+        this.offers = offers;
     }
 
     // 404 for a missing or non-live listing; the counterparty must be a registered user (422).
@@ -88,7 +95,7 @@ public class FinalizationService {
         FinalizationRequest request;
         try {
             request = new FinalizationRequest(
-                    propertyId, callerId, counterparty.getId(), body.agreedPrice());
+                    propertyId, callerId, counterparty.getId(), agreedPrice(callerId, propertyId, body));
             request = finalizationRequests.saveAndFlush(request);
         } catch (DataIntegrityViolationException constraintViolation) {
             // The partial unique index uq_finalization_live_per_user_property caught a concurrent
@@ -105,20 +112,21 @@ public class FinalizationService {
     }
 
     // Terminal rows are returned too, so a turned-down buyer can be told apart from one who never asked.
+    // Empty for the ordinary "nothing proposed yet" case, so the page's status probe is not an error.
     @Transactional(readOnly = true)
-    public FinalizationRequestDto status(UUID callerId, UUID propertyId) {
-        FinalizationRequest request = finalizationRequests
+    public Optional<FinalizationRequestDto> status(UUID callerId, UUID propertyId) {
+        return finalizationRequests
                 .findRecentByPropertyAndParticipant(propertyId, callerId, PageRequest.of(0, 1))
                 .stream().findFirst()
-                .orElseThrow(() -> NotFoundException.of("Finalization request"));
-
-        Map<UUID, User> userMap = batchLoadUsers(
-                request.getInitiatorId(), request.getCounterpartyId());
-        return FinalizationMapper.toDto(request,
-                userMap.get(request.getInitiatorId()),
-                userMap.get(request.getCounterpartyId()),
-                callerId,
-                verifiedAmong(request));
+                .map(request -> {
+                    Map<UUID, User> userMap = batchLoadUsers(
+                            request.getInitiatorId(), request.getCounterpartyId());
+                    return FinalizationMapper.toDto(request,
+                            userMap.get(request.getInitiatorId()),
+                            userMap.get(request.getCounterpartyId()),
+                            callerId,
+                            verifiedAmong(request));
+                });
     }
 
     // Initiator only; the counterparty declines instead (403), a stranger gets 404.
@@ -174,7 +182,7 @@ public class FinalizationService {
     // One transaction: accept this request, decline its siblings, close the deal; any failure rolls back all.
     @Transactional
     public void accept(UUID callerId, UUID requestId) {
-        FinalizationRequest request = finalizationRequests.findById(requestId)
+        FinalizationRequest request = finalizationRequests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> NotFoundException.of("Finalization request"));
 
         // Scoping: caller must be a participant.
@@ -190,7 +198,7 @@ public class FinalizationService {
         }
 
         if (!FinalizationStatuses.canTransition(request.getStatus(), FinalizationStatuses.ACCEPTED)) {
-            throw new ConflictException("Cannot accept a request in status " + request.getStatus());
+            throw new ConflictException("This request has already been " + request.getStatus() + ".");
         }
 
         // Closing first means a failure leaves the request statuses untouched.
@@ -213,7 +221,7 @@ public class FinalizationService {
 
     @Transactional
     public void decline(UUID callerId, UUID requestId) {
-        FinalizationRequest request = finalizationRequests.findById(requestId)
+        FinalizationRequest request = finalizationRequests.findByIdForUpdate(requestId)
                 .orElseThrow(() -> NotFoundException.of("Finalization request"));
 
         // Scoping: caller must be a participant.
@@ -238,6 +246,14 @@ public class FinalizationService {
     }
 
     // ---- internal helpers ----
+
+    // The accepted offer is the agreed price; a client-typed figure only applies when no offer was accepted.
+    private long agreedPrice(UUID buyerId, UUID propertyId, FinalizationCreateRequest body) {
+        return offers.findFirstByFromUserIdAndPropertyIdAndStatusOrderByCreatedAtDesc(
+                        buyerId, propertyId, OfferStatuses.ACCEPTED)
+                .map(Offer::getAmount)
+                .orElse(body.agreedPrice());
+    }
 
     private Map<UUID, User> batchLoadUsers(UUID... ids) {
         return users.findAllById(List.of(ids)).stream()

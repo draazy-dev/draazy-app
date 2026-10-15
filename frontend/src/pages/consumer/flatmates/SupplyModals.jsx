@@ -23,6 +23,8 @@ export default function SupplyModals({ s }) {
           onVerified={() => { setGrp((g) => ({ ...g, consentVerified: true })); toast(t('flatmates.ownerConsentConfirmedToast'), 'success'); }}
         />
       )}
+
+      {s.genderSheet}
     </>
   );
 }

@@ -30,7 +30,7 @@ export default function RentAgreement() {
     withdrawInvite, withdrawing,
     prop, setP, setProp, setSelectedPropertyId, pickListing, myProperties,
     owner, setO, coOwners, setCoOwner, addCoOwner, removeCoOwner, ownerDocs, setOwnerDocs, vaultEnabled, saveOwnerDocToVault,
-    ownerMode, chooseOwnerMode, inviteRole,
+    ownerMode, chooseOwnerMode, inviteRole, inviteAwaitingPayment,
     tenantMode, setTenantMode, tenants, setTenant, addTenant, removeTenant, tenantDocs, setTenantDocs, invite, setInvite,
     terms, setT, startBounds, maint, setMaint, regArea, furnItems, custom, setCustom, clauses, setClauses,
     isChecked, toggleFurn, bumpQty, removeFurn, addCustom, furnitureText,
@@ -52,7 +52,7 @@ export default function RentAgreement() {
         <Hero />
         {/* Active requests tracker */}
 
-        <ServiceTracker typeFilter="rental" title={tr('services.ra.trackerTitle')} />
+        <ServiceTracker key={done ? 'done' : 'open'} typeFilter="rental" title={tr('services.ra.trackerTitle')} />
         {/* Form + Summary */}
 
         <section ref={formRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-y">
@@ -114,7 +114,7 @@ export default function RentAgreement() {
                   <div className="p-6 rounded-xl bg-emerald-500/10 text-center">
                     <Icon name="check-circle-2" className="w-10 h-10 text-emerald-400 mx-auto mb-2" />
                     <p className="text-white font-semibold">{inviting ? tr('services.ra.doneInviteTitle', invitedSide) : tr('services.ra.doneOwnerTitle')}</p>
-                    <p className="text-gray-400 text-sm mt-1">{inviting ? tr('services.ra.doneInviteDesc', invitedSide) : tr('services.ra.doneOwnerDesc')}</p>
+                    <p className="text-gray-400 text-sm mt-1">{inviting ? tr('services.ra.doneInviteDesc', invitedSide) : tr(inviteAwaitingPayment ? 'services.ra.doneInviteeUnpaidDesc' : 'services.ra.doneOwnerDesc')}</p>
                   </div>
                   )}
                   {inviting && inviteResult ? (

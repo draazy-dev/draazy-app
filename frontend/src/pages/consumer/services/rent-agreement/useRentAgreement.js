@@ -517,6 +517,7 @@ export function useRentAgreement() {
   const detailsWorstField = largestFreeTextField(captureShareableState());
 
   const inviteRole = inviteCtx?.invite?.toRole || null;
+  const inviteAwaitingPayment = inviteCtx?.req?.status === 'awaiting_payment';
   const formSnapshot = () => ({ mode, inviteRole, prop, owner, coOwners, ownerMode, tenantMode, tenants, invite, terms, wit, ownerDocs, tenantDocs });
   const collectDocs = () => collectFormDocs(formSnapshot());
   // ── Parties ──
@@ -1067,7 +1068,7 @@ export function useRentAgreement() {
     withdrawInvite, withdrawing,
     prop, setP, setProp, selectedPropertyId, setSelectedPropertyId, myProperties, pickListing,
     owner, setO, coOwners, setCoOwner, addCoOwner, removeCoOwner, ownerDocs, setOwnerDocs, vaultEnabled, saveOwnerDocToVault,
-    ownerMode, chooseOwnerMode, inviteRole,
+    ownerMode, chooseOwnerMode, inviteRole, inviteAwaitingPayment,
     tenantMode, setTenantMode, tenants, setTenant, addTenant, removeTenant, tenantDocs, setTenantDocs, invite, setInvite,
     terms, setT, startBounds, maint, setMaint, regArea, furnItems, custom, setCustom, clauses, setClauses,
     isChecked, toggleFurn, bumpQty, removeFurn, addCustom, furnitureText,

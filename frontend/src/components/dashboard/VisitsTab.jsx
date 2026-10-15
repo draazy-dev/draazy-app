@@ -202,6 +202,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
             <span className={tag ? 'text-teal-300 font-semibold' : ''}>{tag || dateStr}</span>
             {p.timeLabel && <><span>·</span><span>{p.timeLabel}</span></>}
           </p>
+          {v.note ? <p className="text-gray-400 text-xs mt-1 break-words">“{v.note}”</p> : null}
         </div>
         <div className="flex items-center gap-1.5 flex-wrap [&>*]:min-h-[44px] sm:[&>*]:min-h-0">
           {(() => {

@@ -16,6 +16,7 @@ import { SHARE_OPENER, SEEKER_OPENER } from './openers.js';
 import { useFlatmateDiscovery, emptyFilters } from './useFlatmateDiscovery.jsx';
 import { useFlatmateSupply } from './useFlatmateSupply.jsx';
 import { useGroupPickers } from './useGroupPickers.js';
+import { useGenderGate } from './useGenderGate.jsx';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
 
 export { emptyFilters };
@@ -143,7 +144,8 @@ export function useFlatmates() {
     const nm = (user.name || '').trim().toLowerCase();
     return !!nm && !!r.owner && r.owner.trim().toLowerCase() === nm;
   };
-  const supply = useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, myPost, myPostsStatus });
+  const { askGender, genderSheet } = useGenderGate();
+  const supply = useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, myPost, myPostsStatus, askGender });
   const { groupOpen, isVerified, setVerifyOpen, openPostModal } = supply;
   const pickers = useGroupPickers(user, groupOpen);
 
@@ -209,13 +211,15 @@ export function useFlatmates() {
     const key = 'room-' + room.id;
     const opener = SHARE_OPENER[share] || SHARE_OPENER.solo;
     const name = room.society || roomTitle(room);
+    const gate = await askGender(room, 'room');
+    if (!gate) return;
     // Room view models provide `photos`, so the chat preview uses its first photo as a fallback.
     const ask = {
       request: { propertyId: key, property: { title: room.society ? 'Room in ' + room.society : name, price: room.budget ? '₹' + room.budget + '/mo' : '', loc: (room.localities || [])[0] || 'Pune', img: room.img || room.cover || FLATMATE_IMG }, party: { name, avatar: name.slice(0, 2).toUpperCase() }, firstMessage: opener },
     };
     setInterests((m) => ({ ...m, [key]: true }));
     try {
-      await flatmateService.roomInterest(room.id, { share, message: opener });
+      await flatmateService.roomInterest(room.id, { share, message: opener, gender: gate.gender });
     } catch (err) {
       if (err?.code === flatmateService.CONFLICT_ALREADY_INTERESTED) {
         rememberAsk(user.mobile, key);
@@ -267,6 +271,7 @@ export function useFlatmates() {
     onSave,
     onInterest,
     onRoomInterest,
+    genderSheet,
     interestedFor,
     goToPosting,
     saved,

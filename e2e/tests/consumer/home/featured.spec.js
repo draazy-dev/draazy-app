@@ -23,6 +23,8 @@ test('Featured rail shows real properties, and a card opens its details page dir
 
   expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
 
+  await expect(page.locator('section').filter({ hasText: '/mo /mo' })).toHaveCount(0);
+
   const firstCard = cards.first();
   const href = await firstCard.getAttribute('href');
 

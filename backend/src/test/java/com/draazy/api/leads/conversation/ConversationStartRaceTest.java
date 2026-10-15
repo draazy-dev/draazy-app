@@ -179,7 +179,7 @@ class ConversationStartRaceTest {
         AuthPrincipal caller = new AuthPrincipal(
                 buyer.getId(), Roles.Wire.BUYER, null, true, false);
         ConversationCreate body = new ConversationCreate(
-                owner.getMobile(), propertyId.toString(), "Is this still available?");
+                owner.getMobile(), propertyId.toString(), "Is this still available?", null);
 
         raceUntilRetried(index -> conversations.start(caller, body).created());
     }
@@ -193,9 +193,9 @@ class ConversationStartRaceTest {
         AuthPrincipal fromOwner = new AuthPrincipal(
                 owner.getId(), Roles.Wire.BUYER, null, true, false);
         ConversationCreate buyerSays = new ConversationCreate(
-                owner.getMobile(), propertyId.toString(), "Is this still available?");
+                owner.getMobile(), propertyId.toString(), "Is this still available?", null);
         ConversationCreate ownerSays = new ConversationCreate(
-                buyer.getMobile(), propertyId.toString(), "Are you still looking?");
+                buyer.getMobile(), propertyId.toString(), "Are you still looking?", null);
 
         raceUntilRetried(index -> {
             ConversationOpeningService.Started started = index == 0

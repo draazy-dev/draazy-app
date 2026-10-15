@@ -34,6 +34,7 @@ public record OwnerListingCard(
         String ownershipDeclinedReason,
         boolean featured,
         boolean archived,
+        String archivedNote,
         boolean recheckPending,
         String recheckReason,
         boolean ownerVerified,

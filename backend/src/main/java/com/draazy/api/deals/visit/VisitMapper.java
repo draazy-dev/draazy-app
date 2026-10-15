@@ -20,7 +20,8 @@ public final class VisitMapper {
                 visit.getSlot(),
                 visit.getMode(),
                 visit.getStatus(),
-                visit.getCreatedAt());
+                visit.getCreatedAt(),
+                visit.getNote());
     }
 
     public static VisitDto toDto(Visit visit, User visitor, ContactVisibility visibility) {

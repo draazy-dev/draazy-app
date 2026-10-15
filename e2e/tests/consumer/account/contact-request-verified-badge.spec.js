@@ -126,6 +126,8 @@ test('a pending verified buyer keeps the server-provided Serious Buyer badge bef
   await expect(numberRequest).toBeVisible();
   await expect(numberRequest).toContainText('Serious Buyer');
   await expect(numberRequest).toContainText('Wants to contact you');
+  await numberRequest.click();
+  await expect(page.getByText(`+91 ${before.requester.mobile}`).first(), 'the lead detail shows the masked mobile').toBeVisible();
   const unverifiedNumberRequest = page.locator('div.group.relative.rounded-xl').filter({ hasText: unverifiedBefore.requester.name }).first();
   await expect(unverifiedNumberRequest).toBeVisible();
   await expect(unverifiedNumberRequest).not.toContainText('Serious Buyer');

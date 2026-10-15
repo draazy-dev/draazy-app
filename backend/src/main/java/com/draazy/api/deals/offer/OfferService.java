@@ -6,6 +6,7 @@ import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.web.Ids;
@@ -75,6 +76,8 @@ public class OfferService {
         if (!property.isPubliclyVisible()) {
             throw new ConflictException("This listing is not open to offers");
         }
+
+        requireAboveFloor(property, body.amount());
 
         // Duplicate prevention: service-level check for a clean error message.
         if (offers.findLiveByUserAndProperty(callerId, propertyId).isPresent()) {
@@ -149,8 +152,10 @@ public class OfferService {
         String targetStatus = mapActionToStatus(body.action(), body.counterAmount());
 
         if (!OfferStatuses.canTransition(offer.getStatus(), targetStatus)) {
-            throw new ConflictException("Cannot " + body.action() + " an offer in status "
-                    + offer.getStatus());
+            throw new ConflictException("This offer has already been " + offer.getStatus() + ".");
+        }
+        if (OfferActions.COUNTER.equals(body.action())) {
+            requireAboveFloor(property, body.counterAmount());
         }
 
         offer.setStatus(targetStatus);
@@ -240,6 +245,18 @@ public class OfferService {
     /** Each party sees only their own number; an accepted offer unlocks the conversation, not the digits. */
     private ContactVisibility buyerMobileVisibility(UUID viewerId, UUID buyerUserId) {
         return viewerId.equals(buyerUserId) ? ContactVisibility.REVEALED : ContactVisibility.MASKED;
+    }
+
+    private static void requireAboveFloor(Property property, long amount) {
+        Long asking = property.getPrice();
+        if (asking == null) {
+            return;
+        }
+        long floor = (asking + 1) / 2;
+        if (amount < floor) {
+            throw new ValidationException("Offer at least " + Notifier.rupees(floor)
+                    + ", half the asking price of " + Notifier.rupees(asking) + ".");
+        }
     }
 
     private static String mapActionToStatus(String action, Long counterAmount) {

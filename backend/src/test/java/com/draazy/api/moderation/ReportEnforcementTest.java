@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
+import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.moderation.report.Report;
@@ -252,6 +253,35 @@ class ReportEnforcementTest extends AbstractApiTest {
         mvc.perform(get("/reports").param("reason", "notareason")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("a report against a person names them in the queue, and one against a stranger id is refused")
+    void userReportNamesThePersonAndMustTargetOne() throws Exception {
+        User reporter = user("9800000241", "owner", "Reporter");
+        User offender = user("9800000242", "buyer", "Offender Name");
+        User staff = user("9800000243", "staff", "Ops");
+        Property listing = listing(reporter);
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/reports")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(reporter))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetType\":\"user\",\"targetId\":\"" + listing.getId()
+                                + "\",\"reason\":\"fraud\"}"))
+                .andExpect(status().isNotFound());
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/reports")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(reporter))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"targetType\":\"user\",\"targetId\":\"" + offender.getId()
+                                + "\",\"reason\":\"fraud\"}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get("/reports").param("targetType", "user")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].targetName").value("Offender Name"))
+                .andExpect(jsonPath("$.content[0].targetMobile").value(MobileMask.mask("9800000242")));
     }
 
     @Test

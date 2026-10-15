@@ -136,7 +136,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
     setBusy(true);
     try {
       await ensureRequest();
-      await queuePendingChat(p, { active: status === 'owner' || status === 'approved' });
+      if (status !== 'owner') await queuePendingChat(p, { active: status === 'approved' });
       onClose();
       navigate(messagesLinkForProp(p));
     } catch (err) {
@@ -159,7 +159,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
     try {
       await ensureRequest(text || undefined);
       if (flagEnabled('inAppMessaging')) {
-        await queuePendingChat(p, { firstMessage: text || undefined, active: status === 'owner' || status === 'approved' });
+        if (status !== 'owner') await queuePendingChat(p, { firstMessage: text || undefined, active: status === 'approved' });
         toast(t('property.enquirySentChat'), 'success');
       } else {
         toast(t('property.requestSentOwner'), 'success');
@@ -294,7 +294,9 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
         <textarea id="contact-quick-message" value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} enterKeyHint="send" className="w-full px-4 py-3 rounded-xl text-white text-sm resize-none border border-white/10 bg-white/[0.03] focus:border-brand-teal-2 outline-none mb-3" placeholder={t('property.messagePlaceholder')} />
         <button onClick={sendEnquiry} disabled={busy} className="btn-teal w-full flex items-center justify-center gap-2 py-2.5 px-4 disabled:opacity-60"><Icon name="send" className="w-4 h-4" /> {t('property.sendEnquiry')}</button>
         <p className="text-[11px] text-slate-500 mt-3 flex items-center gap-1.5"><Icon name="shield-check" className="w-3.5 h-3.5" /> {t('property.numberStaysPrivate')}</p>
-        <Link to="/tenant-profile" className="mt-3 flex items-center justify-center gap-1.5 min-h-[44px] text-[13px] text-emerald-300 hover:text-emerald-200"><Icon name="user-check" className="w-3.5 h-3.5" /> {t('property.verifiedTenantBadge')}</Link>
+        {p.deal === 'rent' && (
+          <Link to="/tenant-profile" className="mt-3 flex items-center justify-center gap-1.5 min-h-[44px] text-[13px] text-emerald-300 hover:text-emerald-200"><Icon name="user-check" className="w-3.5 h-3.5" /> {t('property.verifiedTenantBadge')}</Link>
+        )}
       </div>
       {verify && (
         <VerifyIdentityRedirect

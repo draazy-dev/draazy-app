@@ -7,6 +7,7 @@ import java.util.List;
 public record ConversationDto(
         String id,
         String kind,
+        String counterpartyId,
         String counterpartyName,
         String counterpartyRole,
         @JsonInclude(JsonInclude.Include.NON_NULL) String counterpartyMobile,
@@ -29,6 +30,7 @@ public record ConversationDto(
         boolean archived,
         boolean muted,
         boolean blocked,
+        boolean blockedYou,
         boolean awaitingReply,
         @JsonInclude(JsonInclude.Include.NON_NULL) Presence presence,
         @JsonInclude(JsonInclude.Include.NON_NULL) List<MessageDto> messages) {

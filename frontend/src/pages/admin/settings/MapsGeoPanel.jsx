@@ -167,13 +167,7 @@ export default function MapsGeoPanel({
   };
 
   const resetCity = () => {
-    const cur = { ...mapOverride };
-    delete cur.center;
-    delete cur.bounds;
-    const nextCities = { ...(geo.cities || {}) };
-    if (Object.keys(cur).length) nextCities[city] = cur;
-    else delete nextCities[city];
-    onSave({ ...geo, cities: nextCities }, `Reset ${city} map coverage to default`);
+    onSave({ ...geo, cities: { ...(geo.cities || {}), [city]: null } }, `Reset ${city} map coverage to default`);
   };
 
   const toggleEnforce = () => onSave({ ...geo, enforceCityLimit: !enforce }, `City limit ${!enforce ? 'enabled' : 'disabled'}`);

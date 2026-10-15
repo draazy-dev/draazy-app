@@ -116,6 +116,7 @@ public class ConversationMapper {
                     return new ConversationDto(
                             c.getId().toString(),
                             c.isGroup() ? ConversationDto.GROUP : ConversationDto.DIRECT,
+                            other == null ? null : other.getId().toString(),
                             other == null ? null : other.getName(),
                             other == null ? null : other.getRole(),
                             other == null || !detail ? null : MobileMask.applyTo(other.getMobile(), visibility),
@@ -138,6 +139,8 @@ public class ConversationMapper {
                             mine.archived(),
                             mine.muted(),
                             other != null && blocks.byReader().contains(other.getId()),
+                            other != null && blocks.eitherWay().contains(other.getId())
+                                    && !blocks.byReader().contains(other.getId()),
                             latestAuthor != null && !readerId.equals(latestAuthor),
                             detail ? presence(c, reader, other, other != null && blocks.eitherWay().contains(other.getId())) : null,
                             detail

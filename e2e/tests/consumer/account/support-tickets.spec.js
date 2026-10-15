@@ -115,6 +115,62 @@ test.describe('Consumer support — live API', () => {
     await expect(page.getByText(ticket.id, { exact: true }).first()).toBeVisible();
   });
 
+  test('a double-click on Submit raises one ticket', async ({ page }) => {
+    await seedConsent(page);
+    const mobile = await signedInAsNew(page);
+    await openSupport(page);
+
+    await page.getByPlaceholder('e.g. Rahul Sharma').fill('E2E Double Click');
+    await page.getByLabel('Subject').fill('Double click guard check');
+    await page.getByLabel('Describe your issue').fill('Pressing submit twice must not raise two tickets.');
+    await page.getByRole('button', { name: 'Submit ticket' }).dblclick();
+    await expect(page.getByRole('dialog')).toBeVisible();
+
+    expect(await ticketsOf(mobile)).toHaveLength(1);
+  });
+
+  test('the form fields are labelled and show the length limits, and a refused field is named', async ({ page }) => {
+    await seedConsent(page);
+    await signedInAsNew(page);
+    await openSupport(page);
+
+    await expect(page.getByLabel('Your name')).toBeVisible();
+    await expect(page.getByLabel('Mobile number')).toBeVisible();
+    await page.getByLabel('Subject').fill('s'.repeat(300));
+    await expect(page.getByLabel('Subject')).toHaveValue('s'.repeat(120));
+    await expect(page.getByText('120/120')).toBeVisible();
+
+    await page.getByLabel('Describe your issue').fill('d'.repeat(4100));
+    await expect(page.getByLabel('Describe your issue')).toHaveValue('d'.repeat(4000));
+    await expect(page.getByText('4000/4000')).toBeVisible();
+
+    await page.route('**/api/support/tickets', (route) => route.request().method() === 'POST'
+      ? route.fulfill({ status: 422, contentType: 'application/json', body: JSON.stringify({ error: 'validation_failed', fields: [{ field: 'body', message: 'size must be between 0 and 4000' }] }) })
+      : route.continue());
+    await page.getByPlaceholder('e.g. Rahul Sharma').fill('E2E Limits');
+    await page.getByRole('button', { name: 'Submit ticket' }).click();
+    await expect(page.getByText(/description must be 8 to 4,000 characters/)).toBeVisible();
+  });
+
+  test('an ended session signs the user out in the UI and sends them to sign-in', async ({ page }) => {
+    await seedConsent(page);
+    await signedInAsNew(page);
+    await openSupport(page);
+
+    await page.route('**/api/support/tickets', (route) => route.request().method() === 'POST'
+      ? route.fulfill({ status: 401, contentType: 'application/json', body: '{}' })
+      : route.continue());
+    await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 401, contentType: 'application/json', body: '{}' }));
+
+    await page.getByPlaceholder('e.g. Rahul Sharma').fill('E2E Session End');
+    await page.getByLabel('Subject').fill('Session ended check');
+    await page.getByLabel('Describe your issue').fill('The session ends while this is submitted.');
+    await page.getByRole('button', { name: 'Submit ticket' }).click();
+
+    await expect(page.getByText('Your session ended. Please sign in again.')).toBeVisible();
+    await expect(page).toHaveURL(/\/signin\?next=%2Fsupport/);
+  });
+
   /* Copy is identical in mock and server, so provenance is the `GET /api/faqs` wait, armed before navigation as it
      fires from an effect during first paint; the API half is read without a browser. */
   test('the FAQ list is a public read that needs no session, and the help page renders what the server returned', async ({ page, login }) => {

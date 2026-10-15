@@ -146,7 +146,7 @@ class FlatmateDuplicateInterestRaceTest {
                 requester.getId(), Roles.Wire.BUYER, null, true, false);
 
         List<Throwable> outcomes = Races.run(RACERS, index ->
-                supply.roomInterest(caller, roomId, "solo", "Hello from racer " + index));
+                supply.roomInterest(caller, roomId, "solo", "Hello from racer " + index, null));
 
         assertOneWinnerAndOneRefusal(outcomes, "room", roomId);
     }

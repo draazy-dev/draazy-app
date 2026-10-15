@@ -19,6 +19,14 @@ import TicketThreadModal from './support/TicketThreadModal.jsx';
 import FaqSection from './support/FaqSection.jsx';
 import ContactCard from './support/ContactCard.jsx';
 
+const SAVE_ERROR_KEYS = { subject: 'misc.supportErrSaveSubject', body: 'misc.supportErrSaveBody' };
+
+function saveErrorMessage(err, tr) {
+  if (err?.status !== 422) return tr('misc.supportErrSave');
+  const field = err.fields?.[0]?.field;
+  return tr(SAVE_ERROR_KEYS[field] || 'misc.supportErrSaveInvalid');
+}
+
 export default function Support() {
   const { t: tr } = useTranslation();
   const rootRef = useScrollReveal();
@@ -44,6 +52,7 @@ export default function Support() {
   const [threadOpen, setThreadOpen] = useState(false);
   const [curTicket, setCurTicket] = useState(null);
   const [replyText, setReplyText] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   const reload = useCallback(async () => {
     const list = await listTickets().catch(() => []);
@@ -104,24 +113,30 @@ export default function Support() {
       toast(tr('misc.supportErrDescribe'), 'error');
       return;
     }
+    if (submitting) return;
+    setSubmitting(true);
     let t;
+    let failure = null;
     try {
       t = await createTicket({
         category: form.category,
         subject,
         message: msg,
       });
-    } catch {
+    } catch (err) {
       t = null;
+      failure = err;
     }
     if (!t) {
-      toast(tr('misc.supportErrSave'), 'error');
+      setSubmitting(false);
+      toast(saveErrorMessage(failure, tr), 'error');
       return;
     }
     setForm((p) => ({ ...p, subject: '', message: '' }));
     toast(tr('misc.supportTicketRaised', { id: t.id }), 'success');
     await reload();
     openThread(t.id);
+    setSubmitting(false);
   };
 
   const openThread = (id) => {
@@ -208,6 +223,7 @@ export default function Support() {
               set={set}
               fld={fld}
               submit={submit}
+              submitting={submitting}
               faqs={faqs}
             />
 

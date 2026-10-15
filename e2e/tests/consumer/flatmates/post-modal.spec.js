@@ -44,6 +44,13 @@ test.describe('LIVE: post-request form', () => {
     await expect(page.locator('.dz-field-error', { hasText: 'Max budget can’t be below min.' })).toBeVisible();
     await page.getByLabel('Highest monthly budget').fill('22000');
 
+    const age = page.locator('input[data-err="age"]');
+    await age.fill('150');
+    await page.getByRole('button', { name: /Post request/i }).click();
+    await expect(page.locator('.dz-field-error', { hasText: 'Enter an age between 18 and 120.' })).toBeVisible();
+    await age.fill('26');
+    await expect(page.locator('.dz-field-error', { hasText: 'Enter an age between 18 and 120.' })).toHaveCount(0);
+
     await pickLocalitiesIn(page, page.getByRole('button', { name: 'Preferred localities' }), ['Baner', 'Wakad']);
     await pickFrom(page, 'Lifestyle preferences', ['Vegetarian', 'Non-smoker']);
 

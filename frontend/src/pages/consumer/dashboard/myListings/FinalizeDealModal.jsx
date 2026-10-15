@@ -1,8 +1,9 @@
 import Modal from '../../../../components/ui/Modal.jsx';
 import DateField from '../../../../components/ui/DateField.jsx';
+import FieldError from '../../../../components/ui/FieldError.jsx';
 
 // Records the closing details when an owner finalizes a sale or rental.
-export default function FinalizeDealModal({ listing, dealForm, setDealForm, onFinalize, onClose }) {
+export default function FinalizeDealModal({ listing, dealForm, setDealForm, errors = {}, onFinalize, onClose }) {
   return (
     <Modal open={true} onClose={onClose} title={`Finalize ${listing.deal === 'buy' || listing.deal === 'sale' ? 'Sale' : 'Rental'}`}>
       <div className="space-y-4">
@@ -13,11 +14,13 @@ export default function FinalizeDealModal({ listing, dealForm, setDealForm, onFi
         </label>
         <label className="block text-sm">
           <span className="text-gray-400 mb-1.5 block">Mobile number</span>
-          <input value={dealForm.buyerMobile} onChange={(e) => setDealForm({ ...dealForm, buyerMobile: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder="10-digit mobile" />
+          <input value={dealForm.buyerMobile} onChange={(e) => setDealForm({ ...dealForm, buyerMobile: e.target.value })} inputMode="numeric" className={'field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm' + (errors.mobile ? ' dz-invalid' : '')} placeholder="10-digit mobile" />
+          <FieldError show={!!errors.mobile}>{errors.mobile}</FieldError>
         </label>
         <label className="block text-sm">
           <span className="text-gray-400 mb-1.5 block">Final {listing.deal === 'buy' || listing.deal === 'sale' ? 'sale price' : 'rent'}</span>
-          <input type="number" value={dealForm.finalPrice} onChange={(e) => setDealForm({ ...dealForm, finalPrice: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" />
+          <input type="number" value={dealForm.finalPrice} onChange={(e) => setDealForm({ ...dealForm, finalPrice: e.target.value })} className={'field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm' + (errors.price ? ' dz-invalid' : '')} />
+          <FieldError show={!!errors.price}>{errors.price}</FieldError>
         </label>
         <label className="block text-sm">
           <span className="text-gray-400 mb-1.5 block">Date</span>

@@ -16,7 +16,7 @@ export default function PrivateListingCard({ l, onPublish, onDelete }) {
             <p className="text-white text-sm font-semibold sm:truncate">{l.title}</p>
             {(l.bhk || l.furnishing) && (
               <p className="text-gray-500 text-[11px] mt-0.5">
-                {[l.bhk && `${l.bhk} BHK`, l.furnishing && (FURNISH_LABEL[String(l.furnishing).toLowerCase()] || l.furnishing)].filter(Boolean).join(' · ')}
+                {[l.bhk && (/BHK|RK/i.test(l.bhk) ? l.bhk : `${l.bhk} BHK`), l.furnishing && (FURNISH_LABEL[String(l.furnishing).toLowerCase()] || l.furnishing)].filter(Boolean).join(' · ')}
               </p>
             )}
             <p className="text-xs mt-0.5">

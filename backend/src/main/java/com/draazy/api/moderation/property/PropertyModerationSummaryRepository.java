@@ -19,6 +19,7 @@ class PropertyModerationSummaryRepository {
               count(*) filter (where not archived and\s""" + Property.FEATURED_SQL + """
             )                                                                          as featured,
               count(*) filter (where not archived and recheck_requested_at is not null
+                                 and status not in ('sold', 'rented')
                                  and coalesce(recheck_reason, '') <> :badgeItem)       as recheck,
               count(*) filter (where archived)                                         as archived,
               count(*) filter (where not archived and ownership_requested_at is not null) as badge_requests,

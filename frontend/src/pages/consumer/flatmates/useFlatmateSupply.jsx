@@ -9,6 +9,7 @@ import * as flatmateService from '../../../services/flatmateService.js';
 import { getLocality } from '../../../services/localityService.js';
 import { initials, hasAgreementEvidence, inr, perHead, numeric, terms, FLATMATE_GROUP_IMG, replacementTitle, detailPath, seekerHeadline, moveInByForm, moveInByWire } from './helpers.js';
 import { groupOpener } from './openers.js';
+import { MIN_AGE, MAX_AGE } from './constants.js';
 import { hasContactDetails } from '../list-property/contactDetails.js';
 import { headlineOf } from '../../../lib/headline.js';
 
@@ -46,7 +47,7 @@ const preferencesForm = (p) => ({
 // `?post=`. A Symbol rather than a string so it can never collide with a value the URL carries.
 const SIGNIN_LATCH = Symbol('sent-to-signin');
 
-export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, myPost, myPostsStatus, onGroupEdited = (id) => navigate(detailPath('group', id)) }) {
+export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: navigate, setInterests, ownsGroup, myPost, myPostsStatus, askGender, onGroupEdited = (id) => navigate(detailPath('group', id)) }) {
   const [params, setParams] = useSearchParams();
   const sendToSignIn = useSignInGate();
   const [postOpen, setPostOpen] = useState(false);
@@ -192,7 +193,8 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     e.preventDefault();
     const ok = postErr.check([
       { name: 'name', ok: !!post.name.trim(), msg: t('flatmates.valAddName') },
-      { name: 'budget', ok: !!post.budget, msg: t('flatmates.valAddBudget') },
+      { name: 'age', ok: !post.age || (Number.isInteger(+post.age) && +post.age >= MIN_AGE && +post.age <= MAX_AGE), msg: t('flatmates.valAge', { min: MIN_AGE, max: MAX_AGE }) },
+      { name: 'budget', ok: !!post.budget,       msg: t('flatmates.valAddBudget') },
       { name: 'localities', ok: post.localities.length > 0, msg: t('flatmates.valPickLocality') },
       { name: 'budgetMax', ok: !post.budgetMax || +post.budgetMax >= +post.budget, msg: t('flatmates.valBudgetRange') },
       { name: 'note', ok: !leaksContact(post.name, post.occupation, post.note), msg: t('flatmates.valNoContact') },
@@ -342,7 +344,13 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     const ownerConsent = role === 'tenant' ? !!grp.consentVerified : false;
     await saveGroup({ title: grp.title.trim(), locality: grp.locality, localitySlug: grp.localitySlug || '', policy: grp.policy, rent: +grp.rent, ...numeric('deposit', grp.deposit), ...terms(grp), seatsTotal: seats, ...seatsOpenAfterEdit(seats), members: members(), tags: grp.tags, note: grp.note, time: 'Just now', ownerMobile: user ? (user.mobile || '') : '', ownerName: grp.name.trim(), hostRole: role, verificationTier, propertyId, agreementDeclared, agreementDoc, ownerConsentMobile: role === 'tenant' ? (grp.consentMobile || '') : '', ownerConsent, addressFingerprint: guard.fingerprint, flagForReview: guard.flagForReview });
   };
+  const savingGroup = useRef(false);
   const saveGroup = async (group) => {
+    if (savingGroup.current) return;
+    savingGroup.current = true;
+    try { await persistGroup(group); } finally { savingGroup.current = false; }
+  };
+  const persistGroup = async (group) => {
     const editedId = editingGroupId;
     let created;
     // The saved record carries the server-assigned id, which the review queue below keys on — the
@@ -381,6 +389,8 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     const key = 'group-' + g.id;
     const open = g.policy === 'any';
     const opener = groupOpener(g);
+    const gate = await askGender(g, 'group');
+    if (!gate) return;
     /* One record for both answers: the device receiving the duplicate `409` is often not the
      * one that made the request, and must still hold the same Messages thread. */
     const ask = {
@@ -390,7 +400,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     // state before the request settles, so a second tap has no button to land on.
     setInterests((m) => ({ ...m, [key]: true }));
     try {
-      await flatmateService.joinGroup(g.id, { share: 'solo', message: opener });
+      await flatmateService.joinGroup(g.id, { share: 'solo', message: opener, gender: gate.gender });
     } catch (err) {
       if (err?.code === flatmateService.CONFLICT_ALREADY_INTERESTED) {
         rememberAsk(user.mobile, key);

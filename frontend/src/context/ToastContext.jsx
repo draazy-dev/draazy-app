@@ -1,5 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, XCircle, ToggleRight, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { SESSION_ENDED_EVENT } from '../services/http.js';
 
 const ToastContext = createContext(null);
 let nextId = 0;
@@ -72,6 +74,7 @@ function Toast({ toast: t, onDismiss }) {
 }
 
 export function ToastProvider({ children }) {
+  const { t } = useTranslation();
   const [toasts, setToasts] = useState([]);
   const timers = useRef(new Map());
 
@@ -91,6 +94,12 @@ export function ToastProvider({ children }) {
     },
     [dismiss],
   );
+
+  useEffect(() => {
+    const onEnded = () => toast(t('common.sessionEnded'), 'warning');
+    window.addEventListener(SESSION_ENDED_EVENT, onEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
+  }, [toast, t]);
 
   // Clear any pending auto-dismiss timers on unmount so they don't fire after teardown.
   useEffect(() => {

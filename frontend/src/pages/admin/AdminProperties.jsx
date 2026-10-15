@@ -246,16 +246,23 @@ export default function AdminProperties() {
     refresh();
   };
   // `PropertyModerationService` clears the re-check on any `setStatus`, so re-approving is "checked it, all fine".
+  const recheckBusy = useRef(false);
   const doRecheckPass = async (l) => {
-    if (!window.confirm(`Re-check "${l.title}" — confirm ${l.recheckReason || 'the edited fields'} look fine?`)) return;
+    if (recheckBusy.current) return;
+    recheckBusy.current = true;
     try {
-      await setListingStatus(l.id, 'approved', { expectedStatus: l.status });
-    } catch (err) {
-      toast(`Could not clear the re-check: ${err.message}`, 'error');
-      return;
+      if (!window.confirm(`Re-check "${l.title}" — confirm ${l.recheckReason || 'the edited fields'} look fine?`)) return;
+      try {
+        await setListingStatus(l.id, 'approved', { expectedStatus: l.status });
+      } catch (err) {
+        toast(`Could not clear the re-check: ${err?.message || 'please refresh and try again.'}`, 'error');
+        return;
+      }
+      toast('Re-check cleared — listing stays live', 'success');
+      refresh();
+    } finally {
+      recheckBusy.current = false;
     }
-    toast('Re-check cleared — listing stays live', 'success');
-    refresh();
   };
   const openRecheckReject = (l) => { setRecheckRejectFor(l); setRecheckRejectReasonCode(''); setRecheckRejectReasonNote(''); };
   const submitRecheckReject = async () => {

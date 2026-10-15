@@ -1,10 +1,5 @@
-/* Two signals kept apart: `offline` is the OS saying no interface is up, `unreachable` is a request
-   that never arrived while `navigator.onLine` still claims true — a captive portal or a dead uplink
-   both report online, so the banner hedges with "can't reach Draazy".
-
-   Any answer from the server, 500 included, means the request arrived and is not a connectivity
-   failure. There is no heartbeat: the store is nudged by traffic the app was making anyway, from
-   the single {@link observeReachability} producer at the bottom of this file. */
+/* `offline` is the OS reporting no interface; `unreachable` is a request that never arrived while
+   `navigator.onLine` still claims true (captive portal, dead uplink). Any server answer, 500 included, is reachable. */
 import { useSyncExternalStore } from 'react';
 import { NetworkError, observeReachability } from '../services/http.js';
 
@@ -13,7 +8,7 @@ let unreachable = false;
 
 /** Cached snapshot object. `useSyncExternalStore` compares by identity, so this must only be
  *  rebuilt when the value actually changes — returning a fresh object per read loops forever. */
-let snapshot = { status: 'online' };
+let snapshot = { status: readStatus() };
 
 const listeners = new Set();
 
@@ -83,9 +78,8 @@ export function useConnectivity() {
   return useSyncExternalStore(subscribe, getSnapshot);
 }
 
-/* Registered on import rather than by a component, so the store is listening before the first
-   provider call — several fire from Context effects that mount above the banner. Repeats are free:
-   both writes are latches that publish only on a real change. */
+/* Registered on import, not by a component, so the store hears provider calls fired from Context
+   effects that mount above the banner. */
 observeReachability((err) => {
   if (err) noteNetworkFailure(err);
   else noteNetworkSuccess();

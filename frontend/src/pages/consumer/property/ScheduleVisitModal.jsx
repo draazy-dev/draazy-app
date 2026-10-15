@@ -8,6 +8,7 @@ import { slotFromParts, todayIso } from '../../../lib/visitWhen.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import useScrollLock from '../../../hooks/useScrollLock.js';
+import useModalDialog from '../../../hooks/useModalDialog.js';
 import { scheduleVisit } from '../../../services/visitService.js';
 import { track } from '../../../lib/pmf.js';
 
@@ -40,11 +41,7 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
     if (sendToSignIn('schedule', returnPath)) onClose();
   }, [authLoading, onClose, returnPath, sendToSignIn, signedIn]);
 
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && onClose();
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const panelRef = useModalDialog(true, onClose);
 
   const submit = async () => {
     if (busy) return;
@@ -98,7 +95,7 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
 
   return (
     <div className="dz-modal-backdrop" role="presentation" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="dz-modal" role="dialog" aria-modal="true" aria-label={t('property.scheduleVisit')} style={{ maxWidth: 600 }}>
+      <div ref={panelRef} tabIndex={-1} className="dz-modal outline-none" role="dialog" aria-modal="true" aria-label={t('property.scheduleVisit')} style={{ maxWidth: 600 }}>
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
             <h3 className="text-lg font-bold text-white">{t('property.scheduleVisit')}</h3>

@@ -2,8 +2,9 @@
    the action was not audited or the feed does not read what the platform writes. */
 import fs from 'node:fs';
 import { test, expect, ACTORS, STAFF } from '../../fixtures/live.js';
-import { API, authHeaders } from '../../helpers/liveAuth.js';
+import { API, authHeaders, uniqueMobile } from '../../helpers/liveAuth.js';
 import { approveListingWithFetch } from '../../helpers/moderation.js';
+import { newListing } from '../../helpers/monetisation.js';
 
 /** Suspend then reactivate restores the account: the audit log is append-only and not reset per test. Names must
  * be unique (the seed has two Isha Mehtas) or `.first()` picks the wrong row. */
@@ -106,10 +107,9 @@ test('the console reads back what the platform audited: renders, empty state, th
 
 async function approveOnePendingListing() {
   const headers = await authHeaders(ACTORS.admin);
-  const queue = await fetch(`${API}/admin/properties?status=pending&size=1`, { headers });
-  expect(queue.status, 'the moderation queue must be readable before anything can be approved').toBe(200);
-  const target = ((await queue.json()).content || [])[0];
-  expect(target, 'the e2e seed must contain at least one pending listing for this spec to act on').toBeTruthy();
+  // A fresh owner's listing: the shared queue also holds the admin's own, which they may not review.
+  const target = await newListing(uniqueMobile(), { title: 'Activity spec listing' });
+  expect(target.status).toBe('pending');
 
   const reason = `activity-spec-${Date.now()}`;
   const patch = await approveListingWithFetch(target.id, headers, { reason });

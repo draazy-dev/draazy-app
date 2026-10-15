@@ -264,3 +264,17 @@ test('Verified Listings is this owner\'s own share, not a constant', async ({ pa
   await page.goto(`/owner/${UNVERIFIED_OWNER_ID}`);
   await expect(tileValue(page, 'Verified Listings')).toHaveText(all);
 });
+
+test('reporting an owner files the report against that owner\'s user id', async ({ page, login }) => {
+  await login.asNewOwner();
+  await page.goto(`/owner/${OWNER_ID}`);
+  await page.getByRole('button', { name: 'Report', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Report this owner' });
+  await dialog.locator('button.w-full').first().click();
+
+  const filed = page.waitForRequest((r) => r.method() === 'POST' && r.url().endsWith('/reports'));
+  await dialog.getByRole('button', { name: 'Submit report' }).click();
+  const req = await filed;
+  expect(req.postDataJSON()).toMatchObject({ targetType: 'user', targetId: OWNER_ID });
+  expect((await req.response()).status()).toBe(201);
+});

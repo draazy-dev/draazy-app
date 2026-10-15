@@ -81,7 +81,7 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
         return mvc.perform(post(Routes.Flatmates.GROUP_JOIN, groupId)
                 .header(HttpHeaders.AUTHORIZATION, bearer(who))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{}"));
+                .content("{\"gender\":\"female\"}"));
     }
 
     private ResultActions leave(String groupId, User who) throws Exception {

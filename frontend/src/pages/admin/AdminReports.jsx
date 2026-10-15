@@ -280,7 +280,7 @@ export default function AdminReports() {
             <FactRow label="People">
               <Cell>{`Reporter: ${r.reportedBy || 'Withheld'}`}</Cell>
               {r.reporterMobile ? <Cell className="tabular-nums">{r.reporterMobile}</Cell> : null}
-              {r.targetOwner ? <Cell className="md:col-span-2">{`Owner: ${r.targetOwner}${r.ownerMobile ? ` · ${r.ownerMobile}` : ''}`}</Cell> : null}
+              {r.targetOwner ? <Cell className="md:col-span-2">{`${r.kind === 'user' ? 'Reported' : 'Owner'}: ${r.targetOwner}${r.ownerMobile ? ` · ${r.ownerMobile}` : ''}`}</Cell> : null}
             </FactRow>
           </>
         )}

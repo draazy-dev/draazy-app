@@ -9,6 +9,7 @@ import { digits } from '../../../lib/contact.js';
 import { isoToDisplay } from '../../../lib/format.js';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import { useSingleFlight } from '../../../hooks/useSingleFlight.js';
 import {
   getDeal, dealStatusForBuyer, reserveDeal, reopenDeal, listParties,
   submitOffer as submitOfferApi, respondOffer, myOffers, offersOnMine,
@@ -91,8 +92,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     const [status, mine, fin] = await Promise.all([
       dealStatusForBuyer(p).catch(() => 'active'),
       isIn ? myOffers().catch(() => []) : Promise.resolve([]),
-      // Asked only once the buyer has engaged: the endpoint 404s when nothing is pending, which is
-      // the ordinary state of every listing, and the finalize card is gated on `contactApproved`.
+      // Asked only once the buyer has engaged: the finalize card is gated on `contactApproved`.
       isIn && contactApproved ? finalizationStatus(propId).catch(() => null) : Promise.resolve(null),
     ]);
     setState({
@@ -114,7 +114,8 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   const dealWord = isRent ? t('property.rentedOutWord') : t('property.soldWord');
 
   /* Every mutation funnels through here: surface the server's refusal, never a false success. */
-  const run = async (fn, okMsg, tone = 'success') => {
+  const singleFlight = useSingleFlight();
+  const run = (fn, okMsg, tone = 'success') => singleFlight(async () => {
     try {
       await fn();
       await reload();
@@ -122,7 +123,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     } catch (err) {
       toast(err?.body?.error || err?.message || t('property.actionFailed'), 'error');
     }
-  };
+  });
 
   const doFinalize = () => {
     if (!isIn) { sendToSignIn('offer'); return; }
@@ -132,10 +133,9 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       toast(t('property.finalizeInDashboard'), 'info');
       return;
     }
-    // The buyer proposes at the listed price against the listing's owner. Both are required by
-    // `FinalizationCreateRequest`; neither was sent before.
+    const agreed = state.myOffer?.status === 'accepted' ? state.myOffer.amount : p.price;
     run(
-      () => requestFinalization(propId, { counterpartyMobile: owner, agreedPrice: Number(p.price) || 0 }),
+      () => requestFinalization(propId, { counterpartyMobile: owner, agreedPrice: Number(agreed) || 0 }),
       t('property.finalizeRequestSent'),
     );
   };
@@ -149,17 +149,31 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
   };
 
   const submitOffer = () => {
-    const amt = parseInt(String(offerAmt).replace(/[^\d]/g, ''), 10) || 0;
-    if (!amt) { setOfferErr(true); toast(t('property.enterAmount'), 'info'); return; }
+    const raw = String(offerAmt).replace(/[\s,₹]/g, '');
+    const amt = /^\d+$/.test(raw) ? parseInt(raw, 10) : 0;
+    if (!amt) {
+      setOfferErr(raw ? t('property.offerAmountDigits') : t('property.enterOfferAmount'));
+      toast(t('property.enterAmount'), 'info');
+      return;
+    }
     setOfferErr(false);
-    const existing = state.myOffer;
+    const existing = state.myOffer && ['pending', 'countered'].includes(state.myOffer.status) ? state.myOffer : null;
     // A second live offer on one listing is a 409, so revising means countering the existing one.
     // A buyer countering is the one response the server allows them.
     const call = existing
       ? () => respondOffer(existing.id, 'counter', amt, { isOwner: false, propId })
       : () => submitOfferApi({ propId, amount: amt, moveIn: offerMoveIn, deal: isRent ? 'rent' : 'buy' });
-    setOfferOpen(false); setOfferAmt(''); setOfferMoveIn('');
-    run(call, t('property.offerSent'));
+    singleFlight(async () => {
+      try {
+        await call();
+      } catch (err) {
+        setOfferErr(err?.message || t('property.actionFailed'));
+        return;
+      }
+      setOfferOpen(false); setOfferAmt(''); setOfferMoveIn('');
+      await reload().catch(() => {});
+      toast(t('property.offerSent'), 'success');
+    });
   };
   const ownerOfferAct = (id, action) => {
     if (action === 'counter') {
@@ -338,7 +352,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
               <button onClick={() => agreeToCounter(my)} className="btn-teal flex-1 py-2 rounded-lg text-xs font-semibold">{t('property.agreeAt', { amount: fmtOffer(my.amount) })}</button>
               <button onClick={openOffer} className="flex-1 py-2 rounded-lg text-xs border border-white/15 text-slate-200">{t('property.counter')}</button>
             </div>
-          ) : (
+          ) : my.status === 'accepted' ? null : (
             <button onClick={openOffer} className="btn-teal w-full py-2.5 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-1.5"><Icon name="repeat" className="w-4 h-4" /> {t('property.reviseOffer')}</button>
           )}
         </div>
@@ -384,7 +398,7 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
               {t('property.offerAmountLabel')} <span className="text-slate-500 font-normal">(₹)</span>
             </label>
             <input id="deal-offer-amt" value={offerAmt} onChange={(e) => { setOfferAmt(e.target.value); if (offerErr) setOfferErr(false); }} inputMode="numeric" data-err="offerAmt" className={'w-full rounded-lg bg-white/5 border px-3 py-2.5 text-sm text-white outline-none focus:border-teal-400/50 ' + (offerErr ? 'dz-invalid mb-1' : 'border-white/10 mb-3')} placeholder={offerPlaceholder} />
-            <FieldError show={offerErr} className="mb-3">{t('property.enterOfferAmount')}</FieldError>
+            <FieldError show={!!offerErr} className="mb-3">{offerErr}</FieldError>
             <p className="text-[11px] text-slate-400 mb-1.5">{isRent ? t('property.preferredMoveInDate') : t('property.targetPossessionDate')}</p>
             <DateField value={offerMoveIn} onChange={(v) => setOfferMoveIn(v)} className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2.5 text-sm text-white mb-4" ariaLabel={isRent ? t('property.preferredMoveInDate') : t('property.targetPossessionDateAria')} />
             <div className="flex gap-2">

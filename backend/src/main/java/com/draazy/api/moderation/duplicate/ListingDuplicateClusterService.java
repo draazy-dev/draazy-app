@@ -11,6 +11,7 @@ import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.trust.ContactVisibility;
+import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.security.AuthPrincipal;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -45,13 +46,16 @@ public class ListingDuplicateClusterService {
     private final ListingArchiveService archiveService;
     private final PropertyMapper propertyMapper;
     private final AuditService audit;
+    private final Notifier notifier;
 
     public ListingDuplicateClusterService(PropertyRepository properties,
             PropertyPhotoHashRepository photoHashes,
             ListingDuplicateDismissalRepository dismissals,
             ListingArchiveService archiveService,
             PropertyMapper propertyMapper,
-            AuditService audit) {
+            AuditService audit,
+            Notifier notifier) {
+        this.notifier = notifier;
         this.properties = properties;
         this.photoHashes = photoHashes;
         this.dismissals = dismissals;
@@ -131,7 +135,12 @@ public class ListingDuplicateClusterService {
             throw new BadRequestException("Name at least one listing to archive");
         }
         for (String dropId : drops) {
-            archiveService.archive(actor, dropId, "Merged duplicate — kept " + keepId);
+            Property archived = archiveService.archive(actor, dropId,
+                    ListingArchiveService.DUPLICATE_REASON + " — kept " + keepId);
+            notifier.notify(archived.getOwner().getId(), "listing.archived_duplicate",
+                    "Your listing was archived",
+                    "\"" + archived.getTitle() + "\" was archived as a duplicate of another listing.",
+                    "/dashboard");
         }
         audit.record(actor, "property.duplicate.merge", "property", keepId,
                 "archived", String.join(",", drops),

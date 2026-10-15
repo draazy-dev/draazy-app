@@ -542,4 +542,52 @@ class OfferEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isConflict());
         assertThat(offerRepo.count()).isZero();
     }
+
+    @Test
+    void offerFarBelowAsking_is422WithAClearMessageAndNothingSaved() throws Exception {
+        User owner = user("9820100091", "owner");
+        User buyer = user("9820100092", "buyer");
+        Property p = listing(owner, "Floor test");
+
+        mvc.perform(post(Routes.Offers.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + p.getId() + "\",\"amount\":1}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value(
+                        "Offer at least ₹12,500, half the asking price of ₹25,000."));
+        assertThat(offerRepo.count()).isZero();
+
+        submitOffer(buyer, p, 12500);
+    }
+
+    @Test
+    void counterFarBelowAsking_is422() throws Exception {
+        User owner = user("9820100073", "owner");
+        User buyer = user("9820100074", "buyer");
+        Property p = listing(owner, "Counter floor test");
+        String offerId = submitOffer(buyer, p, 20000);
+
+        mvc.perform(post(Routes.Offers.BASE + "/" + offerId + "/respond")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"counter\",\"counterAmount\":100}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void counterOnAnAcceptedOffer_is409WithFriendlyText() throws Exception {
+        User owner = user("9820100075", "owner");
+        User buyer = user("9820100076", "buyer");
+        Property p = listing(owner, "Accepted counter test");
+        String offerId = submitOffer(buyer, p, 20000);
+        respond(owner, offerId, "accept", null, null);
+
+        mvc.perform(post(Routes.Offers.BASE + "/" + offerId + "/respond")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"counter\",\"counterAmount\":21000}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This offer has already been accepted."));
+    }
 }

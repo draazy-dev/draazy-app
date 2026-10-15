@@ -91,7 +91,7 @@ export default function HelpLayout({ children, wide = false, title, description,
       </div>
 
       {drawerOpen && (
-        <div className="fixed inset-0 z-[70] lg:hidden">
+        <div className="fixed inset-0 z-[1550] lg:hidden">
           <button
             type="button"
             aria-label={t('help.close')}

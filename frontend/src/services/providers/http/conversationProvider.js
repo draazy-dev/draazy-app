@@ -112,10 +112,11 @@ export async function unreadCount() {
   return Number(res?.count) || 0;
 }
 
-/* "Message owner" is reachable before the contact gate opens, where `POST /messages` answers 403 — so stage
-   locally and drain once it opens. `active: true` means the gate is open already, so nothing is staged. */
+/* Before the contact gate opens `POST /messages` answers 403, so the chat is staged and drained later.
+   `active` means the gate is open: open the thread now, staging only if the server still refuses. */
 export async function queuePendingChat(property, { firstMessage, active = false } = {}) {
-  if (!property?.id || active) return;
+  if (!property?.id) return;
+  if (active && await openNow(property, firstMessage)) return;
   const queue = readQueue();
   const idStr = String(property.uuid || property.id);
   const slugStr = property.slug || (property.uuid ? String(property.id) : null);
@@ -129,6 +130,7 @@ export async function queuePendingChat(property, { firstMessage, active = false 
     userId: viewerId(),
     propertyId: idStr,
     propertySlug: slugStr,
+    clientId: newClientId(),
     at: Date.now(),
     property: {
       title: property.title || 'Property',
@@ -137,33 +139,63 @@ export async function queuePendingChat(property, { firstMessage, active = false 
       img: property.image || property.img || '',
     },
     party: { name: property.owner || 'Owner', role: 'Owner' },
-    firstMessage: firstMessage
-      || `Hi, I'm interested in "${property.title || 'this property'}" on Draazy. Is it still available?`,
+    firstMessage: firstMessage || greeting(property),
   });
   writeQueue(queue);
 }
 
-/* Addressed by `propertyId` alone — the server derives the owner — because the unmasked mobile is
-   never readable here. An entry the server still refuses stays queued: the gate may open later. */
-export async function drainPendingChats() {
+const greeting = (property) =>
+  `Hi, I'm interested in "${property.title || 'this property'}" on Draazy. Is it still available?`;
+
+const newClientId = () => `q${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+
+/* The bare greeting has one fixed id per listing, so a second tap from any browser finds the thread rather than
+   adding another hello. A typed message is always new. */
+async function openNow(property, firstMessage) {
+  try {
+    await post('/messages', toConversationCreate({
+      propertyId: String(property.id),
+      body: firstMessage || greeting(property),
+      clientId: firstMessage ? newClientId() : `open:${property.id}`,
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+let draining = null;
+
+/* Single-flight: the page re-reads the inbox from several triggers. Each entry's stable `clientId` also makes a
+   second tab's drain a no-op server-side. Addressed by `propertyId` alone; a refused entry stays queued. */
+export function drainPendingChats() {
+  draining ??= drain().finally(() => { draining = null; });
+  return draining;
+}
+
+async function drain() {
   const queue = readQueue();
   if (!queue.length) return { sent: 0, blocked: 0 };
 
-  const remaining = [];
-  let sent = 0;
+  if (queue.some((item) => !item.clientId)) {
+    queue.forEach((item) => { item.clientId ??= newClientId(); });
+    writeQueue(queue);
+  }
+  const delivered = new Set();
   for (const item of queue) {
     try {
       await post('/messages', toConversationCreate({
         propertyId: item.propertyId,
         body: item.firstMessage,
+        clientId: item.clientId,
       }));
-      sent += 1;
+      delivered.add(item.propertyId);
     } catch {
-      remaining.push(item);
+      /* stays queued */
     }
   }
-  writeQueue(remaining);
-  return { sent, blocked: remaining.length };
+  writeQueue(readQueue().filter((item) => !delivered.has(item.propertyId)));
+  return { sent: delivered.size, blocked: queue.length - delivered.size };
 }
 
 /* `null` is survivable: the mapper then treats every message as the counterparty's, which is the safer

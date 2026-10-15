@@ -56,6 +56,11 @@ public interface PropertyRepository
     @Query("select p from Property p where p.id = :id")
     Optional<Property> findForVerificationDecision(@Param("id") UUID id);
 
+    /** Serialises deal state changes on one listing so a concurrent second caller sees the committed state. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Property p where p.id = :id and p.owner.id = :ownerId")
+    Optional<Property> findOwnedForUpdate(@Param("id") UUID id, @Param("ownerId") UUID ownerId);
+
     @EntityGraph(attributePaths = "owner")
     Page<Property> findByOwner_Id(UUID ownerId, Pageable pageable);
 

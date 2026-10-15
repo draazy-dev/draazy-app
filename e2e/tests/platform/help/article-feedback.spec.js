@@ -10,6 +10,39 @@ async function openArticle(page, path = ARTICLE) {
 }
 
 test.describe('Help article feedback', () => {
+  test('a double-tap on "Yes" saves one rating and stays on the article', async ({ page }) => {
+    test.slow();
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openArticle(page, '/help/a/invoices-and-refunds');
+    let posts = 0;
+    page.on('request', (r) => { if (r.url().includes('/help/feedback') && r.method() === 'POST') posts += 1; });
+
+    await feedback(page).getByRole('button', { name: /Yes/i }).dblclick();
+    await expect(feedback(page).getByText(/Thanks/i)).toBeVisible();
+    await page.waitForTimeout(300);
+
+    await expect(page).toHaveURL(/\/help\/a\/invoices-and-refunds/);
+    expect(posts).toBe(1);
+  });
+
+  test('the topics drawer footer links are reachable above the bottom nav on a phone', async ({ page }) => {
+    test.slow();
+    await page.setViewportSize({ width: 360, height: 640 });
+    await openArticle(page);
+    await page.getByRole('button', { name: 'Topics' }).click();
+
+    const drawer = page.getByRole('dialog', { name: 'Help topics' });
+    const contact = drawer.getByRole('link', { name: 'Contact support' });
+    await contact.scrollIntoViewIfNeeded();
+    await expect(contact).toBeVisible();
+    const box = await contact.boundingBox();
+    const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('a')?.getAttribute('href'), {
+      x: box.x + box.width / 2,
+      y: box.y + box.height / 2,
+    });
+    expect(hit).toBe('/support');
+  });
+
   test('a positive answer thanks the reader, reaches the server, persists per article and does not leak to the next', async ({ page, consoleErrors }) => {
     test.slow();
     await openArticle(page);

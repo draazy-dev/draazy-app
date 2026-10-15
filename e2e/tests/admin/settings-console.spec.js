@@ -123,6 +123,37 @@ test('saving the fee schedule changes the price the public route quotes', async 
   expect(Number((await publicPricing()).contactPack)).toBe(next);
 });
 
+test('resetting a city\u2019s map coverage removes the override on the server and shows the default at once', async ({ page, login }) => {
+  await login.asAdmin();
+  await page.goto('/admin/settings?tab=maps');
+
+  const lat = page.getByRole('textbox', { name: 'Centre latitude' });
+  await expect(lat).toBeVisible();
+  const builtIn = await lat.inputValue();
+  const next = String(Math.round((Number(builtIn) + 0.01) * 1e4) / 1e4);
+
+  const putGeo = () => page.waitForResponse(
+    (res) => res.url().includes('/api/admin/settings') && res.request().method() === 'PUT',
+  );
+
+  await lat.fill(next);
+  const saved = putGeo();
+  await page.getByRole('button', { name: /^Save .* coverage$/ }).click();
+  expect((await saved).status()).toBe(200);
+  expect(JSON.stringify((await settingsDoc()).geo?.cities ?? {})).toContain(next);
+
+  const reset = putGeo();
+  await page.getByRole('button', { name: 'Reset to default' }).click();
+  expect((await reset).status()).toBe(200);
+
+  await expect(lat).toHaveValue(builtIn);
+  await expect(page.getByText('Using built-in default')).toBeVisible();
+  expect(JSON.stringify((await settingsDoc()).geo?.cities ?? {})).not.toContain(next);
+
+  await page.reload();
+  await expect(page.getByRole('textbox', { name: 'Centre latitude' })).toHaveValue(builtIn);
+});
+
 test('saving the photo limit writes the listings block the public policy route answers from', async ({ page, login }) => {
   await login.asAdmin();
   await page.goto('/admin/settings');

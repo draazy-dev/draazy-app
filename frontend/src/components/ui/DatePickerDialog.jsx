@@ -35,7 +35,7 @@ export default function DatePickerDialog({ open, value, anchorRef, min, max, onC
   }, [i18n.language]);
   const WEEKDAYS = useMemo(() => {
     const f = new Intl.DateTimeFormat(i18n.language, { weekday: 'short' });
-    // 2024-01-07 was a Sunday, so this walks Sun→Sat in the grid's own order.
+    // A known Sunday as the anchor, so this walks Sun to Sat in the grid's own order.
     return Array.from({ length: 7 }, (_, i) => f.format(new Date(2024, 0, 7 + i)));
   }, [i18n.language]);
   const panelRef = useRef(null);
@@ -164,15 +164,16 @@ export default function DatePickerDialog({ open, value, anchorRef, min, max, onC
       // Let an open month/year <Select> handle Escape first.
       if (e.key === 'Escape') {
         if (document.querySelector('.dz-dropdown.is-open')) return;
-        e.preventDefault(); onClose?.(); return;
+        e.preventDefault(); e.stopPropagation(); onClose?.(); return;
       }
       if (e.key === 'Enter') { if (draft) { e.preventDefault(); onConfirm?.(draft); } return; }
       const moves = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
       if (e.key in moves) { e.preventDefault(); shiftDraft(moves[e.key]); }
     };
-    document.addEventListener('keydown', onKey);
+    // Capture phase, so Escape closes this popover before a dialog underneath sees it.
+    document.addEventListener('keydown', onKey, true);
     panelRef.current?.focus();
-    return () => document.removeEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey, true);
   }, [open, draft, shiftDraft, onClose, onConfirm]);
 
   if (!open) return null;

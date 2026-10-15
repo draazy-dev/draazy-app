@@ -267,6 +267,8 @@
     "healthHealthy": "Healthy",
     "remindSent": "Reminder sent for {{category}} · {{amount}}",
     "fillCatAmount": "Please fill category and amount",
+    "pickCategory": "Choose a category.",
+    "enterAmount": "Enter an amount above zero.",
     "txAdded": "Transaction added",
     "txRemoved": "Transaction removed",
     "csvExported": "CSV exported",

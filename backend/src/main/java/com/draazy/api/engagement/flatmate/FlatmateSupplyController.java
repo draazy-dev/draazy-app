@@ -82,7 +82,8 @@ public class FlatmateSupplyController {
             @Valid @RequestBody(required = false) FlatmateSeekerController.InterestRequest body) {
         service.roomInterest(principal, id,
                 body == null ? null : body.share(),
-                body == null ? null : body.message());
+                body == null ? null : body.message(),
+                body == null ? null : body.gender());
     }
 
     @PostMapping(Routes.Flatmates.GROUPS)
@@ -120,7 +121,8 @@ public class FlatmateSupplyController {
             @Valid @RequestBody(required = false) FlatmateSeekerController.InterestRequest body) {
         return service.join(principal, id,
                 body == null ? null : body.share(),
-                body == null ? null : body.message());
+                body == null ? null : body.message(),
+                body == null ? null : body.gender());
     }
 
     /** 200 for both calls; the body says which happened. Role-guarded like the creates it serves:

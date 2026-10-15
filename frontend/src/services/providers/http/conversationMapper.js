@@ -32,6 +32,7 @@ export function toViewModel(c) {
     property: propertyOf(c, group),
 
     party: {
+      id: c.counterpartyId ?? undefined,
       name,
       avatar: initialsOf(name),
       role: group ? 'Group' : c.counterpartyRole === 'owner' ? 'Owner' : 'Buyer',
@@ -52,6 +53,7 @@ export function toViewModel(c) {
     archived: !!c.archived,
     muted: !!c.muted,
     blocked: !!c.blocked,
+    blockedYou: !!c.blockedYou,
     awaitingReply: !!c.awaitingReply,
     messages,
   };
@@ -90,10 +92,11 @@ export function stagedToViewModel(item) {
 }
 
 /** View-model input → the `ConversationCreate` body. */
-export function toConversationCreate({ counterpartyMobile, propertyId, body }) {
+export function toConversationCreate({ counterpartyMobile, propertyId, body, clientId }) {
   const out = { body };
   if (counterpartyMobile) out.counterpartyMobile = counterpartyMobile;
   if (propertyId) out.propertyId = propertyId;
+  if (clientId) out.clientId = clientId;
   return out;
 }
 

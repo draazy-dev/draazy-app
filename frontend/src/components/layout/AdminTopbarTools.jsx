@@ -105,6 +105,8 @@ const FEATURES_INDEX = [
   { label: 'Product Changelog', keywords: 'changelog release notes shipped whats new version updates', path: '/help/changelog', parent: 'Runbooks', flag: null },
 ];
 
+const userPath = (u) => (u.role === 'owner' || u.role === 'buyer' ? '/admin/users' : '/admin/team');
+
 function useOutside(refs, onOutside, active) {
   useEffect(() => {
     if (!active) return undefined;
@@ -279,6 +281,28 @@ export default function AdminTopbarTools() {
     };
   }, [nav, remote, q, filter]);
 
+  const rows = useMemo(() => {
+    if (!results) return [];
+    return [
+      ...results.pages.map((p) => ({ key: 'p' + p.path, path: p.path })),
+      ...results.features.map((f) => ({ key: 'f' + f.path + f.label, path: f.path })),
+      ...results.listings.map((l) => ({ key: 'l' + l.id, path: '/admin/properties?review=' + l.id })),
+      ...results.users.map((u) => ({ key: 'u' + u.id, path: userPath(u) })),
+    ];
+  }, [results]);
+  const [activeKey, setActiveKey] = useState(null);
+  const active = rows.find((r) => r.key === activeKey) || rows[0];
+  const rowCls = (key) => 'flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5' + (active?.key === key ? ' bg-white/10' : '');
+  const onSearchKey = (e) => {
+    if (!searchOpen || !rows.length) return;
+    if (e.key === 'Enter') { e.preventDefault(); go(active.path); return; }
+    const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const at = rows.indexOf(active);
+    setActiveKey(rows[(at + step + rows.length) % rows.length].key);
+  };
+
   const [notif, setNotif] = useState({ pending: [], pendingTotal: 0, open: [], openTotal: 0, replied: [], repliedTotal: 0, blind: [], total: 0 });
 
   // Read on mount, on open, and on a slow timer while the tab is visible; a route change does not refetch.
@@ -326,6 +350,7 @@ export default function AdminTopbarTools() {
             value={q}
             onChange={(e) => { setQ(e.target.value); setSearchOpen(e.target.value.trim().length >= 2); }}
             onFocus={() => { if (q.trim().length >= 2) setSearchOpen(true); }}
+            onKeyDown={onSearchKey}
             placeholder={SEARCH_PLACEHOLDER}
             className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
             aria-label="Global search"
@@ -362,7 +387,7 @@ export default function AdminTopbarTools() {
                     <>
                       <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Pages</div>
                       {results.pages.map((p) => { const PI = p.icon; return (
-                        <button key={p.path} onClick={() => go(p.path)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <button key={p.path} onClick={() => go(p.path)} className={rowCls('p' + p.path)}>
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/15 text-teal-300"><PI className="h-4 w-4" /></span>
                           <span className="min-w-0"><span className="block truncate text-sm text-white">{p.label}</span><span className="block truncate text-xs text-gray-400">{p.path}</span></span>
                         </button>
@@ -373,7 +398,7 @@ export default function AdminTopbarTools() {
                     <>
                       <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Features ({results.features.length})</div>
                       {results.features.map((f) => (
-                        <button key={f.path + f.label} onClick={() => go(f.path)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <button key={f.path + f.label} onClick={() => go(f.path)} className={rowCls('f' + f.path + f.label)}>
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-violet-500/15 text-violet-300"><Compass className="h-4 w-4" /></span>
                           <span className="min-w-0"><span className="block truncate text-sm text-white">{f.label}</span><span className="block truncate text-xs text-gray-400">{f.parent} &middot; {f.path}</span></span>
                         </button>
@@ -384,7 +409,7 @@ export default function AdminTopbarTools() {
                     <>
                       <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Listings ({results.counts.listings})</div>
                       {results.listings.map((l) => (
-                        <button key={l.id} onClick={() => go('/admin/properties?review=' + l.id)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <button key={l.id} onClick={() => go('/admin/properties?review=' + l.id)} className={rowCls('l' + l.id)}>
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/15 text-teal-300"><Building2 className="h-4 w-4" /></span>
                           <span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{l.title}</span><span className="block truncate text-xs text-gray-400">{l.locality} &middot; {l.owner}</span></span>
                           <StatusPill status={l.status} />
@@ -396,7 +421,7 @@ export default function AdminTopbarTools() {
                     <>
                       <div className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-gray-500">People ({results.counts.users})</div>
                       {results.users.map((u) => { const RI = roleIcon(u.role); return (
-                        <button key={u.id} onClick={() => go(u.role === 'owner' || u.role === 'buyer' ? '/admin/users' : '/admin/team')} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
+                        <button key={u.id} onClick={() => go(userPath(u))} className={rowCls('u' + u.id)}>
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/15 text-indigo-300"><RI className="h-4 w-4" /></span>
                           <span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{u.name}</span><span className="block truncate text-xs text-gray-400">{u.role} &middot; {u.mobile}</span></span>
                           {u.verified && <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-teal-400" />}

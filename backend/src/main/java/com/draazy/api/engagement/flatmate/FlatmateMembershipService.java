@@ -59,21 +59,39 @@ public class FlatmateMembershipService {
                 .filter(m -> caller.userId().equals(m.getUserId()))
                 .findFirst()
                 .orElseThrow(() -> NotFoundException.of("Group membership"));
+        release(group, me, users.findById(caller.userId()).map(User::getName).orElse(null));
+    }
 
+    /** Account erasure: every seat the person holds in someone else's group opens again, with the
+     * same notice to the host that leaving by hand sends. */
+    public void leaveAll(UUID userId) {
+        for (UUID groupId : groups.findJoinedIds(userId)) {
+            FlatmateGroup group = groups.findById(groupId).orElse(null);
+            FlatmateGroupMember me = group == null ? null : group.getMembers().stream()
+                    .filter(m -> userId.equals(m.getUserId()))
+                    .findFirst().orElse(null);
+            if (me != null) {
+                release(group, me, null);
+            }
+        }
+    }
+
+    private void release(FlatmateGroup group, FlatmateGroupMember me, String memberName) {
         int open = group.openSeats();
         group.removeMember(me);
         group.setSeatsOpen(Math.min(group.getSeatsTotal(), open + 1));
         groups.saveAndFlush(group);
 
-        requests.findByKindAndTargetIdAndRequesterId("group", groupId, caller.userId())
+        requests.findByKindAndTargetIdAndRequesterId("group", group.getId(), me.getUserId())
                 .ifPresent(requests::delete);
 
-        String name = users.findById(caller.userId()).map(User::getName)
-                .map(FlatmateVocabulary::blankToNull).orElse(null);
-        notifier.notify(group.getHostId(), "flatmate.group.left",
-                (name == null ? "A member" : name) + " left " + group.getTitle(),
-                "A seat is open again.",
-                FlatmateLinks.of("group", groupId));
+        String name = FlatmateVocabulary.blankToNull(memberName);
+        if (!group.isArchived()) {
+            notifier.notify(group.getHostId(), "flatmate.group.left",
+                    (name == null ? "A member" : name) + " left " + group.getTitle(),
+                    "A seat is open again.",
+                    FlatmateLinks.of("group", group.getId()));
+        }
     }
 
     @Transactional

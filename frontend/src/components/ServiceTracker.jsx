@@ -201,7 +201,9 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
         <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
           <h2 className="text-white font-bold text-lg flex items-center gap-2"><Icon name="list-checks" className="w-5 h-5 text-teal-400" /> {title}</h2>
         </div>
-        <p className="text-gray-400 text-sm mb-4">Track progress, review the draft we prepare, and approve it so we can register it with the government.</p>
+        <p className="text-gray-400 text-sm mb-4">{typeFilter === 'rental' || typeFilter === 'legal'
+          ? 'Track progress, review the draft we prepare, and approve it so we can register it with the government.'
+          : 'Track progress, review any draft we share, and message our team from here.'}</p>
 
         {shown.length === 0 ? (
           <div className="rounded-xl border border-dashed border-white/15 p-6 text-center">

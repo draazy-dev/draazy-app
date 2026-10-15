@@ -12,6 +12,8 @@ public interface ReportMapper {
 
     @Mapping(target = "targetReportCount", ignore = true)
     @Mapping(target = "targetTitle", ignore = true)
+    @Mapping(target = "targetName", ignore = true)
+    @Mapping(target = "targetMobile", ignore = true)
     ReportResponse toResponse(Report entity);
 
     default String map(UUID value) {

@@ -95,13 +95,14 @@ export default function TimePickerDialog({ open, value, anchorRef, format = '12h
     const onKey = (e) => {
       if (e.key === 'Escape') {
         if (document.querySelector('.dz-dropdown.is-open')) return; // let an open Select close first
-        e.preventDefault(); onClose?.(); return;
+        e.preventDefault(); e.stopPropagation(); onClose?.(); return;
       }
       if (e.key === 'Enter') { e.preventDefault(); onConfirm?.(formatTime(draft, format)); }
     };
-    document.addEventListener('keydown', onKey);
+    // Capture phase, so Escape closes this popover before a dialog underneath sees it.
+    document.addEventListener('keydown', onKey, true);
     panelRef.current?.focus();
-    return () => document.removeEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey, true);
   }, [open, draft, format, onClose, onConfirm]);
 
   if (!open) return null;

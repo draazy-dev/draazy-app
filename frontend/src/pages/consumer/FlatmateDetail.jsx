@@ -19,15 +19,16 @@ import { recordAskLocally, rememberAsk } from '../../lib/data/flatmates.js';
 import * as flatmateService from '../../services/flatmateService.js';
 import { inr, perHead, roomTitle, FLATMATE_IMG, FLATMATE_GROUP_IMG } from './flatmates/helpers.js';
 import { SHARE_OPENER, SEEKER_OPENER, groupOpener } from './flatmates/openers.js';
+import { useGenderGate } from './flatmates/useGenderGate.jsx';
 
 const KINDS = ['group', 'room', 'post'];
 const interestKey = (kind, id) => (kind === 'post' ? id : `${kind}-${id}`);
 
-function askFor(kind, item, share) {
+function askFor(kind, item, share, gender) {
   if (kind === 'group') {
     const message = groupOpener(item);
     return {
-      send: () => flatmateService.joinGroup(item.id, { share: 'solo', message }),
+      send: () => flatmateService.joinGroup(item.id, { share: 'solo', message, gender }),
       thread: { propertyId: 'group-' + item.id, property: { title: item.title, price: inr(perHead(item)) + '/mo', loc: (item.locality || 'Pune') + ', Pune', img: FLATMATE_GROUP_IMG }, party: { name: item.title, avatar: (item.title || 'GR').slice(0, 2).toUpperCase() }, firstMessage: message },
       sent: [item.policy === 'any' ? 'flatmates.joinedToast' : 'flatmates.requestJoinToast', { title: item.title }],
       dup: ['flatmates.joinRequestAlreadyRecorded', { title: item.title }],
@@ -37,7 +38,7 @@ function askFor(kind, item, share) {
     const message = SHARE_OPENER[share] || SHARE_OPENER.solo;
     const title = item.society || roomTitle(item);
     return {
-      send: () => flatmateService.roomInterest(item.id, { share, message }),
+      send: () => flatmateService.roomInterest(item.id, { share, message, gender }),
       thread: { propertyId: 'room-' + item.id, property: { title: item.society ? 'Room in ' + item.society : title, price: item.budget ? '₹' + item.budget + '/mo' : '', loc: item.localities?.[0] || 'Pune', img: item.photos?.[0] || FLATMATE_IMG }, party: { name: title, avatar: title.slice(0, 2).toUpperCase() }, firstMessage: message },
       sent: ['flatmates.messageSentOwner', { society: title }],
       dup: ['flatmates.enquiryAlreadyRecorded', { society: title }],
@@ -68,6 +69,7 @@ export default function FlatmateDetail() {
   const item = state.item;
   const owned = !!state.owned;
   const signedInAs = user?.mobile;
+  const { askGender, genderSheet } = useGenderGate();
 
   const load = useCallback(async () => {
     if (!KINDS.includes(kind)) { setState({ status: 'missing' }); return; }
@@ -104,7 +106,9 @@ export default function FlatmateDetail() {
       setVerifyOpen(true);
       return;
     }
-    const ask = askFor(kind, target, share);
+    const gate = kind === 'post' ? { gender: undefined } : await askGender(target, kind);
+    if (!gate) return;
+    const ask = askFor(kind, target, share, gate.gender);
     setMyAsk({ status: 'pending' });
     let sent;
     try {
@@ -231,6 +235,7 @@ export default function FlatmateDetail() {
       )}
 
       {verifyOpen && <VerifyIdentityRedirect source="flatmates" onClose={() => setVerifyOpen(false)} />}
+      {genderSheet}
     </div>
   );
 }

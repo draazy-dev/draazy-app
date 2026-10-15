@@ -58,4 +58,21 @@ test.describe('City waitlist (live)', () => {
     await expect(page.getByPlaceholder('Enter mobile number')).toHaveValue('9876543210');
     await expect(page.getByRole('button', { name: 'Notify me when live' })).toBeEnabled();
   });
+
+  test('the waitlist pop-up is a labelled dialog that holds focus, closes on Escape and gives focus back', async ({ page }) => {
+    await openWaitlistModal(page);
+
+    const dialog = page.getByRole('dialog', { name: new RegExp(`Join the ${CITY} waitlist`, 'i') });
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute('aria-modal', 'true');
+    await expect.poll(() => dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+
+    for (let i = 0; i < 12; i += 1) {
+      await page.keyboard.press('Tab');
+      expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true);
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+  });
 });

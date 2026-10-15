@@ -115,7 +115,7 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
         mvc.perform(post(route, targetId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(requester))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"share\":\"" + share + "\"}"))
+                        .content("{\"share\":\"" + share + "\",\"gender\":\"female\"}"))
                 .andExpect(status().isCreated());
         return jdbc.queryForObject(
                 "select id::text from flatmate_requests where target_id = ?::uuid "

@@ -60,7 +60,6 @@ function FeaturedCard({ p, priority = false }) {
         </button>
         <div className="theme-dark absolute bottom-3 left-3">
           <span className="text-xl font-extrabold text-white tabular-nums" style={{ textShadow: '0 1px 4px rgb(var(--dz-c-black) / 0.6)' }}>{priceLabel(p)}</span>
-          {p.deal === 'rent' && <span className="text-xs text-gray-300 ml-1">{t('home.featured.perMonth')}</span>}
         </div>
       </div>
       <div className="flex flex-col flex-1 p-4 gap-1.5">

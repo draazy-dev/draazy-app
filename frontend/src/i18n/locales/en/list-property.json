@@ -409,6 +409,8 @@
       "agreementRequired": "Upload your registered rent agreement.",
       "ownerConsent": "Confirm that the owner knows and agrees to sharing.",
       "photosMax": "Keep at most {{count}} photos. Remove the extra photos before saving.",
+      "photosCapped": "Only {{count}} photos are allowed. Skipped {{skipped}} from your selection.",
+      "photosFailed": "A photo did not upload. Remove it, or add a different one, before posting.",
       "photosKeyCats": "Label at least {{count}} photos with what they show ({{cats}}) — seekers skip listings that hide the rooms.",
       "availableFromDate": "Select the available-from date.",
       "deposit": "Enter the security deposit.",

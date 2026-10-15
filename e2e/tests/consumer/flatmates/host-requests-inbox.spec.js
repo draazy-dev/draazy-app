@@ -60,7 +60,7 @@ test.describe('Host flatmate requests inbox (live API)', () => {
     const join = await fetch(`${API}/flatmates/groups/${group.id}/join`, {
       method: 'POST',
       headers: auth(seeker.accessToken),
-      body: JSON.stringify({}),
+      body: JSON.stringify({ gender: 'female' }),
     });
     expect(join.status, await join.clone().text()).toBe(201);
 

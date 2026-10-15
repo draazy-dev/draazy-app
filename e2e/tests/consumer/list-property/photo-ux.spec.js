@@ -84,15 +84,28 @@ test.describe('list property photo UX', () => {
       await expect(photos.locator('.dz-dd-photocat .dz-dropdown__trigger').first()).toHaveText('Balcony');
     });
 
-    await test.step('shows a per-photo resolution error and retry affordance', async () => {
+    await test.step('shows a per-photo resolution error and offers no retry for a photo that can never pass', async () => {
         await photos.locator('input[type="file"]').first().setInputFiles({
           name: 'tiny.png',
           mimeType: 'image/png',
           buffer: SMALL_PNG,
         });
         await expect(photos).toContainText(/480 px/);
-        await expect(photos.getByRole('button', { name: /retry/i })).toBeVisible();
+        await expect(photos.getByRole('button', { name: /retry/i })).toHaveCount(0);
     });
+  });
+
+  test('a photo dropped on the upload box is added like a picked one', async ({ page }) => {
+    await openPhotos(page);
+    const photos = page.locator('[data-err="photos"]');
+    const transfer = await page.evaluateHandle((b64) => {
+      const data = new DataTransfer();
+      data.items.add(new File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], 'dropped.png', { type: 'image/png' }));
+      return data;
+    }, PHOTO_PNG.toString('base64'));
+    await photos.locator('label.upload-zone').dispatchEvent('drop', { dataTransfer: transfer });
+    await expect(photos.locator('.grid img')).toHaveCount(1);
+    await expect(photos).toContainText('1 / 10 photos');
   });
 
   test('follows the limit the server publishes rather than a bundled number', async ({ page }) => {

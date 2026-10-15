@@ -13,7 +13,8 @@ public record VisitDto(
         Instant slot,
         String mode,
         String status,
-        Instant createdAt) {
+        Instant createdAt,
+        String note) {
 
     public record Party(String id, String name, String mobile, String role) {
     }

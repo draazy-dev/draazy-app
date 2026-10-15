@@ -133,6 +133,29 @@ test.describe('Flatmate group lifecycle (live)', () => {
       expect(await myGroupIds(accessToken)).not.toContain(group.id);
     });
   });
+  test('double-tapping Create group posts one group', async ({ page }) => {
+    const { accessToken } = await newHost(page);
+    await openBoard(page);
+    let posts = 0;
+    page.on('request', (r) => { if (/\/api\/flatmates\/groups(\?|$)/.test(r.url()) && r.method() === 'POST') posts += 1; });
+    const posted = page.waitForResponse(
+      (r) => /\/api\/flatmates\/groups(\?|$)/.test(r.url()) && r.request().method() === 'POST',
+    );
+
+    await postAsGroup(page);
+    await haveAFlat(page);
+    const title = uniqueTitle('twice');
+    await page.getByPlaceholder(/2 girls/i).fill(title);
+    await pickPlaceholderLocality(page);
+    await page.getByPlaceholder(/e\.g\. 34,000/i).fill('40000');
+    await page.getByPlaceholder(/Your name/i).fill('Group Owner');
+    await page.getByRole('button', { name: /Create group/i }).dblclick();
+
+    const created = await (await posted).json();
+    track('groups', created.id, accessToken);
+    await expect.poll(async () => (await myGroupIds(accessToken)).length).toBe(1);
+    expect(posts, 'a second tap must not create a second group').toBe(1);
+  });
   test("somebody else's group still offers a way in", async ({ page }) => {
     const title = uniqueTitle('other');
     await otherHostsGroup(title);

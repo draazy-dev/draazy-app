@@ -21,7 +21,7 @@ const listingLine = (property) => [property?.bhk, property?.loc].filter(Boolean)
 const quickReplies = (property) => [
   'Is it still available?',
   'Can I visit this Saturday?',
-  property?.deal === 'sale' ? "What's the final price?" : "What's the final rent?",
+  property?.deal === 'rent' ? "What's the final rent?" : "What's the final price?",
 ];
 const draftKey = (userId, threadId) => `dzMsgDraft:${userId || 'anon'}:${threadId}`;
 const finePointer = () => typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
@@ -76,7 +76,7 @@ export default function Thread({
   const canCall = isFullMobile(mobile);
   const partyDigits = digits(mobile);
   const key = active ? draftKey(userId, active.id) : '';
-  const showQuick = active && !active.staged && !active.blocked && (!active.messages.length || active.messages.at(-1)?.from === 'them');
+  const showQuick = active && active.youAre === 'buyer' && !active.staged && !active.blocked && (!active.messages.length || active.messages.at(-1)?.from === 'them');
   const showPrivacyHint = draft && !canCall && hasPrivateContact(draft);
   const replies = useMemo(() => quickReplies(active?.property).slice(0, 3), [active?.property]);
   const previewOpen = !!preview;
@@ -223,17 +223,19 @@ export default function Thread({
         {offline ? <div className="pc-offline">You're offline ? messages send when you're back</div> : null}
         {active.staged ? <div className="pc-wait"><Icon name="clock" className="w-4 h-4" /> {t('misc.msgWaitingOwner')}</div> : active.blocked ? (
           <div className="pc-wait"><Icon name="ban" className="w-4 h-4" /> You blocked {active.party.name} ? <button type="button" onClick={() => onBlock(active.id, false)}>Unblock</button></div>
+        ) : active.blockedYou ? (
+          <div className="pc-wait" role="status"><Icon name="ban" className="w-4 h-4" /> {t('misc.msgCantMessage')}</div>
         ) : (
           <>
             {showQuick ? <div className="pc-quick">{replies.map((qr) => <button key={qr} className="pc-quick-chip" onClick={() => send(qr)}>{qr}</button>)}</div> : null}
             {showPrivacyHint ? <div className="pc-privacy-hint">{t('misc.msgPrivateContactHint')}</div> : null}
+            {sendError ? <div className="pc-send-error">{sendError}</div> : null}
             <div className="pc-composer">
               {replyTo ? <div className="pc-reply-bar"><span>{replyTo.text}</span><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><Icon name="x" className="w-4 h-4" /></button></div> : null}
               <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={pickPhoto} />
               <button type="button" className="pc-icon-btn pc-attach" onClick={() => fileRef.current?.click()} aria-label={t('misc.msgAttachPhoto')}><Icon name="paperclip" className="w-5 h-5" /></button>
               <textarea ref={inputRef} className="pc-input" value={draft} onChange={(e) => changeDraft(e.target.value)} onInput={resize} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && finePointer()) { e.preventDefault(); send(); } }} rows={1} enterKeyHint="send" placeholder={t('misc.msgTypeMessage')} aria-label={t('misc.msgTypeMessage')} />
               <button className="pc-send" disabled={!draft.trim()} onClick={() => send()} aria-label={t('misc.msgSendMessage')}><Icon name="send" className="w-5 h-5" /></button>
-              {sendError ? <div className="pc-send-error">{sendError}</div> : null}
             </div>
             {preview ? (
               <div className="pc-photo-preview" role="dialog" aria-modal="true" aria-label={t('misc.msgPhotoPreview')}>

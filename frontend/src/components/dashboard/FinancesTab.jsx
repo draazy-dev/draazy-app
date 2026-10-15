@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import Tabs from '../ui/Tabs.jsx';
 import { fmtINR } from '../../lib/format.js';
+import { istToday } from '../../lib/availability.js';
+import { useSingleFlight } from '../../hooks/useSingleFlight.js';
 import { PALETTE } from '../charts/index.jsx';
 import TenantFinancesTab from './TenantFinancesTab.jsx';
 import {
@@ -60,7 +62,8 @@ function OwnerFinances({ user, listings, toast }) {
   const [finProp, setFinProp] = useState(propKey(propOpts[0]));
   const [finPeriod, setFinPeriod] = useState('all');
   const [finType, setFinType] = useState('all');
-  const [txForm, setTxForm] = useState({ type: 'income', category: '', amount: '', date: new Date().toISOString().slice(0, 10), notes: '', recurring: false });
+  const [txForm, setTxForm] = useState({ type: 'income', category: '', amount: '', date: istToday(), notes: '', recurring: false });
+  const [txErrors, setTxErrors] = useState({});
   const [showTxForm, setShowTxForm] = useState(false);
   const [showAllTx, setShowAllTx] = useState(false);
   const [showBasisModal, setShowBasisModal] = useState(false);
@@ -200,11 +203,15 @@ function OwnerFinances({ user, listings, toast }) {
     return filterByPeriod(typed, finPeriod).sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [txs, finType, finPeriod]);
 
-  const submitTx = async () => {
-    if (!txForm.category || !txForm.amount || isNaN(parseFloat(txForm.amount))) {
-      toast(t('fin.fillCatAmount'), 'error');
-      return;
-    }
+  const singleFlight = useSingleFlight();
+  const submitTx = () => singleFlight(async () => {
+    const amount = parseFloat(txForm.amount);
+    const errors = {
+      ...(txForm.category ? {} : { category: t('fin.pickCategory') }),
+      ...(amount > 0 ? {} : { amount: t('fin.enterAmount') }),
+    };
+    setTxErrors(errors);
+    if (Object.keys(errors).length) return;
     let saved;
     try {
       // The store called the repeat interval `repeat`; the wire calls it `recurring`. One name wins
@@ -212,7 +219,7 @@ function OwnerFinances({ user, listings, toast }) {
       saved = await addTransaction(finProp, {
         type: txForm.type,
         category: txForm.category,
-        amount: parseFloat(txForm.amount),
+        amount,
         date: txForm.date,
         note: txForm.notes,
         recurring: txForm.recurring ? 'monthly' : 'none',
@@ -221,11 +228,11 @@ function OwnerFinances({ user, listings, toast }) {
       toast(err?.body?.error || err?.message || t('fin.fillCatAmount'), 'error');
       return;
     }
-    setTxForm({ type: 'income', category: '', amount: '', date: new Date().toISOString().slice(0, 10), notes: '', recurring: false });
+    setTxForm({ type: 'income', category: '', amount: '', date: istToday(), notes: '', recurring: false });
     setShowTxForm(false);
     applyConfirmed(saved, 1, (rows) => [saved, ...rows]);
     toast(t('fin.txAdded'), 'success');
-  };
+  });
   const removeTx = async (id) => {
     const gone = txs.find((row) => row.id === id);
     try {
@@ -342,8 +349,8 @@ function OwnerFinances({ user, listings, toast }) {
 
       <AddTransactionModal
         open={showTxForm}
-        onClose={() => setShowTxForm(false)}
-        txForm={txForm} setTxForm={setTxForm} catOpts={catOpts} onSubmit={submitTx}
+        onClose={() => { setShowTxForm(false); setTxErrors({}); }}
+        txForm={txForm} setTxForm={setTxForm} catOpts={catOpts} errors={txErrors} onSubmit={submitTx}
       />
 
       <BasisModal

@@ -241,10 +241,10 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                         .content("{}"))
                 .andExpect(status().isNotFound());
 
-        // status (stranger is not a participant on this property)
+        // status (stranger is not a participant on this property): nothing to show, not an error
         mvc.perform(get("/finalization/" + p.getId() + "/status")
                         .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNoContent());
 
         // cancel (stranger is not a participant)
         mvc.perform(delete("/finalization/" + p.getId() + "/status")
@@ -522,5 +522,86 @@ class FinalizationEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isNotFound())
                     .andExpect(jsonPath("$.error").value("not_found"));
         }
+    }
+
+    private void ownerAcceptsOffer(User owner, User buyer, Property p, long amount) throws Exception {
+        MvcResult offer = mvc.perform(post(Routes.Offers.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + p.getId() + "\",\"amount\":" + amount + "}"))
+                .andExpect(status().isCreated())
+                .andReturn();
+        mvc.perform(post(Routes.Offers.BASE + "/" + extractId(offer) + "/respond")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"action\":\"accept\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void statusWithNoRequest_is204NotAnError() throws Exception {
+        User owner = user("9830100081", "owner");
+        User buyer = user("9830100082", "buyer");
+        Property p = listing(owner, "No request yet");
+
+        mvc.perform(get("/finalization/" + p.getId() + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void requestAfterAcceptedOffer_usesTheOfferAmountNotTheListingPrice() throws Exception {
+        User owner = user("9830100083", "owner");
+        User buyer = user("9830100084", "buyer");
+        Property p = listing(owner, "Offer price wins");
+        ownerAcceptsOffer(owner, buyer, p, 20000L);
+
+        mvc.perform(post(Routes.Finalization.REQUEST.replace("{propId}", p.getId().toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"counterpartyMobile\":\"" + owner.getMobile() + "\",\"agreedPrice\":25000}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.agreedPrice").value(20000));
+    }
+
+    @Test
+    void acceptOnRentListing_opensPendingTenancyAndNotifiesTenant() throws Exception {
+        User owner = user("9830100085", "owner");
+        User buyer = user("9830100086", "buyer");
+        Property p = listing(owner, "Tenancy from finalize");
+        String reqId = requestFinalization(buyer, p, owner, 25000L);
+
+        mvc.perform(post("/finalization/requests/" + reqId + "/accept")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM tenancies WHERE property_id = ? AND tenant_id = ? AND status = 'pending'",
+                Integer.class, p.getId(), buyer.getId())).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT count(*) FROM notifications WHERE user_id = ? AND type = 'tenancy.pending'",
+                Integer.class, buyer.getId())).isEqualTo(1);
+    }
+
+    @Test
+    void secondAccept_isACleanConflictNotA500() throws Exception {
+        User owner = user("9830100087", "owner");
+        User buyer = user("9830100088", "buyer");
+        Property p = listing(owner, "Double accept");
+        String reqId = requestFinalization(buyer, p, owner, 25000L);
+
+        mvc.perform(post("/finalization/requests/" + reqId + "/accept")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk());
+        mvc.perform(post("/finalization/requests/" + reqId + "/accept")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("This request has already been accepted."));
     }
 }

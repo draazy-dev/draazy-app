@@ -144,7 +144,7 @@ function clearSessionHint() {
   } catch { /* no document (SSR, worker, DOM-less test env) — the server's clear still applies */ }
 }
 
-export const roleLabel = (r) => (r === 'owner' ? 'Owner' : r === 'admin' ? 'Admin' : r === 'manager' ? 'Manager' : r === 'staff' ? 'Staff' : r === 'member' ? 'Member' : 'Buyer / Tenant');
+export const roleLabel = (r) => (r === 'owner' ? 'Owner' : r === 'admin' ? 'Admin' : r === 'manager' ? 'Manager' : r === 'staff' ? 'Staff' : 'Member');
 // Must match UserUpdate's @Pattern on the server.
 export const isValidName = (name) => name.length >= 2 && name.length <= 80 && /^\p{L}[\p{L}\p{M} .'-]*$/u.test(name);
 export const firstName = (u) => ((u && u.name) || '').trim().split(/\s+/)[0] || 'Account';

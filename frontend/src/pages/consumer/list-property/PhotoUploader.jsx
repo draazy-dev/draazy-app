@@ -76,15 +76,22 @@ const PhotoUploader = ({
   const ERROR_COPY = {
     min: ['listProperty.err.photosMin', { count: MIN_PUBLISH_PHOTOS }],
     max: ['listProperty.err.photosMax', { count: maxPhotos }],
+    failed: ['listProperty.err.photosFailed', {}],
+    capped: ['listProperty.err.photosCapped', { count: maxPhotos, skipped: String(error).split(':')[1] }],
     categories: ['listProperty.err.photosKeyCats', { count: Math.min(MIN_PUBLISH_KEY_CATEGORIES, KEY_CATS.length), cats: KEY_CATS.join(', ') }],
   };
-  const errorCopy = ERROR_COPY[error] || ['listProperty.photoUploader.errorAddPhoto', {}];
+  const errorCopy = ERROR_COPY[String(error).split(':')[0]] || ['listProperty.photoUploader.errorAddPhoto', {}];
+  const dropPhotos = (event) => {
+    event.preventDefault();
+    if (disabled) return;
+    handlePhotoUpload({ target: { files: event.dataTransfer.files, value: '' } });
+  };
   return (
     <div className="mb-6" data-err="photos" aria-busy={isMediaBusy}>
       <label className={lbl3}>{label || t('listProperty.photoUploader.defaultLabel')}</label>
       {hint && <p className="text-gray-500 text-xs mb-3">{hint}</p>}
 
-      <label className={`upload-zone rounded-2xl p-5 text-center block focus-within:ring-2 focus-within:ring-teal-400 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${error ? 'dz-invalid' : ''}`}>
+      <label onDragOver={(e) => e.preventDefault()} onDrop={dropPhotos} className={`upload-zone rounded-2xl p-5 text-center block focus-within:ring-2 focus-within:ring-teal-400 ${disabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'} ${error ? 'dz-invalid' : ''}`}>
         <input type="file" className="sr-only" multiple accept={PHOTO_ACCEPT} disabled={disabled} aria-label={t('listProperty.photoUx.photoPicker')} onChange={handlePhotoUpload} />
         <div className="w-12 h-12 rounded-xl bg-teal-400/10 border border-teal-400/20 flex items-center justify-center mx-auto mb-2.5"><CloudUpload className="w-6 h-6 text-teal-400" /></div>
         <p className="text-white font-medium text-sm mb-0.5">{t('listProperty.photoUploader.addPhoto')}</p>
@@ -170,9 +177,9 @@ const PhotoUploader = ({
                 {p.error && (
                   <div className="p-2 text-xs text-red-200">
                     <p>{p.error}</p>
-                    <button type="button" disabled={isMediaBusy} onClick={() => setPhotoCategory('__retry', i)} className="mt-2 min-h-[44px] inline-flex items-center gap-1 text-teal-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                    {p.retryable !== false && <button type="button" disabled={isMediaBusy} onClick={() => setPhotoCategory('__retry', i)} className="mt-2 min-h-[44px] inline-flex items-center gap-1 text-teal-200 disabled:opacity-50 disabled:cursor-not-allowed">
                       <RotateCcw className="w-3.5 h-3.5" /> {t('listProperty.photoUx.retry')}
-                    </button>
+                    </button>}
                   </div>
                 )}
               </SortablePhoto>

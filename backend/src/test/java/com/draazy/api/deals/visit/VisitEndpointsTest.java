@@ -215,6 +215,25 @@ class VisitEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].propertyId").value(p1.getId().toString()));
     }
 
+    @Test
+    void myVisitRequests_showsTheVisitorsNoteToTheOwner() throws Exception {
+        User owner = user("9820200091", "owner");
+        User visitor = user("9820200092", "buyer");
+        Property p = listing(owner, "Note test");
+
+        mvc.perform(post(Routes.Visits.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot()
+                                + "\",\"mode\":\"in-person\",\"note\":\"Will come with family\"}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(get(Routes.Visits.ME_REQUESTS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].note").value("Will come with family"));
+    }
+
     // The harvest guard. A visit nobody has agreed to yet must not hand out a phone number, or "book a visit" becomes
     // a way to read any stranger's mobile off their own listing.
     @Test

@@ -6,7 +6,10 @@ import { useTranslation } from 'react-i18next';
 import { CATEGORIES, getCatLabel } from '../../../lib/data/support.js';
 import { suggestFaqs } from './suggestFaqs.js';
 
-export default function TicketForm({ form, set, fld, submit, faqs }) {
+const SUBJECT_MAX = 120;
+const MESSAGE_MAX = 4000;
+
+export default function TicketForm({ form, set, fld, submit, submitting, faqs }) {
   const { t } = useTranslation();
   const suggestions = useMemo(() => suggestFaqs(`${form.subject} ${form.message}`, faqs), [form.subject, form.message, faqs]);
   return (
@@ -59,11 +62,12 @@ export default function TicketForm({ form, set, fld, submit, faqs }) {
             id="ticket-subject"
             value={form.subject}
             onChange={(e) => set('subject', e.target.value)}
-            maxLength={120}
+            maxLength={SUBJECT_MAX}
             type="text"
             placeholder={t('misc.tfSubjectPlaceholder')}
             className={fld}
           />
+          <p className="mt-1 text-right text-xs text-gray-500">{form.subject.length}/{SUBJECT_MAX}</p>
           {suggestions.length > 0 && (
             <div className="mt-2 rounded-xl border border-teal-400/20 bg-teal-400/5 p-3" data-testid="faq-suggestions">
               <p className="text-xs font-semibold text-teal-300 mb-1">{t('misc.tfFaqSuggest')}</p>
@@ -87,16 +91,20 @@ export default function TicketForm({ form, set, fld, submit, faqs }) {
             id="ticket-message"
             value={form.message}
             onChange={(e) => set('message', e.target.value)}
+            maxLength={MESSAGE_MAX}
             rows={4}
             placeholder={t('misc.tfDescribePlaceholder')}
             className={fld + ' resize-none'}
           />
+          <p className="mt-1 text-right text-xs text-gray-500">{form.message.length}/{MESSAGE_MAX}</p>
         </div>
       </div>
 
       <button
         onClick={submit}
-        className="btn-teal w-full mt-5 py-3.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2"
+        disabled={submitting}
+        aria-busy={submitting}
+        className="btn-teal w-full mt-5 py-3.5 rounded-xl text-white text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-60"
       >
         <Icon name="send" className="w-4 h-4" /> {t('misc.tfSubmit')}
       </button>

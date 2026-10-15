@@ -53,7 +53,7 @@ export default function useListingMedia({ setErrors }) {
     } catch (error) {
       if (controller.signal.aborted) return;
       setPhotos((prev) => prev.map((photo) => (photo.id === slot.id
-        ? { ...photo, uploading: false, error: error.message || 'Upload failed. Please try again.' }
+        ? { ...photo, uploading: false, error: error.message || 'Upload failed. Please try again.', retryable: error.retryable !== false }
         : photo)));
     }
   };
@@ -67,7 +67,7 @@ export default function useListingMedia({ setErrors }) {
     if (!controller) return;
     const available = Math.max(0, maxPhotos - photos.length);
     const batch = picked.slice(0, available);
-    const failures = picked.length > available ? [`Only ${maxPhotos} photos are allowed. Extra selections were skipped.`] : [];
+    const skipped = picked.length - batch.length;
     clearError('photos');
     const slots = batch.map((file) => {
       const previewUrl = URL.createObjectURL(file);
@@ -95,7 +95,7 @@ export default function useListingMedia({ setErrors }) {
           done += 1;
         }
       }));
-      if (failures.length) setError('photos', failures.join(' '));
+      if (skipped) setError('photos', `capped:${skipped}`);
     } finally { finish(controller); }
   };
   const retryPhoto = async (i) => {

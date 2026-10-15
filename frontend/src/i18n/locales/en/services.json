@@ -173,6 +173,7 @@
       "doneOwnerTitle": "Request submitted!",
       "doneInviteDesc": "We've asked the tenant to fill in their details & documents. Once they're done, our team prepares the draft for your approval.",
       "doneOwnerDesc": "Our team will share the draft within a few hours and schedule biometric e-registration at your convenience.",
+      "doneInviteeUnpaidDesc": "Your details are saved. Our team starts the draft once the person who began this request completes the payment — you'll be notified when it moves.",
       "donePaymentConfirmingTitle": "Confirming your payment",
       "donePaymentConfirmingDesc": "Your rent agreement details are saved. We're waiting for your bank to confirm the payment — this usually takes a few seconds.",
       "donePaymentPendingTitle": "We couldn't confirm your payment yet",
@@ -877,7 +878,7 @@
         "startNewHint": "For a different property",
         "continue": "Add what's missing to this request",
         "continueHint": "Opens your saved answers. Submitting again completes this request rather than filing a new one.",
-        "topUpHint": "Your answers are shared with your tenant and stay as filed ? this adds only your PAN/Aadhaar numbers and any papers still missing.",
+        "topUpHint": "Your answers are shared with your tenant and stay as filed — this adds only your PAN/Aadhaar numbers and any papers still missing.",
         "toppedUp": "Your side of the agreement is complete.",
         "topUpChanged": "Your answers are shared with your tenant and can't be changed here. Undo the change, or cancel this request from your dashboard and file a new one.",
         "topUpHint_owner": "Your answers are shared with the owner and stay as filed — this adds only your PAN/Aadhaar numbers and any papers still missing.",
@@ -910,11 +911,11 @@
         "coFilledTitle": "Your tenant has filled in their part",
         "desc": "Pay to send this agreement to our drafting team. If anything is still missing, we'll say exactly what.",
         "cta": "Pay {{amount}}",
-        "paid": "Payment received ? our drafting team will start on your agreement.",
+        "paid": "Payment received — our drafting team will start on your agreement.",
         "coFilledTitle_owner": "The owner has filled in their part"
       },
       "docsRetry": "We saved your request but couldn't upload one or more documents. Please try again.",
-      "docsReattach": "You changed the agreement, so it has to be filed again ? please re-attach the papers marked below.",
+      "docsReattach": "You changed the agreement, so it has to be filed again — please re-attach the papers marked below.",
       "err": {
         "adult": "Enter an age between 18 and 120.",
         "ageDob": "Age must match the date of birth.",
@@ -931,7 +932,7 @@
       "heroBadge": "Free 3D design · Itemised quote",
       "heroTitle1": "Interiors that",
       "heroTitleAccent": "feel like home",
-      "heroSubtitle": "Full home interiors, modular kitchens and renovations in Pune ? designed in 3D, built by our partner teams, at a transparent price with the handover date written into your quote.",
+      "heroSubtitle": "Full home interiors, modular kitchens and renovations in Pune — designed in 3D, built by our partner teams, at a transparent price with the handover date written into your quote.",
       "bookConsult": "Book Free Consultation",
       "viewWork": "View Our Work",
       "stat": {
@@ -1130,7 +1131,7 @@
     "valuation": {
       "rateBasedComparables": "≈ ₹{{rate}} / sq.ft · based on {{comps}} comparables in {{loc}}",
       "rateBasedCityAvg": "≈ ₹{{rate}} / sq.ft · based on Pune city-average rates for {{loc}}",
-      "heroBadge": "Data-backed ? Qualified valuers",
+      "heroBadge": "Data-backed · Qualified valuers",
       "heroTitle1": "Know what your",
       "heroTitleAccent": "property is really worth",
       "heroSubtitle": "Get an instant ballpark estimate for free, then request a certified valuation report — accepted by banks, courts and tax authorities. Our valuers analyse real Pune comparables, not guesswork.",
@@ -1295,7 +1296,7 @@
         }
       ],
       "ctaTitle": "Need an official property valuation?",
-      "ctaSub": "Get a signed report from a qualified valuer ? we call you back within 24 hours.",
+      "ctaSub": "Get a signed report from a qualified valuer — we call you back within 24 hours.",
       "ctaRequest": "Request Valuation",
       "ctaCall": "Call {{phone}}"
     },
@@ -1423,7 +1424,7 @@
       "ctaPrimary": "Check Eligibility",
       "emiCalc": {
         "title": "Plan your EMI before you apply",
-        "sub": "Move the sliders to see your monthly EMI and total interest instantly ? then get matched to a suitable lender.",
+        "sub": "Move the sliders to see your monthly EMI and total interest instantly — then get matched to a suitable lender.",
         "loanAmount": "Loan amount",
         "interestRate": "Interest rate (p.a.)",
         "tenure": "Tenure",
@@ -1669,7 +1670,7 @@
         },
         {
           "t": "Confirm Partner",
-          "d": "Approve the quote ? we book the mover and give you one Draazy contact for the move."
+          "d": "Approve the quote — we book the mover and give you one Draazy contact for the move."
         },
         {
           "t": "Move Day",
@@ -1699,11 +1700,11 @@
         }
       ],
       "ctaTitle": "Planning a move soon?",
-      "ctaSub": "Get a free, no-obligation quote from a moving partner ? our team calls you back within 24 hours.",
+      "ctaSub": "Get a free, no-obligation quote from a moving partner — our team calls you back within 24 hours.",
       "ctaPrimary": "Get Free Quote",
       "estimator": {
         "title": "Instant moving-cost estimate",
-        "sub": "Get a ballpark price in seconds ? then request a free, exact quote from a moving partner.",
+        "sub": "Get a ballpark price in seconds — then request a free, exact quote from a moving partner.",
         "fSize": "Home size",
         "fDistance": "Move distance",
         "fPacking": "Packing type",

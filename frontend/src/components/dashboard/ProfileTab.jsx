@@ -123,7 +123,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   const [erasing, setErasing] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const { verified: identityVerified } = useVerification();
-  const nameLocked = Boolean(user?.verified || identityVerified);
+  const nameLocked = Boolean(identityVerified);
   /* Preferences are account-level, so the panel shows what the platform will honour on whatever device is asking. */
 
   useEffect(() => {

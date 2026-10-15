@@ -53,6 +53,7 @@ public interface PropertyMapper {
     @Mapping(target = "coverImage", expression = COVER)
     @Mapping(target = "progress", expression = "java(ListingProgress.of(property, false))")
     @Mapping(target = "freshness", expression = FRESHNESS)
+    @Mapping(target = "archivedNote", expression = "java(archivedNote(property))")
     @Mapping(target = "pendingLeads", expression = "java(pendingLeads.getOrDefault(property.getId(), 0))")
     @Mapping(target = "photoCount", expression = "java(photoCount(property))")
     @Mapping(target = "descLength", expression = "java(property.getDescription() == null ? 0"
@@ -276,6 +277,14 @@ public interface PropertyMapper {
                 formDetailBoolean(property, "electricity"),
                 formDetailBoolean(property, "roadAccess"),
                 formDetailBoolean(property, "satbara"));
+    }
+
+    /** Staff free text stays private; only the duplicate verdict is stated to the owner. */
+    default String archivedNote(Property property) {
+        String reason = property.getArchiveReason();
+        return property.isArchived() && reason != null
+                && reason.startsWith(com.draazy.api.catalog.listing.ListingArchiveService.DUPLICATE_REASON)
+                ? "Archived as a duplicate of another listing." : null;
     }
 
     /** The card image: the stored cover, else the first gallery photo. Derived rather than

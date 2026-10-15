@@ -12,6 +12,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,14 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * The finalization endpoints: the maker/checker flow where a buyer proposes to finalize a listing's
- * deal and the owner accepts or declines.
- *
- * <p>All routes are authenticated by the default-deny posture in {@code SecurityConfig}.
- * No {@code @PreAuthorize} role guard — the spec carries no {@code x-roles} on these operations.
- * Authentication plus strict initiator/counterparty scoping is the gate.
- */
+/** Buyer proposes to finalize a deal, the owner accepts or declines; scoping by party is the gate, not a role. */
 @RestController
 public class FinalizationController {
 
@@ -37,10 +31,7 @@ public class FinalizationController {
         this.finalizationService = finalizationService;
     }
 
-    /**
-     * {@code POST /finalization/{propId}/request} (contract {@code requestFinalization}) —
-     * buyer requests finalization for a listing.
-     */
+    /** Buyer requests finalization for a listing. */
     @PostMapping(Routes.Finalization.REQUEST)
     public FinalizationRequestDto requestFinalization(
             @CurrentUser AuthPrincipal principal,
@@ -49,21 +40,17 @@ public class FinalizationController {
         return finalizationService.request(principal.userId(), parseUuid(propId), body);
     }
 
-    /**
-     * {@code GET /finalization/{propId}/status} (contract {@code finalizationStatus}) —
-     * the caller-relevant live request for this property.
-     */
+    /** The caller's request for this property; 204 when there is none. */
     @GetMapping(Routes.Finalization.STATUS)
-    public FinalizationRequestDto finalizationStatus(
+    public ResponseEntity<FinalizationRequestDto> finalizationStatus(
             @CurrentUser AuthPrincipal principal,
             @PathVariable("propId") String propId) {
-        return finalizationService.status(principal.userId(), parseUuid(propId));
+        return finalizationService.status(principal.userId(), parseUuid(propId))
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
-    /**
-     * {@code DELETE /finalization/{propId}/status} (contract {@code cancelFinalization}) —
-     * the initiator soft-cancels their own request. Returns 204.
-     */
+    /** The initiator soft-cancels their own request. */
     @DeleteMapping(Routes.Finalization.STATUS)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelFinalization(
@@ -72,13 +59,7 @@ public class FinalizationController {
         finalizationService.cancel(principal.userId(), parseUuid(propId));
     }
 
-    /**
-     * {@code GET /me/finalization-requests} (contract {@code myFinalizationRequests}) —
-     * requests awaiting the caller's decision (counterparty-scoped), newest first, paged.
-     *
-     * <p><strong>Paged as of D77.</strong> Every row is a proposal a buyer aimed at the caller, so
-     * the collection grows with inbound demand. Sort is fixed server-side.
-     */
+    /** Requests awaiting the caller's decision, newest first, paged; the sort is fixed server-side. */
     @GetMapping(Routes.Finalization.ME_REQUESTS)
     public PageResponse<FinalizationRequestDto> myFinalizationRequests(
             @CurrentUser AuthPrincipal principal,
@@ -88,10 +69,7 @@ public class FinalizationController {
                 r -> r);
     }
 
-    /**
-     * {@code POST /finalization/requests/{reqId}/accept} (contract {@code acceptFinalization}) —
-     * the counterparty accepts; auto-declines siblings and closes the deal.
-     */
+    /** The counterparty accepts; sibling requests are declined and the deal closes. */
     @PostMapping(Routes.Finalization.ACCEPT)
     public void acceptFinalization(
             @CurrentUser AuthPrincipal principal,
@@ -99,10 +77,7 @@ public class FinalizationController {
         finalizationService.accept(principal.userId(), parseUuid(reqId));
     }
 
-    /**
-     * {@code POST /finalization/requests/{reqId}/decline} (contract {@code declineFinalization}) —
-     * the counterparty declines.
-     */
+    /** The counterparty declines. */
     @PostMapping(Routes.Finalization.DECLINE)
     public void declineFinalization(
             @CurrentUser AuthPrincipal principal,

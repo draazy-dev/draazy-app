@@ -173,4 +173,20 @@ test.describe('Connectivity banner (D165)', () => {
 
     await context.setOffline(false);
   });
+
+  test('a page chunk that cannot load offline shows a calm offline card, not the raw import error', async ({ page, context }) => {
+    await open(page, '/');
+    await page.route(/Flatmates/, (route) => route.abort('failed'));
+    await context.setOffline(true);
+    await page.evaluate(() => {
+      history.pushState({}, '', '/flatmates');
+      dispatchEvent(new PopStateEvent('popstate'));
+    });
+
+    await expect(page.getByRole('heading', { name: "You're offline" })).toBeVisible();
+    await expect(page.getByText(/needs a connection/i)).toBeVisible();
+    await expect(page.getByText(/dynamically imported module/i)).toHaveCount(0);
+    await expect(banner(page)).toContainText(OFFLINE_TITLE);
+    await context.setOffline(false);
+  });
 });

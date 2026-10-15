@@ -66,7 +66,7 @@ class BackOfficeUserView {
             return new AdminUserRow(base.id(), base.name(), MobileMask.mask(base.mobile()), base.role(),
                     base.status(), base.verified(), base.city(), base.listingsCount(),
                     base.joinedAt() != null ? base.joinedAt() : base.createdAt(),
-                    user.isFlagged(), user.getFlagReason(), source);
+                    user.isFlagged(), user.getFlagReason(), source, user.isArchived());
         }).toList();
     }
 

@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ListingArchiveService {
 
+    public static final String DUPLICATE_REASON = "Merged duplicate";
+
     private final PropertyRepository properties;
     private final ListingDuplicateProbe duplicates;
     private final PropertyLifecycle lifecycle;

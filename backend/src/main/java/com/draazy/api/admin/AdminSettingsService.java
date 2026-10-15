@@ -255,6 +255,10 @@ public class AdminSettingsService {
             result.set(field.getKey(), field.getValue());
         }
         for (Map.Entry<String, JsonNode> field : incoming.properties()) {
+            if (field.getValue().isNull()) {
+                result.remove(field.getKey());
+                continue;
+            }
             result.set(field.getKey(),
                     merge(result.get(field.getKey()), field.getValue(), depth + 1));
         }

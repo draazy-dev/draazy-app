@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useLocation } from 'react-router';
 import { X } from 'lucide-react';
 import { useCity } from '../context/CityContext.jsx';
@@ -8,6 +8,7 @@ import MobileField from './MobileField.jsx';
 import TurnstileWidget from './security/TurnstileWidget.jsx';
 import { useTurnstile } from './security/useTurnstile.js';
 import useScrollLock from '../hooks/useScrollLock.js';
+import useModalDialog from '../hooks/useModalDialog.js';
 
 /* The +91 prefix only comes off a number longer than ten digits: a real mobile can begin 91. */
 const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
@@ -108,11 +109,7 @@ function CityModal({ modal, user, onClose, onSubmit }) {
   const requestClose = useCallback(() => { if (!busy) onClose(); }, [busy, onClose]);
 
   useScrollLock();
-  useEffect(() => {
-    const onKey = (e) => e.key === 'Escape' && requestClose();
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [requestClose]);
+  const panelRef = useModalDialog(true, requestClose);
 
   const submit = async () => {
     if (busy) return;
@@ -147,7 +144,14 @@ function CityModal({ modal, user, onClose, onSubmit }) {
   return (
     <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4" onMouseDown={(e) => e.target === e.currentTarget && requestClose()}>
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div className="relative w-full max-w-[440px] overflow-hidden rounded-[20px] border border-white/12 bg-ink-card shadow-2xl">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isWaitlist ? `Join the ${cityName} waitlist` : 'Request your city'}
+        className="relative w-full max-w-[440px] overflow-hidden rounded-[20px] border border-white/12 bg-ink-card shadow-2xl outline-none"
+      >
         <div className="flex items-center justify-between border-b border-white/8 px-[18px] py-4">
           <h3 className="text-base font-bold text-white">{isWaitlist ? `Join the ${cityName} waitlist` : 'Request your city'}</h3>
           <button onClick={requestClose} disabled={busy} aria-label="Close" className="text-gray-400 hover:text-white"><X className="h-5 w-5" /></button>

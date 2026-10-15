@@ -49,10 +49,10 @@ export async function createRoom(room = {}) {
 
 /** `PATCH /flatmates/rooms/{id}` — the create body again; the server decides whether it re-reviews. */
 export async function updateRoom(id, room = {}) {
-  return toRoomViewModel(await patch(`/flatmates/rooms/${encodeURIComponent(id)}`, {
+  return toRoomViewModel(await withConflictCode(() => patch(`/flatmates/rooms/${encodeURIComponent(id)}`, {
     ...roomBody(room),
     ...(room.clearSociety ? { societyId: '' } : {}),
-  }));
+  })));
 }
 
 function roomBody(room) {
@@ -105,10 +105,11 @@ export async function setRoomOccupants(id, occupants) {
   }));
 }
 
-export async function roomInterest(id, { share = 'solo', message } = {}) {
+export async function roomInterest(id, { share = 'solo', message, gender } = {}) {
   await withConflictCode(() => post(`/flatmates/rooms/${encodeURIComponent(id)}/interest`, clean({
     share: vocab('share', share) || 'solo',
     message,
+    gender: vocab('gender', gender),
   })));
 }
 
@@ -188,7 +189,7 @@ export async function deleteGroup(id) {
 }
 
 export async function deleteRoom(id) {
-  await del(`/flatmates/rooms/${encodeURIComponent(id)}`);
+  await withConflictCode(() => del(`/flatmates/rooms/${encodeURIComponent(id)}`));
 }
 
 /** `POST /flatmates/{kind}/{id}/renew` — `kind` is `room` | `group` | `post`. */
@@ -205,10 +206,11 @@ export async function setGroupSeats(id, seatsOpen) {
 
 /** `POST /flatmates/groups/{id}/join` — returns a request whose `status` depends on group policy, so callers must
  * read it. Two 409s (`group_full`, `already_interested`) are lifted onto `code`. */
-export async function joinGroup(id, { share = 'solo', message } = {}) {
+export async function joinGroup(id, { share = 'solo', message, gender } = {}) {
   return toRequestViewModel(await withConflictCode(() => post(`/flatmates/groups/${encodeURIComponent(id)}/join`, clean({
     share: vocab('share', share) || 'solo',
     message,
+    gender: vocab('gender', gender),
   }))));
 }
 

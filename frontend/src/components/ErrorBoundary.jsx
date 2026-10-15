@@ -1,14 +1,55 @@
-import { Component } from 'react';
+import { Component, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from './Icon.jsx';
+import { useConnectivity } from '../hooks/useConnectivity.js';
 import { reportError } from '../lib/errorReporter.js';
 
 /* Catches a render error so a broken route shows a recoverable card, not a white screen. `resetKey` (the
    pathname, in layouts) clears it on navigation; the shown reference matches the admin Error Log row. */
 
+const CHUNK_LOAD_ERROR = /dynamically imported module|Importing a module script failed|Loading chunk|ChunkLoadError/i;
+
+/* A rejected `React.lazy` stays rejected, so re-rendering cannot recover it — only a reload can. */
+function ChunkLoadFallback({ reference }) {
+  const { t } = useTranslation();
+  const { status } = useConnectivity();
+  const offline = status === 'offline';
+
+  useEffect(() => {
+    if (!offline) return undefined;
+    const reload = () => window.location.reload();
+    window.addEventListener('online', reload);
+    return () => window.removeEventListener('online', reload);
+  }, [offline]);
+
+  return (
+    <div className="mx-auto max-w-lg px-4 py-16 sm:py-24" data-testid="error-boundary">
+      <div className="glass-card rounded-2xl p-6 flex flex-col items-center text-center gap-3" role="status">
+        <Icon name="alert-triangle" className="w-8 h-8 text-amber-400" />
+        <h1 className="text-lg font-bold text-white">
+          {offline ? t('common.errorBoundary.offlineTitle') : t('common.errorBoundary.chunkTitle')}
+        </h1>
+        <p className="text-gray-300 text-sm leading-relaxed">
+          {offline ? t('common.errorBoundary.offlineBody') : t('common.errorBoundary.chunkBody')}
+        </p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          disabled={offline}
+          className="dz-control dz-control--action px-4 gap-1.5 mt-1 disabled:opacity-50"
+        >
+          <Icon name="refresh-cw" className="w-4 h-4" /> {t('common.errorBoundary.tryAgain')}
+        </button>
+        <p className="text-[11px] text-gray-500 mt-2 break-all">{t('common.errorBoundary.reference', { ref: reference })}</p>
+      </div>
+    </div>
+  );
+}
+
 function ErrorFallback({ error, reference, scope, onRetry }) {
   const { t } = useTranslation();
   const atRoot = scope === 'app';
+  if (CHUNK_LOAD_ERROR.test(error?.message || '')) return <ChunkLoadFallback reference={reference} />;
   return (
     <div className="mx-auto max-w-lg px-4 py-16 sm:py-24" data-testid="error-boundary">
       <div className="glass-card rounded-2xl p-6 flex flex-col items-center text-center gap-3">
@@ -80,6 +121,7 @@ export default class ErrorBoundary extends Component {
 
   render() {
     if (this.state.error) {
+      if (this.props.fallback) return this.props.fallback;
       return (
         <ErrorFallback
           error={this.state.error}

@@ -77,6 +77,7 @@ public class FlatmateSupplyService {
     private final FlatmateMembershipService membership;
     private final LocalityBinding localities;
     private final ListingPhotoSources photoSources;
+    private final FlatmateGenderGate genderGate;
 
     public FlatmateSupplyService(FlatmateRoomRepository rooms, FlatmateGroupRepository groups,
             FlatmateRequestRepository requests,
@@ -88,7 +89,8 @@ public class FlatmateSupplyService {
             RateLimitLock locks, FlatmateRoomCards cards, SocietyReference societyReference,
             FlatmateReviewStatuses reviewStatuses, FlatmateEditRules editRules,
             OwnedDocumentLookup ownedDocuments, FlatmateMembershipService membership,
-            LocalityBinding localities, ListingPhotoSources photoSources) {
+            LocalityBinding localities, ListingPhotoSources photoSources, FlatmateGenderGate genderGate) {
+        this.genderGate = genderGate;
         this.rooms = rooms;
         this.groups = groups;
         this.requests = requests;
@@ -206,12 +208,14 @@ public class FlatmateSupplyService {
     }
 
     @Transactional
-    public void roomInterest(AuthPrincipal caller, UUID roomId, String share, String message) {
+    public void roomInterest(AuthPrincipal caller, UUID roomId, String share, String message,
+            String gender) {
         FlatmateRoom room = rooms.findVisible(roomId)
                 .orElseThrow(() -> NotFoundException.of("Room"));
         if (room.getHostId().equals(caller.userId())) {
             throw new ForbiddenException("You cannot enquire about your own room.");
         }
+        genderGate.admitToRoom(caller.userId(), room.getGender(), gender);
         String intent = FlatmateVocabulary.orDefault(
                 share, FlatmateVocabulary.SHARE_INTENT, "solo", "share intent");
         record(caller, "room", room.getId(), room.getHostId(), "request", intent,
@@ -465,12 +469,14 @@ public class FlatmateSupplyService {
     /** Open-policy auto-accepts; every other policy files a pending request. Both produce an inbox
      * row for the host. */
     @Transactional
-    public FlatmateRequestDto join(AuthPrincipal caller, UUID groupId, String share, String message) {
+    public FlatmateRequestDto join(AuthPrincipal caller, UUID groupId, String share, String message,
+            String gender) {
         FlatmateGroup group = groups.lockVisible(groupId)
                 .orElseThrow(() -> NotFoundException.of("Group"));
         if (group.getHostId().equals(caller.userId())) {
             throw new ForbiddenException("You cannot ask to join your own group.");
         }
+        genderGate.admitToGroup(caller.userId(), group.getPolicy(), gender);
 
         int seats = group.openSeats();
         if (seats <= 0) {

@@ -738,6 +738,7 @@ export default function useListProperty() {
     if (!(Number(form.rentShare) > 0)) err.rentShare = true;
     if (!form.availableFrom) err.availableFrom = true;
     if (photos.length > media.maxPhotos) err.photos = 'max';
+    else if (photos.some((photo) => !photo.url)) err.photos = 'failed';
     if (hasContactDetails(form.title)) err.title = true;
     if (Object.keys(err).length) { setErrors(err); scrollToError(err); return; }
     if (!signedIn) { requestAuthPrompt(); return; }

@@ -104,6 +104,6 @@ export async function loadMyListings(user) {
     getMyFlatmatePosts(),
     getMyFlatmateGroups(),
   ]);
-  /* Drop archived rows for this combined panel; the seam must keep returning the owner's full file. */
-  return [...flatmatePosts, ...flatmateGroups, ...rooms, ...mine.filter((l) => !l.archived)];
+  /* Drop archived rows for this combined panel, except staff takedowns the owner must be able to see. */
+  return [...flatmatePosts, ...flatmateGroups, ...rooms, ...mine.filter((l) => !l.archived || l.archivedNote)];
 }

@@ -104,16 +104,11 @@ export async function requestFinalization(propId, { counterpartyMobile, agreedPr
   );
 }
 
-/** **404 is still a normal answer here.** The endpoint 404s when the caller has never had a request on this property
- * — the ordinary state of every listing nobody has proposed to close. */
+/** `GET /finalization/{propId}/status` — 204 (`null` here) when the caller has never had a request on this property,
+ * the ordinary state of every listing nobody has proposed to close. */
 export async function finalizationStatus(propId) {
   if (!signedIn() || !propId) return null;
-  try {
-    return toFinalizationViewModel(await get(`/finalization/${encodeURIComponent(propId)}/status`));
-  } catch (err) {
-    if (err?.status === 404) return null;
-    throw err;
-  }
+  return toFinalizationViewModel(await get(`/finalization/${encodeURIComponent(propId)}/status`));
 }
 
 /** `DELETE /finalization/{propId}/status` — the initiator withdraws their own request. 204. */

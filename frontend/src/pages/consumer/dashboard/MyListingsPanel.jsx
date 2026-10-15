@@ -16,6 +16,7 @@ import { publishManaged, deleteManaged, ensureManagedForListing } from '../../..
 import { listingFreshness } from '../../../lib/freshness.js';
 import { loadListingQuota } from '../../../lib/data/listingQuota.js';
 import { istToday } from '../../../lib/availability.js';
+import { useSingleFlight } from '../../../hooks/useSingleFlight.js';
 import { Card, SectionHead } from './components.jsx';
 import AttentionBanner from './myListings/AttentionBanner.jsx';
 import EmptyState from './myListings/EmptyState.jsx';
@@ -38,7 +39,9 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   const [showDealModal, setShowDealModal] = useState(null);
   // The rent listing the owner is carving into rooms, if any.
   const [splitTarget, setSplitTarget] = useState(null);
-  const [dealForm, setDealForm] = useState({ buyerName: '', buyerMobile: '', finalPrice: '', date: new Date().toISOString().slice(0, 10) });
+  const [dealForm, setDealForm] = useState({ buyerName: '', buyerMobile: '', finalPrice: '', date: istToday() });
+  const [dealErrors, setDealErrors] = useState({});
+  const singleFlight = useSingleFlight();
   const navigate = useNavigate();
   /* Lead counts, deal state and room splits all ride on the dashboard's own rows, so mounting this panel reads
      nothing and an action re-reads only the row it moved. */
@@ -150,19 +153,28 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
 
   const openFinalizeModal = (l) => {
     setShowDealModal(l);
-    setDealForm({ buyerName: '', buyerMobile: '', finalPrice: l.price || '', date: new Date().toISOString().slice(0, 10) });
+    setDealErrors({});
+    setDealForm({ buyerName: '', buyerMobile: '', finalPrice: l.price || '', date: istToday() });
   };
 
-  const handleFinalize = async () => {
+  const handleFinalize = () => singleFlight(async () => {
     if (!showDealModal) return;
     const l = showDealModal;
     const isSale = l.deal === 'buy' || l.deal === 'sale';
+    const mobile = String(dealForm.buyerMobile).replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
+    const price = parseFloat(dealForm.finalPrice) || l.price;
+    const errors = {
+      ...(/^[6-9]\d{9}$/.test(mobile) ? {} : { mobile: 'Enter the 10-digit mobile number of the ' + (isSale ? 'buyer.' : 'tenant.') }),
+      ...(price > 0 ? {} : { price: 'Enter a price above zero.' }),
+    };
+    setDealErrors(errors);
+    if (Object.keys(errors).length) return;
     try {
       // The server requires a positive agreed price and the counterparty's real ten-digit mobile,
       // refusing a masked number; this modal is the only place that collects both.
       await closeDeal(dealIdOf(l), {
-        agreedPrice: parseFloat(dealForm.finalPrice) || l.price,
-        counterpartyMobile: dealForm.buyerMobile,
+        agreedPrice: price,
+        counterpartyMobile: mobile,
         note: dealForm.buyerName ? `Closed with ${dealForm.buyerName} on ${dealForm.date}` : undefined,
       });
     } catch (err) {
@@ -173,9 +185,9 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     setShowDealModal(null);
     setQuotaTick((n) => n + 1);
     await reloadRow(l);
-  };
+  });
 
-  const handleReopen = async (l, availableOn) => {
+  const handleReopen = (l, availableOn) => singleFlight(async () => {
     try {
       await reopenDeal(dealIdOf(l), availableOn);
     } catch (err) {
@@ -186,7 +198,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     setQuotaTick((n) => n + 1);
     await reloadRow(l);
     return true;
-  };
+  });
 
   // `?relist=<id>&from=<date>` comes from the agreement-renewal strip; it is acted on once, then dropped from the URL.
   const location = useLocation();
@@ -342,21 +354,19 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   // that trips a rate limiter on the action the platform most wants owners to perform.
 
   const handleConfirmAll = async () => {
-    const stale = listingsState.filter((l) => !l.flatmate && listingFreshness(l).owner.cta);
+    const stale = listingsState.filter((l) => !l.flatmate && !l.archived && listingFreshness(l).owner.cta);
     for (const l of stale) patchRow(await confirmListingFresh(l.id));
     toast(`${stale.length} listing${stale.length === 1 ? '' : 's'} confirmed as available`, 'success');
   };
   /* No WhatsApp chaser here: `POST /properties/{id}/outreach` 403s for an owner deliberately, since outreach is the
      platform speaking *to* an owner — handing owners a message from us, to them, to send to themselves. */
 
-  // Listings (properties only) that need the owner's attention, for the nudge banner.
-
   const attentionListings = useMemo(
-    () => listingsState.filter((l) => !l.flatmate && listingFreshness(l).owner.cta),
+    () => listingsState.filter((l) => !l.flatmate && !l.archived && listingFreshness(l).owner.cta),
     [listingsState],
   );
   const dormantCount = useMemo(
-    () => listingsState.filter((l) => !l.flatmate && listingFreshness(l).state === 'dormant').length,
+    () => listingsState.filter((l) => !l.flatmate && !l.archived && listingFreshness(l).state === 'dormant').length,
     [listingsState],
   );
   /* The branches are not interchangeable: a room is withdrawn through its own endpoint, which can 409 when its flat
@@ -492,6 +502,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
           listing={showDealModal}
           dealForm={dealForm}
           setDealForm={setDealForm}
+          errors={dealErrors}
           onFinalize={handleFinalize}
           onClose={() => setShowDealModal(null)}
         />

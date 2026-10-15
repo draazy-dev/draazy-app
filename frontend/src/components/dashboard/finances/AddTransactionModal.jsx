@@ -2,10 +2,11 @@ import { useTranslation } from 'react-i18next';
 import Select from '../../ui/Select.jsx';
 import DateField from '../../ui/DateField.jsx';
 import Modal from '../../ui/Modal.jsx';
+import FieldError from '../../ui/FieldError.jsx';
 import { onlyDigits, grpINR } from './helpers.jsx';
 
 // Add transaction — modal on every viewport (bottom-sheet feel on mobile)
-export default function AddTransactionModal({ open, onClose, txForm, setTxForm, catOpts, onSubmit }) {
+export default function AddTransactionModal({ open, onClose, txForm, setTxForm, catOpts, errors = {}, onSubmit }) {
   const { t } = useTranslation();
   return (
     <Modal
@@ -24,12 +25,14 @@ export default function AddTransactionModal({ open, onClose, txForm, setTxForm, 
           </label>
           <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('fin.category')}</span>
             <Select value={txForm.category} onChange={(v) => setTxForm({ ...txForm, category: v })} options={catOpts} placeholder={t('fin.category')} className="w-full" />
+            <FieldError show={!!errors.category}>{errors.category}</FieldError>
           </label>
           <label className="text-sm" htmlFor="tx-amount"><span className="mb-1.5 block text-gray-400">{t('fin.amount')}</span>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">₹</span>
-              <input id="tx-amount" inputMode="numeric" placeholder="0" value={grpINR(txForm.amount)} onChange={(e) => setTxForm({ ...txForm, amount: onlyDigits(e.target.value) })} className="field w-full pl-7 pr-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" />
+              <input id="tx-amount" inputMode="numeric" placeholder="0" value={grpINR(txForm.amount)} onChange={(e) => setTxForm({ ...txForm, amount: onlyDigits(e.target.value) })} className={'field w-full pl-7 pr-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm' + (errors.amount ? ' dz-invalid' : '')} />
             </div>
+            <FieldError show={!!errors.amount}>{errors.amount}</FieldError>
           </label>
           <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('fin.date')}</span>
             <DateField value={txForm.date} onChange={(v) => setTxForm({ ...txForm, date: v })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" ariaLabel={t('fin.txDate')} />

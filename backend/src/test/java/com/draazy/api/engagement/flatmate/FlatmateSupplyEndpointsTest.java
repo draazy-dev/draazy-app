@@ -724,7 +724,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(joiner))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}"))
+                            .content("{\"gender\":\"female\"}"))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.status").value("pending"))
                     .andExpect(jsonPath("$.action").value("request"));
@@ -873,7 +873,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(joiner))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}"))
+                            .content("{\"gender\":\"female\"}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message", Matchers.endsWith("(group_full)")))
 
@@ -939,14 +939,14 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(joiner))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}"))
+                            .content("{\"gender\":\"female\"}"))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.status").value("pending"));
 
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(joiner))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{}"))
+                            .content("{\"gender\":\"female\"}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message", Matchers.endsWith("(already_interested)")));
 

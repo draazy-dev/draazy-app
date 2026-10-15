@@ -125,6 +125,7 @@ export default function EnquiriesPanel({ contactReqs, decideContact, photoReqs =
   const itemNumber = (r) => ({
     id: 'number:' + r.id, type: 'number', typeLabel: 'Number request', typeIcon: 'lock-keyhole',
     name: r.buyerName, contactMobile: r.status === 'approved' ? r.buyerMobile : undefined,
+    maskedMobile: r.status === 'approved' ? undefined : r.buyerMobile,
     verified: !!r.verified,
     propLabel: r.propId ? titleOf(r.propId) : '',
     detail: 'Wants to contact you', requestedAt: r.requestedAt, status: r.status,

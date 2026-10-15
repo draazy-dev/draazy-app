@@ -188,6 +188,34 @@ test('suspending an account ends its sessions and refuses the next sign-in', asy
   expect(consoleErrors).toHaveLength(0);
 });
 
+test('an archived account shows as archived with Restore, and Restore brings it back', async ({ page, login, consoleErrors }) => {
+  const name = `Zzarchived ${Date.now().toString(36).replace(/\d/g, (d) => 'abcdefghij'[d])}`;
+  const person = await authHeaders(uniqueMobile());
+  const me = await fetch(`${API}/auth/me`, { method: 'PATCH', headers: person, body: JSON.stringify({ name }) });
+  expect(me.status).toBe(200);
+  const id = (await (await fetch(`${API}/auth/me`, { headers: person })).json()).id;
+  const archived = await fetch(`${API}/users/${id}/archive`, {
+    method: 'PATCH',
+    headers: await authHeaders(ACTORS.admin),
+    body: JSON.stringify({ reason: 'e2e archived row' }),
+  });
+  expect(archived.ok).toBeTruthy();
+
+  await login.asAdmin();
+  await page.goto('/admin/users?tab=archived');
+  await page.getByPlaceholder('Search name or mobile…').fill(name);
+  const row = rowFor(page, name);
+  await expect(row).toBeVisible();
+  await expect(row.getByText('archived', { exact: true })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Archive user' })).toHaveCount(0);
+
+  await row.getByRole('button', { name: 'Restore user' }).click();
+  await page.getByRole('button', { name: 'Confirm' }).click();
+  await expect(rowFor(page, name)).toHaveCount(0);
+
+  expect(consoleErrors).toHaveLength(0);
+});
+
 test('staff cannot reach the user directory at all', async ({ page, login }) => {
   await login.asStaff();
   await page.goto('/admin/users');

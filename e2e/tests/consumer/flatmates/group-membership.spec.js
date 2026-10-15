@@ -28,7 +28,7 @@ async function liveGroup(policy) {
 
 async function join(token, groupId, expected) {
   const res = await fetch(`${API}/flatmates/groups/${groupId}/join`, {
-    method: 'POST', headers: auth(token), body: JSON.stringify({ share: 'solo' }),
+    method: 'POST', headers: auth(token), body: JSON.stringify({ share: 'solo', gender: 'female' }),
   });
   expect(res.status, await res.clone().text()).toBe(201);
   expect((await res.json()).status).toBe(expected);

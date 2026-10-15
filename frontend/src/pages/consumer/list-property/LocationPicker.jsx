@@ -3,6 +3,7 @@ import { APIProvider, Map, AdvancedMarker, useMap, MapControl, ControlPosition }
 import { useTranslation } from 'react-i18next';
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme } from '../../../lib/mapsConfig.js';
 import MapUnavailable from '../../../components/property/MapUnavailable.jsx';
+import ErrorBoundary from '../../../components/ErrorBoundary.jsx';
 import '../../../styles/components/location-picker.css';
 
 function readLatLng(e) {
@@ -50,7 +51,16 @@ function ZoomButtons() {
   );
 }
 
-export default function LocationPicker({
+export default function LocationPicker(props) {
+  const { t } = useTranslation();
+  return (
+    <ErrorBoundary scope="location-picker" fallback={<MapUnavailable style={{ height: '100%' }} note={t('listProperty.locationPicker.unavailable')} />}>
+      <GoogleLocationPicker {...props} />
+    </ErrorBoundary>
+  );
+}
+
+function GoogleLocationPicker({
   lat, lng, flyTo, onMove,
   gestureHandling = 'greedy',
   defaultZoom = 13,

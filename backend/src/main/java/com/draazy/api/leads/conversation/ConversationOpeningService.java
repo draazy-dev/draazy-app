@@ -164,7 +164,8 @@ public class ConversationOpeningService {
 
         Conversation conversation = existing.orElseGet(() ->
                 conversations.saveAndFlush(new Conversation(me, them, propertyId, null)));
-        thread.send(conversation, caller, body.body());
+        thread.send(conversation, caller, body.body(),
+                body.clientId() == null || body.clientId().isBlank() ? null : body.clientId().trim(), null);
         if (existing.isEmpty() && Roles.isBackOffice(caller.role())) {
             audit.record(caller, "conversation.started", "conversation",
                     conversation.getId().toString(),

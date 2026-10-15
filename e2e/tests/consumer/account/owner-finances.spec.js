@@ -114,3 +114,26 @@ test('saving or removing a transaction moves the figures on screen without re-re
   const emptied = await api('GET', `/me/finances/${owner.listing.id}/summary?period=all`, owner.headers);
   expect(emptied.body).toMatchObject({ income: 0, expense: 0, net: 0 });
 });
+
+test('Add transaction explains what is missing, and a double-click on Save records it once', async ({ page }) => {
+  const owner = await ownerWithListing();
+  await signedInAs(page, owner.mobile);
+  await page.goto('/dashboard#finances');
+
+  await page.getByRole('button', { name: 'Add transaction' }).first().click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(dialog.getByText('Choose a category.')).toBeVisible();
+  await expect(dialog.getByText('Enter an amount above zero.')).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Category' }).click();
+  await page.getByRole('option', { name: 'Rent received' }).click();
+  await dialog.locator('#tx-amount').fill('9000');
+  await dialog.getByRole('button', { name: 'Save', exact: true }).dblclick();
+  await expect(page.getByText('Transaction added')).toBeVisible();
+
+  await expect.poll(async () => {
+    const rows = await api('GET', `/me/finances/${owner.listing.id}/transactions?size=50`, owner.headers);
+    return (rows.body.content ?? rows.body).length;
+  }).toBe(1);
+});

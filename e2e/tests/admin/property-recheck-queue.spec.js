@@ -149,6 +149,21 @@ test('passing a re-check clears it on the server and leaves the listing earning'
   expect((await fetch(`${API}/properties/${seeded.id}`)).status).toBe(200);
 });
 
+test('a double-click on "Looks fine" opens one confirm and sends one status request', async ({ page, login, request }) => {
+  let confirms = 0;
+  let statusCalls = 0;
+  page.on('dialog', (d) => { confirms += 1; d.accept(); });
+  page.on('request', (r) => { if (r.method() === 'PATCH' && /\/properties\/[^/]+\/status/.test(r.url())) statusCalls += 1; });
+  const seeded = await queuedRecheck(request, 'dblclick');
+  await openQueue(page, login, seeded.title);
+
+  await cardFor(page, seeded.title).getByTestId('recheck-pass').dblclick();
+  await expect(cardFor(page, seeded.title)).toHaveCount(0);
+
+  expect(confirms).toBe(1);
+  expect(statusCalls).toBe(1);
+});
+
 test('failing a re-check takes the listing down, and tells the owner why', async ({ page, login, request }) => {
   const seeded = await queuedRecheck(request, 'fail');
   await openQueue(page, login, seeded.title);

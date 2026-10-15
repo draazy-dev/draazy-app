@@ -91,6 +91,12 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
     long countJoinedBy(@Param("userId") UUID userId);
 
     @Query("""
+            select distinct m.group.id from FlatmateGroupMember m
+            where m.userId = :userId and m.group.hostId <> :userId
+            """)
+    List<UUID> findJoinedIds(@Param("userId") UUID userId);
+
+    @Query("""
             select count(m) > 0 from FlatmateGroupMember m
             where m.group.id = :groupId and m.userId = :userId and m.group.archived = false
             """)

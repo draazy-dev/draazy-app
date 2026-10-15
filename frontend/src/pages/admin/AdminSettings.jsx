@@ -127,12 +127,13 @@ function stripGeoLive(geo = {}) {
   const cities = geo.cities && typeof geo.cities === 'object'
     ? Object.fromEntries(
       Object.entries(geo.cities)
-        .filter(([, value]) => value && typeof value === 'object')
+        .filter(([, value]) => value === null || (value && typeof value === 'object'))
         .map(([name, value]) => {
+          if (value === null) return [name, null];
           const { live: _live, ...rest } = value;
           return [name, rest];
         })
-        .filter(([, value]) => Object.keys(value).length),
+        .filter(([, value]) => value === null || Object.keys(value).length),
     )
     : undefined;
   return {

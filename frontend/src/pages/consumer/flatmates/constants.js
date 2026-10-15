@@ -1,6 +1,8 @@
 /* A stricter client limit is a rule the server never made, and the seeker is told no by a form
  * rather than by the product. */
 const MAX_LOCALITIES = 10;
+const MIN_AGE = 18;
+const MAX_AGE = 120;
 const MAX_GROUP_LOCALITIES = 3;
 const GROUP_BHKS = ['1', '2', '3', '4'];
 const TAGS = ['Vegetarian', 'Non-veg ok', 'Non-smoker', 'Early riser', 'Night owl', 'Pet-friendly', 'Working professional', 'Student', 'Fitness'];
@@ -40,4 +42,4 @@ const SEED_GROUPS = [
   { id: 'g5', title: 'Girls 2BHK share near Aundh', locality: 'Aundh', policy: 'women', rent: 32000, seatsTotal: 3, members: [{ name: 'Ananya', initials: 'AN', verified: true }, { name: 'Meera', initials: 'ME', verified: true }], tags: ['Vegetarian', 'Pet-friendly'], note: 'Plants & cats welcome. Long-term preferred.', time: '5 days ago' },
 ];
 
-export { MAX_LOCALITIES, MAX_GROUP_LOCALITIES, GROUP_BHKS, TAGS, MOVE_LBL, FLAT_PREF_LBL, ROOM_PREF_LBL, ROOM_IMGS, SEEKERS, SEED_ROOMS, SEED_GROUPS };
+export { MAX_LOCALITIES, MIN_AGE, MAX_AGE, MAX_GROUP_LOCALITIES, GROUP_BHKS, TAGS, MOVE_LBL, FLAT_PREF_LBL, ROOM_PREF_LBL, ROOM_IMGS, SEEKERS, SEED_ROOMS, SEED_GROUPS };

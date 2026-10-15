@@ -22,7 +22,7 @@ async function askToJoin(groupId) {
   const res = await fetch(`${API}/flatmates/groups/${groupId}/join`, {
     method: 'POST',
     headers: auth(accessToken),
-    body: JSON.stringify({ share: 'solo' }),
+    body: JSON.stringify({ share: 'solo', gender: 'female' }),
   });
   expect(res.status, await res.clone().text()).toBe(201);
   expect((await res.json()).status).toBe('pending');

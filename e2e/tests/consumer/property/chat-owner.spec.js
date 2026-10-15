@@ -160,4 +160,28 @@ test.describe('Chat with the owner from a listing', () => {
     await expect(page.locator('.pc-input')).toBeVisible();
     await expect(page.getByText(/Waiting for the owner to accept/i)).toHaveCount(0);
   });
+
+  test('an approved buyer with no thread yet gets one when tapping "Chat with Owner", and the owner sees no buyer quick replies', async ({ page, browser }) => {
+    const { owner, id } = await fixture();
+    const buyer = await actor('Zztest Fresh Browser Buyer');
+    await openTheGate(buyer, owner, id);
+
+    await signedInAs(page, buyer.mobile);
+    await openListing(page, id);
+    await chatLink(page).click();
+    await expect(page).toHaveURL(new RegExp(`/messages\\?openProp=${id}`));
+    await expect(page.locator('.pc-input')).toBeVisible({ timeout: 20000 });
+
+    const threads = await api('GET', '/messages', buyer.headers);
+    expect(threads.body.content, 'one thread, created by the click').toHaveLength(1);
+    const detail = await api('GET', `/messages/${threads.body.content[0].id}`, buyer.headers);
+    expect(detail.body.messages, 'the opening hello is delivered exactly once').toHaveLength(1);
+
+    const ownerPage = await (await browser.newContext()).newPage();
+    await signedInAs(ownerPage, owner.mobile);
+    await ownerPage.goto(`/messages?c=${threads.body.content[0].id}`);
+    await expect(ownerPage.locator('.pc-input')).toBeVisible({ timeout: 20000 });
+    await expect(ownerPage.locator('.pc-quick-chip')).toHaveCount(0);
+    await ownerPage.context().close();
+  });
 });

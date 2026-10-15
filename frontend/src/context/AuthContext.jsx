@@ -3,7 +3,7 @@ import { logoutUser, readAccessToken, readUser, sessionHinted } from '../lib/aut
 import * as authService from '../services/authService.js';
 import { clearConversationDeviceState } from '../services/conversationService.js';
 import { unregisterPushSubscription } from '../services/notificationService.js';
-import { ApiError, NetworkError, restoreSession } from '../services/http.js';
+import { ApiError, NetworkError, restoreSession, SESSION_ENDED_EVENT } from '../services/http.js';
 import { primeMeBootstrap } from '../services/meBootstrapService.js';
 
 const AuthContext = createContext(null);
@@ -66,6 +66,17 @@ export function AuthProvider({ children }) {
     return () => { cancelled = true; };
     // Mount-only: `loading` is initialised once and never set back to true.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* The transport only announces this after the server refused the refresh too, so the session is
+     over: drop the identity and let the route guards send a protected page to sign-in. */
+  useEffect(() => {
+    const onEnded = () => {
+      sessionGen.current += 1;
+      setUser(null);
+    };
+    window.addEventListener(SESSION_ENDED_EVENT, onEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
   }, []);
 
   /* Return the server-resolved account: callers act before React renders the new auth state. */

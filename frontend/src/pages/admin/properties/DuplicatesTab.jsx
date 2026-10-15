@@ -5,6 +5,7 @@ import { listDuplicateClusters, mergeDuplicateCluster, dismissDuplicateCluster }
 import { useToast } from '../../../context/ToastContext.jsx';
 import { signalLabel } from './reviewReasons.js';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
+import { fmtINR } from '../../../lib/format.js';
 
 const fmtDate = (ts) => {
   if (!ts) return '—';
@@ -30,7 +31,7 @@ function ListingColumn({ listing: l, isNewest, onKeep, disabled }) {
           <p className="text-sm font-semibold text-white leading-tight">{l.title || 'Untitled listing'}</p>
           <Link to={`/property/${l.id}`} target="_blank" rel="noopener noreferrer" className="shrink-0 text-gray-400 hover:text-brand-teal" title="Open listing"><ArrowUpRight className="h-4 w-4" /></Link>
         </div>
-        <p className="text-base font-extrabold text-brand-teal">{l.price || '—'}</p>
+        <p className="text-base font-extrabold text-brand-teal">{l.price ? fmtINR(l.price) : '—'}</p>
         <p className="flex items-center gap-1.5 text-xs text-gray-300"><User className="h-3.5 w-3.5 text-gray-500" /> {l.owner || 'Unknown'} · {l.ownerMobile || '—'}</p>
         <p className="flex items-start gap-1.5 text-xs text-gray-400"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-500" /> {addr}</p>
         <p className="flex items-center gap-1.5 text-xs text-gray-400"><Calendar className="h-3.5 w-3.5 text-gray-500" /> Listed {fmtDate(l.createdAt)}</p>
