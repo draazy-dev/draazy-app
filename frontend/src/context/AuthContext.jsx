@@ -139,7 +139,10 @@ export function AuthProvider({ children }) {
     const mine = sessionGen.current;
     try {
       const fresh = await authService.getMe();
-      if (fresh && sessionGen.current === mine) setUser(fresh);
+      if (fresh && sessionGen.current === mine) {
+        setUser(fresh);
+        return fresh;
+      }
     } catch (err) {
       if (import.meta.env.DEV) console.warn('[auth] background profile refresh failed', err);
     }

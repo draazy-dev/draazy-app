@@ -125,6 +125,7 @@ test('ops can approve with year-only DOB and revoke a verified case', async ({ p
   await page.getByLabel('Holder name').fill('Asha Patil');
   await page.getByTestId('ops-identity-year-only').check();
   await page.getByTestId('ops-identity-birth-year').fill('1991');
+  await page.getByTestId('ops-identity-gender').selectOption('female');
   await page.getByTestId('ops-identity-pose-confirmed').check();
   await expect(page.getByTestId('ops-identity-approve')).toBeDisabled();
   await tickChecklist(page);
@@ -133,6 +134,8 @@ test('ops can approve with year-only DOB and revoke a verified case', async ({ p
   await page.getByRole('button', { name: 'Approve review', exact: true }).click();
   const approval = await approved;
   expect(approval.status()).toBe(200);
+  expect(approval.request().postDataJSON()).toMatchObject({ gender: 'female' });
+  expect((await approval.json()).accountGender).toBe('female');
 
   if ((await approval.json()).awaitingQa) {
     await expect(page.getByText('You approved this — another reviewer must check it.')).toBeVisible();

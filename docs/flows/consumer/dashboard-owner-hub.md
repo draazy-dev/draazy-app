@@ -47,10 +47,8 @@
 - **`showRental`** (My Rental tab) = `hasTenancy || !isOwner || hasRentalInvite` - buyers/tenants,
   anyone with a finalised tenancy, or anyone with a pending owner co-fill invite; a pure owner who
   rents nothing does not see it.
-- **Tab gating:** `visibleTabs = TABS.filter(t => (!t.owner || isOwner) && (!t.tenant || showRental)
-  && (!t.flag || flagEnabled(t.flag)))`. Owner-only tab: `leads` (Requests). Tenant tab: `rental`.
-  Flag tab: `messages` (feature flag `inAppMessaging`, and it is a link-out to `/messages`, not an
-  inline panel).
+- **Tab gating:** `visibleTabs = TABS.filter(t => (!t.owner || isOwner) && (!t.tenant || showRental))`.
+  Owner-only tab: `leads` (Requests). Tenant tab: `rental`.
 - Every panel receives `isOwner` and renders role-aware content (e.g. Finances = owner P&L vs tenant
   Rent Wallet; Documents = owner vault vs buyer-granted docs).
 
@@ -74,17 +72,17 @@ All read-heavy; mutations happen inside the sub-flows this hub links to. Links g
 ## 5. Business rules & logic  *(the meat)*
 
 ### Tab registry (`constants.js` `TABS`) and the 5 groups
-The 11 section ids are unchanged (so every `#hash`, `?tab=` and `TAB_ALIAS` target still resolves):
-`overview`, `properties`, `rental`, `activity`, `leads`, `finances`, `documents`, `visits`,
-`messages` (link-out, flag), `billing`, `profile`. `TAB_ALIAS` maps legacy ids to `{ tab, sub }`.
+10 section ids: `overview`, `properties`, `rental`, `activity` (Alerts & activity: alerts + followed, recently viewed, flatmate groups), `leads`, `finances`, `documents`, `visits`, `billing`, `profile`.
+`TAB_ALIAS` maps legacy ids to `{ tab, sub }`, or to `{ link }` for what the top bar already owns:
+`#saved` opens `/saved` and `#messages` opens `/messages`, so neither is repeated in the dashboard.
 
 Navigation shows at most **5 groups** (`buildDashboardGroups`) as a top strip, with a sub-strip of
 the group's sections when it holds more than one. Every section is at most 2 taps away on mobile.
 - **Owner:** Home (`overview`) · Requests (`leads`, `visits`) · My Properties (`properties`,
   `documents`, `finances`) · Rental (only when the owner also rents) · Account (`profile`,
-  `billing`, `activity`, `messages`).
-- **Seeker:** Home · Saved (`activity`) · Visits · Rental (tenants) · Account (`profile`,
-  `billing`, `documents`, `finances`, `properties`, `messages`).
+  `billing`, `activity`).
+- **Seeker:** Home · Alerts (`activity`) · Visits · Rental (tenants) · Account (`profile`,
+  `billing`, `documents`, `finances`, `properties`).
 Group badges sum the attention counts of their sections. A user tap pushes a history entry (Back
 returns to the previous section); a deep-link resolution replaces it.
 
@@ -220,7 +218,7 @@ The hub has no lifecycle of its own; it renders one active tab. Tab state:
 ```
 derived: every render resolveTarget(hash || ?tab=) -> { tab, sub }; not a visible tab -> 'overview'
 navigation: go(next) only pushes '#next' (+ scroll top); the tab follows the URL.
-            A link-out target (messages) redirects to its page.
+            A `{ link }` alias (`#saved`, `#messages`) redirects to its page.
 ```
 The tab is never copied into component state: React Router commits location inside a transition,
 so a mirrored copy desynced when Android Back landed before the pending commit

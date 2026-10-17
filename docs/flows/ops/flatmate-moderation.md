@@ -120,6 +120,10 @@ States: Pending, **Published** (`approved`), Flagged, Removed, **Live** (self-pu
 - `rejected` is **absent deliberately**. The shared vocabulary has it and the server would accept
   it, but on this axis it means exactly what `removed` means, and two words for "not published" is
   an invitation for a desk to use them inconsistently and then be unable to report on either.
+- `expired` is set by the expiry sweep, never by the desk. It lists under **Hidden & removed** and
+  counts there, and the Decision section offers only Remove (with a note), the one verdict accepted on
+  it, so a report takedown sticks; any other verdict is a 409, because only the host's renewal
+  revives it, and renewing a removed item leaves it removed.
 
 ### 5.6 The free text is never truncated
 The Moderation board renders `note` in full, never behind a "show more". It is where a phone number
@@ -127,15 +131,34 @@ goes when the contact field will not take one, so a moderator who cannot read al
 the job the board exists for.
 
 ### 5.7 Publishing is not silent
-Every decision writes an audit row and notifies the author. Flag and Remove take an internal note;
-Publish does not, because withholding needs an explanation and permitting does not.
+Every decision writes an audit row (`from`, `modStatus`, `note`). Flag, Remove and Reject **require**
+an internal note (400 without one), and so does publishing something that was removed or rejected:
+withholding, and undoing a withholding, need an explanation a later moderator can read. A first
+Publish does not. The author is told only when the item goes public, or is removed or rejected; the
+internal note is never sent to them. Re-stamping the current state is a no-op unless it clears a
+re-check (audited as `flatmate.recheck.clear`). The expiry clock restarts only when an item goes public.
 
 ---
 
 ## 6. Maker-checker / approval
 The host is the maker (they post, they declare a tier, they upload an agreement); this desk is the
 checker. There is no second checker - a single staffer's decision is final, which is acceptable
-because both decisions are reversible from the same board and both are audited.
+because moderation is reversible from the same board and audited.
+
+- **No self-checking (403).** A staffer cannot moderate, desk-edit or decide the badge of an item they
+  authored or whose group they belong to, nor moderate a group application they made, one from a
+  group they belong to, or one to a flat they own. Staff accounts cannot join groups, send interest or
+  split a flat, so they never become a party. A staffer with a second, unlinked consumer account is a
+  residual risk this rule cannot see.
+- **A decided badge review is terminal.** The same verdict again is an idempotent 200; a different one
+  is a 409. It reopens only when the host edits the post or the trust reconciler re-queues it.
+- **A taken-down application is frozen.** Once the desk hides or removes it, the owner's accept or
+  decline is a 409. The verdict and the owner's decision serialise on the listing lock, so neither
+  overwrites the other; a badge verdict, renewal and the expiry sweep likewise lock the post first.
+  Restoring a removed application the owner had accepted is a 409 once another group holds the flat,
+  or when its own group is no longer live.
+- **Owner consent never republishes.** Recording an owner's OTP consent writes only the consent flags,
+  so a takedown or a decided review that lands meanwhile is kept.
 
 ---
 
@@ -145,13 +168,18 @@ because both decisions are reversible from the same board and both are audited.
 verification:  pending --approve--> approved (badge granted)
                pending --reject(reason)--> rejected
 
+verification:  approved/rejected --other verdict--> 409 (terminal)
+
 moderation:    pending --Publish--> approved (public)
-               pending --Flag--> flagged
+               pending --Flag(note)--> flagged
                pending --Remove(note)--> removed
                live --Looks fine--> approved   (re-check: new post / edited)
-               live --Flag/Remove--> flagged/removed
+               live --Flag/Remove(note)--> flagged/removed
+               removed/rejected --Publish(note)--> approved
+               expired --Remove(note)--> removed   (renew keeps it removed)
+               expired --other--> 409 (host renews)
 
-application:   mod_status live --Clear/Flag/Remove--> approved/flagged/removed
+application:   mod_status live --Clear/Flag(note)/Remove(note)--> approved/flagged/removed
                status pending --(owner, elsewhere)--> accepted/declined
 ```
 

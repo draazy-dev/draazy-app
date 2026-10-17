@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { signedInAsNew } from '../../helpers/liveAuth.js';
+import { expectFloatingCard, floatBottom } from '../../helpers/floatCard.js';
 
 /* Phone-only: the scroll lock behind a full-screen sheet and a home-indicator inset, neither of
  * which a 1280px run can observe. Both modals need a signed-in account, hence the live half. */
@@ -46,33 +47,21 @@ test.describe('Flatmates modals', () => {
     });
   }
 
-  test('the sheet contains its own overscroll and pads clear of the home indicator', async ({ page }) => {
+  test('the sheet is a floating card that contains its own overscroll and clears the home indicator', async ({ page }) => {
     await signedInAsNew(page);
     await openModal(page, '1');
-    const modal = page.locator('.sf-modal');
+    const card = page.locator('.sf-modal [role="dialog"]');
 
-    /* This element is the scroller, so without containment a thumb that reaches the end of the form
+    /* The card is the scroller, so without containment a thumb that reaches the end of the form
        hands the rest of the gesture to the results behind it. */
-    await expect(modal).toHaveCSS('overscroll-behavior-y', 'contain');
+    await expect(card).toHaveCSS('overscroll-behavior-y', 'contain');
+    await expectFloatingCard(page, card);
 
-    /* Emulation reports every `env(safe-area-inset-*)` as 0, so the inset arrives through the token
-       the rule consumes. Measured as a delta because the base gutter is viewport-relative. */
-    const padding = () => modal.evaluate((el) => parseFloat(getComputedStyle(el).paddingBottom));
-    const base = await padding();
+    // Emulation reports every `env(safe-area-inset-*)` as 0, so the inset arrives through the token.
     await page.addStyleTag({ content: ':root { --dz-safe-b: 34px; }' });
-    expect(await padding() - base).toBeCloseTo(34, 1);
-
-    /* `vh` is measured against the large viewport, so the gutter would be cut by the URL bar. Read
-       off the declaration: under emulation the two units resolve alike. */
-    const declared = await page.evaluate(() => {
-      for (const sheet of document.styleSheets) {
-        let rules;
-        try { rules = sheet.cssRules; } catch { continue; } // cross-origin sheet
-        for (const r of rules) if (r.selectorText === '.sf-modal') return r.style.cssText;
-      }
-      return '';
-    });
-    expect(declared).toContain('dvh');
+    const vh = page.viewportSize().height;
+    expect(await floatBottom(page), 'the card clears a 34px home indicator').toBeLessThanOrEqual(vh - 34 - 12);
+    await expectFloatingCard(page, card);
   });
 
   test('Escape closes the picker on top of the sheet, not the sheet under it', async ({ page }) => {

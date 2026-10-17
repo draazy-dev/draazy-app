@@ -17,6 +17,8 @@ async function approve(id) {
   expect(res.status).toBeLessThan(300);
 }
 
+const savedGender = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('draazyUser') || '{}').gender);
+
 async function womenOnlyGroup() {
   const { accessToken } = await apiLogin(uniqueMobile());
   const res = await fetch(`${API}/flatmates/groups`, {
@@ -59,11 +61,26 @@ test.describe('women-only and men-only supply checks who is asking (live)', () =
     });
     expect(direct.status).toBe(422);
     expect((await direct.json()).message).toContain('open to women only');
+
+    const me = await fetch(`${API}/auth/me`, { headers: auth(accessToken) });
+    expect((await me.json()).gender).toBe('male');
+    const stated = await fetch(`${API}/flatmates/groups/${group.id}/join`, {
+      method: 'POST', headers: auth(accessToken), body: JSON.stringify({ gender: 'female' }),
+    });
+    expect(stated.status, 'the profile wins over what a request states').toBe(422);
+
+    const second = await womenOnlyGroup();
+    await page.goto(`/flatmates/group/${second.id}`);
+    await expect.poll(() => savedGender(page)).toBe('male');
+    await page.getByRole('button', { name: /Request to join/i }).filter({ visible: true }).first().click();
+    await expect(page.getByRole('alert').last()).toContainText('open to women only');
+    await expect(page.getByTestId('gender-sheet')).toHaveCount(0);
+    expect(posts).toBe(0);
   });
 
   test('a woman states it once in the sheet and her request goes through', async ({ page }) => {
     const group = await womenOnlyGroup();
-    await signedInAsNew(page);
+    const mobile = await signedInAsNew(page);
 
     await page.goto(`${BASE}/flatmates/group/${group.id}`);
     const ask = page.getByRole('button', { name: /Request to join/i }).filter({ visible: true }).first();
@@ -77,5 +94,51 @@ test.describe('women-only and men-only supply checks who is asking (live)', () =
     const response = await sent;
     expect(response.status()).toBe(201);
     expect(response.request().postDataJSON()).toMatchObject({ gender: 'female' });
+
+    const { accessToken } = await apiLogin(mobile);
+    const me = await fetch(`${API}/auth/me`, { headers: auth(accessToken) });
+    expect((await me.json()).gender, 'the answer is saved to the profile').toBe('female');
+
+    const second = await womenOnlyGroup();
+    await page.goto(`/flatmates/group/${second.id}`);
+    await expect.poll(() => savedGender(page)).toBe('female');
+    const again = page.waitForResponse(
+      (r) => /\/flatmates\/groups\/[^/]+\/join$/.test(r.url()) && r.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: /Request to join/i }).filter({ visible: true }).first().click();
+    expect((await again).status()).toBe(201);
+    await expect(page.getByTestId('gender-sheet')).toHaveCount(0);
+  });
+
+  test('a gender saved on another device is picked up instead of looping on the sheet', async ({ page }) => {
+    const group = await womenOnlyGroup();
+    const mobile = await signedInAsNew(page);
+    const { accessToken } = await apiLogin(mobile);
+    const saved = await fetch(`${API}/auth/me`, {
+      method: 'PATCH', headers: auth(accessToken), body: JSON.stringify({ gender: 'female' }),
+    });
+    expect(saved.status).toBe(200);
+
+    let stale = true;
+    await page.route('**/auth/me', async (route) => {
+      if (route.request().method() === 'PATCH') stale = false;
+      if (!stale || route.request().method() !== 'GET') return route.continue();
+      const res = await route.fetch();
+      return route.fulfill({ response: res, json: { ...(await res.json()), gender: null } });
+    });
+
+    await page.goto(`${BASE}/flatmates/group/${group.id}`);
+    const ask = page.getByRole('button', { name: /Request to join/i }).filter({ visible: true }).first();
+    await expect(ask).toBeVisible({ timeout: 20_000 });
+    const sent = page.waitForResponse(
+      (r) => /\/flatmates\/groups\/[^/]+\/join$/.test(r.url()) && r.request().method() === 'POST',
+    );
+    await ask.click();
+    await page.getByTestId('gender-sheet').getByRole('button', { name: 'Man', exact: true }).click();
+
+    const response = await sent;
+    expect(response.status()).toBe(201);
+    expect(response.request().postDataJSON()).toMatchObject({ gender: 'female' });
+    await expect(page.getByTestId('gender-sheet')).toHaveCount(0);
   });
 });

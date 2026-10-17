@@ -573,6 +573,14 @@ preferences. Activity is shown only when both participants share it; read receip
 reciprocal. `messages.delivered_at` records pair-thread delivery independently, so delivery can stay
 visible even when read receipts are hidden.
 
+### `users.gender` is set once and has no setter
+
+Nullable `male`/`female` (CHECK), the single source for the flatmates women-only and men-only gate. The
+user claims it once through the atomic `UserRepository.claimGender` (profile edit, the gate's sheet, a restricted ask or a seeker
+post); after that a different value is refused and only staff change it, via `correctGender` on identity
+approval, which the approval audit records. It is returned to the user (`/auth/me`) and to staff
+(`accountGender` on the identity review) only, and `erasePersonalData` clears it.
+
 ### `flagged` is a note between colleagues, not a status
 
 Flagging changes nothing the platform does: the person still signs in, their listings still show, their

@@ -38,7 +38,7 @@ export default function ReviewChip({ status, kind, id, owned }) {
   const label = t('flatmates.' + meta[2]);
   return (
     <Tip title={label} body={hostMessage(verification, t) || t('flatmates.' + meta[3])}>
-      <button type="button" className={'chip relative z-[1] px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 ' + meta[1]}>
+      <button type="button" className={'dz-tag chip relative z-[1] font-bold ' + meta[1]}>
         <Icon name={meta[0]} className="w-2.5 h-2.5" /> {label} <Icon name="info" className="w-2.5 h-2.5 opacity-70" />
       </button>
     </Tip>

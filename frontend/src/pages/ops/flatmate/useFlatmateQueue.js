@@ -8,7 +8,7 @@ import {
 
 const KINDS = ['post', 'room', 'group'];
 const PUBLISHED = ['approved', 'live'];
-const HIDDEN = ['flagged', 'removed', 'rejected'];
+const HIDDEN = ['flagged', 'removed', 'rejected', 'expired'];
 // The API's page ceiling. Past it the desk is told the list is partial rather than shown a short one.
 const SOURCE_SIZE = 100;
 
@@ -81,7 +81,7 @@ const earliest = (a, b) => (a == null ? b : b == null ? a : Math.min(a, b));
 
 /* A room can be awaiting publish and claiming a badge at once. It gets one card with both
    reasons, not two cards that each hide half of what the reviewer must decide. */
-export function mergeQueue(tab, results) {
+export function mergeQueue(results) {
   const byKey = new Map();
   results.forEach(({ type, page }) => page.items.forEach((row) => {
     const key = keyOf(type, row);
@@ -94,10 +94,7 @@ export function mergeQueue(tab, results) {
       since: earliest(prev.since, patch.since),
     });
   }));
-  const oldestFirst = tab === 'pending';
-  const items = [...byKey.values()].sort((a, b) => (
-    oldestFirst ? (a.since || 0) - (b.since || 0) : (b.since || 0) - (a.since || 0)
-  ));
+  const items = [...byKey.values()].sort((a, b) => (b.since || 0) - (a.since || 0));
   const truncated = results.some(({ page }) => page.total > page.items.length);
   return { items, truncated };
 }
@@ -117,7 +114,7 @@ export default function useFlatmateQueue(tab) {
     const counts = getFlatmateModerationSummary().catch(() => null);
     Promise.all([Promise.all(sources.map((s) => s.load().then((page) => ({ type: s.type, page })))), counts])
       .then(([results, summary]) => {
-        if (alive) setState({ status: 'ready', ...mergeQueue(tab, results), counts: summary, error: '' });
+        if (alive) setState({ status: 'ready', ...mergeQueue(results), counts: summary, error: '' });
       })
       .catch((e) => {
         if (alive) setState({ status: 'error', items: [], truncated: false, counts: null, error: e.message || 'Could not read this queue.' });

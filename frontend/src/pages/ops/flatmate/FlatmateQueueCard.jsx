@@ -35,7 +35,7 @@ export default function FlatmateQueueCard({ entry, onReview }) {
     <li className="flatmate-queue-card dz-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center" data-testid="flatmate-queue-card" data-key={entry.key}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-300">
+          <span className="dz-tag border border-white/10 bg-white/5 font-semibold uppercase tracking-wide text-gray-300">
             {KIND_LABEL[kind]}
           </span>
           {s.modStatus ? <Badge status={s.modStatus}>{MOD_LABEL[s.modStatus] || null}</Badge> : null}
@@ -43,7 +43,7 @@ export default function FlatmateQueueCard({ entry, onReview }) {
             <span
               key={r}
               className={classNames(
-                'rounded-full border px-2 py-0.5 text-[11px] font-semibold',
+                'dz-tag border font-semibold',
                 WARN_REASONS.has(r)
                   ? 'border-amber-400/30 bg-amber-500/10 text-amber-300'
                   : 'border-brand-teal/30 bg-brand-teal/10 text-brand-teal',

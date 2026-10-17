@@ -4,7 +4,7 @@ import Badge from '../../../../components/ui/Badge.jsx';
 import { openDocUrl } from '../../../../lib/openDoc.js';
 import { Block, fmtDate } from '../board.jsx';
 
-const chip = 'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold';
+const chip = 'dz-tag border font-semibold';
 const OK = `${chip} border-emerald-400/30 bg-emerald-500/10 text-emerald-300`;
 const WARN = `${chip} border-amber-400/30 bg-amber-500/10 text-amber-300`;
 const NEUTRAL = `${chip} border-white/10 bg-white/5 text-gray-300`;

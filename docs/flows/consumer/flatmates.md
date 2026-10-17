@@ -214,7 +214,8 @@ Dashboard -> My Listings ("Let room by room"), and confirmed in `SplitFlatModal`
 - **One review per flat**, not per room - reviewing four rooms of the same flat would be the same
   check four times.
 - **Reversible only while empty:** `canUnsplit` / `unsplitFlat` refuse once anyone has moved in,
-  because deleting their room would erase a live tenancy.
+  because deleting their room would erase a live tenancy. Split and unsplit hold the listing lock and
+  lock the flat's rooms, so an accept that lands meanwhile is seen.
 - **Occupancy ledger:** `setRoomOccupants(roomId, n)` clamps to `min(ROOM_SHARE_MAX, cap - others)`,
   so a society limit can never be exceeded by editing one room.
 
@@ -747,6 +748,30 @@ Host eligibility:  evaluateHostEligibility -> blocked (cap/duplicate) | flagForR
 - **Cross-host address collision:** posts but `flagForReview` -> Ops queue.
 - **`verifiedContactOnly` seeker:** unverified actors are blocked and shown the verify modal.
 - **Duplicate interest / already member / full group:** idempotent toasts, no second request.
+- **Ask message with contact details:** an interest, join or ask whose message carries a phone number,
+  email or messaging link is a 422 (`@NoContactDetails`) — people reach each other through Draazy.
+  The same holds for a seeker post's move-in text and a split room's note.
+- **Staff accounts:** cannot join a group, send interest or split a flat (403), so a staffer is never
+  a party to flatmate content they could later moderate.
+- **Someone else's item:** editing, deleting, renewing, withdrawing or changing the seats of an item
+  you do not own is a 404, the same answer as an id that does not exist.
+- **Saves:** only a live/approved item can be saved (404 otherwise), and a saved item that is later
+  hidden, expires or loses its author stops rendering in the shortlist.
+- **Accepting on a hidden ad:** a host cannot accept a request while their ad is not public (409);
+  declining stays allowed. Accepting on a deleted seeker post is a 409. A requester whose profile gender
+  the ad excludes is refused at accept (422), and at ask on a seeker post with a flat preference.
+- **Gender gate:** `users.gender` (`male`/`female`, nullable) is the one source. The user sets it once
+  (`PATCH /auth/me`, then a different value is a 409 "contact support"); staff may correct it from the
+  document in the identity approve request, and the change is in the approval audit. The first binary
+  answer saves it: the Woman/Man sheet, a stated gender on a request for a women-only or men-only
+  room or group, or a binary "I am a" on a seeker post. After that a stated gender on a request is ignored
+  and accept re-checks the profile. A seeker post keeps what its author picked (default "any", always allowed,
+  never copied from the profile); a binary pick that contradicts the profile is a 422. Visible only to the user (`/auth/me`) and
+  to staff (`accountGender` on the identity review); never on public or host-facing reads.
+- **Erasure:** an erased account's rooms, groups and posts are archived and every pending request it
+  sent or received is deleted, as are the pending group applications it made; an inactive or archived
+  author's items drop out of every public read. An owner cannot accept an application from a group
+  that is no longer live or whose host is suspended (409); declining stays allowed.
 - **One live request per person:** starting a new post while one exists edits the existing one.
 - **Agreement too large (>3 MB):** stored as metadata only (`dataUrl: null`, `tooLarge`), review
   still enqueues (quota-safe retry).
@@ -793,7 +818,9 @@ succeeded ≠ the thing happened" shape the payment domains have, without the mo
 **Two different 409s come out of that one door**, and both arrive as `error: "conflict"` on the
 wire, so the mapper lifts the real reason onto `ApiError.code`. They are not interchangeable:
 `already_interested` is informational (the host has the message), `group_full` is a refusal — the
-last seat went while the board was on screen.
+last seat went while the board was on screen. The room door refuses the same way with `room_full`
+("This room is full right now.") when no seat is open, or a split room has no space for the people
+asking, so a full room never collects asks its host can only decline.
 
 **The vocabularies are closed.** Nine fields accept only a fixed set and the server answers 400
 listing the allowed values, so unknown values are dropped before the request rather than spent on a

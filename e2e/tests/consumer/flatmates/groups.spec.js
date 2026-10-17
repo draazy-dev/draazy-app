@@ -212,7 +212,7 @@ test.describe('Flatmate groups', () => {
         headers: auth(seeker.accessToken),
         body: JSON.stringify({ seatsOpen: 0 }),
       });
-      expect(updateRes.status).toBe(403);
+      expect(updateRes.status).toBe(404);
       // Positive control: the host can. Without it, a route broken for everybody would pass the
       // assertion above and read as an access-control test that works.
       const hostRes = await fetch(`${API}/flatmates/groups/${group.id}/seats`, {
@@ -230,7 +230,7 @@ test.describe('Flatmate groups', () => {
         headers: auth(seeker.accessToken),
         body: JSON.stringify(groupBody({ title: 'Hijacked' })),
       });
-      expect(hijack.status).toBe(403);
+      expect(hijack.status).toBe(404);
       // 405, not 404: the path is registered, this verb is not. Worth pinning because a client that
       // aims here is told something that reads like "no such group" when the group is fine.
       const put = await fetch(`${API}/flatmates/groups/${group.id}`, {

@@ -5,6 +5,7 @@ import NativeSelect from '../../../components/ui/NativeSelect.jsx';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import AutosaveBanner from '../../../components/AutosaveBanner.jsx';
 import FieldError from '../../../components/ui/FieldError.jsx';
+import IdInput from '../../../components/IdInput.jsx';
 import AgreementUpload from './AgreementUpload.jsx';
 import FlatmateTerms from './FlatmateTerms.jsx';
 import GroupPreferencesFields from './GroupPreferencesFields.jsx';
@@ -132,7 +133,7 @@ export default function GroupModal({ setGroupOpen, submitGroup, grpFormRef, grpD
                 {editing && grp.agreement && !grp.agreementDoc && <p className="text-[11px] text-amber-300">{tr('flatmates.reattachAgreement')}</p>}
                 <div>
                   <label className="block text-[11px] font-medium text-gray-400 mb-1.5">{tr('flatmates.ownerMobileConsent')} <span className="text-gray-600">{tr('flatmates.optional')}</span></label>
-                  <input value={grp.consentMobile} onChange={(e) => setGrp({ ...grp, consentMobile: e.target.value.replace(/[^\d]/g, '').slice(0, 10), consentVerified: false })} inputMode="numeric" className="field w-full rounded-xl px-3.5 py-2.5 text-sm" placeholder={tr('flatmates.consentPlaceholder')} />
+                  <IdInput kind="mobile" value={grp.consentMobile} onChange={(v) => setGrp({ ...grp, consentMobile: v, consentVerified: false })} className="field w-full rounded-xl px-3.5 py-2.5 text-sm" placeholder={tr('flatmates.consentPlaceholder')} />
                   {grp.consentVerified ? (
                     <p className="text-[11px] text-emerald-300 mt-1.5 inline-flex items-center gap-1.5"><Icon name="badge-check" className="w-3.5 h-3.5" /> {tr('flatmates.ownerConsentConfirmed')}</p>
                   ) : (
