@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import Breadcrumbs from '../../components/Breadcrumbs.jsx';
@@ -7,6 +8,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import { shareOrCopy } from '../../lib/share.js';
 import { usePrefetchReferralCode } from '../../lib/usePrefetchReferralCode.js';
 import { Stars } from './property/Stars.jsx';
+import { StarInput } from './property/StarInput.jsx';
 import { useSocietyHub } from './society/useSocietyHub.js';
 import { REVIEW_CATS, REVIEW_CAT_KEYS } from './society/constants.js';
 import OverviewTab from './society/tabs/OverviewTab.jsx';
@@ -24,11 +26,13 @@ export default function Society() {
   const { toast } = useToast();
   const hub = useSocietyHub();
   const {
-    rootRef, soc, socLoading, loadError, retryLoad, locName, hero, onFollow, followed, setRateOpen,
+    rootRef, soc, socLoading, loadError, retryLoad, locName, hero, onFollow, followed, toggleComposer, closeComposer, myReview, deleteMine,
     rating, overall,
     rateOpen, pick, setPick, revText, setRevText, cats, setCat, inp, submitReview,
     stats, tabs, current, selectTab,
   } = hub;
+  const composerRef = useRef(null);
+  useEffect(() => { if (rateOpen) composerRef.current?.scrollIntoView({ block: 'nearest' }); }, [rateOpen]);
   const head = socLoading || loadError ? {} : societyHead(soc);
   usePageHead({ title: head.title, description: head.description, path: `/society/${soc.slug}`, noindex: Boolean(soc._generic || head.thin) });
 
@@ -64,7 +68,6 @@ export default function Society() {
           ]}
         />
 
-        {/* Hero */}
         <section className="theme-dark rounded-3xl overflow-hidden relative mb-6 glass reveal">
           <img src={hero} alt={soc.name} className="w-full h-56 sm:h-72 object-cover" />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,rgb(var(--dz-c-ink) / .1),rgb(var(--dz-c-ink) / .88))' }} />
@@ -72,7 +75,7 @@ export default function Society() {
               reflows nothing; 36px from sm up, where pills read as chips. */}
           <div className="absolute top-4 right-4 flex gap-2">
             {soc._generic ? null : <button onClick={onFollow} className={(followed ? 'btn-teal' : 'btn-outline') + ' !h-11 sm:!h-9 !px-3 text-sm'}><Icon name={followed ? 'check' : 'bell'} className="w-4 h-4 mr-1.5" /> {followed ? t('society.following') : t('society.follow')}</button>}
-            {soc._generic ? null : <button onClick={() => setRateOpen((v) => !v)} className="btn-outline !h-11 sm:!h-9 !px-3 text-sm"><Icon name="star" className="w-4 h-4 mr-1.5" /> {t('society.review')}</button>}
+            {soc._generic ? null : <button onClick={toggleComposer} className="btn-outline !h-11 sm:!h-9 !px-3 text-sm"><Icon name={myReview ? 'pencil' : 'star'} className="w-4 h-4 mr-1.5" /> {t(myReview ? 'common.editReview' : 'society.review')}</button>}
             {/* Label collapses below sm (three pills overflow 360px); aria-label
                 names it, and min-width stands in for the missing text width. */}
             <button onClick={shareSociety} aria-label={t('society.share')} className="btn-outline !h-11 sm:!h-9 !px-3 !min-w-[44px] sm:!min-w-0 justify-center text-sm"><Icon name="share-2" className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">{t('society.share')}</span></button>
@@ -100,45 +103,34 @@ export default function Society() {
           </div>
         </section>
 
-        {/* Inline review composer */}
         {rateOpen ? (
-          <div className="glass rounded-2xl p-5 mb-6 reveal">
+          <div ref={composerRef} className="glass rounded-2xl p-5 mb-6 reveal scroll-mt-24" data-testid="society-review-composer">
             <div className="flex items-center gap-3 mb-3">
               <span className="text-sm font-medium text-gray-300">{t('society.yourRating')}</span>
-              <span className="inline-flex items-center" style={{ gap: 2 }}>
-                {[1, 2, 3, 4, 5].map((i) => <button key={i} onClick={() => setPick(i)} aria-label={t('society.starAria', { count: i })}><Icon name="star" style={{ width: 22, height: 22 }} className={i <= pick ? 'fill-amber-400 text-amber-400' : 'text-gray-600'} /></button>)}
-              </span>
+              <StarInput value={pick} onChange={setPick} size={22} />
             </div>
             <textarea value={revText} onChange={(e) => setRevText(e.target.value)} rows={3} placeholder={t('society.reviewPlaceholder')} className={inp} />
-            {/* An untouched row sends no key, so 'did not rate' is absent rather than a 1 dragging the average
-                down; each button names its aspect so the rows don't collide for a screen reader or test. */}
+            {/* An untouched row sends no key, so 'did not rate' is absent rather than a 1 dragging the
+                average down. */}
             <div className="mt-3">
               <p className="text-sm font-medium text-gray-300 mb-2">{t('society.rateByCategory')}</p>
               <div className="space-y-2">
                 {REVIEW_CATS.map((k) => (
                   <div key={k} className="flex items-center justify-between gap-3">
                     <span className="text-sm text-gray-400">{t(REVIEW_CAT_KEYS[k])}</span>
-                    <span className="inline-flex items-center" style={{ gap: 2 }}>
-                      {[1, 2, 3, 4, 5].map((i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => setCat(k, i)}
-                          aria-label={t('society.starAriaCat', { count: i, aspect: t(REVIEW_CAT_KEYS[k]) })}
-                        >
-                          <Icon name="star" style={{ width: 18, height: 18 }} className={i <= (cats[k] || 0) ? 'fill-amber-400 text-amber-400' : 'text-gray-600'} />
-                        </button>
-                      ))}
-                    </span>
+                    <StarInput value={cats[k] || 0} onChange={(i) => setCat(k, i)} size={18} aspect={t(REVIEW_CAT_KEYS[k])} />
                   </div>
                 ))}
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-3"><button onClick={() => setRateOpen(false)} className="btn-outline">{t('society.cancel')}</button><button onClick={submitReview} className="btn-teal">{t('society.postReview')}</button></div>
+            <div className="flex items-center justify-end gap-2 mt-3">
+              {myReview ? <button onClick={deleteMine} className="btn-outline mr-auto !text-rose-300"><Icon name="trash-2" className="w-4 h-4 mr-1.5" /> {t('common.delete')}</button> : null}
+              <button onClick={closeComposer} className="btn-outline">{t('society.cancel')}</button>
+              <button onClick={submitReview} className="btn-teal">{t(myReview ? 'common.updateReview' : 'society.postReview')}</button>
+            </div>
           </div>
         ) : null}
 
-        {/* Stats / honest unverified state */}
         {soc._thin ? (
           <section className="glass rounded-2xl p-5 mb-8 reveal flex items-start gap-3">
             <Icon name="info" className="w-5 h-5 flex-shrink-0 mt-0.5 text-amber-400" />
@@ -183,7 +175,6 @@ export default function Society() {
             {current === 'location' && <LocationTab ctx={hub} />}
           </div>
 
-          {/* Sidebar */}
           <SocietySidebar ctx={hub} />
         </div>
       </div>

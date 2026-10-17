@@ -5,7 +5,7 @@ export function Stars({ value, size = 16 }) {
   return (
     <span className="inline-flex items-center" style={{ gap: 1 }}>
       {[1, 2, 3, 4, 5].map((i) => (
-        <Icon key={i} name="star" style={{ width: size, height: size }} className={i <= v ? 'fill-amber-400 text-amber-400' : 'text-slate-600'} />
+        <Icon key={i} name="star" weight={i <= v ? 'fill' : 'regular'} style={{ width: size, height: size }} className={i <= v ? 'text-amber-400' : 'text-slate-600'} />
       ))}
     </span>
   );

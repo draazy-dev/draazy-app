@@ -15,14 +15,14 @@ export default function DashboardReviewModal({ reviewProp, setReviewProp, thread
   const rs = REVIEW_STATUS[thread?.status] || REVIEW_STATUS.in_review;
   /* The heading is the listing title, so it must own the dialog label. */
   return (
-    <div className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/75 backdrop-blur-md" onClick={() => setReviewProp(null)}>
-      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="dash-review-title" className="dz-modal-panel border border-white/10 w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl p-5 max-h-[85vh] flex flex-col shadow-2xl outline-none" onClick={(e) => e.stopPropagation()}>
+    <div className="dz-modal-backdrop" onClick={() => setReviewProp(null)}>
+      <div ref={panelRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="dash-review-title" className="dz-modal flex flex-col outline-none" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="min-w-0">
             <h3 id="dash-review-title" className="text-white font-bold text-base truncate">{listing?.title || 'Verification'}</h3>
-            <span className={'mt-1 inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-lg border font-semibold ' + rs.cls}><Icon name={rs.icon} className="w-3 h-3" /> {rs.label}</span>
+            <span className={'dz-tag mt-1 border font-semibold ' + rs.cls}><Icon name={rs.icon} /> {rs.label}</span>
           </div>
-          <button onClick={() => setReviewProp(null)} className="text-gray-400 hover:text-white flex-shrink-0"><Icon name="x" className="w-5 h-5" /></button>
+          <button type="button" onClick={() => setReviewProp(null)} aria-label="Close" className="dz-modal-x"><Icon name="x" className="w-5 h-5" /></button>
         </div>
         {!thread ? (
           <p className="flex-1 grid place-items-center text-sm text-gray-400">Loading…</p>

@@ -12,25 +12,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
 
-/**
- * One review, of a property, locality, society or owner.
- *
- * <p><strong>The target is a {@code (type, id)} pair, not a foreign key</strong>, because the four
- * target kinds do not share a table — or even a key type: a locality's primary key is its slug, a
- * society's is a UUID. {@code target_id} is therefore {@code text}, and the service is responsible
- * for resolving whatever public identifier the caller used into the one canonical key per kind
- * (slice 7 flagged this as undecided; {@link ReviewTargetKey} is where it got decided).
- *
- * <p><strong>{@code context} is written by the server, never by the client.</strong> It is the
- * "Verified resident" / "Visited" badge, derived from the author's tenancy and visit history through
- * {@code common.trust.PropertyExperience}. It is <em>stored</em> rather than recomputed on read, and
- * that is deliberate: a review is a historical statement. Re-deriving it would silently strip a
- * resident's badge the day their lease ended and drop their review out of the UI's "Residents"
- * filter, rewriting what they said after the fact.
- *
- * <p>No {@code archived} column and no delete endpoint in this slice — review moderation belongs to
- * the Moderation tag, which will need to add one.
- */
+/** {@code target_id} is text (a locality key is its slug); {@code context} is server-written and stored, so a
+ *  badge outlives the lease. An author's delete removes the row, freeing the one-per-author index. */
 @Entity
 @Table(name = "reviews")
 @Getter
@@ -47,6 +30,7 @@ public class Review extends BaseEntity {
     private UUID authorId;
 
     @Column(name = "rating", nullable = false)
+    @Setter
     private int rating;
 
     @Column(name = "title")

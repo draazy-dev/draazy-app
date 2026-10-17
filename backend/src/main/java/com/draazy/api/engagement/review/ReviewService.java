@@ -61,14 +61,12 @@ public class ReviewService {
         this.ownerRelationship = ownerRelationship;
     }
 
-    // ------------------------------------------------------------------ reads
-
     /** Unpaged because per-property reviews are bounded; the summary comes from the database, not the rows. */
     @Transactional(readOnly = true)
-    public ReviewListResponse listForProperty(UUID propertyId) {
+    public ReviewListResponse listForProperty(UUID propertyId, UUID viewerId) {
         requireReachableProperty(propertyId);
         String targetId = propertyId.toString();
-        List<ReviewResponse> rows = withAuthors(reviews.findPublished(ReviewTargetTypes.PROPERTY, targetId));
+        List<ReviewResponse> rows = withAuthors(reviews.findPublished(ReviewTargetTypes.PROPERTY, targetId), viewerId);
         return ReviewListResponse.of(new PageImpl<>(rows), summaryOf(ReviewTargetTypes.PROPERTY, targetId));
     }
 
@@ -101,15 +99,14 @@ public class ReviewService {
     /** {@link ReviewTargetKey#resolve} 404s an unknown target, so a bad locality slug is an error
      * rather than a zero-review summary. */
     @Transactional(readOnly = true)
-    public ReviewListResponse listForEntity(String entityType, String entityId, Pageable pageable) {
+    public ReviewListResponse listForEntity(String entityType, String entityId, Pageable pageable, UUID viewerId) {
         String key = targetKey.resolve(entityType, entityId);
         Page<Review> page = reviews.findPublished(entityType, key, pageable);
         Map<UUID, String> names = authorNames(page.getContent());
         return ReviewListResponse.of(
-                page.map(r -> mapper.toResponse(r, nameOf(names, r))), summaryOf(entityType, key));
+                page.map(r -> mapper.toResponse(r, nameOf(names, r), mineFor(r, viewerId))),
+                summaryOf(entityType, key));
     }
-
-    // ----------------------------------------------------------------- writes
 
     /** Checks run in order so the caller gets the most specific true reason, with a clean 409 on a duplicate
      * before the write. */
@@ -131,7 +128,7 @@ public class ReviewService {
 
         Review review = persist(authorId, ReviewTargetTypes.PROPERTY, propertyId.toString(), body,
                 ReviewContexts.fromStanding(standing));
-        return mapper.toResponse(review, displayName(authorId));
+        return mapper.toResponse(review, displayName(authorId), Boolean.TRUE);
     }
 
     /** No {@code context} badge: a neighbourhood has no visit or tenancy to evidence, and an owner
@@ -144,10 +141,25 @@ public class ReviewService {
             requireOwnerReviewable(authorId, UUID.fromString(key));
         }
         Review review = persist(authorId, entityType, key, body, null);
-        return mapper.toResponse(review, displayName(authorId));
+        return mapper.toResponse(review, displayName(authorId), Boolean.TRUE);
     }
 
-    // ---------------------------------------------------------------- helpers
+    /** A full replace of what the author wrote; the badge, target and date stay as first posted. */
+    @Transactional
+    public ReviewResponse update(UUID authorId, UUID reviewId, ReviewCreateRequest body) {
+        Review review = requireOwnEditable(authorId, reviewId);
+        review.setRating(body.rating());
+        review.setTitle(body.title());
+        review.setBody(body.body());
+        review.setRecommend(body.recommend());
+        review.setCategories(categoriesJson(review.getTargetType(), body.categories()));
+        return mapper.toResponse(reviews.saveAndFlush(review), displayName(authorId), Boolean.TRUE);
+    }
+
+    @Transactional
+    public void delete(UUID authorId, UUID reviewId) {
+        reviews.delete(requireOwnEditable(authorId, reviewId));
+    }
 
     private void requireOwnerReviewable(UUID authorId, UUID ownerId) {
         if (authorId.equals(ownerId)) {
@@ -159,29 +171,40 @@ public class ReviewService {
         }
     }
 
+    /** 404 for someone else's review too, so ids cannot be probed; a rejected one stays put, or
+     * delete-and-repost would undo a takedown. */
+    private Review requireOwnEditable(UUID authorId, UUID reviewId) {
+        return reviews.findById(reviewId)
+                .filter(r -> authorId.equals(r.getAuthorId()))
+                .filter(r -> !ReviewStatuses.REJECTED.equals(r.getStatus()))
+                .orElseThrow(() -> NotFoundException.of("Review"));
+    }
+
     private Review persist(UUID authorId, String targetType, String targetId,
             ReviewCreateRequest body, String context) {
         if (reviews.existsByAuthorIdAndTargetTypeAndTargetId(authorId, targetType, targetId)) {
             throw new AlreadyReviewedException("You have already reviewed this");
         }
-
-        Map<String, Integer> categories;
-        try {
-            // Other-vocabulary keys are refused, not dropped, which would 201 a review with an empty aspect bar.
-            categories = ReviewCategories.validated(targetType, body.categories());
-        } catch (IllegalArgumentException rejected) {
-            throw new BadRequestException(rejected.getMessage());
-        }
+        String categories = categoriesJson(targetType, body.categories());
 
         Review review = new Review(targetType, targetId, authorId, body.rating());
         review.setTitle(body.title());
         review.setBody(body.body());
         review.setRecommend(body.recommend());
         review.setContext(context);
-        review.setCategories(CATEGORIES_JSON.writeValueAsString(categories));
+        review.setCategories(categories);
         // Post-moderation, deliberately. See the class Javadoc.
         review.setStatus(ReviewStatuses.PUBLISHED);
         return reviews.save(review);
+    }
+
+    private static String categoriesJson(String targetType, Map<String, Integer> given) {
+        try {
+            // Other-vocabulary keys are refused, not dropped, which would save a review with an empty aspect bar.
+            return CATEGORIES_JSON.writeValueAsString(ReviewCategories.validated(targetType, given));
+        } catch (IllegalArgumentException rejected) {
+            throw new BadRequestException(rejected.getMessage());
+        }
     }
 
     private Property requireProperty(UUID propertyId) {
@@ -204,11 +227,16 @@ public class ReviewService {
         return row.getAuthorId() == null ? null : names.get(row.getAuthorId());
     }
 
-    private List<ReviewResponse> withAuthors(List<Review> rows) {
+    private List<ReviewResponse> withAuthors(List<Review> rows, UUID viewerId) {
         Map<UUID, String> names = authorNames(rows);
         return rows.stream()
-                .map(r -> mapper.toResponse(r, nameOf(names, r)))
+                .map(r -> mapper.toResponse(r, nameOf(names, r), mineFor(r, viewerId)))
                 .toList();
+    }
+
+    /** Null rather than false, so every other reader's rows stay exactly as before. */
+    private static Boolean mineFor(Review row, UUID viewerId) {
+        return viewerId != null && viewerId.equals(row.getAuthorId()) ? Boolean.TRUE : null;
     }
 
     /** One query per page: resolving authors in the row mapping is an N+1 on a public anonymous endpoint. */
@@ -230,8 +258,6 @@ public class ReviewService {
     private String displayName(UUID userId) {
         return users.findById(userId).map(User::getName).orElse(null);
     }
-
-    // ------------------------------------------------------- summary helpers
 
     private ReviewSummaryResponse summaryOf(String targetType, String targetId) {
         ReviewRatingTally tally = reviews.tallyFor(targetType, targetId);

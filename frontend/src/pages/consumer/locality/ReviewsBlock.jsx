@@ -1,12 +1,16 @@
 import { Trans, useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import { Stars } from '../property/Stars.jsx';
+import { StarInput } from '../property/StarInput.jsx';
+import { OwnReviewBar } from '../property/OwnReviewBar.jsx';
 
-export default function ReviewsBlock({ activeName, locReviews, summary, summaryFailed, onSubmit, revText, setRevText, pick, setPick }) {
+export default function ReviewsBlock({ activeName, locReviews, summary, summaryFailed, onSubmit, revText, setRevText, pick, setPick, editing, busy, onEdit, onDelete, onCancel }) {
   const { t } = useTranslation();
   /** The headline is the server aggregate, not an average of the cards (page one only). A failed read
    * must not reuse the "no reviews yet" copy: that claims nobody reviewed the area. */
   const loading = !summary && !summaryFailed;
   const rated = !!summary && summary.count > 0 && Number.isFinite(summary.avg);
+  const showForm = editing || !locReviews.some((rv) => rv.mine);
   return (
     <div className="glass-card rounded-2xl p-6 reveal">
       <div className="flex items-center justify-between mb-4">
@@ -18,15 +22,24 @@ export default function ReviewsBlock({ activeName, locReviews, summary, summaryF
                 : t('locality.reviewsNone')}
         </div>
       </div>
-      <form onSubmit={onSubmit} className="rounded-xl p-4 mb-5" style={{ background: 'rgb(var(--dz-c-white) / .03)', border: '1px solid rgb(var(--dz-c-white) / calc(.08 * var(--dz-line-boost)))' }}>
+      {showForm && (
+      <form onSubmit={onSubmit} data-testid="locality-review-composer" className="rounded-xl p-4 mb-5" style={{ background: 'rgb(var(--dz-c-white) / .03)', border: '1px solid rgb(var(--dz-c-white) / calc(.08 * var(--dz-line-boost)))' }}>
         <label htmlFor="locality-review-input" className="block text-sm font-semibold text-white mb-2"><Trans i18nKey="locality.reviewPrompt" values={{ name: activeName }} components={{ 1: <span className="text-teal-400" /> }} /></label>
-        <div className="flex gap-1 mb-3">{[1, 2, 3, 4, 5].map((n) => <button key={n} type="button" onClick={() => setPick(n)} style={{ fontSize: '22px', color: n <= pick ? 'rgb(var(--dz-c-amber-500))' : 'rgb(var(--dz-c-slate-600))' }}>★</button>)}</div>
+        <div className="mb-3"><StarInput value={pick} onChange={setPick} size={22} /></div>
         <textarea id="locality-review-input" value={revText} onChange={(e) => setRevText(e.target.value)} rows={2} placeholder={t('locality.reviewPlaceholder')} className="w-full rounded-lg bg-white/5 border border-white/10 px-3 py-2 text-sm text-white placeholder-gray-500 outline-none focus:border-teal-400/50" />
-        <button type="submit" className="btn-teal mt-3 px-4 py-2 rounded-lg text-sm font-semibold inline-flex items-center gap-2"><Icon name="send" className="w-4 h-4" /> {t('locality.reviewPost')}</button>
+        <div className="flex gap-2 mt-3">
+          <button type="submit" disabled={busy} className="btn-teal px-4 py-2 rounded-lg text-sm font-semibold inline-flex items-center gap-2 disabled:opacity-60"><Icon name="send" className="w-4 h-4" /> {t(editing ? 'common.updateReview' : 'locality.reviewPost')}</button>
+          {editing && <button type="button" onClick={onCancel} disabled={busy} className="px-4 py-2 rounded-lg border border-white/10 text-sm text-slate-300 hover:bg-white/5">{t('common.cancel')}</button>}
+        </div>
       </form>
+      )}
       <div className="space-y-3">
-        {locReviews.length ? locReviews.map((rv, i) => (
-          <div key={i} className="glass-card rounded-xl p-4"><div className="flex items-center justify-between mb-1"><span className="font-semibold text-sm">{rv.user}</span><span className="text-sm">{[1, 2, 3, 4, 5].map((s) => <span key={s} style={{ color: s <= rv.rating ? 'rgb(var(--dz-c-amber-500))' : 'rgb(var(--dz-c-slate-600))' }}>★</span>)}</span></div><p className="text-gray-400 text-sm">{rv.text}</p></div>
+        {locReviews.length ? locReviews.map((rv) => (
+          <div key={rv.id} className="glass-card rounded-xl p-4">
+            <div className="flex items-center justify-between mb-1"><span className="font-semibold text-sm">{rv.user}</span><Stars value={rv.rating} size={14} /></div>
+            <p className="text-gray-400 text-sm">{rv.text}</p>
+            {rv.mine && !editing && <OwnReviewBar onEdit={onEdit} onDelete={onDelete} busy={busy} />}
+          </div>
         )) : <p className="text-gray-500 text-sm">{t('locality.reviewBeFirst', { name: activeName })}</p>}
       </div>
     </div>
