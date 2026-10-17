@@ -209,7 +209,7 @@ class VerificationThreadTest extends AbstractApiTest {
 
         properties.flush();
 
-        // Both halves move together now: there is no state in which the case file says approved and
+        // Both halves move together: there is no state in which the case file says approved and
         // the listing is still invisible, because that gap had nobody's name on it.
         assertThat(jdbc.queryForObject("select status from properties where id = ?",
                 String.class, listingId)).isEqualTo(PropertyStatus.APPROVED);
@@ -289,11 +289,11 @@ class VerificationThreadTest extends AbstractApiTest {
                 String.class, listing.getId())).isEqualTo(PropertyStatus.APPROVED);
         assertThat(jdbc.queryForObject("""
                 select count(*) from audit_log
-                where entity = 'property_override_request'
+                where entity = 'property'
                   and action in ('property.verification.override.requested',
                                  'property.verification.override.approved')
                   and entity_id = ?
-                """, Integer.class, requestId)).isEqualTo(2);
+                """, Integer.class, listing.getId().toString())).isEqualTo(2);
     }
 
     @Test
@@ -405,7 +405,7 @@ class VerificationThreadTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.messages[0].body").value(
                         "\u26D4 Your property could not be approved.\nReason: Ownership documents could not be verified."
-                                + " The Index II is illegible. This decision is final."
+                                + " The Index II is illegible.\nThis decision is final."
                                 + " The listing cannot be resubmitted."));
     }
 

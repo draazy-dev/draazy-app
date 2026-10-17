@@ -13,7 +13,6 @@ import com.draazy.api.catalog.property.PropertyPossession;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
-import com.draazy.api.security.JwtService;
 import com.draazy.api.security.Roles;
 import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
@@ -24,7 +23,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.test.web.servlet.MockMvc;
 
 // Server-side `/properties` invariants: approval floor, owner scope,
 // foundation-edit reverts and wire shapes.
@@ -331,7 +329,7 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[0].title").value("Under Flat"));
 
         // All three are searchable without the facet — proving the filter narrows rather than the
-        // rows simply being invisible, which is the failure mode this whole change exists to fix.
+        // rows simply being invisible.
         mvc.perform(get("/properties"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(3));
@@ -555,6 +553,22 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void reelsAreResidentialOnly() throws Exception {
+        User o = owner("9891300001");
+        save(o, "Flat reel", "rent", "Flat / Apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
+        save(o, "Villa reel", "buy", "Villa", new BigDecimal("4"), 25000000, "Baner", "approved", false);
+        save(o, "Office reel", "rent", "Commercial Office Space", null, 60000, "Baner", "approved", false);
+        save(o, "Plot reel", "buy", "Open Plot", null, 6000000, "Wagholi", "approved", false);
+        save(o, "Farm reel", "buy", "Farm Land", null, 7000000, "Manjari", "approved", false);
+
+        mvc.perform(get("/properties/reels"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[?(@.title=='Flat reel')]").isNotEmpty())
+                .andExpect(jsonPath("$[?(@.title=='Villa reel')]").isNotEmpty());
+    }
+
+    @Test
     void similarAnswersSameDealLiveRowsOtherThanTheOneViewed() throws Exception {
         User o = owner("9810000097");
         Property viewed = save(o, "Viewed", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
@@ -585,8 +599,20 @@ class PropertiesEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.recheckReason").doesNotExist())
                 .andExpect(jsonPath("$.archived").doesNotExist())
                 .andExpect(jsonPath("$.featured").doesNotExist())
-                .andExpect(jsonPath("$.qualityScore").doesNotExist())
                 .andExpect(jsonPath("$.pincode").doesNotExist());
+    }
+
+    @Test
+    void publicDetailCarriesTheServerQualityScore() throws Exception {
+        Property p = save(owner("9810000096"), "Scored", "rent", "apartment", new BigDecimal("2"), 25000, "Kothrud", "approved", false);
+        em.flush();
+        em.clear();
+        Property stored = properties.findById(p.getId()).orElseThrow();
+        em.clear();
+
+        mvc.perform(get("/properties/" + p.getId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.qualityScore").value(stored.getQualityScore().intValue()));
     }
 
     @Test

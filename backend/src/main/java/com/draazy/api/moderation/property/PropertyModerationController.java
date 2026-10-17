@@ -164,7 +164,6 @@ public class PropertyModerationController {
         return summaries.summary();
     }
 
-    /** {@code PATCH /properties/{id}/status} (contract {@code setPropertyStatus}). */
     @PatchMapping(Routes.Moderation.PROPERTY_STATUS)
     @PreAuthorize(PROPERTIES_MODERATE)
     public void setStatus(@CurrentUser AuthPrincipal principal, @PathVariable String id,
@@ -173,7 +172,6 @@ public class PropertyModerationController {
                 body.reasonCode(), body.expectedStatus());
     }
 
-    /** {@code POST /properties/{id}/flag} (contract {@code flagProperty}). */
     @PostMapping(Routes.Moderation.PROPERTY_FLAG)
     @PreAuthorize(PROPERTIES_MODERATE)
     public void flag(@CurrentUser AuthPrincipal principal, @PathVariable String id,
@@ -181,7 +179,6 @@ public class PropertyModerationController {
         service.flag(principal, id, body.reason());
     }
 
-    /** {@code DELETE /properties/{id}/flag} (contract {@code clearFlag}) — 204. */
     @DeleteMapping(Routes.Moderation.PROPERTY_FLAG)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @PreAuthorize(PROPERTIES_MODERATE)
@@ -285,7 +282,7 @@ public class PropertyModerationController {
             String reasonCode, String expectedStatus) {
     }
 
-    public record ReasonRequest(String reason) {
+    public record ReasonRequest(@NotBlank String reason) {
     }
 
     public record PhotoTakedownRequest(@NotBlank String photo, @NotBlank String reason) {

@@ -142,7 +142,7 @@ public class AdminSlaService {
               from tickets t
              where t.status in """ + TICKET_UNRESOLVED;
 
-    /** Only {@code 'approved'} puts it live; the first decision may be a bounce, not go-live. */
+    /** Approved, or approved but held paused by the free tier; the first decision may be a bounce, not go-live. */
     private static final String CONCIERGE_COMPLETED = """
             select cast(extract(epoch from (min(a.at) - p.created_at)) / 3600.0
                         as double precision) as hours
@@ -151,7 +151,7 @@ public class AdminSlaService {
                 on a.entity = 'property'
                and a.action = 'property.status'
                and (a.entity_id = cast(p.id as text) or a.entity_id = p.slug)
-               and a.metadata ->> 'to' = 'approved'
+               and a.metadata ->> 'to' in ('approved', 'paused')
              where p.posted_by_admin = true
                and p.archived = false
              group by p.id, p.created_at

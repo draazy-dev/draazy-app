@@ -71,6 +71,13 @@ public class PropertyReview extends AuditedEntity {
         return add(senderId, body, false, clarificationRequested);
     }
 
+    // An approval asks the owner for nothing, so it must not count as an unread message from the desk.
+    public ReviewMessage addApprovalMessage(UUID senderId, String body) {
+        ReviewMessage message = addMessage(senderId, body);
+        message.markRead();
+        return message;
+    }
+
     // No sender: a system user would add a fictional participant to the thread.
     public ReviewMessage addInternalNote(String body) {
         return add(null, body, true, false);

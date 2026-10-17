@@ -1,6 +1,7 @@
 package com.draazy.api.moderation.verification;
 
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyLifecycle;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.PlatformTime;
@@ -27,7 +28,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -183,6 +183,8 @@ public class OwnershipVerificationService {
                 "owner", String.valueOf(property.getOwner().getId()));
         if (!wasVerified) {
             announcer.announceOwnershipVerified(property.getOwner().getId(), property.getId(), now);
+            notifier.notify(property.getOwner().getId(), "listing.badge_verified", "Your listing is Verified",
+                    PropertyLifecycle.label(property) + " now carries the Verified owner badge.", "/dashboard");
         }
         return OwnershipGate.toResponse(property, rows, now, true);
     }
@@ -298,7 +300,7 @@ public class OwnershipVerificationService {
         Property property = Ids.parseUuid(propertyId)
                 .flatMap(properties::findForVerificationDecision)
                 .orElseThrow(() -> NotFoundException.of("Property"));
-        if (actor.userId().equals(property.getOwner().getId())) {
+        if (property.isMadeBy(actor.userId())) {
             throw new ForbiddenException("You cannot verify the ownership of your own listing");
         }
         return property;

@@ -67,7 +67,6 @@ class ServiceRequestSelfDealing {
     }
 
     private boolean isListingSide(UUID me, UUID propertyId) {
-        return propertyId != null && properties.findById(propertyId).filter(p -> me.equals(p.getOwner().getId())
-                        || me.toString().equals(p.getPostedByStaff())).isPresent();
+        return propertyId != null && properties.findById(propertyId).filter(p -> p.isMadeBy(me)).isPresent();
     }
 }

@@ -10,6 +10,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -32,6 +34,12 @@ public @interface ListingSanityLimits {
         Long price();
 
         Long deposit();
+
+        BigDecimal area();
+
+        String areaUnit();
+
+        String landUse();
 
         BigDecimal carpetArea();
 
@@ -71,7 +79,18 @@ public @interface ListingSanityLimits {
             if (isResidential(in.propertyType())) {
                 valid = validateResidentialAreas(in, context, valid);
             }
+            for (ListingShape.Problem problem : shapeProblems(in)) {
+                valid = report(context, problem.field(), problem.message());
+            }
             return valid;
+        }
+
+        private static List<ListingShape.Problem> shapeProblems(Input in) {
+            List<ListingShape.Problem> problems = new ArrayList<>(ListingShape.price(in.deal(), in.price()));
+            problems.addAll(ListingShape.areaSize(in.area(), in.areaUnit()));
+            problems.addAll(ListingShape.areaUnit(in.propertyType(), in.areaUnit()));
+            problems.addAll(ListingShape.landUse(in.propertyType(), in.landUse()));
+            return problems;
         }
 
         private static boolean validateResidentialAreas(Input in, ConstraintValidatorContext context,

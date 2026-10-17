@@ -30,7 +30,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
 
 // Contract + behaviour proof for the contacts + contact-gate slice, organised around invariants:
-// badge-not-gate (ADR-019), reveal-only-on-owner-or-approved, owner-scoping, and request idempotency.
+// badge-not-gate, reveal-only-on-owner-or-approved, owner-scoping, and request idempotency.
 class ContactGateEndpointsTest extends AbstractApiTest {
 
     @Autowired
@@ -90,7 +90,7 @@ class ContactGateEndpointsTest extends AbstractApiTest {
         return json.replaceAll("^.*?\"id\":\"([^\"]+)\".*$", "$1");
     }
 
-    // Badge-not-gate (ADR-019): unverified callers must succeed against an ordinary owner; the badge
+    // Badge-not-gate: unverified callers must succeed against an ordinary owner; the badge
     // bites only when the owner opts in.
     @Test
     void myContactRequests_isEmptyForAnOwnerWithNoListings_ratherThanEveryonesInbox() throws Exception {
@@ -316,15 +316,15 @@ class ContactGateEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void requestContact_onOwnListing_returnsOwner_andWritesNoRow() throws Exception {
+    void requestContact_onOwnListing_isRefused_andWritesNoRow() throws Exception {
         User owner = user("9820000008", "owner");
         Property p = listing(owner, "Self request");
 
         mvc.perform(post(Routes.Contacts.REQUEST).header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"propertyId\":\"" + p.getId() + "\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value(ContactStatuses.OWNER));
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("own_listing"));
 
         assertThat(contactRequests.findByPropertyIdInOrderByCreatedAtDesc(List.of(p.getId()),
                 Pageable.unpaged())).isEmpty();

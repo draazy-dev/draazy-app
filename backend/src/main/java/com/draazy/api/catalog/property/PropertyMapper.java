@@ -97,11 +97,13 @@ public interface PropertyMapper {
             expression = OWN_SIDE + "property.getOwnershipDeclinedReason() : null)")
     @Mapping(target = "recheckPending", expression = OWN_SIDE + "(Boolean) property.isRecheckPending() : null)")
     @Mapping(target = "recheckReason", expression = OWN_SIDE + "property.getRecheckReason() : null)")
+    @Mapping(target = "recheckChanges",
+            expression = "java(backOffice == BackOfficeVisibility.VISIBLE ? property.getRecheckChanges() : null)")
     @Mapping(target = "recheckRequestedAt", expression = OWN_SIDE + "property.getRecheckRequestedAt() : null)")
     @Mapping(target = "archived", expression = OWN_SIDE + "(Boolean) property.isArchived() : null)")
     @Mapping(target = "featured", expression = OWN_SIDE + "(Boolean) property.isFeatured() : null)")
     @Mapping(target = "qualityScore",
-            expression = OWN_SIDE + "(property.getQualityScore() == null ? null : property.getQualityScore().intValue()) : null)")
+            expression = "java(property.getQualityScore() == null ? null : property.getQualityScore().intValue())")
     @Mapping(target = "societyId",
             expression = OWN_SIDE + "(property.getSocietyId() == null ? null : property.getSocietyId().toString()) : null)")
     @Mapping(target = "pincode", expression = OWN_SIDE + "property.getPincode() : null)")

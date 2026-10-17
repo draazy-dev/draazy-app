@@ -31,6 +31,7 @@ class ListingAvailableOnTest extends AbstractApiTest {
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     private User owner;
+    private int nextPrice = 25000;
 
     @BeforeEach
     void owner() {
@@ -42,9 +43,9 @@ class ListingAvailableOnTest extends AbstractApiTest {
 
     private String body(String extra) {
         return """
-                {"title":"Dated listing","deal":"rent","propertyType":"apartment","price":25000,
+                {"title":"Dated listing","deal":"rent","propertyType":"apartment","price":%d,
                  "bhk":2,"locality":"Kothrud","city":"Pune","images":["/api/dev/storage/public/photos/%s/%s"]%s}
-                """.formatted(owner.getId(), UUID.randomUUID(), extra);
+                """.formatted(nextPrice++, owner.getId(), UUID.randomUUID(), extra);
     }
 
     private org.springframework.test.web.servlet.ResultActions create(String extra) throws Exception {
@@ -87,10 +88,10 @@ class ListingAvailableOnTest extends AbstractApiTest {
 
     private String saleBody(String possession, String extra) {
         return """
-                {"title":"Dated sale","deal":"buy","propertyType":"apartment","price":5000000,
+                {"title":"Dated sale","deal":"buy","propertyType":"apartment","price":%d,
                  "bhk":2,"locality":"Kothrud","city":"Pune","possession":"%s",
                  "images":["/api/dev/storage/public/photos/%s/%s"]%s}
-                """.formatted(possession, owner.getId(), UUID.randomUUID(), extra);
+                """.formatted(5_000_000 + nextPrice++, possession, owner.getId(), UUID.randomUUID(), extra);
     }
 
     private ResultActions createSale(String possession, LocalDate on) throws Exception {

@@ -80,8 +80,16 @@ Configuration for the paid channels is in [DEPLOY.md](../DEPLOY.md) (WhatsApp id
 
 | Type | Trigger | To | Title | Body | Link |
 |---|---|---|---|---|---|
-| `listing.approved` | Moderator / verification desk / override approves | Owner | Your listing is approved | It is now live and visible to buyers. | `/property/{id}` |
-| `listing.rejected` | Moderator or reviewer rejects | Owner | Your listing was not approved | `A moderator could not approve it: {reason}` (or `A reviewer …`) | `/dashboard` |
+| `listing.under_review` | Owner submits a listing | Owner | Your listing is under review | `"{title}" in {locality} is with our team. We'll tell you as soon as it is reviewed.` | `/dashboard?review={id}` |
+| `listing.approved` | Moderator / verification desk / override approves and the listing goes live | Owner | Your listing is approved | `"{title}" in {locality} is now live and visible to buyers.` | `/property/{id}` |
+| `listing.approved_paused` | Approval lands paused (free tier: one live listing) | Owner | Your listing is approved | `"{title}" in {locality} is approved.` plus the free-tier hold (buy a listing pass or pause another listing) | `/dashboard?review={id}` |
+| `listing.rejected` | Moderator or reviewer rejects | Owner | Your listing was not approved | `A moderator could not approve "{title}" in {locality}: {reason}` (or `A reviewer …`), then a new line `This decision is final. The listing cannot be resubmitted.` | `/dashboard?review={id}` |
+| `listing.reopened` | Second approver reopens a final reject | Owner | Your listing is back under review | `"{title}" in {locality}` was not final after all: it is being reviewed again. | `/dashboard?review={id}` |
+| `listing.flagged` | Staff flag the listing | Owner | Your listing has been taken down | A moderator took down your listing. Contact support if you think this is a mistake. | `/dashboard` |
+| `listing.unflagged` | Staff clear the flag | Owner | Your listing is back under review | `"{title}" in {locality}` is no longer flagged and is back in the review queue. | `/dashboard?review={id}` |
+| `listing.archived` | Staff archive someone else's listing (not the owner's own archive, merge or timeout, which have their own notices) | Owner | Your listing was archived | `"{title}" in {locality}` was archived by our team, plus `Reason: {reason}` when given. | `/dashboard` |
+| `listing.edited_by_staff` | Staff change fields of the listing through the admin edit (one per edit that changed something) | Owner | Your listing was updated by our team | `"{title}" in {locality}` was corrected by a reviewer: {changed fields}. | `/dashboard` |
+| `listing.badge_verified` | Verified-owner badge granted (not on a re-grant while still valid) | Owner | Your listing is Verified | `"{title}" in {locality}` now carries the Verified owner badge. | `/dashboard` |
 | `listing.needs_info` | Reviewer asks for clarification | Owner | Your listing needs info | Reason-code message for the owner, plus the reviewer's note | `/dashboard?review={id}` |
 | `listing.needs_info_reminder` | No reply (first reminder) | Owner | Your listing still needs info | Please reply or edit your listing so Draazy can finish the review. Listings with no update are archived after 14 days. | `/dashboard` |
 | `listing.needs_info_reminder` | No reply, day 7 | Owner | Your listing still needs info | Please reply or edit your listing in the next 7 days, or we'll archive it for now. | `/dashboard` |

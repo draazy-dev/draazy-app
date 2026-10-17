@@ -141,9 +141,14 @@ public class PropertyVerificationService {
         String normalizedReason = ReviewReasonCodes.require(decision, reasonCode, note);
         Property property = loadForWrite(propertyId);
         lifecycle.requireChecker(actor, property);
+        requireNotStale(property, expectedStatus);
         lifecycle.requireActive(property);
+        if (approve) {
+            lifecycle.requireOwnerConfirmed(property);
+        }
         PropertyReview review = requireFreshCase(property);
         requireExpected(property.getStatus(), PropertyReviewStatuses.wire(review), expectedStatus);
+        String from = property.getStatus();
         boolean publishingVerifiedApproval = approve
                 && PropertyStatus.APPROVED.equals(review.getStatus())
                 && !PropertyStatus.APPROVED.equals(property.getStatus());
@@ -169,17 +174,17 @@ public class PropertyVerificationService {
         } else if (approve) {
             lifecycle.publish(actor, property);
             review.decide(PropertyStatus.APPROVED, actor.userId().toString(), note, null);
-            review.addMessage(actor.userId(), decisionMessage(true, note));
+            review.addApprovalMessage(actor.userId(), approvalMessage(property, note));
         } else {
             review.decide(PropertyStatus.REJECTED, actor.userId().toString(), note, normalizedReason);
-            review.addMessage(actor.userId(), decisionMessage(false,
-                    ReviewReasonCodes.rejectionMessage(normalizedReason, note)));
+            review.addMessage(actor.userId(), ReviewReasonCodes.rejectionThread(normalizedReason, note));
             property.setStatus(PropertyStatus.REJECTED);
         }
         reviews.saveAndFlush(review);
         property.clearRecheck();
         audit.record(actor, "property.verification.decision", "property", propertyId,
-                "decision", decision, "note", note, "reasonCode", normalizedReason,
+                "decision", decision, "from", from, "to", property.getStatus(),
+                "note", note, "reasonCode", normalizedReason,
                 "checklist", checklistSnapshot(review),
                 "owner", String.valueOf(property.getOwner().getId()));
         announce(property, decision, normalizedReason, note);
@@ -191,12 +196,13 @@ public class PropertyVerificationService {
             lifecycle.announceApproval(property);
         } else if ("needs_info".equals(decision)) {
             notifier.notify(property.getOwner().getId(), "listing.needs_info", "Your listing needs info",
-                    ReviewReasonCodes.ownerMessage(reasonCode, note), "/dashboard?review=" + property.getId());
+                    ReviewReasonCodes.ownerMessage(reasonCode, note), PropertyLifecycle.reviewLink(property));
         } else {
             notifier.notify(property.getOwner().getId(), "listing.rejected",
                     "Your listing was not approved",
-                    "A reviewer could not approve it: "
-                            + ReviewReasonCodes.rejectionMessage(reasonCode, note), "/dashboard");
+                    "A reviewer could not approve " + PropertyLifecycle.label(property) + ": "
+                            + ReviewReasonCodes.rejectionMessage(reasonCode, note),
+                    PropertyLifecycle.reviewLink(property));
         }
     }
 
@@ -223,14 +229,9 @@ public class PropertyVerificationService {
         return toResponse(review, property, mayReadNotes(actor));
     }
 
-    private static String decisionMessage(boolean approve, String note) {
+    private String approvalMessage(Property property, String note) {
         String explanation = note == null ? "" : note.trim();
-        if (approve) {
-            return "\u2705 Your property has been verified and is now live."
-                    + (explanation.isEmpty() ? "" : " " + explanation);
-        }
-        return "\u26D4 Your property could not be approved.\nReason: "
-                + (explanation.isEmpty() ? "It did not meet our verification requirements." : explanation);
+        return lifecycle.approvalMessage(property) + (explanation.isEmpty() ? "" : " " + explanation);
     }
 
     private Property participantProperty(AuthPrincipal actor, String propertyId) {
@@ -344,6 +345,15 @@ public class PropertyVerificationService {
         if (signals.hasHardSignal(property.getId())) {
             throw new ConflictException("second_approver_required",
                     "A hard broker signal requires a second staff approver.");
+        }
+    }
+
+    // Before the lifecycle guards, so the loser of a race is told the listing moved, not how to restore it.
+    private void requireNotStale(Property property, String expected) {
+        if (expected != null && !expected.isBlank()) {
+            String wire = reviews.findByPropertyId(property.getId())
+                    .map(PropertyReviewStatuses::wire).orElse(property.getStatus());
+            requireExpected(property.getStatus(), wire, expected);
         }
     }
 

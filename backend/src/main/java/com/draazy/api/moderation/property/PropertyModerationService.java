@@ -72,7 +72,6 @@ public class PropertyModerationService {
         String from = property.getStatus();
         boolean clearingApprovedRecheck = PropertyStatus.APPROVED.equals(status)
                 && PropertyStatus.APPROVED.equals(from) && property.isRecheckPending();
-        requireExpected(from, expectedStatus);
         if (PropertyStatus.APPROVED.equals(status)) {
             if (PropertyStatus.REJECTED.equals(from)) {
                 throw new ConflictException("second_approver_required",
@@ -83,6 +82,15 @@ public class PropertyModerationService {
             lifecycle.requireFiled(property);
         } else if (PropertyStatus.REJECTED.equals(status)) {
             ReviewReasonCodes.require("reject", reasonCode, reason);
+        } else if (property.isArchived() || PropertyStatus.SOLD.equals(from) || PropertyStatus.RENTED.equals(from)) {
+            throw new ConflictException("Restore or reopen this listing first");
+        } else if (PropertyStatus.REJECTED.equals(from)) {
+            throw new ConflictException("second_approver_required",
+                    "A final rejection requires a second staff approver to reopen.");
+        }
+        requireExpected(from, expectedStatus, clearingApprovedRecheck);
+        if (PropertyStatus.APPROVED.equals(status) && PropertyStatus.APPROVED.equals(from) && !clearingApprovedRecheck) {
+            return property;
         }
 
         if (PropertyStatus.APPROVED.equals(status)) {
@@ -108,23 +116,15 @@ public class PropertyModerationService {
             String normalizedReason = ReviewReasonCodes.require("reject", reasonCode, reason);
             PropertyReview review = cases.ensure(property.getId(), property.getDeal());
             review.decide(PropertyStatus.REJECTED, actor.userId().toString(), reason, normalizedReason);
-            review.addMessage(actor.userId(), rejectionMessage(normalizedReason, reason));
+            review.addMessage(actor.userId(), ReviewReasonCodes.rejectionThread(normalizedReason, reason));
             reviews.saveAndFlush(review);
             property.setStatus(status);
             referralTriggers.listingTakenDown(property.getId());
         } else {
-            if (property.isArchived() || PropertyStatus.SOLD.equals(property.getStatus())
-                    || PropertyStatus.RENTED.equals(property.getStatus())) {
-                throw new ConflictException("Restore or reopen this listing first");
-            }
-            if (PropertyStatus.REJECTED.equals(property.getStatus())) {
-                throw new ConflictException("second_approver_required",
-                        "A final rejection requires a second staff approver to reopen.");
-            }
             lifecycle.reenterPending(actor, property);
         }
         property.clearRecheck();
-        audit.record(actor, "property.status", "property", id, "from", from, "to", status,
+        audit.record(actor, "property.status", "property", id, "from", from, "to", property.getStatus(),
                 "reason", reason, "reasonCode", reasonCode,
                 "checklist", checklistSnapshot(property.getId()),
                 "owner", String.valueOf(property.getOwner().getId()));
@@ -135,11 +135,11 @@ public class PropertyModerationService {
         if (PropertyStatus.APPROVED.equals(status) && !clearingApprovedRecheck) {
             lifecycle.announceApproval(property);
         } else if (PropertyStatus.REJECTED.equals(status)) {
-            String ownerMessage = ReviewReasonCodes.rejectionMessage(reasonCode, reason);
             notifier.notify(ownerId, "listing.rejected",
                     "Your listing was not approved",
-                    "A moderator could not approve it: " + ownerMessage,
-                    "/dashboard");
+                    "A moderator could not approve " + PropertyLifecycle.label(property) + ": "
+                            + ReviewReasonCodes.rejectionMessage(reasonCode, reason),
+                    PropertyLifecycle.reviewLink(property));
         }
         return property;
     }
@@ -186,20 +186,25 @@ public class PropertyModerationService {
         String from = property.getStatus();
         property.setFlagReason(null);
         lifecycle.reenterPending(actor, property);
-        audit.record(actor, "property.flag.clear", "property", id, "from", from,
+        audit.record(actor, "property.flag.clear", "property", id, "from", from, "to", property.getStatus(),
                 "owner", String.valueOf(property.getOwner().getId()));
+        notifier.notify(property.getOwner().getId(), "listing.unflagged", "Your listing is back under review",
+                PropertyLifecycle.label(property) + " is no longer flagged and is back in the review queue.",
+                PropertyLifecycle.reviewLink(property));
     }
 
-    private static void requireExpected(String current, String expected) {
-        if (expected != null && !expected.isBlank() && !current.equals(expected)) {
+    // A caller that does not name the status it saw may only decide a pending listing; otherwise the loser of
+    // two concurrent verdicts would land on top of the winner's (approve then reject both succeeding).
+    private static void requireExpected(String current, String expected, boolean clearingRecheck) {
+        if (expected == null || expected.isBlank()) {
+            if (!PropertyStatus.PENDING.equals(current) && !clearingRecheck) {
+                throw new ConflictException("stale_decision",
+                        "This listing is already " + current + "; send expectedStatus to change it");
+            }
+        } else if (!current.equals(expected)) {
             throw new ConflictException("stale_decision",
                     "Listing status changed; refresh before deciding");
         }
-    }
-
-    private static String rejectionMessage(String reasonCode, String note) {
-        return "\u26D4 Your property could not be approved.\nReason: "
-                + ReviewReasonCodes.ownerMessage(reasonCode, note);
     }
 
     private Map<String, Boolean> checklistSnapshot(UUID propertyId) {

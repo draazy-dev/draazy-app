@@ -80,10 +80,11 @@ class ListingNoticesTest extends AbstractApiTest {
     private String body(String token, String meter, String address) {
         User photoOwner = users.findById(jwtService.parse(token.replace("Bearer ", "")).userId()).orElseThrow();
         return """
-                {"title":"2BHK in Kothrud","deal":"rent","propertyType":"apartment","price":32000,
+                {"title":"2BHK in Kothrud","deal":"rent","propertyType":"apartment","price":%d,
                  "bhk":2,"locality":"Kothrud","city":"Pune","floor":4,%s
                  %s %s}
                 """.formatted(
+                NEXT_PRICE.incrementAndGet(),
                 listingImages(photoOwner),
                 meter == null ? "" : ",\"electricityMeterNo\":\"" + meter + "\"",
                 address == null ? "" : ",\"address\":\"" + address + "\"");
@@ -97,6 +98,7 @@ class ListingNoticesTest extends AbstractApiTest {
         return UUID.fromString(com.jayway.jsonpath.JsonPath.read(json, "$.id"));
     }
 
+    private static final java.util.concurrent.atomic.AtomicInteger NEXT_PRICE = new java.util.concurrent.atomic.AtomicInteger(32000);
     private static final String BASE = "ffff0000ffff0000";
     private static final String NEAR = "ffff0000ffff0003";
     private static final String BANDED_BUT_DISTANT = "ffff0000ffffffff";
@@ -112,10 +114,10 @@ class ListingNoticesTest extends AbstractApiTest {
 
     private static String photoBody(User owner, String... hashes) {
         return """
-                {"title":"2BHK in Kothrud","deal":"rent","propertyType":"apartment","price":32000,
+                {"title":"2BHK in Kothrud","deal":"rent","propertyType":"apartment","price":%d,
                  "bhk":2,"locality":"Kothrud","city":"Pune","floor":4,
                  "images":[%s]}
-                """.formatted(imagesJson(owner, hashes));
+                """.formatted(NEXT_PRICE.incrementAndGet(), imagesJson(owner, hashes));
     }
 
     private UUID createWithPhotos(String token, String... hashes) throws Exception {

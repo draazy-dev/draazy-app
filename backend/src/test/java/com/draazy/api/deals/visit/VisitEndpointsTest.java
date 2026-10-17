@@ -28,7 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
-// Contract + behaviour proof for the visits sub-slice (A4), driven through the real filter chain against the live
+// Contract + behaviour proof for the visits slice, driven through the real filter chain against the live
 // Flyway'd Postgres under {@code ddl-auto=validate}.
 class VisitEndpointsTest extends AbstractApiTest {
 
@@ -684,7 +684,7 @@ class VisitEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void scheduleVisit_onAListingThatIsNotLive_is404LikeThePublicRead() throws Exception {
+    void scheduleVisit_onAListingThatIsNotLive_isRefusedLikeAContactRequest() throws Exception {
         User owner = user("9820200071", "owner");
         User visitor = user("9820200072", "buyer");
         for (String state : List.of("pending", "rejected", "flagged", "paused", "archived")) {
@@ -700,8 +700,8 @@ class VisitEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot() + "\"}"))
-                    .andExpect(status().isNotFound())
-                    .andExpect(jsonPath("$.error").value("not_found"));
+                    .andExpect(status().is("paused".equals(state) ? 409 : 404))
+                    .andExpect(jsonPath("$.error").value("paused".equals(state) ? "listing_not_live" : "not_found"));
         }
         assertThat(visitRepo.count()).isZero();
     }

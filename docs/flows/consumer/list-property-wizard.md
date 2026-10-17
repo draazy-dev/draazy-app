@@ -77,6 +77,9 @@
   adopted by that account, quota/paywall is checked, and the owner continues without a redirect.
   Dismissing the sheet leaves the guest on the photos step behind a verify card; the submit button
   reads "Verify & submit" and reopens the sheet, since sign-in is checked before the photo floor.
+  If the session expires mid-wizard (a 401 on the duplicate check, upload or submit), the sign-in sheet
+  opens and the same account signing back in keeps the form and its browser draft; a different account
+  starts clean.
   `?edit=<id>` is still protected before the wizard loads.
 - **No identity gate:** once signed in (L1), an owner posts immediately. The success screen is a
   `ListingStatusCard` (Pending / Needs info / Live · Verified owner) with one next action; the
@@ -157,6 +160,9 @@ advance on any error (scrolling to the first error via `scrollToError`).
   and the server (`ListingSanityLimits`). Rentals and
   farmland are not asked. Changing `reraId` or `plottedProject` on a live listing queues a moderator
   re-check. A resale listing never autofills `reraId` as its own claim.
+- Money fields round a typed decimal to the nearest rupee (the dot is never stripped into digits) and
+  refuse a sale price above ₹10,000,000,000 or a monthly rent above ₹10,000,000 inline. Floor above
+  total floors is an inline Details error and blocks Next.
 - The server mirrors the limits (`ListingSanityLimits`, 422 `validation_failed`): sale ≥ ₹1,00,000,
   rent ≥ ₹1,000, residential carpet 100–20,000 sq.ft, built-up ≥ carpet, super built-up ≥ built-up
   (≥ carpet when built-up is blank), deposit ≤ 24 × rent. An edit is checked only on the fields it
@@ -353,7 +359,10 @@ commercialType, landUse, locality, deal` take the listing **off search** until r
 furnishing, possession, address, images, description, amenities, reraId, plottedProject, video`, a
 changed `societyId` or `electricityMeterNo`, a `carpetArea` change of ≥ 20 % and a pin moved
 > 500 m keep it **live with a re-check**. Changing `address`, `societyId` or `electricityMeterNo`
-also revokes the Verified owner badge. The client tiers below only drive the owner's edit banner.
+also revokes the Verified owner badge. Everything else (title, deposit, maintenance, availability, floor,
+facing, age, tenants, pets, pincode, other form answers) publishes directly. Description, amenities,
+photos, video, address and RERA id are re-checked on purpose (anti bait-and-switch), not published
+instantly. The client tiers below only drive the owner's edit banner, whose copy lists these two sets.
 
 Editing a **live** listing classifies every changed field into two tiers (`classifyChanges`):
 - **Tier A (material / trust):** `deal, propertyType, commercialType, bhk, carpetArea, builtUp,
@@ -361,8 +370,9 @@ Editing a **live** listing classifies every changed field into two tiers (`class
   tower, street, pincode` + removing/replacing an already-uploaded photo. A Tier-A edit on a live
   listing **keeps it live** but schedules an admin re-check (`record.reReview`) and notifies the
   owner. Adding new photos never counts.
-- **Tier B (soft / marketing):** price, description, amenities, availability, furnishing, etc. -
-  goes live **instantly**, no re-verification.
+- **Tier B (soft / marketing):** client-side grouping only. The server still re-checks price,
+  description, amenities, furnishing, possession, video and RERA id (listing stays live); the rest
+  (availability, deposit, maintenance, ...) publishes with no re-verification.
 - **Identity subset** (`IDENTITY_FIELDS = ['propertyType', 'commercialType', 'locality']`): changing
   identity is treated as effectively a different property -> triggers the identity guard and interacts
   with the freemium quota. (Society is deliberately excluded - a name correction stays Tier A.)
@@ -375,7 +385,9 @@ Editing a **live** listing classifies every changed field into two tiers (`class
 - **Lean validation, two tiers.** Step advance uses `validateFlatmateStep1` (`bhk`, `roomType`) and
   `validateFlatmateStep2` (`locality`, `society`, `rentShare` > 0, `availableFrom`) - note the
   flatmate Step 2 does **not** require a map placement, unlike the whole-place track. `submitFlatmate`
-  re-checks all six **plus** at least one photo before persisting.
+  re-checks all six before persisting. Photos are optional: a room with none is always held for
+  staff review (`FlatmateSupplyService` hands `flagged || photos.isEmpty()` to `FlatmatePublication`),
+  so it never goes live unreviewed.
 - **Host verification tier:** `hostRole` = `owner` or `tenant`. Owner -> tier `owner`. A tenant host
   must upload the registered leave-and-licence agreement and confirm the owner agrees
   (`ownerConsent: true`) before the room can be posted — the server refuses it otherwise (422 naming
@@ -541,8 +553,8 @@ is along a real seam: a rule that decides and a caller that acts. `check-listing
 pins the two sets against the client's copy of the same rule.
 
 A foundation-field change earns a re-review either way: an identity change reverts to `pending` and
-leaves search, an attribute change raises a re-check and stays live. Non-foundation edits (photos,
-description, deposit) leave both untouched. When one PATCH does both, the revert wins and no
+leaves search, an attribute change raises a re-check and stays live. Edits outside the two
+sets (title, deposit, maintenance, availability, floor, facing, age, tenants, pets) leave both untouched. When one PATCH does both, the revert wins and no
 re-check is raised, because a full re-moderation looks at the whole listing and queueing the
 attribute change separately would put the same edit in front of a moderator twice.
 
@@ -637,7 +649,9 @@ moderation decision. Neither writes an audit row: they are the owner's own actio
 
 - A paused listing is excluded from search and every public discovery surface, but its direct link
   still resolves, so a buyer holding the URL is not sent to a dead page.
-- It still counts toward the owner's listing quota: pausing is not a way round the plan.
+- It does **not** count toward the free-tier ceiling: only `approved` and `flagged` listings occupy a
+  slot (`PropertyStatus.OCCUPIES_LISTING_SLOT`), which is what lets pause free the slot for another
+  listing. Resuming re-checks the ceiling, so pausing is a swap rather than a way round the plan.
 - An edit made while paused queues its re-check as usual, and that re-check survives the resume.
 - Resume re-runs duplicate flagging (`ListingDuplicateProbe.flag`), and paused listings are included
   when other listings are checked for duplicates, so pausing cannot hide a collision.
@@ -648,3 +662,37 @@ pending or re-check listing a moderation SLA badge (`lib/moderationSla.js`) meas
 listing back to moderation, with `createdAt`, `recheckRequestedAt` and `lastConfirmedAt` retained as
 fallbacks for old rows and stays-live re-checks. On mobile the Post CTA carries the free-listing
 label.
+
+
+### 9.7 Write-path guards
+
+One set of rules covers create, owner edit and moderator edit (`ListingSanityLimits` for a body,
+`ListingEditRules.validateSanityPatch` for a patch merged with the stored row, both calling `ListingShape`):
+
+- **Bounds (422, per field).** `price` > 0, at most Rs 1,000 Cr for a sale and Rs 1 Cr a month for rent;
+  `area` > 0 and at most 10,000 acres in any unit (`AreaUnit.sqftPer`); `lat` in [-90, 90], `lng` in
+  [-180, 180]; `floor` 0 (Ground) or above.
+- **Type consistency (422).** `landUse` only on a plot or farm; `areaUnit` only from what the wizard offers
+  for the type (plot sqft/sqyd/sqm/guntha, farm acre/guntha/hectare, everything else sqft). Co-working is a
+  valid commercial type. A patch that moves only the type is checked against the stored unit and land use.
+- **Answers the wizard never asks are not stored** (`ListingShape.clearUnaskedAnswers`, shared by create,
+  `createOnBehalf` and `ListingEditRules.apply`): no `bhk` on commercial, plot or farm land, and no deposit,
+  pets or rent-only form answers (agreement duration, lock-in, notice, food, pets policy, maintenance mode,
+  preferred tenants, fit-out, escalation) on a sale. Migration `26.10.30` cleans existing rows.
+- **Photos** are de-duplicated in first-seen order by the `ListingCreate` / `ListingUpdate` constructors.
+- **Replay guard.** `ListingSubmissionGuard` refuses a create when the same owner has a non-archived listing
+  with the same normalised title, address, type, deal and price created in the last 10 minutes:
+  409 `duplicate_submission` with `existingId`. It runs under the create lock, before the daily pace check.
+- **Daily pace.** The 429 `Retry-After` (header and `retryAfterSeconds`) is the time until the post that
+  frees a slot leaves the 24-hour window.
+- **Closed listings.** Owner `PATCH /me/listings/{id}` on a rejected, sold, rented or archived listing is
+  409 `listing_not_editable`. A flagged listing stays editable and stays `flagged`; an owner edit raises a
+  re-check for staff and never moves it to `pending`.
+- **Visits and contacts** answer a closed listing alike: 409 `listing_not_live` (`ListingClosed`), 404 when
+  the listing is not visible at all. An owner requesting contact on their own listing gets 409
+  `own_listing` and nothing is created.
+- **Re-check diff.** Each stays-live re-check records `[{field, before, after}]` in
+  `properties.recheck_changes` (first `before`, latest `after` per field; images as photo counts, text cut
+  to 300 chars). It is exposed as `recheckChanges` on the admin queue row and `GET /admin/properties/{id}`,
+  and cleared with the re-check.
+- **Split.** `POST/DELETE /properties/{id}/split` by anyone but the owner is the same 404 as an unknown id.

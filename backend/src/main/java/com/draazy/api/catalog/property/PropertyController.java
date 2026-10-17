@@ -137,7 +137,7 @@ public class PropertyController {
             @RequestBody(required = false) ReasonRequest body) {
         String reason = body != null ? body.reason() : null;
         return propertyMapper.toResponse(
-                archiveService.archive(principal, id, reason), ContactVisibility.MASKED,
+                archiveService.archiveAndNotify(principal, id, reason), ContactVisibility.MASKED,
                 BackOfficeVisibility.HIDDEN, OutreachCounts.NONE, PrivateFieldVisibility.VISIBLE);
     }
 

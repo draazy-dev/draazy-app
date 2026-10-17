@@ -26,7 +26,7 @@ import org.springframework.http.MediaType;
 @DisplayName("Entitlements — the contact quota the browser used to keep")
 class EntitlementsEndpointsTest extends AbstractApiTest {
 
-    /** Owner Plus. Priced, and {@code unlimited_contacts} since V91. */
+    /** Owner Plus: priced, and carries {@code unlimited_contacts}. */
     private static final String UNLIMITED_PLAN = "b1000000-0000-4000-8000-000000000002";
 
     /** {@code fees.freeContactLimit} and {@code fees.referralContactBonus} in the seeded row. */
@@ -40,8 +40,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
 
     @Autowired PlanRepository plans;
     @Autowired TestPlanGrants grants;
-
-    // ---- fixtures ----
 
     private User user(String mobile, String role) {
         User u = new User(mobile, role);
@@ -74,7 +72,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andReturn().getResponse().getStatus();
     }
 
-    /** Spend {@code count} contacts against {@code count} different owners. */
     private void spend(User buyer, int count, long firstOwnerMobile) throws Exception {
         for (int i = 0; i < count; i++) {
             User owner = user(String.valueOf(firstOwnerMobile + i), "owner");
@@ -119,8 +116,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk());
         return id;
     }
-
-    // ---- 1: what the free tier is worth ----
 
     @Test
     @DisplayName("a brand-new account is told the free allowance, not left to assume one")
@@ -204,13 +199,11 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
     void anOwnerNeverSpendsOnTheirOwnListing() throws Exception {
         User owner = user("9844400030", "owner");
 
-        assertThat(ask(owner, listing(owner, "My own flat"))).isEqualTo(200);
+        assertThat(ask(owner, listing(owner, "My own flat"))).isEqualTo(409);
 
         mvc.perform(get(Routes.Plans.ENTITLEMENTS).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.contacts.used").value(0));
     }
-
-    // ---- 2: running out ----
 
     @Test
     @DisplayName("the sixteenth new owner is refused with 422, not 403 and not 429")
@@ -245,8 +238,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
         assertThat(ask(buyer, listing(user("9844402099", "owner"), "Blocked")))
                 .isEqualTo(422);
     }
-
-    // ---- 3: what a referral is worth ----
 
     @Test
     @DisplayName("a qualified referral raises the ceiling, and says how much of it it bought")
@@ -341,8 +332,6 @@ class EntitlementsEndpointsTest extends AbstractApiTest {
                 // there is no counter anybody has to remember to un-increment.
                 .andExpect(jsonPath("$.agreements.free").value(0));
     }
-
-    // ---- 4: what a priced plan is worth ----
 
     @Test
     @DisplayName("an unlimited plan reports null rather than a number nobody can read")

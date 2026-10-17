@@ -4,6 +4,7 @@ import com.draazy.api.catalog.locality.LocalityBinding;
 import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyKind;
 import com.draazy.api.catalog.property.PropertyPossession;
 import com.draazy.api.catalog.society.Society;
 import com.draazy.api.catalog.society.SocietyRepository;
@@ -28,6 +29,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ListingEditRules {
+
+    private static final int MAX_CHANGE_TEXT = 300;
 
     private final LocalityBinding localities;
     private final SocietyRepository societies;
@@ -79,10 +82,12 @@ public class ListingEditRules {
         boolean remoderationRequired = false;
         boolean recheckOnly = false;
         List<String> rechecked = new ArrayList<>();
+        List<Map<String, String>> changes = new ArrayList<>();
+        boolean carriesBhk = PropertyKind.carriesBhk(in.propertyType() == null ? p.getPropertyType() : in.propertyType());
 
-        // ── Foundation, OFF SEARCH: these change what the listing fundamentally *is*, so a stale
-        // index entry is a wrong answer rather than a late one. ───────────────────────────────
-        if (in.bhk() != null && !numericEquals(in.bhk(), p.getBhk())) {
+        // Foundation, off search: these change what the listing fundamentally *is*, so a stale
+        // index entry is a wrong answer rather than a late one.
+        if (in.bhk() != null && carriesBhk && !numericEquals(in.bhk(), p.getBhk())) {
             p.setBhk(in.bhk());
             remoderationRequired = true;
         }
@@ -125,19 +130,19 @@ public class ListingEditRules {
         }
 
         if (in.price() != null && !in.price().equals(p.getPrice())) {
+            note(rechecked, changes, "price", p.getPrice(), in.price());
             p.setPrice(in.price());
             recheckOnly = true;
-            rechecked.add("price");
         }
         if (in.furnishing() != null && !in.furnishing().equals(p.getFurnishing())) {
+            note(rechecked, changes, "furnishing", p.getFurnishing(), in.furnishing());
             p.setFurnishing(in.furnishing());
             recheckOnly = true;
-            rechecked.add("furnishing");
         }
         if (in.possession() != null && !in.possession().equals(p.getPossession())) {
+            note(rechecked, changes, "possession", p.getPossession(), in.possession());
             p.setPossession(in.possession());
             recheckOnly = true;
-            rechecked.add("possession");
         }
 
         // `address` is what AddressKey derives the duplicate signal from, so an edit to it is how a
@@ -145,59 +150,60 @@ public class ListingEditRules {
         if (in.address() != null && !in.address().equals(p.getAddress())) {
 
             // A legacy/staff correction must not leave components that restore the old address.
+            note(rechecked, changes, "address", p.getAddress(), in.address());
             clearStaleAddressParts(p, in);
             p.setAddress(in.address());
             p.revokeOwnershipVerification();
             recheckOnly = true;
-            rechecked.add("address");
         }
         UUID wantedSociety = in.societyId() == null ? p.getSocietyId() : societyOf(in.societyId());
         if (in.societyId() != null && !Objects.equals(wantedSociety, p.getSocietyId())) {
+            note(rechecked, changes, "societyId", p.getSocietyId(), wantedSociety);
             stampSociety(p, wantedSociety, true);
             p.setSocietyId(wantedSociety);
             p.revokeOwnershipVerification();
             recheckOnly = true;
-            rechecked.add("societyId");
         }
         if (in.electricityMeterNo() != null && !Objects.equals(in.electricityMeterNo(), p.getElectricityMeterNo())) {
+            note(rechecked, changes, "electricityMeterNo", p.getElectricityMeterNo(), in.electricityMeterNo());
             p.setElectricityMeterNo(in.electricityMeterNo());
             p.revokeOwnershipVerification();
             recheckOnly = true;
-            rechecked.add("electricityMeterNo");
         }
         if (in.carpetArea() != null && materialCarpetAreaChange(p.getCarpetArea(), in.carpetArea())) {
+            note(rechecked, changes, "carpetArea", p.getCarpetArea(), in.carpetArea());
             recheckOnly = true;
-            rechecked.add("carpetArea");
         }
         if (locationMovedMoreThan500m(p, in)) {
+            note(rechecked, changes, "location", p.getLat() + "," + p.getLng(),
+                    (in.lat() == null ? p.getLat() : in.lat()) + "," + (in.lng() == null ? p.getLng() : in.lng()));
             recheckOnly = true;
-            rechecked.add("location");
         }
 
         /** Photos, prose and amenities are the evidence a reviewer approved against, so swapping them re-sells
          * that approval. Stays-live because it is the same flat, and going dark would cost a day per photo. */
         if (in.images() != null && !in.images().equals(p.getImages())) {
+            note(rechecked, changes, "images", p.getImages() == null ? 0 : p.getImages().size(), in.images().size());
             p.setImages(List.copyOf(in.images()));
             recheckOnly = true;
-            rechecked.add("images");
         }
         if (in.description() != null && !in.description().equals(p.getDescription())) {
+            note(rechecked, changes, "description", p.getDescription(), in.description());
             p.setDescription(in.description());
             recheckOnly = true;
-            rechecked.add("description");
         }
         if (in.amenities() != null && !in.amenities().equals(p.getAmenities())) {
+            note(rechecked, changes, "amenities", p.getAmenities(), in.amenities());
             p.setAmenities(List.copyOf(in.amenities()));
             recheckOnly = true;
-            rechecked.add("amenities");
         }
         if (in.reraId() != null && !in.reraId().equals(p.getReraId())) {
+            note(rechecked, changes, "reraId", p.getReraId(), in.reraId());
             recheckOnly = true;
-            rechecked.add("reraId");
         }
         if (plottedProjectChanged(p, in)) {
+            note(rechecked, changes, "plottedProject", plottedProjectOf(p), in.formDetails().get("plottedProject"));
             recheckOnly = true;
-            rechecked.add("plottedProject");
         }
 
         if (in.formDetails() != null) p.setFormDetails(Map.copyOf(in.formDetails()));
@@ -218,8 +224,8 @@ public class ListingEditRules {
         if (in.video() != null) {
             String video = in.video().isBlank() ? null : in.video();
             if (!Objects.equals(video, p.getVideo())) {
+                note(rechecked, changes, "video", p.getVideo(), video);
                 recheckOnly = true;
-                rechecked.add("video");
             }
             p.setVideo(video);
         }
@@ -303,8 +309,26 @@ public class ListingEditRules {
         }
 
         clearReadyToMoveSaleAvailableDate(p);
+        ListingShape.clearUnaskedAnswers(p);
 
-        return new EditImpact(remoderationRequired, recheckOnly && !remoderationRequired, rechecked);
+        return new EditImpact(remoderationRequired, recheckOnly && !remoderationRequired, rechecked, changes);
+    }
+
+    private static void note(List<String> rechecked, List<Map<String, String>> changes, String field,
+            Object before, Object after) {
+        rechecked.add(field);
+        changes.add(Map.of("field", field, "before", display(before), "after", display(after)));
+    }
+
+    private static String display(Object value) {
+        String text = value instanceof List<?> list
+                ? list.stream().map(String::valueOf).collect(Collectors.joining(", "))
+                : value == null ? "" : String.valueOf(value);
+        return text.length() > MAX_CHANGE_TEXT ? text.substring(0, MAX_CHANGE_TEXT) + "\u2026" : text;
+    }
+
+    private static Object plottedProjectOf(Property p) {
+        return p.getFormDetails() == null ? null : p.getFormDetails().get("plottedProject");
     }
 
     private void validateSanityPatch(Property p, ListingUpdate in) {
@@ -335,6 +359,23 @@ public class ListingEditRules {
         }
         if (in.deposit() != null && DealIntent.RENT.equals(deal) && price != null && in.deposit() > price * 24L) {
             violations.add(violation("deposit", "cannot exceed 24 months of rent"));
+        }
+        String areaUnit = in.areaUnit() == null ? p.getAreaUnit() : in.areaUnit();
+        if (in.price() != null || in.deal() != null) {
+            ListingShape.price(deal, price).forEach(problem -> violations.add(violation(problem.field(), problem.message())));
+        }
+        if (in.area() != null || in.areaUnit() != null) {
+            ListingShape.areaSize(in.area() == null ? p.getArea() : in.area(), areaUnit)
+                    .forEach(problem -> violations.add(violation(problem.field(), problem.message())));
+        }
+        if (in.areaUnit() != null || in.propertyType() != null) {
+            ListingShape.areaUnit(propertyType, areaUnit)
+                    .forEach(problem -> violations.add(violation(problem.field(), problem.message())));
+        }
+        if (in.landUse() != null || in.propertyType() != null) {
+            ListingShape.landUse(propertyType, Boolean.TRUE.equals(in.clearLandUse()) ? null
+                    : in.landUse() == null ? p.getLandUse() : in.landUse())
+                    .forEach(problem -> violations.add(violation(problem.field(), problem.message())));
         }
         if (isResidential(propertyType)) {
             if (in.carpetArea() != null || in.propertyType() != null) {

@@ -7,6 +7,8 @@ import com.draazy.api.catalog.property.Furnishing;
 import com.draazy.api.catalog.property.LandUse;
 import com.draazy.api.catalog.property.PropertyPossession;
 import com.draazy.api.catalog.property.PropertyTypeLabel;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -35,20 +37,20 @@ public record ListingUpdate(
         @PositiveOrZero Long maintenance,
         Boolean clearMaintenance,
         Boolean negotiable,
-        BigDecimal area,
+        @Positive BigDecimal area,
         @Pattern(regexp = AreaUnit.PATTERN, message = AreaUnit.PATTERN_MESSAGE) String areaUnit,
         @Pattern(regexp = Furnishing.PATTERN,
                 message = Furnishing.PATTERN_MESSAGE) String furnishing,
         String locality,
         String localitySlug,
         String city,
-        Double lat,
-        Double lng,
+        @DecimalMin(value = "-90", message = "must be between -90 and 90") @DecimalMax(value = "90", message = "must be between -90 and 90") Double lat,
+        @DecimalMin(value = "-180", message = "must be between -180 and 180") @DecimalMax(value = "180", message = "must be between -180 and 180") Double lng,
         @Pattern(regexp = "^$|^P[0-9]{11}$",
                 message = "must be a MahaRERA id: P followed by 11 digits") String reraId,
         @Pattern(regexp = PropertyPossession.PATTERN,
                 message = PropertyPossession.PATTERN_MESSAGE) String possession,
-        @Size(max = 5) List<@NotNull @Pattern(regexp = "family|bachelors|bachelor-male|bachelor-female|company|anyone") String> tenants,
+        @Size(max = 5) List<@NotNull @Pattern(regexp = "family|bachelors|bachelor-male|bachelor-female|company|anyone", message = "must be family, bachelors, bachelor-male, bachelor-female, company or anyone") String> tenants,
 
         // Bounded, contact-guarded and null-free to match ListingCreate; see the notes there.
         @Size(max = 40) List<@NotNull @Size(max = 60) @NoContactDetails String> amenities,
@@ -56,12 +58,12 @@ public record ListingUpdate(
         @Size(max = 20, message = "cannot carry more than 20 photos") List<@NotNull @Size(max = 512) String> images,
 
         @Size(max = 512) String floorPlan,
-        @Pattern(regexp = "^$|^[A-Za-z0-9_-]{11}$") String video,
+        @Pattern(regexp = "^$|^[A-Za-z0-9_-]{11}$", message = "must be an 11-character YouTube video id") String video,
         @Size(max = 4000) @NoContactDetails String description,
 
         @Size(max = 300) @NoContactDetails String address,
-        Integer floor,
-        @Pattern(regexp = "^$|^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$") String societyId,
+        @Min(value = 0, message = "cannot be below the ground floor") Integer floor,
+        @Pattern(regexp = "^$|^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$", message = "must be a valid society id") String societyId,
         @Size(max = 64) String electricityMeterNo,
 
         // Match ListingCreate's bounds to preserve legacy values rather than enforce picker options.
@@ -73,12 +75,12 @@ public record ListingUpdate(
         @Size(max = 32) String overlooking,
         @Min(1) Integer totalFloors,
         @Min(0) Integer ageYears,
-        @Pattern(regexp = "^$|^[1-9][0-9]{5}$") String pincode,
+        @Pattern(regexp = "^$|^[1-9][0-9]{5}$", message = "must be a 6-digit pincode") String pincode,
         @Positive BigDecimal carpetArea,
         @Positive BigDecimal builtUpArea,
         @Positive BigDecimal superBuiltUpArea,
 
-        @Pattern(regexp = "^$|now|15|30") String availableFrom,
+        @Pattern(regexp = "^$|now|15|30", message = "must be now, 15 or 30") String availableFrom,
         @Pattern(regexp = AvailableOn.PATTERN, message = AvailableOn.PATTERN_MESSAGE) String availableOn,
         Boolean pets,
 
@@ -90,4 +92,8 @@ public record ListingUpdate(
         String landUse,
 
         Boolean clearLandUse) implements CoherentDimensions.Dimensions, ListingSanityLimits.Input {
+
+    public ListingUpdate {
+        images = images == null ? null : images.stream().distinct().toList();
+    }
 }

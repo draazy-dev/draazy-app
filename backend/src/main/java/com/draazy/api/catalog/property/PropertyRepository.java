@@ -310,8 +310,13 @@ public interface PropertyRepository
             select exists (select 1 from properties p where p.id = :propertyId and\s""" + ACTIVE_PASS_SQL + ")")
     boolean hasActivePass(@Param("propertyId") UUID propertyId, @Param("now") Instant now);
 
-    @Query("select count(p) from Property p where p.owner.id = :ownerId and p.createdAt > :since")
-    long countPostedSince(@Param("ownerId") UUID ownerId, @Param("since") java.time.Instant since);
+    @Query("select p.createdAt from Property p where p.owner.id = :ownerId and p.createdAt > :since"
+            + " order by p.createdAt asc")
+    List<Instant> postedTimesSince(@Param("ownerId") UUID ownerId, @Param("since") Instant since);
+
+    @Query("select p from Property p where p.owner.id = :ownerId and p.archived = false and p.createdAt > :since"
+            + " order by p.createdAt desc")
+    List<Property> recentlyPostedBy(@Param("ownerId") UUID ownerId, @Param("since") Instant since);
 
     /** The three homepage trust numbers in one statement so they cannot straddle a moderation write;
      * the ownership clause spells out the lapse rule and {@code verifiedOwners} counts people. */

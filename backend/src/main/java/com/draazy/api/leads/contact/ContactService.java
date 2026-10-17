@@ -1,7 +1,7 @@
 package com.draazy.api.leads.contact;
 
 import com.draazy.api.catalog.property.Property;
-import com.draazy.api.catalog.property.PropertyStatus;
+import com.draazy.api.catalog.property.ListingClosed;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ContactPendingLimitException;
@@ -83,10 +83,11 @@ public class ContactService {
         User owner = property.getOwner();
 
         if (owner != null && owner.getId().equals(viewerId)) {
-            return describe(viewerId, property);
+            throw new ConflictException(ErrorCodes.OWN_LISTING,
+                    "This is your own listing, so there is no one to request contact from.");
         }
         if (!property.isPubliclyVisible()) {
-            throw closedListing(property);
+            throw ListingClosed.refusal(property);
         }
         if (owner != null && owner.isVerifiedContactOnly() && !hasBadge(viewerId)) {
             throw new VerificationRequiredException("This owner only accepts verified contacts");
@@ -221,15 +222,6 @@ public class ContactService {
         } else {
             returnedContact.notifySeeker(row, "declined");
         }
-    }
-
-    // A listing a visitor can still open (paused, rented, sold) is closed; anything else is not visible to the caller.
-    private static RuntimeException closedListing(Property property) {
-        boolean reachable = !property.isArchived() && !property.isOwnerSuspended()
-                && PropertyStatus.DIRECTLY_REACHABLE.contains(property.getStatus());
-        return reachable
-                ? new ConflictException(ErrorCodes.LISTING_NOT_LIVE, "This listing is not live right now")
-                : NotFoundException.of("Property");
     }
 
     private boolean listingIsLive(UUID propertyId) {

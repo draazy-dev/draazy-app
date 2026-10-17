@@ -196,6 +196,7 @@ public class DealService {
         property.setStatus(terminalStatusFor(property));
         property.setDealStatus(DealStatuses.CLOSED);
         properties.endListingPasses(property.getId());
+        lifecycle.announceClosed(property);
     }
 
     private Property lockedOwnedProperty(UUID callerId, UUID propertyId) {

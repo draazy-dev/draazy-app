@@ -37,8 +37,7 @@ public class PropertyLifecycle {
                 && !permissions.granted(actor, BackOfficePermissions.PROPERTIES_VERIFY))) {
             throw new ForbiddenException("Property review permission is required");
         }
-        if (actor.userId().equals(property.getOwner().getId())
-                || actor.userId().toString().equals(property.getPostedByStaff())) {
+        if (property.isMadeBy(actor.userId())) {
             throw new ForbiddenException("You cannot approve or review your own listing");
         }
     }
@@ -61,6 +60,13 @@ public class PropertyLifecycle {
         }
     }
 
+    public void requireOwnerConfirmed(Property property) {
+        if (!PropertyStatus.APPROVED.equals(property.getStatus()) && property.awaitsOwnerConfirmation()) {
+            throw new ConflictException("owner_not_confirmed",
+                    "The owner has not confirmed this listing yet. Send the claim link and wait for them to confirm.");
+        }
+    }
+
     public void publish(AuthPrincipal actor, Property property) {
         publish(actor, property, false);
     }
@@ -73,10 +79,7 @@ public class PropertyLifecycle {
         requireChecker(actor, property);
         requireActive(property);
         requireFiled(property);
-        if (!PropertyStatus.APPROVED.equals(property.getStatus()) && property.awaitsOwnerConfirmation()) {
-            throw new ConflictException("owner_not_confirmed",
-                    "The owner has not confirmed this listing yet. Send the claim link and wait for them to confirm.");
-        }
+        requireOwnerConfirmed(property);
         publicationGate.requirePublishable(actor, property, secondApprovalSatisfied);
         boolean alreadyLive = PropertyStatus.APPROVED.equals(property.getStatus());
         boolean live = alreadyLive || liveGate.mayGoLive(property);
@@ -93,18 +96,53 @@ public class PropertyLifecycle {
         events.publishEvent(new PropertyArchived(property.getId()));
     }
 
+    public void announceClosed(Property property) {
+        events.publishEvent(new PropertyClosed(property.getId()));
+    }
+
     /** Tells the owner their listing was approved, or that the free tier held it back. */
     public void announceApproval(Property property) {
         UUID ownerId = property.getOwner().getId();
         if (PropertyStatus.PAUSED.equals(property.getStatus())) {
             notifier.notify(ownerId, "listing.approved_paused", "Your listing is approved",
-                    "Approved — you're on the free tier (1 live listing). Buy a ₹" + settings.listingPass()
-                    + " listing pass or pause another listing to make it live.",
-                    "/dashboard");
+                    label(property) + " is approved. " + freeTierHold(),
+                    reviewLink(property));
             return;
         }
         notifier.notify(ownerId, "listing.approved", "Your listing is approved",
-                "It is now live and visible to buyers.", "/property/" + property.getId());
+                label(property) + " is now live and visible to buyers.", "/property/" + property.getId());
+    }
+
+    /** The thread line for an approval, worded for where the listing actually landed. */
+    public String approvalMessage(Property property) {
+        return PropertyStatus.PAUSED.equals(property.getStatus())
+                ? "\u2705 Your property has been verified and approved. " + freeTierHold()
+                : "\u2705 Your property has been verified and is now live.";
+    }
+
+    public void announceSubmitted(Property property) {
+        notifier.notify(property.getOwner().getId(), "listing.under_review", "Your listing is under review",
+                label(property) + " is with our team. We'll tell you as soon as it is reviewed.",
+                reviewLink(property));
+    }
+
+    public void announceReopened(Property property) {
+        notifier.notify(property.getOwner().getId(), "listing.reopened", "Your listing is back under review",
+                label(property) + " was not final after all: a second reviewer reopened it and it is being reviewed again.",
+                reviewLink(property));
+    }
+
+    public static String reviewLink(Property property) {
+        return "/dashboard?review=" + property.getId();
+    }
+
+    public static String label(Property property) {
+        return "\"" + property.getTitle() + "\" in " + property.getLocality();
+    }
+
+    private String freeTierHold() {
+        return "You're on the free tier (1 live listing). Buy a ₹" + settings.listingPass()
+                + " listing pass or pause another listing to make it live.";
     }
 
     public void start(AuthPrincipal actor, Property property) {

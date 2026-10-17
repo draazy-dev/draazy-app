@@ -33,7 +33,7 @@ public class AdminFunnelService {
                   join audit_log a
                     on a.entity = 'property'
                    and (a.entity_id = cast(p.id as text) or a.entity_id = p.slug)
-                   and ((a.action = 'property.status' and a.metadata ->> 'to' = 'approved')
+                   and ((a.action = 'property.status' and a.metadata ->> 'to' in ('approved', 'paused'))
                      or (a.action = 'property.verification.decision' and a.metadata ->> 'decision' = 'approve'))
                  where p.archived = false
                  group by p.id
