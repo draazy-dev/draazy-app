@@ -52,7 +52,7 @@ public class ServiceRequestDrafting {
     @Transactional
     public ServiceRequestDto shareDraft(AuthPrincipal caller, String id, String note,
             List<String> checks, MultipartFile file) {
-        ServiceRequest request = requests.opsAccessible(caller, id);
+        ServiceRequest request = requests.opsAccessibleForUpdate(caller, id);
         requests.requireHolder(caller, request, "sharing a draft", "the draft is theirs to share");
         List<String> attested = DraftingChecklist.require(request, checks);
         documentReviews.requireVerified(caller, request, "sharing the draft");
@@ -78,7 +78,6 @@ public class ServiceRequestDrafting {
         return mapper.toDto(request, caller);
     }
 
-    // Final upload completes only from approved, held requests.
     // Rent agreements draft tenancy rows; a second operator verifies before trust badges.
     @Transactional
     public DocumentDto uploadFinalDoc(AuthPrincipal caller, String id, MultipartFile file,

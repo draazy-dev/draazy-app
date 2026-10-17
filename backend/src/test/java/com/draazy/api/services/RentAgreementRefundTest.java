@@ -104,7 +104,8 @@ class RentAgreementRefundTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.refunds[0].gatewayRefundId", startsWith("mock_refund_")))
                 .andExpect(jsonPath("$.refunded").value(paid))
                 .andExpect(jsonPath("$.refundableBeforeDuty").value(0));
-        decideRefund(checker, id, refund, true).andExpect(status().isNotFound());
+        decideRefund(checker, id, refund, true).andExpect(status().isConflict());
+        decideRefund(checker, id, UUID.randomUUID().toString(), true).andExpect(status().isNotFound());
         ask(maker, id, 1, false, null).andExpect(status().isUnprocessableEntity());
 
         mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))

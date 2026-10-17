@@ -1,6 +1,5 @@
 package com.draazy.api.services.request;
 
-import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.Roles;
 import java.time.Instant;
@@ -45,10 +44,8 @@ class ServiceRequestReadReceipts {
 
     @Transactional
     void markDraftOpened(AuthPrincipal caller, String id) {
-        ServiceRequest request = requests.visible(caller, id);
-        if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED) {
-            throw new ConflictException("There is no draft out for review on this request.");
-        }
+        ServiceRequest request = requests.visibleLocked(caller, id);
+        approvals.requireOutForReview(request);
         approvals.markOpened(caller, request);
         if (caller.userId().equals(request.getRequesterId())) {
             List<ServiceRequestEvent> timeline = events.findByRequestIdOrderByAtAsc(request.getId());

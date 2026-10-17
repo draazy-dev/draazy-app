@@ -9,7 +9,6 @@ import com.draazy.api.security.AuthPrincipal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -53,7 +52,7 @@ public class ServiceRequestDraftChecks {
 
     @Transactional
     public ServiceRequestDto decide(AuthPrincipal caller, String id, String decision, String note) {
-        ServiceRequest request = requests.opsAccessible(caller, id);
+        ServiceRequest request = requests.opsAccessibleForUpdate(caller, id);
         int version = approvals.currentVersion(request);
         ServiceRequestDraftCheck check = checks.findByRequestIdAndDraftVersion(request.getId(), version).orElseThrow(() -> new ConflictException("No draft is waiting for a second check."));
         if (!ServiceRequestDraftCheck.PENDING.equals(check.getStatus())) {
@@ -68,22 +67,6 @@ public class ServiceRequestDraftChecks {
             default -> throw new BadRequestException("decision must be 'release' or 'send-back'");
         }
         return mapper.toDto(request, caller);
-    }
-
-    ServiceRequestDto.DraftCheck summary(ServiceRequest request, ServiceRequestDraftCheck check,
-            Map<UUID, String> names) {
-        if (check == null) {
-            return null;
-        }
-        return new ServiceRequestDto.DraftCheck(check.getDraftVersion(), check.getStatus(),
-                check.reasonsList(), check.getNote(), names.get(check.getSharedBy()),
-                names.get(check.getCheckedBy()), check.getCheckedAt());
-    }
-
-    boolean hideDraftFromCustomer(ServiceRequest request, List<ServiceRequestDraftCheck> all) {
-        int version = approvals.currentVersion(request);
-        return all.stream().anyMatch(c -> c.getRequestId().equals(request.getId())
-                && c.getDraftVersion() == version && ServiceRequestDraftCheck.PENDING.equals(c.getStatus()));
     }
 
     private void release(AuthPrincipal caller, ServiceRequest request, ServiceRequestDraftCheck check,

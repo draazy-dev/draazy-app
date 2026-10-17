@@ -289,7 +289,11 @@ public class ServiceRequestRefunds {
     }
 
     private ServiceRequestRefund open(ServiceRequest request, String refundId) {
-        return refunds.findOpenForUpdate(request.getId()).filter(r -> r.getId().toString().equals(refundId)).orElseThrow(() -> NotFoundException.of("Open refund"));
+        return refunds.findOpenForUpdate(request.getId()).filter(r -> r.getId().toString().equals(refundId))
+                .orElseThrow(() -> refunds.findByServiceRequestIdOrderByCreatedAtDesc(request.getId()).stream()
+                        .filter(r -> r.getId().toString().equals(refundId)).findFirst()
+                        .<RuntimeException>map(r -> new ConflictException("This refund is already " + r.getStatus() + "."))
+                        .orElseGet(() -> NotFoundException.of("Refund")));
     }
 
     private ServiceRequest locked(UUID requestId) {
