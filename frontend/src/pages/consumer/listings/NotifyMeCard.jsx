@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
+import Button from '../../../components/ui/Button.jsx';
 import { recordSignal } from '../../../services/demandService.js';
 import { useSavedSearchCreate } from '../../../context/SavedSearchContext.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
@@ -106,9 +107,9 @@ export default function NotifyMeCard({ filters, locNameBySlug, toast }) {
         <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">
           {t('listings.sentInApp')} <span className="text-white"> {label}</span>
         </p>
-        <Link to="/dashboard#alerts" className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-teal-400/30 bg-teal-500/10 px-4 py-2 text-sm font-semibold text-teal-200 transition hover:bg-teal-500/20">
-          <Icon name="sliders-horizontal" className="h-4 w-4" /> {t('listings.manageAlerts')}
-        </Link>
+        <Button to="/dashboard#alerts" variant="secondary" icon="sliders-horizontal" className="mt-4">
+          {t('listings.manageAlerts')}
+        </Button>
       </div>
     );
   }
@@ -130,8 +131,8 @@ export default function NotifyMeCard({ filters, locNameBySlug, toast }) {
 
         <div className="mt-4 flex flex-wrap gap-1.5">
           {chips.map((c, i) => (
-            <span key={i} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-gray-200">
-              <Icon name={c.icon} className="h-3 w-3 text-amber-300/80" /> {c.text}
+            <span key={i} className="dz-tag dz-tag--muted font-medium">
+              <Icon name={c.icon} className="text-amber-300/80" /> {c.text}
             </span>
           ))}
         </div>
@@ -147,9 +148,9 @@ export default function NotifyMeCard({ filters, locNameBySlug, toast }) {
           </p>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <button type="submit" disabled={saving} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-teal-500 px-4 py-2 text-sm font-semibold text-ink transition hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed">
-              <Icon name="bell-plus" className="h-4 w-4" /> {t('listings.createAlert')}
-            </button>
+            <Button type="submit" variant="primary" icon="bell-plus" loading={saving}>
+              {t('listings.createAlert')}
+            </Button>
           </div>
         </form>
       </div>

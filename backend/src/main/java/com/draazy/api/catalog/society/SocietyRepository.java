@@ -45,6 +45,7 @@ public interface SocietyRepository
                 select s.id from societies s
                 where s.merged_into is null and s.archived_at is null
                   and (cast(:locality as text) is null or s.locality_slug = cast(:locality as text))
+                  and (not :mapped or s.place_id is not null)
                   and (cast(:like as text) is null or lower(s.name || ' ' || coalesce(s.builder, '')
                        || ' ' || replace(coalesce(s.locality_slug, ''), '-', ' ')) like cast(:like as text))
             ), fam as (
@@ -83,7 +84,7 @@ public interface SocietyRepository
                 lower(s.name), s.slug
             limit :limit offset :offset""", nativeQuery = true)
     List<Object[]> rankedIds(@Param("like") String like, @Param("locality") String locality,
-            @Param("hasListings") boolean hasListings, @Param("mode") String mode,
+            @Param("hasListings") boolean hasListings, @Param("mapped") boolean mapped, @Param("mode") String mode,
             @Param("limit") int limit, @Param("offset") long offset);
 
     /** Merged-away rows are excluded so a duplicate already dealt with does not return;

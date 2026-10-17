@@ -2,13 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useSaved } from '../../context/SavedContext.jsx';
 import { useFollows } from '../../context/FollowContext.jsx';
 import { useSavedSearches } from '../../context/SavedSearchContext.jsx';
 import { firstName } from '../../lib/auth.js';
-import { useConversationUnread } from '../../context/ConversationContext.jsx';
 import { useVerification } from '../../context/VerificationContext.jsx';
 import { listRecentSearches } from '../../services/recentSearchService.js';
 import { dashboardCaps, primeMeDashboard } from '../../services/meDashboardService.js';
@@ -39,7 +37,6 @@ export default function Dashboard() {
   const saved = useSaved();
   const follows = useFollows();
   const savedSearches = useSavedSearches();
-  const { flagEnabled } = useAppFlags();
   const { toast } = useToast();
   const location = useLocation();
   const navigate = useNavigate();
@@ -65,7 +62,6 @@ export default function Dashboard() {
     dashboardCaps(dashboardDoc).then((next) => { if (live) setCaps(next); });
     return () => { live = false; };
   }, [dashboardDoc]);
-  const { unread: chatUnread } = useConversationUnread();
   const { verified } = useVerification();
   // Management tabs unlock on actual inventory, not on role, so a brand-new owner is not handed
   // empty "My Listings / Enquiries / Finances" dead-ends.
@@ -106,8 +102,8 @@ export default function Dashboard() {
   const hasRentalGroup = hasTenancy || hasRentalInvite;
 
   const visibleTabs = useMemo(
-    () => TABS.filter((t) => (!t.owner || isOwner) && (!t.tenant || showRental) && (!t.flag || flagEnabled(t.flag))),
-    [isOwner, showRental, flagEnabled],
+    () => TABS.filter((t) => (!t.owner || isOwner) && (!t.tenant || showRental)),
+    [isOwner, showRental],
   );
   const dashboardGroups = useMemo(
     () => buildDashboardGroups({ visibleTabs, isOwner, showRental, hasRentalGroup }),
@@ -115,28 +111,23 @@ export default function Dashboard() {
   );
 
   const urlTarget = resolveTarget(tabFromLocation());
-  const urlDef = visibleTabs.find((t) => t.tab === urlTarget.tab);
-  const { tab, sub } = urlDef && !urlDef.link ? urlTarget : { tab: 'overview', sub: undefined };
+  const { tab, sub } = visibleTabs.some((t) => t.tab === urlTarget.tab) ? urlTarget : { tab: 'overview', sub: undefined };
 
   const REVIEW_STATUS = REVIEW_STATUS_MAP;
 
   const go = (next, { replace = false } = {}) => {
     const r = resolveTarget(next);
-    const def = visibleTabs.find((t) => t.tab === r.tab);
-    if (!def) return;
-    // Link-out tabs (e.g. Messages) open a standalone page, not an inline panel.
-    if (def.link) { navigate(def.link); return; }
+    if (r.link) { navigate(r.link); return; }
+    if (!visibleTabs.some((t) => t.tab === r.tab)) return;
     const apply = () => { navigate('#' + next, { replace }); window.scrollTo(0, 0); };
     if (document.startViewTransition) document.startViewTransition(apply);
     else apply();
   };
 
   useEffect(() => {
-    // A deep link to a link-out tab (#messages) redirects to its real page so we
-    // never render a divergent inline version of it.
-    if (urlDef?.link) navigate(urlDef.link, { replace: true });
+    if (urlTarget.link) navigate(urlTarget.link, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- redirect only follows the active URL tab
-  }, [urlDef?.link]);
+  }, [urlTarget.link]);
 
   const reviewParam = new URLSearchParams(location.search).get('review');
   useEffect(() => {
@@ -178,7 +169,7 @@ export default function Dashboard() {
   });
   // Badge counts only items genuinely waiting on the owner, matching the Requests panel's
   // "Waiting on you"; an already-contactable enquiry needs no accept/decline decision.
-  const attentionCounts = { ...attentionFromItems(actionItems), messages: chatUnread };
+  const attentionCounts = attentionFromItems(actionItems);
 
   // Total open leads, computed exactly as the Leads panel computes its own total, so the Overview
   // tile and the panel can never show two different numbers for the same inbox.
@@ -238,7 +229,6 @@ export default function Dashboard() {
         />
 
         <div className="lg:grid lg:grid-cols-[260px_1fr] lg:gap-6">
-          {/* Sidebar */}
           <DashboardSidebar
             groups={dashboardGroups}
             activeTab={tab}
@@ -248,7 +238,6 @@ export default function Dashboard() {
             onLogout={logout}
             loading={personaPending}
           />
-          {/* Content */}
 
           <section>
             {dataStatus === 'error' && (

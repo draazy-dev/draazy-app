@@ -30,7 +30,7 @@ const plansFaqs = (t, rentFee, price, n) => [
 function PlanCard({ p }) {
   return (
     <div className={'glass rounded-2xl p-6 flex flex-col h-full ' + (p.pop ? 'plan-pop relative' : '')}>
-      {p.badge && <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-teal-300 mb-2 px-2 py-0.5 rounded-full bg-teal-500/15 self-start">{p.badge}</span>}
+      {p.badge && <span className="dz-tag font-bold uppercase tracking-wider text-teal-300 mb-2 bg-teal-500/15 self-start">{p.badge}</span>}
       <h3 className="text-xl font-extrabold">{p.name}</h3>
       <p className="mt-1"><span className="text-3xl font-extrabold">{p.price}</span> <span className="text-gray-500 text-sm">{p.sub}</span></p>
       <p className="text-teal-300 text-sm font-medium mt-1 mb-4">{p.tag}</p>
@@ -170,7 +170,7 @@ export default function Plans() {
   return (
     <div className="pt-8 sm:pt-10 pb-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="text-center mb-8 sm:mb-12">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-emerald-300 mb-3" style={{ background: 'rgb(var(--dz-c-emerald-500) / .12)', border: '1px solid rgb(var(--dz-c-emerald-500) / .25)' }}><Icon name="hand-coins" className="w-3.5 h-3.5" /> {t('misc1.plansBadge')}</span>
+        <span className="dz-tag font-semibold text-emerald-300 mb-3" style={{ background: 'rgb(var(--dz-c-emerald-500) / .12)', border: '1px solid rgb(var(--dz-c-emerald-500) / .25)' }}><Icon name="hand-coins" className="w-3.5 h-3.5" /> {t('misc1.plansBadge')}</span>
         <h1 className="text-3xl sm:text-4xl font-extrabold">{t('misc1.plansTitle')}</h1>
         <p className="text-gray-400 mt-2">{t('misc1.plansSubtitle')}</p>
       </div>

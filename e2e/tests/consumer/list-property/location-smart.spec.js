@@ -7,7 +7,7 @@ import { pickLocality } from '../../../helpers/locality.js';
 const BANER_PIN = { lat: 18.5602, lng: 73.7861, locality: 'Baner', pincode: '411045' };
 const uniqueName = (stem) => `${stem} ${Date.now().toString(36)}`;
 
-async function gotoLocation(page) {
+async function gotoLocation(page, { mapUp = true } = {}) {
   await signedInAsNew(page);
   await page.goto('/list-property');
   await page.waitForSelector('.lp-steps', { timeout: 20000 });
@@ -17,7 +17,7 @@ async function gotoLocation(page) {
   await page.locator('.dz-dropdown__option', { hasText: 'Flat / Apartment' }).first().click();
   await pickFloors(page);
   await page.getByRole('button', { name: /Next Step/i }).click();
-  await page.waitForSelector('.gm-style', { timeout: 30000 });
+  if (mapUp) await page.waitForSelector('.gm-style', { timeout: 30000 });
 }
 
 test('the society pick leads the location step and autofills safe fields; the current-location control and mobile map controls are wired', async ({ page }) => {
@@ -134,4 +134,27 @@ test('land keeps the area search bar above the map, with the locate button insid
   const locate = page.getByRole('button', { name: /Use my current location/i });
   await expect(locate).toBeVisible();
   await expect(page.locator('[data-err="location"]').filter({ has: locate }).filter({ has: search })).toHaveCount(1);
+});
+
+test('with Google Maps down the map becomes a one-line note and a society already on Draazy still places the pin', async ({ page }) => {
+  await page.route(/maps\.googleapis\.com/, (route) => route.abort());
+  await gotoLocation(page, { mapUp: false });
+  await expect(page.getByTestId('map-down-note')).toBeVisible();
+  await expect(page.locator('.gm-style')).toHaveCount(0);
+  await expect(page.getByText('Pick your society above, or drag the pin to your building.')).toHaveCount(0);
+
+  const mappedOnly = page.waitForRequest((r) => /\/societies\?/.test(r.url()) && r.url().includes('mapped=true'));
+  await page.getByTestId('society-input').fill('Aditya Shagun');
+  await mappedOnly;
+  await page.getByTestId('society-saved-option').filter({ hasText: 'Aditya Shagun' }).click();
+  await expect(page.locator('[data-err="locality"]')).toContainText('Kothrud');
+  await expect(page.getByText(/Location set:/i)).toBeVisible();
+});
+
+test('with Google Maps down a locality pick alone places the pin', async ({ page }) => {
+  await page.route(/maps\.googleapis\.com/, (route) => route.abort());
+  await gotoLocation(page, { mapUp: false });
+  await expect(page.getByTestId('map-down-note')).toBeVisible();
+  await pickLocality(page, 'Wakad');
+  await expect(page.getByText(/Location set:/i)).toBeVisible();
 });

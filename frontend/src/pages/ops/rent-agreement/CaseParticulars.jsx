@@ -126,7 +126,7 @@ function DetailCard({ group, papers, paperRow }) {
         {group.name ? <span className="font-semibold text-white">{group.name}</span> : null}
         <span className={group.name ? 'text-xs uppercase tracking-wide text-gray-500' : 'text-sm font-semibold'}>{group.title}</span>
         {papers.length ? (
-          <span className={classNames('ml-auto rounded-full px-2 py-0.5 text-xs', verified === papers.length ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/5 text-gray-400')}>
+          <span className={classNames('dz-tag ml-auto', verified === papers.length ? 'bg-emerald-500/15 text-emerald-200' : 'bg-white/5 text-gray-400')}>
             {verified}/{papers.length} papers verified
           </span>
         ) : null}

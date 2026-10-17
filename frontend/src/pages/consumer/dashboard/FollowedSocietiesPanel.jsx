@@ -63,11 +63,11 @@ export default function FollowedSocietiesPanel() {
                 </div>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {soc ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-gray-300">
+                    <span className="dz-tag border border-white/10 bg-white/5 font-medium text-gray-300">
                       <Icon name="map-pin" className="h-3 w-3 text-gray-400" /> {titleCase(soc.localitySlug)}
                     </span>
                   ) : null}
-                  <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-teal-300">
+                  <span className="dz-tag border border-white/10 bg-white/5 font-medium text-teal-300">
                     <Icon name="home" className="h-3 w-3" /> {count ? `${count} home${count > 1 ? 's' : ''} listed now` : 'No homes listed now'}
                   </span>
                 </div>

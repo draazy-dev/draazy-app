@@ -355,15 +355,14 @@ export default function AdminReports() {
         </QueuePanel>
       )}
 
-      {/* Detail modal */}
       <Modal open={!!detail} onClose={() => setDetail(null)} title={detail ? `Report · ${detail.id}` : ''} size="lg">
         {detail ? (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge status={detail.status} />
-              <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-2.5 py-0.5 text-xs capitalize text-orange-300"><Flag className="mr-1 inline h-3 w-3" />{detail.kind} report</span>
+              <span className="dz-tag border border-orange-400/30 bg-orange-500/10 capitalize text-orange-300"><Flag className="mr-1 inline h-3 w-3" />{detail.kind} report</span>
               {(detail.targetReportCount || 1) >= 3 && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-red-400/30 bg-red-500/10 px-2 py-0.5 text-[11px] font-semibold text-red-300">
+                <span className="dz-tag border border-red-400/30 bg-red-500/10 font-semibold text-red-300">
                   <AlertTriangle className="h-3 w-3" /> Escalated ({detail.targetReportCount} reports)
                 </span>
               )}

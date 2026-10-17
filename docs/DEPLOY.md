@@ -592,7 +592,7 @@ tell those apart.
 |---|---|---|
 | `sandbox` environment | `DIGITALOCEAN_ACCESS_TOKEN`, `SANDBOX_JWT_SECRET`, `SANDBOX_ORIGIN_SHARED_SECRET`, `SANDBOX_REFERRAL_SIGNAL_SALT`, `SANDBOX_IDENTITY_HASH_SECRET`, `SANDBOX_STAFF_TOTP_KEY`, `SANDBOX_IDENTITY_ENCRYPTION_KEY`, `SANDBOX_CASHFREE_APP_ID`, `SANDBOX_CASHFREE_SECRET_KEY`, `SANDBOX_ZEPTOMAIL_API_KEY`, `SANDBOX_WHATSAPP_ACCESS_TOKEN`, `SANDBOX_TURNSTILE_SECRET_KEY`, `SANDBOX_R2_ACCESS_KEY_ID`, `SANDBOX_R2_SECRET_ACCESS_KEY`, `SANDBOX_GOOGLE_PLACES_SERVER_KEY`, `SANDBOX_PUSH_VAPID_PRIVATE_KEY`, `SANDBOX_PUSH_VAPID_PUBLIC_KEY`, `SANDBOX_BOOTSTRAP_ADMIN_EMAIL`, `SANDBOX_BOOTSTRAP_ADMIN_MOBILE` | `SANDBOX_R2_ENDPOINT`, `SANDBOX_R2_BUCKET_PRIVATE`, `SANDBOX_R2_BUCKET_PUBLIC`, `SANDBOX_R2_PUBLIC_BASE_URL`, `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` (blank = off) |
 | `sandbox-web` environment | `CLOUDFLARE_API_TOKEN` (Account → Cloudflare Pages → Edit, nothing else) | `CLOUDFLARE_ACCOUNT_ID` |
-| repository (frontend build) | `VITE_GOOGLE_MAPS_API_KEY`, `VITE_GA_ID` | `VITE_GOOGLE_MAPS_MAP_ID`, `VITE_CASHFREE_MODE`, `VITE_PMF_MODE`, `VITE_VAPID_PUBLIC_KEY`, `VITE_TURNSTILE_SITE_KEY` |
+| repository (frontend build) | `VITE_GOOGLE_MAPS_API_KEY`, `VITE_GA_ID` | `VITE_GOOGLE_MAPS_MAP_ID`, `VITE_CASHFREE_MODE`, `VITE_PMF_MODE`, `VITE_VAPID_PUBLIC_KEY`, `VITE_TURNSTILE_SITE_KEY`, `VITE_POSTHOG_KEY` (US-cloud project key; blank = off), `VITE_POSTHOG_APP_URL` |
 
 The workflow fails fast when any `sandbox` value except the three bootstrap ones is empty. The four R2
 values and `SANDBOX_BOOTSTRAP_ADMIN_RECOVER` are variables because they are identifiers; the R2 key pair
@@ -633,7 +633,7 @@ ShedLock is needed.
 | Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates` |
 | Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs) |
 | Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
-| Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `waiting-digest` |
+| Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `tracked-rent-reminders`, `waiting-digest` |
 
 The app is always on, so the `@Scheduled` cron runs in-process at the times above with no external
 trigger. Switches: `draazy.jobs.enabled=false` turns off all of them (the test suite does), and

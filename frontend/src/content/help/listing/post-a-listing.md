@@ -35,7 +35,7 @@ Draazy is owner-only: owners and family of owners can list; agents and brokers c
 
 If it is a rental of a residential property, you also choose here whether you are letting the **whole place** or looking for a **flatmate**. The flatmate route is a different flow — see [Finding flatmates](/help/a/finding-flatmates).
 
-**Step 2 — Location.** For flats, houses and villas, start with **Find your society / project** — pick it from the Google Maps suggestions, or choose "Not on Google Maps" to continue with the address and map pin only. The locality follows the society you pick; localities come only from Google suggestions. Then add the flat or unit number and a 6-digit pincode, and **place the property on the map** — a listing is never left on a default pin.
+**Step 2 — Location.** For flats, houses and villas, start with **Find your society / project** — pick it from the Google Maps suggestions, or choose "Not on Google Maps" to continue with the address and map pin only. The locality follows the society you pick; localities come only from Google suggestions. If Google Maps is down, pick a society already on Draazy or a locality and we pin it for you; fine-tune the pin later from Edit. Then add the flat or unit number and a 6-digit pincode, and **place the property on the map** — a listing is never left on a default pin.
 
 **Step 3 — Pricing.** For a rental: monthly rent, deposit and the available-from date. For a sale: price, possession and ownership type. Pet policy can be left unstated if you have not decided.
 

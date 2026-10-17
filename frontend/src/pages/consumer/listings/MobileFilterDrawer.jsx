@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import ScrollRail from '../../../components/ScrollRail.jsx';
 import useSwipeDismiss from '../../../lib/useSwipeDismiss.js';
 import useBackToClose from '../../../hooks/useBackToClose.js';
 import Filters from './Filters.jsx';
@@ -39,17 +40,17 @@ export default function MobileFilterDrawer({ drawer, setDrawer, f, set, localiti
       <div className={'filter-overlay lg:hidden ' + (drawer ? 'open' : '')} onClick={() => setDrawer(false)} />
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
       <div {...swipe} className={'filter-panel lg:hidden flex flex-col ' + (drawer ? 'open' : '')} role="dialog" aria-modal={drawer ? 'true' : undefined} aria-label={t('listings.filters')} inert={!drawer}>
-        <div className="filter-panel__grabber" aria-hidden="true" />
-        <div className="filter-panel__drag-zone flex items-center justify-between px-5 pt-3 pb-3 shrink-0">
-          <h3 className="text-lg font-bold text-white">{t('listings.filters')}</h3>
+        <div className="filter-panel__drag-zone flex items-center gap-3 pl-4 pr-2 pt-3 pb-3 shrink-0">
+          <span className="filter-panel__badge" aria-hidden="true"><Icon name="sliders-horizontal" className="w-5 h-5" /></span>
+          <h3 className="flex-1 text-lg font-bold text-white">{t('listings.filters')}</h3>
           <button ref={closeRef} onClick={() => setDrawer(false)} aria-label={t('listings.closeFilters')} className="w-11 h-11 rounded-lg flex items-center justify-center hover:bg-white/10 t-all">
             <Icon name="x" className="w-5 h-5 text-gray-400" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-6 filter-scroll">
+        <ScrollRail className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-6 filter-scroll">
           <Filters f={f} set={set} localities={localities} onAddLocality={onAddLocality} clearAll={clearAll} idp="m-" showClear={false} />
-        </div>
-        <div data-testid="filter-drawer-actions" className="shrink-0 flex items-center gap-2 border-t border-white/10 px-3 pt-3 pb-[calc(0.75rem+var(--dz-safe-b))]" style={{ background: 'rgb(var(--dz-c-ink-card))' }}>
+        </ScrollRail>
+        <div data-testid="filter-drawer-actions" className="shrink-0 flex items-center gap-2 border-t border-white/10 p-3">
           <span className="sr-only" aria-live="polite">
             {total === 0 ? t('listings.noMatchesSr') : t('listings.resultsMatch', { count: total })}
           </span>

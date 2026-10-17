@@ -25,7 +25,7 @@ export default function VideoWalkthrough({ id, title, label }) {
                 <Icon name="play" className="h-7 w-7 translate-x-0.5" />
               </span>
             </span>
-            <span className="absolute left-4 top-4 rounded-full bg-black/70 px-3 py-1.5 text-sm font-semibold text-white">{safeTitle}</span>
+            <span className="dz-tag absolute left-4 top-4 max-w-[calc(100%-2rem)] overflow-hidden bg-black/70 font-semibold text-white">{safeTitle}</span>
           </button>
         )}
       </div>

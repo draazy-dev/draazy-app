@@ -25,7 +25,7 @@ export default function UploadBox({ label, fileName, onPick, preview, vaultState
       <label className="lbl flex items-center gap-2">
         <span className={required ? 'req' : ''}>{label}</span>
         {vaultState && (
-          <span className={'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold ' + (vaultState === 'reused' ? 'bg-teal-500/15 text-teal-300' : 'bg-emerald-500/15 text-emerald-300')}>
+          <span className={'dz-tag font-semibold ' + (vaultState === 'reused' ? 'bg-teal-500/15 text-teal-300' : 'bg-emerald-500/15 text-emerald-300')}>
             <Icon name={vaultState === 'reused' ? 'folder-check' : 'check'} className="w-3 h-3" />
             {t(vaultState === 'reused' ? 'services.ra.owner.vaultReused' : 'services.ra.owner.vaultSaved')}
           </span>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, GitMerge } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { classNames } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useTabParam } from '../../lib/useTabParam.js';
@@ -14,7 +14,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { hasPermission } from '../../lib/adminModules.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { QueueTabs } from '../../components/admin/WorkQueue.jsx';
-import useScrollLock from '../../hooks/useScrollLock.js';
+import Modal from '../../components/ui/Modal.jsx';
 import { titleCase, DUPES_FAILED } from './societies/helpers.jsx';
 import CandidatesTab from './societies/CandidatesTab.jsx';
 import DirectoryTab from './societies/DirectoryTab.jsx';
@@ -50,7 +50,6 @@ export default function AdminPlaces() {
   const [edit, setEdit] = useState(null); // { slug, ...form }
   const [merge, setMerge] = useState(null); // { cand, target, query }
   const [merging, setMerging] = useState(false);
-  useScrollLock(Boolean(edit || merge));
 
   // Server-paged: `candQuery` is debounced into `candSearch`, and a new search resets to page 0.
   const [candQuery, setCandQuery] = useState('');
@@ -301,10 +300,15 @@ export default function AdminPlaces() {
         />
       ) : null}
 
-      {edit && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgb(var(--dz-c-black) / .6)', backdropFilter: 'blur(4px)' }} onClick={() => setEdit(null)}>
-          <div role="dialog" aria-modal="true" aria-label="Edit society" className="dz-card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-1">{edit.name}</h3>
+      <Modal
+        open={Boolean(edit)}
+        onClose={() => setEdit(null)}
+        title="Edit society"
+        footer={<><button onClick={() => setEdit(null)} className="btn-outline">Cancel</button><button onClick={saveEdit} className="btn-teal">Save</button></>}
+      >
+        {edit && (
+          <>
+            <p className="font-semibold text-white">{edit.name}</p>
             <p className="text-gray-400 text-sm mb-4">Overlay edits — override the catalogue without touching source data.</p>
             <div className="space-y-3">
               <label className="flex items-center justify-between text-sm"><span>Registered</span>
@@ -316,15 +320,18 @@ export default function AdminPlaces() {
               <label className="block text-sm">Admin note
                 <textarea rows={2} value={edit.adminNote} onChange={(e) => setEdit({ ...edit, adminNote: e.target.value })} className={inp + ' mt-1'} /></label>
             </div>
-            <div className="mt-5 flex gap-2"><button onClick={() => setEdit(null)} className="btn-outline flex-1">Cancel</button><button onClick={saveEdit} className="btn-teal flex-1">Save</button></div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
-      {merge && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: 'rgb(var(--dz-c-black) / .6)', backdropFilter: 'blur(4px)' }} onClick={() => setMerge(null)}>
-          <div role="dialog" aria-modal="true" aria-label="Merge society" className="dz-card p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold mb-1 flex items-center gap-2"><GitMerge className="h-5 w-5 text-brand-teal" />Merge duplicate</h3>
+      <Modal
+        open={Boolean(merge)}
+        onClose={() => setMerge(null)}
+        title="Merge society"
+        footer={<><button onClick={() => setMerge(null)} className="btn-outline">Cancel</button><button onClick={confirmMerge} disabled={!merge?.target || merging} className="btn-teal disabled:opacity-40">{merging ? 'Merging…' : 'Merge'}</button></>}
+      >
+        {merge && (
+          <>
             <p className="text-gray-400 text-sm mb-4">Fold <span className="text-white font-semibold">“{merge.cand.name}”</span> into a canonical society. Its listings, follows and reviews will read on that society instead; nothing is deleted, and the merge can be undone.</p>
             <label className="block text-sm mb-1 text-gray-300">Merge into</label>
             <input autoFocus value={merge.query} onChange={(e) => setMerge({ ...merge, query: e.target.value })} placeholder="Search societies…" className={inp} />
@@ -339,10 +346,9 @@ export default function AdminPlaces() {
                 </button>
               ))}
             </div>
-            <div className="mt-5 flex gap-2"><button onClick={() => setMerge(null)} className="btn-outline flex-1">Cancel</button><button onClick={confirmMerge} disabled={!merge.target || merging} className="btn-teal flex-1 disabled:opacity-40">{merging ? 'Merging…' : 'Merge'}</button></div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

@@ -123,7 +123,7 @@ export default function Contact() {
       <div className="pt-8 lg:pt-10 pb-20 min-h-[100dvh]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-6 sm:mb-10 reveal">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-semibold mb-3">
+            <span className="dz-tag bg-teal-500/10 border border-teal-500/20 text-teal-400 font-semibold mb-3">
               {t('misc1.contactBadge')}
             </span>
             <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">{t('misc1.contactTitle')}</h1>
@@ -250,7 +250,7 @@ export default function Contact() {
 
       <div className="dz-sticky-cta lg:hidden" role="navigation" aria-label="Quick contact support">
         <a href={SUPPORT_TEL} className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4 focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"><Icon name="phone" className="w-4 h-4" /> {t('misc1.contactCall')}</a>
-        <a href={WA_SUPPORT} target="_blank" rel="noopener noreferrer" className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold py-3 px-4 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"><Icon name="message-circle" className="w-4 h-4" /> {t('misc1.contactWhatsappShort')}</a>
+        <a href={WA_SUPPORT} target="_blank" rel="noopener noreferrer" className="h-btn flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold px-4 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-ink"><Icon name="message-circle" className="w-4 h-4" /> {t('misc1.contactWhatsappShort')}</a>
       </div>
     </div>
   );

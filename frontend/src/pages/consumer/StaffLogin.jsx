@@ -124,7 +124,7 @@ export default function StaffLogin() {
           <button
             type="button"
             onClick={() => navigator.clipboard?.writeText(recovery.codes.join('\n')).then(() => setCopied('Copied'), () => setCopied('Copy failed — write them down'))}
-            className="send-otp-btn w-full py-3 rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2"
+            className="send-otp-btn w-full h-btn-lg rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2"
           >
             <Copy className="w-4 h-4" /> <span aria-live="polite">{copied || 'Copy codes'}</span>
           </button>

@@ -38,15 +38,20 @@ test.describe('Mobile listings controls', () => {
       expect(pillBox.y + pillBox.height).toBeLessThanOrEqual(navBox.y + 1);
     });
 
-    await test.step('view toggles are 44px', async () => {
-      // Both toggles are permanent chrome on /listings, so a missing one is a regression rather
-      // than a variant. `if (!(await btn.count())) continue` turned the whole loop into a no-op.
+    await test.step('view toggles keep a 44px target', async () => {
+      // Both toggles are permanent chrome on /listings, so a missing one is a regression, not a variant.
+      // They are drawn smaller (.dz-segmented); the 44px target is the transparent ::before.
       for (const name of [/grid view/i, /list view/i]) {
         const btn = page.getByRole('button', { name }).first();
         await expect(btn, `${name} must be present to measure`).toBeVisible();
-        const b = await btn.boundingBox();
-        expect(b.width).toBeGreaterThanOrEqual(MIN_TAP);
-        expect(b.height).toBeGreaterThanOrEqual(MIN_TAP);
+        const t = await btn.evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          const ps = getComputedStyle(el, '::before');
+          const on = ps.content !== 'none' && ps.position === 'absolute';
+          return { w: Math.max(r.width, on ? parseFloat(ps.width) : 0), h: Math.max(r.height, on ? parseFloat(ps.height) : 0) };
+        });
+        expect(t.w).toBeGreaterThanOrEqual(MIN_TAP);
+        expect(t.h).toBeGreaterThanOrEqual(MIN_TAP);
       }
     });
 
@@ -56,6 +61,19 @@ test.describe('Mobile listings controls', () => {
       await expect(close).toBeVisible();
       await expect(panel).toHaveClass(/open/);
       await expect(panel).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
+      // A floating card like the Draaz panel: inset from the edges and docked above the bottom nav.
+      const pb = await panel.boundingBox();
+      const nb = await page.locator('nav.dz-bottom-nav').boundingBox();
+      expect(pb.x).toBeGreaterThanOrEqual(12);
+      expect(pb.y + pb.height).toBeLessThanOrEqual(nb.y);
+      await expect(panel).toHaveCSS('border-bottom-left-radius', '24px');
+      // Phones hide native scrollbars at rest, so the drawn rail must be visible and track the scroll.
+      const thumb = panel.locator('.scroll-rail > span');
+      await expect(thumb).toBeVisible();
+      const y0 = (await thumb.boundingBox()).y;
+      await panel.locator('.filter-scroll').evaluate((el) => { el.scrollTop = el.scrollHeight; });
+      await expect.poll(async () => (await thumb.boundingBox()).y).toBeGreaterThan(y0);
+      await panel.locator('.filter-scroll').evaluate((el) => { el.scrollTop = 0; });
       const cb = await close.boundingBox();
       expect(cb.width).toBeGreaterThanOrEqual(MIN_TAP);
       expect(cb.height).toBeGreaterThanOrEqual(MIN_TAP);

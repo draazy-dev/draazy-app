@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
@@ -7,8 +7,7 @@ import HelpSidebar from './HelpSidebar.jsx';
 import { isStaff } from '../../lib/help.js';
 import { useHelpTree } from '../../lib/useHelp.js';
 import { useAuth } from '../../context/AuthContext.jsx';
-import useScrollLock from '../../hooks/useScrollLock.js';
-import useModalDialog from '../../hooks/useModalDialog.js';
+import Modal from '../ui/Modal.jsx';
 import usePageHead from '../../lib/usePageHead.js';
 /* `prefixed: false` marks a destination outside the help centre: /support has no language prefix, so passing it
    through the help path helper would produce /mr/support, which does not exist. */
@@ -32,20 +31,15 @@ export default function HelpLayout({ children, wide = false, title, description,
 
   useEffect(() => { setDrawerOpen(false); }, [pathname]);
 
-  useScrollLock(drawerOpen);
-  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
-  const drawerRef = useModalDialog(drawerOpen, closeDrawer);
-
   return (
     <div className="min-h-[60dvh]">
-      <div className="sticky top-[var(--dz-nav-h)] z-30 border-b border-white/10 bg-ink/95 backdrop-blur supports-[backdrop-filter]:bg-ink/80">
+      <div className="dz-docks-under-nav sticky top-[var(--dz-nav-h)] z-30 border-b border-white/10 bg-ink/95 backdrop-blur supports-[backdrop-filter]:bg-ink/80">
         <div className="mx-auto flex max-w-[88rem] items-center gap-3 px-4 py-3 sm:px-6">
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
             aria-expanded={drawerOpen}
-            aria-controls="help-drawer"
-            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 min-h-[44px] text-xs font-semibold text-gray-300 hover:text-white lg:hidden"
+            className="h-btn flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3 text-xs font-semibold text-gray-300 hover:text-white lg:hidden"
           >
             <Icon name="menu" className="w-4 h-4" /> {t('help.topics')}
           </button>
@@ -64,7 +58,7 @@ export default function HelpLayout({ children, wide = false, title, description,
               <Link
                 key={to}
                 to={to}
-                className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium text-gray-400 transition-colors hover:bg-white/[0.04] hover:text-white"
+                className="h-btn-sm flex items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-gray-400 transition-colors hover:bg-white/[0.04] hover:text-white"
               >
                 <Icon name={icon} className="w-3.5 h-3.5" /> {t(key)}
               </Link>
@@ -90,60 +84,31 @@ export default function HelpLayout({ children, wide = false, title, description,
         <div className="min-w-0 py-8 sm:py-10">{children}</div>
       </div>
 
-      {drawerOpen && (
-        <div className="fixed inset-0 z-[1550] lg:hidden">
-          <button
-            type="button"
-            aria-label={t('help.close')}
-            onClick={() => setDrawerOpen(false)}
-            className="absolute inset-0 bg-black/70"
-          />
-          <div
-            id="help-drawer"
-            ref={drawerRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal="true"
-            aria-label={t('help.helpTopics')}
-            className="absolute inset-y-0 left-0 flex w-[85vw] max-w-sm flex-col border-r border-white/10 bg-ink-card outline-none"
-          >
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-              <span className="flex items-center gap-2 text-sm font-bold text-white">
-                <Icon name="book-open" className="w-4 h-4 text-teal-400" /> {t('help.helpTopics')}
-              </span>
-              <button
-                type="button"
-                onClick={() => setDrawerOpen(false)}
-                aria-label={t('help.close')}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white"
+      <Modal
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={t('help.helpTopics')}
+        footer={(
+          <div className="grid w-full grid-cols-3 gap-1">
+            {UTILITY_LINKS.map(([key, to, icon]) => (
+              <Link
+                key={to}
+                to={to}
+                className="tap-target flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-xs font-medium text-gray-400 hover:bg-white/5 hover:text-white"
               >
-                <Icon name="x" className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5">
-              <HelpSidebar
-                sections={sections}
-                categories={categories}
-                articles={articles}
-                onNavigate={() => setDrawerOpen(false)}
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-1 border-t border-white/10 p-3 pb-[calc(0.75rem+var(--dz-safe-b))]">
-              {UTILITY_LINKS.map(([key, to, icon]) => (
-                <Link
-                  key={to}
-                  to={to}
-                  className="tap-target flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium text-gray-400 hover:bg-white/5 hover:text-white"
-                >
-                  <Icon name={icon} className="w-4 h-4" /> {t(key)}
-                </Link>
-              ))}
-            </div>
+                <Icon name={icon} className="w-4 h-4" /> {t(key)}
+              </Link>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      >
+        <HelpSidebar
+          sections={sections}
+          categories={categories}
+          articles={articles}
+          onNavigate={() => setDrawerOpen(false)}
+        />
+      </Modal>
     </div>
   );
 }

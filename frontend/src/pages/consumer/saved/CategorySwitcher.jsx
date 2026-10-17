@@ -68,16 +68,16 @@ export default function CategorySwitcher({ categories, activeKey, counts = {}, o
           <span className="block text-xs font-medium uppercase tracking-wider text-gray-500">{CATEGORY_LABEL}</span>
           <span className="block text-white text-sm font-semibold truncate">{labelFor(active)}</span>
         </span>
-        <span className="tab-count px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0">{counts[active?.key] || 0}</span>
+        <span className="dz-count tab-count flex-shrink-0">{counts[active?.key] || 0}</span>
         <Icon name="chevron-down" className="w-4 h-4 text-gray-400 flex-shrink-0" />
       </button>
 
       {open && (
-        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions --
-           Backdrop-click-to-dismiss; Escape is bound on the document while the sheet is open. */
+        /* eslint-disable-next-line jsx-a11y/click-events-have-key-events,
+           jsx-a11y/no-noninteractive-element-interactions -- Escape is bound on the document while open. */
         <div
           data-no-ptr
-          className="fixed inset-0 z-[1500] flex items-end justify-center bg-black/75 backdrop-blur-md"
+          className="dz-modal-backdrop"
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
           role="dialog"
           aria-modal="true"
@@ -85,16 +85,15 @@ export default function CategorySwitcher({ categories, activeKey, counts = {}, o
         >
           <div
             ref={panelRef}
-            className="dz-modal-panel border border-white/10 w-full rounded-t-2xl p-4 pb-6 max-h-[85vh] flex flex-col shadow-2xl"
+            className="dz-modal flex flex-col"
           >
-            <div className="mx-auto w-9 h-1 rounded-full bg-white/15 mb-4" aria-hidden="true" />
             <div className="flex items-center justify-between gap-3 mb-4">
               <h2 id={headingId} className="text-white text-sm font-semibold">{CATEGORY_LABEL}</h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label={tr('compare.close')}
-                className="text-gray-400 hover:text-white flex-shrink-0"
+                className="dz-modal-x"
               >
                 <Icon name="x" className="w-5 h-5" />
               </button>
@@ -119,7 +118,7 @@ export default function CategorySwitcher({ categories, activeKey, counts = {}, o
                         <span className={'block text-sm font-medium leading-tight ' + (isActive ? 'text-brand-teal' : 'text-white')}>{labelFor(c)}</span>
                         <span className="block text-xs text-gray-500 truncate">{descFor(c)}</span>
                       </span>
-                      <span className="tab-count px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0">{counts[c.key] || 0}</span>
+                      <span className="dz-count tab-count flex-shrink-0">{counts[c.key] || 0}</span>
                       {isActive && <Icon name="check" className="w-4 h-4 text-brand-teal flex-shrink-0" />}
                     </button>
                   );

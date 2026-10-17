@@ -22,7 +22,7 @@ public final class SocietySpecs {
 
     /** {@code findAll} only, never delete-by-Specification (societies.md section 9.5). */
     public static Specification<Society> browse(
-            String q, String localitySlug, Boolean hasListings) {
+            String q, String localitySlug, Boolean hasListings, Boolean mapped) {
         return (root, query, cb) -> {
             List<Predicate> where = new ArrayList<>();
 
@@ -39,6 +39,9 @@ public final class SocietySpecs {
             }
             if (Boolean.TRUE.equals(hasListings)) {
                 where.add(cb.exists(hasLiveListing(root, query, cb)));
+            }
+            if (Boolean.TRUE.equals(mapped)) {
+                where.add(cb.isNotNull(root.get("placeId")));
             }
             return cb.and(where.toArray(new Predicate[0]));
         };

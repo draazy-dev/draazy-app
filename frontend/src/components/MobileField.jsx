@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import IdInput from './IdInput.jsx';
+import { cleanMobile as sanitize } from '../lib/idFormat.js';
 
 const IN_PATTERN = /^[6-9]\d{9}$/;
-const sanitize = (v) => String(v == null ? '' : v).replace(/\D/g, '').slice(0, 10);
 
 export const isValidMobile = (v) => IN_PATTERN.test(sanitize(v));
 
@@ -32,7 +33,6 @@ export default function MobileField({
 
   return (
     <div className={'flex items-center gap-1.5 w-full ' + className}>
-      {/* Country code chip */}
       <span
         className={
           'inline-flex items-center gap-1.5 h-11 sm:h-10 px-3.5 rounded-xl border bg-white/5 text-sm font-medium text-gray-300 select-none whitespace-nowrap flex-shrink-0 '
@@ -43,15 +43,11 @@ export default function MobileField({
         <span className="text-gray-400">+91</span>
       </span>
 
-      {/* Number input */}
-      <input
+      <IdInput
+        kind="mobile"
         id={id}
         aria-invalid={ariaInvalid}
         aria-describedby={ariaDescribedBy}
-        type="tel"
-        inputMode="numeric"
-        maxLength={10}
-        autoComplete="tel-national"
         // A phone number is almost never the last field in these forms, so the
         // keyboard's action key should move the user on rather than say "return".
         enterKeyHint={enterKeyHint}
@@ -59,7 +55,7 @@ export default function MobileField({
         autoFocus={autoFocus}
         disabled={disabled}
         value={clean}
-        onChange={(e) => onChange(sanitize(e.target.value))}
+        onChange={onChange}
         onBlur={() => setTouched(true)}
         placeholder={placeholder}
         className={

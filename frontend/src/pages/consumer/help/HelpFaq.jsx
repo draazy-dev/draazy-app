@@ -125,7 +125,7 @@ export default function HelpFaq() {
           <p className="mt-1.5 text-xs leading-relaxed text-gray-500">{t('help.faqNotAnsweredBody')}</p>
           <Link
             to="/support"
-            className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-teal-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal-400"
+            className="h-btn-sm mt-3 inline-flex items-center gap-1.5 rounded-lg bg-teal-500 px-4 text-xs font-semibold text-white transition-colors hover:bg-teal-400"
           >
             <Icon name="life-buoy" className="w-4 h-4" /> {t('help.raiseATicket')}
           </Link>

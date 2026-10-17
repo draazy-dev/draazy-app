@@ -61,7 +61,8 @@
       "prevAria": "Scroll to previous property types",
       "nextAria": "Scroll to next property types",
       "allListings": "All listings",
-      "properties": "properties"
+      "properties": "properties",
+      "listings": "listings"
     },
     "featured": {
       "verified": "Verified",

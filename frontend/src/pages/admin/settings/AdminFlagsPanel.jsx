@@ -36,7 +36,6 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
   return (
     <div className="flex flex-col lg:flex-row rounded-3xl border border-white/[0.08] overflow-hidden lg:h-[calc(100vh-220px)] lg:min-h-[480px] lg:max-h-[720px] shadow-xl shadow-black/20">
 
-      {/* ─── Left Column: Section Navigator ─── */}
       <div className="w-full lg:w-[345px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.06] bg-gradient-to-b from-white/[0.02] to-transparent overflow-y-auto">
         <div className="px-5 py-4">
           <div className="flex items-center gap-2">
@@ -62,7 +61,6 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
                 )}
               >
                 <div className="flex items-center gap-3 px-4 py-3">
-                  {/* Clickable label area */}
                   <button
                     onClick={() => setSelected(config.section)}
                     className="flex-1 min-w-0 text-left"
@@ -76,7 +74,7 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
                       </span>
                       {config.options.length > 0 && (
                         <span className={classNames(
-                          'rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums',
+                          'dz-tag font-medium tabular-nums',
                           enabledCount === config.options.length
                             ? 'bg-emerald-500/15 text-emerald-400'
                             : enabledCount === 0
@@ -90,7 +88,6 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
                     <span className="text-[11px] text-gray-500 leading-tight line-clamp-1 mt-0.5">{config.desc}</span>
                   </button>
 
-                  {/* On/Off switch for entire module (hidden for critical modules) */}
                   {!config.critical && (
                     <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
                       <Switch
@@ -107,7 +104,7 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
                     </div>
                   )}
                   {config.critical && (
-                    <span className="rounded-full bg-brand-teal/10 px-2 py-0.5 text-[9px] font-bold text-brand-teal uppercase tracking-wide shrink-0">Core</span>
+                    <span className="dz-tag bg-brand-teal/10 font-bold text-brand-teal uppercase tracking-wide">Core</span>
                   )}
                 </div>
               </div>
@@ -116,16 +113,14 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
         </div>
       </div>
 
-      {/* ─── Right Column: Options Detail ─── */}
       <div className="flex-1 overflow-y-auto min-w-0 bg-gradient-to-br from-white/[0.01] to-transparent">
         {active && (
           <>
-            {/* Header */}
             <div className="sticky top-0 z-10 backdrop-blur-xl bg-ink/80 border-b border-white/[0.06] px-7 py-5">
               <div className="flex items-center gap-3">
                 <h3 className="text-lg font-bold text-white">{active.title}</h3>
                 <span className={classNames(
-                  'rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide',
+                  'dz-tag font-bold uppercase tracking-wide',
                   activeModuleOn ? 'bg-emerald-500/15 text-emerald-400' : 'bg-rose-500/10 text-rose-400',
                 )}>
                   {activeModuleOn ? 'Active' : 'Disabled'}
@@ -141,16 +136,13 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
               )}
             </div>
 
-            {/* Options table */}
             {active.options.length > 0 ? (
               <div className={classNames(!activeModuleOn ? 'opacity-35 pointer-events-none select-none' : '')}>
-                {/* Table heading row */}
                 <div className="flex items-center gap-4 px-7 py-3 border-b border-white/[0.06] bg-white/[0.015]">
                   <span className="flex-1 text-[11px] font-semibold uppercase tracking-wider text-gray-500">Feature</span>
                   <span className="w-14 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-500">Status</span>
                 </div>
 
-                {/* Option rows */}
                 {active.options.map((opt, i) => {
                   const checked = adminFlags[active.section]?.[opt.key] !== false;
                   return (
@@ -161,7 +153,6 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
                         i < active.options.length - 1 ? 'border-b border-white/[0.04]' : '',
                       )}
                     >
-                      {/* Feature info */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className={classNames('text-sm font-medium', checked ? 'text-gray-100' : 'text-gray-400')}>{opt.label}</span>
@@ -169,7 +160,6 @@ export default function AdminFlagsPanel({ adminFlags, onToggle }) {
                         <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{opt.desc}</p>
                       </div>
 
-                      {/* Toggle */}
                       <div className="w-14 flex justify-center">
                         <Switch
                           checked={checked}

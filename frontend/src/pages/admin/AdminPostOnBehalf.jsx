@@ -232,12 +232,12 @@ export default function AdminPostOnBehalf() {
         <p className="text-sm text-gray-500 mb-6">Listing ID: {createdListing?.id}</p>
         <div className="mb-8">
           {!claimMessage && (
-            <button onClick={sendClaimLink} className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-emerald-400 transition">
+            <button onClick={sendClaimLink} className="h-btn inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 text-sm font-semibold text-ink hover:bg-emerald-400 transition">
               <MessageCircle className="h-4 w-4" /> Send claim link on WhatsApp
             </button>
           )}
           {claimMessage && !claimMessage.sent && (
-            <button onClick={confirmClaimSent} className="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-emerald-400 transition">
+            <button onClick={confirmClaimSent} className="h-btn inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 text-sm font-semibold text-ink hover:bg-emerald-400 transition">
               <Check className="h-4 w-4" /> I&apos;ve sent it
             </button>
           )}
@@ -246,8 +246,8 @@ export default function AdminPostOnBehalf() {
           )}
         </div>
         <div className="flex flex-wrap justify-center gap-3">
-          <button onClick={() => navigate('/admin/properties')} className="rounded-xl border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-medium hover:bg-white/10 transition">View All Properties</button>
-          <button onClick={() => { setSuccess(false); setStep(1); setForm(INITIAL_FORM); setRestored(false); setClaimMessage(null); }} className="rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-teal-400 transition">Post Another</button>
+          <button onClick={() => navigate('/admin/properties')} className="h-btn inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/5 px-5 text-sm font-medium hover:bg-white/10 transition">View All Properties</button>
+          <button onClick={() => { setSuccess(false); setStep(1); setForm(INITIAL_FORM); setRestored(false); setClaimMessage(null); }} className="h-btn inline-flex items-center justify-center rounded-xl bg-teal-500 px-5 text-sm font-semibold text-ink hover:bg-teal-400 transition">Post Another</button>
         </div>
       </div>
     );
@@ -315,11 +315,11 @@ export default function AdminPostOnBehalf() {
       <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-8">
         {stepContent()}
         <div className="mt-8 flex items-center justify-between">
-          {step > 1 ? <button onClick={prev} className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium hover:bg-white/10 transition"><ArrowLeft className="h-4 w-4" /> Back</button> : <div />}
+          {step > 1 ? <button onClick={prev} className="h-btn flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 text-sm font-medium hover:bg-white/10 transition"><ArrowLeft className="h-4 w-4" /> Back</button> : <div />}
           {step < LAST_STEP ? (
-            <button onClick={next} disabled={localityBusy} className="flex items-center gap-1.5 rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-teal-400 transition disabled:opacity-50">Next <ArrowRight className="h-4 w-4" /></button>
+            <button onClick={next} disabled={localityBusy} className="h-btn flex items-center gap-1.5 rounded-xl bg-teal-500 px-5 text-sm font-semibold text-ink hover:bg-teal-400 transition disabled:opacity-50">Next <ArrowRight className="h-4 w-4" /></button>
           ) : (
-            <button onClick={handleSubmit} disabled={submitting} className="flex items-center gap-1.5 rounded-xl bg-teal-500 px-5 py-2.5 text-sm font-semibold text-ink hover:bg-teal-400 transition disabled:opacity-50">{submitting ? 'Saving...' : 'Send to Owner'} <Send className="h-4 w-4" /></button>
+            <button onClick={handleSubmit} disabled={submitting} className="h-btn flex items-center gap-1.5 rounded-xl bg-teal-500 px-5 text-sm font-semibold text-ink hover:bg-teal-400 transition disabled:opacity-50">{submitting ? 'Saving...' : 'Send to Owner'} <Send className="h-4 w-4" /></button>
           )}
         </div>
       </div>

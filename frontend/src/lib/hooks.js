@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { cleanMobile } from './idFormat.js';
 
 // Marks EVERY failing field red, scrolls to + focuses the first via `data-err`, and returns the
 // first message for a single toast.
@@ -72,8 +73,8 @@ export function useValidation() {
 
 const IN_PATTERN = /^[6-9]\d{9}$/;
 export function useMobileInput(initial = '') {
-  const [value, setRaw] = useState(() => String(initial).replace(/\D/g, '').slice(0, 10));
-  const setValue = useCallback((v) => setRaw(String(v).replace(/\D/g, '').slice(0, 10)), []);
+  const [value, setRaw] = useState(() => cleanMobile(initial));
+  const setValue = useCallback((v) => setRaw(cleanMobile(v)), []);
   const onChange = useCallback((e) => setValue(e.target.value), [setValue]);
   const valid = IN_PATTERN.test(value);
   return { value, setValue, onChange, valid, dial: '+91', maxLength: 10, inputMode: 'numeric' };

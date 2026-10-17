@@ -33,12 +33,15 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
   if (f.bhk.size) broadeners.push({ id: 'bhk', label: t('listings.broadenAnyBhk'), apply: () => set({ bhk: new Set() }) });
   if (f.types.size) broadeners.push({ id: 'type', label: t('listings.broadenAnyType'), apply: () => set({ types: new Set(), commercialTypes: new Set() }) });
 
+  const views = [['grid', 'layout-grid', 'gridView'], ['list', 'list', 'listView'], ...(flagEnabled('mapSearch') ? [['map', 'map', 'mapView']] : [])];
   const viewToggles = (
-    <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-      <span className="text-sm text-gray-400 mr-0.5 sm:mr-1">{t('listings.viewLabel')}</span>
-      <button onClick={() => setView('grid')} aria-pressed={view === 'grid'} aria-label={t('listings.gridView')} className={'view-btn w-11 h-11 sm:w-10 sm:h-10 rounded-lg border border-white/10 flex items-center justify-center t-all' + (view === 'grid' ? ' active' : ' text-gray-500')} title={t('listings.gridView')}><Icon name="layout-grid" className="w-4 h-4" /></button>
-      <button onClick={() => setView('list')} aria-pressed={view === 'list'} aria-label={t('listings.listView')} className={'view-btn w-11 h-11 sm:w-10 sm:h-10 rounded-lg border border-white/10 flex items-center justify-center t-all' + (view === 'list' ? ' active' : ' text-gray-500')} title={t('listings.listView')}><Icon name="list" className="w-4 h-4" /></button>
-      {flagEnabled('mapSearch') && <button onClick={() => setView('map')} aria-pressed={view === 'map'} aria-label={t('listings.mapView')} className={'view-btn w-11 h-11 sm:w-10 sm:h-10 rounded-lg border border-white/10 flex items-center justify-center t-all' + (view === 'map' ? ' active' : ' text-gray-500')} title={t('listings.mapView')}><Icon name="map" className="w-4 h-4" /></button>}
+    <div className="flex items-center gap-2 shrink-0">
+      <span className="hidden sm:inline text-sm text-gray-400">{t('listings.viewLabel')}</span>
+      <div className="dz-segmented" role="group" aria-label={t('listings.viewLabel')}>
+        {views.map(([id, icon, key]) => (
+          <button key={id} type="button" onClick={() => setView(id)} aria-pressed={view === id} aria-label={t(`listings.${key}`)} title={t(`listings.${key}`)}><Icon name={icon} /></button>
+        ))}
+      </div>
     </div>
   );
 
@@ -113,21 +116,22 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
               </div>
 
               {activeChips.length ? (
-                <div className="flex flex-wrap items-center gap-2 mb-6 list-reveal" style={{ animationDelay: '200ms' }}>
-                  <span className="text-xs text-gray-500 mr-0.5">{t('listings.activeFilters')}</span>
+                /* py-1.5 leaves room inside the scroller for each chip's 44px ::before target. */
+                <div className="flex items-center gap-2 -mx-4 px-4 py-1.5 mb-3 overflow-x-auto no-scrollbar sm:mx-0 sm:px-0 sm:mb-5 sm:flex-wrap sm:overflow-visible list-reveal" style={{ animationDelay: '200ms' }}>
+                  <span className="hidden sm:inline text-xs text-gray-500 mr-0.5">{t('listings.activeFilters')}</span>
                   {activeChips.map((c) => (
                     <button
                       key={c.id}
                       type="button"
                       onClick={c.remove}
                       aria-label={t('listings.removeFilter', { label: c.label })}
-                      className="af-chip inline-flex items-center gap-1.5 pl-3 pr-2 py-1.5 rounded-full bg-teal-500/12 border border-teal-400/30 text-teal-200 text-xs font-medium hover:bg-teal-500/20 hover:border-teal-400/50 t-all"
+                      className="af-chip dz-chip dz-chip--accent"
                     >
                       {c.label}
-                      <Icon name="x" className="w-3 h-3" />
+                      <Icon name="x" />
                     </button>
                   ))}
-                  <button type="button" onClick={clearAll} className="af-clear-all text-xs font-medium text-gray-400 hover:text-white underline underline-offset-2 ml-1">{t('listings.clearAllLower')}</button>
+                  <button type="button" onClick={clearAll} className="af-clear-all dz-chip">{t('listings.clearAllLower')}</button>
                 </div>
               ) : null}
 
@@ -229,15 +233,13 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                   {broadeners.length ? (
                     <div className="flex flex-wrap items-center justify-center gap-2 mb-4 sm:mb-5">
                       {broadeners.map((b) => (
-                        <button key={b.id} type="button" onClick={b.apply} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-white/5 border border-white/10 text-sm font-medium text-gray-200 hover:border-teal-400/40 hover:text-white hover:bg-teal-500/10 transition-all">
-                          <Icon name="plus-circle" className="w-4 h-4 text-teal-400" /> {b.label}
+                        <button key={b.id} type="button" onClick={b.apply} className="dz-chip">
+                          <Icon name="plus-circle" className="text-teal-400" /> {b.label}
                         </button>
                       ))}
                     </div>
                   ) : null}
-                  <div>
-                    <button onClick={clearAll} className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-400/30 text-teal-300 text-sm font-medium hover:bg-teal-500/20 transition-all"><Icon name="x-circle" className="w-4 h-4" /> {t('listings.clearAllFiltersBtn')}</button>
-                  </div>
+                  <Button variant="secondary" icon="x-circle" onClick={clearAll}>{t('listings.clearAllFiltersBtn')}</Button>
                   <NotifyMeCard filters={f} locNameBySlug={locNameBySlug} toast={toast} />
                 </div>
               ) : (
@@ -264,7 +266,7 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                 <Icon name="sliders-horizontal" className="w-[18px] h-[18px] text-teal-300" />
                 {t('listings.filters')}
                 {activeChips.length ? (
-                  <span className="filter-fab__count inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold leading-none">{activeChips.length}</span>
+                  <span className="filter-fab__count dz-count">{activeChips.length}</span>
                 ) : null}
               </button>
             </div>

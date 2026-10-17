@@ -254,6 +254,8 @@ jobs:
           VITE_GA_ID: ${{ secrets.VITE_GA_ID }}
           VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
           VITE_TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
+          VITE_POSTHOG_KEY: ${{ vars.VITE_POSTHOG_KEY }}
+          VITE_POSTHOG_APP_URL: ${{ vars.VITE_POSTHOG_APP_URL }}
         run: |
           set -euo pipefail
 

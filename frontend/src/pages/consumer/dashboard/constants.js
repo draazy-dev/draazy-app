@@ -1,4 +1,4 @@
-/* Owner tabs show only with real inventory; flag tabs show only when their app flag is on. */
+/* Owner tabs show only with real inventory. */
 export const TABS = [
   // Not owner-gated: Property Tools (Rent-o-meter) is the "value your home" acquisition entry, reachable by any
   // signed-in user (old /owner-hub route).
@@ -7,29 +7,26 @@ export const TABS = [
   // Tenant mirror of My Properties — "the home you rent". Shown to buyers/tenants
   // and anyone with a finalised tenancy; a pure owner with no rental won't see it.
   { tab: 'rental', label: 'Rental', icon: 'key-round', tenant: true },
-  { tab: 'activity', label: 'Saved', icon: 'heart' },
+  { tab: 'activity', label: 'Alerts & activity', icon: 'bell' },
   // Role-aware (like Documents): owners see a property P&L, tenants see the Rent
   // Wallet, and a user who is both can switch.
   { tab: 'leads', label: 'Requests', icon: 'messages-square', owner: true },
   { tab: 'finances', label: 'Finances', icon: 'wallet' },
   { tab: 'documents', label: 'Documents', icon: 'folder-lock' },
-  // Messages has a single canonical layout — the full /messages inbox. The tab is
-  // a link-out so the dashboard entry and navbar icon open the same page.
   { tab: 'visits', label: 'Visits', icon: 'calendar-check' },
-  { tab: 'messages', label: 'Messages', icon: 'message-square', flag: 'inAppMessaging', link: '/messages' },
   // Account-level and universal (every user has a plan — buyers included), so it
   // lives in its own section rather than buried in Profile & Settings.
   { tab: 'billing', label: 'Plan & Billing', icon: 'receipt-indian-rupee' },
   { tab: 'profile', label: 'Profile', icon: 'user-cog' },
 ];
 /* Back-compat: legacy tab hashes/?tab= values map onto the new tab (+ optional sub-section) so existing deep-links
-   from across the app keep landing correctly. */
-
+   keep landing; `link` sends the ones the top bar already owns to that page. */
 export const TAB_ALIAS = {
   'owner-hub': { tab: 'properties' },
   listings: { tab: 'properties' },
   enquiries: { tab: 'leads' },
-  saved: { tab: 'activity', sub: 'saved' },
+  saved: { link: '/saved' },
+  messages: { link: '/messages' },
   recent: { tab: 'activity', sub: 'recent' },
   alerts: { tab: 'activity', sub: 'alerts' },
   groups: { tab: 'activity', sub: 'groups' },
@@ -50,19 +47,18 @@ export function buildDashboardGroups({ visibleTabs, isOwner, showRental, hasRent
         group('requests', 'Requests', 'messages-square', ['leads', 'visits']),
         group('properties', 'My Properties', 'home', ['properties', 'documents', 'finances']),
         rentalOwn ? group('rental', 'Rental', 'key-round', ['rental']) : null,
-        group('account', 'Account', 'user-cog', ['profile', 'billing', 'activity', ...accountRental, 'messages']),
+        group('account', 'Account', 'user-cog', ['profile', 'billing', 'activity', ...accountRental]),
       ]
     : [
         group('home', 'Home', 'layout-grid', ['overview']),
-        group('saved', 'Saved', 'heart', ['activity']),
+        group('alerts', 'Alerts', 'bell', ['activity']),
         group('visits', 'Visits', 'calendar-check', ['visits']),
         rentalOwn ? group('rental', 'Rental', 'key-round', ['rental']) : null,
-        group('account', 'Account', 'user-cog', ['profile', 'billing', 'documents', 'finances', ...accountRental, 'properties', 'messages']),
+        group('account', 'Account', 'user-cog', ['profile', 'billing', 'documents', 'finances', ...accountRental, 'properties']),
       ];
   return groups.filter((g) => g && g.sections.length);
 }
 
-/* Static constants (moved to module scope to avoid per-render recreation) */
 export const CAL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export const CAL_DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export const CAL_HOURS = Array.from({ length: 13 }, (_, i) => i + 7);
@@ -82,7 +78,6 @@ export const SAVED_SEED = [
   { id: 'P5008', title: '4 BHK Villa, Koregaon Park', price: '₹2.8 Cr', bhk: '4 BHK', area: '3,200 sq.ft', img: null },
   { id: 'P5015', title: '4 BHK Penthouse, Kalyani Nagar', price: '₹3.5 Cr', bhk: '4 BHK', area: '4,500 sq.ft', img: null },
 ];
-/* Visit request status for Enquiries tab */
 
 export const VISIT_STATUS_CLS = {
   scheduled: 'bg-amber-500/15 text-amber-300',

@@ -114,7 +114,7 @@ export default function FeatureSelector({
           type="button"
           onClick={commit}
           disabled={!draft.trim()}
-          className="shrink-0 inline-flex items-center gap-1.5 px-4 py-3 rounded-xl text-sm font-semibold text-teal-300 border border-teal-500/40 hover:bg-teal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="h-btn shrink-0 inline-flex items-center gap-1.5 px-4 rounded-xl text-sm font-semibold text-teal-300 border border-teal-500/40 hover:bg-teal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
           <Plus className="w-4 h-4" /> Add
         </button>

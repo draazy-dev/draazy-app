@@ -8,7 +8,6 @@ export default function HomesTab({ ctx }) {
   const { listings, priceStats } = ctx;
   return (
             <>
-            {/* Homes in this society */}
             {listings.length ? (
               <section className="reveal">
                 <div className="flex items-center justify-between mb-4">
@@ -25,8 +24,8 @@ export default function HomesTab({ ctx }) {
                   {listings.map((x) => { const rent = x.deal === 'rent'; return (
                     <Link key={x.id} to={`/property/${x.id}`} className="glass rounded-2xl p-4 block hover:border-teal-400/30 transition-all">
                       <div className="flex items-center justify-between mb-1">
-                        {rent ? <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wide bg-teal-600/50 text-teal-50">{t('society.rent')}</span> : <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wide bg-emerald-600/50 text-emerald-50">{t('society.sale')}</span>}
-                        <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wide text-pure-white" style={{ background: 'rgb(var(--dz-c-emerald-500) / .9)' }}>{t('society.zeroBrokerageTag')}</span>
+                        {rent ? <span className="dz-tag font-bold uppercase tracking-wide bg-teal-600/50 text-teal-50">{t('society.rent')}</span> : <span className="text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wide bg-emerald-600/50 text-emerald-50">{t('society.sale')}</span>}
+                        <span className="dz-tag font-bold uppercase tracking-wide text-pure-white" style={{ background: 'rgb(var(--dz-c-emerald-500) / .9)' }}>{t('society.zeroBrokerageTag')}</span>
                       </div>
                       <p className="text-white font-bold text-lg mt-1">{rent ? '₹' + fmtNum(x.price) + t('society.perMonth') : fmtINR(x.price)}</p>
                       <p className="text-gray-300 text-sm truncate">{x.title}</p>

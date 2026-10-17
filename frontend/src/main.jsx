@@ -29,6 +29,7 @@ import './styles/index.css';
 // being trapped inside whichever route chunk happened to import them.
 import './styles/components/buttons.css';
 import './styles/components/surfaces.css';
+import './styles/components/chips.css';
 // Global, not imported by DateField/TimeField: those are lazy, so a component-level import would
 // leave `.dz-cal` unstyled anywhere picker markup renders without pulling the component in.
 import './styles/components/date-time-fields.css';

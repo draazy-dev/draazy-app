@@ -11,7 +11,7 @@ const rate = (v) => (v == null ? '—' : `${v}%`);
 const targetLabel = (h) => (h == null ? '—' : h >= 48 ? `${Math.round(h / 24)}d` : `${h}h`);
 
 /* Grey is 'no measurement', not a performance band, so the
-   null check comes first; green/red are real comparisons. / */
+   null check comes first; green/red are real comparisons. */
 const avgTone = (avgHours, targetHours) => (
   avgHours == null || targetHours == null ? 'text-gray-500'
     : avgHours <= targetHours ? 'text-emerald-400'
@@ -87,7 +87,6 @@ export default function SlaTab({ sla, failed, days }) {
 
   return (
     <div className="space-y-6">
-      {/* Measured: listing review turnaround and the live backlog. */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         {[
           [sla.reviewedCount, `Listings reviewed (${days}d)`, 'text-white'],
@@ -111,7 +110,6 @@ export default function SlaTab({ sla, failed, days }) {
         </p>
       ) : null}
 
-      {/* Measured: the actual queue, longest wait first — the one panel here that is actionable. */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-1">Longest Waiting Listings</h3>
         <p className="text-xs text-gray-500 mb-4">Pending review, oldest first.{target == null ? '' : ` Target is ${target} hours.`}</p>
@@ -132,8 +130,8 @@ export default function SlaTab({ sla, failed, days }) {
                       {target == null
                         ? <span className="text-[10px] text-gray-500">—</span>
                         : p.hoursWaiting > target
-                        ? <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">Overdue</span>
-                        : <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">On track</span>}
+                        ? <span className="dz-tag bg-rose-500/15 font-semibold text-rose-300">Overdue</span>
+                        : <span className="dz-tag bg-emerald-500/15 font-semibold text-emerald-300">On track</span>}
                     </td>
                   </tr>
                 ))}
@@ -185,7 +183,7 @@ export default function SlaTab({ sla, failed, days }) {
                 <div className="text-sm font-medium text-gray-200">{name}</div>
                 <div className="text-[11px] text-gray-500">{desc}</div>
               </div>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${hoursTarget == null ? 'bg-white/5 text-gray-400' : 'bg-teal-500/15 text-teal-300'}`}>
+              <span className={`dz-tag font-semibold ${hoursTarget == null ? 'bg-white/5 text-gray-400' : 'bg-teal-500/15 text-teal-300'}`}>
                 {hoursTarget == null ? '—' : `< ${targetLabel(hoursTarget)}`}
               </span>
             </div>

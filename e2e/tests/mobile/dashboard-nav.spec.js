@@ -54,7 +54,6 @@ test.describe('Live dashboard navigation', () => {
         ['listings', 'properties'],
         ['enquiries', 'requests'],
         ['leads', 'requests'],
-        ['saved', 'account'],
         ['recent', 'account'],
         ['alerts', 'account'],
         ['groups', 'account'],
@@ -71,6 +70,16 @@ test.describe('Live dashboard navigation', () => {
       await expect(groupButton(page, 'account')).toHaveAttribute('aria-current', 'page');
     });
 
+    await test.step('Account holds no copies of the top-bar Saved and Messages; their old hashes open those pages', async () => {
+      const subnav = page.getByTestId('dashboard-section-subnav');
+      await expect(subnav.getByRole('tab', { name: /Alerts & activity/i })).toBeVisible();
+      await expect(subnav.getByRole('tab', { name: /Saved|Messages/i })).toHaveCount(0);
+      await page.goto('/dashboard#saved');
+      await expect(page).toHaveURL(/\/saved$/);
+      await page.goto('/dashboard#messages');
+      await expect(page).toHaveURL(/\/messages$/);
+    });
+
     await test.step('Android back returns to the previous dashboard group', async () => {
       await page.goto('/dashboard');
       await expect(nav(page)).toBeVisible({ timeout: 20000 });
@@ -84,13 +93,13 @@ test.describe('Live dashboard navigation', () => {
       await expect(groupButton(page, 'home')).toHaveAttribute('aria-current', 'page');
     });
 
-    await test.step('a seeker gets Saved and Visits instead, and they fit too', async () => {
+    await test.step('a seeker gets Alerts and Visits instead, and they fit too', async () => {
       await page.context().clearCookies();
       await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
       await signedInAsNew(page);
       await page.goto('/dashboard');
       await expect(nav(page)).toBeVisible({ timeout: 20000 });
-      await expectGroups(page, ['Home', 'Saved', 'Visits', 'Account']);
+      await expectGroups(page, ['Home', 'Alerts', 'Visits', 'Account']);
       for (const width of [360, 390, 414]) await expectSegmentsFit(page, width);
     });
   });
@@ -105,4 +114,13 @@ test.describe('Live dashboard navigation', () => {
     await page.goto('/dashboard#tenancy');
     await expect(groupButton(page, 'rental')).toHaveAttribute('aria-current', 'page');
   });
+});
+
+test('the dashboard tabs rise to the top edge when the top bar hides, leaving no see-through gap', async ({ page, login }) => {
+  await openDashboard(page, login, 'asOwner');
+  const before = (await nav(page).boundingBox()).y;
+  await page.evaluate(() => window.scrollTo(0, 900));
+  await page.waitForFunction(() => document.documentElement.classList.contains('dz-nav-hidden'));
+  await expect.poll(async () => (await nav(page).boundingBox()).y).toBeLessThan(2);
+  expect(before).toBeGreaterThan(40);
 });

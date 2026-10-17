@@ -177,7 +177,7 @@ export default function SocietiesSection() {
            Featured / Categories, so no rail loses its escape hatch on a phone. */}
         <button
           onClick={() => navigate('/societies')}
-          className="sm:hidden mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-teal-400 hover:bg-white/10 hover:text-teal-300 transition-all"
+          className="h-btn sm:hidden mt-4 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 text-sm font-semibold text-teal-400 hover:bg-white/10 hover:text-teal-300 transition-all"
         >
           View all societies <Icon name="arrow-right" className="w-4 h-4" />
         </button>

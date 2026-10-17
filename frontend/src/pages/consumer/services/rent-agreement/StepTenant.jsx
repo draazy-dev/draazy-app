@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import NativeSelect from '../../../../components/ui/NativeSelect.jsx';
 import Icon from '../../../../components/Icon.jsx';
 import MobileField from '../../../../components/MobileField.jsx';
+import IdInput from '../../../../components/IdInput.jsx';
 import Field from '../../../../components/ui/Field.jsx';
 import { COMMERCIAL_ROUTE, MAX_TENANTS } from './constants.js';
 import { pickDoc } from './helpers.js';
@@ -72,7 +73,7 @@ export default function StepTenant({ step, canInvite, tenantMode, setTenantMode,
                   </div>
                   <Field label={tr('services.ra.tenant.occupation')}><input value={t.occupation} onChange={(e) => setTenant(i, 'occupation', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={tr('services.ra.tenant.occupationPlaceholder')} /></Field>
                   <Field label={tr('services.ra.tenant.relation')}><input value={t.relation} onChange={(e) => setTenant(i, 'relation', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={tr('services.ra.tenant.relationPlaceholder')} /></Field>
-                  <Field label={tr('services.ra.tenant.pan')} required error={errors['t' + i + 'pan'] && why('t' + i + 'pan', 'services.ra.tenant.panErr')}><input maxLength={10} value={t.pan} onChange={(e) => { setTenant(i, 'pan', e.target.value.toUpperCase()); clearErr('t' + i + 'pan'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm uppercase' + (errors['t' + i + 'pan'] ? ' err' : '')} placeholder="ABCDE1234F" /></Field>
+                  <Field label={tr('services.ra.tenant.pan')} required error={errors['t' + i + 'pan'] && why('t' + i + 'pan', 'services.ra.tenant.panErr')}><IdInput kind="pan" value={t.pan} onChange={(v) => { setTenant(i, 'pan', v); clearErr('t' + i + 'pan'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'pan'] ? ' err' : '')} placeholder="ABCDE1234F" /></Field>
                   {t.residency === 'nri' || t.residency === 'foreign' ? (
                     <>
                       <Field label={tr('services.ra.party.passport')} required error={errors['t' + i + 'passport'] && tr('services.ra.party.passportErr')}><input maxLength={20} value={t.passport || ''} onChange={(e) => { setTenant(i, 'passport', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); clearErr('t' + i + 'passport'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'passport'] ? ' err' : '')} placeholder={tr('services.ra.party.passportPlaceholder')} /></Field>
@@ -80,7 +81,7 @@ export default function StepTenant({ step, canInvite, tenantMode, setTenantMode,
                       {t.residency === 'foreign' && <Field label={tr('services.ra.party.frro')}><input maxLength={40} value={t.frro || ''} onChange={(e) => setTenant(i, 'frro', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={tr('services.ra.party.frroPlaceholder')} /></Field>}
                     </>
                   ) : (
-                    <Field label={tr('services.ra.tenant.aadhaar')} required error={errors['t' + i + 'aadhaar'] && why('t' + i + 'aadhaar', 'services.ra.tenant.aadhaarErr')}><input inputMode="numeric" maxLength={12} value={t.aadhaar} onChange={(e) => { setTenant(i, 'aadhaar', e.target.value.replace(/\D/g, '')); clearErr('t' + i + 'aadhaar'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'aadhaar'] ? ' err' : '')} placeholder={tr('services.ra.tenant.aadhaarPlaceholder')} /></Field>
+                    <Field label={tr('services.ra.tenant.aadhaar')} required error={errors['t' + i + 'aadhaar'] && why('t' + i + 'aadhaar', 'services.ra.tenant.aadhaarErr')}><IdInput kind="aadhaar" value={t.aadhaar} onChange={(v) => { setTenant(i, 'aadhaar', v); clearErr('t' + i + 'aadhaar'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'aadhaar'] ? ' err' : '')} placeholder={tr('services.ra.tenant.aadhaarPlaceholder')} /></Field>
                   )}
                   <Field label={tr('services.ra.tenant.mobile')} required error={errors['t' + i + 'mobile'] && why('t' + i + 'mobile', 'services.ra.tenant.mobileErr')}><MobileField value={t.mobile} onChange={(v) => { setTenant(i, 'mobile', v); clearErr('t' + i + 'mobile'); }} error={!!errors['t' + i + 'mobile']} placeholder={tr('services.ra.tenant.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
                   <Field label={tr('services.ra.tenant.email')} error={errors['t' + i + 'email'] && tr('services.ra.err.email')}><input type="email" value={t.email} onChange={(e) => { setTenant(i, 'email', e.target.value); clearErr('t' + i + 'email'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'email'] ? ' err' : '')} placeholder="you@example.com" /></Field>

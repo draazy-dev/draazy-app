@@ -1,5 +1,6 @@
 import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
+import IdInput from '../../../components/IdInput.jsx';
 import { fmtNum } from '../../../lib/format.js';
 import { SOURCES, TOOLS_AS_OF, toolByPath } from '../../../data/freeTools.js';
 import '../../../styles/routes/tools.css';
@@ -26,11 +27,14 @@ export function NumField({ id, label, value, onChange, prefix = '₹', suffix, d
   );
 }
 
-export function TextField({ id, label, value, onChange, placeholder, maxLength = 80, upper = false, hint, error }) {
+export function TextField({ id, label, value, onChange, placeholder, maxLength = 80, idKind, hint, error }) {
+  const shared = { id, value, placeholder, 'aria-invalid': error ? 'true' : undefined, className: fieldCls };
   return (
     <div>
       <label htmlFor={id} className={labelCls}>{label}</label>
-      <input id={id} type="text" autoComplete="off" value={value} maxLength={maxLength} placeholder={placeholder} aria-invalid={error ? 'true' : undefined} onChange={(e) => onChange(upper ? e.target.value.toUpperCase() : e.target.value)} className={fieldCls} />
+      {idKind
+        ? <IdInput kind={idKind} {...shared} onChange={onChange} />
+        : <input type="text" autoComplete="off" maxLength={maxLength} {...shared} onChange={(e) => onChange(e.target.value)} />}
       {error ? <p role="alert" className="mt-1.5 text-xs text-amber-400">{error}</p> : hint && <p className="mt-1.5 text-xs text-gray-400">{hint}</p>}
     </div>
   );
@@ -71,7 +75,7 @@ export default function ToolShell({ path, children }) {
   return (
     <article className="tool-page mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
       <header>
-        <p className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/25 bg-teal-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-teal-300">
+        <p className="dz-tag border border-teal-400/25 bg-teal-400/10 font-semibold uppercase tracking-widest text-teal-300">
           <Icon name="calculator" aria-hidden="true" className="h-3.5 w-3.5" /> Free tool
         </p>
         <h1 className="mt-4 text-[1.85rem] font-extrabold leading-[1.15] text-white sm:text-5xl">{tool.top} <span className="gradient-text">{tool.accent}</span></h1>

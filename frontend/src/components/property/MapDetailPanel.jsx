@@ -190,7 +190,6 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
   return (
     <>
       <aside {...swipe} data-no-ptr className="dz-mdp" role="dialog" aria-modal="true" aria-label={titleOf(p, t) + ' details'}>
-        <span className="dz-mdp-grip" aria-hidden="true" />
         <div className="dz-mdp-top">
           <div className="dz-mdp-step">
             <button type="button" onClick={() => step(-1)} disabled={activeIndex <= 0} aria-label="Previous property"><Icon name="chevron-left" /></button>

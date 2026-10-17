@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import NativeSelect from '../../../../components/ui/NativeSelect.jsx';
 import Icon from '../../../../components/Icon.jsx';
 import MobileField from '../../../../components/MobileField.jsx';
+import IdInput from '../../../../components/IdInput.jsx';
 import Field from '../../../../components/ui/Field.jsx';
 import { pickDoc } from './helpers.js';
 import { coOwnerDocSlots, dupMessageKey } from './validation.js';
@@ -53,7 +54,7 @@ export default function CoOwnerBlock({ index, row, set, remove, errors, fc, clea
           <Field label={t('services.ra.owner.age')} required error={errors[p + 'age'] && (t(errors[p + 'age'] === 'match' ? 'services.ra.err.ageDob' : 'services.ra.err.adult'))}><input inputMode="numeric" {...input('age')} onChange={(e) => { set('age', e.target.value.replace(/\D/g, '')); clearErr(p + 'age'); }} placeholder={t('services.ra.owner.agePlaceholder')} /></Field>
           <Field label={t('services.ra.owner.gender')}><NativeSelect value={row.gender} onChange={(e) => set('gender', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm"><option value="">{t('services.ra.owner.genderPlaceholder')}</option>{['Male', 'Female', 'Other'].map((o) => <option key={o}>{o}</option>)}</NativeSelect></Field>
         </div>
-        <Field label={t('services.ra.owner.pan')} required error={errors[p + 'pan'] && why('pan', 'services.ra.owner.panErr')}><input maxLength={10} {...input('pan')} onChange={(e) => { set('pan', e.target.value.toUpperCase()); clearErr(p + 'pan'); }} className={fc(p + 'pan') + ' uppercase'} placeholder="ABCDE1234F" /></Field>
+        <Field label={t('services.ra.owner.pan')} required error={errors[p + 'pan'] && why('pan', 'services.ra.owner.panErr')}><IdInput kind="pan" value={row.pan || ''} onChange={(v) => { set('pan', v); clearErr(p + 'pan'); }} className={fc(p + 'pan')} placeholder="ABCDE1234F" /></Field>
         {offline ? (
           <>
             <Field label={t('services.ra.party.passport')} required error={errors[p + 'passport'] && t('services.ra.party.passportErr')}><input maxLength={20} {...input('passport')} onChange={(e) => { set('passport', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); clearErr(p + 'passport'); }} placeholder={t('services.ra.party.passportPlaceholder')} /></Field>
@@ -61,7 +62,7 @@ export default function CoOwnerBlock({ index, row, set, remove, errors, fc, clea
             {row.residency === 'foreign' && <Field label={t('services.ra.party.frro')}><input maxLength={40} {...input('frro')} placeholder={t('services.ra.party.frroPlaceholder')} /></Field>}
           </>
         ) : (
-          <Field label={t('services.ra.owner.aadhaar')} required error={errors[p + 'aadhaar'] && why('aadhaar', 'services.ra.owner.aadhaarErr')}><input inputMode="numeric" maxLength={12} {...input('aadhaar')} onChange={(e) => { set('aadhaar', e.target.value.replace(/\D/g, '')); clearErr(p + 'aadhaar'); }} placeholder={t('services.ra.owner.aadhaarPlaceholder')} /></Field>
+          <Field label={t('services.ra.owner.aadhaar')} required error={errors[p + 'aadhaar'] && why('aadhaar', 'services.ra.owner.aadhaarErr')}><IdInput kind="aadhaar" value={row.aadhaar || ''} onChange={(v) => { set('aadhaar', v); clearErr(p + 'aadhaar'); }} className={fc(p + 'aadhaar')} placeholder={t('services.ra.owner.aadhaarPlaceholder')} /></Field>
         )}
         <Field label={t('services.ra.owner.mobile')} required error={errors[p + 'mobile'] && why('mobile', 'services.ra.owner.mobileErr')}><MobileField value={row.mobile} onChange={(v) => { set('mobile', v); clearErr(p + 'mobile'); }} error={!!errors[p + 'mobile']} placeholder={t('services.ra.owner.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
         <Field label={t('services.ra.owner.email')} error={errors[p + 'email'] && t('services.ra.err.email')}><input type="email" {...input('email')} placeholder="you@example.com" /></Field>

@@ -278,3 +278,25 @@ test('reporting an owner files the report against that owner\'s user id', async 
   expect(req.postDataJSON()).toMatchObject({ targetType: 'user', targetId: OWNER_ID });
   expect((await req.response()).status()).toBe(201);
 });
+
+test('a repeat rating is refused by name, and the picker fills exactly the stars chosen', async ({ page, login }) => {
+  await login.asNewOwner();
+  await page.route(`**/api/reviews/owner/${OWNER_ID}`, (route) => (route.request().method() === 'POST'
+    ? route.fulfill({
+      status: 409,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'already_reviewed', message: 'You have already reviewed this', status: 409 }),
+    })
+    : route.fallback()));
+  await page.goto(`/owner/${OWNER_ID}`);
+
+  await page.getByRole('button', { name: '4 star', exact: true }).click();
+  const shapes = await page.locator('.star-pick svg path').evaluateAll((paths) => paths.map((p) => p.getAttribute('d')));
+  expect(new Set(shapes.slice(0, 4)).size, 'the four chosen stars share the filled shape').toBe(1);
+  expect(shapes[4], 'the fifth star stays an outline').not.toBe(shapes[0]);
+
+  await page.getByPlaceholder('Share your experience...').fill('Rating this owner twice');
+  await page.getByRole('button', { name: 'Post Review' }).click();
+  await expect(page.getByText('You have already rated this. Only one review per person is allowed.')).toBeVisible();
+  await expect(page.getByText('Something went wrong. Please try again.')).toHaveCount(0);
+});

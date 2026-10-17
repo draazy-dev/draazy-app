@@ -74,7 +74,7 @@ export default function StepTerms({ step, terms, setT, startBounds, errors = {},
 
       <label className="lbl">{t('services.ra.terms.maintBy')}</label>
       <div className="grid grid-cols-2 gap-3 mb-5">
-        {['Tenant', 'Owner'].map((v) => <button type="button" key={v} onClick={() => setMaint(v)} aria-pressed={maint === v} className={'opt-pill rounded-xl px-4 py-3 text-sm font-medium text-center ' + (maint === v ? 'sel' : 'text-gray-400')}>{maintLabel[v]}</button>)}
+        {['Tenant', 'Owner'].map((v) => <button type="button" key={v} onClick={() => setMaint(v)} aria-pressed={maint === v} className={'h-btn inline-flex items-center justify-center opt-pill rounded-xl px-4 text-sm font-medium text-center ' + (maint === v ? 'sel' : 'text-gray-400')}>{maintLabel[v]}</button>)}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-5">
@@ -104,7 +104,7 @@ export default function StepTerms({ step, terms, setT, startBounds, errors = {},
 
       <label className="lbl">{t('services.ra.terms.language')}</label>
       <div className="grid grid-cols-2 gap-3 mb-2">
-        {DEED_LANGUAGES.map((v) => <button type="button" key={v} onClick={() => setT('language', v)} aria-pressed={terms.language === v} className={'opt-pill rounded-xl px-4 py-3 text-sm font-medium text-center ' + (terms.language === v ? 'sel' : 'text-gray-400')}>{t(`services.ra.terms.languageOpt.${v}`)}</button>)}
+        {DEED_LANGUAGES.map((v) => <button type="button" key={v} onClick={() => setT('language', v)} aria-pressed={terms.language === v} className={'h-btn inline-flex items-center justify-center opt-pill rounded-xl px-4 text-sm font-medium text-center ' + (terms.language === v ? 'sel' : 'text-gray-400')}>{t(`services.ra.terms.languageOpt.${v}`)}</button>)}
       </div>
       <p className="text-gray-500 text-xs mb-5">{t('services.ra.terms.languageHint')}</p>
 

@@ -58,7 +58,7 @@ export default function Badge({ status, children, className }) {
   // Both separators, so a wire value is never rendered with its punctuation showing.
   const label = children ?? LABELS[key] ?? String(status || '').replace(/[_-]/g, ' ');
   return (
-    <span className={classNames('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize', tone, className)}>
+    <span className={classNames('dz-tag border font-medium capitalize', tone, className)}>
       {label}
     </span>
   );

@@ -5,6 +5,7 @@ import Select from '../../../components/ui/Select.jsx';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import SocietySelect from '../../consumer/list-property/SocietySelect.jsx';
 import FieldError from '../../../components/ui/FieldError.jsx';
+import IdInput from '../../../components/IdInput.jsx';
 import AvailabilityField from '../../../components/ui/AvailabilityField.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
 import i18n from '../../../i18n/index.js';
@@ -73,7 +74,7 @@ export function OwnerStep({ form, set, errors, standing }) {
         <strong>Concierge Mode:</strong> Take only the key facts on the call. The owner signs in with this mobile number, confirms the listing is theirs, and adds the rest and photos.
       </div>
       <div><label htmlFor="pob-ownerName" className={label}>Owner Name *</label><input id="pob-ownerName" value={form.ownerName} onChange={(e) => set('ownerName', e.target.value)} placeholder="Full name of the property owner" className={classNames(fld, errors.ownerName && errCls)} /><FieldError show={!!errors.ownerName}>Owner name is required.</FieldError></div>
-      <div><label htmlFor="pob-ownerMobile" className={label}>Owner Mobile *</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">+91</span><input id="pob-ownerMobile" inputMode="numeric" value={form.ownerMobile} onChange={(e) => set('ownerMobile', e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="9876543210" className={classNames(fld, 'pl-12', errors.ownerMobile && errCls)} /></div><FieldError show={!!errors.ownerMobile}>Valid 10-digit mobile required.</FieldError>
+      <div><label htmlFor="pob-ownerMobile" className={label}>Owner Mobile *</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">+91</span><IdInput kind="mobile" id="pob-ownerMobile" value={form.ownerMobile} onChange={(v) => set('ownerMobile', v)} placeholder="9876543210" className={classNames(fld, 'pl-12', errors.ownerMobile && errCls)} /></div><FieldError show={!!errors.ownerMobile}>Valid 10-digit mobile required.</FieldError>
         {dupCount > 0 && <p className="mt-1.5 text-xs text-amber-300/90">⚠ This owner already has {dupCount} pending listing{dupCount > 1 ? 's' : ''}. You can still continue if this is a different property.</p>}
         {overage && <p data-testid="pob-plan-overage" className="mt-1.5 text-xs text-sky-300/90">This owner is over their plan — {overage.held} live listing{overage.held > 1 ? 's' : ''} on a plan that includes {overage.allowance}. You can still post; worth mentioning an upgrade on the call.</p>}
       </div>

@@ -95,7 +95,7 @@ function PaymentRow({ payment: p, onRefund }) {
         <p className="text-gray-500 text-xs truncate">
           {p.invoiceNo && <><span className="font-mono">{p.invoiceNo}</span> · </>}{fmtDate(p.paidAt)}
         </p>
-        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold flex-shrink-0 ${STATUS_TONE[p.status] || STATUS_TONE.paid}`}>
+        <span className={`dz-tag font-semibold ${STATUS_TONE[p.status] || STATUS_TONE.paid}`}>
           {t(`dash.billingStatus.${p.status}`, { defaultValue: p.status })}
         </span>
       </div>

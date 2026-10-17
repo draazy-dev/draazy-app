@@ -12,38 +12,32 @@ import { useTabParam } from '../../lib/useTabParam.js';
 import { Chips, QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import Switch from '../../components/ui/Switch.jsx';
 import Loading from '../../components/ui/Loading.jsx';
+import Modal from '../../components/ui/Modal.jsx';
 import AdminFlagsPanel from './settings/AdminFlagsPanel.jsx';
 import AppFlagsPanel, { appFlagOn } from './settings/AppFlagsPanel.jsx';
 import MapsGeoPanel from './settings/MapsGeoPanel.jsx';
 
 function ConfirmDialog({ open, title, message, onConfirm, onCancel, confirmLabel = 'Confirm', danger }) {
-  if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative w-full max-w-sm rounded-2xl border border-white/10 bg-ink-2 p-6 shadow-2xl animate-slideIn">
-        <div className="flex items-start gap-3 mb-4">
-          <span className={classNames('mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl', danger ? 'bg-rose-500/15' : 'bg-amber-500/15')}>
-            <AlertTriangle className={classNames('h-4.5 w-4.5', danger ? 'text-rose-400' : 'text-amber-400')} />
-          </span>
-          <div>
-            <h3 className="text-sm font-bold text-white">{title}</h3>
-            <p className="text-sm text-gray-400 mt-1 leading-relaxed">{message}</p>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <button onClick={onCancel} className="rounded-xl px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/5 transition-colors">
-            Cancel
-          </button>
-          <button
-            onClick={onConfirm}
-            className={classNames('rounded-xl px-4 py-2 text-sm font-semibold transition-colors', danger ? 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30' : 'bg-brand-teal/20 text-brand-teal hover:bg-brand-teal/30')}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+    <Modal
+      open={open}
+      onClose={onCancel}
+      size="sm"
+      title={title}
+      footer={(
+        <>
+          <button onClick={onCancel} className="btn btn-secondary">Cancel</button>
+          <button onClick={onConfirm} className={classNames('btn', danger ? 'btn-danger' : 'btn-primary')}>{confirmLabel}</button>
+        </>
+      )}
+    >
+      <div className="flex items-start gap-3">
+        <span className={classNames('mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-xl', danger ? 'bg-rose-500/15' : 'bg-amber-500/15')}>
+          <AlertTriangle className={classNames('h-4.5 w-4.5', danger ? 'text-rose-400' : 'text-amber-400')} />
+        </span>
+        <p className="text-sm text-gray-400 leading-relaxed">{message}</p>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -185,7 +179,7 @@ export default function AdminSettings() {
   /** Stable identity keeps the Maps panel from re-syncing over a half-typed bounding box. */
   const geo = useMemo(() => settings?.geo || {}, [settings?.geo]);
 
-  // Confirmation-gated admin flag toggle (must be before early return to satisfy Rules of Hooks)
+  // Declared above the early return to satisfy the Rules of Hooks.
   const requestAdminFlagToggle = useCallback((section, key, value, moduleTitle) => {
     const label = moduleTitle || humanize(key);
     setConfirm({
@@ -216,7 +210,7 @@ export default function AdminSettings() {
         <button
           type="button"
           onClick={() => window.location.reload()}
-          className="mt-4 rounded-xl bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/15"
+          className="h-btn-sm inline-flex items-center justify-center mt-4 rounded-xl bg-white/10 px-4 text-sm font-medium text-white transition-colors hover:bg-white/15"
         >
           Reload
         </button>
@@ -372,7 +366,6 @@ export default function AdminSettings() {
       <QueueTabs tabs={TABS.map(([key, label]) => ({ key, label, count: null }))} active={tab} onChange={setTab} label="Settings sections" idPrefix="settings" />
 
       <div id="settings-panel" role="tabpanel" aria-labelledby={`settings-tab-${tab}`}>
-      {/* General */}
       {tab === 'general' && (
         <div className="max-w-2xl space-y-5">
           <div className="dz-card p-5">
@@ -439,7 +432,6 @@ export default function AdminSettings() {
         </div>
       )}
 
-      {/* Fees */}
       {tab === 'fees' && (
         <div className="max-w-xl space-y-5">
           <div className="dz-card p-5">
@@ -502,7 +494,6 @@ export default function AdminSettings() {
             </div>
           )}
 
-          {/* Move-in Pack — prices + launch toggle for the consumer /services bundle */}
           <div className="dz-card p-5">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
@@ -533,7 +524,6 @@ export default function AdminSettings() {
         </div>
       )}
 
-      {/* Maps & Places — Google geo policy: city limit + blacklist */}
       {tab === 'maps' && (
         <div>
           <p className="mb-4 text-sm text-gray-400">
@@ -551,7 +541,6 @@ export default function AdminSettings() {
         </div>
       )}
 
-      {/* Feature Flags — contains sub-tabs for Application and Admin Modules */}
       {tab === 'flags' && (
         <div>
           <div className="mb-4">
@@ -563,7 +552,6 @@ export default function AdminSettings() {
             />
           </div>
 
-          {/* Application flags — grouped two-column layout */}
           {flagSubTab === 'application' && (
             <div>
               <p className="mb-4 text-sm text-gray-400">Platform-wide feature toggles that control consumer and app behavior.</p>
@@ -571,7 +559,6 @@ export default function AdminSettings() {
             </div>
           )}
 
-          {/* Admin Module flags — two-column layout */}
           {flagSubTab === 'admin' && (
             <div>
               <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -597,7 +584,6 @@ export default function AdminSettings() {
       )}
       </div>
 
-      {/* Confirmation dialog for flag changes */}
       <ConfirmDialog
         open={!!confirm}
         title={confirm?.title}

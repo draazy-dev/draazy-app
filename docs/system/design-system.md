@@ -48,6 +48,40 @@ Everything below derives from `--control-h` / `--btn-h`, so all of them are 40px
 | Navbar pills | `--dz-nav-pill-h` | `.dz-topbar__pill` + `.tap-extend` | "Post Property", "Sign In" |
 | Range slider | grows on touch | `.rng-wrap` / `.rng` | Budget slider (thumb 16px -> 28px) |
 
+### Compact scale (chips, tags, toggles)
+
+Not everything is a 44px control. Like a native chat app, secondary pieces are **drawn smaller** and
+keep the 44px **target** with a transparent `::before` (built into each tappable class — no
+`.tap-extend` needed). Tokens live in `:root` of `index.css`; the classes in
+`styles/components/chips.css`. Same size on desktop and phone.
+
+| Token | Size | Class | For |
+|---|---|---|---|
+| `--dz-icon-btn` | 36px | `.dz-segmented > button[aria-pressed]` inside a `--control-h` pill (same shape as `DealToggle`) | Icon-only toggles (listings Grid/List/Map) |
+| `--dz-chip-h` | 32px | `.dz-chip`, `.dz-chip--accent` (selected/removable) | Tappable filter chips, "Clear all", broaden-search suggestions |
+| `--dz-tag-h` | 24px | `.dz-tag`, `.dz-tag--muted` (neutral surface) | Display-only labels: SALE/RENT/RERA, amenities, alert criteria |
+| `--dz-count-h` | 20px | `.dz-count` | Numeric count badges (filter FAB, notification bell, tab counts) |
+
+Rules: **pill = tappable, 6px corner = display-only.** `.dz-tag` carries no colour — tone comes from
+utilities (`bg-emerald-600/50 text-emerald-50`) because Tier 0 loads after Tailwind and would
+override them. A chip row that can outgrow a phone scrolls horizontally (`overflow-x-auto
+no-scrollbar py-1.5`, the padding leaving room for the 44px target) instead of wrapping.
+
+The classes own size, padding, radius and font size, so drop those utilities when applying one; their
+`display`/`position` are zero-specificity, so `hidden`, `sm:flex` and `absolute` still place them.
+A button that keeps its own colours but is not a `.btn` takes its height from the same tokens through
+`h-btn` / `h-btn-sm` / `h-btn-lg` (`@layer utilities` in `index.css` → `--btn-h*`, so `sm:` variants work)
+instead of `py-*` padding, which grows with the font. Content-height rows and cards (`text-left`,
+`justify-between`, multi-line) keep their padding.
+
+Light theme draws a 0.25px text stroke in `color`; transparent-fill text (`.gradient-text`) sets it to 0 or
+the stroke outlines it. A sticky bar under the top nav uses `dz-docks-under-nav` with
+`top-[var(--dz-nav-h)]` so it docks flush when the nav hides on scroll.
+
+`node scripts/check-ui-std.mjs` fails when a hand-rolled pill, tag, padded button, `fixed inset-0` popup
+or native `type="date|time|month"` input appears (baseline 0); form fields and `<kbd>` are not chips.
+Dates and times use `DateField` / `TimeField`, months a `Select` of `monthOptions()` (`lib/toolCalc.js`).
+
 ### Utility Classes
 
 ```
@@ -87,7 +121,7 @@ is now the minority pattern and should not be used in new code.
 // Dropdown (automatic via NativeSelect/Select component)
 <NativeSelect className="...">...</NativeSelect>
 // Trigger height comes from --dd-trigger-height: var(--control-h).
-// Below 640px Select/MultiSelect stop writing inline anchor geometry and render as bottom sheets.
+// Below 640px Select/MultiSelect stop writing inline anchor geometry and render as floating cards.
 ```
 
 ### Typography in Controls
@@ -119,7 +153,7 @@ is now the minority pattern and should not be used in new code.
 | Cards | `1rem` (16px) | `--radius` / `rounded-2xl` |
 | Dropdown menu | `1.1rem` | `--dd-menu-radius` |
 | Menu options | `0.8rem` | `--dd-option-radius` |
-| Bottom sheets (top corners) | `1.25rem` | — (literal) |
+| Mobile floating cards | `24px` | `--dz-float-radius` |
 | Badges | `6px` | — |
 
 ### When NOT to use the default height
@@ -266,35 +300,53 @@ screen edge instead of leaving a hole. Opt a sub-header in with `.dz-docks-under
 that reacts to the class lives inside a `max-width: 1023.98px` block, so the class is inert on
 desktop.
 
-### Bottom sheets are the mobile overlay shape
+### Floating cards are the mobile overlay shape
 Below 640px a centred dialog is the wrong shape: with the keyboard open the usable viewport is ~300px,
-so a form modal's submit button leaves the screen. Every centred overlay therefore docks to the bottom
-edge as a sheet — squared bottom corners, `1.25rem` top corners, `max-height` in `dvh`, a slide-in, a
-36x4px grab handle, and bottom padding that adds `--dz-safe-b`. Four shells implement it and must not
-diverge:
+so a form modal's submit button leaves the screen. Every overlay therefore becomes a **floating card**
+in the Draaz assistant's style: 24px corners on all sides, 12px in from the screen edges, its bottom
+edge 12px above the bottom nav (or the home indicator where there is no nav), rising in with
+`dzFloatIn`, over a light `black/.35` scrim, no grab handle. One token set in `index.css :root` drives
+every shell — change the shape there, never per component:
+
+| Token | Meaning |
+|---|---|
+| `--dz-float-edge` / `--dz-float-radius` | 12px side inset / 24px corners |
+| `--dz-float-top` | Highest a card may reach: `min(7.5rem, 16dvh)` below the safe area |
+| `--dz-float-bottom` | Bottom edge; computed on `:root` via `:has(.has-bottom-nav)` because portalled overlays sit outside the nav's subtree |
+| `--dz-float-bg` / `--dz-float-shadow` / `--dz-float-scrim` | Glass surface, drop shadow, scrim |
+
+Cards are **content-height**, capped at `calc(100dvh - --dz-float-top - --dz-float-bottom)`; only the
+filter drawer (`.filter-panel`, below `lg`) is pinned full-height, and the searchable dropdown picker
+(`--picker`) runs from near the top to 12px above the keyboard so results never hide behind it. Long
+bodies scroll under a drawn `ScrollRail`, because phones hide native scrollbars at rest. The shells
+that implement it, which must not diverge:
 
 - `.dz-modal` / `.dz-modal-backdrop` — all legacy consumer overlays, converted by **one media query
   with zero markup edits**. Look for the shared class before editing a component.
-- `.dz-modal-sheet` — the shared `<Modal>`.
+- `.dz-modal-sheet` + `.dz-float-scrim` — the shared `<Modal>`.
+- `.sf-modal` — the flatmates post/group/gender forms.
 - `.dz-dropdown__menu--sheet` + `.dz-dropdown__scrim` — `Select`/`MultiSelect` stop writing inline
   anchor geometry below `sm`.
 - `.dz-action-sheet` — overflow menus.
+- `.dz-cal` + `.dz-cal-backdrop` — date and time pickers.
+- `.dz-mdp` — the map detail panel (below 768px, no scrim: the map stays live).
+- `.filter-panel` — the listings/flatmates filter drawer (below `lg`).
 
 `useSwipeDismiss` adds drag-to-dismiss; it arms only on the mobile media query, only inside the top
-40px handle zone, and takes pointer capture on the first qualifying *move* — capturing on
+40px of the card, and takes pointer capture on the first qualifying *move* — capturing on
 `pointerdown` retargets the following click and breaks every button in the panel.
 
 **The shared `<Modal>` sits at `z-[1550]`, inside the floating-chrome band**, and the trap is that
 the collision only exists below 640px. On desktop the panel is centred while the passive chrome
 (CityChrome 1200, AssistantWidget 1300, InstallPrompt 1350, CookieConsent 1400, ConnectivityBanner
-1450, MobileNav 1500) is pinned to an edge; as a bottom sheet the two share one strip, and a *short*
-sheet lands its buttons under the cookie banner outright. Anything below that band also has its
+1450, MobileNav 1500) is pinned to an edge; as a bottom card the two share one strip, and a *short*
+card lands its buttons under the cookie banner outright. Anything below that band also has its
 clicks swallowed by the `pointer-events-auto` panels in it. A modal is the foreground task, so it
 outranks passive chrome — but it stays **below** `ToastContext`'s 1600, because a toast is how the
 modal's own action reports back. The portalled `Select`/`Menu` popovers set `zIndex = 9999` inline
 and are unaffected, which is what keeps a dropdown usable inside a dialog.
 
-Structurally, the sheet's header/body/footer become a bounded flex column so the body scrolls
+Structurally, the card's header/body/footer become a bounded flex column so the body scrolls
 internally and the footer actions stay pinned above the keyboard. Every mobile value is a base class
 paired with an `sm:` reset, so at ≥640px the rendered class set is the plain desktop one.
 
@@ -387,7 +439,7 @@ padding utilities survive); `env()` is `0px` everywhere else including desktop, 
 off-device.
 
 Every viewport-height constraint uses **`dvh`**, so the mobile URL bar collapsing does not resize the
-layout: dropdown/action sheets cap at `70dvh`, modals at `88dvh`, the app shell is `min-h-[100dvh]`.
+layout: floating cards cap at `100dvh` minus `--dz-float-top`/`--dz-float-bottom`, the app shell is `min-h-[100dvh]`.
 Do not introduce `vh`.
 
 ### Responsive dual-render (mobile card / desktop table)
@@ -434,10 +486,9 @@ route file, not in `index.css`.
 
 ### Shared primitives inventory
 Reach for these before hand-rolling (`src/components/ui/`): `Button` (3 tiers, 3 sizes, `to`/`as`
-polymorphism), `Modal` (portal, focus trap, stacked-dialog-aware Escape, sheet on mobile), `Table`
+polymorphism), `Modal` (portal, focus trap, stacked-dialog-aware Escape, floating card on mobile), `Table`
 (pagination, selection, optional `mobileCard`), `Select` / `MultiSelect` / `NativeSelect` /
-`LocalitySelect`, `DateField` / `TimeField` / `DatePickerDialog` / `TimePickerDialog` (all bottom
-sheets on phones), `Menu` (action sheet on phones), `MobileCollapse` (collapsed below `lg`, always
+`LocalitySelect`, `DateField` / `TimeField` / `DatePickerDialog` / `TimePickerDialog` (all floating cards on phones), `Menu` (floating action card on phones), `MobileCollapse` (collapsed below `lg`, always
 open above — an overlay toggle, so existing heading markup is untouched), `HScroll` (horizontal rail
 with edge fades; its arrow buttons are 36px and are *removed* under `pointer: coarse` rather than
 grown), `Tabs`, `Switch`, `Badge`, `Tip`, `FieldError`, `DualRange`, `Stat`, `PageHeader`,
@@ -487,12 +538,13 @@ Before shipping a form, confirm:
 - [ ] Standalone dropdowns/inputs are capped (`ddSolo` / `sm:max-w-xs`) or paired into a grid row.
 - [ ] Every interactive control derives its height from a token (`--control-h`, `--btn-h`,
       `--btn-h-sm`, `--btn-h-lg`) — never a literal `h-*`.
-- [ ] No control drops below 44px at <640px; verify at **360px**, not just at desktop width.
+- [ ] No tap target drops below 44px at <640px (a compact-scale control may be drawn smaller, its
+      `::before` carries the target); verify at **360px**, not just at desktop width.
 - [ ] Grid-paired controls share the row evenly (`sm:grid-cols-2`), no lone stretched cell.
 - [ ] Every icon-only control has an `aria-label` (a `title` is not a label on touch).
 - [ ] Nothing bottom-anchored hardcodes a `bottom-*` value — it docks at `--dz-bottom-inset` and was
       checked against the existing bottom-chrome inventory.
-- [ ] Any new overlay uses one of the four sheet shells rather than a fifth.
+- [ ] Any new overlay uses one of the floating-card shells (or `<Modal>`) rather than a new one.
 - [ ] No `vh` — viewport heights are `dvh`.
 
 ---
@@ -502,7 +554,7 @@ Before shipping a form, confirm:
 1. Use `<Button>` for every button; pick the tier (`primary` / `secondary` / `icon`) and, if needed,
    the size (`sm` / `lg`). Do not hand-roll `py-*` heights.
 2. Use `<NativeSelect>` or `<Select>` for dropdowns — they take their height from `--control-h` and
-   become bottom sheets below 640px automatically.
+   become floating cards below 640px automatically.
 3. Use the `seg()` helper or `.seg` for toggle/filter pills.
 4. Use `.dz-input` or `input.form-input` for text/search inputs — both take their height from
    `--control-h`. Do not hand-tune vertical padding (`py-[9px]`); it desyncs from the mobile 44px ramp.

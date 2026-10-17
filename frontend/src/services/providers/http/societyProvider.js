@@ -32,9 +32,10 @@ export const topSocieties = () => get('/societies/top', null, { auth: false });
 const SEARCH_CANDIDATES = 20;
 
 // **The locality is deliberately not sent** — docs/flows/consumer/societies.md
-export async function searchSocieties(query) {
+export async function searchSocieties(query, { mapped = false } = {}) {
   const res = await get('/societies', {
     q: query || undefined,
+    mapped: mapped || undefined,
     page: 0,
     size: SEARCH_CANDIDATES,
   });

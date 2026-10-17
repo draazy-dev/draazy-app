@@ -41,10 +41,9 @@ function livenessChip(detail) {
 }
 
 const Chip = ({ tone, children, ...props }) => (
-  <span {...props} className={classNames('rounded-full border px-2.5 py-0.5 text-xs font-medium', tone)}>{children}</span>
+  <span {...props} className={classNames('dz-tag border font-medium', tone)}>{children}</span>
 );
 
-/** One KYC case: the evidence on the left, every decision in the rail on the right. */
 export default function KycReviewModal({ openId, nextId, onNext, onClose, onChanged, canWrite, user }) {
   const kase = useKycCase(openId, { canWrite, userId: user?.id, onChanged });
   const { detail, loading, deciding, error } = kase;

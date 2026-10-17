@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
-import { API, authHeaders, apiLogin, uploadedListingPhotos, uniqueMobile, signIn } from '../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signIn } from '../../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../../helpers/moderation.js';
 import { chooseLocality } from '../../helpers/locality.js';
 
@@ -159,7 +159,7 @@ test('an unknown listing is a 404, not a 500, on every decision', async () => {
   }
 });
 
-test('a moderator can correct a BHK on a listing they do not own', async ({ page, request }) => {
+test('a moderator can correct the BHK and type on a listing they do not own, picking only approved values', async ({ page, request }) => {
   const title = `BHK correction ${Date.now()}`;
   const { id, headers } = await freshListing(title);
 
@@ -174,10 +174,17 @@ test('a moderator can correct a BHK on a listing they do not own', async ({ page
   await row.getByRole('button', { name: 'Edit', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Edit listing' })).toBeVisible();
 
-  // Use the numeric field because the contract stores BHK as an integer.
-  const bhkBox = page.getByLabel('Configuration (BHK)');
-  await expect(bhkBox).toHaveValue('2');
-  await bhkBox.fill('3');
+  // Both fields offer only the values the listing wizard writes.
+  const bhkBox = page.getByRole('button', { name: 'Configuration (BHK)' });
+  const typeBox = page.getByRole('button', { name: 'Property type' });
+  await expect(bhkBox).toContainText('2 BHK');
+  await expect(typeBox).toContainText('Flat');
+  await bhkBox.click();
+  await expect(page.getByRole('option', { name: '5+ BHK', exact: true })).toBeVisible();
+  await page.getByRole('option', { name: '3 BHK', exact: true }).click();
+  await typeBox.click();
+  await expect(page.getByRole('option', { name: 'Office Space', exact: true })).toBeVisible();
+  await page.getByRole('option', { name: 'Villa', exact: true }).click();
   await page.getByRole('button', { name: /Save changes/i }).click();
   // The modal closes only on a write the API accepted; a refusal leaves it open with a toast.
   await expect(page.getByRole('dialog', { name: 'Edit listing' })).toHaveCount(0);
@@ -185,6 +192,7 @@ test('a moderator can correct a BHK on a listing they do not own', async ({ page
   // Read back from the API rather than from the screen.
   const after = await (await fetch(`${API}/me/listings/${id}`, { headers })).json();
   expect(Number(after.bhk)).toBe(3);
+  expect(after.propertyType).toBe('Villa');
 
   // Moderator corrections must not remove an already approved listing from public view.
   expect(after.status).toBe('approved');
@@ -211,11 +219,12 @@ test('cancelling the edit modal discards the change rather than quietly saving i
   const modal = page.getByRole('dialog', { name: 'Edit listing' });
   await expect(modal).toBeVisible();
 
-  const bhkBox = page.getByLabel('Configuration (BHK)');
-  await expect(bhkBox).toHaveValue('2');
-  await bhkBox.fill('3');
+  const bhkBox = modal.getByRole('button', { name: 'Configuration (BHK)' });
+  await expect(bhkBox).toContainText('2 BHK');
+  await bhkBox.click();
+  await page.getByRole('option', { name: '3 BHK', exact: true }).click();
   // Without this the test cannot tell "Cancel discarded the edit" from "the edit never happened".
-  await expect(bhkBox).toHaveValue('3');
+  await expect(bhkBox).toContainText('3 BHK');
 
   await modal.getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(modal).toHaveCount(0);

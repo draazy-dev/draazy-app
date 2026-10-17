@@ -49,7 +49,7 @@ const STATUS_CLS = {
 const STATUS_KEYS = { scheduled: 'visits.stScheduled', confirmed: 'visits.stConfirmed', completed: 'visits.stCompleted', cancelled: 'visits.stCancelled', 'no-show': 'visits.stNoShow' };
 
 const StatusBadge = ({ status, t }) => (
-  <span className={'text-[11px] px-2 py-0.5 rounded-full font-semibold ' + (STATUS_CLS[status] || 'bg-white/10 text-gray-300')}>{STATUS_KEYS[status] ? t(STATUS_KEYS[status]) : status}</span>
+  <span className={'dz-tag font-semibold ' + (STATUS_CLS[status] || 'bg-white/10 text-gray-300')}>{STATUS_KEYS[status] ? t(STATUS_KEYS[status]) : status}</span>
 );
 
 const btnConfirm = 'px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/25 flex items-center gap-1';
@@ -178,7 +178,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
     if (diff === 1) return t('visits.tomorrow');
     return '';
   };
-  // ─── One actionable upcoming-visit row (confirm / reschedule / cancel / mark visited) ───
 
   const UpcomingRow = ({ v }) => {
     const p = parsed.get(v.id) || {};
@@ -326,7 +325,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
       ) : null}
     </Modal>
   );
-  // Empty state — a user with zero visits of any kind.
 
   if (visitList.length === 0) {
     return (
@@ -343,7 +341,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
       </div>
     );
   }
-  // ─── WEEK VIEW (per-day agenda — real slot time when known, else "Time TBD") ───
 
   if (weekView) {
     const weekDays = Array.from({ length: 7 }, (_, i) => { const d = new Date(weekView); d.setDate(weekView.getDate() + i); return d; });
@@ -370,7 +367,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
                 <div key={d.toISOString()} className={'rounded-xl border p-3 min-h-[110px] ' + (isToday ? 'border-teal-400/40 bg-teal-500/[0.06]' : 'border-white/[0.06] bg-white/[0.02]')}>
                   <div className="flex items-center justify-between mb-2">
                     <p className={'text-xs font-semibold ' + (isToday ? 'text-teal-300' : 'text-gray-300')}>{CAL_DAYS[d.getDay()]} {d.getDate()}</p>
-                    {dayVisits.length > 0 && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 text-gray-400 font-semibold">{dayVisits.length}</span>}
+                    {dayVisits.length > 0 && <span className="dz-count bg-white/5 text-gray-400">{dayVisits.length}</span>}
                   </div>
                   {dayVisits.length === 0 ? (
                     <p className="text-[11px] text-gray-600">{t('visits.noVisits')}</p>
@@ -397,7 +394,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
       </div>
     );
   }
-  // ─── MONTH VIEW ───
 
   return (
     <div className="space-y-6">
@@ -421,7 +417,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
         </div>
 
         <div className="rounded-xl overflow-hidden ring-1 ring-white/[0.06] bg-black/20">
-          {/* Weekday header — teal-tinted band, no hard white grid lines */}
           <div className="grid grid-cols-7 bg-gradient-to-b from-teal-500/[0.16] to-teal-500/[0.05] border-b border-teal-400/10">
             {CAL_DAYS.map((d, idx) => {
               const weekend = idx === 0 || idx === 6;
@@ -432,7 +427,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
               );
             })}
           </div>
-          {/* Day grid — one uniform whisper-soft hairline (white/[0.04]) replaces the old stacked borders */}
 
           <div className="grid grid-cols-7">
             {Array.from({ length: firstDay }).map((_, i) => <div key={'e' + i} className="min-h-[76px] border-b border-r border-white/[0.04] bg-white/[0.008]" />)}
@@ -449,7 +443,7 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
                     {dayVisits.slice(0, 2).map((v) => {
                       const { chip, dot } = visitChip(v.status);
                       return (
-                        <div key={v.id} className={'flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight ' + chip}>
+                        <div key={v.id} className={'dz-tag flex font-medium ' + chip}>
                           <span className={'w-1.5 h-1.5 rounded-full flex-shrink-0 ' + dot} />
                           <span className="truncate">{v.listing.split(' in ')[0]}</span>
                         </div>

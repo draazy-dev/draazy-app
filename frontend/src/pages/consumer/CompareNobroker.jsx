@@ -38,7 +38,7 @@ export default function CompareNobroker() {
   return (
     <article className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
       <header className="rounded-3xl border border-teal-400/15 bg-gradient-to-br from-teal-400/[0.14] via-teal-400/[0.04] to-transparent px-5 py-8 sm:px-10 sm:py-12">
-        <p className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/25 bg-teal-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-teal-300">
+        <p className="dz-tag border border-teal-400/25 bg-teal-400/10 font-semibold uppercase tracking-widest text-teal-300">
           <Icon name="scale" aria-hidden="true" className="h-3.5 w-3.5" /> Comparison
         </p>
         <h1 className="mt-4 text-[1.85rem] font-extrabold leading-[1.15] text-white sm:text-5xl">{c.top} <span className="gradient-text">{c.accent}</span></h1>

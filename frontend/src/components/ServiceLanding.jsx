@@ -131,7 +131,7 @@ export default function ServiceLanding({
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="reveal">
               <ServiceBreadcrumbs k={CRUMB_KEY[desk]} />
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs text-teal-200 font-medium mb-5"><Icon name={badgeIcon} className="w-3.5 h-3.5" /> {badge}</span>
+              <span className="dz-tag bg-white/10 border border-white/15 text-teal-200 font-medium mb-5"><Icon name={badgeIcon} className="w-3.5 h-3.5" /> {badge}</span>
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight">{titleTop}<br /><span className="gradient-text">{titleAccent}</span></h1>
               <p className="text-gray-200 text-base sm:text-lg mt-5 max-w-xl">{subtitle}</p>
               <div className="flex flex-wrap gap-x-6 gap-y-3 mt-7">
@@ -295,8 +295,8 @@ export default function ServiceLanding({
                 <p className="text-gray-400 mt-3 mb-7">{cta.sub}</p>
                 <div className="flex flex-col sm:flex-row gap-3 justify-center">
                   <button onClick={scrollToForm} className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name={cta.icon || 'send'} className="w-4 h-4" /> {cta.primary}</button>
-                  {cta.phone ? <a href={`tel:${cta.phone.replace(/[^\d+]/g, '')}`} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> Call {cta.phone}</a> : null}
-                  {cta.link ? <Link to={cta.link} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2">{cta.linkLabel}</Link> : null}
+                  {cta.phone ? <a href={`tel:${cta.phone.replace(/[^\d+]/g, '')}`} className="h-btn-lg px-6 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> Call {cta.phone}</a> : null}
+                  {cta.link ? <Link to={cta.link} className="h-btn-lg px-6 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2">{cta.linkLabel}</Link> : null}
                 </div>
               </div>
             </div>

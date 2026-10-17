@@ -50,15 +50,12 @@ export default function RentAgreement() {
     <div ref={rootRef} className="ra-page">
       <div>
         <Hero />
-        {/* Active requests tracker */}
 
         <ServiceTracker key={done ? 'done' : 'open'} typeFilter="rental" title={tr('services.ra.trackerTitle')} />
-        {/* Form + Summary */}
 
         <section ref={formRef} className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-y">
           <p role="status" aria-live="polite" className="sr-only" data-testid="ra-error-count">{Object.keys(errors).length ? tr('services.ra.errorCount', { count: Object.keys(errors).length }) : ''}</p>
           <div className={`grid grid-cols-1 gap-6${locked ? '' : ' lg:grid-cols-[1fr_340px]'}`}>
-            {/* Wizard */}
             <div className="glass-card rounded-2xl p-6 sm:p-8">
               {inviteError ? (
                 <div className="p-6 rounded-xl bg-amber-500/8 border border-amber-500/25 text-center">
@@ -68,7 +65,6 @@ export default function RentAgreement() {
                   <button type="button" onClick={() => navigate('/services/rent-agreement')} className="btn-teal mt-5 px-6 py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center gap-2"><Icon name="file-signature" className="w-4 h-4" /> {tr('services.ra.inviteErr.startOwn')}</button>
                 </div>
               ) : (
-              /* Progress */
               <>
               {!locked && (
               <HScroll wrapClassName="mb-8" className="flex items-center pb-2" fadeColor="rgb(var(--dz-c-ink-card))">
@@ -129,7 +125,7 @@ export default function RentAgreement() {
                         <p className="text-gray-500 text-[11px] mt-2 flex items-start gap-1.5"><Icon name="clock" className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> {tr('services.ra.invite.awaitingReply')}</p>
                       )}
                       <div className="flex flex-col sm:flex-row gap-2 mt-3">
-                        <a href={inviteResult.waLink} target="_blank" rel="noopener noreferrer" className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold min-h-[44px]"><Icon name="message-circle" className="w-4 h-4" /> {tr('services.ra.invite.sendWhatsapp')}</a>
+                        <a href={inviteResult.waLink} target="_blank" rel="noopener noreferrer" className="h-btn flex-1 inline-flex items-center justify-center gap-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold"><Icon name="message-circle" className="w-4 h-4" /> {tr('services.ra.invite.sendWhatsapp')}</a>
                         <button type="button" onClick={copyInviteLink} className="btn-outline inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-gray-200 text-sm font-semibold min-h-[44px]"><Icon name={copied ? 'check' : 'copy'} className="w-4 h-4" /> {copied ? tr('services.ra.invite.copied') : tr('services.ra.invite.copyLink')}</button>
                       </div>
                       <p className="text-gray-600 text-[11px] mt-2.5 leading-relaxed">{tr('services.ra.invite.sendNote', invitedSide)}</p>
@@ -192,7 +188,6 @@ export default function RentAgreement() {
                       </div>
                     </div>
                   )}
-                  {/* Restored draft — pick up where you left off */}
 
                   {restored && mode === 'owner' && (
                     <div className="mb-6 p-3.5 rounded-xl bg-teal-500/8 border border-teal-500/20 flex items-center justify-between gap-3">
@@ -206,7 +201,6 @@ export default function RentAgreement() {
                       <button type="button" onClick={startFresh} className="text-gray-400 hover:text-white text-[11px] font-semibold whitespace-nowrap underline underline-offset-2">{tr('services.ra.draft.startFresh')}</button>
                     </div>
                   )}
-                  {/* Pending co-fill invites addressed to this signed-in user */}
 
                   {myInvites.length > 0 && mode === 'owner' && (
                     <div className="mb-6 p-4 rounded-xl bg-emerald-500/8 border border-emerald-500/25">
@@ -243,33 +237,27 @@ export default function RentAgreement() {
                       </div>
                     )
                   )}
-                  {/* Step 1: Property */}
 
                   <fieldset disabled={mode === 'invite'} className="contents">
                     <StepProperty step={step} prop={prop} setP={setP} setProp={setProp} setSelectedPropertyId={setSelectedPropertyId} pickListing={pickListing} myProperties={myProperties} errors={errors} fc={fc} clearErr={clearErr} onLocalityBusy={setLocalityBusy} />
                   </fieldset>
 
-                  {/* Step 2: Owner */}
                   <fieldset disabled={mode === 'invite' && inviteRole !== 'owner'} className="contents">
                     <StepOwner step={step} canInvite={mode === 'owner'} ownerMode={ownerMode} chooseOwnerMode={chooseOwnerMode} invite={invite} setInvite={setInvite} owner={owner} setO={setO} coOwners={coOwners} setCoOwner={setCoOwner} addCoOwner={addCoOwner} removeCoOwner={removeCoOwner} errors={errors} fc={fc} clearErr={clearErr} ownerDocs={ownerDocs} setOwnerDocs={setOwnerDocs} vaultEnabled={vaultEnabled} onDocSaved={saveOwnerDocToVault} identityReminders={identityReminders.owner} />
                   </fieldset>
 
-                  {/* Step 3: Tenant — the invited tenant's editable section */}
                   <fieldset disabled={mode === 'invite' && inviteRole === 'owner'} className="contents">
                   <StepTenant step={step} canInvite={mode === 'owner' && ownerMode !== 'invite'} tenantMode={tenantMode} setTenantMode={setTenantMode} tenants={tenants} setTenant={setTenant} removeTenant={removeTenant} addTenant={addTenant} errors={errors} clearErr={clearErr} tenantDocs={tenantDocs} setTenantDocs={setTenantDocs} invite={invite} setInvite={setInvite} identityReminders={identityReminders.tenant} />
                   </fieldset>
-                  {/* Step 4: Terms */}
 
                   <fieldset disabled={mode === 'invite'} className="contents">
                     <StepTerms step={step} terms={terms} setT={setT} startBounds={startBounds} errors={errors} fc={fc} clearErr={clearErr} maint={maint} setMaint={setMaint} regArea={regArea} furnish={prop.furnish} setFurnish={(v) => setP('furnish', v)} furnItems={furnItems} toggleFurn={toggleFurn} isChecked={isChecked} bumpQty={bumpQty} removeFurn={removeFurn} custom={custom} setCustom={setCustom} addCustom={addCustom} clauses={clauses} setClauses={setClauses} />
                   </fieldset>
-                  {/* Step 5: Witnesses */}
 
                   <fieldset disabled={mode === 'invite'} className="contents">
                     <StepWitnesses step={step} wit={wit} setWit={setWit} errors={errors} fc={fc} clearErr={clearErr} identityReminders={identityReminders.witness} />
                   </fieldset>
 
-                  {/* Step 6: Review */}
                   <StepReview step={step} prop={prop} owner={owner} coOwners={coOwners} wit={wit} ownerMode={ownerMode} tenantMode={tenantMode} invite={invite} tenants={tenants} terms={terms} cost={cost} maint={maint} furnitureText={furnitureText} regArea={regArea} declare={declare} setDeclare={setDeclare} generate={generate} submitting={submitting} retrying={!!pendingRequestId} paysNow={mode === 'owner' && !inviting} identityReminders={identityReminders.review} />
 
                   {/* Nav buttons — sticky at viewport bottom on mobile so step actions stay reachable */}
@@ -291,7 +279,6 @@ export default function RentAgreement() {
             )}
           </div>
         </section>
-        {/* Documents required */}
 
         <DocsRequired />
 

@@ -54,12 +54,6 @@
   transform: translateX(18px);
 }
 
-.view-btn.active {
-  background: rgb(var(--dz-c-indigo-600) / 0.3);
-  color: rgb(var(--dz-c-white));
-  border-color: rgb(var(--dz-c-indigo-600) / 0.5);
-}
-
 /* .filter-overlay/.filter-panel/.filter-fab* are shared with flatmates FilterBar.jsx and stay
    global in index.css; .fg-* and .page-btn* are shared too and live in routes/filters.css. */
 
@@ -81,18 +75,6 @@
 
 .badge-verified {
   background: var(--brand-gradient);
-}
-
-.badge-premium {
-  background: linear-gradient(135deg, rgb(var(--dz-c-orange-500)), rgb(var(--dz-c-orange-400)));
-}
-
-.badge-new {
-  background: var(--brand-gradient);
-}
-
-.badge-furnished {
-  background: linear-gradient(135deg, rgb(var(--dz-c-violet-500)), rgb(var(--dz-c-violet-400)));
 }
 
 .badge-rera {

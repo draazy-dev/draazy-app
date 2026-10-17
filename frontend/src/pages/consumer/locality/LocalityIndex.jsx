@@ -40,7 +40,7 @@ export default function LocalityIndex() {
     <div className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 sm:py-10">
       <header className="overflow-hidden rounded-3xl border border-teal-400/15 bg-gradient-to-br from-teal-400/[0.14] via-teal-400/[0.04] to-transparent p-4 sm:p-8 lg:grid lg:grid-cols-[2fr_3fr] lg:items-center lg:gap-8">
         <div className="px-1 sm:px-2">
-          <p className="inline-flex items-center gap-1.5 rounded-full border border-teal-400/25 bg-teal-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-teal-300">
+          <p className="dz-tag border border-teal-400/25 bg-teal-400/10 font-semibold uppercase tracking-widest text-teal-300">
             <Icon name="map-pin" aria-hidden="true" className="h-3.5 w-3.5" /> Pune locality guides
           </p>
           <h1 className="mt-4 text-[1.85rem] font-extrabold leading-[1.15] text-white sm:text-5xl">{hub.heading}</h1>

@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { AADHAAR, MOBILE, active, BUILDING_PLACEHOLDER, SOCIETY_PLACEHOLDER, clickNext, fillBuilding, fillOwner, fillProperty, fillTenant, fillTenantPolice, fillTerms, fillWitnesses, inviteOwner, pickLocality, uploadAll } from '../../../helpers/rentAgreementWizard.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { shownMobile } from '../../../helpers/liveAuth.js';
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const BUYER = { name: 'Anita Verma', mobile: '9811223344', email: '', role: 'buyer', joinedAt: Date.now() };
 async function login(page, user) {
@@ -157,7 +158,7 @@ test.describe('Rent Agreement — revenue flow', () => {
     const t = active(page);
     await expect(t.getByText('Invite the tenant', { exact: true }), 'one side is invited at a time').toHaveCount(0);
     await expect(t.getByPlaceholder('As per PAN/Aadhaar').first(), 'the first tenant is the signed-in requester').toHaveValue(BUYER.name);
-    await expect(t.getByPlaceholder('10-digit mobile').first()).toHaveValue(BUYER.mobile);
+    await expect(t.getByPlaceholder('10-digit mobile').first()).toHaveValue(shownMobile(BUYER.mobile));
     await t.getByPlaceholder('As per identity proof').first().fill('Latha Nair');
     await pickDate(page, '[data-err="t0dob"]', '1995-01-01');
     await t.getByPlaceholder('ABCDE1234F').first().fill('PQRSX6789K');

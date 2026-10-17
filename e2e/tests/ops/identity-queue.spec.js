@@ -62,7 +62,8 @@ test('the queue shows 10 cases a page with the total, and pages on the server', 
   await expect(page.getByTestId('kyc-count-needs')).toHaveText('23');
   await expect(page.getByTestId('kyc-count-qa')).toHaveText('2');
   await expect(page.getByTestId('kyc-count-decided')).toHaveText('40');
-  expect(desk.last()).toMatchObject({ status: 'pending', page: '0', size: '10', sort: 'oldest' });
+  expect(desk.last()).toMatchObject({ status: 'pending', page: '0', size: '10', sort: 'newest' });
+  await expect(page.getByRole('group', { name: 'Sort' })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Next page' }).first().click();
   await expect(page.getByTestId('queue-range').first()).toHaveText('11–20 of 23');
@@ -91,7 +92,6 @@ test('every filter is a server query, and each tab only sends its own', async ({
   await page.getByRole('button', { name: /Overdue 4/ }).click();
   await expect.poll(() => desk.last().overdue).toBe('true');
 
-  await page.getByRole('group', { name: 'Sort' }).getByRole('button', { name: 'Newest' }).click();
   await expect.poll(() => desk.last()).toMatchObject({ status: 'pending', q: 'Asha', docType: 'pan', claim: 'unclaimed', overdue: 'true', sort: 'newest', page: '0' });
 
   await page.getByRole('tab', { name: /^Decided/ }).click();
@@ -103,7 +103,7 @@ test('every filter is a server query, and each tab only sends its own', async ({
   await expect.poll(() => desk.last().outcome).toBe('revoked');
 
   await page.getByRole('tab', { name: /^QA sample/ }).click();
-  await expect.poll(() => desk.last()).toMatchObject({ status: 'qa', sort: 'oldest' });
+  await expect.poll(() => desk.last()).toMatchObject({ status: 'qa', sort: 'newest' });
   expect(desk.last()).not.toHaveProperty('outcome');
   expect(consoleErrors).toEqual([]);
 });
@@ -126,7 +126,13 @@ test('a case opens with evidence beside the fields, a checklist gating approve, 
   await history.locator('summary').click();
   await expect(history.getByText(/Blurry image — Earlier attempt was blurry\./)).toBeVisible();
 
-  await dialog.getByLabel('Document number').fill('1234');
+  const docNumber = dialog.getByLabel('Document number');
+  await docNumber.fill('97945664164646');
+  await expect(docNumber, 'Aadhaar is grouped 4-4-4 and stops at 12 digits').toHaveValue('9794 5664 1646');
+  await docNumber.evaluate((el) => el.setSelectionRange(5, 5));
+  await docNumber.press('Backspace');
+  await expect(docNumber, 'backspace over a group space removes the digit before it').toHaveValue('9795 6641 646');
+  await docNumber.fill('1234');
   await dialog.getByLabel('Holder name').fill('Applicant 1');
   await pickDate(dialog.page(), '[aria-label="Date of birth"]:visible', '1990-01-01');
   await dialog.getByTestId('ops-identity-pose-confirmed').check();

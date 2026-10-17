@@ -8,7 +8,7 @@ export default function CommunicationLog({ commsOpen, setCommsOpen, commsLog, lo
       <button type="button" aria-expanded={commsOpen} onClick={() => setCommsOpen(!commsOpen)} className="flex w-full items-center justify-between text-sm font-semibold text-gray-200">
         <span className="flex items-center gap-2">
           <History className="h-4 w-4 text-indigo-400" /> Communication log
-          {loaded ? <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">{commsLog.length}</span> : null}
+          {loaded ? <span className="dz-count bg-indigo-500/15 text-indigo-300">{commsLog.length}</span> : null}
         </span>
         <span className="text-xs font-medium text-teal-300">{commsOpen ? 'Hide' : 'Show timeline'}</span>
       </button>

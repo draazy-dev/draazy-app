@@ -57,7 +57,7 @@ test.describe('Listings platform layer', () => {
   test('the browser does not run its own pull-to-refresh next to the app one', async ({ page }) => {
     await page.goto('/listings');
     const root = await page.evaluate(() => getComputedStyle(document.documentElement).overscrollBehaviorY);
-    /* `usePullToRefresh` skips its preventDefault once the gesture is no longer cancellable, so a
+    /* `usePullToRefresh` skips its preventDefault once the gesture is not cancellable, so a
        fast flick arms both indicators. Root, not body: `overflow-x: clip` blocks propagation. */
     expect(root, 'Chrome would otherwise refresh the page under the app indicator').toBe('contain');
   });
@@ -100,10 +100,10 @@ test.describe('Listings platform layer', () => {
   test('the drawer keeps its primary action clear of the home indicator', async ({ page }) => {
     await withConsent(page);
     await openDrawer(page);
-    const declared = await declaredOn(page, '[data-testid="filter-drawer-actions"]');
-    expect(declared, 'the drawer action bar was not on screen').not.toBeNull();
-    /* The computed value is 12px here and on a notched iPhone alike — emulation reports a 0 inset —
-       so only the declaration distinguishes a bar that clears the gesture zone from one that does not. */
-    expect(declared, '"Show N results" would sit under the gesture bar').toContain('--dz-safe-b');
+    const declared = await declaredOn(page, '.filter-panel.open');
+    expect(declared, 'the drawer was not on screen').not.toBeNull();
+    /* Emulation reports a 0 safe-area inset, so only the declaration proves the card floats above the gesture
+       zone; --dz-float-bottom is never less than --dz-safe-b. */
+    expect(declared, '"Show N results" would sit under the gesture bar').toContain('--dz-float-bottom');
   });
 });

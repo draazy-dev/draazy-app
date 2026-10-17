@@ -35,7 +35,7 @@ export default function PoliceIntimation({ request, onUpdated, onError }) {
             confirms they submitted it to the relevant commissionerate.
           </p>
         </div>
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${existing.confirmed ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200'}`}>
+        <span className={`dz-tag font-semibold ${existing.confirmed ? 'bg-emerald-500/15 text-emerald-200' : 'bg-amber-500/15 text-amber-200'}`}>
           {existing.confirmed ? <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" /> : <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />}
           {existing.confirmed ? 'Confirmed' : 'Pending'}
         </span>

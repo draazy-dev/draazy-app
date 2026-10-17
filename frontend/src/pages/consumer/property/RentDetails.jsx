@@ -211,7 +211,7 @@ export function RentDetails({ p }) {
           </div>
 
           <div className="mt-auto space-y-2">
-            <Link to="/services/rent-agreement" className="w-full block text-center py-2.5 rounded-xl border border-brand-teal-2/40 text-brand-teal-3 text-sm font-semibold hover:bg-brand-teal-1/10 transition-smooth">{tr('property.getRentAgreement')}</Link>
+            <Link to="/services/rent-agreement" className="h-btn w-full flex items-center justify-center rounded-xl border border-brand-teal-2/40 text-brand-teal-3 text-sm font-semibold hover:bg-brand-teal-1/10 transition-smooth">{tr('property.getRentAgreement')}</Link>
           </div>
         </div>
       </div>

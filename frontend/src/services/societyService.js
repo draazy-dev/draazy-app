@@ -4,9 +4,10 @@ import { isBlacklisted } from '../lib/geoConfig.js';
 
 const provider = createProvider('society');
 
-/** Ranked type-ahead (max 20 rows): locality match, then alphabetical, so callers cannot rank per mode. */
-export const searchSocieties = async (query, localityLabel = '') => {
-  const rows = await (await provider()).searchSocieties(query, localityLabel);
+/** Ranked type-ahead (max 20 rows): locality match, then alphabetical, so callers cannot rank per mode.
+ * `mapped` keeps only societies someone picked from Google Maps. */
+export const searchSocieties = async (query, localityLabel = '', { mapped = false } = {}) => {
+  const rows = await (await provider()).searchSocieties(query, { mapped });
   const locSlug = localityLabel ? localityLabel.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') : '';
   const locHead = locSlug.split('-')[0];
   const locMatch = (s) =>

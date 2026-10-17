@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
+import IdInput from '../IdInput.jsx';
 import BadgeRequestCard from './BadgeRequestCard.jsx';
 import AgreementPerks from './AgreementPerks.jsx';
 import PropertyImage from '../ui/PropertyImage.jsx';
@@ -14,6 +15,7 @@ import { formatSize, checklistFromDocs, DOC_CATEGORIES, docInfo } from '../../li
 import { listDocuments, uploadDocument, deleteDocument, listDocRequests, respondDocRequest, getDocumentUrl } from '../../services/documentService.js';
 import { generateRentReceipts, fyStart, thisMonth } from '../../lib/data/rentReceiptGen.js';
 import { myTenancies, myRentAgreements } from '../../services/rentService.js';
+import { monthLabel, monthOptions } from '../../lib/toolCalc.js';
 import { toRentalCards } from '../../lib/data/tenancy.js';
 import { openDocFrom } from '../../lib/openDoc.js';
 import { DOCUMENT_ACCEPT, DOCUMENT_GUIDANCE_KEY, PDF_GUIDANCE_KEY } from '../../lib/uploads/policy.js';
@@ -136,7 +138,7 @@ function CategoryCard({ group, docs, open, onToggle, onUpload, onRemove, onView 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-white text-sm font-semibold truncate">{t(group.titleKey)}</p>
-            <span className={'text-[10px] px-2 py-0.5 rounded-full font-semibold ' + (complete ? 'bg-emerald-500/15 text-emerald-300' : done ? 'bg-amber-500/15 text-amber-300' : 'bg-white/[0.08] text-gray-400')}>{done}/{total}</span>
+            <span className={'dz-tag font-semibold ' + (complete ? 'bg-emerald-500/15 text-emerald-300' : done ? 'bg-amber-500/15 text-amber-300' : 'bg-white/[0.08] text-gray-400')}>{done}/{total}</span>
           </div>
           {group.subKey && <p className="text-gray-500 text-xs mt-0.5 truncate">{t(group.subKey)}</p>}
           <div className="mt-2 h-1 rounded-full bg-white/[0.08] overflow-hidden max-w-[240px]">
@@ -174,7 +176,7 @@ function PanelCard({ id, icon, tone, title, sub, badge, open, onToggle, children
   );
 }
 
-const pill = (cls, children) => <span className={'text-[10px] px-2 py-0.5 rounded-full font-semibold ' + cls}>{children}</span>;
+const pill = (cls, children) => <span className={'dz-tag font-semibold ' + cls}>{children}</span>;
 /* Shared renderer for a list of rent agreements, used by both the tenant "Personal" vault and the owner per-property
    vault so the two can never drift apart. */
 
@@ -217,7 +219,8 @@ function VaultSkeleton() {
 }
 
 export default function DocumentsTab({ user, listings, toast, isOwner = false }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const hraMonths = useMemo(() => monthOptions().map((v) => ({ value: v, label: monthLabel(v, i18n.language) })), [i18n.language]);
   /* Both caller-scoped, and the agreement list answers for either side of the lease — this tab renders an owner pack
      and a tenancy pack from the same list. */
   const propList = (listings || []).filter((listing) => !!listing.uuid);
@@ -567,12 +570,12 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
           <PanelCard id="hra" icon="receipt" tone="teal" title={t('dash.hraTitle')} sub={t('dash.hraSub')} open={!!openSections.hra} onToggle={toggle}>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.landlordName')} <span className="text-rose-400">*</span></span><input value={hraForm.landlordName} onChange={(e) => setHraForm({ ...hraForm, landlordName: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder={t('dash.landlordNamePh')} /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.landlordPan')}</span><input value={hraForm.landlordPan} onChange={(e) => setHraForm({ ...hraForm, landlordPan: e.target.value.toUpperCase() })} maxLength={10} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm uppercase" placeholder="ABCDE1234F" /></label>
+              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.landlordPan')}</span><IdInput kind="pan" value={hraForm.landlordPan} onChange={(v) => setHraForm({ ...hraForm, landlordPan: v })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder="ABCDE1234F" /></label>
               <label className="text-sm col-span-full"><span className="mb-1.5 block text-gray-400">{t('dash.landlordAddr')}</span><input value={hraForm.landlordAddr} onChange={(e) => setHraForm({ ...hraForm, landlordAddr: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder={t('dash.landlordAddrPh')} /></label>
               <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.tenantNameLbl')} <span className="text-rose-400">*</span></span><input value={hraForm.tenantName} onChange={(e) => setHraForm({ ...hraForm, tenantName: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.tenantPan')}</span><input value={hraForm.tenantPan} onChange={(e) => setHraForm({ ...hraForm, tenantPan: e.target.value.toUpperCase() })} maxLength={10} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm uppercase" placeholder="ABCDE1234F" /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.fromMonth')}</span><input type="month" value={hraForm.fromMonth} onChange={(e) => setHraForm({ ...hraForm, fromMonth: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" /></label>
-              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.toMonth')}</span><input type="month" value={hraForm.toMonth} onChange={(e) => setHraForm({ ...hraForm, toMonth: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" /></label>
+              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.tenantPan')}</span><IdInput kind="pan" value={hraForm.tenantPan} onChange={(v) => setHraForm({ ...hraForm, tenantPan: v })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder="ABCDE1234F" /></label>
+              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.fromMonth')}</span><Select value={hraForm.fromMonth} options={hraMonths} searchable={false} ariaLabel={t('dash.fromMonth')} onChange={(v) => setHraForm({ ...hraForm, fromMonth: v })} /></label>
+              <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.toMonth')}</span><Select value={hraForm.toMonth} options={hraMonths} searchable={false} ariaLabel={t('dash.toMonth')} onChange={(v) => setHraForm({ ...hraForm, toMonth: v })} /></label>
               <label className="text-sm"><span className="mb-1.5 block text-gray-400">{t('dash.monthlyRentLbl')} <span className="text-rose-400">*</span></span><input type="number" value={hraForm.rentAmt} onChange={(e) => setHraForm({ ...hraForm, rentAmt: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder="₹" /></label>
               <label className="text-sm col-span-full"><span className="mb-1.5 block text-gray-400">{t('dash.propertyAddr')} <span className="text-rose-400">*</span></span><input value={hraForm.propertyAddr} onChange={(e) => setHraForm({ ...hraForm, propertyAddr: e.target.value })} className="field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm" placeholder={t('dash.propertyAddrPh')} /></label>
             </div>

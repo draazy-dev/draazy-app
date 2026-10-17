@@ -71,9 +71,9 @@ test.describe('Property alerts (live)', () => {
     // count after the submit is unambiguous.
     expect(await savedSearchesOf(headers), 'a new account should hold no alerts').toEqual([]);
 
-    await test.step('the dashboard exposes the Saved surface that holds alerts', async () => {
+    await test.step('the dashboard exposes the Alerts surface', async () => {
       await page.goto('/dashboard');
-      await expect(page.getByRole('button', { name: 'Saved', exact: true }).first()).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Alerts', exact: true }).first()).toBeVisible();
     });
 
     const createBtn = await openEmptySearch(page, slug);
@@ -155,8 +155,8 @@ test.describe('Property alerts (live)', () => {
 
     await expect(page.getByText(label), 'the alert never appeared in the dashboard list').toBeVisible();
     const freq = page.getByTestId('alert-frequency').first();
-    // A row created with `daily` reads as `daily` rather than as an empty select: the picker
-    // replaced an on/off Switch, and a row that predates the column has no stored cadence at all.
+    // A row created with `daily` must read `daily`, not an empty select: a row that predates the column
+    // has no stored cadence at all.
     await expect(freq).toHaveValue('daily');
 
     for (const cadence of ['instant', 'weekly']) {

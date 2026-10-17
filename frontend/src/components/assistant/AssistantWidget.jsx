@@ -15,7 +15,6 @@ import {
   ROUTE_SUGGESTIONS,
   KB,
 } from '../../data/assistant.js';
-/* Draaz — the always-on help assistant. */
 
 /* Deliberately not migrated from the older `dz_nestor_*` keys: an existing thread is a transcript of a conversation
    with a differently-named bot. */
@@ -59,7 +58,6 @@ function loadMsgs() {
   } catch {}
   return [];
 }
-/* Turn a KB entry into a bot message. */
 
 function botFromEntry(entry, extra) {
   return { id: uid(), role: 'bot', text: entry.a, actions: entry.actions || [], ...extra };
@@ -76,8 +74,6 @@ export default function AssistantWidget() {
   const [input, setInput] = useState('');
   const [faqs, setFaqs] = useState([]);
   const [showNudge, setShowNudge] = useState(() => nudgeShows() < NUDGE_MAX_SHOWS);
-  // On phones the FAB and the full-width consent bar fight for the same corner,
-  // so the FAB yields to the consent UI there.
   const [cookieBar, setCookieBar] = useState(() => !getCookieConsent());
 
   const threadRef = useRef(null);
@@ -93,26 +89,22 @@ export default function AssistantWidget() {
     faqsRequested.current = true;
     listFaqs().then((f) => setFaqs(f || [])).catch(() => {});
   }, [open]);
-  // Persist the thread across route changes / refresh within the session.
 
   useEffect(() => {
     try { sessionStorage.setItem(MSG_KEY, JSON.stringify(msgs)); } catch {}
   }, [msgs]);
-  // Seed the greeting the first time the panel opens with an empty thread.
 
   useEffect(() => {
     if (open && msgs.length === 0) {
       setMsgs([{ id: uid(), role: 'bot', text: ASSISTANT.greeting, quick: true }]);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps -- greeting should run only when opened
-  // Auto-scroll to the newest message; focus the composer on open.
 
   useEffect(() => {
     if (!open) return;
     threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: 'smooth' });
   }, [msgs, open]);
   useEffect(() => { if (open) inputRef.current?.focus(); }, [open]);
-  // Esc closes the panel.
 
   useEffect(() => {
     if (!open) return;
@@ -120,8 +112,6 @@ export default function AssistantWidget() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
-  // Track cookie-consent visibility (dispatched by CookieConsent) so the FAB can
-  // step aside on small screens while the user is choosing cookies.
 
   useEffect(() => {
     const onBar = (e) => setCookieBar(!!e.detail?.visible);
@@ -152,7 +142,6 @@ export default function AssistantWidget() {
   const openPanel = useCallback(() => { setOpen(true); dismissNudge(); }, [dismissNudge]);
 
   const push = useCallback((...m) => setMsgs((prev) => [...prev, ...m]), []);
-  // Core: answer a free-text (or chip) query from the KB.
 
   const ask = useCallback((text) => {
     const q = String(text || '').trim();
@@ -204,7 +193,6 @@ export default function AssistantWidget() {
   const resetThread = useCallback(() => {
     setMsgs([{ id: uid(), role: 'bot', text: ASSISTANT.greeting, quick: true }]);
   }, []);
-  // Context-aware suggestion chips for the current route (longest-prefix match).
 
   const suggestions = useMemo(() => {
     const key = Object.keys(ROUTE_SUGGESTIONS)
@@ -232,8 +220,7 @@ export default function AssistantWidget() {
   // the FAB there while the consent UI is up (desktop keeps it — no overlap).
   const hideClass = cookieBar && !open ? 'max-sm:hidden' : '';
   const centerClass = open ? 'max-sm:left-4 max-sm:flex max-sm:justify-center' : '';
-  // Ops can hide the assistant via settings.flags.assistant (defaults on). Kept
-  // after all hooks so the hook order stays stable.
+  // Early returns stay after all hooks so the hook order is stable.
 
   if (pathname.startsWith('/messages')) return null;
   if (!flagEnabled('assistant')) return null;
@@ -271,7 +258,6 @@ export default function AssistantWidget() {
     </div>
   );
 }
-/* ── Floating action button + first-visit nudge ─────────────────────────────── */
 
 function Fab({ onOpen, showNudge, onDismissNudge, nudgeMuted }) {
   return (
@@ -301,7 +287,6 @@ function Fab({ onOpen, showNudge, onDismissNudge, nudgeMuted }) {
     </div>
   );
 }
-/* ── Chat panel ─────────────────────────────────────────────────────────────── */
 
 function Panel({
   msgs, threadRef, inputRef, input, setInput, onSubmit,
@@ -317,7 +302,6 @@ function Panel({
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-0 h-16 overflow-hidden">
         <div className="absolute -top-14 left-1/2 h-28 w-64 -translate-x-1/2 rounded-full bg-teal-500/15 blur-3xl" />
       </div>
-      {/* Header */}
 
       <header className="relative z-10 flex items-center gap-3 bg-gradient-to-b from-white/[0.06] to-transparent px-4 py-3.5">
         <span className="relative flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-teal-600 to-teal-500 shadow-lg shadow-teal-500/30">
@@ -342,13 +326,11 @@ function Panel({
         </button>
       </header>
 
-      {/* Thread */}
       <div ref={threadRef} className="relative z-10 flex-1 space-y-3.5 overflow-y-auto overscroll-contain px-4 py-4">
         {msgs.map((m) => (
           <Bubble key={m.id} m={m} onAction={onAction} />
         ))}
       </div>
-      {/* Contextual suggestion chips */}
 
       {suggestions.length ? (
         <div className="relative z-10 px-3 pt-2.5">
@@ -357,7 +339,7 @@ function Panel({
               <button
                 key={e.id}
                 onClick={() => onSuggest(e)}
-                className="rounded-full bg-white/[0.05] px-3 py-1.5 text-[11.5px] font-medium text-gray-300 transition hover:bg-white/10 hover:text-white cursor-pointer"
+                className="dz-chip bg-white/[0.05] text-gray-300 hover:bg-white/10 hover:text-white"
               >
                 {e.q}
               </button>
@@ -365,7 +347,6 @@ function Panel({
           </div>
         </div>
       ) : null}
-      {/* Composer */}
 
       <div aria-hidden className="relative z-10 mx-4 mt-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
       <form onSubmit={onSubmit} className="relative z-10 flex items-center gap-2 p-3">
@@ -389,7 +370,6 @@ function Panel({
     </div>
   );
 }
-/* ── One message bubble (+ its action / related / escalation chips) ──────────── */
 
 function Bubble({ m, onAction }) {
   const isUser = m.role === 'user';
@@ -428,7 +408,6 @@ function Bubble({ m, onAction }) {
           ))}
         </div>
       ) : null}
-      {/* Show the quick-start actions right under the very first greeting. */}
 
       {!isUser && m.quick ? (
         <div className="flex flex-wrap gap-1.5">
@@ -446,7 +425,7 @@ function ActionChip({ a, onAction, subtle }) {
     <button
       onClick={() => onAction(a)}
       className={
-        'inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition cursor-pointer ' +
+        'dz-chip ' +
         (subtle
           ? 'bg-white/[0.05] text-gray-300 hover:bg-white/10 hover:text-white'
           : 'bg-teal-400/[0.14] text-teal-100 shadow-[inset_0_1px_0_rgb(var(--dz-c-white)/0.08)] hover:bg-teal-400/25')

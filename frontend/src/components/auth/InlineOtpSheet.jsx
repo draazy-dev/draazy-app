@@ -162,7 +162,7 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
       {verifying ? <><Loader2 className="w-5 h-5 animate-spin" /> {t('auth.verifying')}</> : <>{t('auth.verifyAndSignIn')} <ArrowRight className="w-4 h-4" /></>}
     </button>
   ) : (
-    <button type="submit" form={INLINE_OTP_FORM_ID} disabled={otp.sending} className="send-otp-btn w-full min-h-[48px] rounded-xl border border-teal-400/30 bg-teal-400/10 text-teal-300 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
+    <button type="submit" form={INLINE_OTP_FORM_ID} disabled={otp.sending} className="send-otp-btn w-full h-btn-lg rounded-xl border border-teal-400/30 bg-teal-400/10 text-teal-300 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-60">
       {otp.sending ? <><Loader2 className="w-5 h-5 animate-spin" /> {t('auth.sending')}</> : <><Send className="w-4 h-4" /> {t('auth.sendOtp')}</>}
     </button>
   );

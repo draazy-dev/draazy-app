@@ -136,7 +136,6 @@ export default function MapsGeoPanel({
     east: toNum(bounds.east), west: toNum(bounds.west),
   };
 
-  // Sync the editable form whenever the selected city (or its persisted override) changes.
   useEffect(() => {
     const v = cityValues(geo, city);
     setCenter({ lat: num(v.center.lat), lng: num(v.center.lng) });
@@ -204,7 +203,6 @@ export default function MapsGeoPanel({
 
   return (
     <div className="space-y-5">
-      {/* City limit toggle */}
       <div className="dz-card p-5">
         <div className="flex items-center justify-between gap-4">
           <div className="min-w-0">
@@ -222,7 +220,6 @@ export default function MapsGeoPanel({
         </div>
       </div>
 
-      {/* Per-city coverage */}
       <div className="dz-card p-5">
         <div className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-brand-teal" />
@@ -261,7 +258,6 @@ export default function MapsGeoPanel({
           </p>
         )}
 
-        {/* Launch status for the selected city */}
         {selectedRow && (
         <div className="mb-5 flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -288,7 +284,6 @@ export default function MapsGeoPanel({
         </div>
         )}
 
-        {/* Visual boundary editor — drag/search to set the box; syncs with the fields below. */}
         <div className="mb-5">
           <MapBoundaryEditor center={centerNum} bounds={boundsNum} onChange={applyGeo} />
         </div>
@@ -325,7 +320,6 @@ export default function MapsGeoPanel({
         {coverageError ? <p role="alert" className="mt-3 text-xs text-rose-300">{coverageError}</p> : null}
       </div>
 
-      {/* Blacklist */}
       <div className="dz-card p-5">
         <div className="flex items-center gap-2">
           <Ban className="h-4 w-4 text-rose-400" />
@@ -336,12 +330,10 @@ export default function MapsGeoPanel({
           (consumer search, filters, list-property, and society pickers).
         </p>
 
-        {/* Exact-place blacklist (recommended) — pick a specific place so only IT is hidden. */}
         <div className="mb-3">
           <BlacklistPlaceSearch onPick={addBlacklistPlace} />
         </div>
 
-        {/* Free-text term fallback. */}
         <div className="flex flex-col gap-2 sm:flex-row">
           <input
             value={term}
@@ -375,7 +367,7 @@ export default function MapsGeoPanel({
                 <div className="min-w-0">
                   <span className="text-sm font-medium text-gray-200">{b.term}</span>
                   {b.placeId ? (
-                    <span className="ml-2 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-semibold text-brand-teal" style={{ background: 'rgb(var(--dz-c-teal-500) / 0.12)' }}>
+                    <span className="dz-tag ml-2 font-semibold text-brand-teal" style={{ background: 'rgb(var(--dz-c-teal-500) / 0.12)' }}>
                       <MapPin className="h-3 w-3" /> exact place
                     </span>
                   ) : null}

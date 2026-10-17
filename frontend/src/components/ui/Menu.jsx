@@ -6,18 +6,8 @@ import useSheetViewport from '../../lib/useSheetViewport.js';
 import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
 import Icon from '../Icon.jsx';
 
-/**
- * Compact overflow ("More") menu. A kebab trigger opens a small themed panel of
- * actions, portaled to <body> so it escapes any card overflow/stacking trap and
- * flips up near the viewport edge — the same anchoring approach as Select.
- *
- * @param {object} props
- * @param {Array<{icon?: string, label: string, onClick?: () => void, href?: string,
- *   to?: string, tone?: 'default'|'danger', disabled?: boolean, divider?: boolean}>} props.items
- * @param {string} [props.ariaLabel] - Defaults to the translated "More actions".
- * @param {string} [props.className] - Extra classes on the trigger.
- * @param {(to: string) => void} [props.onNavigate] - Called for items with `to` (router push).
- */
+/* Portaled to <body> so the panel escapes card overflow/stacking traps; items take
+   { icon, label, onClick | href | to, tone, disabled, divider }. */
 export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
   const { t } = useTranslation();
   const menuLabel = ariaLabel || t('ui.moreActions');
@@ -25,9 +15,8 @@ export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
   const rootRef = useRef(null);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
-  /* On phones a kebab panel anchored to a table row is a cluster of ~32px targets
-     in whichever corner the row happens to be. Below 640px the same items become
-     a bottom action sheet: full-width rows in the thumb arc. */
+  /* Below 640px an anchored kebab panel is a cluster of ~32px targets in a random corner,
+     so the items become a floating action card of full-width rows instead. */
   const sheet = useSheetViewport();
 
   const close = useCallback(() => setOpen(false), []);
@@ -90,7 +79,7 @@ export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
     else if (it.onClick) it.onClick();
   };
 
-  /* Drag the sheet's grab handle down to dismiss. Mobile-only by construction. */
+  /* Drag the card's top edge down to dismiss. Mobile-only by construction. */
   const swipe = useSwipeDismiss(close);
 
   return (
@@ -114,8 +103,7 @@ export default function Menu({ items = [], ariaLabel, className, onNavigate }) {
       {open && typeof document !== 'undefined'
         ? createPortal(
             <>
-              {/* Scrim: a sheet is a modal surface, so the page behind it has to
-                  read as dismissed rather than merely covered. */}
+              {/* The card is a modal surface, so the page behind it must read as dismissed. */}
               {sheet ? <div className="dz-dropdown__scrim" onClick={close} aria-hidden="true" /> : null}
               <div
                 ref={menuRef}

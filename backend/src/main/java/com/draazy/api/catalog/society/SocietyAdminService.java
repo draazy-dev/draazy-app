@@ -28,7 +28,7 @@ public class SocietyAdminService {
     @Transactional(readOnly = true)
     public Page<SocietyDirectoryRow> directory(String q, Pageable pageable) {
         Pageable page = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by("name", "slug"));
-        return societies.findAll(SocietySpecs.browse(q, null, null), page).map(SocietyDirectoryRow::of);
+        return societies.findAll(SocietySpecs.browse(q, null, null, null), page).map(SocietyDirectoryRow::of);
     }
 
     /** Read-only, so no audit entry: reading destroys no evidence, and a log of every glance goes unread. */

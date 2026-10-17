@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag, shownMobile } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const createdListings = new Map();
@@ -179,7 +179,7 @@ test('an owner can decline a real finalization request and later accept the buye
   expect(closed.body.dealStatus).toBe('closed');
 });
 
-test('an offer far below asking is refused, a typed minus is not stripped, and nothing sends', async ({ page }) => {
+test('an offer field keeps digits only, shows Indian grouping, and refuses an offer below half the asking price', async ({ page }) => {
   const owner = await newActor(`Zztest Floor Owner ${letterTag()}`);
   const buyer = await newActor(`Zztest Floor Buyer ${letterTag()}`);
   const listing = await createApprovedListing(owner);
@@ -195,15 +195,19 @@ test('an offer far below asking is refused, a typed minus is not stripped, and n
   let offerPosts = 0;
   page.on('request', (req) => { if (new URL(req.url()).pathname === '/api/offers' && req.method() === 'POST') offerPosts += 1; });
 
-  await offerInput.fill('-5');
   await page.getByRole('button', { name: 'Send offer' }).click();
-  await expect(page.getByText('Use numbers only, with no minus sign or symbols.')).toBeVisible();
-  await expect(offerInput).toHaveValue('-5');
+  await expect(page.getByText('Enter an offer amount.')).toBeVisible();
+
+  await offerInput.pressSequentially('-1a00');
+  await expect(offerInput).toHaveValue('100');
+  await page.getByRole('button', { name: 'Send offer' }).click();
+  await expect(page.getByText('Offer at least ₹14,000, half the asking price of ₹28,000.')).toBeVisible();
   expect(offerPosts).toBe(0);
 
-  await offerInput.fill('100');
-  await page.getByRole('button', { name: 'Send offer' }).click();
-  await expect(page.getByText(/half the asking price/)).toBeVisible();
+  await offerInput.fill('2500000');
+  await expect(offerInput).toHaveValue('25,00,000');
+  await expect(page.getByText('≈ ₹ 25 Lakh')).toBeVisible();
+  await expect(page.getByText(/half the asking price/)).toHaveCount(0);
   expect((await contentFrom(buyer, '/offers/mine?size=50', 'reading the buyer offer book')).length).toBe(0);
 });
 
@@ -251,7 +255,7 @@ test('after the owner accepts: no Revise button, the finalize price is the offer
   expect(tenancies.body.map((t) => t.status)).toEqual(['pending']);
 });
 
-test('Finalize rental explains a bad mobile, defaults to the local date and fires once on a double-click', async ({ page }) => {
+test('Finalize rental validates each field, defaults to the local date and fires once on a double-click', async ({ page }) => {
   const owner = await newActor(`Zztest Modal Owner ${letterTag()}`);
   const tenant = await newActor(`Zztest Modal Tenant ${letterTag()}`);
   await createApprovedListing(owner);
@@ -260,10 +264,23 @@ test('Finalize rental explains a bad mobile, defaults to the local date and fire
   await page.goto('/dashboard#properties');
   await page.getByRole('button', { name: /Finalize rental/ }).first().click();
   const modal = page.getByRole('dialog');
-  await modal.getByPlaceholder('Full name').fill('Asha');
+  const price = modal.getByPlaceholder('e.g. 25,000');
+  await expect(price).toHaveValue('28,000');
+  await price.fill('');
   await modal.getByRole('button', { name: /Confirm & Finalize/ }).click();
+  await expect(modal.getByText("Enter the tenant's full name, letters only.")).toBeVisible();
   await expect(modal.getByText('Enter the 10-digit mobile number of the tenant.')).toBeVisible();
-  await modal.getByPlaceholder('10-digit mobile').fill('12345');
+  await expect(modal.getByText('Enter the final rent.')).toBeVisible();
+
+  await modal.getByPlaceholder('Full name').fill('Asha');
+  await expect(modal.getByText("Enter the tenant's full name, letters only.")).toHaveCount(0);
+  await price.pressSequentially('28000');
+  await expect(price).toHaveValue('28,000');
+  await expect(modal.getByText('Enter the final rent.')).toHaveCount(0);
+  const mobile = modal.getByPlaceholder('10-digit mobile');
+  await mobile.pressSequentially('98-76x5432101234');
+  await expect(mobile).toHaveValue(shownMobile('9876543210'));
+  await mobile.fill('12345');
   await modal.getByRole('button', { name: /Confirm & Finalize/ }).click();
   await expect(modal.getByText('Enter the 10-digit mobile number of the tenant.')).toBeVisible();
 

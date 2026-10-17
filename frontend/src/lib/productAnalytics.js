@@ -1,6 +1,10 @@
 import { CONSENT_CHANGE, hasAnalyticsConsent } from '../components/CookieConsent.jsx';
 
-const KEY = import.meta.env.VITE_POSTHOG_KEY || '';
+// Deployed builds only: a dev server or a `VITE_DEPLOY_ENV=local` build would spend the free quota.
+const DEPLOYED = import.meta.env.PROD
+  ? import.meta.env.VITE_DEPLOY_ENV !== 'local'
+  : import.meta.env.VITE_POSTHOG_IN_DEV === 'on';
+const KEY = (DEPLOYED && import.meta.env.VITE_POSTHOG_KEY) || '';
 const HOST = import.meta.env.VITE_POSTHOG_HOST || 'https://us.i.posthog.com';
 
 let client = null;
@@ -8,8 +12,8 @@ let replayPaused = false;
 
 const backOffice = (pathname) => /^\/(admin|ops|staff)\b/.test(pathname || '');
 
-/* Staff work on real people's records, and replay snapshots ignore paths while admin modals portal outside `ph-no-capture`,
-   so a session that enters the back office pauses the recorder; PostHog's history patch fires this before React mounts. */
+/* Replay ignores paths and admin modals portal outside `ph-no-capture`, so entering the back office (real people's
+   records) pauses the recorder. PostHog's history patch fires this before React mounts. */
 const keepOutOfBackOffice = (posthog) => (event) => {
   const inBackOffice = backOffice(window.location.pathname);
   if (inBackOffice !== replayPaused) {

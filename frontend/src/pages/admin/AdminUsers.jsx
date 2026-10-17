@@ -399,7 +399,7 @@ export default function AdminUsers() {
               <div className="flex items-center gap-2 text-sm font-bold text-gray-200">
                 <MessageSquareText className="h-4 w-4 text-indigo-400" /> Staff notes
                 {userNotes && (
-                  <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">{userNotes.length}</span>
+                  <span className="dz-count bg-indigo-500/15 text-indigo-300">{userNotes.length}</span>
                 )}
               </div>
               <div className="mt-3 flex items-start gap-2">
