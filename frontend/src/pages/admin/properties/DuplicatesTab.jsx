@@ -5,6 +5,7 @@ import { listDuplicateClusters, mergeDuplicateCluster, dismissDuplicateCluster }
 import { useToast } from '../../../context/ToastContext.jsx';
 import { signalLabel } from './reviewReasons.js';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
+import Modal from '../../../components/ui/Modal.jsx';
 import { fmtINR } from '../../../lib/format.js';
 
 const fmtDate = (ts) => {
@@ -23,8 +24,8 @@ function ListingColumn({ listing: l, isNewest, onKeep, disabled }) {
         ) : (
           <div className="grid h-full place-items-center text-gray-600 text-xs">No photo</div>
         )}
-        {isNewest && <span className="absolute left-2 top-2 rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-bold text-ink">NEWEST</span>}
-        <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-mono text-gray-200">{l.id}</span>
+        {isNewest && <span className="dz-tag absolute left-2 top-2 bg-amber-500/90 font-bold text-ink">NEWEST</span>}
+        <span className="dz-tag absolute right-2 top-2 bg-black/60 font-mono text-gray-200">{l.id}</span>
       </div>
       <div className="flex flex-1 flex-col gap-2 p-3">
         <div className="flex items-start justify-between gap-2">
@@ -36,15 +37,15 @@ function ListingColumn({ listing: l, isNewest, onKeep, disabled }) {
         <p className="flex items-start gap-1.5 text-xs text-gray-400"><MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray-500" /> {addr}</p>
         <p className="flex items-center gap-1.5 text-xs text-gray-400"><Calendar className="h-3.5 w-3.5 text-gray-500" /> Listed {fmtDate(l.createdAt)}</p>
         <div className="flex items-center gap-2 text-[11px]">
-          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 capitalize text-gray-300">{l.status || 'pending'}</span>
-          {l.verified && <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-emerald-300"><ShieldCheck className="h-3 w-3" /> Verified</span>}
+          <span className="dz-tag border border-white/10 bg-white/5 capitalize text-gray-300">{l.status || 'pending'}</span>
+          {l.verified && <span className="dz-tag border border-emerald-500/25 bg-emerald-500/10 text-emerald-300"><ShieldCheck className="h-3 w-3" /> Verified</span>}
         </div>
         {onKeep ? (
           <button
             type="button"
             disabled={disabled}
             onClick={() => onKeep(l.id)}
-            className="mt-auto inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-teal px-3 py-2 text-xs font-semibold text-ink transition hover:brightness-110 disabled:opacity-50"
+            className="h-btn-sm mt-auto inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-teal px-3 text-xs font-semibold text-ink transition hover:brightness-110 disabled:opacity-50"
           >
             <Check className="h-4 w-4" /> Keep this, archive the rest
           </button>
@@ -58,6 +59,7 @@ export default function DuplicatesTab({ onRefresh, onCount, canModerate = true }
   const { toast } = useToast();
   const [state, setState] = useState({ status: 'loading', clusters: [], truncated: false, scanned: 0 });
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(null);
 
   const load = useCallback(async () => {
     try {
@@ -81,19 +83,21 @@ export default function DuplicatesTab({ onRefresh, onCount, canModerate = true }
 
   const reload = () => { load(); onRefresh?.(); };
 
-  const keepOne = async (cluster, keepId) => {
+  const keepOne = async ({ cluster, keepId }) => {
     if (busy) return;
     setBusy(true);
     try {
       const drops = cluster.listings.filter((l) => l.id !== keepId).map((l) => l.id);
       await mergeDuplicateCluster(keepId, drops);
-      toast(`Kept ${keepId}, archived ${drops.length} duplicate${drops.length !== 1 ? 's' : ''}`, 'success');
+      const kept = cluster.listings.find((l) => l.id === keepId);
+      toast(`Kept \u201C${kept?.title || 'the chosen listing'}\u201D, archived ${drops.length} duplicate${drops.length !== 1 ? 's' : ''}`, 'success');
       reload();
     } catch (err) {
       console.error('[DuplicatesTab] merge failed', err);
       toast('Could not archive those listings — nothing was changed', 'error');
     } finally {
       setBusy(false);
+      setConfirm(null);
     }
   };
 
@@ -162,17 +166,17 @@ export default function DuplicatesTab({ onRefresh, onCount, canModerate = true }
             <div key={cluster.id} className="dz-card p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/25 bg-rose-500/10 px-3 py-1 text-xs font-medium text-rose-300">
+                  <span className="dz-tag border border-rose-500/25 bg-rose-500/10 font-medium text-rose-300">
                     <Copy className="h-3.5 w-3.5" /> {cluster.listings.length} listings · {cluster.reasonLabel || cluster.reason}
                   </span>
                   {cluster.sameOwner && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-500/25 bg-sky-500/10 px-3 py-1 text-xs font-medium text-sky-300">
+                    <span className="dz-tag border border-sky-500/25 bg-sky-500/10 font-medium text-sky-300">
                       <User className="h-3.5 w-3.5" /> same owner
                     </span>
                   )}
                   {(cluster.hints || []).map((hint) => (
                     <span key={`${cluster.id}:${hint.code}`} title={hint.detail || signalLabel(hint.code)}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-medium text-gray-300">
+                      className="dz-tag border border-white/10 bg-white/5 font-medium text-gray-300">
                       {signalLabel(hint.code)}
                     </span>
                   ))}
@@ -190,13 +194,33 @@ export default function DuplicatesTab({ onRefresh, onCount, canModerate = true }
               </div>
               <div className="flex flex-wrap gap-3">
                 {cluster.listings.map((l, i) => (
-                  <ListingColumn key={l.id} listing={l} isNewest={i === 0} onKeep={canModerate ? (id) => keepOne(cluster, id) : null} disabled={busy} />
+                  <ListingColumn key={l.id} listing={l} isNewest={i === 0} onKeep={canModerate ? (id) => setConfirm({ cluster, keepId: id }) : null} disabled={busy} />
                 ))}
               </div>
             </div>
           ))}
         </div>
       )}
+
+      <Modal
+        open={!!confirm}
+        onClose={() => setConfirm(null)}
+        size="sm"
+        title="Archive the other listings?"
+        footer={(
+          <>
+            <button type="button" onClick={() => setConfirm(null)} className="dz-btn dz-btn-ghost">Cancel</button>
+            <button type="button" data-testid="confirm-keep" disabled={busy} onClick={() => keepOne(confirm)} className="dz-btn dz-btn-danger disabled:opacity-50">Keep this, archive the rest</button>
+          </>
+        )}
+      >
+        {confirm ? (
+          <p className="text-sm leading-relaxed text-gray-300">
+            Keep {'\u201C'}{confirm.cluster.listings.find((l) => l.id === confirm.keepId)?.title || 'this listing'}{'\u201D'} and archive{' '}
+            {confirm.cluster.listings.length - 1} other{confirm.cluster.listings.length - 1 !== 1 ? 's' : ''}. They leave search; you can restore them from All listings.
+          </p>
+        ) : null}
+      </Modal>
     </div>
   );
 }

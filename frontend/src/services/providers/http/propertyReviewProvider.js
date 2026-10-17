@@ -58,6 +58,11 @@ export async function startPropertyReview(propertyId, { markRead = false } = {})
   return toCaseFile(await post(`${caseFilePath(propertyId)}${markRead ? '?markRead=true' : ''}`));
 }
 
+/** Moves a pending listing to In review and stamps the reviewer; idempotent, 403 for the maker. */
+export async function beginPropertyReview(propertyId) {
+  return toCaseFile(await post(`${caseFilePath(propertyId)}/start`));
+}
+
 export async function addPropertyReviewMessage(propertyId, body, clarificationRequested = false) {
   return toCaseFile(await post(`${caseFilePath(propertyId)}/messages`, { body, clarificationRequested }));
 }

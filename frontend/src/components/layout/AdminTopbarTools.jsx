@@ -95,7 +95,6 @@ const FEATURES_INDEX = [
   { label: 'Areas', keywords: 'areas localities locality retire restore registry community', path: '/admin/places?tab=areas', parent: 'Places', flag: null },
   { label: 'Duplicate Societies', keywords: 'society candidates merge duplicate minted community', path: '/admin/places?tab=duplicates', parent: 'Places', flag: null },
   { label: 'Society Details', keywords: 'society directory catalogue edit registration conveyance maintenance', path: '/admin/places?tab=societies', parent: 'Places', flag: null },
-  /* Three Dashboard entries stood here — Smart Alerts, SLA Health and Daily Scorecard. */
 
   { label: 'Team Performance', keywords: 'staff kpi performance metrics summary leaderboard turnaround', path: '/admin/staff-activity?tab=performance', parent: 'Team Activity', flag: null },
 
@@ -117,7 +116,6 @@ function useOutside(refs, onOutside, active) {
     return () => document.removeEventListener('mousedown', onDown);
   }, [refs, onOutside, active]);
 }
-/* Fixed, because all four are answerable on every deployment now. */
 
 const FILTER_CHIPS = [
   { key: 'all', label: 'All' },
@@ -125,7 +123,7 @@ const FILTER_CHIPS = [
   { key: 'listings', label: 'Listings' },
   { key: 'users', label: 'People' },
 ];
-/** Listing moderation statuses, which are the only ones this palette renders now. */
+/** Listing moderation statuses, the only ones this palette renders. */
 
 function StatusPill({ status }) {
   const colors = {
@@ -135,7 +133,7 @@ function StatusPill({ status }) {
     archived: 'bg-white/10 text-gray-400',
   };
   return (
-    <span className={'shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ' + (colors[status] || 'bg-white/10 text-gray-400')}>
+    <span className={'dz-tag font-semibold ' + (colors[status] || 'bg-white/10 text-gray-400')}>
       {status}
     </span>
   );
@@ -204,7 +202,6 @@ export default function AdminTopbarTools() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
-  /* Pages and features only. */
 
   const nav = useMemo(() => {
     const term = q.trim().toLowerCase();
@@ -218,7 +215,6 @@ export default function AdminTopbarTools() {
       : [];
     return { pages: pages.slice(0, 4), features: features.slice(0, 8), pageCount: pages.length, featureCount: features.length };
   }, [q, filter, NAV_INDEX, FEATURES]);
-  /* Listings and people, over the seam. */
 
   const [remote, setRemote] = useState(NO_RESULTS);
 
@@ -241,7 +237,6 @@ export default function AdminTopbarTools() {
         listings: listings.status === 'fulfilled' ? (listings.value.items || []) : [],
         listingsTotal: listings.status === 'fulfilled' ? (listings.value.total || 0) : 0,
         users: people.status === 'fulfilled' ? (people.value.items || []) : [],
-        /* Named, never silently empty. */
         usersTotal: people.status === 'fulfilled' ? (people.value.total || 0) : 0,
         failed: [
           ...(listings.status === 'rejected' ? ['listings'] : []),
@@ -340,7 +335,6 @@ export default function AdminTopbarTools() {
   const roleIcon = (role) => (role === 'staff' ? Wrench : role === 'owner' ? ShieldCheck : User);
 
   return (
-      /* Global search */
     <div className="flex items-center gap-3 flex-1 ml-2">
       <div className="relative flex-1 max-w-md" ref={searchRef}>
         <div className={(phoneSearch ? 'flex' : 'hidden') + ' items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.06] px-3.5 py-2 sm:flex hover:border-white/20 focus-within:border-teal-500/40 focus-within:bg-white/[0.08] transition-all'}>
@@ -355,7 +349,7 @@ export default function AdminTopbarTools() {
             className="flex-1 bg-transparent text-sm text-white placeholder-gray-500 outline-none"
             aria-label="Global search"
           />
-          <kbd className="hidden lg:inline-flex items-center rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">Ctrl+K</kbd>
+          <kbd className="hidden lg:inline-flex items-center rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] font-medium text-gray-400">Ctrl+K</kbd>
         </div>
           <button onClick={() => setPhoneSearch(true)} className={(phoneSearch ? 'hidden' : 'grid') + ' h-11 w-11 place-items-center rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:text-white sm:hidden'} aria-label="Search">
           <Search className="h-4 w-4" />

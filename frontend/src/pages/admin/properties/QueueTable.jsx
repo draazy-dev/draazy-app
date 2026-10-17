@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Archive, Bell, CheckCircle, ClipboardCheck, Clock, Eye, Flag, MapPin, Pencil, RotateCcw, XCircle } from 'lucide-react';
 import { fmtArea, fmtINR, fmtNum, isSqftUnit, classNames } from '../../../lib/format.js';
 import Badge from '../../../components/ui/Badge.jsx';
@@ -69,14 +70,14 @@ function RowChips({ listing: l, ownerReplied, hasPhoto }) {
         </span>
       ))}
       {soft.length > 2 ? (
-        <span className="text-[10px] text-gray-500" title={soft.slice(2).map((item) => signalLabel(item.code)).join(', ')}>+{soft.length - 2}</span>
+        <span className="text-[10px] text-gray-400" title={soft.slice(2).map((item) => signalLabel(item.code)).join(', ')}>+{soft.length - 2}</span>
       ) : null}
       {l.recheckPending ? (
-        <span data-testid="recheck-strip" className={classNames(CHIP, 'border-sky-400/30 bg-sky-500/10 text-sky-200')}>
+        <span data-testid="recheck-strip" className={classNames(CHIP, 'min-w-0 max-w-full whitespace-normal break-words border-sky-400/30 bg-sky-500/10 text-sky-200')}>
           {onlySeeksOwnershipBadge(l) ? 'Badge request' : 'Re-check'}:&nbsp;<span data-testid="recheck-fields" className="font-medium">{l.recheckReason || 'unspecified fields'}</span>
         </span>
       ) : null}
-      {l.reminderCount > 0 ? <span className="text-[10px] text-gray-500">Reminded {'\u00D7'}{l.reminderCount}</span> : null}
+      {l.reminderCount > 0 ? <span className="text-[10px] text-gray-400">Reminded {'\u00D7'}{l.reminderCount}</span> : null}
     </div>
   );
 }
@@ -84,6 +85,7 @@ function RowChips({ listing: l, ownerReplied, hasPhoto }) {
 // The slot keeps its height when empty so price and icons sit at the same spot on every tile.
 function PrimaryActions({ listing: l, actions }) {
   const recheck = l.recheckPending && !onlySeeksOwnershipBadge(l);
+  if (l.archived) return <div className="min-h-9 max-md:hidden" />;
   return (
     <div className="flex min-h-9 flex-wrap items-start justify-end gap-1.5 max-md:justify-start">
       {(l.status === 'pending' || seeksOwnershipBadge(l)) && actions.onReview ? (
@@ -107,18 +109,21 @@ function PrimaryActions({ listing: l, actions }) {
 
 function IconActions({ listing: l, actions }) {
   const recheck = l.recheckPending && !onlySeeksOwnershipBadge(l);
+  const editBlocked = actions.editBlocked?.(l);
   return (
     <div className="mt-auto flex flex-wrap items-center justify-end gap-1.5 pt-3 max-md:justify-start">
-      {actions.onReminder && (actions.reminderAlways || (l.postedByAdmin && l.status === 'pending')) ? (
+      {!l.archived && actions.onReminder && (actions.reminderAlways || (l.postedByAdmin && l.status === 'pending')) ? (
         <IconAction label="Remind the owner on WhatsApp" onClick={() => actions.onReminder(l)} icon={Bell} />
       ) : null}
-      {recheck && actions.onRecheckFail ? (
+      {!l.archived && recheck && actions.onRecheckFail ? (
         <IconAction label={'Re-check failed \u2014 take the listing down'} onClick={() => actions.onRecheckFail(l)} icon={XCircle} testId="recheck-fail"
           className="hover:border-rose-400/40 hover:bg-rose-500/15 hover:text-rose-300" />
       ) : null}
       {actions.onView ? <IconAction label="View details" onClick={() => actions.onView(l)} icon={Eye} /> : null}
-      {actions.onEdit ? <IconAction label="Edit" onClick={() => actions.onEdit(l)} icon={Pencil} /> : null}
-      {l.status !== 'flagged' && actions.onFlag ? <IconAction label="Flag" onClick={() => actions.onFlag(l)} icon={Flag} /> : null}
+      {actions.onEdit ? (
+        <IconAction label="Edit" title={editBlocked ? `Edit unavailable \u2014 ${editBlocked}` : undefined} onClick={() => actions.onEdit(l)} icon={Pencil} disabled={Boolean(editBlocked)} testId="edit-listing" />
+      ) : null}
+      {!l.archived && l.status !== 'flagged' && actions.onFlag ? <IconAction label="Flag" onClick={() => actions.onFlag(l)} icon={Flag} /> : null}
       {l.archived && actions.onRestore ? (
         <IconAction label="Restore" onClick={() => actions.onRestore(l)} icon={RotateCcw} />
       ) : !l.archived && actions.onArchive ? (
@@ -133,20 +138,22 @@ const rowPhoto = (l) => l.image || (Array.isArray(l.gallery) ? l.gallery.find(Bo
 function QueueRow({ listing: l, tab, ownerReplied, actions, showScore }) {
   const photo = rowPhoto(l);
   const isRent = l.deal === 'rent';
+  const [more, setMore] = useState(false);
+  const moreCls = more ? undefined : 'max-md:hidden';
   return (
-    <li data-testid="queue-row" data-id={l.id} className="list-card glass overflow-hidden rounded-2xl transition hover:border-white/15">
-      <div className="lr">
+    <li data-testid="queue-row" data-id={l.id} className="list-card glass min-w-0 overflow-hidden rounded-2xl transition hover:border-white/15 max-md:[&_.lr-img]:h-28">
+      <div className="lr min-w-0">
         <div className="lr-img bg-white/5">
           {photo ? <PropertyImage src={photo} alt="" loading="lazy" /> : <NoPhotoPlaceholder className="h-full w-full" label="" />}
           <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
-            <span className={classNames('rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider backdrop-blur', isRent ? 'bg-teal-600/60 text-teal-50' : 'bg-emerald-600/60 text-emerald-50')}>
+            <span className={classNames('dz-tag font-bold uppercase tracking-wider backdrop-blur', isRent ? 'bg-teal-600/60 text-teal-50' : 'bg-emerald-600/60 text-emerald-50')}>
               {isRent ? 'Rent' : 'Sale'}
             </span>
-            {l.featured ? <span className="rounded bg-amber-500/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-50 backdrop-blur">Featured</span> : null}
+            {l.featured ? <span className="dz-tag bg-amber-500/60 font-bold uppercase tracking-wider text-amber-50 backdrop-blur">Featured</span> : null}
           </div>
         </div>
-        <div className="lr-body">
-          <div className="lr-info flex-1">
+        <div className="lr-body min-w-0">
+          <div className="lr-info min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
               <h3 className="min-w-0 truncate text-[15px] font-bold leading-snug text-white" title={l.title}>{l.title}</h3>
               <span className="flex shrink-0 items-center gap-1.5">
@@ -157,9 +164,9 @@ function QueueRow({ listing: l, tab, ownerReplied, actions, showScore }) {
             </div>
             <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-gray-400">
               <MapPin className="h-3.5 w-3.5 shrink-0 text-teal-400" aria-hidden="true" />
-              <span className="shrink-0">{[l.locality, l.city || 'Pune'].filter(Boolean).join(', ')}</span>
-              <span className="text-gray-600" aria-hidden="true">{'\u00B7'}</span>
-              <span className="truncate text-gray-500" title={l.id}>{l.id}</span>
+              <span className="min-w-0 truncate" title={[l.locality, l.city].filter(Boolean).join(', ')}>{[l.locality, l.city || 'Pune'].filter(Boolean).join(', ')}</span>
+              <span className="text-gray-600 max-md:hidden" aria-hidden="true">{'\u00B7'}</span>
+              <span className="min-w-0 max-w-[40%] truncate text-gray-400 max-md:hidden" title={l.id}>{l.id}</span>
             </p>
             <dl className={classNames(GROUP, 'space-y-1.5')}>
               <FactRow label="Property">
@@ -168,7 +175,7 @@ function QueueRow({ listing: l, tab, ownerReplied, actions, showScore }) {
                 <Cell>{fmtArea(l.area, l.areaUnit)}</Cell>
                 <Cell>{FURN_LBL[l.furnishing]}</Cell>
               </FactRow>
-              <FactRow label="Owner">
+              <FactRow label="Owner" className={moreCls}>
                 <Cell className="font-medium text-gray-200 md:col-span-2">{l.owner}</Cell>
                 <Cell className="tabular-nums md:col-span-2">{l.ownerMobile}</Cell>
               </FactRow>
@@ -178,10 +185,18 @@ function QueueRow({ listing: l, tab, ownerReplied, actions, showScore }) {
                 <span className="col-span-2 min-w-0 truncate"><Waiting listing={l} tab={tab} /></span>
               </FactRow>
             </dl>
-            <div className={classNames(GROUP, 'space-y-2')}>
+            <div className={classNames(GROUP, 'min-w-0 space-y-2')}>
               <RowChips listing={l} ownerReplied={ownerReplied} hasPhoto={Boolean(photo)} />
-              {l.progress ? <ProgressTracker progress={l.progress} compact /> : null}
+              {l.progress ? <div className={moreCls}><ProgressTracker progress={l.progress} compact /></div> : null}
             </div>
+            <button
+              type="button"
+              aria-expanded={more}
+              onClick={() => setMore((v) => !v)}
+              className="mt-2 hidden items-center text-xs font-medium text-teal-300 max-md:inline-flex max-md:min-h-11 max-md:px-1"
+            >
+              {more ? 'Less detail' : 'More detail'}
+            </button>
           </div>
           <div className="flex w-[212px] shrink-0 flex-col items-end border-l border-white/[0.07] pl-[18px] text-right max-md:w-full max-md:items-start max-md:border-l-0 max-md:border-t max-md:pl-0 max-md:pt-3 max-md:text-left">
             <PrimaryActions listing={l} actions={actions} />
@@ -190,7 +205,7 @@ function QueueRow({ listing: l, tab, ownerReplied, actions, showScore }) {
                 {fmtINR(l.price)}{isRent ? <span className="text-sm font-normal text-gray-400">/mo</span> : null}
               </div>
               {l.area && !isRent && isSqftUnit(l.areaUnit) ? (
-                <div className="mt-0.5 text-[11px] tabular-nums text-gray-500">{'\u20B9'}{Math.round(l.price / l.area).toLocaleString('en-IN')} / sq.ft</div>
+                <div className="mt-0.5 text-[11px] tabular-nums text-gray-400">{'\u20B9'}{Math.round(l.price / l.area).toLocaleString('en-IN')} / sq.ft</div>
               ) : null}
               {showScore ? <div className="mt-1.5 flex justify-end max-md:justify-start"><QualityScoreBadge listing={l} /></div> : null}
             </div>
@@ -202,7 +217,6 @@ function QueueRow({ listing: l, tab, ownerReplied, actions, showScore }) {
   );
 }
 
-/** One page of a moderation queue: a card per listing, photo left, details centre, price and actions right. */
 export default function QueueTable({ rows, tab, repliedIds, actions, empty, showScore }) {
   if (!rows.length) return <p className="p-10 text-center text-sm text-gray-400">{empty}</p>;
   return (

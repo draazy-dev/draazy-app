@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Search, X } from 'lucide-react';
 import { classNames, fmtNum } from '../../lib/format.js';
 import HScroll from '../ui/HScroll.jsx';
 
-export const CHIP = 'inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold';
+export const CHIP = 'dz-tag border font-semibold';
 export const CHIP_TONE = {
   neutral: 'border-white/10 bg-white/5 text-gray-300',
   red: 'border-rose-400/40 bg-rose-500/15 text-rose-200',
@@ -18,7 +18,7 @@ export const BTN = {
   ghost: 'dz-btn dz-btn-ghost dz-btn-sm',
   danger: 'dz-btn dz-btn-ghost dz-btn-sm border-rose-400/30 text-rose-300 hover:bg-rose-500/10',
 };
-const ICON_BTN = 'grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-white/10 text-gray-400 transition hover:border-white/20 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-40';
+const ICON_BTN = 'grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-white/10 text-gray-400 transition hover:border-white/20 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-40 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11';
 const GROUP = 'mt-2.5 border-t border-white/[0.06] pt-2.5';
 const DASH = '\u2014';
 
@@ -95,7 +95,7 @@ export function ClearFilters({ onClick }) {
 
 export function Chips({ label, options, value, onChange }) {
   return (
-    <div role="group" aria-label={label} className="inline-flex h-9 max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+    <div role="group" aria-label={label} className="inline-flex h-9 max-w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-white/10 bg-white/[0.04] p-0.5 [@media(pointer:coarse)]:h-12">
       {options.map((o) => (
         <button
           key={o.value}
@@ -114,35 +114,36 @@ export function Chips({ label, options, value, onChange }) {
   );
 }
 
-export function PageNav({ page, pageCount, total, size, onPage, stale }) {
+export function PageNav({ page, pageCount, total, size, onPage, stale, label = 'Pages' }) {
   const from = total ? (page - 1) * size + 1 : 0;
   const to = Math.min(page * size, total);
+  const step = 'grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-white/10 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11';
   return (
-    <nav aria-label="Pages" className="flex items-center gap-1.5 text-xs tabular-nums text-gray-400">
+    <nav aria-label={label} className="flex items-center gap-1.5 text-xs tabular-nums text-gray-400">
       <span data-testid="queue-range">{stale ? 'Searching…' : `${fmtNum(from)}–${fmtNum(to)} of ${fmtNum(total)}`}</span>
-      <button type="button" onClick={() => onPage(page - 1)} disabled={stale || page <= 1} aria-label="Previous page" className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-white/10 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+      <button type="button" onClick={() => onPage(page - 1)} disabled={stale || page <= 1} aria-label="Previous page" className={step}>
         <ChevronLeft className="h-4 w-4" />
       </button>
-      <button type="button" onClick={() => onPage(page + 1)} disabled={stale || page >= pageCount} aria-label="Next page" className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border border-white/10 transition hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:opacity-30">
+      <button type="button" onClick={() => onPage(page + 1)} disabled={stale || page >= pageCount} aria-label="Next page" className={step}>
         <ChevronRight className="h-4 w-4" />
       </button>
     </nav>
   );
 }
 
-export function IconAction({ label, onClick, icon: Icon, className, testId, disabled }) {
+export function IconAction({ label, title, onClick, icon: Icon, className, testId, disabled }) {
   return (
-    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} title={label} className={classNames(ICON_BTN, className)} data-testid={testId}>
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={label} title={title ?? label} className={classNames(ICON_BTN, className)} data-testid={testId}>
       <Icon className="h-4 w-4" />
     </button>
   );
 }
 
 // Fixed columns so a value sits in the same place on every tile; a missing one shows a dash.
-export function FactRow({ label, children }) {
+export function FactRow({ label, className, children }) {
   return (
-    <div className="flex items-baseline gap-3">
-      <dt className="w-14 shrink-0 text-[11px] text-gray-500">{label}</dt>
+    <div className={classNames('flex items-baseline gap-3', className)}>
+      <dt className="w-14 shrink-0 text-[11px] text-gray-400">{label}</dt>
       <dd className="grid min-w-0 flex-1 grid-cols-2 gap-x-3 gap-y-0.5 text-xs text-gray-300 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)]">{children}</dd>
     </div>
   );

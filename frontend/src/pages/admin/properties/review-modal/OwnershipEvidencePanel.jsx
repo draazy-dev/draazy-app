@@ -15,6 +15,7 @@ import Section from './ownership/Section.jsx';
 import UploadedDocuments from './ownership/UploadedDocuments.jsx';
 import VerdictBanner from './ownership/VerdictBanner.jsx';
 import { DOC_TYPES } from './ownership/vocabulary.js';
+import { isMadeBy } from '../constants.js';
 
 const EMPTY_FORM = { documentId: '', docType: '', issueDate: '', subjectName: '' };
 const maskLast4 = (value) => {
@@ -47,7 +48,7 @@ function OwnershipCase({ propertyId, listing, actorId, onRefresh, onVerification
   // A ref so a parent re-render never re-fetches the case.
   const onVerificationRef = useRef(onVerification);
   onVerificationRef.current = onVerification;
-  const canDecide = Boolean(actorId && listing.ownerId && String(actorId) !== String(listing.ownerId));
+  const canDecide = Boolean(actorId && !isMadeBy(listing, actorId));
 
   useEffect(() => {
     mounted.current = true;
