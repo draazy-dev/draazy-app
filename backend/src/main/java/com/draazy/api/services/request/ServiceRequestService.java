@@ -341,7 +341,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 + "reconcile.", request.getId(), request.getPaymentRef(), request.getRequesterId());
     }
 
-    // Guard by status, not paymentRef; ref exists in the modal-closed scenario this fixes.
+    // Guard by status, not paymentRef: a customer who closed the payment modal already holds a ref.
     @Transactional
     public ServiceRequestDto cancelUnpaid(AuthPrincipal caller, String id) {
         ServiceRequest request = visible(caller, id);
@@ -423,7 +423,6 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 .orElseThrow(() -> NotFoundException.of("Document"));
     }
 
-    // The requester or ops.
     // authorRole is taken from the principal, so a customer cannot post as staff.
     @Transactional
     public MessageDto addMessage(AuthPrincipal caller, String id, String body) {
@@ -488,7 +487,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
     @Transactional
     public ServiceRequestDto decideDraft(AuthPrincipal caller, String id, String decision,
             String note) {
-        ServiceRequest request = found(id);
+        ServiceRequest request = foundForUpdate(id);
         if (!caller.userId().equals(request.getRequesterId())
                 && !draftApprovals.canReject(caller, request)) {
             throw new ForbiddenException(
@@ -502,11 +501,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
         ServiceRequestStatus target = approve
                 ? ServiceRequestStatus.APPROVED
                 : ServiceRequestStatus.CHANGES_REQUESTED;
-        if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED) {
-            throw new ConflictException(
-                    "There is no draft awaiting your decision — this request is "
-                            + request.getStatus() + ".");
-        }
+        draftApprovals.requireOutForReview(request);
         String reason = blankToNull(note);
         if (!approve && reason == null) {
             throw new BadRequestException(
@@ -539,8 +534,9 @@ public class ServiceRequestService implements AbandonedCheckouts {
 
     @Transactional
     void completeDraftApproval(AuthPrincipal caller, String id) {
-        ServiceRequest request = found(id);
-        if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED) {
+        ServiceRequest request = foundForUpdate(id);
+        if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED || draftApprovals.held(request)
+                || !draftApprovals.complete(request)) {
             return;
         }
         ServiceRequestStatus from = transition(request, ServiceRequestStatus.APPROVED);
@@ -593,10 +589,12 @@ public class ServiceRequestService implements AbandonedCheckouts {
                         + " holds this request, so " + theirs + ".");
     }
 
-    // Any existing request.
-    // Used by the ops-only operations, whose role guard is the controller's.
     private ServiceRequest found(String id) {
         return Ids.parseUuid(id).flatMap(requests::findById).orElseThrow(() -> NotFoundException.of("Service request"));
+    }
+
+    private ServiceRequest foundForUpdate(String id) {
+        return Ids.parseUuid(id).flatMap(requests::findByIdForUpdate).orElseThrow(() -> NotFoundException.of("Service request"));
     }
 
     // Package-private so read receipts reuse the same participant guard.
@@ -612,10 +610,23 @@ public class ServiceRequestService implements AbandonedCheckouts {
                 accountPermissions.desksFor(caller));
     }
 
-    // Any existing request on the calling operator's own desk that they are not a side of.
-    // For the ops-only operations.
+    // Same guard as visible(), on a row locked first so a concurrent draft share waits for this one.
+    ServiceRequest visibleLocked(AuthPrincipal caller, String id) {
+        foundForUpdate(id);
+        return visible(caller, id);
+    }
+
+    // Only the caller's own desk, and never a case they are a side of, so staff cannot work their own agreement.
     ServiceRequest opsAccessible(AuthPrincipal caller, String id) {
-        ServiceRequest request = ServiceDeskAuthority.onCallersDesk(caller, found(id),
+        return deskWorkable(caller, found(id));
+    }
+
+    ServiceRequest opsAccessibleForUpdate(AuthPrincipal caller, String id) {
+        return deskWorkable(caller, foundForUpdate(id));
+    }
+
+    private ServiceRequest deskWorkable(AuthPrincipal caller, ServiceRequest found) {
+        ServiceRequest request = ServiceDeskAuthority.onCallersDesk(caller, found,
                 accountPermissions.desksFor(caller));
         selfDealing.refuse(caller, request);
         return request;
@@ -643,9 +654,9 @@ public class ServiceRequestService implements AbandonedCheckouts {
         return opened.requestId();
     }
 
-    // The same request, locked for update, with the same participant guard the reads use.
+    // Not desk-scoped like visible(): its callers then refuse anyone but the requester.
     ServiceRequest visibleForUpdate(AuthPrincipal caller, String id) {
-        ServiceRequest request = Ids.parseUuid(id).flatMap(requests::findByIdForUpdate).orElseThrow(() -> NotFoundException.of("Service request"));
+        ServiceRequest request = foundForUpdate(id);
         if (!isOps(caller) && !requests.isParticipant(request.getId(), caller.userId())) {
             throw NotFoundException.of("Service request");
         }

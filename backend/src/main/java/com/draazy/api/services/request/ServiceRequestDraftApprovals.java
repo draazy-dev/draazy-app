@@ -33,6 +33,8 @@ public class ServiceRequestDraftApprovals {
     static final String METHOD_OTP = "otp";
 
     private final ServiceRequestDraftApprovalRepository approvals;
+    private final ServiceRequestDraftCheckRepository checks;
+    private final ServiceRequestRepository requestRows;
     private final ServiceRequestPartyRepository parties;
     private final DocumentRepository documents;
     private final UserRepository users;
@@ -40,9 +42,12 @@ public class ServiceRequestDraftApprovals {
     private final AuditService audit;
 
     ServiceRequestDraftApprovals(ServiceRequestDraftApprovalRepository approvals,
+            ServiceRequestDraftCheckRepository checks, ServiceRequestRepository requestRows,
             ServiceRequestPartyRepository parties, DocumentRepository documents, UserRepository users,
             OtpService otp, AuditService audit) {
         this.approvals = approvals;
+        this.checks = checks;
+        this.requestRows = requestRows;
         this.parties = parties;
         this.documents = documents;
         this.users = users;
@@ -52,6 +57,22 @@ public class ServiceRequestDraftApprovals {
 
     int currentVersion(ServiceRequest request) {
         return Math.toIntExact(documents.countByServiceRequestIdAndCategory(request.getId(), "draft"));
+    }
+
+    // A revision shared while draft-shared stays held there, so the status alone does not prove the customer may act.
+    void requireOutForReview(ServiceRequest request) {
+        if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED) {
+            throw new ConflictException("There is no draft awaiting your decision \u2014 this request is "
+                    + request.getStatus() + ".");
+        }
+        if (held(request)) {
+            throw new ConflictException("There is no draft awaiting your decision right now.");
+        }
+    }
+
+    boolean held(ServiceRequest request) {
+        return checks.findByRequestIdAndDraftVersion(request.getId(), currentVersion(request))
+                .filter(ServiceRequestDraftCheck::holdsDraft).isPresent();
     }
 
     List<RequiredApproval> required(ServiceRequest request) {
@@ -108,14 +129,23 @@ public class ServiceRequestDraftApprovals {
 
     @Transactional(noRollbackFor = {OtpSender.DeliveryFailedException.class,
             UnauthorizedException.class, RateLimitedException.class})
-    public boolean confirmOtp(AuthPrincipal caller, ServiceRequest request, String partyKey, String code) {
+    public boolean confirmOtp(AuthPrincipal caller, ServiceRequest visible, String partyKey, String code) {
+        boolean sending = code == null || code.isBlank();
+        ServiceRequest request = sending ? visible : requestRows.findByIdForUpdate(visible.getId()).orElseThrow();
         if (!caller.userId().equals(request.getRequesterId())) {
             throw new ForbiddenException("Only the requester can collect an inline party's draft approval.");
         }
+        requireOutForReview(request);
         RequiredApproval party = required(request).stream().filter(p -> p.key().equals(partyKey) && METHOD_OTP.equals(p.method())).findFirst().orElseThrow(() -> new BadRequestException("Choose an inline party awaiting OTP approval."));
         String mobile = party.mobile();
-        if (code == null || code.isBlank()) {
-            otp.sendCode(mobile, purpose(request, party.key()), caller.userId());
+        if (sending) {
+            String purpose = purpose(request, party.key());
+            otp.sendCode(mobile, purpose, caller.userId());
+            // A share can land while the SMS is out; refusing then rolls the code back so it can never be used.
+            if (!purpose.equals(purpose(request, party.key()))) {
+                throw new ConflictException(
+                        "The draft changed while the code was being sent. Open the new draft first.");
+            }
             return false;
         }
         otp.verifyCode(mobile, code.strip(), purpose(request, party.key()));
@@ -150,7 +180,7 @@ public class ServiceRequestDraftApprovals {
         return new ServiceRequestDto.DraftApproval(version, (int) approved, parties.size(), parties);
     }
 
-    private boolean complete(ServiceRequest request) {
+    boolean complete(ServiceRequest request) {
         int version = currentVersion(request);
         List<String> approvedKeys = approvals.findByRequestIdAndDraftVersion(request.getId(), version).stream().filter(a -> a.getApprovedAt() != null).map(ServiceRequestDraftApproval::getPartyKey).toList();
         return required(request).stream().allMatch(p -> approvedKeys.contains(p.key()));

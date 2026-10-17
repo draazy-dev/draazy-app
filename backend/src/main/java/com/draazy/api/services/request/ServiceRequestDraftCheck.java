@@ -62,6 +62,10 @@ public class ServiceRequestDraftCheck extends AuditedEntity {
         decide(SENT_BACK, checker, note);
     }
 
+    boolean holdsDraft() {
+        return !RELEASED.equals(status);
+    }
+
     List<String> reasonsList() {
         if (reasons == null || reasons.isBlank()) {
             return List.of();

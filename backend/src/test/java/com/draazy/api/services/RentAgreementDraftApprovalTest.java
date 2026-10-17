@@ -88,6 +88,122 @@ class RentAgreementDraftApprovalTest extends ServiceFixtures {
                 .andExpect(jsonPath("$.documents[?(@.category=='draft')]", org.hamcrest.Matchers.hasSize(1)));
     }
 
+    @Test
+    @DisplayName("a revision held for a second check leaves no trace for the customer and cannot be approved")
+    void heldRevisionCannotBeApproved() throws Exception {
+        User owner = customer("9820006121");
+        User holder = staff("9820006122", Teams.RENTAL);
+        User checker = staff("9820006123", Teams.RENTAL);
+        String id = raiseWithState(owner, listing(owner), "{\"owner\":{\"oMobile\":\"" + owner.getMobile()
+                + "\"},\"tenants\":[{\"name\":\"Ria\",\"mobile\":\"9820006124\"}],"
+                + "\"terms\":{\"rent\":\"55000\",\"months\":\"11\"}}");
+        setStatus(holder, id, "assigned", 200);
+        shareDraft(holder, id, 200);
+        String partyKey = detail(holder, id)
+                .replaceAll("(?s)^.*?\"key\":\"([^\"]+)\",\"label\":\"Tenant 1\".*$", "$1");
+        draftOtp(owner, id, partyKey, 409);
+
+        checkDraft(checker, id, "release", 200);
+        shareDraft(holder, id, 200);
+
+        mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draftCheck").doesNotExist())
+                .andExpect(jsonPath("$.draftApproval").doesNotExist())
+                .andExpect(jsonPath("$.timeline[?(@.event =~ /draft\\.check.*/)]").isEmpty())
+                .andExpect(jsonPath("$.documents[?(@.category=='draft')]").isEmpty());
+        openDraft(owner, id, 409);
+        decide(owner, id, "approve", 409);
+        reject(owner, id, "Clause 7 is wrong", 409);
+        draftOtp(owner, id, partyKey, 409);
+        expectStatus(owner, id, "draft-shared");
+    }
+
+    @Test
+    @DisplayName("a revision the checker sends back stays hidden and cannot be approved, and the check stays internal")
+    void sentBackRevisionStaysHidden() throws Exception {
+        User owner = customer("9820006141");
+        User holder = staff("9820006142", Teams.RENTAL);
+        User checker = staff("9820006143", Teams.RENTAL);
+        String id = raiseWithState(owner, listing(owner), "{\"owner\":{\"oMobile\":\"" + owner.getMobile()
+                + "\"},\"tenants\":[{\"name\":\"Ria\",\"mobile\":\"9820006144\"}],"
+                + "\"terms\":{\"rent\":\"55000\",\"months\":\"11\"}}");
+        setStatus(holder, id, "assigned", 200);
+        shareDraft(holder, id, 200);
+        checkDraft(checker, id, "release", 200);
+        mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.draftCheck").doesNotExist());
+        em.flush();
+        String first = jdbc.queryForObject("select id::text from documents where service_request_id = ?::uuid"
+                + " and category = 'draft'", String.class, id);
+        shareDraft(holder, id, 200);
+        mvc.perform(post(Routes.ServiceRequests.DRAFT_CHECK, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(checker))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"send-back\",\"note\":\"Clause 7 names the wrong flat\"}"))
+                .andExpect(status().isOk());
+        em.flush();
+        String revision = jdbc.queryForObject("select id::text from documents where service_request_id = ?::uuid"
+                + " and category = 'draft' and id <> ?::uuid", String.class, id, first);
+
+        mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.draftCheck").doesNotExist())
+                .andExpect(jsonPath("$.documents[?(@.category=='draft')]").isEmpty());
+        mvc.perform(get(Routes.ServiceRequests.DOC_URL, id, revision).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isNotFound());
+        openDraft(owner, id, 409);
+        decide(owner, id, "approve", 409);
+        expectStatus(owner, id, "draft-shared");
+
+        shareDraft(holder, id, 200);
+        checkDraft(checker, id, "release", 200);
+        mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(jsonPath("$.documents[?(@.category=='draft')]", org.hamcrest.Matchers.hasSize(2)))
+                .andExpect(jsonPath("$.documents[?(@.id=='" + revision + "')]").isEmpty());
+        mvc.perform(get(Routes.ServiceRequests.DOC_URL, id, revision).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("staff who are a side of the agreement see a held draft exactly as a customer would")
+    void staffPartyCannotSeeAHeldDraft() throws Exception {
+        User insider = staff("9820006131", Teams.RENTAL);
+        User holder = staff("9820006132", Teams.RENTAL);
+        String id = raiseWithState(insider, listing(insider), "{\"owner\":{\"oMobile\":\"" + insider.getMobile()
+                + "\"},\"tenants\":[{\"name\":\"Ria\",\"mobile\":\"9820006134\"}],"
+                + "\"terms\":{\"rent\":\"55000\",\"months\":\"11\"}}");
+        setStatus(holder, id, "assigned", 200);
+        shareDraft(holder, id, 200);
+        em.flush();
+        String draftId = jdbc.queryForObject("select id::text from documents where service_request_id = ?::uuid"
+                + " and category = 'draft'", String.class, id);
+
+        mvc.perform(get(Routes.ServiceRequests.BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(insider)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.draftCheck").doesNotExist())
+                .andExpect(jsonPath("$.timeline[?(@.event =~ /draft\\.check.*/)]").isEmpty())
+                .andExpect(jsonPath("$.documents[?(@.category=='draft')]").isEmpty());
+        mvc.perform(get(Routes.ServiceRequests.DOC_URL, id, draftId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(insider)))
+                .andExpect(status().isNotFound());
+    }
+
+    private void checkDraft(User caller, String id, String decision, int expected) throws Exception {
+        mvc.perform(post(Routes.ServiceRequests.DRAFT_CHECK, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(caller))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"" + decision + "\"}"))
+                .andExpect(status().is(expected));
+    }
+
+    private void draftOtp(User caller, String id, String partyKey, int expected) throws Exception {
+        mvc.perform(post(Routes.ServiceRequests.DRAFT_OTP, id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(caller))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"partyKey\":\"" + partyKey + "\"}"))
+                .andExpect(status().is(expected));
+    }
+
     private String raiseWithState(User caller, Property property, String stateJson) throws Exception {
         String json = mvc.perform(post(Routes.ServiceRequests.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(caller))

@@ -193,6 +193,21 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     expect(released.draftCheck.reasons).toContain('rent_ge_50000');
     const visible = await ok('GET', `/service-requests/${request.id}`, customer);
     expect(visible.documents.some((doc) => doc.category === 'draft')).toBe(true);
+
+    await ok('POST', `/service-requests/${request.id}/draft`, holder, upload('draft-v2.png', CHECKS));
+    const held = await ok('GET', `/service-requests/${request.id}`, customer);
+    expect(held.status).toBe('draft-shared');
+    expect(held.draftCheck ?? null).toBeNull();
+    expect(held.draftApproval ?? null).toBeNull();
+    expect(held.documents.filter((doc) => doc.category === 'draft')).toHaveLength(0);
+    expect(held.timeline.filter((e) => e.event.startsWith('draft.check-'))).toHaveLength(0);
+    for (const [path, body] of [['draft/opened'], ['draft/decision', { decision: 'approve' }], ['draft/otp', { partyKey: 'tenant-0' }]]) {
+      const refused = await call('POST', `/service-requests/${request.id}/${path}`, customer, body);
+      expect(refused.status, `${path} on a held revision`).toBe(409);
+    }
+    await ok('POST', `/service-requests/${request.id}/draft/check`, checker, { decision: 'release' });
+    await ok('POST', `/service-requests/${request.id}/draft/opened`, customer);
+    await ok('POST', `/service-requests/${request.id}/draft/decision`, customer, { decision: 'approve' });
   });
 
   test('a flat that was never listed completes, and prepares no badge rows', async () => {
@@ -579,7 +594,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     const staff = (await apiLogin(STAFF.rental)).accessToken;
     const me = await ok('GET', '/auth/me', staff);
     const scope = (functions) => ok('PUT', `/users/${me.id}/permissions`, admin, { functions });
-    // The registration-check atom now ships inside `desk:rental`, so dropping that desk is how it is withheld.
+    // The registration-check atom ships inside `desk:rental`, so dropping that desk is how it is withheld.
     await scope(BASELINE_STAFF.filter((fn) => fn !== 'desk:rental'));
     try {
       const rows = await ok('GET', `/service-requests/${id}/rent-agreements`, admin);

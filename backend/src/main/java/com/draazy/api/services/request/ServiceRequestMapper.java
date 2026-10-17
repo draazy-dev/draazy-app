@@ -100,7 +100,12 @@ public class ServiceRequestMapper {
                 police.values(), checks.values());
         Instant now = Instant.now();
 
-        return requests.stream().map(r -> new ServiceRequestDto(
+        return requests.stream().map(r -> {
+            List<ServiceRequestParty> side = sides.getOrDefault(r.getId(), List.of());
+            List<ServiceRequestDraftCheck> rowChecks = checks.getOrDefault(r.getId(), List.of());
+            List<Document> rowFiles = files.getOrDefault(r.getId(), List.of());
+            boolean desk = deskView(viewer, r, side);
+            return new ServiceRequestDto(
                         r.getId().toString(),
                         r.getType(),
                         r.getTeam(),
@@ -110,12 +115,12 @@ public class ServiceRequestMapper {
                         visibleDetails(r.getDetails()),
                         names.get(r.getAssigneeId()),
                         Objects.equals(r.getAssigneeId(), viewer.userId()),
-                        timelines.getOrDefault(r.getId(), List.of()).stream().map(e -> new ServiceRequestDto.TimelineEntry(
-                                        e.getAt(), e.getEvent(), e.getBy())).toList(),
-                        visibleFiles(r, files.getOrDefault(r.getId(), List.<Document>of()),
-                                checks.getOrDefault(r.getId(), List.of()), viewer).stream().map(d -> toDocumentSummary(d, r, sides.getOrDefault(r.getId(), List.of()), viewer)).toList(),
+                        timelines.getOrDefault(r.getId(), List.of()).stream()
+                                .filter(e -> desk || !e.getEvent().startsWith("draft.check-"))
+                                .map(e -> new ServiceRequestDto.TimelineEntry(e.getAt(), e.getEvent(), e.getBy())).toList(),
+                        visibleFiles(rowFiles, rowChecks, desk).stream().map(d -> toDocumentSummary(d, r, side, viewer)).toList(),
                         threads.getOrDefault(r.getId(), List.of()).stream().map(m -> toMessageDto(m, names)).toList(),
-                        sides.getOrDefault(r.getId(), List.<ServiceRequestParty>of()).stream().map(p -> CoFillParties.toDto(p, r.getType(),
+                        side.stream().map(p -> CoFillParties.toDto(p, r.getType(),
                                         names.get(p.getUserId()), names.get(p.getInvitedBy()))).toList(),
                         r.getCreatedAt(),
                         r.getAmount(),
@@ -124,19 +129,37 @@ public class ServiceRequestMapper {
                         policeIntimation(police.get(r.getId()), names),
                         RentAgreementSla.of(r, now),
                         amendment(proposed.get(r.getId())),
-                        approvalSummary.summary(r, approvals.getOrDefault(r.getId(), List.of())),
-                        draftCheck(r, checks.getOrDefault(r.getId(), List.of()), names))).toList();
+                        !desk && currentDraftHeld(rowFiles, rowChecks) ? null
+                                : approvalSummary.summary(r, approvals.getOrDefault(r.getId(), List.of())),
+                        desk ? draftCheck(r, rowChecks, names) : null);
+        }).toList();
     }
 
-    private List<Document> visibleFiles(ServiceRequest request, List<Document> files,
-            List<ServiceRequestDraftCheck> checks, AuthPrincipal viewer) {
-        if (Roles.isBackOffice(viewer.role())) {
+    // Staff who are a side of the request read it as a customer does.
+    private static boolean deskView(AuthPrincipal viewer, ServiceRequest request, List<ServiceRequestParty> parties) {
+        return Roles.isBackOffice(viewer.role()) && !viewer.userId().equals(request.getRequesterId())
+                && parties.stream().noneMatch(p -> CoFillParties.ACCEPTED.equals(p.getStatus())
+                        && viewer.userId().equals(p.getUserId()));
+    }
+
+    // The customer side never learns of a draft a second operator has not released.
+    private static boolean currentDraftHeld(List<Document> files, List<ServiceRequestDraftCheck> checks) {
+        long version = files.stream().filter(d -> "draft".equals(d.getCategory())).count();
+        return checks.stream().anyMatch(c -> c.getDraftVersion() == version && c.holdsDraft());
+    }
+
+    // Drafts come newest first, so the n-th from the end is version n; the customer side sees only released ones.
+    private static List<Document> visibleFiles(List<Document> files, List<ServiceRequestDraftCheck> checks,
+            boolean desk) {
+        if (checks.isEmpty() || desk) {
             return files;
         }
-        int version = approvalSummary.currentVersion(request);
-        boolean pending = checks.stream().anyMatch(c -> c.getDraftVersion() == version
-                && ServiceRequestDraftCheck.PENDING.equals(c.getStatus()));
-        return pending ? files.stream().filter(d -> !"draft".equals(d.getCategory())).toList() : files;
+        Set<Integer> withheld = checks.stream().filter(ServiceRequestDraftCheck::holdsDraft)
+                .map(ServiceRequestDraftCheck::getDraftVersion).collect(Collectors.toSet());
+        List<Document> drafts = files.stream().filter(d -> "draft".equals(d.getCategory())).toList();
+        boolean currentHeld = withheld.contains(drafts.size());
+        return files.stream().filter(d -> !"draft".equals(d.getCategory())
+                || !currentHeld && !withheld.contains(drafts.size() - drafts.indexOf(d))).toList();
     }
 
     private static ServiceRequestDto.DraftCheck draftCheck(ServiceRequest request,
@@ -193,22 +216,21 @@ public class ServiceRequestMapper {
     // The same visibility and identity-scan rules as the list, applied to one file when it is opened.
     Optional<String> documentUrl(ServiceRequest request, UUID documentId, AuthPrincipal viewer) {
         List<UUID> ids = List.of(request.getId());
-        List<Document> files = visibleFiles(request, documents.findByServiceRequestIdInOrderByUploadedAtDesc(ids),
-                draftChecks.findByRequestIdIn(ids), viewer);
+        List<ServiceRequestParty> sides = parties.findByRequestIdIn(ids);
+        List<Document> files = visibleFiles(documents.findByServiceRequestIdInOrderByUploadedAtDesc(ids),
+                draftChecks.findByRequestIdIn(ids), deskView(viewer, request, sides));
         return files.stream().filter(d -> d.getId().equals(documentId)).findFirst()
-                .filter(d -> readable(d, request, parties.findByRequestIdIn(ids), viewer))
+                .filter(d -> readable(d, request, sides, viewer))
                 .map(documentMapper::urlOf);
     }
 
     private static Set<String> readableSides(ServiceRequest request, List<ServiceRequestParty> parties,
             AuthPrincipal viewer) {
-        boolean requester = viewer.userId().equals(request.getRequesterId());
-        List<ServiceRequestParty> accepted = parties.stream().filter(p -> CoFillParties.ACCEPTED.equals(p.getStatus())).toList();
-        boolean party = accepted.stream().anyMatch(p -> viewer.userId().equals(p.getUserId()));
-        if (!requester && !party
-                && Roles.isBackOffice(viewer.role())) {
+        if (deskView(viewer, request, parties)) {
             return CoFillParties.ROLES;
         }
+        boolean requester = viewer.userId().equals(request.getRequesterId());
+        List<ServiceRequestParty> accepted = parties.stream().filter(p -> CoFillParties.ACCEPTED.equals(p.getStatus())).toList();
         Set<String> readable = new HashSet<>();
         if (requester) {
             readable.addAll(CoFillParties.ROLES);
