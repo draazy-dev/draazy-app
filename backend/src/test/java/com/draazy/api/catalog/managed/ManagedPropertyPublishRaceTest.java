@@ -65,7 +65,7 @@ class ManagedPropertyPublishRaceTest {
     void concurrentPublishesCreateOneListing() {
         ManagedPropertyDto record = service.register(owner.getId(), new ManagedPropertyCreateRequest(
                 null, "rent", "Flat", null, 25000L, LOCALITY, null, null, null, null, null,
-                null, null, null, null, null, null));
+                null, null, null, null, null, null, null));
         List<ManagedPropertyDto> results = new CopyOnWriteArrayList<>();
 
         List<Throwable> outcomes = Races.run(RACERS,

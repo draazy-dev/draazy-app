@@ -384,7 +384,7 @@ matter *most* — that is where personal data survives an erasure request — so
 1. **The record is the subject's.** That it happened, when, its status, its money, and the property
    it concerns are exported in full — as much the subject's history as the counterparty's.
 2. **The subject's own contribution is exported in full**, including free text in which they named
-   somebody else (`tenant_profiles.prior_landlord`, `managed_properties.tenant_name`). They typed it,
+   somebody else (`tenant_profiles.prior_landlord`, `managed_properties.tenant_name`/`tenant_mobile`). They typed it,
    they can already read it in the product, and returning it discloses nothing new.
 3. **The counterparty is reduced to `partyRef`** (see `DataExportRedaction`). Stable across this
    subject's exports; meaningless outside them because the digest is salted with the subject's own id.

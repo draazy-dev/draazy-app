@@ -2,10 +2,14 @@ package com.draazy.api.catalog.managed;
 
 import com.draazy.api.catalog.property.AreaUnit;
 import com.draazy.api.catalog.property.DealIntent;
+import com.draazy.api.common.validation.IndianMobile;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.Map;
 
@@ -23,9 +27,10 @@ public record ManagedPropertyCreateRequest(
         @Pattern(regexp = AreaUnit.PATTERN, message = AreaUnit.PATTERN_MESSAGE) String areaUnit,
         String furnishing,
         Boolean rented,
-        String tenantName,
-        Long monthlyRent,
-        Integer dueDay,
+        @Size(max = 80) String tenantName,
+        @IndianMobile String tenantMobile,
+        @PositiveOrZero @Max(ManagedProperty.MAX_MONTHLY_RENT) Long monthlyRent,
+        @Min(1) @Max(28) Integer dueDay,
         Map<String, Object> valuation,
         String publishedListingId) {
 }

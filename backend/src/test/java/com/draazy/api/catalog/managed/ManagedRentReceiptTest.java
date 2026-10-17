@@ -67,8 +67,17 @@ class ManagedRentReceiptTest extends AbstractApiTest {
     private String rentedFlat(User o) throws Exception {
         String id = register(o, "{\"deal\":\"rent\",\"propertyType\":\"Flat\",\"bhk\":2,"
                 + "\"price\":26000,\"locality\":\"Baner\",\"societyId\":\"" + societyNamed("Vista Heights") + "\"}");
-        patchProperty(o, id, "{\"rented\":true,\"tenantName\":\"Rohit Kulkarni\",\"monthlyRent\":26000}");
+        patchProperty(o, id, "{\"rented\":true,\"tenantName\":\"Rohit Kulkarni\",\"tenantMobile\":\"9123456780\","
+                + "\"monthlyRent\":26000}");
         return id;
+    }
+
+    private void forceRentState(String id, String tenantName, Long monthlyRent) {
+        ManagedProperty m = managed.findById(UUID.fromString(id)).orElseThrow();
+        m.setRented(true);
+        m.setTenantName(tenantName);
+        m.setMonthlyRent(monthlyRent);
+        managed.saveAndFlush(m);
     }
 
     private static String receipts(String id) {
@@ -83,8 +92,6 @@ class ManagedRentReceiptTest extends AbstractApiTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
     }
-
-    // ---------------- the snapshot ----------------
 
     @Test
     @DisplayName("the server composes amount, tenant, landlord and address — the client sends only a month")
@@ -148,8 +155,6 @@ class ManagedRentReceiptTest extends AbstractApiTest {
                 .andExpect(jsonPath("$[0].id").value(receiptId));
     }
 
-    // ---------------- ownership ----------------
-
     @Test
     @DisplayName("a foreign id and an unknown id are the same 404, on both read and write")
     void ownership_foreignAndUnknownAreIndistinguishable() throws Exception {
@@ -194,8 +199,6 @@ class ManagedRentReceiptTest extends AbstractApiTest {
                 .andExpect(status().isUnauthorized());
     }
 
-    // ---------------- parent state ----------------
-
     @Test
     @DisplayName("a property that is not rented, has no rent, or has no tenant cannot issue a receipt")
     void create_requiresARentableParent() throws Exception {
@@ -210,10 +213,10 @@ class ManagedRentReceiptTest extends AbstractApiTest {
                         .content("{\"rentMonth\":\"" + MONTH_2 + "\"}"))
                 .andExpect(status().isUnprocessableEntity());
 
-        // Rented, but nobody named to receipt it to.
+        // Rented, but nobody named to receipt it to. PATCH refuses this state, so it is written straight to the row.
         String noTenant = register(o, "{\"deal\":\"rent\",\"propertyType\":\"Flat\",\"bhk\":2,"
                 + "\"price\":26000,\"locality\":\"Baner\"}");
-        patchProperty(o, noTenant, "{\"rented\":true}");
+        forceRentState(noTenant, null, 26000L);
         mvc.perform(post(receipts(noTenant))
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -223,7 +226,7 @@ class ManagedRentReceiptTest extends AbstractApiTest {
         // Rented and tenanted, but no amount -- a receipt for zero rupees is not a receipt.
         String noRent = register(o, "{\"deal\":\"buy\",\"propertyType\":\"Flat\",\"bhk\":2,"
                 + "\"price\":9000000,\"locality\":\"Baner\"}");
-        patchProperty(o, noRent, "{\"rented\":true,\"tenantName\":\"Rohit Kulkarni\"}");
+        forceRentState(noRent, "Rohit Kulkarni", null);
         mvc.perform(post(receipts(noRent))
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -232,7 +235,7 @@ class ManagedRentReceiptTest extends AbstractApiTest {
 
         // Positive anchor: the same request succeeds the moment the parent is complete, so the three
         // 422s above are about the parent state and not about the request being malformed.
-        patchProperty(o, noRent, "{\"monthlyRent\":26000}");
+        patchProperty(o, noRent, "{\"tenantMobile\":\"9123456780\",\"monthlyRent\":26000}");
         mvc.perform(post(receipts(noRent))
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -289,8 +292,6 @@ class ManagedRentReceiptTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.length()").value(2));
     }
 
-    // ---------------- one receipt per month ----------------
-
     @Test
     @DisplayName("the second attempt at the same month is a 409 and leaves the first receipt untouched")
     void create_isOneReceiptPerMonth() throws Exception {
@@ -332,8 +333,6 @@ class ManagedRentReceiptTest extends AbstractApiTest {
         mvc.perform(get(receipts(two)).header(HttpHeaders.AUTHORIZATION, bearer(o)))
                 .andExpect(jsonPath("$.length()").value(1));
     }
-
-    // ---------------- the list ----------------
 
     @Test
     @DisplayName("newest month first, and months is a window not a filter")
@@ -378,8 +377,6 @@ class ManagedRentReceiptTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
     }
-
-    // ---------------- cascade ----------------
 
     @Test
     @DisplayName("deleting the property deletes its receipts")

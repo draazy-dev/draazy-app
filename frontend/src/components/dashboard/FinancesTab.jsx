@@ -16,7 +16,7 @@ import {
   financeSummary, cashflow as cashflowApi, dues as duesApi,
 } from '../../services/rentService.js';
 import FinancesHeader from './finances/FinancesHeader.jsx';
-import KpiStrip from './finances/KpiStrip.jsx';
+import SummaryCard from './finances/SummaryCard.jsx';
 import DuesSection from './finances/DuesSection.jsx';
 import ActivityPanel from './finances/ActivityPanel.jsx';
 import InsightsPanel from './finances/InsightsPanel.jsx';
@@ -34,7 +34,7 @@ export default function FinancesTab({ user, listings, toast, isOwner = true, sho
   const [ctx, setCtx] = useState(canOwner ? 'owner' : 'tenant');
 
   if (!canOwner && canTenant) return <TenantFinancesTab user={user} toast={toast} />;
-  if (canOwner && !canTenant) return <OwnerFinances user={user} listings={listings} toast={toast} />;
+  if (canOwner && !canTenant) return <OwnerFinances listings={listings} toast={toast} />;
 
   return (
     <div className="space-y-6">
@@ -46,12 +46,12 @@ export default function FinancesTab({ user, listings, toast, isOwner = true, sho
           <Icon name="wallet" className="w-4 h-4" /> {t('fin.rentWallet')}
         </button>
       </div>
-      {ctx === 'tenant' ? <TenantFinancesTab user={user} toast={toast} /> : <OwnerFinances user={user} listings={listings} toast={toast} />}
+      {ctx === 'tenant' ? <TenantFinancesTab user={user} toast={toast} /> : <OwnerFinances listings={listings} toast={toast} />}
     </div>
   );
 }
 
-function OwnerFinances({ user, listings, toast }) {
+function OwnerFinances({ listings, toast }) {
   const { t } = useTranslation();
   /* The finance routes parse `{propId}` as a UUID and 404 on anything else, so the selector must
      carry the uuid — `l.id` is the listing's slug. The fallback is a safety net, not a live path. */
@@ -67,8 +67,6 @@ function OwnerFinances({ user, listings, toast }) {
   const [showTxForm, setShowTxForm] = useState(false);
   const [showAllTx, setShowAllTx] = useState(false);
   const [showBasisModal, setShowBasisModal] = useState(false);
-
-  const mob = user?.mobile || '';
 
   /* Server endpoints, not client reductions over txs: the ledger is paged, so reducing what the client holds
      summarises page one; only a recurring row changes what is due, and the server owns that date rule. */
@@ -137,8 +135,7 @@ function OwnerFinances({ user, listings, toast }) {
     expenseData: fin.cf.map((p) => p.expense),
   }), [fin.cf]);
 
-  // Only surfaced where "up = good" holds — Collected and Net — so the Stat up/down
-  // colours (emerald/rose) stay truthful.
+  // Only surfaced where "up = good" holds — Collected and Net — so the emerald/rose trend stays truthful.
   const kpiTrend = useMemo(() => {
     const inc = cf.incomeData || [];
     const exp = cf.expenseData || [];
@@ -154,13 +151,7 @@ function OwnerFinances({ user, listings, toast }) {
     return { income: trend(inc[n - 1], inc[n - 2]), net: trend(net(n - 1), net(n - 2)) };
   }, [cf, t]);
 
-  const netSeries = useMemo(
-    () => (cf.incomeData || []).map((v, i) => (v || 0) - ((cf.expenseData || [])[i] || 0)),
-    [cf],
-  );
-
-  // Single at-a-glance health signal, shown in the header on every tab so the user
-  // never loses sight of money-at-risk. Priority: overdue > due-soon/negative > healthy.
+  // Priority: overdue > due-soon/negative > healthy.
   const health = useMemo(() => {
     if (dues.overdue.length > 0) return { label: t('fin.healthOverdue', { count: dues.overdue.length }), cls: 'bg-rose-500/15 text-rose-300', dot: 'bg-rose-400' };
     if (dues.upcoming.length > 0) return { label: t('fin.healthDueSoon', { count: dues.upcoming.length }), cls: 'bg-amber-500/15 text-amber-300', dot: 'bg-amber-400' };
@@ -245,15 +236,14 @@ function OwnerFinances({ user, listings, toast }) {
     toast(t('fin.txRemoved'));
   };
   const doExportCSV = () => {
-    exportTransactionsCSV(mob, finProp);
+    exportTransactionsCSV(filterByPeriod(txs, finPeriod), finProp);
     toast(t('fin.csvExported'), 'success');
   };
   const doExportPDF = async () => {
-    await exportStatementPDF(mob, finProp, propOpts.find((l) => propKey(l) === finProp)?.title || finProp);
+    await exportStatementPDF(filterByPeriod(txs, finPeriod), finProp, propOpts.find((l) => propKey(l) === finProp)?.title || finProp);
     toast(t('fin.pdfDownloaded'), 'success');
   };
 
-  // Ownership basis form state
   const [basisForm, setBasisForm] = useState({
     type: basis?.type || 'owned',
     purchasePrice: basis?.purchasePrice || '',
@@ -301,7 +291,7 @@ function OwnerFinances({ user, listings, toast }) {
 
   const activityPanel = (
     <ActivityPanel
-      finType={finType} setFinType={setFinType} typeOpts={typeOpts}
+      finType={finType} setFinType={setFinType} typeOpts={typeOpts} hasAny={txs.length > 0}
       filteredTxs={filteredTxs} showAllTx={showAllTx} setShowAllTx={setShowAllTx}
       onAdd={() => setShowTxForm(true)} onRemove={removeTx}
     />
@@ -309,22 +299,20 @@ function OwnerFinances({ user, listings, toast }) {
 
   const insightsPanel = <InsightsPanel cf={cf} cfData={cfData} expBreak={expBreak} expData={expData} />;
 
-  const reportsPanel = <ReportsPanel basis={basis} summary={summary} onEditBasis={openBasisModal} />;
+  const reportsPanel = <ReportsPanel basis={basis} summary={summary} onEditBasis={openBasisModal} onExportCSV={doExportCSV} onExportPDF={doExportPDF} />;
 
   return (
     <>
-      <div className="space-y-5">
+      <div className="space-y-4">
         <FinancesHeader
           finProp={finProp} setFinProp={setFinProp} listings={propOpts}
           finPeriod={finPeriod} setFinPeriod={setFinPeriod} periodOpts={periodOpts}
-          health={health} onExportCSV={doExportCSV} onExportPDF={doExportPDF}
         />
 
-        <KpiStrip summary={summary} kpiTrend={kpiTrend} cf={cf} netSeries={netSeries} basis={basis} onEditBasis={openBasisModal} />
+        <SummaryCard summary={summary} kpiTrend={kpiTrend} health={health} />
 
         <DuesSection dues={dues} onRemind={remindDue} />
 
-        {/* Detail tabs keep the deep data one tap away instead of one long scroll */}
         <Tabs
           variant="underline"
           items={[
@@ -334,18 +322,6 @@ function OwnerFinances({ user, listings, toast }) {
           ]}
         />
       </div>
-
-      {/* Docked to --dz-bottom-inset and anchored bottom-LEFT: the Draaz FAB owns the
-          bottom-right corner at z-1300, and the bottom nav outranks a z-40 button. */}
-      <button
-        type="button"
-        onClick={() => setShowTxForm(true)}
-        aria-label={t('fin.addTransaction')}
-        className="lg:hidden fixed left-4 z-[60] w-14 h-14 rounded-full bg-brand-teal text-ink shadow-xl shadow-black/30 flex items-center justify-center active:scale-95 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-        style={{ bottom: 'calc(var(--dz-bottom-inset) + 1rem)' }}
-      >
-        <Icon name="plus" className="w-6 h-6" />
-      </button>
 
       <AddTransactionModal
         open={showTxForm}

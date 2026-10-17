@@ -9,6 +9,8 @@ import com.draazy.api.billing.plan.SubscriptionSweeper;
 import com.draazy.api.billing.referral.ReferralHoldSweep;
 import com.draazy.api.billing.referral.ReferralSignalRetention;
 import com.draazy.api.catalog.listing.ListingDuplicateSweep;
+import com.draazy.api.catalog.managed.TrackedRentService;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditLogRetention;
 import com.draazy.api.common.log.ErrorEventRetention;
 import com.draazy.api.common.payments.AbandonedCheckoutSweep;
@@ -31,6 +33,7 @@ import com.draazy.api.services.request.CoFillInviteRetention;
 import com.draazy.api.services.request.ServiceRequestIdentityRetention;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.function.LongSupplier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -209,6 +212,11 @@ class JobCatalog {
     @Bean
     ScheduledJob renewalRemindersJob(RentAgreementRenewalSweeper renewals) {
         return new ScheduledJob("renewal-reminders", DAYTIME, () -> renewals.remindEnding(Instant.now()));
+    }
+
+    @Bean
+    ScheduledJob trackedRentRemindersJob(TrackedRentService rent) {
+        return new ScheduledJob("tracked-rent-reminders", DAYTIME, () -> rent.remindDue(LocalDate.now(PlatformTime.IST)));
     }
 
     @Bean

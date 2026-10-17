@@ -4,16 +4,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Map;
 
-/**
- * Read shape for a managed property (contract {@code ManagedProperty}). Carries the owner-captured
- * facts, the owner-only rent-tracker block and the lifecycle/link fields; presentation strings
- * (formatted price, gallery, "society, locality, Pune" line) are derived on the client, so the wire
- * stays the source data rather than a rendered card.
- *
- * <p>{@code deal} is the catalogue's {@code buy|rent} value; the front-end seam translates it to its
- * own {@code sale|rent} display label. {@code publishedListingId} is {@code null} until the record
- * is published, at which point it is the id of the spawned listing.
- */
+/** Wire source data, not a rendered card: the client derives price strings and the location line, and relabels
+ * {@code buy} as {@code sale}. */
 public record ManagedPropertyDto(
         String id,
         String title,
@@ -31,6 +23,7 @@ public record ManagedPropertyDto(
         String status,
         boolean rented,
         String tenantName,
+        String tenantMobile,
         Long monthlyRent,
         Integer dueDay,
         Map<String, Object> valuation,

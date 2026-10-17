@@ -19,6 +19,9 @@ export const updateManaged = async (id, changes) => (await provider()).updateMan
  * and deleting the private file must not withdraw a live advert. */
 export const deleteManaged = async (id) => (await provider()).deleteManaged(id);
 
+/** Clears the tenant, rent and due day; receipts already issued are kept. */
+export const stopRentTracking = async (id) => (await provider()).stopRentTracking(id);
+
 /** Idempotent: a record that already has a listing does not spawn a second. Rejects when the record cannot become
  * a listing (the server re-runs its validation), so callers must have an error branch. */
 export const publishManaged = async (id, known) => (await provider()).publishManaged(id, known);
@@ -37,3 +40,6 @@ export const listRentReceipts = async (propertyId, months = 6) =>
  * Callers need an error branch: 422 is safe to show; 409 means the view is stale, so re-read. */
 export const recordRentReceipt = async (propertyId, rentMonth) =>
   (await provider()).recordRentReceipt(propertyId, rentMonth);
+
+/** Tenant side: matched on the caller's mobile, so receipts are only those issued since they were named. */
+export const listTrackedRent = async () => (await provider()).listTrackedRent();

@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uploadedListingPhotos, uniqueMobile, signedInAs } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
@@ -70,6 +71,22 @@ test('owner finance transaction drives the API summary and the dashboard expense
 
   await expect(page.getByText('Rent received — August rent')).toBeVisible();
   await expect(page.getByText('Repairs — Plumbing repair')).toBeVisible();
+  await expect(page.getByText('₹24,000', { exact: true }), 'net cashflow leads the summary').toBeVisible();
+
+  await page.getByRole('button', { name: 'Expense', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Expense', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByText('Rent received — August rent')).toHaveCount(0);
+  await expect(page.getByText('Repairs — Plumbing repair')).toBeVisible();
+
+  await page.getByRole('tab', { name: /Reports/i }).click();
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Export as CSV' }).click(),
+  ]);
+  const csv = await readFile(await download.path(), 'utf8');
+  expect(csv, 'the statement carries the server ledger').toContain('Plumbing repair');
+  expect(csv).toContain('August rent');
+
   await page.getByRole('tab', { name: /Insights/i }).click();
   await expect(page.getByText('Expense breakdown', { exact: true })).toBeVisible();
   await expect(page.locator('canvas').last()).toBeVisible();

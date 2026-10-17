@@ -1,8 +1,13 @@
 /** Routes are scoped to the bearer token, so there is no owner argument; a record not yours is a 404. */
 import { PAGE_LOAD_TTL, get, post, patch, del } from '../../http.js';
 import {
-  toManaged, toManagedList, toCreateRequest, toUpdateRequest, toRentReceiptList, toRentReceipt,
+  toManaged, toManagedList, toCreateRequest, toUpdateRequest, toRentReceiptList, toRentReceipt, toTrackedRentList,
 } from './managedMapper.js';
+
+/** Homes whose owner tracks rent against the caller's own mobile — the tenant's side. */
+export async function listTrackedRent() {
+  return toTrackedRentList(await get('/me/tracked-rent'));
+}
 
 /** The caller's managed records, newest first (the server orders them). */
 export async function listManaged() {
@@ -20,7 +25,6 @@ export async function getManaged(id) {
   }
 }
 
-/** Register a new private record. */
 export async function registerManaged(data) {
   return toManaged(await post('/me/managed-properties', toCreateRequest(data)));
 }
@@ -33,6 +37,10 @@ export async function updateManaged(id, changes) {
 /** Hard delete. The listing it may have spawned is untouched, server-side and here. */
 export async function deleteManaged(id) {
   await del(`/me/managed-properties/${encodeURIComponent(id)}`);
+}
+
+export async function stopRentTracking(id) {
+  return toManaged(await del(`/me/managed-properties/${encodeURIComponent(id)}/rent-tracking`));
 }
 
 const receiptsPath = (id) => `/me/managed-properties/${encodeURIComponent(id)}/rent-receipts`;

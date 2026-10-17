@@ -1,12 +1,10 @@
-/* Owner Hub — passport completeness. A property's "passport" is complete when the
-   owner has captured the basics, a valuation, at least one document, and rent
-   details (or marked it vacant). Drives the completeness meter. */
+/* Passport completeness: basics, a valuation, a document, and rent details or a vacant mark. */
 
 export function passportChecklist(prop, docCount = 0) {
   const basics = !!(prop.locality && prop.bhkNum && prop.area);
   const valued = !!prop.valuation;
   const hasDoc = docCount > 0;
-  const rentReady = prop.rented ? !!(prop.monthlyRent && prop.tenantName) : true;
+  const rentReady = prop.rented ? !!(prop.monthlyRent && prop.tenantName && prop.tenantMobile) : true;
   const furnished = !!prop.furnishing;
   return [
     { key: 'basics', labelKey: 'ownerHub.ckBasics', done: basics },

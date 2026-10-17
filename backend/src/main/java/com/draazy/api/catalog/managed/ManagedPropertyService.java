@@ -10,6 +10,7 @@ import com.draazy.api.catalog.society.SocietyReference;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -42,12 +43,13 @@ public class ManagedPropertyService {
     private final UserRepository users;
     private final Validator validator;
     private final SocietyReference societyReference;
+    private final TrackedRentService trackedRent;
 
     public ManagedPropertyService(ManagedPropertyRepository records,
             ManagedRentReceiptRepository receipts, ManagedPropertyMapper mapper,
             LocalityBinding localities, ListingService listingService,
             PropertyRepository properties, UserRepository users, Validator validator,
-            SocietyReference societyReference) {
+            SocietyReference societyReference, TrackedRentService trackedRent) {
         this.records = records;
         this.receipts = receipts;
         this.mapper = mapper;
@@ -57,6 +59,7 @@ public class ManagedPropertyService {
         this.users = users;
         this.validator = validator;
         this.societyReference = societyReference;
+        this.trackedRent = trackedRent;
     }
 
     @Transactional(readOnly = true)
@@ -80,15 +83,26 @@ public class ManagedPropertyService {
                 in.bhk(), in.price(), locality.name(), locality.slug(), societyReference.nameOf(in.societyId()), in.area(), in.areaUnit(),
                 in.furnishing());
         m.setRented(Boolean.TRUE.equals(in.rented()));
-        m.setTenantName(in.tenantName());
+        m.setTenantName(trimmed(in.tenantName()));
+        boolean named = m.setTenantMobile(MobileMask.normalise(in.tenantMobile()));
         m.setMonthlyRent(in.monthlyRent() != null ? in.monthlyRent()
                 : (DealIntent.RENT.equals(in.deal()) ? in.price() : null));
         m.setDueDay(in.dueDay());
         m.setValuation(in.valuation());
+        if (m.isRented()) {
+            requireTrackable(ownerId, m);
+        }
         if (in.publishedListingId() != null && !in.publishedListingId().isBlank()) {
             m.markPublished(adopt(ownerId, in.publishedListingId()));
         }
-        return mapper.toDto(records.saveAndFlush(m));
+        return announced(records.saveAndFlush(m), named);
+    }
+
+    private ManagedPropertyDto announced(ManagedProperty saved, boolean named) {
+        if (named && saved.isRented()) {
+            trackedRent.announceTenant(saved);
+        }
+        return mapper.toDto(saved);
     }
 
     /** Resolve the listing a new record claims, or refuse. Someone else's listing is {@code 404} so
@@ -147,8 +161,9 @@ public class ManagedPropertyService {
             m.setRented(in.rented());
         }
         if (in.tenantName() != null) {
-            m.setTenantName(in.tenantName());
+            m.setTenantName(trimmed(in.tenantName()));
         }
+        boolean named = in.tenantMobile() != null && m.setTenantMobile(MobileMask.normalise(in.tenantMobile()));
         if (in.monthlyRent() != null) {
             m.setMonthlyRent(in.monthlyRent());
         }
@@ -158,7 +173,48 @@ public class ManagedPropertyService {
         if (in.valuation() != null) {
             m.setValuation(in.valuation());
         }
+        boolean rentTouched = in.rented() != null || in.tenantName() != null || in.tenantMobile() != null
+                || in.monthlyRent() != null || in.dueDay() != null;
+        if (rentTouched && m.isRented()) {
+            requireTrackable(ownerId, m);
+        }
+        return announced(records.saveAndFlush(m), named);
+    }
+
+    /** Stop tracking rent and forget the tenant. Recorded receipts stay: each is an issued document. */
+    @Transactional
+    public ManagedPropertyDto stopRentTracking(UUID ownerId, String id) {
+        ManagedProperty m = ownedRecord(ownerId, id);
+        m.setRented(false);
+        m.setTenantName(null);
+        m.setTenantMobile(null);
+        m.setMonthlyRent(null);
+        m.setDueDay(null);
         return mapper.toDto(records.saveAndFlush(m));
+    }
+
+    /** A tracked tenancy must name who pays, on which number, and how much — the receipt and every
+     * reminder are built from these, and the mobile is what ties the tenant to the owner. */
+    private void requireTrackable(UUID ownerId, ManagedProperty m) {
+        if (m.getTenantName() == null || m.getTenantName().isBlank()) {
+            throw new ValidationException("Add the tenant's full name");
+        }
+        if (m.getTenantMobile() == null) {
+            throw new ValidationException("Add the tenant's 10-digit mobile number");
+        }
+        if (users.findById(ownerId).map(User::getMobile).filter(m.getTenantMobile()::equals).isPresent()) {
+            throw new ValidationException("The tenant's mobile can't be your own number");
+        }
+        if (m.getMonthlyRent() == null || m.getMonthlyRent() <= 0) {
+            throw new ValidationException("Set a monthly rent above zero");
+        }
+        if (m.getMonthlyRent() > ManagedProperty.MAX_MONTHLY_RENT) {
+            throw new ValidationException("Rent can't be more than ₹1,00,00,000 a month");
+        }
+    }
+
+    private static String trimmed(String s) {
+        return s == null ? null : s.trim();
     }
 
     @Transactional
@@ -259,7 +315,9 @@ public class ManagedPropertyService {
         String landlord = owner.getName() == null || owner.getName().isBlank()
                 ? "Owner"
                 : owner.getName().trim();
-        return mapper.toDto(receipts.saveAndFlush(new ManagedRentReceipt(m, rentMonth, landlord)));
+        ManagedRentReceipt receipt = receipts.saveAndFlush(new ManagedRentReceipt(m, rentMonth, landlord));
+        trackedRent.announceReceipt(m, rentMonth);
+        return mapper.toDto(receipt);
     }
 
     /** Refuse a month no tenancy could have paid rent for — a receipt is immutable and undeletable,

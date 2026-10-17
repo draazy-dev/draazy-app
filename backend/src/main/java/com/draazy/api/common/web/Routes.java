@@ -247,6 +247,10 @@ public final class Routes {
         public static final String PUBLISH = BASE + "/{id}/publish";
 
         public static final String RENT_RECEIPTS = BY_ID + "/rent-receipts";
+
+        public static final String RENT_TRACKING = BY_ID + "/rent-tracking";
+
+        public static final String TRACKED_RENT = "/me/tracked-rent";
     }
 
     public static final class MePhotos {
@@ -694,6 +698,9 @@ public final class Routes {
 
         /** {@code GET} public, {@code POST} authenticated — reviews of a society, locality or owner. */
         public static final String FOR_ENTITY = "/reviews/{entityType}/{entityId}";
+
+        /** {@code PUT} / {@code DELETE} by the review's own author. */
+        public static final String BY_ID = "/reviews/{id}";
     }
 
     public static final class Content {
