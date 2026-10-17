@@ -17,5 +17,7 @@ public record ReviewResponse(
         String context,
         Map<String, Integer> categories,
         Boolean recommend,
-        Instant createdAt) {
+        Instant createdAt,
+        // True only on the signed-in caller's own review, so the page can offer edit and delete.
+        Boolean mine) {
 }

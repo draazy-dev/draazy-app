@@ -5,12 +5,15 @@ import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.CurrentUser;
 import jakarta.validation.Valid;
+import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,13 +31,14 @@ public class EntityReviewController {
 
     /** Sort stripped via {@link Pageables#unsorted(Pageable)}: {@code ?sort=} on a public route would 500. */
     @GetMapping(Routes.Reviews.FOR_ENTITY)
-    public ReviewListResponse list(@PathVariable String entityType,
+    public ReviewListResponse list(@CurrentUser AuthPrincipal viewer,
+            @PathVariable String entityType,
             @PathVariable String entityId,
             @PageableDefault(size = 20) Pageable pageable) {
-        return reviewService.listForEntity(entityType, entityId, Pageables.unsorted(pageable));
+        return reviewService.listForEntity(entityType, entityId, Pageables.unsorted(pageable),
+                viewer == null ? null : viewer.userId());
     }
 
-    /** {@code POST /reviews/{entityType}/{entityId}} (contract {@code createEntityReview}) — 201. */
     @PostMapping(Routes.Reviews.FOR_ENTITY)
     @ResponseStatus(HttpStatus.CREATED)
     public ReviewResponse create(@CurrentUser AuthPrincipal principal,
@@ -42,5 +46,18 @@ public class EntityReviewController {
             @PathVariable String entityId,
             @Valid @RequestBody ReviewCreateRequest body) {
         return reviewService.createForEntity(principal.userId(), entityType, entityId, body);
+    }
+
+    /** Any target kind, so it sits beside the generic route rather than the property one. */
+    @PutMapping(Routes.Reviews.BY_ID)
+    public ReviewResponse update(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
+            @Valid @RequestBody ReviewCreateRequest body) {
+        return reviewService.update(principal.userId(), id, body);
+    }
+
+    @DeleteMapping(Routes.Reviews.BY_ID)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@CurrentUser AuthPrincipal principal, @PathVariable UUID id) {
+        reviewService.delete(principal.userId(), id);
     }
 }

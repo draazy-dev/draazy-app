@@ -15,7 +15,6 @@ const SOCIETY_CATEGORY_ORDER = ['Safety', 'Maintenance', 'Management', 'Amenitie
 const categoryOrderFor = (entityType) =>
   (entityType === 'society' ? SOCIETY_CATEGORY_ORDER : PROPERTY_CATEGORY_ORDER);
 
-/** One wire `Review` → one view model. */
 export function toViewModel(r) {
   if (!r) return null;
   return {
@@ -31,6 +30,7 @@ export function toViewModel(r) {
     recommend: r.recommend ?? null,
     context: r.context ?? null,
     at: displayDate(r.createdAt),
+    mine: r.mine === true,
   };
 }
 

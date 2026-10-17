@@ -3,12 +3,12 @@ import Icon from '../../../../components/Icon.jsx';
 import ReportModal from '../../../../components/ReportModal.jsx';
 import { REVIEW_REPORT_REASONS } from '../../../../lib/reportReasons.js';
 import { Stars } from '../../property/Stars.jsx';
+import { OwnReviewBar } from '../../property/OwnReviewBar.jsx';
 
 export default function ReviewsTab({ ctx }) {
   const { t } = useTranslation();
-  const { rating, overall, bars, reviews, openReport, reportFor, closeReport, toast } = ctx;
-  /** Three outcomes: an unreadable `rating` must not collapse into "no reviews yet"; the aspect grid is gated on `bars.length`,
-   * because a review may rate the society overall and skip every aspect. */
+  const { rating, overall, bars, reviews, openReport, reportFor, closeReport, toast, openComposer, deleteMine } = ctx;
+  // An unreadable `rating` must not read as "no reviews yet"; a review may skip every aspect.
   const showAggregate = !rating.loading && !rating.failed && rating.count > 0;
   return (
     <>
@@ -34,7 +34,7 @@ export default function ReviewsTab({ ctx }) {
         {reviews.length ? (
           <div className="space-y-3">
             {reviews.slice(0, 5).map((r) => (
-              <div key={r.id} className="glass rounded-xl p-4"><div className="flex items-center justify-between mb-1"><span className="font-semibold text-sm flex items-center gap-1.5">{r.user}</span><span className="flex items-center gap-2"><Stars value={r.rating} size={14} /><button onClick={() => openReport(r)} aria-label={t('society.reportReview')} className="text-gray-500 hover:text-amber-300"><Icon name="flag" className="w-3.5 h-3.5" /></button></span></div>{r.text ? <p className="text-gray-400 text-sm">{r.text}</p> : null}</div>
+              <div key={r.id} className="glass rounded-xl p-4"><div className="flex items-center justify-between mb-1"><span className="font-semibold text-sm flex items-center gap-1.5">{r.user}</span><span className="flex items-center gap-2"><Stars value={r.rating} size={14} /><button onClick={() => openReport(r)} aria-label={t('society.reportReview')} className="text-gray-500 hover:text-amber-300"><Icon name="flag" className="w-3.5 h-3.5" /></button></span></div>{r.text ? <p className="text-gray-400 text-sm">{r.text}</p> : null}{r.mine ? <OwnReviewBar onEdit={openComposer} onDelete={deleteMine} /> : null}</div>
             ))}
           </div>
         ) : <p className="text-gray-500 text-sm"><Trans i18nKey="society.noReviewsYet" components={{ 1: <b /> }} /></p>}

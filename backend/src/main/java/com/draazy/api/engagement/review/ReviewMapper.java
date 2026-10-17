@@ -24,7 +24,8 @@ public interface ReviewMapper {
     @Mapping(target = "id", source = "entity.id")
     @Mapping(target = "author", source = "authorName")
     @Mapping(target = "categories", source = "entity.categories", qualifiedByName = "jsonToCategories")
-    ReviewResponse toResponse(Review entity, String authorName);
+    @Mapping(target = "mine", source = "mine")
+    ReviewResponse toResponse(Review entity, String authorName, Boolean mine);
 
     /** Falls back to empty on malformed JSON so one corrupt row costs its sub-ratings, not a 500 on the
      * whole listing page. */

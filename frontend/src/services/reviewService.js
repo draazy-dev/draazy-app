@@ -24,9 +24,20 @@ export const listEntityReviews = async (entityType, entityId, opts) =>
 export const getEntityReviewSummary = async (entityType, entityId, opts) =>
   (await provider()).getEntityReviewSummary(entityType, entityId, opts);
 
-/** Rate a society, locality or owner. Resolves to the created review. */
 export const createEntityReview = async (entityType, entityId, review) =>
   (await provider()).createEntityReview(entityType, entityId, review);
+
+/** The caller's own review only (`mine` on the list row); the server 404s anyone else's. */
+export const updateReview = async (id, review) => (await provider()).updateReview(id, review);
+
+export const deleteReview = async (id) => (await provider()).deleteReview(id);
+
+/** The message for a review the server refused on purpose, or `null` so the caller keeps its own fallback. */
+export const reviewRefusal = (err, t) => {
+  if (err?.code === 'already_reviewed') return t('common.alreadyReviewed');
+  if (err?.code === 'review_not_eligible' && err.message) return err.message;
+  return null;
+};
 
 /** A separate route: a public one that could return rejected rows is one missed auth check from leaking them. */
 export const listReviewsForModeration = async (opts) =>

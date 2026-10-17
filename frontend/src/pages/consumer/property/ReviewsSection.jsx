@@ -5,7 +5,7 @@ import MobileCollapse from '../../../components/ui/MobileCollapse.jsx';
 import { digits } from '../../../lib/contact.js';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
-import { listPropertyReviews, createPropertyReview, getPropertyReviewSummary } from '../../../services/reviewService.js';
+import { listPropertyReviews, createPropertyReview, getPropertyReviewSummary, reviewRefusal, updateReview, deleteReview } from '../../../services/reviewService.js';
 import {
   myTenancies,
   listTenancyDeclarations,
@@ -16,6 +16,7 @@ import {
 import { listVisits } from '../../../services/visitService.js';
 import { Stars } from './Stars.jsx';
 import { ReviewModal } from './ReviewModal.jsx';
+import { OwnReviewBar } from './OwnReviewBar.jsx';
 
 function initials(name) {
   const parts = String(name || 'U').trim().split(/\s+/);
@@ -59,13 +60,13 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
       .catch(() => { if (alive) setReviewsFailed(true); });
     getPropertyReviewSummary(propId)
       .then((s) => { if (alive) setSummary(s); })
-      // Deliberately not recomputed from the list as a fallback. That reduce is the thing this
-      // replaced, and keeping a copy of it would mean a broken summary endpoint never shows.
+      // Not recomputed from the list as a fallback: a broken summary endpoint must show as a failure.
       .catch(() => { if (alive) setSummaryFailed(true); });
     return () => { alive = false; };
   }, [propId]);
 
   const list = reviews || [];
+  const myReview = list.find((r) => r.mine) || null;
   /* Loading is "still outstanding", so a settled failure ends it — otherwise a 404 leaves three
    * skeletons spinning forever, which is its own kind of lie. */
   const loading = (reviews === null && !reviewsFailed) || (summary === null && !summaryFailed);
@@ -156,11 +157,11 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
 
   const openRate = () => {
     if (!isIn) { sendToSignIn('review'); return; }
+    if (myReview) { setModal(true); return; }
     if (isOwner) { toast(t('property.cantReviewOwn'), 'info'); return; }
     if (!eligible) {
       if (myVisit === 'scheduled') toast(t('property.visitBookedReview'), 'info');
-      // A resident who never booked a visit is not told to go and book one — that sentence was
-      // simply wrong for them, and it was the only thing the dead tenancy check left them with.
+      // A resident who never booked a visit is not told to go and book one.
       else if (myDeclaration) toast(t('property.declarationPending'), 'info');
       else toast(t('property.bookVisitFirst'), 'info');
       return;
@@ -168,7 +169,6 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
     setModal(true);
   };
 
-  /* ── Declaring a past stay, and the owner answering ────────────────────────────────────────── */
   const [deciding, setDeciding] = useState(false);
   /* Both actions unmount the button the user activated, which drops focus to `<body>` a long way up the page. */
   const outcomeRef = useRef(null);
@@ -201,20 +201,36 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
      them to make a claim the owner then has to answer is work for both parties that changes nothing. */
   const canDeclare = isIn && !!propId && !isOwner && !eligible && myVisit !== 'completed' && !myDeclaration;
 
+  const [busy, setBusy] = useState(false);
+  // Re-read rather than patch locally: the server owns the id, timestamp and `context` badge, and the
+  // summary is independent of this list so it has to be refreshed alongside it.
+  const reload = () => Promise.all([listPropertyReviews(propId), getPropertyReviewSummary(propId)])
+    .then(([res, s]) => {
+      setReviews(res.items);
+      setReviewsFailed(false);
+      setSummary(s);
+      setSummaryFailed(false);
+    });
+
   const submit = (review) => {
-    // Re-read rather than prepend a local object: the server owns the id, timestamp and `context`
-    // badge, and the summary is independent of this list so it has to be refreshed alongside it.
-    createPropertyReview(propId, review)
-      .then(() => Promise.all([listPropertyReviews(propId), getPropertyReviewSummary(propId)]))
-      .then(([res, s]) => {
-        setReviews(res.items);
-        setReviewsFailed(false);
-        setSummary(s);
-        setSummaryFailed(false);
+    const editing = !!myReview;
+    (editing ? updateReview(myReview.id, review) : createPropertyReview(propId, review))
+      .then(reload)
+      .then(() => {
         setModal(false);
-        toast(t('property.reviewPosted'), 'success');
+        toast(t(editing ? 'common.reviewUpdated' : 'property.reviewPosted'), 'success');
       })
-      .catch(() => toast(t('property.reviewFailed'), 'error'));
+      .catch((err) => toast(reviewRefusal(err, t) || t('property.reviewFailed'), 'error'));
+  };
+
+  const removeMine = () => {
+    if (busy || !myReview || !window.confirm(t('common.deleteReviewConfirm'))) return;
+    setBusy(true);
+    deleteReview(myReview.id)
+      .then(reload)
+      .then(() => toast(t('common.reviewDeleted'), 'success'))
+      .catch(() => toast(t('common.reviewDeleteFailed'), 'error'))
+      .finally(() => setBusy(false));
   };
 
   return (
@@ -223,11 +239,10 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
         <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2"><Icon name="star" className="w-5 h-5 text-amber-400" /> {t('property.ratingsReviews')}</h2>
         <div className="flex items-center gap-2 sm:gap-3">
           <button onClick={onReport} className="inline-flex items-center gap-1.5 text-sm font-medium text-slate-400 hover:text-red-400 transition-smooth"><Icon name="flag" className="w-4 h-4" /> {t('property.reportListing')}</button>
-          {!isOwner ? <button type="button" onClick={openRate} className="btn-teal inline-flex items-center gap-2 text-sm py-2.5 px-4"><Icon name="star" className="w-4 h-4" /> {t('property.rateProperty')}</button> : null}
+          {!isOwner ? <button type="button" onClick={openRate} className="btn-teal inline-flex items-center gap-2 text-sm py-2.5 px-4"><Icon name={myReview ? 'pencil' : 'star'} className="w-4 h-4" /> {myReview ? t('common.editReview') : t('property.rateProperty')}</button> : null}
         </div>
       </div>
 
-      {/* ── The tenancy door ────────────────────────────────────────────────────. */}
       {canDeclare ? (
         <div className="rounded-xl border border-white/8 bg-white/[0.03] px-4 py-3 mb-6 flex items-center gap-3 flex-wrap" data-testid="tenancy-declare">
           <Icon name="home" className="w-5 h-5 text-brand-teal-3 flex-shrink-0" />
@@ -334,9 +349,8 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
                 return (
                   <div key={s} className="flex items-center gap-2 mb-1">
                     <span className="text-[11px] text-slate-400 w-3">{s}</span>
-                    <Icon name="star" className="w-3 h-3 fill-amber-400 text-amber-400" />
+                    <Icon name="star" weight="fill" className="w-3 h-3 text-amber-400" />
                     <div className="flex-1 h-2 rounded-full bg-white/8 overflow-hidden"><div className="h-full bg-amber-400" style={{ width: Math.round((c / max) * 100) + '%' }} /></div>
-
                     <span className="text-[11px] text-slate-500 w-5 text-right" data-testid={'reviews-bar-' + s}>{c}</span>
                   </div>
                 );
@@ -368,7 +382,7 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
                       <span className="text-white font-semibold text-sm">{r.user}</span>
 
                       {r.context ? (
-                        <span className={'inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ' + (r.context === 'tenant' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' : 'bg-teal-500/15 text-teal-300 border-teal-500/25')}><Icon name={r.context === 'tenant' ? 'home' : 'calendar-check'} className="w-2.5 h-2.5" /> {r.context === 'tenant' ? t('property.verifiedResident') : t('property.visited')}</span>
+                        <span className={'dz-tag font-semibold border ' + (r.context === 'tenant' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' : 'bg-teal-500/15 text-teal-300 border-teal-500/25')}><Icon name={r.context === 'tenant' ? 'home' : 'calendar-check'} className="w-2.5 h-2.5" /> {r.context === 'tenant' ? t('property.verifiedResident') : t('property.visited')}</span>
                       ) : null}
                     </div>
                     <div className="flex items-center gap-2 mb-2"><Stars value={r.rating} size={14} /><span className="text-[11px] text-slate-500">{r.at}</span></div>
@@ -381,7 +395,8 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
                       </div>
                     ) : null}
                     {r.recommend != null ? <p className={'text-[11px] mt-2 ' + (r.recommend ? 'text-emerald-400' : 'text-slate-400')}><Icon name={r.recommend ? 'thumbs-up' : 'thumbs-down'} className="w-3 h-3 inline" /> {r.recommend ? t('property.wouldRecommend') : t('property.wouldNotRecommend')}</p> : null}
-                  </div>
+                                        {r.mine ? <OwnReviewBar onEdit={() => setModal(true)} onDelete={removeMine} busy={busy} /> : null}
+                                      </div>
                 </div>
               </div>
             )) : reviewsFailed ? (
@@ -391,7 +406,7 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
         </MobileCollapse>
       )}
 
-      {modal ? <ReviewModal onClose={() => setModal(false)} onSubmit={submit} /> : null}
+      {modal ? <ReviewModal initial={myReview} onClose={() => setModal(false)} onSubmit={submit} /> : null}
     </section>
   );
 }

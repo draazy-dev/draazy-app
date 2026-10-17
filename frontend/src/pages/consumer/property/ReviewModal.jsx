@@ -6,14 +6,12 @@ import { StarInput } from './StarInput.jsx';
 import { RV_CATS } from './ReviewsSection.jsx';
 import useScrollLock from '../../../hooks/useScrollLock.js';
 
-// No `user` prop: the author's display name is the server's answer, taken from the authenticated
-// caller, not something the form carries. It was only ever needed to stamp the review locally.
-export function ReviewModal({ onClose, onSubmit }) {
+export function ReviewModal({ onClose, onSubmit, initial }) {
   const { t } = useTranslation();
-  const [rating, setRating] = useState(0);
-  const [cats, setCats] = useState({});
-  const [text, setText] = useState('');
-  const [recommend, setRecommend] = useState(null);
+  const [rating, setRating] = useState(initial?.rating || 0);
+  const [cats, setCats] = useState(initial?.categories || {});
+  const [text, setText] = useState(initial?.text || '');
+  const [recommend, setRecommend] = useState(initial?.recommend ?? null);
 
   useScrollLock();
   useEffect(() => {
@@ -21,6 +19,8 @@ export function ReviewModal({ onClose, onSubmit }) {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  const title = t(initial ? 'common.editReview' : 'property.rateProperty');
 
   const submit = () => {
     if (!rating) return;
@@ -30,11 +30,11 @@ export function ReviewModal({ onClose, onSubmit }) {
   };
 
   return createPortal(
-    <div className="dz-modal-backdrop" role="dialog" aria-modal="true" aria-label={t('property.rateProperty')} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="dz-modal-backdrop" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="dz-modal">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-lg font-bold text-white">{t('property.rateProperty')}</h3>
+            <h3 className="text-lg font-bold text-white">{title}</h3>
             <p className="text-xs text-slate-400 mt-0.5">{t('property.rateSub')}</p>
           </div>
           <button onClick={onClose} className="dz-modal-x" aria-label={t('property.close')}><Icon name="x" className="w-5 h-5" /></button>
@@ -62,11 +62,11 @@ export function ReviewModal({ onClose, onSubmit }) {
           <div>
             <p className="text-sm font-semibold text-white mb-2">{t('property.wouldYouRecommend')}</p>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setRecommend(true)} className={'flex-1 py-2 rounded-xl border text-sm font-medium inline-flex items-center justify-center gap-1.5 ' + (recommend === true ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-white/10 text-slate-300 hover:bg-white/5')}><Icon name="thumbs-up" className="w-4 h-4" /> {t('property.yes')}</button>
-              <button type="button" onClick={() => setRecommend(false)} className={'flex-1 py-2 rounded-xl border text-sm font-medium inline-flex items-center justify-center gap-1.5 ' + (recommend === false ? 'border-red-500/40 bg-red-500/10 text-red-300' : 'border-white/10 text-slate-300 hover:bg-white/5')}><Icon name="thumbs-down" className="w-4 h-4" /> {t('property.no')}</button>
+              <button type="button" onClick={() => setRecommend(true)} className={'h-btn-sm flex-1 rounded-xl border text-sm font-medium inline-flex items-center justify-center gap-1.5 ' + (recommend === true ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-white/10 text-slate-300 hover:bg-white/5')}><Icon name="thumbs-up" className="w-4 h-4" /> {t('property.yes')}</button>
+              <button type="button" onClick={() => setRecommend(false)} className={'h-btn-sm flex-1 rounded-xl border text-sm font-medium inline-flex items-center justify-center gap-1.5 ' + (recommend === false ? 'border-red-500/40 bg-red-500/10 text-red-300' : 'border-white/10 text-slate-300 hover:bg-white/5')}><Icon name="thumbs-down" className="w-4 h-4" /> {t('property.no')}</button>
             </div>
           </div>
-          <button type="button" onClick={submit} disabled={!rating} className={'btn-teal w-full flex items-center justify-center gap-2 py-3 ' + (!rating ? 'opacity-50 cursor-not-allowed' : '')}><Icon name="check" className="w-4 h-4" /> {t('property.submitReview')}</button>
+          <button type="button" onClick={submit} disabled={!rating} className={'btn-teal w-full flex items-center justify-center gap-2 py-3 ' + (!rating ? 'opacity-50 cursor-not-allowed' : '')}><Icon name="check" className="w-4 h-4" /> {t(initial ? 'common.updateReview' : 'property.submitReview')}</button>
         </div>
       </div>
     </div>,

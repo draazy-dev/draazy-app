@@ -1,4 +1,4 @@
-import { get, patch, post } from '../../http.js';
+import { del, get, patch, post, put } from '../../http.js';
 import {
   toModerationViewModelPage,
   toReviewCreate,
@@ -61,6 +61,14 @@ export async function createEntityReview(entityType, entityId, review) {
     toReviewCreate(review),
   );
   return toViewModel(created);
+}
+
+export async function updateReview(id, review) {
+  return toViewModel(await put(`/reviews/${encodeURIComponent(id)}`, toReviewCreate(review)));
+}
+
+export async function deleteReview(id) {
+  await del(`/reviews/${encodeURIComponent(id)}`);
 }
 
 /** Summary of the same response `listEntityReviews` reads (pass the same `size` to share it).

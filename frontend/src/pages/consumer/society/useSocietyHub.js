@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useFollows } from '../../../context/FollowContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
@@ -8,14 +9,14 @@ import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { fmtNum } from '../../../lib/format.js';
 import { fnvHash } from '../../../lib/hash.js';
 import { commuteInfo } from '../property/locationIntel.js';
-import { createEntityReview, getEntityReviewSummary, listEntityReviews } from '../../../services/reviewService.js';
+import { createEntityReview, deleteReview, getEntityReviewSummary, listEntityReviews, reviewRefusal, updateReview } from '../../../services/reviewService.js';
 import { getSociety } from '../../../services/societyService.js';
 import { TAB_IDS, REVIEW_CATS, REVIEW_CAT_KEYS, NOW_YEAR, HERO, titleCase } from './constants.js';
 import { genericSociety } from './helpers.jsx';
 
 const MIN_REVIEWS_FOR_TAB = 3;
-/** The reviews tab shows five; list and summary share one request at this size. */
-const REVIEW_READ = { size: 5 };
+// Visitors get the five the tab shows; a signed-in reader gets the full page so their own review is found.
+const VISITOR_READ = { size: 5 };
 const EMPTY_HOMES = [];
 
 export function useSocietyHub() {
@@ -25,6 +26,7 @@ export function useSocietyHub() {
   const sendToSignIn = useSignInGate();
   const { isIn } = useAuth();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const follows = useFollows();
 
   const activeTab = useMemo(() => {
@@ -63,6 +65,7 @@ export function useSocietyHub() {
   const locName = soc._locName || titleCase(soc.localitySlug);
 
   const listings = soc.homes || EMPTY_HOMES;
+  const reviewRead = isIn ? undefined : VISITOR_READ;
   const [reviews, setReviews] = useState([]);
   // `null` until the summary read settles; `summaryFailed` keeps "could not read" distinguishable
   // from "count is 0", which is the difference between an outage and an unreviewed society.
@@ -80,17 +83,19 @@ export function useSocietyHub() {
   // The server accepts the slug as an alias for its UUID key; soc.id is a local synthetic id it cannot resolve.
   useEffect(() => {
     let alive = true;
+    setReviews([]);
     setSummary(null);
     setSummaryFailed(false);
-    listEntityReviews('society', soc.slug, REVIEW_READ)
+    setRateOpen(false);
+    listEntityReviews('society', soc.slug, reviewRead)
       .then((res) => { if (alive) setReviews(res.items); })
       .catch(() => { if (alive) setReviews([]); });
     // The summary covers the whole corpus, not just the page above.
-    getEntityReviewSummary('society', soc.slug, REVIEW_READ)
+    getEntityReviewSummary('society', soc.slug, reviewRead)
       .then((s) => { if (alive) setSummary(s); })
       .catch(() => { if (alive) setSummaryFailed(true); });
     return () => { alive = false; };
-  }, [soc.slug]);
+  }, [soc.slug, reviewRead]);
 
   // The summary is the authority: reducing the on-screen page would pass the newest few off as the rating.
   const rating = useMemo(() => ({
@@ -128,26 +133,35 @@ export function useSocietyHub() {
     const now = await follows.toggle(soc.slug);
     toast(now ? `Following ${soc.name} — we'll alert you on new listings` : 'Unfollowed', now ? 'success' : 'info');
   };
+  const myReview = reviews.find((r) => r.mine);
+  // Both reads: the headline comes from the summary, so re-reading only the cards would
+  // leave a stale average beside the reviewer's own rating.
+  const reloadReviews = () => Promise.all([
+    listEntityReviews('society', soc.slug, reviewRead),
+    getEntityReviewSummary('society', soc.slug, reviewRead),
+  ]).then(([list, sum]) => { setReviews(list.items); setSummary(sum); setSummaryFailed(false); });
+  const closeComposer = () => { setRevText(''); setPick(5); setCats({}); setRateOpen(false); };
+  const openComposer = () => {
+    if (myReview) { setPick(myReview.rating); setRevText(myReview.text); setCats(myReview.categories); }
+    setRateOpen(true);
+  };
+  const toggleComposer = () => (rateOpen ? closeComposer() : openComposer());
   const submitReview = () => {
     if (soc._generic || !requireLogin()) return;
     // No `resident` flag: `categories` carries only the aspects the reviewer actually touched.
-    createEntityReview('society', soc.slug, { rating: pick, text: revText.trim(), categories: cats })
-      .then((saved) => (saved === 'login'
-        ? null
-        // Both reads: the headline comes from the summary, so re-reading only the cards would
-        // leave a stale average beside the reviewer's own rating.
-        : Promise.all([
-          listEntityReviews('society', soc.slug, REVIEW_READ),
-          getEntityReviewSummary('society', soc.slug, REVIEW_READ),
-        ])))
-      .then((res) => {
-        if (!res) return;
-        const [list, sum] = res;
-        setReviews(list.items); setSummary(sum); setSummaryFailed(false);
-        setRevText(''); setPick(5); setCats({}); setRateOpen(false);
-        toast('Thanks for reviewing this society!', 'success');
-      })
-      .catch(() => toast('Your review could not be posted. Please try again.', 'error'));
+    const review = { rating: pick, text: revText.trim(), categories: cats };
+    (myReview ? updateReview(myReview.id, review) : createEntityReview('society', soc.slug, review))
+      .then((saved) => (saved === 'login' ? null : reloadReviews().then(() => {
+        closeComposer();
+        toast(myReview ? t('common.reviewUpdated') : 'Thanks for reviewing this society!', 'success');
+      })))
+      .catch((err) => toast(reviewRefusal(err, t) || 'Your review could not be posted. Please try again.', 'error'));
+  };
+  const deleteMine = () => {
+    if (!window.confirm(t('common.deleteReviewConfirm'))) return;
+    deleteReview(myReview.id)
+      .then(() => reloadReviews().then(() => { closeComposer(); toast(t('common.reviewDeleted'), 'success'); }))
+      .catch(() => toast(t('common.reviewDeleteFailed'), 'error'));
   };
   const openReport = (review) => { if (requireLogin()) setReportFor(review); };
   const closeReport = () => setReportFor(null);
@@ -190,7 +204,7 @@ export function useSocietyHub() {
     rating, overall, bars, reviews, openReport, reportFor, closeReport, toast,
     hasCoords, dirUrl, commute,
     followed: follows.has(soc.slug), onFollow,
-    hero, rateOpen, setRateOpen, pick, setPick, revText, setRevText, cats, setCat, inp,
+    hero, rateOpen, toggleComposer, openComposer, closeComposer, myReview, deleteMine, pick, setPick, revText, setRevText, cats, setCat, inp,
     submitReview, stats, tabs, current, selectTab,
   };
 }
