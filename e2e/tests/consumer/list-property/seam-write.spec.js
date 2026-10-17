@@ -28,7 +28,7 @@ test.afterEach(async () => {
       await fetch(`${API}/properties/${row.id}/status`, {
         method: 'PATCH',
         headers: adminHeaders,
-        body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup \u2014 synthetic seam-write fixture' }),
+        body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup \u2014 synthetic seam-write fixture', expectedStatus: row.status }),
       });
     }
   }

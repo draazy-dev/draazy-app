@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { API, seedConsent } from '../../../helpers/liveAuth.js';
+import { pickMarker } from '../../../helpers/mapMarker.js';
 
 const RERA_LISTING = 'p5013';
 const NO_RERA_LISTING = 'p5000';
@@ -75,7 +76,7 @@ test('listing cards and map drawer avoid fabricated Draazy verification and conn
 
   await page.goto('/listings?deal=buy&view=map&loc=baner', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/listings\?[^#]*view=map[^#]*loc=baner/);
-  await page.locator('.price-marker', { hasText: label }).first().click();
+  await pickMarker(page, label);
   const drawer = page.locator('.dz-mdp');
   await expect(drawer).toBeVisible({ timeout: 20000 });
   await expect(drawer.locator('.dz-mdp-full')).toHaveAttribute('href', `/property/${MAP_LISTING}`);

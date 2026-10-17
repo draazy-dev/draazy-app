@@ -1,6 +1,6 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { signedInAsNew, authHeaders, API, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
-import { approveListingWithFetch } from '../../../helpers/moderation.js';
+import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const created = new Set();
 
@@ -49,10 +49,7 @@ test.afterEach(async () => {
   if (!created.size) return;
   const headers = await authHeaders(ACTORS.admin);
   for (const id of created) {
-    await api('PATCH', `/properties/${id}/status`, headers, {
-      status: 'rejected',
-      reason: 'Zztest cleanup \u2014 synthetic edit-policy fixture',
-    });
+    await rejectListingWithFetch(id, headers, { reason: 'Zztest cleanup \u2014 synthetic edit-policy fixture' });
   }
   created.clear();
 });

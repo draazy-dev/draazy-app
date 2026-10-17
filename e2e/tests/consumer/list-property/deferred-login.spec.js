@@ -1,5 +1,6 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, E2E_OTP, authHeaders, ownerIdOf, seedConsent, signIn, storedPhotoUrl, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { LIST_PROPERTY_DRAFT_KEY, pickFloors, pickPossession } from '../../../helpers/listingForm.helper.js';
 import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { fillSociety } from '../../../helpers/places.js';
@@ -83,10 +84,7 @@ async function verifyInlineOtp(sheet, mobile) {
 test.afterEach(async () => {
   const admin = await authHeaders(ACTORS.admin);
   for (const id of created) {
-    await api('PATCH', `/properties/${id}/status`, admin, {
-      status: 'rejected',
-      reason: 'Zztest cleanup — deferred login wizard fixture',
-    });
+    await rejectListingWithFetch(id, admin, { reason: 'Zztest cleanup — deferred login wizard fixture' });
   }
   created.clear();
 });

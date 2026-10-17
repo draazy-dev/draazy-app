@@ -187,6 +187,7 @@ test.describe('LIVE: the properties console', () => {
     TAB_ORDER.forEach((pattern, i) => expect(labels[i].trim()).toMatch(pattern));
     await expect(tab(page, /^To verify/)).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByTestId('verify-note')).toContainText('Oldest first');
+    await expect(page.getByRole('group', { name: 'Sort' })).toHaveCount(0);
     await expect(rows(page).first()).toBeVisible({ timeout: 20000 });
     expect(consoleErrors).toEqual([]);
   });

@@ -161,6 +161,7 @@ test('on a phone the identity banner and listing status card leave no dead rows'
   const line = await status.getByText('Buyers can now find and contact you.').boundingBox();
   const card = await status.boundingBox();
   const badge = await status.getByRole('link', { name: 'Get Verified property badge' }).boundingBox();
+  const share = await status.getByRole('button', { name: 'Share listing' }).boundingBox();
   expect(line.y, 'the status line shares the pill row').toBeLessThan(pill.y + pill.height);
-  expect(badge.width, 'the badge CTA fills the row').toBeGreaterThan(card.width * 0.8);
+  expect(share.width + badge.width, 'Share and the badge link fill the action row').toBeGreaterThan(card.width * 0.8);
 });

@@ -20,7 +20,7 @@ test.afterEach(async () => {
       await fetch(`${API}/properties/${row.id}/status`, {
         method: 'PATCH',
         headers: adminHeaders,
-        body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup — required-fields fixture' }),
+        body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup — required-fields fixture', expectedStatus: row.status }),
       });
     }
   }
@@ -88,8 +88,8 @@ test('possession is an unanswered required choice, and the answer drives the sea
   const mobile = await gotoPricing(page);
   await page.locator('input[data-err="price"]').fill('9500000');
   await pickOption(page, 'ownership', 'Freehold');
-  // No pre-selection: a pre-filled "Ready to Move" made the requirement unfailable, so every sale
-  // published the default as though the owner had chosen it.
+  // No pre-selection: a pre-filled "Ready to Move" would make the requirement unfailable, so every sale
+  // would publish the default as though the owner had chosen it.
   await expect(page.locator('[data-err="possession"] .radio-pill[aria-pressed="true"]')).toHaveCount(0);
   await page.getByRole('button', { name: /Next Step/i }).click();
   await expect(page.getByText('Select the possession status.', { exact: true })).toBeVisible();
@@ -244,17 +244,19 @@ test('commercial step 1: the profile decides the measurements, subtypes and floo
     await expect(page.getByText(/chargeable|loading factor/i)).toHaveCount(0);
   });
 
-  await test.step('co-working is no longer offered, because a lump monthly rent cannot state a per-seat price', async () => {
+  await test.step('co-working is offered and asks the same questions as an office', async () => {
     await page.locator('[data-err="commercialType"] .dz-dropdown__trigger').click();
     const menu = page.locator('.dz-dropdown__menu.is-portal-open');
     await expect(menu).toBeVisible();
     const options = await menu.locator('.dz-dropdown__option').allInnerTexts();
-    /* The positive anchor first: an empty menu satisfies the absence below without proving anything
-       about it. */
     expect(options).toContain('Warehouse / Godown');
-    expect(options).not.toContain('Co-working Space');
+    expect(options).toContain('Co-working Space');
     await page.keyboard.press('Escape');
     await expect(page.locator('.dz-dropdown__menu.is-portal-open')).toHaveCount(0);
+
+    await pickOption(page, 'commercialType', 'Co-working Space');
+    await expect(page.locator('input[data-err="seatCount"]')).toBeVisible();
+    await expect(page.locator('input[data-err="floorLoad"]')).toHaveCount(0);
   });
 
   await test.step('a commercial listing cannot leave step 1 without a fit-out status, and owes no floor', async () => {
@@ -265,7 +267,7 @@ test('commercial step 1: the profile decides the measurements, subtypes and floo
     await expect(page.getByText('Floor No. *')).toHaveCount(0);
     await expect(page.getByText('Total Floors *')).toHaveCount(0);
     /* Fit-out is the opposite move. It sets the rent and it is the first filter every enquiry
-       applies, so leaving it unstated publishes a price nobody can read. It was optional. */
+       applies, so leaving it unstated publishes a price nobody can read. */
     await page.getByRole('button', { name: /Next Step/i }).click();
     await expect(page.locator('.gm-style')).toHaveCount(0);
     await expect(page.getByText('Select the fit-out status — it sets the rent, and it is the first thing every enquiry filters on.', { exact: true })).toBeVisible();

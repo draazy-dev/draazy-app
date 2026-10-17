@@ -1,6 +1,7 @@
 // The admin Ctrl+K palette and the bell, against the live API.
 import { test, expect, ACTORS, STAFF } from '../../fixtures/live.js';
 import { API, authHeaders, uploadedListingPhotos, uniqueMobile, letterTag } from '../../helpers/liveAuth.js';
+import { rejectListingWithFetch } from '../../helpers/moderation.js';
 
 const UNIQUE_PAGE_TERM = 'Referrals';
 
@@ -62,11 +63,7 @@ test.afterEach(async () => {
   if (!created.size) return;
   const headers = await authHeaders(ACTORS.admin);
   for (const id of created) {
-    await api('PATCH', `/properties/${id}/status`, headers, {
-      status: 'rejected',
-      reasonCode: 'other',
-      reason: 'Zztest cleanup \u2014 synthetic command-palette fixture',
-    });
+    await rejectListingWithFetch(id, headers, { reasonCode: 'other', reason: 'Zztest cleanup \u2014 synthetic command-palette fixture' });
   }
   created.clear();
 });
@@ -267,7 +264,6 @@ test("a manager's staff change reaches the admin's own bell under For you, and o
   expect(consoleErrors).toHaveLength(0);
 });
 
-// The two below came off `admin/command-palette.spec.js` when that file was retired.
 const ALL_CHIPS = ['All', 'Features', 'Listings', 'People'];
 
 // These endpoints cannot search, so filtering here would only filter the current page.

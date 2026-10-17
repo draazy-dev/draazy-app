@@ -2,7 +2,7 @@
  * can set them, and seeding such a row would report a feature that does not work. */
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { signedInAsNew, authHeaders, API, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
-import { approveListingWithFetch } from '../../../helpers/moderation.js';
+import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const created = new Set();
 
@@ -39,10 +39,7 @@ test.afterEach(async () => {
   if (!created.size) return;
   const headers = await authHeaders(ACTORS.admin);
   for (const id of created) {
-    await api('PATCH', `/properties/${id}/status`, headers, {
-      status: 'rejected',
-      reason: 'Zztest cleanup \u2014 synthetic consumer-fixes fixture',
-    });
+    await rejectListingWithFetch(id, headers, { reason: 'Zztest cleanup \u2014 synthetic consumer-fixes fixture' });
   }
   created.clear();
 });
@@ -100,7 +97,7 @@ test('detail page shows the owner’s real furnishing and floor, not a value der
 test('detail page shows the owner’s real deposit for a rental (not price × 2)', async ({ page, request }) => {
   const slug = await publishListing(request, {
     deal: 'rent', propertyType: 'Flat', bhk: 2, area: 900, price: 20000,
-    // The bug: an absent deposit fell back to a multiple of the rent. ₹45,000 is deliberately not
+    // An absent deposit must not fall back to a multiple of the rent. ₹45,000 is deliberately not
     // ₹40,000, so the fallback and the saved value cannot be confused.
     deposit: 45000,
   });

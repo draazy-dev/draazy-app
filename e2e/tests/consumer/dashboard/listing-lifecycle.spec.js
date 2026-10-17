@@ -50,7 +50,7 @@ async function listing(request, headers, status = 'approved') {
 test.afterEach(async ({ request }) => {
   const adminHeaders = await authHeaders(ACTORS.admin);
   for (const id of createdListingIds) {
-    await rejectListing(request, id, adminHeaders, { reasonCode: 'other' });
+    await rejectListing(request, id, adminHeaders, { reasonCode: 'other', reason: 'Zztest cleanup' });
   }
   createdListingIds.clear();
 });
@@ -63,8 +63,8 @@ test('owner can pause and resume an approved listing from My listings', async ({
   await page.goto('/dashboard#listings');
   await expect(page.getByText('1 of 1 free live listing used')).toBeVisible();
 
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  await page.getByTestId('confirm-modal-ok').click();
   await expect(page.getByText('Paused', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
 

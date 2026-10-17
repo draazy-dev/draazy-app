@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { needsMaps } from '../maps-specs.js';
 
 function* tests(suite, file, titles = []) {
   const path = suite.file === suite.title ? titles : [...titles, suite.title];
@@ -31,12 +32,14 @@ function plan(listFile, durationsFile, shardArg, outFile) {
   const weight = (f) => durations[f] > 0 ? durations[f] : perFile.get(f) * perTest;
 
   const shards = Array.from({ length: Math.max(1, Math.min(Number(shardArg), perFile.size)) }, () => ({ seconds: 0, files: [] }));
-  for (const f of [...perFile.keys()].sort((a, b) => weight(b) - weight(a) || a.localeCompare(b))) {
-    const lightest = shards.reduce((min, s) => (s.seconds < min.seconds ? s : min));
-    lightest.files.push(f);
-    lightest.seconds += weight(f);
+  const byWeight = [...perFile.keys()].sort((a, b) => weight(b) - weight(a) || a.localeCompare(b));
+  const place = (shard, f) => { shard.files.push(f); shard.seconds += weight(f); };
+  for (const f of byWeight.filter(needsMaps)) place(shards[0], f);
+  for (const f of byWeight.filter((f) => !needsMaps(f))) {
+    place(shards.reduce((min, s) => (s.seconds < min.seconds ? s : min)), f);
   }
-  writeFileSync(outFile, JSON.stringify(shards.map((s) => ({ seconds: Math.round(s.seconds), files: s.files.sort() }))));
+  const used = shards.filter((s) => s.files.length);
+  writeFileSync(outFile, JSON.stringify(used.map((s) => ({ seconds: Math.round(s.seconds), files: s.files.sort() }))));
 }
 
 function report(reportFile, lastFailedFile, durationsFile, ...listFiles) {

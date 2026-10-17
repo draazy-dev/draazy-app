@@ -77,4 +77,31 @@ test.describe('LIVE: who may read and who may decide a verification case', () =>
     const after = await ok('GET', `/me/listings/${id}`, owner.token);
     expect(after.status).toBe('pending');
   });
+
+  test('the staffer who posted on an owner\'s behalf cannot correct, badge or decide it', async () => {
+    const { accessToken: poster } = await apiLogin('9000000000');
+    const { accessToken: peer } = await apiLogin(STAFF.rental);
+    const { id } = await ok('POST', '/admin/properties', poster, {
+      ownerMobile: uniqueMobile(),
+      ownerName: 'Zztest Maker Owner',
+      listing: {
+        title: `Zztest maker-checker ${Date.now()}`, deal: 'rent', propertyType: 'Flat', price: 25000,
+        bhk: 2, area: 800, locality: 'Baner', city: 'Pune', images: await uploadedListingPhotos(poster),
+      },
+    });
+
+    expect((await api('PATCH', `/properties/${id}/admin`, poster, { price: 31111 })).status).toBe(403);
+    expect((await api('POST', `/properties/${id}/verification/ownership/evidence`, poster,
+      { docType: 'index_ii', issuedOn: '2026-01-01' })).status).toBe(403);
+    expect((await api('POST', `/properties/${id}/verification/ownership`, poster)).status).toBe(403);
+    expect((await api('PATCH', `/properties/${id}/status`, poster, { status: 'approved' })).status).toBe(403);
+
+    const rejected = await api('PATCH', `/properties/${id}/status`, peer,
+      { status: 'rejected', reasonCode: 'other', reason: 'Zztest cleanup' });
+    expect(rejected.status).toBe(200);
+    const stacked = await api('PATCH', `/properties/${id}/status`, peer,
+      { status: 'rejected', reasonCode: 'other', reason: 'second verdict' });
+    expect(stacked.status).toBe(409);
+    expect(stacked.body.error).toBe('stale_decision');
+  });
 });

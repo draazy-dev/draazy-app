@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect, ACTORS, STAFF } from '../../../fixtures/live.js';
 import { authHeaders, API } from '../../../helpers/liveAuth.js';
-import { approveListingWithFetch } from '../../../helpers/moderation.js';
+import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { pickPlaceholderLocality } from '../../../helpers/locality.js';
 import * as consumerC from '../../../../frontend/src/pages/consumer/list-property/constants.js';
 import * as adminC from '../../../../frontend/src/pages/admin/post-on-behalf/constants.js';
@@ -12,11 +12,7 @@ test.afterEach(async () => {
   if (!postedIds.size) return;
   const headers = await authHeaders(STAFF.rental);
   for (const id of postedIds) {
-    await fetch(`${API}/properties/${id}/status`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup \u2014 synthetic post-on-behalf fixture' }),
-    });
+    await rejectListingWithFetch(id, headers, { reason: 'Zztest cleanup \u2014 synthetic post-on-behalf fixture' });
   }
   postedIds.clear();
 });

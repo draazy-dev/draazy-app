@@ -72,7 +72,7 @@ test('the review modal shows the submitted photos, description and address', asy
   await modal.getByRole('button', { name: 'Needs info' }).click();
   await modal.getByRole('button', { name: 'Photos not real' }).click();
   await expect(modal.getByText('Owner message preview')).toBeVisible();
-  await expect(modal.getByText(/Please upload clear, real photos/)).toBeVisible();
+  await expect(modal.getByText(/Please add clear photos of the actual property/)).toBeVisible();
   await modal.getByTestId('review-section-messages').click();
   await modal.getByRole('button', { name: /WhatsApp templates/ }).click();
   await expect(modal.getByTestId('wa-preview-body')).toContainText('please upload clear real photos');

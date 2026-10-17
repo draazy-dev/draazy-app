@@ -1,7 +1,8 @@
-/* ADR-019: an owner who has never started a verification can post, so no badge is granted here.
+/* An owner who has never started a verification can post, so no badge is granted here.
    The second test holds a listing to show the tier is never mistaken for an identity wall. */
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { signedInAsNew, authHeaders, API, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const BASE_LISTING = {
   deal: 'rent',
@@ -21,11 +22,7 @@ test.afterEach(async () => {
   if (!created.size) return;
   const headers = await authHeaders(ACTORS.admin);
   for (const id of created) {
-    await fetch(`${API}/properties/${id}/status`, {
-      method: 'PATCH',
-      headers,
-      body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup \u2014 synthetic no-gate fixture' }),
-    });
+    await rejectListingWithFetch(id, headers, { reason: 'Zztest cleanup \u2014 synthetic no-gate fixture' });
   }
   created.clear();
 });
@@ -47,7 +44,6 @@ async function gotoOwner(page, { withListing = false } = {}) {
 }
 
 const formLocator = (page) => page.locator('[data-err="propertyType"]');
-// The removed gate heading — must never appear now.
 const gateHeading = (page) => page.getByRole('heading', { name: 'Verify your identity to start' });
 
 test('a signed-in owner reaches the wizard form immediately and after a reload ? no identity gate', async ({ page }) => {

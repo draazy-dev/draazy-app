@@ -1,6 +1,6 @@
 import { test, expect } from '../../../fixtures/live.js';
 
-const INTERNAL = ['recheckPending', 'recheckReason', 'recheckRequestedAt', 'archived', 'featured', 'qualityScore',
+const INTERNAL = ['recheckPending', 'recheckReason', 'recheckRequestedAt', 'archived', 'featured',
   'societyId', 'pincode', 'flagReason', 'formDetails'];
 const COMPARE = ['id', 'slug', 'deal', 'propertyType', 'bhk', 'price', 'area', 'areaUnit', 'furnishing', 'possession',
   'reraId', 'amenities', 'locality', 'city', 'coverImage'];
@@ -18,6 +18,7 @@ test('a stranger’s listing detail carries no listing-internal state', async ({
   const body = await (await detail).json();
   expect(body.status).toBe('approved');
   expect(INTERNAL.filter((k) => k in body)).toEqual([]);
+  expect(typeof body.qualityScore).toBe('number');
   await expect(page.locator('h1').first()).toBeVisible();
   expect(consoleErrors).toEqual([]);
 });
