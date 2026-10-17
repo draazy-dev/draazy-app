@@ -70,7 +70,7 @@ function AdminLayoutInner() {
           </Link>
           {/* tap-extend, not tap-target: growing the box would push
               the wordmark; aria-label as phones never show `title`. */}
-          <button onClick={() => setOpen(false)} aria-label="Close menu" className="tap-extend relative rounded-lg p-1 hover:bg-white/5 lg:hidden">
+          <button onClick={() => setOpen(false)} aria-label="Close menu" className="tap-extend relative rounded-lg p-1 hover:bg-white/5 lg:hidden [@media(pointer:coarse)]:p-3">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -85,7 +85,7 @@ function AdminLayoutInner() {
                 /* py-3 below sm: 16 nav rows at 40px are a long thumb-drag,
                    and a miss lands on the neighbouring section. */
                 'flex items-center gap-3 rounded-xl px-3 py-3 sm:py-2.5 text-sm transition-all ' +
-                (isActive ? 'bg-brand-teal/15 text-brand-teal' : 'text-gray-300 hover:bg-white/5 hover:text-white')
+                (isActive ? 'bg-brand-teal/15 text-teal-300' : 'text-gray-300 hover:bg-white/5 hover:text-white')
               }
             >
               <Icon className="h-4 w-4" /> {label}
@@ -103,7 +103,7 @@ function AdminLayoutInner() {
         />
       ) : null}
 
-      <div className="flex min-h-[100dvh] flex-1 flex-col">
+      <div className="flex min-h-[100dvh] min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-white/10 bg-ink/80 backdrop-blur">
           <div className="flex items-center gap-3 px-4 py-2.5">
             <button onClick={() => setOpen(true)} aria-label="Open menu" className="tap-extend relative rounded-lg p-2 hover:bg-white/5 lg:hidden">
@@ -129,7 +129,7 @@ function AdminLayoutInner() {
               aria-label={light ? 'Switch to dark mode' : 'Switch to light mode'}
               aria-pressed={light}
               title={light ? 'Dark mode' : 'Light mode'}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-1.5 text-gray-300 transition hover:bg-white/10 hover:text-white sm:min-h-0 sm:min-w-0"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg border border-white/10 bg-white/5 p-1.5 text-gray-300 transition hover:bg-white/10 hover:text-white sm:min-h-0 sm:min-w-0 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11"
             >
               {light ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
             </button>
@@ -141,7 +141,7 @@ function AdminLayoutInner() {
               target="_blank"
               rel="noopener noreferrer"
               title={t('help.runbooks')}
-              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition hover:bg-white/10 hover:text-white sm:min-h-0 sm:min-w-0"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-gray-300 transition hover:bg-white/10 hover:text-white sm:min-h-0 sm:min-w-0 [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11"
             >
               <BookOpen className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">{t('help.runbooks')}</span>
@@ -158,7 +158,7 @@ function AdminLayoutInner() {
                     {roleLabel(user?.role)}
                   </div>
                 </div>
-                <button onClick={doLogout} aria-label="Log out" className="tap-extend relative rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition" title="Log out">
+                <button onClick={doLogout} aria-label="Log out" className="tap-extend relative rounded-lg p-1.5 text-gray-400 hover:bg-white/5 hover:text-white transition [@media(pointer:coarse)]:p-3.5" title="Log out">
                   <LogOut className="h-4 w-4" />
                 </button>
               </div>

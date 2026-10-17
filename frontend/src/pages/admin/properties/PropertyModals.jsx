@@ -8,7 +8,7 @@ import Badge from '../../../components/ui/Badge.jsx';
 import Select from '../../../components/ui/Select.jsx';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import InternalNote from '../../../components/ui/InternalNote.jsx';
-import { EDIT_DEAL_OPTS, EDIT_STATUS_OPTS, dealLabel, perSqftLabel, liveHref, detailKvs, fmtAgo, statusLabel } from './constants.js';
+import { EDIT_DEAL_OPTS, EDIT_STATUS_OPTS, editBhkOpts, editTypeOpts, dealLabel, perSqftLabel, liveHref, detailKvs, fmtAgo, statusLabel } from './constants.js';
 import { REVIEW_REASONS, ownerMessagePreview } from './reviewReasons.js';
 import { SubmittedPhotos } from './review-modal/SubmittedContent.jsx';
 import { getModerationProperty } from '../../../services/propertyService.js';
@@ -63,15 +63,14 @@ export function PropertyEditModal({ edit, setEdit, onClose, onSubmit, saving, ca
             <span className="mb-1 block text-gray-300">Built-up area (sq.ft)</span>
             <input type="number" min="0" value={edit.area} onChange={(e) => setEdit({ ...edit, area: e.target.value })} className="dz-input" />
           </label>
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span className="mb-1 block text-gray-300">Configuration (BHK)</span>
-            {/* Numeric like Price and Area; free text published values the listing form never offers. */}
-            <input type="number" min="0" step="1" value={edit.bhk} onChange={(e) => setEdit({ ...edit, bhk: e.target.value })} className="dz-input" />
-          </label>
-          <label className="block text-sm">
+            <Select value={edit.bhk} onChange={(v) => setEdit({ ...edit, bhk: v })} options={editBhkOpts(edit._ref?.bhkNum == null ? '' : String(edit._ref.bhkNum))} ariaLabel="Configuration (BHK)" />
+          </div>
+          <div className="block text-sm">
             <span className="mb-1 block text-gray-300">Property type</span>
-            <input value={edit.type} onChange={(e) => setEdit({ ...edit, type: e.target.value })} className="dz-input" />
-          </label>
+            <Select value={edit.type} onChange={(v) => setEdit({ ...edit, type: v })} options={editTypeOpts(edit._ref?.type)} ariaLabel="Property type" />
+          </div>
           <div className="block text-sm">
             <span className="mb-1 block text-gray-300">Locality <span className="text-rose-400">*</span></span>
             <LocalitySelect
@@ -84,10 +83,10 @@ export function PropertyEditModal({ edit, setEdit, onClose, onSubmit, saving, ca
               className="w-full"
             />
           </div>
-          <label className="block text-sm">
+          <div className="block text-sm">
             <span className="mb-1 block text-gray-300">Deal</span>
             <Select value={edit.deal} onChange={(v) => setEdit({ ...edit, deal: v })} options={EDIT_DEAL_OPTS} ariaLabel="Deal" />
-          </label>
+          </div>
         </div>
         {canSetStatus ? (
           <label className="block text-sm">
@@ -115,7 +114,7 @@ export function PropertyFlagModal({ flagFor, setFlagFor, flagReason, setFlagReas
       footer={
         <>
           <button onClick={() => setFlagFor(null)} className="dz-btn dz-btn-ghost">Cancel</button>
-          <button onClick={onSubmit} className="dz-btn dz-btn-danger"><Flag className="h-4 w-4" /> Flag listing</button>
+          <button onClick={onSubmit} disabled={!flagReason.trim()} className="dz-btn dz-btn-danger disabled:opacity-50"><Flag className="h-4 w-4" /> Flag listing</button>
         </>
       }
     >
@@ -177,9 +176,9 @@ export function PropertyViewModal({ view, setView }) {
               <div className="text-lg font-extrabold text-white">{view.title}</div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <Badge status={view.status}>{statusLabel(view.status)}</Badge>
-                <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-gray-300">{dealLabel(view.deal)}</span>
-                {view.featured ? <span className="rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-0.5 text-xs text-teal-300">{'\u2605'} Featured</span> : null}
-                {view.real ? <span className="rounded-full border border-teal-400/30 bg-teal-500/15 px-2.5 py-0.5 text-xs text-teal-300">Live user post</span> : null}
+                <span className="dz-tag border border-white/10 text-gray-300">{dealLabel(view.deal)}</span>
+                {view.featured ? <span className="dz-tag border border-teal-400/30 bg-teal-500/15 text-teal-300">{'\u2605'} Featured</span> : null}
+                {view.real ? <span className="dz-tag border border-teal-400/30 bg-teal-500/15 text-teal-300">Live user post</span> : null}
               </div>
               <div className="mt-2 flex items-center gap-1 text-sm text-gray-300">
                 <MapPin className="h-3.5 w-3.5" /> {view.locality} {'\u00B7'} {view.bhk || '\u2014'} {'\u00B7'} {view.type}
@@ -210,7 +209,7 @@ function ReasonPicker({ decision = 'reject', reasonCode, setReasonCode, note, se
       <div className="flex flex-wrap gap-2">
         {REVIEW_REASONS.map((reason) => (
           <button key={reason.code} type="button" onClick={() => setReasonCode(reason.code)}
-            className={classNames('rounded-full border px-3 py-1.5 text-xs font-semibold transition', reasonCode === reason.code
+            className={classNames('dz-chip border', reasonCode === reason.code
               ? 'border-brand-teal bg-brand-teal text-ink'
               : 'border-white/10 bg-white/[0.03] text-gray-300 hover:border-white/20')}>
             {reason.label}

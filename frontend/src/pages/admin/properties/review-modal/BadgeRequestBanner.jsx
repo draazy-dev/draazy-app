@@ -6,7 +6,7 @@ import { fmtAgo } from '../constants.js';
 
 /* Granting in the badge section below answers the request; this is the other answer. The listing's
    status is untouched, so it works the same on a live, paused or pending listing. */
-export default function BadgeRequestBanner({ propertyId, requestedAt, onDeclined }) {
+export default function BadgeRequestBanner({ propertyId, requestedAt, onDeclined, disabledReason }) {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -47,7 +47,7 @@ export default function BadgeRequestBanner({ propertyId, requestedAt, onDeclined
           </div>
         </div>
       ) : (
-        <button type="button" onClick={() => setOpen(true)} className="dz-btn dz-btn-ghost dz-btn-sm mt-3" data-testid="decline-badge-request">
+        <button type="button" onClick={() => setOpen(true)} disabled={Boolean(disabledReason)} title={disabledReason || undefined} className="dz-btn dz-btn-ghost dz-btn-sm mt-3" data-testid="decline-badge-request">
           Decline badge request
         </button>
       )}

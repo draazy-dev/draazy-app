@@ -1,5 +1,6 @@
 import { fmtArea, fmtINR, fmtNum, isSqftUnit } from '../../../lib/format.js';
 import { availabilityLabel } from '../../../lib/availability.js';
+import { COMMERCIAL_SUBTYPES } from '../../consumer/list-property/constants.js';
 import i18n from '../../../i18n/index.js';
 
 // The four pending buckets the server partitions by `progress`; their labels match the tracker's.
@@ -10,6 +11,11 @@ export const PROGRESS_OPTS = [
   { value: 'needs_info', label: 'Waiting on owner' },
 ];
 const PROGRESS = new Set(PROGRESS_OPTS.map((o) => o.value));
+
+// The server refuses the maker as checker (403); this only keeps the buttons honest.
+export const isMadeBy = (listing, userId) => Boolean(userId)
+  && [listing?.ownerId, listing?.postedByStaff].some((id) => id != null && String(id) === String(userId));
+export const MAKER_REASON = 'You posted this listing, so another staff member must review or edit it.';
 
 export const STATUS_OPTS = [
   { value: '', label: 'All statuses' },
@@ -42,6 +48,24 @@ export const EDIT_STATUS_OPTS = [
   { value: 'approved', label: 'Approved' },
   { value: 'pending', label: 'Pending' },
 ];
+
+// A legacy value stays pickable, so opening the modal never silently rewrites it.
+const withCurrent = (opts, current, label) =>
+  (!current || opts.some((o) => o.value === current) ? opts : [...opts, { value: current, label }]);
+
+// The labels the listing wizard stores as `type` (`listingLabels` in list-property/submit.js).
+const EDIT_TYPES = ['Flat', 'Independent House', 'Villa', ...COMMERCIAL_SUBTYPES.map((s) => s.label), 'Open Plot', 'Farm Land']
+  .map((v) => ({ value: v, label: v }));
+export const editTypeOpts = (current) => withCurrent(EDIT_TYPES, current, current);
+
+// The wizard's BHK pills; '' is a plot or commercial unit, which has no bedroom count.
+const EDIT_BHKS = [
+  { value: '', label: 'Not applicable' },
+  { value: '0', label: '1 RK' },
+  ...['1', '2', '3', '4'].map((n) => ({ value: n, label: `${n} BHK` })),
+  { value: '5', label: '5+ BHK' },
+];
+export const editBhkOpts = (current) => withCurrent(EDIT_BHKS, current, `${current} BHK`);
 
 export const PAGE_LIMIT = 10;
 
@@ -88,8 +112,8 @@ export function detailKvs(l) {
   };
   const sqft = (v) => fmtNum(v) + ' sq.ft';
 
-  /* Three areas, three claims. The old single "Built-up area" row was labelled for one of them and
-     fed by the generic `area`, which is exactly the mislabelling a reviewer cannot catch. */
+  /* Three areas, three claims: each row reads its own field, never the generic `area`,
+     which is how a label ends up on the wrong figure unnoticed by a reviewer. */
   push('Carpet area', stated(l.carpetArea) ? sqft(l.carpetArea) : null);
   push('Built-up area', stated(l.builtUpArea) ? sqft(l.builtUpArea) : null);
   push('Super built-up area', stated(l.superBuiltUpArea) ? sqft(l.superBuiltUpArea) : null);

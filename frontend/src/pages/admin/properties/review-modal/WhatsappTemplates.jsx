@@ -2,7 +2,10 @@ import { MessageCircle } from 'lucide-react';
 import { classNames } from '../../../../lib/format.js';
 
 /** Takes rendered preview text so interpolation rules do not grow a second copy in this component. */
-export default function WhatsappTemplates({ review, waOpen, setWaOpen, waTemplates, waPreview, setWaPreview, waPreviewText, busy, handleSendWaTemplate }) {
+export default function WhatsappTemplates({ review, waOpen, setWaOpen, waTemplates, waPreview, setWaPreview, waPreviewText, unresolvedKeys, busy, handleSendWaTemplate }) {
+  const missingFor = (tpl) => unresolvedKeys(tpl.body || '');
+  const previewMissing = waPreview ? missingFor(waPreview) : [];
+  const blockedLabel = (keys) => `Needs ${keys.map((k) => k.replace(/_/g, ' ')).join(', ')} \u2014 not known for this listing`;
   return (
     <div className="px-4 py-3">
       <button type="button" aria-expanded={waOpen} onClick={() => { setWaOpen(!waOpen); setWaPreview(null); }} className="flex w-full items-center justify-between text-sm font-semibold text-gray-200">
@@ -18,12 +21,15 @@ export default function WhatsappTemplates({ review, waOpen, setWaOpen, waTemplat
             </div>
           ) : (
           <div className="grid gap-2 sm:grid-cols-2">
-            {waTemplates.map((tpl) => (
-              <button key={tpl.id} onClick={() => setWaPreview(waPreview?.id === tpl.id ? null : tpl)} className={classNames('text-left rounded-xl border p-3 transition-all text-sm', waPreview?.id === tpl.id ? 'border-emerald-400/40 bg-emerald-500/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20')}>
+            {waTemplates.map((tpl) => {
+              const missing = missingFor(tpl);
+              return (
+              <button key={tpl.id} type="button" disabled={missing.length > 0} title={missing.length ? blockedLabel(missing) : undefined} onClick={() => setWaPreview(waPreview?.id === tpl.id ? null : tpl)} className={classNames('text-left rounded-xl border p-3 transition-all text-sm disabled:cursor-not-allowed disabled:opacity-50', waPreview?.id === tpl.id ? 'border-emerald-400/40 bg-emerald-500/10' : 'border-white/10 bg-white/[0.02] hover:border-white/20')}>
                 <div className="font-semibold text-gray-200">{tpl.name}</div>
-                <div className="text-[11px] text-gray-500 mt-0.5 capitalize">{tpl.category}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5 capitalize">{missing.length ? blockedLabel(missing) : tpl.category}</div>
               </button>
-            ))}
+              );
+            })}
           </div>
           )}
           {waPreview && (
@@ -34,7 +40,7 @@ export default function WhatsappTemplates({ review, waOpen, setWaOpen, waTemplat
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-xs text-gray-500">Will open WhatsApp with pre-filled message to +91 {review.ownerMobile}</span>
-                <button onClick={handleSendWaTemplate} disabled={busy} className="dz-btn dz-btn-primary inline-flex items-center gap-2 disabled:opacity-50">
+                <button onClick={handleSendWaTemplate} disabled={busy || previewMissing.length > 0} title={previewMissing.length ? blockedLabel(previewMissing) : undefined} className="dz-btn dz-btn-primary inline-flex items-center gap-2 disabled:opacity-50">
                   <MessageCircle className="h-4 w-4" /> Send via WhatsApp
                 </button>
               </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { Download } from 'lucide-react';
 import { searchForModeration, getModerationProperty, setListingStatus, clearFlag, flagListing, updateListingAsModerator, archiveListing, restoreListing, moderationSummary } from '../../services/propertyService.js';
@@ -15,11 +15,13 @@ import { useTabParam } from '../../lib/useTabParam.js';
 import Loading from '../../components/ui/Loading.jsx';
 import { PageNav, QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import QueueTable from './properties/QueueTable.jsx';
-import QueueFilterBar, { EMPTY_FILTERS, ALL_TAB_DEFAULTS } from './properties/QueueFilterBar.jsx';
-import DuplicatesTab from './properties/DuplicatesTab.jsx';
-import PropertyReviewModal from './properties/PropertyReviewModal.jsx';
+import QueueFilterBar, { EMPTY_FILTERS } from './properties/QueueFilterBar.jsx';
 import { PropertyEditModal, PropertyFlagModal, PropertyArchiveModal, PropertyViewModal, PropertyRecheckRejectModal } from './properties/PropertyModals.jsx';
-import { statusQuery, PAGE_LIMIT, exportCsv } from './properties/constants.js';
+import { statusQuery, PAGE_LIMIT, exportCsv, isMadeBy, MAKER_REASON } from './properties/constants.js';
+
+const loadReviewModal = () => import('./properties/PropertyReviewModal.jsx');
+const PropertyReviewModal = lazy(loadReviewModal);
+const DuplicatesTab = lazy(() => import('./properties/DuplicatesTab.jsx'));
 
 // The verification routes bind `{id}` as a UUID while `propertyMapper` sets `id` to `slug || id`,
 // so only the review calls need the real key off `uuid`.
@@ -39,7 +41,11 @@ const TAB_KEYS = TABS.map((t) => t.key);
 const CSV_NAMES = { verify: 'verification-queue', recheck: 'recheck-queue', badge: 'badge-requests', followup: 'follow-up', flagged: 'flagged', all: 'listings' };
 
 const SORT_COLUMN = { recheck: 'recheck', badge: 'badge', followup: 'confirmed' };
-const sortFor = (tab, dir) => (SORT_COLUMN[tab] ? `${SORT_COLUMN[tab]}-${dir}` : dir);
+// Work queues are oldest first so the longest-waiting item is decided first; All is a browse view.
+const sortFor = (tab) => {
+  const dir = tab === 'all' ? 'newest' : 'oldest';
+  return SORT_COLUMN[tab] ? `${SORT_COLUMN[tab]}-${dir}` : dir;
+};
 
 function queueFilters(tab, f) {
   const common = { q: f.q.trim() || undefined, deal: f.deal || undefined };
@@ -118,12 +124,12 @@ export default function AdminProperties() {
   const canEdit = canVerify || canModerate;
   const activeTab = tab;
 
-  const [filters, setFilters] = useState(() => (activeTab === 'all' ? ALL_TAB_DEFAULTS : EMPTY_FILTERS));
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   // Reset during render, not in an effect: the tab also changes from outside (palette, back button).
   const [filtersTab, setFiltersTab] = useState(activeTab);
   if (filtersTab !== activeTab) {
     setFiltersTab(activeTab);
-    setFilters(activeTab === 'all' ? ALL_TAB_DEFAULTS : EMPTY_FILTERS);
+    setFilters(EMPTY_FILTERS);
   }
   const page = Math.max(1, parseInt(params.get('page'), 10) || 1);
   const setPage = useCallback((n) => setParams((prev) => {
@@ -132,10 +138,9 @@ export default function AdminProperties() {
     return next;
   }, { replace: true }), [setParams]);
 
-  const defaults = activeTab === 'all' ? ALL_TAB_DEFAULTS : EMPTY_FILTERS;
-  const filtered = Object.keys(defaults).some((k) => filters[k] !== defaults[k]);
+  const filtered = Object.keys(EMPTY_FILTERS).some((k) => filters[k] !== EMPTY_FILTERS[k]);
   const changeFilters = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
-  const clearFilters = () => changeFilters(defaults);
+  const clearFilters = () => changeFilters(EMPTY_FILTERS);
 
   const [review, setReview] = useState(null);
   const [edit, setEdit] = useState(null);
@@ -177,7 +182,7 @@ export default function AdminProperties() {
 
   const isQueueTab = activeTab !== 'duplicates';
   const query = useMemo(() => queueFilters(activeTab, filters), [activeTab, filters]);
-  const sort = sortFor(activeTab, filters.sort);
+  const sort = sortFor(activeTab);
   const queue = useModerationQueue(isQueueTab, query, sort, page, reloadToken);
   const rows = useMemo(() => queue.page?.items || [], [queue.page]);
   const repliedIds = useMemo(
@@ -186,6 +191,25 @@ export default function AdminProperties() {
   );
   const total = queue.page?.total ?? 0;
   const pageCount = queue.page?.pageCount ?? 0;
+
+  // Fetch the review modal once the queue is on screen, so the first Review click does not wait on it.
+  const queueReady = queue.page != null;
+  useEffect(() => { if (queueReady) loadReviewModal(); }, [queueReady]);
+
+  // Approving removes the row the modal opened from, which drops focus to <body>; hand it back to the list.
+  const panelRef = useRef(null);
+  const focusPending = useRef(null);
+  useEffect(() => {
+    if (review) { focusPending.current = { seen: undefined }; return; }
+    const pending = focusPending.current;
+    if (!pending || queue.stale || !queue.page) return;
+    if (pending.seen === undefined) { pending.seen = queue.page; return; }
+    if (pending.seen === queue.page) return;
+    focusPending.current = null;
+    if (document.activeElement && document.activeElement !== document.body) return;
+    const target = panelRef.current?.querySelector('[data-testid="queue-row"] button') ?? panelRef.current;
+    target?.focus();
+  }, [review, queue.page, queue.stale]);
 
   // A decision can empty the last page; step back rather than showing "nothing here" over a backlog.
   useEffect(() => {
@@ -326,7 +350,7 @@ export default function AdminProperties() {
     refresh();
   };
   // `bhkNum`, not the rendered `bhk`: the label is "3 BHK", and the contract wants an integer.
-  const openEdit = (l, fromReview = false) => { setEdit({ id: l.id, title: l.title || '', price: l.price ?? '', area: l.area ?? '', bhk: l.bhkNum ? String(l.bhkNum) : '', type: l.type || '', locality: l.locality || '', localitySlug: l.localitySlug || '', deal: l.deal || 'buy', status: l.status || 'pending', _ref: l, _fromReview: fromReview }); };
+  const openEdit = (l, fromReview = false) => { setEdit({ id: l.id, title: l.title || '', price: l.price ?? '', area: l.area ?? '', bhk: l.bhkNum == null ? '' : String(l.bhkNum), type: l.type || '', locality: l.locality || '', localitySlug: l.localitySlug || '', deal: l.deal || 'buy', status: l.status || 'pending', _ref: l, _fromReview: fromReview }); };
   const closeEdit = () => {
     if (edit?._fromReview) setReview(edit._ref);
     setEdit(null);
@@ -415,6 +439,7 @@ export default function AdminProperties() {
   };
 
   const onEdit = canEdit ? openEdit : undefined;
+  const editBlockedReason = (l) => (isMadeBy(l, user?.id) ? MAKER_REASON : null);
   const moderateActions = canModerate ? {
     onReminder: handleReminder,
     onConfirmReminder: handleConfirmReminder,
@@ -452,8 +477,14 @@ export default function AdminProperties() {
         tabs={TABS.map((t) => ({ key: t.key, label: t.label, count: t.count(summary, dupCount) }))}
       />
 
-      {activeTab === 'duplicates' ? <DuplicatesTab onRefresh={refresh} onCount={setDupCount} canModerate={canModerate} /> : (
-        <section id="queue-panel" role="tabpanel" aria-labelledby={`queue-tab-${activeTab}`} className="dz-card overflow-hidden p-0">
+      {activeTab === 'duplicates' ? (
+        <div id="queue-panel" role="tabpanel" aria-labelledby="queue-tab-duplicates">
+          <Suspense fallback={<Loading />}>
+            <DuplicatesTab onRefresh={refresh} onCount={setDupCount} canModerate={canModerate} />
+          </Suspense>
+        </div>
+      ) : (
+        <section ref={panelRef} tabIndex={-1} id="queue-panel" role="tabpanel" aria-labelledby={`queue-tab-${activeTab}`} className="dz-card overflow-hidden p-0 outline-none">
           {activeMeta?.note ? (
             <p className="border-b border-white/10 px-4 py-2.5 text-xs text-gray-400" data-testid={`${activeTab}-note`}>{activeMeta.note}</p>
           ) : null}
@@ -464,19 +495,23 @@ export default function AdminProperties() {
                 rows={rows}
                 tab={activeTab}
                 repliedIds={repliedIds}
-                actions={actionsFor[activeTab]}
+                actions={{ ...actionsFor[activeTab], editBlocked: editBlockedReason }}
                 showScore
                 empty={filtered ? 'No listings match these filters.' : 'All caught up — nothing waiting here.'}
               />
             )}
           </QueueBody>
           {pageCount > 1 ? (
-            <div className="flex justify-end border-t border-white/10 p-3"><PageNav {...paging} /></div>
+            <div className="flex justify-end border-t border-white/10 p-3"><PageNav {...paging} label="Pages, bottom" /></div>
           ) : null}
         </section>
       )}
 
-      {review && <PropertyReviewModal review={review} setReview={setReview} onRefresh={refresh} onEdit={canEdit ? (l) => { setReview(null); openEdit(l, true); } : undefined} />}
+      {review && (
+        <Suspense fallback={null}>
+          <PropertyReviewModal review={review} setReview={setReview} onRefresh={refresh} onEdit={canEdit ? (l) => { setReview(null); openEdit(l, true); } : undefined} />
+        </Suspense>
+      )}
       <PropertyEditModal edit={edit} setEdit={setEdit} onClose={closeEdit} onSubmit={submitEdit} saving={savingEdit} canSetStatus={canModerate} />
       <PropertyFlagModal flagFor={flagFor} setFlagFor={setFlagFor} flagReason={flagReason} setFlagReason={setFlagReason} internalNote={internalNote} setInternalNote={setInternalNote} onSubmit={submitFlag} />
       <PropertyArchiveModal archiveFor={archiveFor} setArchiveFor={setArchiveFor} archiveReason={archiveReason} setArchiveReason={setArchiveReason} internalNote={internalNote} setInternalNote={setInternalNote} onSubmit={submitArchive} />

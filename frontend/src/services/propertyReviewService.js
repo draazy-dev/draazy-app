@@ -53,6 +53,11 @@ export async function startPropertyReview(propertyId, options) {
   return (await provider()).startPropertyReview(propertyId, options);
 }
 
+/** Staff only: marks a pending listing In review. Idempotent, so reopening the modal is safe. */
+export async function beginPropertyReview(propertyId) {
+  return (await provider()).beginPropertyReview(propertyId);
+}
+
 /** Post to the thread. Returns the updated case file, not just the new message. */
 export async function addPropertyReviewMessage(propertyId, body, clarificationRequested) {
   return (await provider()).addPropertyReviewMessage(propertyId, body, clarificationRequested);
