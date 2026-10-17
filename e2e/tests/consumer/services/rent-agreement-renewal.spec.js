@@ -45,6 +45,11 @@ test.describe('LIVE: rent agreement renewal and the brokerage-saved card', () =>
   test('an owner whose agreement ends within 20 days is offered the renewal for ₹499 and a relisting, beside what they saved', async ({ page }) => {
     await seedConsent(page);
     const { owner, listing, agreement } = await agreementOn({ daysLeft: 20 });
+    // The agreements answering before the listings must not park the owner in the tenant view.
+    await page.route(/\/me\/dashboard(\?|$)/, async (route) => {
+      await new Promise((r) => setTimeout(r, 1500));
+      await route.continue();
+    });
     await ownerVault(page, owner);
 
     await expect(page.getByText(/^Ends \d/)).toBeVisible({ timeout: 20000 });

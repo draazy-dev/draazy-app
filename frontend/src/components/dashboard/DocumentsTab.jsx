@@ -17,7 +17,6 @@ import { myTenancies, myRentAgreements } from '../../services/rentService.js';
 import { toRentalCards } from '../../lib/data/tenancy.js';
 import { openDocFrom } from '../../lib/openDoc.js';
 import { DOCUMENT_ACCEPT, DOCUMENT_GUIDANCE_KEY, PDF_GUIDANCE_KEY } from '../../lib/uploads/policy.js';
-/* Owner-side document packs (property-based). */
 
 const OWNER_GROUPS = [
   { id: 'title', titleKey: 'dash.grpTitle', subKey: 'dash.grpTitleSub', icon: 'scroll-text', tone: 'teal', cats: DOC_CATEGORIES['Title & Ownership'] },
@@ -30,15 +29,13 @@ const OWNER_GROUPS = [
 const KYC_GROUP = { id: 'kyc', titleKey: 'dash.grpKyc', subKey: 'dash.grpKycSub', icon: 'fingerprint', tone: 'amber', cats: ['Aadhaar Card', 'PAN Card', 'Passport Photo', 'Ownership Proof'] };
 
 const OWNER_CATS = OWNER_GROUPS.flatMap((g) => g.cats);
-/* Match an uploaded doc to a slot: exact category first, then the legacy loose match so any documents saved by the
-   previous version of the tab still line up with their slot. */
+// Exact category first, then a loose prefix match so documents filed under older category names still fill their slot.
 
 const findDoc = (list, category) =>
   (list || []).find((d) => d.category === category) ||
   (list || []).find((d) => d.category?.toLowerCase().includes(category.toLowerCase().slice(0, 8)));
 
 const countDone = (cats, docs) => cats.filter((c) => findDoc(docs, c)).length;
-/* A rent agreement belongs to the property it was registered for. */
 
 const agreementMatchesProp = (ra, propId, listing) => {
   if (ra.propId) return ra.propId === propId;
@@ -218,9 +215,6 @@ function VaultSkeleton() {
     </div>
   );
 }
-/* A failed load degrades to a retry affordance rather than vanishing. */
-
-const VaultError = LoadError;
 
 export default function DocumentsTab({ user, listings, toast, isOwner = false }) {
   const { t } = useTranslation();
@@ -255,10 +249,10 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
   const [context, setContext] = useState(isOwner ? 'owner' : 'personal');
   const contextChosen = useRef(false);
   useEffect(() => {
-    if (isOwner && !contextChosen.current) setContext((c) => (c === 'personal' ? 'owner' : c));
+    if (isOwner && !contextChosen.current) setContext('owner');
+  }, [isOwner]);
   // The tenancy context only exists once the server confirms a lease, so open on the safe default
   // and move when the answer arrives — else a non-tenant lands on a tab that vanishes under them.
-  }, [isOwner]);
   useEffect(() => {
     if (rental.loaded && !isOwner && isTenant) setContext((c) => (c === 'personal' ? 'tenancy' : c));
   }, [rental.loaded, isOwner, isTenant]);
@@ -402,7 +396,6 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
 
   return (
     <div className="space-y-5">
-      {/* ── Vault header: completeness ring + trust + context switch ── */}
       <div className="glass-card rounded-2xl p-4 sm:p-6 relative overflow-hidden">
         <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
         <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
@@ -460,12 +453,11 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
           )}
         </div>
       </div>
-      {/* ── Owner context: property-based document packs ── */}
 
       {context === 'owner' && (
         <>
           {ownerStatus === 'error' ? (
-            <VaultError message={t('dash.vaultLoadError')} error={ownerError} onRetry={reloadOwner} t={t} />
+            <LoadError message={t('dash.vaultLoadError')} error={ownerError} onRetry={reloadOwner} t={t} />
           ) : ownerStatus === 'loading' && ownerDocs.length === 0 ? (
             <VaultSkeleton />
           ) : (
@@ -508,7 +500,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
               badge={reqStatus !== 'error' && pendingReqs > 0 ? pill('bg-amber-500/15 text-amber-300', t('dash.pendingCount', { count: pendingReqs })) : null}
               open={openSections.requests !== false} onToggle={toggle}>
               {reqStatus === 'error' ? (
-                <VaultError message={t('dash.reqsLoadError')} error={reqError} onRetry={reloadReqs} t={t} />
+                <LoadError message={t('dash.reqsLoadError')} error={reqError} onRetry={reloadReqs} t={t} />
               ) : (
                 <div className="space-y-3">
                   {docReqs.map((r) => (
@@ -538,11 +530,8 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
               )}
             </PanelCard>
           )}
-          {/* There was a "Rent received online" panel here, listing settled rows from `GET /me/rent-ledger`. */}
-
         </>
       )}
-      {/* ── Tenancy context: the flat the user rents + its registered agreement ── */}
 
       {context === 'tenancy' && (
         <>
@@ -565,12 +554,11 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
           </PanelCard>
         </>
       )}
-      {/* ── Personal context: identity + tenant/buyer tools ── */}
 
       {context === 'personal' && (
         <>
           {personalStatus === 'error' ? (
-            <VaultError message={t('dash.vaultLoadError')} error={personalError} onRetry={reloadPersonal} t={t} />
+            <LoadError message={t('dash.vaultLoadError')} error={personalError} onRetry={reloadPersonal} t={t} />
           ) : personalStatus === 'loading' && personalDocs.length === 0 ? (
             <VaultSkeleton />
           ) : (
