@@ -52,29 +52,26 @@ test('map bubbles preview posts with actions, open the list or a detail page, an
 
 test('a room whose request the host accepted offers "Message owner" in the map popup, not "Sent"', async ({ page }) => {
   test.slow();
-  const roomIds = new Promise((resolve) => {
-    page.route('**/api/flatmates/feed**', async (route) => {
-      const res = await route.fetch();
-      const body = await res.json();
-      const ids = [];
-      const walk = (v) => {
-        if (Array.isArray(v)) v.forEach(walk);
-        else if (v && typeof v === 'object') {
-          if (typeof v.id === 'string') ids.push(v.id);
-          Object.values(v).forEach(walk);
-        }
-      };
-      walk(body);
-      resolve(ids);
-      await route.fulfill({ response: res, json: body });
-    });
+  const seen = new Set();
+  await page.route('**/api/flatmates/feed**', async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    const walk = (v) => {
+      if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') {
+        if (typeof v.id === 'string') seen.add(v.id);
+        Object.values(v).forEach(walk);
+      }
+    };
+    walk(body);
+    await route.fulfill({ response: res, json: body });
   });
-  await page.route('**/api/me/flatmate-interests/keys', async (route) => {
-    const ids = await roomIds;
-    await route.fulfill({ json: ids.map((targetId) => ({ kind: 'room', targetId, status: 'accepted' })) });
-  });
+  await page.route('**/api/me/flatmate-interests/keys', (route) =>
+    route.fulfill({ json: [...seen].map((targetId) => ({ kind: 'room', targetId, status: 'accepted' })) }));
   await signedInAs(page, uniqueMobile());
 
+  // The popup's rooms arrive in a later, area-scoped read; the second visit re-reads keys knowing them.
+  await openMap(page, '/flatmates');
   await openMap(page, '/flatmates');
 
   await expect(page.locator('.dz-sp-cta').filter({ hasText: 'Message owner' }).first()).toBeVisible();

@@ -34,7 +34,7 @@ function Header({ title, kindLabel, locality, price, chips }) {
       <div className="min-w-0">
         <div className="break-words text-lg font-extrabold text-white">{title || 'Untitled'}</div>
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-gray-300">{kindLabel}</span>
+          <span className="dz-tag border border-white/10 text-gray-300">{kindLabel}</span>
           {chips}
         </div>
         {locality ? (
@@ -166,7 +166,7 @@ export default function FlatmateReviewModal({ entry, onClose, onChanged }) {
               locality={item?.locality || summary.locality}
               price={d ? priceOf(d) : ''}
               chips={entry.reasons.map((r) => (
-                <span key={r} className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-0.5 text-xs text-amber-300">{r}</span>
+                <span key={r} className="dz-tag border border-amber-400/30 bg-amber-500/10 text-amber-300">{r}</span>
               ))}
             />
             {detail.status === 'loading' ? <Loading /> : null}

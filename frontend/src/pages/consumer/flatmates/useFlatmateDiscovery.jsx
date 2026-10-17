@@ -313,7 +313,7 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     + (on ? ' active' : '');
   /* Counts are rendered: stock a seeker cannot see is stock they never switch tabs for. */
   const tabCount = (n) => (
-    <span className={'ml-0.5 shrink-0 text-[11px] font-bold tabular-nums px-1.5 py-0.5 rounded-full ' + (n ? 'bg-white/10 text-gray-100' : 'bg-white/5 text-gray-500')}>{n == null ? '·' : n}</span>
+    <span className={'dz-count ml-0.5 tabular-nums ' + (n ? 'bg-white/10 text-gray-100' : 'bg-white/5 text-gray-500')}>{n == null ? '·' : n}</span>
   );
   const moveInCount = tab === TAB_MOVE_IN ? loadedTotal : search.otherCount;
   const teamUpCount = tab === TAB_TEAM_UP ? loadedTotal : search.otherCount;

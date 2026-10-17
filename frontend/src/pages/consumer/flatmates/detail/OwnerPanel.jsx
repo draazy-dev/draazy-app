@@ -12,7 +12,7 @@ function StatusChip({ item }) {
   const [icon, cls, key] = item.modStatus === MOD_PENDING
     ? ['clock', 'text-amber-300', 'detailUnderReview']
     : !isPubliclyVisible(item.modStatus) ? ['eye', 'text-rose-300', 'detailNotPublic'] : ['check-circle', 'text-emerald-300', 'detailLive'];
-  return <span className={'chip px-2.5 py-1 rounded-full text-[11px] font-semibold inline-flex items-center gap-1.5 ' + cls}><Icon name={icon} className="w-3.5 h-3.5" /> {t('flatmates.' + key)}</span>;
+  return <span className={'dz-tag chip font-semibold ' + cls}><Icon name={icon} className="w-3.5 h-3.5" /> {t('flatmates.' + key)}</span>;
 }
 
 function SeatsStepper({ kind, item, onSeats }) {

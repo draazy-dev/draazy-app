@@ -25,10 +25,10 @@
   - The Saved page's per-card "bell-plus" button (`Saved.createAlert`) - turns a saved home into an
     alert for similar homes.
 - **Routes:** `/saved` (not protected; guests see a sign-in prompt),
-  `/listings`, `/flatmates`, `/notifications`, and the Dashboard "Saved & Activity" tab
-  (`#activity`, sub `saved` / `alerts`).
+  `/listings`, `/flatmates`, `/notifications`, and the Dashboard "Alerts & activity" tab
+  (`#alerts`; `#saved` redirects to `/saved`).
 - **Source components:** `src/pages/consumer/Saved.jsx`,
-  `src/pages/consumer/dashboard/SavedPanel.jsx`, `src/pages/consumer/dashboard/AlertsPanel.jsx`,
+  `src/pages/consumer/dashboard/AlertsPanel.jsx`,
   `src/pages/consumer/Notifications.jsx`,
   `src/pages/consumer/listings/{alertCriteria.js,NotifyMeCard.jsx,ResultsArea.jsx}`,
   `src/pages/consumer/flatmates/{alertCriteria.js,FlatmateAlertCard.jsx}`.
@@ -184,8 +184,8 @@ Alert delivery (derived):  alerts on AND matchAlerts pref on AND not in quiet ho
 ## 8. Edge cases, validation & error states
 - **Signed-out lead:** alert stored under the mobile they typed, not `anon`, so it re-appears after
   they sign in with that number.
-- **Empty states:** Saved page has a full empty state and per-category empty states; SavedPanel and
-  AlertsPanel each render a distinct "nothing yet" card with a CTA (never blank).
+- **Empty states:** Saved page has a full empty state and per-category empty states; AlertsPanel
+  renders a distinct "nothing yet" card with a CTA (never blank).
 - **Hidden listing:** archived, paused, pending, rejected and flagged listings drop out of `/me/saved`
   and its totals without deleting the saved row.
 - **"Any" ranges:** default-max budget/rent produce no price chip (noise suppression).

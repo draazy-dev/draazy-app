@@ -22,14 +22,14 @@ export function GroupBadges({ g, reviewStatus, myPost, owned }) {
   return (
     <>
       {left <= 0
-        ? <span className="chip px-2 py-0.5 rounded-full text-[10px] text-amber-300 whitespace-nowrap">{tr('flatmates.full')}</span>
-        : <span className="badge-seeker px-2 py-0.5 rounded-full text-[10px] font-bold text-white whitespace-nowrap">{tr('flatmates.seatsLeft', { count: left })}</span>}
+        ? <span className="dz-tag chip text-amber-300">{tr('flatmates.full')}</span>
+        : <span className="dz-tag badge-seeker font-bold text-white">{tr('flatmates.seatsLeft', { count: left })}</span>}
       <span className="inline-flex items-center gap-1 text-[11px] text-teal-300"><Icon name="map-pin" className="w-3 h-3" />{groupLocalities(g).join(' · ')}</span>
-      {g.hunting && <span className="chip px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 text-sky-300"><Icon name="search" className="w-2.5 h-2.5" /> {tr('flatmates.lookingForFlat')}</span>}
+      {g.hunting && <span className="dz-tag chip font-bold text-sky-300"><Icon name="search" className="w-2.5 h-2.5" /> {tr('flatmates.lookingForFlat')}</span>}
       <PolicyChip policy={g.policy} />
-      {allVerified(g) && <span className="badge-seeker px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 text-white"><Icon name="shield-check" className="w-2.5 h-2.5" /> {tr('flatmates.allVerified')}</span>}
-      {showHostBadge(g, reviewStatus) && <span className={'chip px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 ' + hostTierMeta(g).cls}><Icon name={hostTierMeta(g).icon} className="w-2.5 h-2.5" /> {hostTierMeta(g).label}</span>}
-      {g.ownerConsent && <span className="chip px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center gap-1 text-emerald-300"><Icon name="badge-check" className="w-2.5 h-2.5" /> {tr('flatmates.ownerConsented')}</span>}
+      {allVerified(g) && <span className="dz-tag badge-seeker font-bold text-white"><Icon name="shield-check" className="w-2.5 h-2.5" /> {tr('flatmates.allVerified')}</span>}
+      {showHostBadge(g, reviewStatus) && <span className={'dz-tag chip font-bold ' + hostTierMeta(g).cls}><Icon name={hostTierMeta(g).icon} className="w-2.5 h-2.5" /> {hostTierMeta(g).label}</span>}
+      {g.ownerConsent && <span className="dz-tag chip font-bold text-emerald-300"><Icon name="badge-check" className="w-2.5 h-2.5" /> {tr('flatmates.ownerConsented')}</span>}
       <ReviewChip status={reviewStatus} kind="group" id={g.id} owned={owned} />
       <MatchPill match={match} />
       <Fresh item={g} />

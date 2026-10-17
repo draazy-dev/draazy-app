@@ -99,6 +99,9 @@ test.describe('LIVE: post-request form', () => {
        stored value is what proves the translation happened. */
     expect(saved.flatPref, '"Women only" should be stored as the enum').toBe('women');
     expect(saved.roomPref, '"Private room" should be stored as the enum').toBe('private');
+    expect(saved.gender, 'an untouched "I am a" stays "any" and is never copied from or onto the profile').toBe('any');
+    const me = await (await fetch(`${API}/auth/me`, { headers: auth(accessToken) })).json();
+    expect(me.gender ?? null).toBeNull();
     expect(saved.budget, 'the grouped display must not leak commas onto the wire').toBe(17500);
     expect(saved.budgetMax, 'the budget ceiling should be stored as the top of the range').toBe(22000);
     expect(saved.title, 'the headline the poster wrote should be stored as written').toBe('Quiet designer wants a sunny room near Baner');

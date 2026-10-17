@@ -4,6 +4,7 @@ import { API, E2E_OTP, apiLogin, authHeaders, uniqueMobile, uploadedListingPhoto
 import { tenantRoomAgreement } from '../../helpers/flatmateAgreement.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
 import { pickLocalitiesIn } from '../../helpers/locality.js';
+import { sql } from '../../helpers/monetisation.js';
 
 const STAFF = '9733798115';
 
@@ -151,7 +152,7 @@ async function openDesk(page, login) {
 }
 
 test.describe('Ops → flatmate desk (live)', () => {
-  test('the desk has three status tabs and no board switcher, type tabs narrow the queue, and the queue can be searched, sorted and cut by date', async ({ page, login }) => {
+  test('the desk has three status tabs and no board switcher, type tabs narrow the queue, and the queue is newest first, searchable and cut by date', async ({ page, login }) => {
     await test.step('one Pending tab, three tabs in all — no board switcher', async () => {
       await openDesk(page, login);
       const tabs = page.getByRole('tablist', { name: 'Flatmate queues' }).getByRole('tab');
@@ -195,7 +196,7 @@ test.describe('Ops → flatmate desk (live)', () => {
       await openTab(page, 'Published');
       await expect(page.getByRole('group', { name: 'Post type' }).getByRole('button', { name: 'Group', exact: true })).toHaveAttribute('aria-pressed', 'true');
     });
-    await test.step('the queue can be searched, sorted and cut by date like the property queues', async () => {
+    await test.step('the queue is newest first with no sort toggle, and can be searched and cut by date', async () => {
       const tag = `Sort probe ${stamp()}`;
       await seedSeekerPost({ mobile: uniqueMobile(), name: 'Sort One' }, `${tag} first`);
       await seedSeekerPost({ mobile: uniqueMobile(), name: 'Sort Two' }, `${tag} second`);
@@ -205,10 +206,8 @@ test.describe('Ops → flatmate desk (live)', () => {
       const cards = page.getByTestId('flatmate-queue-card');
       await expect(cards).toHaveCount(2);
       await expect(page.getByRole('status').filter({ hasText: 'items' })).toHaveText('2 items');
-      await expect(cards.first()).toContainText(`${tag} first`);
-
-      await page.getByRole('group', { name: 'Sort' }).getByRole('button', { name: 'Newest' }).click();
       await expect(cards.first()).toContainText(`${tag} second`);
+      await expect(page.getByRole('group', { name: 'Sort' })).toHaveCount(0);
 
       await page.getByRole('group', { name: 'Posted' }).getByRole('button', { name: 'Today', exact: true }).click();
       await expect(cards).toHaveCount(2);
@@ -310,7 +309,7 @@ test.describe('Ops → flatmate desk (live)', () => {
     await expect(card(page, marker)).toHaveCount(0);
   });
 
-  test('removing a post takes an optional note, and the free text is never truncated', async ({ page, login }) => {
+  test('removing a post needs a note, and the free text is never truncated', async ({ page, login }) => {
     const marker = `Contact 99999 in the free text ${stamp()}`;
     await seedSeekerPost(HOSTS.remove, marker);
     await openDesk(page, login);
@@ -318,13 +317,37 @@ test.describe('Ops → flatmate desk (live)', () => {
     const dialog = await review(page, marker);
     await expect(dialog.locator('.flatmate-mod-text')).toHaveText(marker);
 
-    await dialog.getByPlaceholder('Internal note (optional)').fill('Phone number in the free text.');
+    await expect(dialog.getByRole('button', { name: 'Remove' })).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: 'Hide for review' })).toBeDisabled();
+    await dialog.getByLabel('Internal note', { exact: true }).fill('Phone number in the free text.');
     await dialog.getByRole('button', { name: 'Remove' }).click();
     await expect(dialog).toHaveCount(0);
 
     await expect(card(page, marker)).toHaveCount(0);
     await openTab(page, 'Hidden & removed');
     await expect(cardFor(page, marker)).toContainText('removed');
+
+    const removed = await review(page, marker);
+    await expect(removed.getByRole('button', { name: 'Publish' })).toBeDisabled();
+  });
+
+  test('an expired post can only be removed from the desk, with a note', async ({ page, login }) => {
+    const marker = `Expired on the desk ${stamp()}`;
+    const { created } = await seedSeekerPost({ mobile: uniqueMobile(), name: 'Old Post' }, marker);
+    sql(`update flatmate_seeker_posts set mod_status = 'expired', expired_from = mod_status where id = '${created.id}'`);
+    await openDesk(page, login);
+    await openTab(page, 'Hidden & removed');
+
+    const dialog = await review(page, marker);
+    await expect(dialog.locator('.flatmate-decision-section')).toContainText('only the host\'s renewal brings it back');
+    for (const name of ['Publish', 'Hide for review', 'Looks fine']) {
+      await expect(dialog.getByRole('button', { name })).toHaveCount(0);
+    }
+    await expect(dialog.getByRole('button', { name: 'Remove' })).toBeDisabled();
+    await dialog.getByLabel('Internal note', { exact: true }).fill('Reported after it lapsed.');
+    await dialog.getByRole('button', { name: 'Remove' }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(sql(`select mod_status from flatmate_seeker_posts where id = '${created.id}'`)).toBe('removed');
   });
 
   test('the desk corrects a post\'s core fields in place', async ({ page, login }) => {
@@ -362,7 +385,7 @@ test.describe('Ops → flatmate desk (live)', () => {
     await expect(dialog).toContainText('Per head');
     await expect(dialog).toContainText('Owner: pending');
 
-    await dialog.getByPlaceholder('Internal note (optional)').fill('Group members look duplicated.');
+    await dialog.getByLabel('Internal note', { exact: true }).fill('Group members look duplicated.');
     await dialog.getByRole('button', { name: 'Hide for review' }).click();
     await expect(dialog).toHaveCount(0);
 

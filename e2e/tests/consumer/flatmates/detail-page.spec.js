@@ -136,6 +136,7 @@ test.describe('LIVE: flatmate detail page', () => {
       await expect(dots).toHaveCount(3);
       await dots.nth(1).click();
       await expect(hero).toContainText('2/3');
+      await expect(page.locator('[data-gallery-track]')).toHaveCSS('overflow-y', 'hidden');
 
       await page.locator('[data-gallery-track] img').nth(1).click();
       const lightbox = page.getByRole('dialog');

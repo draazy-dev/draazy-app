@@ -7,6 +7,8 @@ import {
 } from '../../../services/identityReviewService.js';
 import { classNames } from '../../../lib/format.js';
 import DateField from '../../../components/ui/DateField.jsx';
+import IdInput from '../../../components/IdInput.jsx';
+import { ID_KINDS } from '../../../lib/idFormat.js';
 import KycAppealPanel from './KycAppealPanel.jsx';
 import {
   NOTE_REQUIRED_REASONS,
@@ -35,6 +37,7 @@ function initialApproval(detail) {
     yearOnly: Boolean(detail?.holderDobYearOnly),
     numberMismatch: false,
     numberOverride: false,
+    gender: '',
   };
 }
 
@@ -137,7 +140,7 @@ export default function KycActionRail({ detail, kase, user, canWrite, checklistL
           </div>
           {mode === 'approve' ? (
             <div className="mt-4 space-y-3">
-              <Input label="Document number" value={approval.number} autoComplete="off" spellCheck={false} onChange={(number) => setApproval((a) => ({ ...a, number, numberMismatch: false, numberOverride: false }))} />
+              <Input label="Document number" kind={ID_KINDS[detail.docType] ? detail.docType : undefined} value={approval.number} autoComplete="off" spellCheck={false} onChange={(number) => setApproval((a) => ({ ...a, number, numberMismatch: false, numberOverride: false }))} />
               {approval.numberMismatch ? (
                 <div className="rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100">
                   <p>Your number doesn&apos;t match the applicant&apos;s entry. Re-check the image.</p>
@@ -149,6 +152,13 @@ export default function KycActionRail({ detail, kase, user, canWrite, checklistL
               ) : null}
               <Input label="Holder name" value={approval.name} onChange={(name) => setApproval((a) => ({ ...a, name }))} />
               {accountNameHint ? <p className="text-xs text-gray-400">{accountNameHint}</p> : null}
+              <label className="block text-sm text-gray-300">Gender on document{detail.accountGender ? <span className="text-xs text-gray-400"> · profile: {detail.accountGender}</span> : null}
+                <select data-testid="ops-identity-gender" value={approval.gender} onChange={(e) => setApproval((a) => ({ ...a, gender: e.target.value }))} className={fieldClass}>
+                  <option value="">—</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                </select>
+              </label>
               <label className="flex items-center gap-2 text-sm text-gray-300">
                 <input data-testid="ops-identity-year-only" type="checkbox" checked={approval.yearOnly} onChange={(e) => setApproval((a) => ({ ...a, yearOnly: e.target.checked }))} className="h-4 w-4 accent-[var(--teal-2)]" />
                 Year only (old Aadhaar)
@@ -254,10 +264,12 @@ function ReasonBox({ testId, label, value, onChange }) {
   );
 }
 
-function Input({ label, onChange, 'data-testid': testId, ...props }) {
+function Input({ label, onChange, kind, 'data-testid': testId, ...props }) {
   return (
     <label className="block text-sm text-gray-300">{label}
-      <input data-testid={testId} {...props} onChange={(e) => onChange(e.target.value)} className={fieldClass} />
+      {kind
+        ? <IdInput kind={kind} data-testid={testId} {...props} onChange={onChange} className={fieldClass} />
+        : <input data-testid={testId} {...props} onChange={(e) => onChange(e.target.value)} className={fieldClass} />}
     </label>
   );
 }

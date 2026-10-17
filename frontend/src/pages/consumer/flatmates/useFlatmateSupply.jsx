@@ -56,7 +56,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
   const [consentOpen, setConsentOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [editingGroupId, setEditingGroupId] = useState(null);
-  const [post, setPost] = useState({ name: '', gender: 'female', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
+  const [post, setPost] = useState({ name: '', gender: 'any', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
   const [grp, setGrp] = useState(BLANK_GROUP);
   const postDraft = useFormDraft('dzDraft:flatmate-post', post, setPost, { ignore: ['gender', 'moveIn', 'flatPref', 'roomPref', 'verifiedContactOnly'] });
   const grpDraft = useFormDraft('dzDraft:share-group:v3', grp, setGrp, { ignore: ['policy', 'seats', 'locality', 'hunting'], omit: ['role', 'propertyId', 'agreement', 'agreementDoc', 'consentMobile', 'consentVerified'] });
@@ -106,7 +106,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
           verifiedContactOnly: myPost.verifiedContactOnly || false,
         });
       } else if (!id) {
-        setPost({ name: user.name || '', gender: 'female', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
+        setPost({ name: user.name || '', gender: user.gender || 'any', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
       }
       setPostOpen(true);
     });
@@ -236,7 +236,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     postDraft.clear();
     setPostOpen(false);
     setEditingId(null);
-    setPost({ name: '', gender: 'female', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
+    setPost({ name: '', gender: 'any', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
     toast(editingId ? t('flatmates.requestUpdated') : t('flatmates.requestLive'));
   };
   const prefillGroupFromListing = async (listing) => {

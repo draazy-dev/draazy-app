@@ -3,11 +3,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { inr } from './helpers.js';
 
-// An empty result set is an invitation to act, not a dead end. `primary` is the
-// one thing we want the user to do here (post, list, create); when filters are
-// narrowing things down we also offer a one-tap way back to everything. `chips`
-// spell out WHY it's empty (the active filters), and `hint` surfaces the cheapest
-// post just beyond the current budget so the user can widen it in one tap.
+// `chips` say why the result is empty; `hint` is the cheapest post just past the budget, one tap to widen it.
 function Empty({ icon, title, text, primary, filtersActive, onClearFilters, chips = [], query, hint, onRaiseBudget, rescue }) {
   const { t } = useTranslation();
   return (
@@ -17,13 +13,11 @@ function Empty({ icon, title, text, primary, filtersActive, onClearFilters, chip
       <p className="text-gray-500 text-sm mt-1 max-w-sm mx-auto">{text}</p>
       {(query || chips.length > 0) && (
         <div className="mt-3 flex items-center justify-center gap-1.5 flex-wrap max-w-md mx-auto">
-          {query && <span className="inline-flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[11px] text-gray-300"><Icon name="search" className="w-3 h-3" /> “{query}”</span>}
-          {chips.map((c, i) => <span key={i} className="inline-flex items-center gap-1 rounded-full bg-white/5 border border-white/10 px-2.5 py-1 text-[11px] text-gray-300"><Icon name={c.icon} className="w-3 h-3" /> {c.text}</span>)}
+          {query && <span className="dz-tag bg-white/5 border border-white/10 text-gray-300"><Icon name="search" className="w-3 h-3" /> “{query}”</span>}
+          {chips.map((c, i) => <span key={i} className="dz-tag bg-white/5 border border-white/10 text-gray-300"><Icon name={c.icon} className="w-3 h-3" /> {c.text}</span>)}
         </div>
       )}
-      {/* Cross-tab rescue outranks the budget hint: the other tab already holds
-          stock for the SAME filters, so switching costs the user no compromise,
-          while raising a budget does. */}
+      {/* Outranks the budget hint: the other tab matches the same filters, so switching costs no compromise. */}
       {rescue && rescue.count > 0 && (
         <div className="mt-4 max-w-sm mx-auto rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
           <p className="text-gray-300 text-xs">{rescue.text}</p>

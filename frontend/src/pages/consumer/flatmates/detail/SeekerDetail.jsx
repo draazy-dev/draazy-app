@@ -23,7 +23,7 @@ export default function SeekerDetail({ r, owned, interested, saved, onSave, onAs
       title={seekerTitle(r)}
       meta={[r.title && r.name, seekerSubtitle(r)].filter(Boolean).join(' · ')}
       badges={<>
-        {r.verified && <span className="badge-seeker inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"><Icon name="shield-check" className="w-3 h-3" /> {t('flatmates.verifiedSeeker')}</span>}
+        {r.verified && <span className="dz-tag badge-seeker font-bold uppercase tracking-wider"><Icon name="shield-check" className="w-3 h-3" /> {t('flatmates.verifiedSeeker')}</span>}
         <Fresh item={r} />
       </>}
     />

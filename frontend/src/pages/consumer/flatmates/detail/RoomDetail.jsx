@@ -32,10 +32,10 @@ export default function RoomDetail({ r, owned, ask, saved, onSave, onAsk, onRepo
       title={title}
       meta={<span className="inline-flex items-center gap-1"><Icon name="map-pin" className="w-3.5 h-3.5 text-teal-300 shrink-0" />{[r.title && r.society, loc, r.flatType, r.gatedCommunity && t('flatmates.gated')].filter(Boolean).join(' · ')}</span>}
       badges={<>
-        {r.verified && <span className="badge-seeker inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"><Icon name="shield-check" className="w-3 h-3" /> {t('flatmates.verified')}</span>}
-        {tierMeta && <span className={'chip px-2 py-0.5 rounded-md text-[11px] font-bold inline-flex items-center gap-1 ' + tierMeta.cls}><Icon name={tierMeta.icon} className="w-3 h-3" /> {tierMeta.label}</span>}
+        {r.verified && <span className="dz-tag badge-seeker font-bold uppercase tracking-wider"><Icon name="shield-check" className="w-3 h-3" /> {t('flatmates.verified')}</span>}
+        {tierMeta && <span className={'dz-tag chip font-bold ' + tierMeta.cls}><Icon name={tierMeta.icon} className="w-3 h-3" /> {tierMeta.label}</span>}
         <ReviewChip status={r.reviewStatus} kind="room" id={r.id} owned={owned} />
-        {r.seatsOpen != null && <span className="chip px-2 py-0.5 rounded-md text-[11px] font-bold text-gray-200">{seatsLeft(r) > 0 ? t('flatmates.seatsOpen', { count: seatsLeft(r) }) : t('flatmates.filled')}</span>}
+        {r.seatsOpen != null && <span className="dz-tag chip font-bold text-gray-200">{seatsLeft(r) > 0 ? t('flatmates.seatsOpen', { count: seatsLeft(r) }) : t('flatmates.filled')}</span>}
         <Fresh item={r} />
       </>}
     />

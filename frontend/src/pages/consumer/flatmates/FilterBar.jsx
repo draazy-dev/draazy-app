@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import ScrollRail from '../../../components/ScrollRail.jsx';
 import NativeSelect from '../../../components/ui/NativeSelect.jsx';
 import Select from '../../../components/ui/Select.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
@@ -243,7 +244,7 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
                 className={'inline-flex items-center gap-1.5 px-3 h-10 min-h-11 lg:min-h-10 rounded-xl border text-sm font-semibold t-all shrink-0 ' + (showFilters ? 'border-teal-400/60 bg-teal-500/25 text-teal-100' : 'border-teal-400/40 bg-teal-500/15 text-teal-100 hover:bg-teal-500/25')}
               >
                 <Icon name="sliders-horizontal" className="w-4 h-4" /> {t('flatmates.filters')}
-                {activeCount > 0 && <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-teal-400 text-gray-900 text-[10px] font-bold leading-none">{activeCount}</span>}
+                {activeCount > 0 && <span className="dz-count bg-teal-400 text-gray-900">{activeCount}</span>}
               </button>
               <span className="text-xs font-medium text-gray-400 whitespace-nowrap">{t('flatmates.sortBy')}</span>
               <Select value={sortMode} onChange={onSort} options={SORT_OPTIONS} className="w-44" ariaLabel={t('flatmates.ariaSortPosts')} />
@@ -269,7 +270,7 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
         <Icon name="sliders-horizontal" className="w-[18px] h-[18px] text-teal-300" />
         {t('flatmates.filters')}
         {activeCount > 0 ? (
-          <span className="filter-fab__count inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold leading-none">{activeCount}</span>
+          <span className="dz-count filter-fab__count">{activeCount}</span>
         ) : null}
       </button>
 
@@ -283,19 +284,19 @@ export default function FilterBar({ filters, setF, viewMode, setViewMode, seg, b
 
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- swipe needs one drag surface. */}
       <div {...swipe} className={'filter-panel lg:hidden flex flex-col ' + (drawer ? 'open' : '')} role="dialog" aria-label={t('flatmates.filters')} aria-modal="true" inert={!drawer}>
-        <div className="filter-panel__grabber" aria-hidden="true" />
-        <div className="filter-panel__drag-zone flex items-center justify-between px-5 pt-3 pb-3 shrink-0">
-          <h3 className="text-lg font-bold text-white">{t('flatmates.filters')}{activeCount > 0 && <span className="ml-2 text-sm font-medium text-teal-300">· {t('flatmates.nActive', { count: activeCount })}</span>}</h3>
+        <div className="filter-panel__drag-zone flex items-center gap-3 pl-4 pr-2 pt-3 pb-3 shrink-0">
+          <span className="filter-panel__badge" aria-hidden="true"><Icon name="sliders-horizontal" className="w-5 h-5" /></span>
+          <h3 className="flex-1 text-lg font-bold text-white">{t('flatmates.filters')}{activeCount > 0 && <span className="ml-2 text-sm font-medium text-teal-300">· {t('flatmates.nActive', { count: activeCount })}</span>}</h3>
           <button onClick={() => setDrawer(false)} className="w-11 h-11 rounded-lg flex items-center justify-center hover:bg-white/10 t-all" aria-label={t('flatmates.ariaCloseFilters')}>
             <Icon name="x" className="w-5 h-5 text-gray-400" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-6 filter-scroll">
+        <ScrollRail className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-6 filter-scroll">
           <div className="sf-filter-sheet">
             <FilterControls {...fieldProps} variant="sheet" />
           </div>
-        </div>
-        <div data-testid="filter-drawer-actions" className="shrink-0 flex items-center gap-2 border-t border-white/10 px-3 pt-3 pb-[calc(0.75rem+var(--dz-safe-b))]" style={{ background: 'rgb(var(--dz-c-ink-card))' }}>
+        </ScrollRail>
+        <div data-testid="filter-drawer-actions" className="shrink-0 flex items-center gap-2 border-t border-white/10 p-3">
           <span className="sr-only" aria-live="polite">
             {loaded ? (total === 0 ? t('flatmates.noMatchesSr') : t('flatmates.resultsMatch', { count: total })) : ''}
           </span>

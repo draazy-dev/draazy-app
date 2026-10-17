@@ -25,6 +25,7 @@ function approvalPayload(payload) {
     name: payload?.name,
     poseConfirmed: Boolean(payload?.poseConfirmed),
     numberOverride: Boolean(payload?.numberOverride),
+    ...(payload?.gender ? { gender: payload.gender } : {}),
   };
   return payload?.yearOnly
     ? { ...base, birthYear: Number(payload?.birthYear) }

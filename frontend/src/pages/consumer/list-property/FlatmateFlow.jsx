@@ -5,7 +5,7 @@ import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import AvailabilityField from '../../../components/ui/AvailabilityField.jsx';
 import { FieldError } from './controls.jsx';
 import StepHeader from './StepHeader.jsx';
-import LocationPicker from './LocationPicker.jsx';
+import { PinMapBox } from './LocationPicker.jsx';
 import AreaSearch from './AreaSearch.jsx';
 import PhotoUploader from './PhotoUploader.jsx';
 import { fld, lbl, lbl3 } from './styles.js';
@@ -55,16 +55,18 @@ const FlatmateFlow = ({
               placeholder={t('listProperty.ph.areaSearch')}
             />
           </div>
-          <div style={{ height: 280, borderRadius: 14, overflow: 'hidden', border: `1px solid ${errors.location ? 'rgb(var(--dz-c-red-400) / .6)' : 'rgb(var(--dz-c-white) / .1)'}` }}>
-            <LocationPicker lat={form.propLat} lng={form.propLng} flyTo={flyTo} onMove={(la, ln) => onPinMove(la, ln)} />
-          </div>
-          {locationSet ? (
+          <PinMapBox
+            invalid={!!errors.location}
+            hint={!locationSet && (
+              <p className="text-gray-500 text-xs mt-2">
+                <MapPin className="w-3 h-3 inline text-teal-400" /> {t('listProperty.help.searchOrDragFlat')}
+              </p>
+            )}
+            lat={form.propLat} lng={form.propLng} flyTo={flyTo} onMove={(la, ln) => onPinMove(la, ln)}
+          />
+          {locationSet && (
             <p className="text-emerald-300/90 text-xs mt-2 flex items-center gap-1.5">
               <MapPin className="w-3 h-3 text-emerald-400" /> {t('listProperty.help.locationSet', { lat: Number(form.propLat).toFixed(4), lng: Number(form.propLng).toFixed(4) })}
-            </p>
-          ) : (
-            <p className="text-gray-500 text-xs mt-2">
-              <MapPin className="w-3 h-3 inline text-teal-400" /> {t('listProperty.help.searchOrDragFlat')}
             </p>
           )}
           {geoFillStatus === 'filling' && <p className="text-gray-500 text-xs mt-1.5">{t('listProperty.help.fillingAddress')}</p>}

@@ -86,11 +86,13 @@
 - **The KYC desk.** Three tabs, 10 cases a page, every filter a server query
   (`GET /moderation/identity-reviews?status=&q=&docType=&claim=&overdue=&outcome=&sort=`, counts
   from `/moderation/identity-reviews/summary`):
-  - *Needs review* (`pending`, oldest first) — the work. Claim chips All / Unclaimed / Mine n/3 /
+  - *Needs review* (`pending`) — the work. Claim chips All / Unclaimed / Mine n/3 /
     Others replace a separate "my cases" tab, since a reviewer holds at most three.
   - *QA sample* (`qa`) — sampled approvals awaiting a second reviewer; the approver's own are hidden.
-  - *Decided* (`verified`/`rejected`/`revoked`, newest first, Outcome chips) — revoke a badge or
+  - *Decided* (`verified`/`rejected`/`revoked`, Outcome chips) — revoke a badge or
     read a case's history.
+
+  Every tab is newest first; the back office has no sort toggle.
 
   A row opens one case in a dialog: document images beside the applicant's entries and a per-document
   checklist (Approve stays disabled until every line is ticked — the server cannot judge a photo),

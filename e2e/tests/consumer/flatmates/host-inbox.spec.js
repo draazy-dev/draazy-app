@@ -90,3 +90,39 @@ test('host sees a seeker\'s room interest in the dashboard, and Accept persists 
   await expect(page).toHaveURL(/\/messages\?c=/, { timeout: 15_000 });
   await expect(page.locator('.pc-input')).toBeVisible({ timeout: 15_000 });
 });
+
+for (const [label, viewport] of [['web', { width: 1280, height: 800 }], ['phone', { width: 360, height: 800 }]]) {
+  test.describe(label, () => {
+    test.use({ viewport });
+    test('a room with no seats left refuses a new ask, and the seeker is told why', async ({ page }) => {
+      const { accessToken: hostToken } = await apiLogin(uniqueMobile());
+      const roomRes = await fetch(`${API}/flatmates/rooms`, {
+        method: 'POST',
+        headers: auth(hostToken),
+        body: JSON.stringify({
+          ...(await withSocietyId(hostToken, { society: `Full Room ${Date.now().toString(36)}` })),
+          roomType: 'Private room', locality: 'Baner', rentShare: 15000, bhk: '2',
+          attachedBath: 'attached', furnishing: 'semi', hostRole: 'owner',
+          photos: await uploadedListingPhotos(hostToken),
+        }),
+      });
+      const room = await roomRes.json();
+      expect(roomRes.status, JSON.stringify(room)).toBe(201);
+      track('rooms', room.id, hostToken);
+      await approve(room.id);
+      const closed = await fetch(`${API}/flatmates/rooms/${room.id}/seats`, {
+        method: 'PATCH', headers: auth(hostToken), body: JSON.stringify({ seatsOpen: 0 }),
+      });
+      expect(closed.status, await closed.clone().text()).toBeLessThan(300);
+
+      await signedInAs(page, uniqueMobile());
+      await page.goto(`${BASE}/flatmates/room/${room.id}`);
+      await expect(page.getByText('Filled').first()).toBeVisible({ timeout: 15_000 });
+      const asked = page.waitForResponse((r) => r.url().includes(`/flatmates/rooms/${room.id}/interest`), { timeout: 15_000 });
+      await page.getByRole('button', { name: 'Send interest' }).filter({ visible: true }).first().click();
+      expect((await asked).status()).toBe(409);
+      await expect(page.getByText('This room is full right now.')).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByRole('button', { name: 'Send interest' }).filter({ visible: true }).first()).toBeEnabled();
+    });
+  });
+}

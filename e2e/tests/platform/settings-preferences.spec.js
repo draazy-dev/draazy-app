@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
-import { signIn, uniqueMobile, apiLogin, authHeaders, API } from '../../helpers/liveAuth.js';
+import { signIn, uniqueMobile, letterTag, apiLogin, authHeaders, API } from '../../helpers/liveAuth.js';
 
 // Dashboard ▸ Profile & Settings, against the live backend.
 const SEEKER = ACTORS.buyer;
@@ -49,6 +49,30 @@ test.describe('Dashboard settings', () => {
     await page.getByRole('button', { name: 'Save changes' }).click();
     await expect(page.getByText("Name can only have letters, spaces and . ' - (2 to 80 characters)")).toBeVisible();
     expect(patches).toEqual([]);
+  });
+
+  test('Gender is set once from the profile, then locked', async ({ page }) => {
+    const mobile = uniqueMobile();
+    await signIn(page, mobile);
+    await page.goto('/dashboard#profile');
+    const gender = page.getByRole('button', { name: 'Gender', exact: true });
+    await expect(gender).toBeEnabled();
+
+    await page.getByLabel('Full name').fill(`Asha ${letterTag()}`);
+    await gender.click();
+    await page.getByRole('option', { name: 'Female' }).click();
+    const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/auth/me'));
+    await page.getByRole('button', { name: 'Save changes' }).click();
+    expect((await (await saved).json()).gender).toBe('female');
+    await expect(gender).toBeDisabled();
+    await expect(page.getByText('Set once. Contact support to change it.')).toBeVisible();
+
+    const headers = await authHeaders(mobile);
+    const other = await fetch(`${API}/auth/me`, { method: 'PATCH', headers, body: JSON.stringify({ gender: 'male' }) });
+    expect(other.status).toBe(409);
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Gender', exact: true })).toBeDisabled();
   });
 
   test('Light mode is the default, keeps teal fills, and a switch to dark persists on this device', async ({ page, login }) => {

@@ -41,7 +41,7 @@ export default function FlatmateMapGate({ areas, selected, onToggle, maxAreas, o
             <button
               type="button"
               onClick={onSwitchList}
-              className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-500/10 border border-teal-400/30 text-teal-300 text-sm font-semibold hover:bg-teal-500/20 t-all"
+              className="h-btn mt-6 inline-flex items-center gap-2 px-5 rounded-xl bg-teal-500/10 border border-teal-400/30 text-teal-300 text-sm font-semibold hover:bg-teal-500/20 t-all"
             >
               <Icon name="list" className="w-4 h-4" /> {t('flatmates.seeAllAreasList', { count: selected.size })}
             </button>
@@ -65,7 +65,7 @@ export default function FlatmateMapGate({ areas, selected, onToggle, maxAreas, o
                       onClick={() => onToggle(a.name)}
                       aria-pressed={on}
                       className={
-                        'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border text-sm font-medium t-all ' +
+                        'h-btn-sm inline-flex items-center gap-1.5 px-3.5 rounded-full border text-sm font-medium t-all ' +
                         (on
                           ? 'bg-teal-500/15 border-teal-400/40 text-teal-200'
                           : 'bg-white/5 border-white/10 text-gray-300 hover:border-teal-400/40 hover:text-white')

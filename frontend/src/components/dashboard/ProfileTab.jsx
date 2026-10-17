@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import Switch from '../ui/Switch.jsx';
 import TimeField from '../ui/TimeField.jsx';
+import NativeSelect from '../ui/NativeSelect.jsx';
 import Modal from '../ui/Modal.jsx';
 import VerifyIdentityRedirect from '../auth/VerifyIdentityRedirect.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -55,7 +56,6 @@ const CollapsibleCard = ({ icon, iconCls = 'text-teal-400', title, sub, defaultO
     </Card>
   );
 };
-// One preference row: label + description on the left, control on the right.
 
 const PrefRow = ({ title, desc, children }) => (
   <div className="flex items-start justify-between gap-4 py-2">
@@ -66,12 +66,12 @@ const PrefRow = ({ title, desc, children }) => (
 // Trust chips reused in the identity header. Green = confirmed, amber = pending.
 
 const VerifiedChip = ({ label }) => (
-  <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/12 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
+  <span className="dz-tag border border-emerald-500/20 bg-emerald-500/12 font-semibold text-emerald-300">
     <Icon name="badge-check" className="w-3 h-3" /> {label}
   </span>
 );
 const PendingChip = ({ label, title, onClick }) => {
-  const cls = 'inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/12 px-2 py-0.5 text-[11px] font-semibold text-amber-300';
+  const cls = 'dz-tag border border-amber-500/20 bg-amber-500/12 font-semibold text-amber-300';
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className={cls + ' transition-colors hover:bg-amber-500/20 hover:text-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/40'} title={title}>
@@ -101,7 +101,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   const navigate = useNavigate();
   /* Seeded from the published defaults — the same shape the server returns for a user who has never saved — not from
      a local copy, which would flash a stale value before the real one. */
-  const [form, setForm] = useState({ name: user?.name || '', mobile: user?.mobile || '', email: user?.email || '', city: user?.city || 'Pune' });
+  const [form, setForm] = useState({ name: user?.name || '', mobile: user?.mobile || '', email: user?.email || '', city: user?.city || 'Pune', gender: '' });
   const [prefs, setPrefs] = useState(NOTIFICATION_PREFERENCE_DEFAULTS);
   const [app, setApp] = useState(() => getAppPrefs());
   /* Not seeded: the server sends these two non-nullable on every `/auth/me`, so there is always a real answer and
@@ -124,6 +124,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   const [identityOpen, setIdentityOpen] = useState(false);
   const { verified: identityVerified } = useVerification();
   const nameLocked = Boolean(identityVerified);
+  const genderLocked = Boolean(user?.gender);
   /* Preferences are account-level, so the panel shows what the platform will honour on whatever device is asking. */
 
   useEffect(() => {
@@ -172,7 +173,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
     if (!nameLocked && !isValidName(name)) { toast("Name can only have letters, spaces and . ' - (2 to 80 characters)", 'error'); return; }
     if (email && !EMAIL_RE.test(email)) { toast('Enter a valid email address', 'error'); return; }
     try {
-      await update({ ...(nameLocked ? {} : { name }), email, city: form.city });
+      await update({ ...(nameLocked ? {} : { name }), email, city: form.city, ...(!genderLocked && form.gender ? { gender: form.gender } : {}) });
       toast('Profile saved', 'success');
     } catch (err) {
       toast(err?.code === 'NAME_LOCKED_WHILE_VERIFIED' ? 'Name is locked while verified.' : err?.message || 'Could not save your profile. Please try again.', 'error');
@@ -183,7 +184,8 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   const dirty =
     (!nameLocked && form.name.trim() !== (user?.name || '').trim()) ||
     form.email.trim() !== (user?.email || '').trim() ||
-    form.city !== (user?.city || 'Pune');
+    form.city !== (user?.city || 'Pune') ||
+    (!genderLocked && form.gender !== '');
   /* Optimistic, then reconciled from the write's response; a failure rolls the control back rather than leaving a
      switch showing a state the server never accepted. */
 
@@ -295,7 +297,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-lg font-bold text-white truncate">{form.name.trim() || firstName(user)}</h2>
-              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-white/8 text-gray-300 border border-white/10">{roleLabel(user?.role)}</span>
+              <span className="dz-tag font-semibold bg-white/8 text-gray-300 border border-white/10">{roleLabel(user?.role)}</span>
             </div>
             <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
               <VerifiedChip label={t('verify.chipMobileVerified')} />
@@ -322,6 +324,15 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           </div>
           <label className="text-sm"><span className="mb-1.5 block text-gray-400">Email</span><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={fld} placeholder="you@example.com" inputMode="email" /></label>
           <label className="text-sm"><span className="mb-1.5 block text-gray-400">City</span><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={fld} /></label>
+          <div className="text-sm">
+            <span className="mb-1.5 block text-gray-400">Gender</span>
+            <NativeSelect value={genderLocked ? user.gender : form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} disabled={genderLocked} aria-label="Gender">
+              <option value="">Not set</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </NativeSelect>
+            <p className="mt-1 text-[11px] text-gray-500">{genderLocked ? 'Set once. Contact support to change it.' : "Set once. You can't change it later."}</p>
+          </div>
         </div>
         <button onClick={save} disabled={!dirty} className="dz-control dz-control--action mt-5 px-5 gap-2 disabled:opacity-40 disabled:cursor-not-allowed"><Icon name="save" className="w-4 h-4" /> Save changes</button>
 

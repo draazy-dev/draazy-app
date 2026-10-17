@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAs, signedInAsNew } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAs, signedInAsNew, shownMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { trackErrors } from '../../../helpers/console.js';
 import { postAsGroup, haveAFlat } from '../../../helpers/app.js';
@@ -121,7 +121,7 @@ test.describe('LIVE: group-form prefill', () => {
 
     const ownerMobile = String(tenancy.owner?.mobile || '').replace(/\D/g, '').slice(-10);
     expect(ownerMobile, 'the tenancy should name the landlord').toHaveLength(10);
-    await expect(page.getByPlaceholder(/10-digit mobile/i)).toHaveValue(ownerMobile);
+    await expect(page.getByPlaceholder(/10-digit mobile/i)).toHaveValue(shownMobile(ownerMobile));
     // Prefill enables consent but never substitutes for the owner's OTP.
     await expect(page.getByRole('button', { name: /Verify owner consent via OTP/i })).toBeEnabled();
 

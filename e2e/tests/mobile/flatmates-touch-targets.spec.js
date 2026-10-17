@@ -79,9 +79,12 @@ test.describe('Flatmates touch targets', () => {
     const actions = page.getByTestId('filter-drawer-actions');
     await expect(actions).toBeInViewport();
 
-    await expect(actions).toHaveCSS('padding-bottom', '12px');
-    // Headless Chrome reports safe-area env vars as 0, so the test uses the token.
+    // Headless Chrome reports safe-area env vars as 0, so the test uses the token. The card floats on
+    // --dz-bottom-inset, so it must stay above the bottom nav once a home indicator lifts the nav.
     await page.addStyleTag({ content: ':root { --dz-safe-b: 34px; }' });
-    await expect(actions).toHaveCSS('padding-bottom', '46px');
+    const nav = page.locator('nav.dz-bottom-nav');
+    await expect.poll(async () => (await nav.boundingBox()).y + (await nav.boundingBox()).height).toBeLessThanOrEqual(page.viewportSize().height - 34);
+    const [a, n] = [await actions.boundingBox(), await nav.boundingBox()];
+    expect(a.y + a.height).toBeLessThanOrEqual(n.y);
   });
 });

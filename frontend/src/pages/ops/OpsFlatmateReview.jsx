@@ -14,9 +14,9 @@ const EMPTY = {
 };
 
 const NOTES = {
-  pending: 'Open only: posts awaiting publish, edits since review, badge claims and group applications. An item leaves once you decide it. Oldest first.',
+  pending: 'Open only: posts awaiting publish, edits since review, badge claims and group applications. An item leaves once you decide it. Newest first.',
   published: 'Everything the city can see, plus cleared group applications. Open one to hide or remove it. Newest first.',
-  hidden: 'Flagged, removed and rejected posts. Open one to read why, or publish it again. Newest first.',
+  hidden: 'Flagged, removed, rejected and expired posts. Open one to read why, or publish it again. Newest first.',
 };
 
 const TYPE_CHIPS = [
@@ -26,8 +26,6 @@ const TYPE_CHIPS = [
   { value: 'post', label: 'Seeker post' },
 ];
 
-const SORT_CHIPS = [{ value: 'oldest', label: 'Oldest' }, { value: 'newest', label: 'Newest' }];
-
 const typeOf = (entry) => (entryKind(entry) === 'application' ? 'group' : entryKind(entry));
 
 const haystack = (entry) => {
@@ -35,16 +33,14 @@ const haystack = (entry) => {
   return [s.title, s.locality, s.author, entry.post?.snippet, entry.key].join(' ').toLowerCase();
 };
 
-function filterQueue(items, { type, q, days, order }) {
+function filterQueue(items, { type, q, days }) {
   const needle = q.trim().toLowerCase();
   const cutoff = days ? Date.now() - Number(days) * 86400000 : 0;
-  const dir = order === 'oldest' ? 1 : -1;
   return items
     .filter((e) => (type === 'all' || typeOf(e) === type)
       && (!needle || haystack(e).includes(needle))
       // An entry with no timestamp survives every cutoff rather than vanishing from the queue.
-      && (!cutoff || !e.since || e.since >= cutoff))
-    .sort((a, b) => dir * ((a.since || 0) - (b.since || 0)));
+      && (!cutoff || !e.since || e.since >= cutoff));
 }
 
 export default function OpsFlatmateReview() {
@@ -52,14 +48,12 @@ export default function OpsFlatmateReview() {
   const [type, setType] = useState('all');
   const [q, setQ] = useState('');
   const [days, setDays] = useState('');
-  const [sort, setSort] = useState('');
   const [open, setOpen] = useState(null);
   const loaded = useFlatmateQueue(tab);
-  const order = sort || (tab === 'pending' ? 'oldest' : 'newest');
-  const queue = { ...loaded, items: filterQueue(loaded.items, { type, q, days, order }) };
+  const queue = { ...loaded, items: filterQueue(loaded.items, { type, q, days }) };
   const filtered = loaded.items.length > 0;
-  const dirty = type !== 'all' || q !== '' || days !== '' || sort !== '';
-  const clear = () => { setType('all'); setQ(''); setDays(''); setSort(''); };
+  const dirty = type !== 'all' || q !== '' || days !== '';
+  const clear = () => { setType('all'); setQ(''); setDays(''); };
   const close = useCallback(() => setOpen(null), []);
   const ready = loaded.status === 'ready';
 
@@ -93,7 +87,6 @@ export default function OpsFlatmateReview() {
           <>
             <SearchBox value={q} onChange={setQ} placeholder="Title, author or locality" label="Search the queue" />
             <Chips label="Post type" options={TYPE_CHIPS} value={type} onChange={setType} />
-            <Chips label="Sort" options={SORT_CHIPS} value={order} onChange={setSort} />
             <Chips label="Posted" options={DATE_CHIPS} value={days} onChange={setDays} />
             {dirty ? <ClearFilters onClick={clear} /> : null}
             {queue.status === 'ready' ? (
