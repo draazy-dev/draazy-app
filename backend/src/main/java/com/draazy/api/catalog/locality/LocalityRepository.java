@@ -24,6 +24,14 @@ public interface LocalityRepository extends JpaRepository<Locality, String> {
             """)
     List<Locality> searchLive(@Param("q") String q, Pageable page);
 
+    // pg_trgm word_similarity; the same 0.5 floor as the listing text search.
+    @Query(value = """
+            select * from localities l
+            where l.archived_at is null and word_similarity(lower(:q), lower(l.name)) >= 0.5
+            order by word_similarity(lower(:q), lower(l.name)) desc, l.name
+            limit :size""", nativeQuery = true)
+    List<Locality> searchLiveClose(@Param("q") String q, @Param("size") int size);
+
     /** Inserts a live row; 0 means the slug or the place is already taken, and nothing was written. */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(value = """

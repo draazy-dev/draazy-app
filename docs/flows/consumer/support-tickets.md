@@ -118,6 +118,7 @@ create -> new
   open      --staff resolves (back-office)--> resolved
   resolved  --customer reply--> open      (re-opened)
   resolved  --(staff) closes--> closed
+  any       --desk `POST /support/tickets/{id}/close` (tickets:write)--> closed  (customer is notified "Your support ticket was closed"; closing twice is a no-op)
   closed    --customer reply--> open      (re-opened)
   waiting   --customer reply--> open
 ```

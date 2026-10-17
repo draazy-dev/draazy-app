@@ -14,6 +14,8 @@ import org.springframework.data.repository.query.Param;
  * cannot use the V18 indexes; {@link #search} hits unindexed columns, so it is a scan regardless. */
 public interface ReportRepository extends JpaRepository<Report, UUID> {
 
+    long countByReporterIdAndCreatedAtAfter(UUID reporterId, Instant since);
+
     /** The whole queue, newest first. */
     Page<Report> findAllByOrderByCreatedAtDesc(Pageable pageable);
 

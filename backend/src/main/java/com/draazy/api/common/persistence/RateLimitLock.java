@@ -22,6 +22,8 @@ public class RateLimitLock {
 
         SERVICE_WAITLIST(4),
 
+        /** Distinct from {@link #OTP_SEND}, which keys on the recipient a caller can rotate freely.
+         * Both are taken on one send, always in namespace order, so the pair cannot deadlock. */
         OTP_SEND_CALLER(5),
 
         LISTING_CREATE(6),
@@ -32,12 +34,10 @@ public class RateLimitLock {
 
         LISTING_LIVE(9),
 
-        REFERRER_QUALIFY(10);
+        REFERRER_QUALIFY(10),
 
-        /** Distinct from {@link #OTP_SEND}, which keys on the recipient a caller can rotate freely.
-         * Both are taken on one send, always in namespace order, so the pair cannot deadlock. */
-        // Distinct from `#OTP_SEND`, which keys on the recipient a caller can rotate freely.
-        // Both are taken on one send, always in namespace order, so the pair cannot deadlock.
+        REPORT_CREATE(11);
+
         private final int namespace;
 
         Limit(int namespace) {

@@ -85,7 +85,11 @@ public class LocalityPlaceService {
             return List.of();
         }
         int size = Math.max(1, Math.min(limit, MAX_SEARCH));
-        return localities.searchLive(text, PageRequest.of(0, size)).stream().map(LocalitySummary::of).toList();
+        List<Locality> hits = localities.searchLive(text, PageRequest.of(0, size));
+        if (hits.isEmpty()) {
+            hits = localities.searchLiveClose(text, size);
+        }
+        return hits.stream().map(LocalitySummary::of).toList();
     }
 
     private LocalitySummary known(String placeId) {
