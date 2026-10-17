@@ -37,7 +37,7 @@ for (const name of ['heic-to', 'pdf-lib']) {
 }
 const integration = path.join(output, 'integration');
 await mkdir(integration, { recursive: true });
-for (const name of ['image.worker.js', 'imageDimensions.js', 'pdf.worker.js', 'prepareUpload.js', 'policy.js']) {
+for (const name of ['image.worker.js', 'imageProcess.js', 'imageDimensions.js', 'pdf.worker.js', 'prepareUpload.js', 'policy.js']) {
   await copyFile(path.join(root, 'src/lib/uploads', name), path.join(integration, name));
 }
 await writeFile(path.join(output, 'sources.json'), JSON.stringify(manifest, null, 2));

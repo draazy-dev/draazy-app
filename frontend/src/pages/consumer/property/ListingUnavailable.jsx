@@ -19,17 +19,18 @@ export default function ListingUnavailable({ reason, listing = null, closedWord,
 
   const browseTo = useMemo(() => listingsPathFor(listing), [listing]);
   const isClosed = reason === 'closed';
+  const isPaused = reason === 'paused';
   const title = isClosed
     ? tr('property.dealClosedTitle', { word: closedWord })
-    : tr('property.notFound');
+    : tr(isPaused ? 'property.pausedTitle' : 'property.notFound');
   const body = isClosed
     ? tr('property.propertyBeenSub', { word: closedWord })
-    : tr('property.notFoundRecoveryBody');
+    : tr(isPaused ? 'property.pausedBody' : 'property.notFoundRecoveryBody');
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-28 sm:py-32">
       <div className="mx-auto max-w-2xl text-center">
-        <Icon name={isClosed ? 'lock' : 'home'} className="w-11 h-11 text-slate-400 mx-auto mb-4" />
+        <Icon name={isClosed ? 'lock' : isPaused ? 'clock' : 'home'} className="w-11 h-11 text-slate-400 mx-auto mb-4" />
         <h1 className="text-2xl font-bold text-white mb-2">{title}</h1>
         <p className="text-gray-400 text-sm">{body}</p>
         <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
@@ -49,7 +50,7 @@ export default function ListingUnavailable({ reason, listing = null, closedWord,
           ) : null}
         </div>
       </div>
-      {isClosed && listing ? (
+      {(isClosed || isPaused) && listing ? (
         <div className="mt-12">
           <SimilarProperties p={listing} />
         </div>

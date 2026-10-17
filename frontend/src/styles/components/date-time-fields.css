@@ -94,15 +94,17 @@
 
   .dz-cal {
     top: auto !important;
-    right: 0;
-    bottom: 0;
-    left: 0 !important;
-    width: 100%;
+    right: var(--dz-float-edge);
+    bottom: var(--dz-float-bottom);
+    left: var(--dz-float-edge) !important;
+    width: auto;
     max-width: none;
-    padding-bottom: calc(14px + var(--dz-safe-b));
-    border-radius: 20px 20px 0 0;
-    border-bottom: 0;
-    transform: translateY(100%);
+    max-height: calc(100dvh - var(--dz-float-top) - var(--dz-float-bottom));
+    overflow-y: auto;
+    border: 0;
+    border-radius: var(--dz-float-radius);
+    box-shadow: var(--dz-float-shadow);
+    transform: translateY(16px) scale(0.96);
     transform-origin: bottom center;
   }
 
@@ -113,24 +115,11 @@
     position: fixed;
     inset: 0;
     z-index: 1999;
-    background: rgb(var(--dz-c-black) / 0.5);
+    background: var(--dz-float-scrim);
   }
 
   .dz-cal.is-open {
-    transform: translateY(0);
-  }
-
-  /* Grab handle, matching the modal sheets. */
-  .dz-cal::after {
-    content: '';
-    position: absolute;
-    top: 6px;
-    left: 50%;
-    width: 2.25rem;
-    height: 0.25rem;
-    border-radius: 999px;
-    background: rgb(var(--dz-c-white) / 0.15);
-    transform: translateX(-50%);
+    transform: none;
   }
 }
 
@@ -215,9 +204,11 @@
   transition: background 0.18s ease, color 0.18s ease;
 }
 
-.dz-cal__nav:hover {
-  background: rgb(var(--dz-c-teal-500) / 0.16);
-  color: rgb(var(--dz-c-teal-400));
+@media (hover: hover) {
+  .dz-cal__nav:hover {
+    background: rgb(var(--dz-c-teal-500) / 0.16);
+    color: rgb(var(--dz-c-teal-400));
+  }
 }
 
 /* Year is fixed-narrow (only 4 digits) so month gets the room full names need. */
@@ -288,8 +279,10 @@
   font-weight: 500;
 }
 
-.dz-cal__day:hover:not(:disabled):not(.is-selected) {
-  background: rgb(var(--dz-c-teal-500) / 0.16);
+@media (hover: hover) {
+  .dz-cal__day:hover:not(:disabled):not(.is-selected) {
+    background: rgb(var(--dz-c-teal-500) / 0.16);
+  }
 }
 
 .dz-cal__day.is-today:not(.is-selected)::after {
@@ -338,8 +331,10 @@
   transition: filter 0.18s ease, transform 0.08s ease;
 }
 
-.dz-cal__confirm:hover:not(:disabled) {
-  filter: brightness(1.06);
+@media (hover: hover) {
+  .dz-cal__confirm:hover:not(:disabled) {
+    filter: brightness(1.06);
+  }
 }
 
 .dz-cal__confirm:active:not(:disabled) {
@@ -420,9 +415,11 @@
   border-left: 1px solid rgb(var(--dz-c-white) / calc(0.1 * var(--dz-line-boost)));
 }
 
-.dz-timepicker__mer button:hover:not(.is-on) {
-  background: rgb(var(--dz-c-teal-500) / 0.12);
-  color: rgb(var(--dz-c-teal-400));
+@media (hover: hover) {
+  .dz-timepicker__mer button:hover:not(.is-on) {
+    background: rgb(var(--dz-c-teal-500) / 0.12);
+    color: rgb(var(--dz-c-teal-400));
+  }
 }
 
 .dz-timepicker__mer button.is-on {

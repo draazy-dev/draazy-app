@@ -9,7 +9,6 @@ import useScrollLock from '../../hooks/useScrollLock.js';
 import Icon from '../Icon.jsx';
 import PoweredByGoogle from './PoweredByGoogle.jsx';
 import { isSearchableList } from './dropdownSearch.js';
-/* Custom dropdown select (themed, dark, with search for long lists). */
 
 const Select = forwardRef(function Select({
   value,
@@ -125,7 +124,7 @@ const Select = forwardRef(function Select({
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [open, close]);
-  // Portal the menu to <body> with fixed positioning (mirrors dropdowns.js) so it escapes any
+  // Portal the menu to <body> with fixed positioning so it escapes any
   // ancestor overflow/transform/stacking trap and can flip up near the viewport edge.
 
   const position = useCallback(() => {
@@ -179,13 +178,17 @@ const Select = forwardRef(function Select({
     searchRef.current.focus({ preventScroll: true });
   }, [open, isSearchable]);
 
+  const closeToTrigger = () => {
+    close();
+    triggerRef.current?.focus({ preventScroll: true });
+  };
   const choose = (opt) => {
     if (opt.disabled) return;
     if (!opt.deferChange) onChange(opt.value);
     if (onPick) onPick(opt);
-    close();
+    closeToTrigger();
   };
-  /* Drag the sheet's grab handle down to dismiss. Mobile-only by construction. */
+  /* Drag the card's top edge down to dismiss. Mobile-only by construction. */
 
   const swipe = useSwipeDismiss(close);
 
@@ -226,7 +229,7 @@ const Select = forwardRef(function Select({
         /* Escape closes the innermost thing only. */
         e.preventDefault();
         e.stopPropagation();
-        close();
+        closeToTrigger();
         break;
       default:
         break;
@@ -283,7 +286,7 @@ const Select = forwardRef(function Select({
                       ref={searchRef}
                     />
                     {picker ? (
-                      <button type="button" className="dz-dropdown__search-close" onClick={close}>
+                      <button type="button" className="dz-dropdown__search-close" onClick={closeToTrigger}>
                         {t('ui.pickerCancel')}
                       </button>
                     ) : null}

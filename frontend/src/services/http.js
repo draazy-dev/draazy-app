@@ -19,7 +19,7 @@ const REFRESH_LOCK = 'draazy:auth-refresh';
 // Branch on `code`, the backend's stable machine-readable string — never on `message`, which is
 // human-facing and may be reworded at any time.
 export class ApiError extends Error {
-  constructor({ code, message, status, traceId, fields, attemptsRemaining, retryAfterSeconds, reason }) {
+  constructor({ code, message, status, traceId, fields, attemptsRemaining, retryAfterSeconds, reason, existingId }) {
     super(message || code || `HTTP ${status}`);
     this.name = 'ApiError';
     this.code = code || null;
@@ -35,6 +35,8 @@ export class ApiError extends Error {
       Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0 ? retryAfterSeconds : null;
     /** The sub-code a 422 adds beside `code`, e.g. why a refund is not eligible. */
     this.reason = typeof reason === 'string' ? reason : null;
+    /** The listing a 409 `duplicate_submission` points at; `null` on every other error. */
+    this.existingId = typeof existingId === 'string' ? existingId : null;
   }
 
   /** True when the failure was a validation rejection, so a form can map `fields` onto inputs. */
@@ -416,6 +418,7 @@ async function toResult(res, withStatus = false) {
     // headers, so a browser on another origin can read the body and nothing else.
     retryAfterSeconds: payload?.retryAfterSeconds,
     reason: payload?.reason,
+    existingId: payload?.existingId,
   });
 }
 

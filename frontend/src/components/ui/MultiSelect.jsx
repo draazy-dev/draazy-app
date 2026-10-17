@@ -135,6 +135,7 @@ const MultiSelect = forwardRef(function MultiSelect({
       e.preventDefault();
       e.stopPropagation();
       close();
+      triggerRef.current?.focus({ preventScroll: true });
     };
     document.addEventListener('keydown', onEscape, true);
     return () => {
@@ -215,7 +216,7 @@ const MultiSelect = forwardRef(function MultiSelect({
     if (!has && onPick) onPick(opt);
     if (autoClose) close();
   }, [onChange, values, autoClose, close, onPick, disabled]);
-  /* Drag the sheet's grab handle down to dismiss. Mobile-only by construction. */
+  /* Drag the card's top edge down to dismiss. Mobile-only by construction. */
 
   const swipe = useSwipeDismiss(close);
 
@@ -287,7 +288,7 @@ const MultiSelect = forwardRef(function MultiSelect({
 
       {open && typeof document !== 'undefined'
         ? createPortal(
-              /* Scrim: a sheet is a modal surface, so the page behind it has to read as dismissed rather than merely covered. */
+              /* The card is a modal surface, so the page behind it must read as dismissed. */
             <>
               {sheet ? <div className="dz-dropdown__scrim" onClick={close} aria-hidden="true" /> : null}
               <div

@@ -49,7 +49,6 @@
   pointer-events: none;
 }
 
-/* Tier 1 — primary */
 .btn-primary,
 .btn-teal,
 .dz-btn-primary {
@@ -59,12 +58,14 @@
   box-shadow: var(--btn-primary-shadow);
 }
 
-.btn-primary:hover,
-.btn-teal:hover,
-.dz-btn-primary:hover {
-  box-shadow: var(--btn-primary-shadow-hover);
-  filter: brightness(1.05);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .btn-primary:hover,
+  .btn-teal:hover,
+  .dz-btn-primary:hover {
+    box-shadow: var(--btn-primary-shadow-hover);
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+  }
 }
 
 .btn-primary:active,
@@ -73,7 +74,6 @@
   transform: translateY(0);
 }
 
-/* Tier 2 — secondary */
 .btn-secondary,
 .btn-outline,
 .dz-btn-ghost {
@@ -83,12 +83,14 @@
   box-shadow: none;
 }
 
-.btn-secondary:hover,
-.btn-outline:hover,
-.dz-btn-ghost:hover {
-  border-color: rgb(var(--dz-c-teal-500) / .5);
-  color: rgb(var(--dz-c-white));
-  background: rgb(var(--dz-c-teal-500) / .08);
+@media (hover: hover) {
+  .btn-secondary:hover,
+  .btn-outline:hover,
+  .dz-btn-ghost:hover {
+    border-color: rgb(var(--dz-c-teal-500) / .5);
+    color: rgb(var(--dz-c-white));
+    background: rgb(var(--dz-c-teal-500) / .08);
+  }
 }
 
 .btn-secondary:active,
@@ -97,7 +99,6 @@
   transform: translateY(1px);
 }
 
-/* Tier 3 — compact icon-only */
 .btn-icon {
   width: var(--btn-h);
   height: var(--btn-h);
@@ -109,13 +110,14 @@
   color: rgb(var(--dz-c-slate-300));
 }
 
-.btn-icon:hover {
-  background: var(--control-bg-hover);
-  border-color: rgb(var(--dz-c-white) / calc(.2 * var(--dz-line-boost)));
-  color: rgb(var(--dz-c-white));
+@media (hover: hover) {
+  .btn-icon:hover {
+    background: var(--control-bg-hover);
+    border-color: rgb(var(--dz-c-white) / calc(.2 * var(--dz-line-boost)));
+    color: rgb(var(--dz-c-white));
+  }
 }
 
-/* Sizes */
 .btn-sm,
 .dz-btn-sm {
   height: var(--btn-h-sm);
@@ -138,7 +140,6 @@
   padding: 0;
 }
 
-/* Color modifiers (apply on primary) */
 .btn-success,
 .dz-btn-success {
   background: rgb(var(--dz-c-emerald-500));
@@ -147,9 +148,11 @@
   box-shadow: none;
 }
 
-.btn-success:hover,
-.dz-btn-success:hover {
-  filter: brightness(1.08);
+@media (hover: hover) {
+  .btn-success:hover,
+  .dz-btn-success:hover {
+    filter: brightness(1.08);
+  }
 }
 
 .btn-danger,
@@ -160,7 +163,9 @@
   box-shadow: none;
 }
 
-.btn-danger:hover,
-.dz-btn-danger:hover {
-  background: rgb(var(--dz-c-rose-500) / .25);
+@media (hover: hover) {
+  .btn-danger:hover,
+  .dz-btn-danger:hover {
+    background: rgb(var(--dz-c-rose-500) / .25);
+  }
 }

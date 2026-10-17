@@ -1,6 +1,7 @@
 import { canonicalTypeKey, matchTypeKey, COMMERCIAL_SUBTYPES } from '../../../data/propertyTypes.js';
 import { ADDRESS_PARTS, pickListingFormDetails, splitStoredAddress } from '../../../lib/listingFormDetails.js';
 import { istToday } from '../../../lib/availability.js';
+import { bhkLabel } from '../../../lib/listingSeo.js';
 
 // The catalogue uses shorthand; the public API uses explicit construction and furnishing values.
 const CONSTRUCTION_FROM_WIRE = {
@@ -82,8 +83,8 @@ export function toViewModel(p) {
     gallery: p.images ?? [],
     video: p.video ?? null,
     desc: p.description,
-    bhkNum: p.bhk ?? null,
-    bhk: p.bhk == null ? '' : Number(p.bhk) === 0 ? '1 RK' : Number(p.bhk) >= 5 ? '5+ BHK' : `${p.bhk} BHK`,
+    bhkNum: bhkLabel(p.bhk, p.propertyType) ? p.bhk : null,
+    bhk: bhkLabel(p.bhk, p.propertyType),
     rera: Boolean(p.reraId),
     reraId: p.reraId ?? '',
     reraChecked: p.reraChecked === true,
@@ -116,6 +117,7 @@ export function toViewModel(p) {
     recheckPending: p.recheckPending ?? false,
     recheckReason: p.recheckReason ?? '',
     recheckRequestedAt: p.recheckRequestedAt ?? '',
+    recheckChanges: Array.isArray(p.recheckChanges) ? p.recheckChanges : [],
     ownerReplied: p.ownerReplied ?? false,
     // Contact masking is the server's decision, never the mapper's.
     owner: p.owner?.name,

@@ -16,8 +16,10 @@ export const listSupportQueue = async (opts) => (await provider()).listSupportQu
 
 export const createTicket = async (ticket) => (await provider()).createTicket(ticket);
 
-/** Reply to a ticket. Resolves to the created message. */
 export const replyToTicket = async (id, text) => (await provider()).replyToTicket(id, text);
 
 /** The side comes from the session, never a parameter, which would let one side clear the other's flag. */
 export const markTicketRead = async (id) => (await provider()).markTicketRead(id);
+
+/** Desk only: closes the ticket for everyone and notifies the customer. */
+export const closeTicket = async (id) => (await provider()).closeTicket(id);

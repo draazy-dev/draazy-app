@@ -3,7 +3,7 @@ import PropertyImage from '../../../../components/ui/PropertyImage.jsx';
 import ListingStatusCard, { getOwnerListingStatusMeta } from '../../../../components/listing/ListingStatusCard.jsx';
 import { fmtINR, fmtNum, fmtDate } from '../../../../lib/format.js';
 import { onlySeeksOwnershipBadge } from '../../../../lib/recheckFields.js';
-import { computeQualityScore, qualityTips, qualityColor } from '../../../../lib/qualityScore.js';
+import { qualityTips, qualityColor } from '../../../../lib/qualityScore.js';
 import { listingFreshness } from '../../../../lib/freshness.js';
 import { availabilityLabel } from '../../../../lib/availability.js';
 import { canSplitIntoRooms } from '../../../../lib/data/flatSplit.js';
@@ -30,8 +30,8 @@ export default function ListingCard({
   // Freshness describes availability, not approval; unapproved listings cannot be reactivated.
   const fr = !l.flatmate && !closed && l.status === 'approved' ? listingFreshness(l) : null;
   const leads = !l.flatmate ? l.pendingLeads || 0 : 0;
-  const qScore = !l.flatmate ? computeQualityScore(l) : 0;
-  const qMeta = !l.flatmate ? qualityColor(qScore) : null;
+  const qScore = !l.flatmate && Number.isFinite(l.qualityScore) ? l.qualityScore : null;
+  const qMeta = qScore === null ? null : qualityColor(qScore);
   const qTone = qScore >= 80 ? 'emerald' : qScore >= 60 ? 'amber' : 'rose';
   const specs = [
     l.bhk && (/BHK|RK/i.test(l.bhk) ? l.bhk : `${l.bhk} BHK`),
@@ -42,14 +42,14 @@ export default function ListingCard({
   const hasReview = !closed && !reserved && !!review;
   const ownerStatusMeta = !l.flatmate && !closed && !reserved ? getOwnerListingStatusMeta(l, review, t) : null;
   const finalRejected = ownerStatusMeta?.state === 'rejected';
+  // The server refuses an edit on these with 409 listing_not_editable.
+  const editLocked = !l.flatmate && (closed || l.archived || ['sold', 'rented', 'rejected', 'archived'].includes(l.status));
   const statusPill = ownerStatusMeta ? null : {
     label: STATUS_LABEL[displayStatus] || displayStatus,
     cls: LISTING_STATUS_CLS[displayStatus] || 'bg-white/10 text-gray-300',
     icon: STATUS_ICON[displayStatus],
     onClick: hasReview ? () => openReview(l.id) : undefined,
   };
-  // Rooms inherit the verified property identity from an already-live rent listing.
-  // Verification gets a chip only when the lifecycle pill cannot say enough.
   const StatusTag = statusPill?.onClick ? 'button' : 'span';
   const splitEligible = !l.flatmate && !closed && !reserved && canSplitIntoRooms(l);
   const isSplit = splitEligible && !!split;
@@ -102,7 +102,7 @@ export default function ListingCard({
       }
     : null;
   const cardActions = [
-    !finalRejected && editAction,
+    !finalRejected && !editLocked && editAction,
     viewAction,
     toolsAction,
     roomAction,
@@ -131,16 +131,16 @@ export default function ListingCard({
             </p>
             {l.flatmate && (
               <div className="mt-1.5">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 font-semibold inline-flex items-center gap-1"><Icon name="users-round" className="w-3 h-3" /> {l.flatmateGroup ? 'Flatmate group' : l.flatmatePost ? 'Flatmate request' : 'Flatmate'}</span>
+                <span className="dz-tag bg-teal-500/15 text-teal-300 font-semibold"><Icon name="users-round" className="w-3 h-3" /> {l.flatmateGroup ? 'Flatmate group' : l.flatmatePost ? 'Flatmate request' : 'Flatmate'}</span>
                 {splitRoom && <p className="text-xs text-gray-500 mt-1">Part of a flat let room by room. To remove it, open the flat's listing and choose "Stop letting room by room".</p>}
               </div>
             )}
             {/* An occupied room prevents offering the whole flat. */}
             {isSplit && (
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 font-semibold inline-flex items-center gap-1"><Icon name="layout-grid" className="w-3 h-3" /> {splitRooms} room{splitRooms > 1 ? 's' : ''} listed</span>
+                <span className="dz-tag bg-teal-500/15 text-teal-300 font-semibold"><Icon name="layout-grid" className="w-3 h-3" /> {splitRooms} room{splitRooms > 1 ? 's' : ''} listed</span>
                 {movedIn > 0
-                  ? <span className="text-xs px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-300 font-semibold inline-flex items-center gap-1"><Icon name="eye-off" className="w-3 h-3" /> {movedIn} moved in · whole-flat listing hidden</span>
+                  ? <span className="dz-tag bg-amber-400/15 text-amber-300 font-semibold"><Icon name="eye-off" className="w-3 h-3" /> {movedIn} moved in · whole-flat listing hidden</span>
                   : <span className="text-xs text-gray-500">Whole-flat listing still live</span>}
               </div>
             )}
@@ -152,29 +152,29 @@ export default function ListingCard({
                 onClick={statusPill.onClick}
                 title={statusPill.onClick ? 'Open the verification review for this listing' : undefined}
                 aria-label={statusPill.onClick && unread ? `${statusPill.label} — ${unread} unread verification message${unread > 1 ? 's' : ''}` : undefined}
-                className={'relative text-[13px] px-2.5 py-1 rounded-full font-semibold inline-flex items-center gap-1 ' + statusPill.cls + (statusPill.onClick ? ' hover:brightness-110 transition' : '')}
+                className={'dz-tag relative font-semibold ' + statusPill.cls + (statusPill.onClick ? ' hover:brightness-110 transition' : '')}
               >
                 <Icon name={statusPill.icon} className="w-3 h-3" /> {statusPill.label}
-                {statusPill.onClick && unread ? <span aria-hidden="true" className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] flex items-center justify-center font-bold">{unread}</span> : null}
+                {statusPill.onClick && unread ? <span aria-hidden="true" className="dz-count absolute -top-1.5 -right-1.5 bg-rose-500 text-white">{unread}</span> : null}
               </StatusTag>
             )}
             {l.archived && l.archivedNote && <p className="w-full text-xs leading-snug text-gray-400 sm:max-w-[16rem] sm:text-right">{l.archivedNote}</p>}
             {/* Rechecking an edit does not take the original listing offline. */}
             {((l.recheckPending && !onlySeeksOwnershipBadge(l)) || l.reReview) && (
               <div className="w-full sm:max-w-[16rem]">
-                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-semibold inline-flex items-center gap-1">
+                <span className="dz-tag bg-amber-500/15 text-amber-300 font-semibold">
                   <Icon name="history" className="w-3 h-3" /> Update under review
                 </span>
                 <p className="mt-1 text-xs leading-snug text-amber-100/80">{recheckReason}</p>
               </div>
             )}
             {passTill && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-300 font-semibold inline-flex items-center gap-1">
+              <span className="dz-tag bg-teal-500/15 text-teal-300 font-semibold">
                 <Icon name="ticket" className="w-3 h-3" /> {t('listingLifecycle.passTill', { date: passTill })}
               </span>
             )}
             {l.priceReduced && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-semibold inline-flex items-center gap-1">
+              <span className="dz-tag bg-emerald-500/15 text-emerald-300 font-semibold">
                 <Icon name="trending-down" className="w-3 h-3" /> Price reduced
               </span>
             )}
@@ -190,6 +190,7 @@ export default function ListingCard({
             variant="slim"
             editHref={`${editHref}&step=photos`}
             viewHref={viewHref}
+            omitView
             onOpenReview={hasReview ? () => openReview(l.id) : undefined}
             onShare={onShare ? () => onShare(l, viewHref) : undefined}
             onConfirm={onConfirmListing ? () => onConfirmListing(l) : undefined}
@@ -220,17 +221,13 @@ export default function ListingCard({
               title={fr.state === 'active' ? 'Buyers see this as actively managed' : `Last confirmed available ${fr.since}`}
             />
           )}
-          <StatChip icon="gauge" value={`${qScore}/100`} label={qMeta?.label || 'Quality'} tone={qTone} title={`Listing quality: ${qScore}/100`} />
+          {qScore !== null && <StatChip icon="gauge" value={`${qScore}/100`} label={qMeta.label} tone={qTone} title={`Listing quality: ${qScore}/100`} />}
         </div>
       )}
 
-        {/* The badge documents live on the wizard's photos step, so verifying after posting is the same edit the
-           owner could have made at the time — not a second upload surface. */}
-        {/* edit */}
-      {/* Action row keeps rental management beside the verification entry point. */}
       <CardActions primary={l.archived ? null : primary} items={l.archived ? [] : cardActions} />
       {needsPass && <p className="px-3 pb-3 text-[11px] text-gray-400 sm:px-4">{t('listingLifecycle.orPauseOther')}</p>}
-      {!l.flatmate && qScore < 80 && (
+      {qScore !== null && qScore < 80 && (
         <div className="px-3 pb-3 sm:px-4 sm:pb-4">
           <div className="border-l-2 border-amber-500/40 pl-3">
             <p className="text-[11px] font-semibold text-amber-300 mb-1 inline-flex items-center gap-1"><Icon name="sparkles" className="w-3.5 h-3.5" /> Lift your score to reach more buyers:</p>

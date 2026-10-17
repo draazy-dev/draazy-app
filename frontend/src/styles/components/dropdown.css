@@ -76,8 +76,17 @@
   color: rgb(var(--dz-c-pure-white) / 0.9);
 }
 
-.dz-dd-photocat .dz-dropdown__trigger:hover {
-  background: rgb(var(--dz-c-black) / 0.35);
+@media (pointer: coarse) {
+  .dz-dd-photocat .dz-dropdown__trigger {
+    height: 44px;
+    min-height: 44px;
+  }
+}
+
+@media (hover: hover) {
+  .dz-dd-photocat .dz-dropdown__trigger:hover {
+    background: rgb(var(--dz-c-black) / 0.35);
+  }
 }
 
 .dz-dropdown__trigger {
@@ -100,10 +109,12 @@
   transition: border-color var(--dd-speed) var(--dd-ease), box-shadow var(--dd-speed) var(--dd-ease), background-color var(--dd-speed) var(--dd-ease);
 }
 
-.dz-dropdown__trigger:hover {
-  border-color: var(--dd-border-hover);
-  background: var(--dd-bg-hover);
-  box-shadow: var(--dd-trigger-shadow-hover);
+@media (hover: hover) {
+  .dz-dropdown__trigger:hover {
+    border-color: var(--dd-border-hover);
+    background: var(--dd-bg-hover);
+    box-shadow: var(--dd-trigger-shadow-hover);
+  }
 }
 
 .dz-dropdown__trigger:disabled {
@@ -195,26 +206,25 @@
   position: fixed;
   inset: 0;
   z-index: 9998;
-  background: rgb(var(--dz-c-black) / 0.6);
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
+  background: var(--dz-float-scrim);
 }
 
 .dz-dropdown__menu--sheet {
-  /* Phone dropdowns dock as sheets so options stay thumb-reachable above browser chrome. */
+  /* Phone dropdowns are floating cards (--dz-float-* in index.css) so options stay thumb-reachable above the nav. */
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: calc(env(safe-area-inset-left, 0px) + var(--dz-float-edge));
+  right: calc(env(safe-area-inset-right, 0px) + var(--dz-float-edge));
+  bottom: var(--dz-float-bottom);
   top: auto;
   z-index: 9999;
   width: auto;
   max-width: none;
-  max-height: 70dvh;
-  padding: 0 0.5rem calc(0.5rem + var(--dz-safe-b));
-  border-width: 1px 0 0;
-  border-radius: 1.25rem 1.25rem 0 0;
-  transform: translateY(100%);
+  max-height: calc(100dvh - var(--dz-float-top) - var(--dz-float-bottom));
+  padding: 0.5rem;
+  border-width: 0;
+  border-radius: var(--dz-float-radius);
+  box-shadow: var(--dz-float-shadow);
+  transform: translateY(16px) scale(0.96);
   transform-origin: bottom center;
   transition: transform 0.24s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.24s cubic-bezier(0.32, 0.72, 0, 1);
 }
@@ -225,7 +235,7 @@
 
 .dz-dropdown__menu--picker {
   top: calc(var(--dz-vv-top, 0px) + env(safe-area-inset-top, 0px) + 0.75rem);
-  bottom: var(--dz-vv-bottom, 0px);
+  bottom: max(var(--dz-float-bottom), calc(var(--dz-vv-bottom, 0px) + var(--dz-float-edge)));
   max-height: none;
 }
 
@@ -251,60 +261,24 @@
   opacity: 0.6;
 }
 
-/* Grab handle. Sticky rather than static because the sheet is itself the
-   scrolling element, and a handle that scrolls away can't be dragged. */
-.dz-dropdown__menu--sheet::before {
-  content: '';
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  flex: 0 0 auto;
-  align-self: center;
-  width: 2.25rem;
-  height: 0.25rem;
-  margin: 0.625rem 0 0.5rem;
-  border-radius: 9999px;
-  background: rgb(var(--dz-c-white) / 0.18);
-}
-
 .dz-dropdown__menu--sheet .dz-dropdown__option {
   white-space: normal;
 }
 
-/* Both the handle and the search box are sticky; park the search below the
-   handle so they don't pile up at top: 0. */
-.dz-dropdown__menu--sheet .dz-dropdown__search {
-  top: 1.375rem;
-}
-
 .dz-action-sheet {
   position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  left: calc(env(safe-area-inset-left, 0px) + var(--dz-float-edge));
+  right: calc(env(safe-area-inset-right, 0px) + var(--dz-float-edge));
+  bottom: var(--dz-float-bottom);
   top: auto;
   z-index: 9999;
-  max-height: 70dvh;
+  max-height: calc(100dvh - var(--dz-float-top) - var(--dz-float-bottom));
   overflow-y: auto;
-  padding-bottom: calc(0.375rem + var(--dz-safe-b));
-  border-width: 1px 0 0;
-  border-radius: 1.25rem 1.25rem 0 0;
-  animation: dzSheetUp 0.24s cubic-bezier(0.32, 0.72, 0, 1);
-}
-
-.dz-action-sheet::before {
-  /* Overflow menus use the same grab handle as sheets to signal they dismiss by dragging down. */
-  content: '';
-  position: sticky;
-  top: 0;
-  z-index: 4;
-  flex: 0 0 auto;
-  align-self: center;
-  width: 2.25rem;
-  height: 0.25rem;
-  margin: 0.375rem 0 0.5rem;
-  border-radius: 9999px;
-  background: rgb(var(--dz-c-white) / 0.18);
+  padding: 0.375rem;
+  border-width: 0;
+  border-radius: var(--dz-float-radius);
+  box-shadow: var(--dz-float-shadow);
+  animation: dzFloatIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -403,10 +377,15 @@
   transition: color 0.15s var(--dd-ease);
 }
 
-.dz-dropdown__option:hover .opt-icon,
 .dz-dropdown__option.is-active .opt-icon,
 .dz-dropdown__option[aria-selected="true"] .opt-icon {
   color: var(--dd-accent);
+}
+
+@media (hover: hover) {
+  .dz-dropdown__option:hover .opt-icon {
+    color: var(--dd-accent);
+  }
 }
 
 .dz-dropdown__option .opt-badge {
@@ -425,11 +404,17 @@
   line-height: 1;
 }
 
-.dz-dropdown__option:hover .opt-badge,
 .dz-dropdown__option.is-active .opt-badge,
 .dz-dropdown__option[aria-selected="true"] .opt-badge {
   background: var(--dd-accent);
   color: rgb(var(--dz-c-emerald-950));
+}
+
+@media (hover: hover) {
+  .dz-dropdown__option:hover .opt-badge {
+    background: var(--dd-accent);
+    color: rgb(var(--dz-c-emerald-950));
+  }
 }
 
 .dz-dropdown__option .opt-sub {
@@ -447,11 +432,18 @@
   transition: opacity 0.15s var(--dd-ease), transform 0.15s var(--dd-ease);
 }
 
-.dz-dropdown__option:hover,
 .dz-dropdown__option.is-active {
   background: var(--dd-option-hover);
   color: rgb(var(--dz-c-white));
   transform: translateX(var(--dd-option-slide));
+}
+
+@media (hover: hover) {
+  .dz-dropdown__option:hover {
+    background: var(--dd-option-hover);
+    color: rgb(var(--dz-c-white));
+    transform: translateX(var(--dd-option-slide));
+  }
 }
 
 .dz-dropdown__option[aria-selected="true"] {

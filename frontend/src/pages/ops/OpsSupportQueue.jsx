@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageSquare, RefreshCw, Send } from 'lucide-react';
-import { getTicket, listSupportQueue, replyToTicket } from '../../services/supportService.js';
+import { closeTicket, getTicket, listSupportQueue, replyToTicket } from '../../services/supportService.js';
 import { classNames } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
@@ -95,6 +95,21 @@ export default function OpsSupportQueue() {
       setDetailStatus('ready');
     } catch {
       setDetailStatus('error');
+    }
+  };
+
+  const close = async () => {
+    if (!detail || detail.status === 'closed' || sending.current) return;
+    sending.current = true;
+    try {
+      await closeTicket(detail.id);
+      setDetail((d) => ({ ...d, status: 'closed' }));
+      setState((s) => ({ ...s, items: s.items.map((r) => (r.id === detail.id ? { ...r, status: 'closed' } : r)) }));
+      toast('Ticket closed', 'success');
+    } catch {
+      toast('That ticket could not be closed. Try again.', 'error');
+    } finally {
+      sending.current = false;
     }
   };
 
@@ -207,6 +222,7 @@ export default function OpsSupportQueue() {
               <Badge status={detail.status} />
               <span className="text-gray-400">{catLabel(detail.category)}</span>
               {detail.raiser ? (<><span className="text-gray-600">·</span><span className="text-gray-400">{detail.raiser}</span></>) : null}
+              {detail.status !== 'closed' ? <button type="button" onClick={close} className={classNames(BTN.ghost, 'ml-auto')}>Close ticket</button> : null}
             </div>
 
             {detailStatus === 'loading' ? <Loading label="Loading the conversation…" /> : null}

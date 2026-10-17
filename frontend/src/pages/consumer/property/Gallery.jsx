@@ -68,8 +68,7 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
     return (
       <>
       <section className="fade-in mb-6 sm:mb-10">
-        {/* On a phone the old 230px letterbox read as a thumbnail; a full-bleed 4:3 hero gives them the weight they
-           deserve. */}
+        {/* Full-bleed 4:3 on a phone: a short letterbox reads as a thumbnail. */}
         <div className="relative main-image-wrapper -mx-4 sm:mx-0 rounded-none sm:rounded-2xl overflow-hidden bg-white/[0.04] border border-white/10 flex flex-col items-center justify-center gap-2.5 px-8 text-center w-full aspect-[4/3] sm:aspect-auto sm:h-[320px] lg:h-[360px]" style={{ maxHeight: 400 }}>
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-400">
             <Icon name="image-off" className="h-5 w-5" aria-hidden="true" />
@@ -102,7 +101,8 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
 
       <div className="relative main-image-wrapper -mx-4 sm:mx-0 rounded-none sm:rounded-2xl overflow-hidden" style={{ maxHeight: 400 }}>
 
-        {/* Above sm: it stops being user-scrollable (`sm:overflow-hidden`) and the arrows drive it instead. */}
+        {/* Above sm: it stops being user-scrollable (`sm:overflow-hidden`) and the arrows drive it instead.
+            `overflow-y-hidden`: x `auto` alone computes y to `auto`, so an overhang drags the photo vertically. */}
         <div
           ref={trackRef}
           onScroll={onScroll}
@@ -110,7 +110,7 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
           onTouchEnd={onTouchEnd}
           onTouchCancel={onTouchEnd}
           data-gallery-track=""
-          className="no-scrollbar flex w-full aspect-[4/3] sm:aspect-auto sm:h-[320px] lg:h-[360px] overflow-x-auto sm:overflow-hidden overscroll-x-contain snap-x snap-mandatory"
+          className="no-scrollbar flex w-full aspect-[4/3] sm:aspect-auto sm:h-[320px] lg:h-[360px] overflow-x-auto overflow-y-hidden sm:overflow-hidden overscroll-x-contain snap-x snap-mandatory"
         >
           {gallery.map((g, i) => (
             <img
@@ -158,10 +158,10 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
           </>
         ) : null}
 
-        {/* The label is `hidden sm:inline`, so on a phone this collapses to a bare 16px icon and the padding alone
-           left it 46x34. */}
-        <button type="button" onClick={() => setLightbox(true)} className="absolute top-4 right-4 flex items-center justify-center gap-2 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 px-3.5 py-2 rounded-full glass-strong text-white text-sm font-semibold hover:bg-white/15 transition-smooth">
-          <Icon name="expand" className="w-4 h-4" /> <span className="hidden sm:inline">{t('property.fullscreen')}</span>
+        {/* On a phone the label is screen-reader only (it stays the accessible name), so min-w/h-btn keep the
+           bare icon at 44px. */}
+        <button type="button" onClick={() => setLightbox(true)} className="h-btn absolute top-4 right-4 flex items-center justify-center gap-2 min-w-[44px] sm:min-w-0 px-3.5 rounded-full glass-strong text-white text-sm font-semibold hover:bg-white/15 transition-smooth">
+          <Icon name="expand" className="w-4 h-4" /> <span className="sr-only sm:not-sr-only">{t('property.fullscreen')}</span>
         </button>
         <div className="absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-white text-sm font-semibold">
           <Icon name="camera" className="w-4 h-4" /> <span>{active + 1}/{count}</span>
@@ -183,8 +183,7 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
       </div>
 
       {count > 1 || requestPhotos ? (<>
-      {/* Centred, because it is now the only thing on its line — it answers "where am I?" and keeps tapping as an
-         alternative to swiping; the counter over the photo answers "how many". */}
+      {/* Centred: the dots answer "where am I?" and stay tappable; the counter over the photo answers "how many". */}
       <div data-gallery-dots="" className="sm:hidden flex items-center justify-center -mb-6 sm:mb-0" role="group" aria-label={t('property.photoDotsAria')}>
         {Array.from({ length: dotCount }, (_, d) => (
           <button
@@ -216,7 +215,7 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
       </div>
       <HScroll wrapClassName="hidden sm:block" className="grid grid-flow-col auto-cols-[104px] sm:auto-cols-[120px] gap-3 mt-3 pb-1">
         {gallery.map((g, i) => (
-          <button key={i} onClick={() => showPhoto(i)} className={'thumbnail h-20 ' + (i === active ? 'active' : '')}>
+          <button key={i} type="button" onClick={() => showPhoto(i)} aria-label={t('property.photoOf', { n: i + 1, total: count })} aria-current={i === active ? 'true' : undefined} className={'thumbnail h-20 ' + (i === active ? 'active' : '')}>
             <img src={g} alt="" className="w-full h-full object-cover" />
           </button>
         ))}

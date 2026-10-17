@@ -19,7 +19,7 @@ import { isInternal } from '../../../lib/auth.js';
 import { AMEN_LABEL, availableLabel, deriveFloor, deriveFacing, deriveOverlooking, deriveAge, possessionDateLabel, propertyKind } from './derivations.js';
 import { commercialSpecsFor } from '../list-property/constants.js';
 import { LANDUSE_LBL } from '../../../data/propertyTypes.js';
-import { propertyKey } from '../../../lib/listingSeo.js';
+import { bhkLabel as bhkLabelOf, propertyKey } from '../../../lib/listingSeo.js';
 
 const PROP_TAB_IDS = ['overview', 'amenities', 'location', 'pricing', 'trust'];
 
@@ -159,8 +159,8 @@ export default function useProperty() {
   }[p.construction] || '—');
   const typeLabel = p.type || tr('property.typeFallback');
   const typeLower = String(typeLabel).toLowerCase();
-  const bhkLabel = p.bhkNum == null ? '' : p.bhkNum === 0 ? '1 RK ' : p.bhkNum + ' BHK ';
-  const title = `${bhkLabel}${typeLabel} for ${isRent ? 'Rent' : 'Sale'} in ${p.locality}`;
+  const bhkLabel = bhkLabelOf(p.bhkNum, p.type);
+  const title = `${bhkLabel ? `${bhkLabel} ` : ''}${typeLabel} for ${isRent ? 'Rent' : 'Sale'} in ${p.locality}`;
   const priceStr = isRent ? `₹${(p.price || 0).toLocaleString('en-IN')}/month` : fmtINR(p.price);
 
   const areaCandidate = [
@@ -223,7 +223,7 @@ export default function useProperty() {
     ];
   } else {
     details = [
-      ['bed-double', tr('property.bedrooms'), p.bhkNum == null ? '—' : p.bhkNum === 0 ? '1 RK' : p.bhkNum + ' BHK', 'keydetail.bedrooms'],
+      ['bed-double', tr('property.bedrooms'), bhkLabel || '—', 'keydetail.bedrooms'],
       ['bath', tr('property.bathrooms'), baths ?? '—', 'keydetail.bathrooms'],
       ['maximize', areaTitle, areaLabel, 'keydetail.area'],
       ['sofa', tr('property.furnishingLabel'), furnishLabel, 'keydetail.furnishing'],
@@ -270,7 +270,7 @@ export default function useProperty() {
     : kind === 'commercial'
       ? tr('property.overviewCommercial', { type: typeLower, locality: p.locality, amenities: amenPhrase })
       : tr('property.overviewResidential', {
-          bhk: p.bhkNum ? p.bhkNum + ' BHK ' : '',
+          bhk: bhkLabel ? bhkLabel + ' ' : '',
           type: typeLower,
           locality: p.locality,
           amenities: amenPhrase,

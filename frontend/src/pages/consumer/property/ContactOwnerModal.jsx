@@ -28,8 +28,6 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
   const [msg, setMsg] = useState('');
   const [verify, setVerify] = useState(false);
   const [quotaOpen, setQuotaOpen] = useState(false);
-  // opt-in badge modal for verified-only owners
-  // free contacts spent → refer or upgrade
   const [busy, setBusy] = useState(false);
   const { flagEnabled } = useAppFlags();
   const { referral } = usePricing();
@@ -82,6 +80,11 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
         toast(t('property.contactPendingLimit'), 'info');
         return;
       }
+      if (err?.code === 'own_listing') {
+        toast(t('property.ownListing'), 'info');
+        onClose();
+        return;
+      }
       if (err?.status === 401) {
         /* `back` is the listing as it was when the request left: `signInPath` otherwise reads `window.location` at
            call time and would return them to wherever they navigated meanwhile. */
@@ -116,6 +119,10 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
     }
     if (err?.code === 'listing_not_live') {
       toast(t('property.listingNotLive'), 'info');
+      return true;
+    }
+    if (err?.code === 'own_listing') {
+      toast(t('property.ownListing'), 'info');
       return true;
     }
     if (err?.status === 401) {

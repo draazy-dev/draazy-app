@@ -24,6 +24,7 @@ import PrivateListingCard from './myListings/PrivateListingCard.jsx';
 import ListingCard from './myListings/ListingCard.jsx';
 import FinalizeDealModal from './myListings/FinalizeDealModal.jsx';
 import RelistModal from './myListings/RelistModal.jsx';
+import ConfirmModal from '../../../components/ui/ConfirmModal.jsx';
 import VerifyListingsBanner from './myListings/VerifyListingsBanner.jsx';
 import SplitFlatModal from '../flatmates/SplitFlatModal.jsx';
 import { useFlatmateEditing } from './myListings/useFlatmateEditing.jsx';
@@ -37,10 +38,11 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   const { fee } = usePricing();
   const listingsState = useMemo(() => composeOwnerProperties(listings, managed), [listings, managed]);
   const [showDealModal, setShowDealModal] = useState(null);
+  const [ask, setAsk] = useState(null);
+  const confirmAction = (opts) => new Promise((resolve) => setAsk({ ...opts, resolve }));
+  const settleAsk = (ok) => { ask.resolve(ok); setAsk(null); };
   // The rent listing the owner is carving into rooms, if any.
   const [splitTarget, setSplitTarget] = useState(null);
-  const [dealForm, setDealForm] = useState({ buyerName: '', buyerMobile: '', finalPrice: '', date: istToday() });
-  const [dealErrors, setDealErrors] = useState({});
   const singleFlight = useSingleFlight();
   const navigate = useNavigate();
   /* Lead counts, deal state and room splits all ride on the dashboard's own rows, so mounting this panel reads
@@ -98,8 +100,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       .catch(() => { if (live) setQuota({ used: 0, allowance: null, passes: {} }); });
     return () => { live = false; };
   }, [user, postedCount, quotaTick]);
-  // Categorize each item so the type filter can group properties, flatmate rooms,
-  // flatmate requests and flatmate groups — the things a user can post.
 
   const catOf = (l) => (l.flatmateGroup ? 'group' : l.flatmatePost ? 'request' : l.flatmate ? 'room' : 'property');
   const counts = useMemo(() => {
@@ -107,7 +107,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     listingsState.forEach((l) => c[catOf(l)]++);
     return c;
   }, [listingsState]);
-  // Total across live properties (ADR-019 C2), so the verify nudge can attach to real interest
+  // Total across live properties so the verify nudge can attach to real interest
   // rather than a generic pitch.
 
   const totalEnquiries = useMemo(
@@ -151,31 +151,17 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     }
   };
 
-  const openFinalizeModal = (l) => {
-    setShowDealModal(l);
-    setDealErrors({});
-    setDealForm({ buyerName: '', buyerMobile: '', finalPrice: l.price || '', date: istToday() });
-  };
-
-  const handleFinalize = () => singleFlight(async () => {
+  const handleFinalize = (dealForm) => singleFlight(async () => {
     if (!showDealModal) return;
     const l = showDealModal;
     const isSale = l.deal === 'buy' || l.deal === 'sale';
-    const mobile = String(dealForm.buyerMobile).replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
-    const price = parseFloat(dealForm.finalPrice) || l.price;
-    const errors = {
-      ...(/^[6-9]\d{9}$/.test(mobile) ? {} : { mobile: 'Enter the 10-digit mobile number of the ' + (isSale ? 'buyer.' : 'tenant.') }),
-      ...(price > 0 ? {} : { price: 'Enter a price above zero.' }),
-    };
-    setDealErrors(errors);
-    if (Object.keys(errors).length) return;
     try {
       // The server requires a positive agreed price and the counterparty's real ten-digit mobile,
       // refusing a masked number; this modal is the only place that collects both.
       await closeDeal(dealIdOf(l), {
-        agreedPrice: price,
-        counterpartyMobile: mobile,
-        note: dealForm.buyerName ? `Closed with ${dealForm.buyerName} on ${dealForm.date}` : undefined,
+        agreedPrice: dealForm.finalPrice,
+        counterpartyMobile: dealForm.buyerMobile,
+        note: `Closed with ${dealForm.buyerName} on ${dealForm.date}`,
       });
     } catch (err) {
       toast(err?.body?.error || err?.message || 'Could not finalize the deal', 'error');
@@ -287,7 +273,12 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
   };
 
   const handlePause = async (l) => {
-    if (!window.confirm(t('listingLifecycle.pauseConfirm', { title: l.title }))) return;
+    const ok = await confirmAction({
+      title: t('listingLifecycle.pauseTitle'),
+      message: t('listingLifecycle.pauseConfirm', { title: l.title }),
+      confirmLabel: t('listingLifecycle.pause'),
+    });
+    if (!ok) return;
     try {
       patchRow(await pauseListing(l.uuid || l.id));
       setQuotaTick((n) => n + 1);
@@ -373,7 +364,14 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
      shares one occupancy ledger — a refusal that has to reach the owner as words. */
 
   const handleDelete = async (l) => {
-    if (!window.confirm(`Take "${l.title}" down? Buyers will stop seeing it.`)) return;
+    const kind = l.flatmate || l.flatmatePost || l.flatmateGroup ? 'delete' : l.status === 'approved' ? 'takeDown' : 'withdraw';
+    const ok = await confirmAction({
+      title: t(`listingLifecycle.${kind}Title`),
+      message: t(`listingLifecycle.${kind}Confirm`, { title: l.title }),
+      confirmLabel: t(`listingLifecycle.${kind}Action`),
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       if (l.private) await deleteManaged(l.managedId);
@@ -475,7 +473,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
                   onConfirmListing={handleConfirmListing}
                   onReopen={(row) => (row.deal === 'rent' ? setRelist({ listing: row, date: istToday() }) : handleReopen(row))}
                   onMarkUnderOffer={handleMarkUnderOffer}
-                  onFinalize={openFinalizeModal}
+                  onFinalize={setShowDealModal}
                   onDelete={handleDelete}
                   onSplit={setSplitTarget}
                   onUnsplit={handleUnsplit}
@@ -495,14 +493,9 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
           </div>
         )}
       </Card>
-      {/* Finalize Deal Modal */}
-
       {showDealModal && (
         <FinalizeDealModal
           listing={showDealModal}
-          dealForm={dealForm}
-          setDealForm={setDealForm}
-          errors={dealErrors}
           onFinalize={handleFinalize}
           onClose={() => setShowDealModal(null)}
         />
@@ -510,7 +503,17 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
       {relist && (
         <RelistModal listing={relist.listing} initialDate={relist.date} onConfirm={confirmRelist} onClose={() => setRelist(null)} />
       )}
-      {/* Let this flat room by room */}
+      {ask && (
+        <ConfirmModal
+          title={ask.title}
+          message={ask.message}
+          confirmLabel={ask.confirmLabel}
+          cancelLabel={t('listingLifecycle.confirmCancel')}
+          danger={ask.danger}
+          onConfirm={() => settleAsk(true)}
+          onCancel={() => settleAsk(false)}
+        />
+      )}
 
       {splitTarget && (
         <SplitFlatModal
