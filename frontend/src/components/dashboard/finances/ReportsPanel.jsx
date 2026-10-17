@@ -5,10 +5,20 @@ import { Card, SectionHead } from './helpers.jsx';
 
 const BASIS_KEYS = { owned: 'fin.basisOwned', financed: 'fin.basisFinanced', inherited: 'fin.basisInherited' };
 
-export default function ReportsPanel({ basis, summary, onEditBasis }) {
+export default function ReportsPanel({ basis, summary, onEditBasis, onExportCSV, onExportPDF }) {
   const { t } = useTranslation();
   return (
     <div className="space-y-4 lg:space-y-6">
+      <Card className="p-4 sm:p-5 flex items-center justify-between gap-3 flex-wrap">
+        <div className="min-w-0">
+          <h2 className="text-white text-sm font-semibold flex items-center gap-2"><Icon name="download" className="w-4 h-4 text-teal-400" aria-hidden="true" /> {t('fin.statementTitle')}</h2>
+          <p className="text-gray-400 text-xs mt-0.5">{t('fin.statementSub')}</p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button type="button" onClick={onExportCSV} aria-label={t('fin.exportCsv')} className="dz-control dz-control--ghost px-3 gap-1.5"><Icon name="table" className="w-4 h-4" aria-hidden="true" /> CSV</button>
+          <button type="button" onClick={onExportPDF} aria-label={t('fin.exportPdf')} className="dz-control dz-control--ghost px-3 gap-1.5"><Icon name="file-text" className="w-4 h-4" aria-hidden="true" /> PDF</button>
+        </div>
+      </Card>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         <Card className="p-5 sm:p-6">
           <SectionHead icon="trending-up" iconCls="text-emerald-400" title={t('fin.capitalAppreciation')} sub={t('fin.capitalAppreciationSub')} />

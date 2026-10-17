@@ -1,4 +1,4 @@
-// Live coverage for the finance console and the three reads behind it (ledger item 20, ).
+// Live coverage for the finance console and the three reads behind it.
 import { test, expect } from '@playwright/test';
 import { API, authHeaders, signIn } from '../helpers/liveAuth.js';
 import { ACTORS } from '../fixtures/live.js';
@@ -162,7 +162,7 @@ test.describe('finance console UI behaviour', () => {
       const first = txRows(page).first();
       await expect(first).toBeVisible();
       await expect(first.getByText('Platform take')).toBeVisible();
-      await expect(first.locator('.rounded-full').first()).toBeVisible();
+      await expect(first.locator('.dz-tag').first()).toBeVisible();
     });
     await test.step('the ledger on screen is the ledger from the API', async () => {
       const headers = await authHeaders(ACTORS.admin, { request });

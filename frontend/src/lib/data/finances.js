@@ -161,12 +161,14 @@ export function cashflowAfter(cashflow, tx, sign) {
   return cashflow.map((p) => (p.month === month ? { ...p, [key]: p[key] + moved, net: p.net + netMoved } : p));
 }
 
-export function financeSummary(mobile, propId, period = 'all', now = new Date()) {
-  const txns = filterByPeriod(getTransactions(mobile, propId), period, now);
-
+const totals = (txns) => {
   const income = txns.filter((t) => t.type === 'income').reduce((s, t) => s + (t.amount || 0), 0);
   const expense = txns.filter((t) => t.type === 'expense').reduce((s, t) => s + (t.amount || 0), 0);
   return { income, expense, net: income - expense, count: txns.length };
+};
+
+export function financeSummary(mobile, propId, period = 'all', now = new Date()) {
+  return totals(filterByPeriod(getTransactions(mobile, propId), period, now));
 }
 
 export function expenseBreakdown(mobile, propId, period = 'all', now = new Date()) {
@@ -230,10 +232,9 @@ export function getDues(mobile, propId) {
   return dues.sort((a, b) => a.daysUntil - b.daysUntil);
 }
 
-export function exportTransactionsCSV(mobile, propId) {
-  const txns = getTransactions(mobile, propId);
+export function exportTransactionsCSV(txns, propId) {
   const header = ['Date', 'Type', 'Category', 'Amount', 'Note', 'Repeat'];
-  const rows = txns.map((t) => [t.date, t.type, t.category, t.amount, t.note || '', t.repeat || 'none']);
+  const rows = txns.map((t) => [t.date, t.type, t.category, t.amount, t.note || '', t.recurring || 'none']);
   const csv = [header, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
@@ -246,9 +247,8 @@ export function exportTransactionsCSV(mobile, propId) {
 
 // jsPDF (~382 KB) is loaded on demand: a static import here would put the whole PDF library in
 // front of first paint for every visitor.
-export async function exportStatementPDF(mobile, propId, title) {
-  const txns = getTransactions(mobile, propId);
-  const summary = financeSummary(mobile, propId, 'all');
+export async function exportStatementPDF(txns, propId, title) {
+  const summary = totals(txns);
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 

@@ -16,8 +16,10 @@ import {
 } from '../../../services/rentService.js';
 import { inviteRouteFor } from '../../../lib/serviceRequestStatus.js';
 import { listMyServiceRequestInvites } from '../../../services/serviceRequestService.js';
+import { listTrackedRent } from '../../../services/managedService.js';
+import TrackedRent from './TrackedRent.jsx';
 
-/* The tenant hub. No rent moves through Draazy, so there is no payment history or HRA receipt here. */
+/* The tenant hub. No rent moves through Draazy; receipts here are ones the owner recorded. */
 export default function MyRentalPanel({ user }) {
   const { t: tr } = useTranslation();
   const { toast } = useToast();
@@ -57,10 +59,10 @@ export default function MyRentalPanel({ user }) {
       headingRef.current?.focus();
     }
   };
-  /* The tenant's own tenancy, profile and agreements — four caller-scoped reads, issued together
-     because none depends on another and the panel blocks on all of them. */
+  /* Caller-scoped reads, issued together because none depends on another and the panel blocks on all of them. */
   const [rent, setRent] = useState({ profile: null, agreements: [] });
   const [invites, setInvites] = useState([]);
+  const [tracked, setTracked] = useState([]);
   useEffect(() => {
     let alive = true;
     Promise.all([
@@ -69,11 +71,13 @@ export default function MyRentalPanel({ user }) {
       myRentAgreements().catch(() => []),
       /* The invite is created by the owner, so it can only come from the server, never local storage. */
       listMyServiceRequestInvites().catch(() => []),
-    ]).then(async ([rows, profileRow, agreementRows, inviteRows]) => {
+      listTrackedRent().catch(() => []),
+    ]).then(async ([rows, profileRow, agreementRows, inviteRows, trackedRows]) => {
       if (!alive) return;
       const cards = await toRentalCards(rows);
       if (!alive) return;
       setTenancies(cards);
+      setTracked(trackedRows);
       setInvites((inviteRows || [])
         .filter((row) => row?.status === 'invited')
         .map((row) => ({
@@ -104,8 +108,7 @@ export default function MyRentalPanel({ user }) {
   // Rent-agreement co-fill requests addressed to this user (owner invited them to
   // add their tenant details). Fetched with the panel's other reads, above.
 
-  /* ---- Still asking. Everything below dereferences `t`, and "no rental" is a claim we are not
-     entitled to make until the reads land. ---- */
+  /* Everything below dereferences `t`, and "no rental" is not a claim to make until the reads land. */
   if (!loaded) {
     return (
       <div className="space-y-6">
@@ -119,14 +122,14 @@ export default function MyRentalPanel({ user }) {
     );
   }
 
-  /* ---- Empty state: no finalised rental yet ---- */
   if (loaded && !t) {
     return (
       <div className="space-y-6">
         <Hero headingRef={headingRef} />
         <PendingInvites invites={invites} />
         <PendingTenancies rows={pendingRows} busy={busy} onAnswer={answer} />
-        {pendingRows.length === 0 && (
+        <TrackedRent homes={tracked} />
+        {pendingRows.length === 0 && tracked.length === 0 && (
         <Card className="p-8 text-center">
           <div className="w-14 h-14 rounded-2xl bg-brand-teal/10 flex items-center justify-center mx-auto mb-4">
             <Icon name="key-round" className="w-7 h-7 text-brand-teal-3" />
@@ -156,17 +159,17 @@ export default function MyRentalPanel({ user }) {
       <Hero headingRef={headingRef} />
       <PendingInvites invites={invites} />
       <PendingTenancies rows={pendingRows} busy={busy} onAnswer={answer} />
+      <TrackedRent homes={tracked} />
       {live.length > 1 && (
         <HScroll wrapClassName="-mx-1" className="flex gap-1.5 px-1">
           {live.map((x, i) => (
-            <button key={x.id} onClick={() => setIdx(i)} className={'inline-flex min-h-[40px] items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-medium transition ' + (i === idx ? 'border-brand-teal/30 bg-brand-teal/15 text-brand-teal' : 'border-transparent bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white')}>
+            <button key={x.id} onClick={() => setIdx(i)} className={'h-btn inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 text-sm font-medium transition ' + (i === idx ? 'border-brand-teal/30 bg-brand-teal/15 text-brand-teal' : 'border-transparent bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white')}>
               <Icon name="house" className="w-4 h-4" /> {x.locality || x.title}
             </button>
           ))}
         </HScroll>
       )}
 
-      {/* Rented-home card */}
       <Card className="overflow-hidden">
         <div className="flex flex-col sm:flex-row">
           <PropertyImage src={t.image} sizes="(max-width: 639px) 100vw, 208px" alt={t.title} className="w-full sm:w-52 h-40 sm:h-auto object-cover" />
@@ -176,7 +179,7 @@ export default function MyRentalPanel({ user }) {
                 <h2 className="text-white font-bold text-lg truncate">{t.title}</h2>
                 <p className="text-gray-400 text-sm mt-0.5 flex items-center gap-1.5"><Icon name="map-pin" className="w-3.5 h-3.5" /> {t.address}</p>
               </div>
-              <span className="text-[11px] px-2.5 py-1 rounded-full font-semibold bg-emerald-500/15 text-emerald-300 flex-shrink-0 capitalize">{t.status === 'active' ? 'Active tenancy' : t.status}</span>
+              <span className="dz-tag font-semibold bg-emerald-500/15 text-emerald-300 capitalize">{t.status === 'active' ? 'Active tenancy' : t.status}</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
               <Fact label="Monthly rent" value={fmtINR(t.rent)} />
@@ -202,13 +205,12 @@ export default function MyRentalPanel({ user }) {
               {`Due ${status.nextDueLabel} · ${fmtINR(t.rent)}`}
             </p>
           </div>
-          <Link to="/pay-rent" className="px-5 py-2.5 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10">
+          <Link to="/pay-rent" className="h-btn px-5 rounded-xl text-sm font-semibold inline-flex items-center justify-center gap-2 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10">
             <Icon name="calendar-clock" className="w-4 h-4" /> Pay rent · Coming soon
           </Link>
         </div>
       </Card>
 
-      {/* Quick actions */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <ActionTile to="/pay-rent" icon="wallet" title="Pay rent" desc="Pay your landlord in-app" soon />
         <ActionTile to="/services/rent-agreement" icon="file-signature" title="Rent agreement" desc={agreement ? 'Registered · view' : 'Create & e-register'} />
@@ -234,14 +236,13 @@ export default function MyRentalPanel({ user }) {
           </div>
         </Card>
 
-        {/* Sidebar: landlord + agreement + tenant score */}
         <div className="space-y-6">
           <Card className="p-5">
             <SectionHead icon="user-round" title="Your landlord" />
             <p className="text-white text-sm font-medium">{t.ownerName}</p>
             <p className="text-gray-500 text-xs mt-0.5">Landlord for {t.locality || 'your home'}</p>
             {t.ownerMobile ? (
-              <a href={`tel:${t.ownerMobile}`} className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 text-sm font-semibold border border-white/10"><Icon name="phone" className="w-4 h-4" /> Call landlord</a>
+              <a href={`tel:${t.ownerMobile}`} className="h-btn mt-3 w-full inline-flex items-center justify-center gap-2 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-gray-200 text-sm font-semibold border border-white/10"><Icon name="phone" className="w-4 h-4" /> Call landlord</a>
             ) : null}
           </Card>
 
@@ -332,7 +333,7 @@ function Hero({ headingRef }) {
   return (
     <div className="glass-card rounded-2xl p-6">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 text-xs font-medium"><Icon name="key-round" className="w-3.5 h-3.5" /> For tenants</span>
+        <span className="dz-tag bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 font-medium"><Icon name="key-round" className="w-3.5 h-3.5" /> For tenants</span>
       </div>
       <h1 ref={headingRef} tabIndex={-1} className="text-xl sm:text-2xl font-bold text-white outline-none">The home you rent</h1>
       <p className="text-gray-400 text-sm mt-1.5 max-w-2xl">Keep your agreement and deposit sorted, track the rent you already pay, and stay on top of every due date — all in one place.</p>
@@ -348,7 +349,7 @@ const Fact = ({ label, value }) => (
 );
 
 const SoonPill = () => (
-  <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-400/15 text-amber-300 font-bold">Soon</span>
+  <span className="dz-tag uppercase tracking-wide bg-amber-400/15 text-amber-300 font-bold">Soon</span>
 );
 
 const ActionTile = ({ to, icon, title, desc, soon }) => (

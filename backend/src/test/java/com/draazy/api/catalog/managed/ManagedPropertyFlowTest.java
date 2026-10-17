@@ -163,13 +163,72 @@ class ManagedPropertyFlowTest extends AbstractApiTest {
         mvc.perform(patch(Routes.MeManagedProperties.BASE + "/" + id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"rented\":true,\"tenantName\":\"Rohan\",\"dueDay\":5}"))
+                        .content("{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"+91 98310 03990\","
+                                + "\"dueDay\":5}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rented").value(true))
                 .andExpect(jsonPath("$.tenantName").value("Rohan"))
+                .andExpect(jsonPath("$.tenantMobile").value("9831003990"))
                 .andExpect(jsonPath("$.dueDay").value(5))
 
                 .andExpect(jsonPath("$.locality").value("Baner"))
+                .andExpect(jsonPath("$.price").value(25000));
+    }
+
+    @Test
+    void rentTracking_requiresTenantNameMobileAndRent_withSaneBounds() throws Exception {
+        User owner = user("9831003991");
+
+        for (String bad : new String[] {
+                "{\"rented\":true,\"tenantMobile\":\"9831003992\"}",
+                "{\"rented\":true,\"tenantName\":\"Rohan\"}",
+                "{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003991\"}",
+                "{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"5831003992\"}",
+                "{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003992\",\"monthlyRent\":0}",
+                "{\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003992\",\"monthlyRent\":10000001}",
+                "{\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003992\",\"dueDay\":29}"}) {
+            // A fresh record per case: the test's transaction keeps a refused patch's changes in the session.
+            String id = register(owner, flat("Baner", 25000));
+            mvc.perform(patch(Routes.MeManagedProperties.BASE + "/" + id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(bad))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+
+        // A rent deal's rent defaults to its price, which has no ceiling of its own.
+        mvc.perform(post(Routes.MeManagedProperties.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deal\":\"rent\",\"propertyType\":\"Flat\",\"price\":10000001,"
+                                + "\"locality\":\"Baner\",\"rented\":true,\"tenantName\":\"Rohan\","
+                                + "\"tenantMobile\":\"9831003992\"}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void stopRentTracking_clearsTheTenantButKeepsTheRecord() throws Exception {
+        User owner = user("9831003993");
+        String id = register(owner, flat("Baner", 25000));
+        String byId = Routes.MeManagedProperties.BASE + "/" + id;
+        mvc.perform(patch(byId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"rented\":true,\"tenantName\":\"Rohan\",\"tenantMobile\":\"9831003994\"}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(delete(byId + "/rent-tracking")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user("9831003995"))))
+                .andExpect(status().isNotFound());
+
+        mvc.perform(delete(byId + "/rent-tracking")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.rented").value(false))
+                .andExpect(jsonPath("$.tenantName").doesNotExist())
+                .andExpect(jsonPath("$.tenantMobile").doesNotExist())
+                .andExpect(jsonPath("$.monthlyRent").doesNotExist())
                 .andExpect(jsonPath("$.price").value(25000));
     }
 

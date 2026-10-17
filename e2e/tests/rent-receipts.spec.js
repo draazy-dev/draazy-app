@@ -51,6 +51,7 @@ async function estimateAndSave(page, mobile) {
 /** Fill the rent-tracking setup form and switch the property to rented. */
 async function startTracking(page) {
   await page.getByLabel(/Tenant name/i).fill(TENANT);
+  await page.getByLabel(/Tenant mobile/i).fill('9123456780');
   await page.getByLabel(/Monthly rent/i).fill(String(RENT));
   await page.getByRole('button', { name: /Start tracking/i }).click();
   await expect(page.getByText(/Recent months/i)).toBeVisible({ timeout: 20000 });
@@ -114,7 +115,7 @@ test.describe('LIVE: manual rent receipts against the real API', () => {
     await expect(page.getByText('Received this month')).toBeVisible();
 
     // Re-read from outside the page. A receipt that only exists in the tab that made it is the
-    // exact failure this port was for.
+    // exact failure this guards against.
     const res = await fetch(`${receiptsUrl(id)}?months=6`, { headers: await authHeaders(mobile) });
     expect(res.status).toBe(200);
     const rows = await res.json();

@@ -1,6 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, authHeaders, signedInAs, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, authHeaders, signedInAs, signedInAsNew, uniqueMobile, shownMobile } from '../../../helpers/liveAuth.js';
 import { AADHAAR, SOCIETY_PLACEHOLDER, active, clickNext, fillOwner, fillProperty, fillTenantPolice, fillTerms, fillWitnesses, inviteOwner, inviteTenant, uploadAll } from '../../../helpers/rentAgreementWizard.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 // Co-fill must be live: it spans two accounts and browser contexts.
@@ -163,7 +163,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
       await clickNext(tenantPage, 2); // Owner -> Tenant
       await expect(tenantPage.getByText('Your details — please complete this step')).toBeVisible();
       await expect(active(tenantPage).getByPlaceholder('As per PAN/Aadhaar')).toBeEnabled();
-      await expect(active(tenantPage).getByPlaceholder('10-digit mobile').first(), 'the invitee finds their own mobile already on their step').toHaveValue(tenantMobile);
+      await expect(active(tenantPage).getByPlaceholder('10-digit mobile').first(), 'the invitee finds their own mobile already on their step').toHaveValue(shownMobile(tenantMobile));
       /* Accepting removes the row from the *pending* invite list, so a second visit finds nothing
          there and must not read that absence as expiry — the tenant would have no way back in. */
 
@@ -188,7 +188,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     await fillProperty(page);
     await inviteOwner(page, ownerMobile, 'Rajesh Deshpande');
     const t = active(page);
-    await expect(t.getByPlaceholder('10-digit mobile').first(), 'the requester is the first tenant').toHaveValue(tenantMobile);
+    await expect(t.getByPlaceholder('10-digit mobile').first(), 'the requester is the first tenant').toHaveValue(shownMobile(tenantMobile));
     await t.getByPlaceholder('As per PAN/Aadhaar').first().fill('Rahul Nair');
     await t.getByPlaceholder('As per identity proof').first().fill('Latha Nair');
     await pickDate(page, '[data-err="t0dob"]', '1995-01-01');
@@ -227,7 +227,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
       await clickNext(ownerPage, 1);
       await expect(ownerPage.getByText('Your details — please complete this step')).toBeVisible();
       const o = active(ownerPage);
-      await expect(o.getByPlaceholder('10-digit mobile').first(), 'the invitee\'s own number is already there').toHaveValue(ownerMobile);
+      await expect(o.getByPlaceholder('10-digit mobile').first(), 'the invitee\'s own number is already there').toHaveValue(shownMobile(ownerMobile));
       await o.getByPlaceholder('As per PAN/Aadhaar').first().fill('Rajesh Deshpande');
       await o.getByPlaceholder('As per identity proof').first().fill('Maya Deshpande');
       await pickDate(ownerPage, '[data-err="oDob"]', '1974-01-01');
@@ -393,7 +393,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     await test.step('the invitee\'s own mobile is on their step, seeded from the account rather than from the owner\'s state', async () => {
       await clickNext(page, 1);
       await clickNext(page, 2);
-      await expect(active(page).getByPlaceholder('10-digit mobile').first()).toHaveValue(tenantMobile);
+      await expect(active(page).getByPlaceholder('10-digit mobile').first()).toHaveValue(shownMobile(tenantMobile));
     });
   });
 });

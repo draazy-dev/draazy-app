@@ -45,13 +45,11 @@ const SectionHead = ({ icon, iconCls = 'text-teal-400', title, sub, action }) =>
    no PII leaves the device). */
 
 const basisSalaryKey = (mob) => 'dzHraBasic:' + (mob || 'anon');
-/* Rent Wallet — the tenant view of Finances. */
 
 export default function TenantFinancesTab({ user, toast }) {
   const { t, i18n } = useTranslation();
   const mob = user?.mobile || '';
   const [idx, setIdx] = useState(0);
-  /* One caller-scoped read. */
 
   const [rentals, setRentals] = useState([]);
   const [status, setStatus] = useState('loading');
@@ -131,7 +129,6 @@ export default function TenantFinancesTab({ user, toast }) {
       </div>
     );
   }
-  /* Empty state — nothing recorded yet. */
 
   if (loaded && !rental && !editing) {
     return (
@@ -186,7 +183,7 @@ export default function TenantFinancesTab({ user, toast }) {
         {rentals.length > 1 && (
           <HScroll wrapClassName="-mx-1 flex-1" className="flex gap-1.5 px-1">
             {rentals.map((x, i) => (
-              <button key={x.id} onClick={() => setIdx(i)} className={'inline-flex min-h-[40px] items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-medium transition ' + (i === idx ? 'border-brand-teal/30 bg-brand-teal/15 text-brand-teal' : 'border-transparent bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white')}>
+              <button key={x.id} onClick={() => setIdx(i)} className={'h-btn inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 text-sm font-medium transition ' + (i === idx ? 'border-brand-teal/30 bg-brand-teal/15 text-brand-teal' : 'border-transparent bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white')}>
                 <Icon name="house" className="w-4 h-4" /> {x.address}
               </button>
             ))}
@@ -196,7 +193,6 @@ export default function TenantFinancesTab({ user, toast }) {
           <Icon name="plus" className="w-4 h-4" /> {t('wallet.addRental')}
         </button>
       </div>
-      {/* The recorded rental itself — stated plainly as the tenant's own entry. */}
 
       <Card className="p-5">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -220,7 +216,6 @@ export default function TenantFinancesTab({ user, toast }) {
           </div>
         </div>
       </Card>
-      {/* KPI stats */}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Stat icon="receipt-indian-rupee" bg="bg-teal-400/15" fg="text-teal-400" value={fmtINR(rental.fyPaid)} label={t('wallet.rentPaidFy', { fy: fyLabel() })} />
@@ -244,7 +239,6 @@ export default function TenantFinancesTab({ user, toast }) {
         <p className="text-gray-400 text-sm">{t('wallet.passportSoonBody')}</p>
       </Card>
 
-        {/* HRA Tax Saver */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="p-6">
           <SectionHead icon="piggy-bank" iconCls="text-brand-teal-3" title={t('wallet.hraTitle')} sub={t('wallet.hraSub')} />
@@ -270,7 +264,6 @@ export default function TenantFinancesTab({ user, toast }) {
             <p className="text-gray-500 text-sm">{t('wallet.addSalaryPrompt')}</p>
           )}
         </Card>
-        {/* Deposit tracker */}
 
         <Card className="p-6">
           <SectionHead icon="landmark" iconCls="text-amber-400" title={t('wallet.depositTitle')} sub={t('wallet.depositSub')} />
@@ -289,7 +282,6 @@ export default function TenantFinancesTab({ user, toast }) {
           )}
         </Card>
       </div>
-      {/* Rent vs Buy nudge */}
 
       <Card className="p-6">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
@@ -317,7 +309,7 @@ function Hero() {
   return (
     <div className="glass-card rounded-2xl p-6">
       <div className="flex items-center gap-2 mb-1.5">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 text-xs font-medium"><Icon name="wallet" className="w-3.5 h-3.5" /> {t('wallet.forTenants')}</span>
+        <span className="dz-tag bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 font-medium"><Icon name="wallet" className="w-3.5 h-3.5" /> {t('wallet.forTenants')}</span>
       </div>
       <h1 className="text-xl sm:text-2xl font-bold text-white">{t('wallet.title')}</h1>
       <p className="text-gray-400 text-sm mt-1.5 max-w-2xl">{t('wallet.intro')}</p>
@@ -341,7 +333,6 @@ const Field = ({ label, hint, children }) => (
 );
 
 const input = 'field w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm';
-/* Record or edit a home the tenant already rents. */
 
 function RentalForm({ initial, onCancel, onDone, onError }) {
   const { t } = useTranslation();

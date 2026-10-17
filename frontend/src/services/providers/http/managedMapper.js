@@ -23,7 +23,6 @@ export const toClientDeal = (deal) => (deal === 'rent' ? 'rent' : 'sale');
 /** Owner-hub deal → wire deal. The inverse, and the one that stops a 422. */
 export const toWireDeal = (deal) => (deal === 'rent' ? 'rent' : 'buy');
 
-/** One managed record, wire → card. */
 export function toManaged(dto) {
   if (!dto) return null;
   const u = readUser() || {};
@@ -59,6 +58,7 @@ export function toManaged(dto) {
     ownerMobile: u.mobile || '',
     rented: !!dto.rented,
     tenantName: dto.tenantName || '',
+    tenantMobile: dto.tenantMobile || '',
     monthlyRent: Number(dto.monthlyRent) || 0,
     dueDay: Number(dto.dueDay) || 5,
     valuation: dto.valuation || null,
@@ -68,7 +68,6 @@ export function toManaged(dto) {
   };
 }
 
-/** A page (or bare array) of managed records, wire → cards. */
 export const toManagedList = (rows) => (Array.isArray(rows) ? rows.map(toManaged).filter(Boolean) : []);
 
 /** The Rent Panel must render and print these values rather than re-deriving them from the record it happens to be
@@ -90,6 +89,17 @@ export function toRentReceipt(dto) {
 export const toRentReceiptList = (rows) =>
   (Array.isArray(rows) ? rows.map(toRentReceipt).filter(Boolean) : []);
 
+export const toTrackedRentList = (rows) => (Array.isArray(rows) ? rows : []).map((dto) => ({
+  id: dto.id || '',
+  title: dto.title || '',
+  address: dto.address || '',
+  landlordName: dto.landlordName || '',
+  monthlyRent: Number(dto.monthlyRent) || 0,
+  status: dto.status || 'due',
+  dueOn: dto.dueOn || '',
+  receipts: toRentReceiptList(dto.receipts),
+}));
+
 /** Only the fields the server owns a column for survive; `visibility`, `status`, `owner` and `publishedListingId` are
  * refused by the contract on purpose. */
 export function toCreateRequest(data = {}) {
@@ -109,6 +119,7 @@ export function toCreateRequest(data = {}) {
     furnishing: data.furnishing || null,
     rented: !!data.rented,
     tenantName: data.tenantName || null,
+    tenantMobile: data.tenantMobile || null,
     // `deal === 'rent'` mirrors the browser store's rule: for a rental the price *is* the rent, and
     // the tracker should not start out disagreeing with the headline.
     monthlyRent: deal === 'rent' ? price : (Number(data.monthlyRent) || null),
@@ -135,6 +146,7 @@ export function toUpdateRequest(patch = {}) {
   if ('furnishing' in patch) body.furnishing = patch.furnishing;
   if ('rented' in patch) body.rented = !!patch.rented;
   if ('tenantName' in patch) body.tenantName = patch.tenantName;
+  if ('tenantMobile' in patch) body.tenantMobile = patch.tenantMobile;
   if ('monthlyRent' in patch) body.monthlyRent = Number(patch.monthlyRent) || null;
   if ('dueDay' in patch) body.dueDay = Number(patch.dueDay) || null;
   if ('valuation' in patch) body.valuation = patch.valuation;

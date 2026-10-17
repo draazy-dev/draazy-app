@@ -17,6 +17,10 @@ public interface ManagedPropertyRepository extends JpaRepository<ManagedProperty
     // Not owner-scoped on purpose: register only reads whether the listing is already adopted, never the record.
     Optional<ManagedProperty> findByPublishedListingId(UUID publishedListingId);
 
+    List<ManagedProperty> findByTenantMobileAndRentedTrueOrderByCreatedAtDescIdDesc(String tenantMobile);
+
+    List<ManagedProperty> findByRentedTrueAndTenantMobileNotNull();
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select m from ManagedProperty m where m.id = :id")
     Optional<ManagedProperty> findByIdForUpdate(@Param("id") UUID id);
