@@ -112,7 +112,8 @@ public class PropertyService {
 
     @Transactional(readOnly = true)
     public List<Property> newestReels(ListingFacets facets) {
-        return properties.findPage(PropertySpecs.publicSearch(NO_FILTERS, facets).and(PropertySpecs.newestFirst()),
+        return properties.findPage(PropertySpecs.publicSearch(NO_FILTERS, facets).and(PropertySpecs.residential())
+                .and(PropertySpecs.newestFirst()),
                 PageRequest.of(0, REELS_CAP));
     }
 

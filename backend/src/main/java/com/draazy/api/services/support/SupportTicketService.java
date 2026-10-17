@@ -113,6 +113,19 @@ public class SupportTicketService {
                 sent.getCreatedAt());
     }
 
+    @Transactional
+    public SupportTicketDto close(AuthPrincipal caller, String id) {
+        SupportTicket ticket = readable(caller, id, BackOfficePermissions.TICKETS_WRITE);
+        if (!SupportTicketStatuses.CLOSED.equals(ticket.getStatus())) {
+            ticket.close();
+            ticket.setUnread(true);
+            tickets.saveAndFlush(ticket);
+            notifier.notify(ticket.getUserId(), "support.closed", "Your support ticket was closed",
+                    ticket.getSubject(), "/support?open=" + ticket.getId());
+        }
+        return mapper.toDto(ticket);
+    }
+
     // Clears only the caller's side; staff reads remove tickets from the ops queue.
     @Transactional
     public void markRead(AuthPrincipal caller, String id) {

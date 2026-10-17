@@ -255,4 +255,15 @@ class LocalityResolveEndpointsTest extends AbstractApiTest {
         mvc.perform(get("/localities/search").param("q", "%"))
                 .andExpect(jsonPath("$.length()").value(0));
     }
+
+    @Test
+    void searchForgivesASmallSpellingMistake() throws Exception {
+        row("zzbaner-close", "Zzbaner", 18.5, 73.8, "p-close", false);
+
+        mvc.perform(get("/localities/search").param("q", "Zzbner"))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].slug").value("zzbaner-close"));
+        mvc.perform(get("/localities/search").param("q", "Qqqqq"))
+                .andExpect(jsonPath("$.length()").value(0));
+    }
 }

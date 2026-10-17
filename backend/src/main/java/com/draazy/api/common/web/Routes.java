@@ -361,6 +361,8 @@ public final class Routes {
         public static final String MESSAGES = BY_ID + "/messages";
 
         public static final String READ = BY_ID + "/read";
+
+        public static final String CLOSE = BY_ID + "/close";
     }
 
     public static final class Offers {

@@ -494,8 +494,35 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
         }
     }
 
-    private String raiseTicket(User caller, String subject) throws Exception {
-        String json = mvc.perform(post(Routes.SupportTickets.BASE)
+    @Nested
+    @DisplayName("closing")
+    class Closing {
+
+        @Test
+        @DisplayName("ops close a ticket and the customer sees it closed; the customer cannot close it")
+        void staffClosesTheTicket() throws Exception {
+            User asha = customer("9891300004");
+            User desk = staff("9891300005", Teams.RENTAL);
+            String id = raiseTicket(asha, "Refund not received");
+
+            mvc.perform(post(Routes.SupportTickets.CLOSE, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(asha)))
+                    .andExpect(status().isForbidden());
+
+            mvc.perform(post(Routes.SupportTickets.CLOSE, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.status").value("closed"));
+
+            mvc.perform(get(Routes.SupportTickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(asha)))
+                    .andExpect(jsonPath("$[0].status").value("closed"))
+                    .andExpect(jsonPath("$[0].unread").value(true));
+            expectAwaitingReply(desk, id, false);
+        }
+    }
+
+    private String raiseTicket(User caller, String subject) throws Exception {        String json = mvc.perform(post(Routes.SupportTickets.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(caller))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"subject\":\"" + subject

@@ -42,6 +42,7 @@ final class PropertySpecs {
 
     // Letters only and five or more: a short word or a number is matched exactly, so "2bhk" never becomes "3bhk".
     private static final Pattern FUZZY_WORD = Pattern.compile("\\p{L}{5,}");
+    private static final Pattern PHONE_TEXT = Pattern.compile("^[+\\d\\s().-]+$");
     private static final Set<String> FACING = Set.of(
             "east", "west", "north", "south", "north-east", "north-west", "south-east", "south-west");
 
@@ -51,6 +52,7 @@ final class PropertySpecs {
             "east", List.of("east", "north-east", "south-east"),
             "west", List.of("west", "north-west", "south-west"));
     private static final Set<String> SHELL = Set.of("bareshell", "warmshell", "furnished");
+    private static final Set<String> RESIDENTIAL_KEYS = Set.of("flat", "house", "villa");
     private static final Set<String> NA = Set.of("agricultural", "deemed", "sanctioned");
     private PropertySpecs() {
     }
@@ -82,6 +84,10 @@ final class PropertySpecs {
             }
             return cb.and(where.toArray(Predicate[]::new));
         };
+    }
+
+    static Specification<Property> residential() {
+        return (root, query, cb) -> root.get("propertyTypeKey").in(RESIDENTIAL_KEYS);
     }
 
     static Specification<Property> newestFirst() {
@@ -365,9 +371,21 @@ final class PropertySpecs {
                 cb.like(cb.lower(root.get("title")), like, LIKE_ESCAPE),
                 cb.like(cb.lower(root.get("locality")), like, LIKE_ESCAPE),
                 cb.like(cb.lower(root.get("owner").get("name")), like, LIKE_ESCAPE),
-                cb.like(root.get("owner").get("mobile"), like, LIKE_ESCAPE),
+                cb.like(root.get("owner").get("mobile"), mobileLike(filters.q(), like), LIKE_ESCAPE),
                 cb.like(cb.lower(root.get("slug")), like, LIKE_ESCAPE),
                 cb.like(idAsText, like, LIKE_ESCAPE)));
+    }
+
+    /** A mobile typed with spaces, dashes or +91 matches the stored 10 digits; any other text keeps its own pattern. */
+    private static String mobileLike(String q, String textLike) {
+        if (!PHONE_TEXT.matcher(q).matches()) {
+            return textLike;
+        }
+        String digits = q.replaceAll("\\D", "");
+        if (digits.length() == 12 && digits.startsWith("91")) {
+            digits = digits.substring(2);
+        }
+        return digits.length() >= 3 ? "%" + LikePatterns.escape(digits) + "%" : textLike;
     }
 
     /** A null date matches nothing; an unknown bucket (negative) matches nothing at all. */

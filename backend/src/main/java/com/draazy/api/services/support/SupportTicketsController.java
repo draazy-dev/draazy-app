@@ -2,12 +2,15 @@ package com.draazy.api.services.support;
 
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
+import com.draazy.api.security.BackOfficePermissions;
 import com.draazy.api.security.CurrentUser;
+import com.draazy.api.security.Roles;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,6 +56,13 @@ public class SupportTicketsController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void markRead(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         service.markRead(principal, id);
+    }
+
+    @PostMapping(Routes.SupportTickets.CLOSE)
+    @PreAuthorize("hasAnyRole('" + Roles.STAFF + "', '" + Roles.ADMIN + "') and "
+            + BackOfficePermissions.REQUIRE_TICKETS_WRITE)
+    public SupportTicketDto close(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
+        return service.close(principal, id);
     }
 
     public record MessageCreate(@NotBlank @Size(max = 4000) String body) {

@@ -6,6 +6,8 @@ import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.error.RateLimitedException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
@@ -15,6 +17,7 @@ import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.moderation.property.PropertyModerationService;
 import com.draazy.api.moderation.user.UserAdminService;
 import com.draazy.api.security.AuthPrincipal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -35,6 +38,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ReportService {
 
+    private static final int MAX_PER_HOUR = 10;
+    private static final Duration WINDOW = Duration.ofHours(1);
+
     private final ReportRepository reports;
     private final ReportMapper mapper;
     private final AuditService audit;
@@ -43,10 +49,12 @@ public class ReportService {
     private final FlatmateModerationService flatmateModeration;
     private final PropertyRepository properties;
     private final UserRepository users;
+    private final RateLimitLock locks;
 
     public ReportService(ReportRepository reports, ReportMapper mapper, AuditService audit,
             PropertyModerationService propertyModeration, UserAdminService userAdmin,
-            FlatmateModerationService flatmateModeration, PropertyRepository properties, UserRepository users) {
+            FlatmateModerationService flatmateModeration, PropertyRepository properties, UserRepository users,
+            RateLimitLock locks) {
         this.reports = reports;
         this.mapper = mapper;
         this.audit = audit;
@@ -55,6 +63,7 @@ public class ReportService {
         this.flatmateModeration = flatmateModeration;
         this.properties = properties;
         this.users = users;
+        this.locks = locks;
     }
 
     /** Target is deliberately not resolved for listings and posts: a scammer deleting the listing must not also
@@ -72,6 +81,11 @@ public class ReportService {
         if (ReportTargetTypes.USER.equals(targetType)
                 && Ids.parseUuid(body.targetId()).filter(users::existsById).isEmpty()) {
             throw NotFoundException.of("User");
+        }
+        locks.holdUntilCommit(RateLimitLock.Limit.REPORT_CREATE, reporterId.toString());
+        if (reports.countByReporterIdAndCreatedAtAfter(reporterId, Instant.now().minus(WINDOW)) >= MAX_PER_HOUR) {
+            throw new RateLimitedException("You can file up to " + MAX_PER_HOUR + " reports an hour. Please try again later.",
+                    (int) WINDOW.toSeconds());
         }
         if (reports.existsByReporterIdAndTargetTypeAndTargetIdAndStatusIn(
                 reporterId, targetType, body.targetId(), ReportStatuses.LIVE)) {
