@@ -5,9 +5,9 @@ const PRIMARY_TONE = {
   emerald: 'bg-emerald-500 hover:bg-emerald-600',
   teal: 'bg-brand-teal hover:bg-brand-teal-1',
 };
-const PRIMARY = 'text-xs px-3.5 py-1.5 rounded-lg font-semibold text-white inline-flex items-center justify-center gap-1.5 transition-colors min-h-[44px] sm:min-h-[36px] ';
-const BASE = 'flex flex-col items-center justify-center gap-1 min-h-[56px] px-1.5 py-2 rounded-lg text-[11px] leading-tight text-center font-semibold transition-colors '
-  + 'sm:flex-row sm:min-h-[36px] sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs';
+const PRIMARY = 'tap-coarse text-xs px-3.5 py-1.5 rounded-lg font-semibold text-white inline-flex items-center justify-center gap-1.5 transition-colors min-h-[44px] sm:[@media(pointer:fine)]:min-h-[36px] ';
+const BASE = 'tap-coarse flex flex-col items-center justify-center gap-1 min-h-[56px] px-1.5 py-2 rounded-lg text-[11px] leading-tight text-center font-semibold transition-colors '
+  + 'sm:flex-row sm:[@media(pointer:fine)]:min-h-[36px] sm:gap-1.5 sm:px-3 sm:py-1.5 sm:text-xs';
 const TONE = {
   default: 'bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white',
   danger: 'bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 sm:ml-auto',

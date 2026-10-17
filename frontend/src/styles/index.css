@@ -2,7 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== Draazy design tokens ===== */
 /* Colours live in theme.css; this block holds sizing and type only. */
 :root {
   /* Noto sits AFTER Outfit so the browser falls through per character and only Devanagari
@@ -15,25 +14,25 @@
   /* Control sizing scale: every interactive control shares one height for visual rhythm. */
   --control-h: 40px;
   --control-font: 0.875rem;
-  /* 14px — text-sm */
   --control-weight: 400;
-  /* regular for inputs/dropdowns */
   --control-weight-action: 600;
-  /* semibold for action buttons/pills */
   --control-radius: 10px;
-  /* rounded square for most controls */
   --control-radius-pill: 9999px;
-  /* pill — reserved for search tabs, nav CTAs */
   --control-px: 1rem;
-  /* 16px horizontal padding */
 
   /* Button tiers. md aligns to --control-h for rhythm with inputs; lg is for hero + prominent
      mobile CTAs, sm for dense toolbars. */
   --btn-h: var(--control-h);
-  /* 40px — md */
   --btn-h-sm: 32px;
   --btn-h-lg: 48px;
   --btn-radius: var(--control-radius);
+
+  /* Compact scale (styles/components/chips.css). Drawn under the 44px touch floor on purpose: each
+     tappable class restores the target with a transparent ::before, as .tap-extend does. */
+  --dz-icon-btn: 36px;
+  --dz-chip-h: 32px;
+  --dz-tag-h: 24px;
+  --dz-count-h: 20px;
 
   /* Mobile bottom-chrome system: nothing bottom-anchored hardcodes a bottom-*, and every fixed
      layer takes a rung off the ladder in docs/system/design-system.md (Bottom chrome). */
@@ -57,6 +56,36 @@
      target is restored by .tap-extend, not by painting a bigger box. */
   --dz-nav-pill-h: 40px;
   --dz-nav-icon-box: 32px;
+
+  /* Floating-card overlays (filter drawer, Modal, pickers, menus, map panel) share this one shape below their
+     breakpoint. See docs/system/design-system.md - Floating cards. */
+  --dz-float-edge: 12px;
+  --dz-float-radius: 24px;
+  --dz-float-top: calc(var(--dz-safe-t, 0px) + min(7.5rem, 16dvh));
+  --dz-float-bottom: calc(var(--dz-safe-b) + var(--dz-float-edge));
+  --dz-float-bg: radial-gradient(60% 64px at 50% 0, rgb(var(--dz-c-teal-500) / 0.15), transparent),
+    rgb(var(--dz-c-ink-card) / 0.95);
+  --dz-float-shadow: 0 25px 50px -12px rgb(var(--dz-c-black) / 0.6), 0 0 0 1px rgb(var(--dz-c-white) / 0.06);
+  --dz-float-scrim: rgb(var(--dz-c-black) / 0.35);
+}
+
+/* Portalled overlays render outside .has-bottom-nav, so the root learns about the nav here to float above it. */
+@media (max-width: 1023.98px) {
+  :root:has(.has-bottom-nav) {
+    --dz-float-bottom: calc(var(--dz-bottom-nav-h) + var(--dz-bottom-nav-offset) + var(--dz-float-edge));
+  }
+}
+
+@keyframes dzFloatIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (min-width: 768px) {
@@ -268,6 +297,17 @@
   min-height: 44px;
 }
 
+/* Same floor, painted only where a finger is the pointer, so dense desktop rows keep their size. */
+@media (pointer: coarse) {
+  .tap-coarse {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
 /* Same 44px floor for controls whose *drawn* size is load-bearing: a transparent centred
    ::before carries the target so the glyph stays as designed. Needs a positioning context. */
 .tap-extend::before {
@@ -325,6 +365,14 @@
   }
 }
 
+/* Height-only twins of .btn sizes, for buttons that keep their own colours. Kept here rather than in
+   tailwind.config.js because a running dev server never reloads that file. */
+@layer utilities {
+  .h-btn { height: var(--btn-h); }
+  .h-btn-sm { height: var(--btn-h-sm); }
+  .h-btn-lg { height: var(--btn-h-lg); }
+}
+
 .section-y {
   padding-top: var(--section-gap);
   padding-bottom: var(--section-gap);
@@ -359,8 +407,6 @@
   }
 }
 
-/* ── Design Language: Reusable control classes ──
-   Use these classes for any interactive control to maintain consistent sizing. */
 .dz-control {
   height: var(--control-h);
   display: inline-flex;
@@ -377,7 +423,9 @@
   cursor: pointer;
 }
 
-.dz-control:hover { background: var(--control-bg-hover); }
+@media (hover: hover) {
+  .dz-control:hover { background: var(--control-bg-hover); }
+}
 
 .dz-control.active,
 .dz-control[aria-pressed="true"] {
@@ -393,7 +441,9 @@
   color: rgb(var(--dz-c-pure-white));
 }
 
-.dz-control--action:hover { filter: brightness(1.08); }
+@media (hover: hover) {
+  .dz-control--action:hover { filter: brightness(1.08); }
+}
 
 .dz-control--ghost {
   background: transparent;
@@ -401,13 +451,13 @@
   color: var(--text-muted);
 }
 
-.dz-control--ghost:hover {
-  background: var(--control-bg-hover);
-  color: rgb(var(--dz-c-white));
+@media (hover: hover) {
+  .dz-control--ghost:hover {
+    background: var(--control-bg-hover);
+    color: rgb(var(--dz-c-white));
+  }
 }
 
-/* ===== Base ===== */
-/* box-sizing handled by Tailwind Preflight; margin/padding reset removed to avoid double-reset conflicts */
 html {
   scroll-behavior: smooth;
   overflow-x: clip;
@@ -484,7 +534,6 @@ input:-webkit-autofill:focus {
   transition: background-color 5000s ease-in-out 0s;
 }
 
-/* ── Heading balance — prevents orphaned words on all headings ── */
 h1,
 h2,
 h3,
@@ -499,18 +548,15 @@ h4 { text-wrap: balance; }
 .badge-verified,
 .badge-rera { border-radius: 6px !important; }
 
-/* Keep pills for: nav Post Property, Sign In, hero Buy/Rent tabs, popular-locality chips */
 .search-tab,
 .loc-chip { border-radius: var(--control-radius-pill) !important; }
 
-/* ── Tabular figures on all price and stat numbers ── */
 .price-marker,
 .rd-val,
 .rd-val-lg,
 .dz-lb-caption,
 [class*="font-extrabold"] { font-variant-numeric: tabular-nums; }
 
-/* ── Active/press feedback on all interactive controls ── */
 button:active:not(:disabled),
 a[role="button"]:active { transform: scale(0.97) translateY(1px); }
 
@@ -534,7 +580,6 @@ a[role="button"]:active { transform: scale(0.97) translateY(1px); }
   }
 }
 
-/* ── Section subtext max-width — prevents lines stretching too wide ── */
 .section-desc { max-width: 60ch; }
 
 ::-webkit-scrollbar { width: 6px; }
@@ -590,7 +635,6 @@ a[role="button"]:active { transform: scale(0.97) translateY(1px); }
   .filter-scroll:hover::-webkit-scrollbar-thumb:hover { background: rgb(var(--dz-c-teal-500) / 0.7); }
 }
 
-/* ── Hero gradient animation ── */
 @keyframes heroGradient {
   0% { background-position: 0% 50%; }
 
@@ -650,7 +694,6 @@ html.light .hero-mist {
 }
 html.dz-reduce-motion .hero-mist { animation: none; }
 
-/* ── Floating shapes ── */
 @keyframes float1 {
 
   0%,
@@ -733,7 +776,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   animation: float2 16s ease-in-out infinite reverse;
 }
 
-/* ── Staggered hero text (compressed: search widget usable well under ~0.6s) ── */
 @keyframes fadeInUp {
   from {
     opacity: 0;
@@ -789,7 +831,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.36s forwards;
 }
 
-/* ── Hero trust-proof ticker ── */
 .hero-ticker {
   opacity: 0;
   animation: fadeInUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.74s forwards;
@@ -806,7 +847,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 
 .ticker-ping { animation: tickerPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; }
 
-/* ── Scroll reveal ── */
 .reveal {
   opacity: 0;
   transform: translateY(36px);
@@ -818,7 +858,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   transform: translateY(0);
 }
 
-/* ── Card image zoom ── */
 .card-img-wrap { overflow: hidden; }
 
 .card-img-wrap img { transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1); }
@@ -827,7 +866,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   .property-card:hover .card-img-wrap img { transform: scale(1.08); }
 }
 
-/* ── Heart animation ── */
 @keyframes heartPop {
   0% { transform: scale(1); }
 
@@ -860,7 +898,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 
 .badge-verified-icon svg { width: 24px; height: 24px; }
 
-/* ── Glow hover for category cards ── */
 .cat-card { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease; }
 
 @media (hover: hover) {
@@ -891,7 +928,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   background: linear-gradient(to right, var(--brand-dark), transparent);
 }
 
-/* ── Property card lift + off-screen rendering optimization ── */
 .property-card {
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
   content-visibility: auto;
@@ -903,7 +939,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   contain-intrinsic-size: 0 320px;
 }
 
-/* ── CTA floating shapes ── */
 @keyframes ctaFloat1 {
 
   0%,
@@ -925,7 +960,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 .cta-float-3 { animation: ctaFloat1 10s ease-in-out infinite reverse; }
 .cta-float-4 { animation: ctaFloat2 12s ease-in-out infinite; }
 
-/* ── Glass (with fallback for browsers without backdrop-filter support) ── */
 .glass {
   background: var(--glass);
   backdrop-filter: blur(16px);
@@ -953,7 +987,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   .glass-card { background: rgb(var(--dz-c-ink-2) / 0.94); }
 }
 
-/* Opaque dropdown surface */
 .search-dropdown {
   background: var(--brand-card);
   border: 1px solid rgb(var(--dz-c-white) / calc(0.14 * var(--dz-line-boost)));
@@ -984,7 +1017,9 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   border-radius: 999px;
 }
 
-.search-dd-scroll::-webkit-scrollbar-thumb:hover { background: rgb(var(--dz-c-teal-500) / 0.95); }
+@media (hover: hover) {
+  .search-dd-scroll::-webkit-scrollbar-thumb:hover { background: rgb(var(--dz-c-teal-500) / 0.95); }
+}
 
 /* Shared option row for the Type / BHK dropdowns, on the app-standard option metrics so every
    value across the hero search matches the rest of the app. */
@@ -1005,10 +1040,12 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   cursor: pointer;
 }
 
-.search-dd-opt:hover {
-  background: var(--dd-option-hover);
-  color: rgb(var(--dz-c-white));
-  transform: translateX(var(--dd-option-slide));
+@media (hover: hover) {
+  .search-dd-opt:hover {
+    background: var(--dd-option-hover);
+    color: rgb(var(--dz-c-white));
+    transform: translateX(var(--dd-option-slide));
+  }
 }
 
 .loc-chip {
@@ -1036,9 +1073,11 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   flex-shrink: 0;
 }
 
-.loc-chip button:hover {
-  background: rgb(var(--dz-c-white) / 0.18);
-  color: rgb(var(--dz-c-white));
+@media (hover: hover) {
+  .loc-chip button:hover {
+    background: rgb(var(--dz-c-white) / 0.18);
+    color: rgb(var(--dz-c-white));
+  }
 }
 
 .loc-sugg {
@@ -1059,11 +1098,18 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   white-space: nowrap;
 }
 
-.loc-sugg:hover,
 .loc-sugg.active {
   background: var(--dd-option-hover);
   color: rgb(var(--dz-c-white));
   transform: translateX(var(--dd-option-slide));
+}
+
+@media (hover: hover) {
+  .loc-sugg:hover {
+    background: var(--dd-option-hover);
+    color: rgb(var(--dz-c-white));
+    transform: translateX(var(--dd-option-slide));
+  }
 }
 
 .loc-sugg .add {
@@ -1080,9 +1126,11 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   transition: all .2s ease;
 }
 
-.loc-sugg:hover .add {
-  background: var(--teal-2);
-  color: rgb(var(--dz-c-emerald-950));
+@media (hover: hover) {
+  .loc-sugg:hover .add {
+    background: var(--teal-2);
+    color: rgb(var(--dz-c-emerald-950));
+  }
 }
 
 .loc-sugg.active .add {
@@ -1131,14 +1179,23 @@ html.dz-reduce-motion .hero-mist { animation: none; }
 
 .loc-sugg--empty .truncate { color: rgb(var(--dz-c-slate-400)); }
 
-.loc-sugg:hover .loc-sugg-count,
 .loc-sugg.active .loc-sugg-count { color: rgb(var(--dz-c-teal-200)); }
 
-.loc-sugg--empty:hover .loc-sugg-count,
+@media (hover: hover) {
+  .loc-sugg:hover .loc-sugg-count { color: rgb(var(--dz-c-teal-200)); }
+}
+
 .loc-sugg--empty.active .loc-sugg-count { color: rgb(var(--dz-c-slate-400)); }
 
-.loc-sugg:hover .loc-sugg-kind,
+@media (hover: hover) {
+  .loc-sugg--empty:hover .loc-sugg-count { color: rgb(var(--dz-c-slate-400)); }
+}
+
 .loc-sugg.active .loc-sugg-kind { color: rgb(var(--dz-c-slate-400)); }
+
+@media (hover: hover) {
+  .loc-sugg:hover .loc-sugg-kind { color: rgb(var(--dz-c-slate-400)); }
+}
 
 .loc-sugg--stack {
   height: auto;
@@ -1154,8 +1211,11 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   color: rgb(var(--dz-c-slate-500));
 }
 
-.loc-sugg:hover .loc-sugg-sub,
 .loc-sugg.active .loc-sugg-sub { color: rgb(var(--dz-c-slate-400)); }
+
+@media (hover: hover) {
+  .loc-sugg:hover .loc-sugg-sub { color: rgb(var(--dz-c-slate-400)); }
+}
 
 /* "Powered by Google" attribution mark, required by Places ToS off-map. The letter colours are
    Google's fixed brand palette and are applied inline; only layout/typography is themed here. */
@@ -1215,7 +1275,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   z-index: 10;
 }
 
-/* ── Category scroll hide scrollbar ── */
 .cat-scroll::-webkit-scrollbar { display: none; }
 
 .cat-scroll {
@@ -1254,18 +1313,15 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   }
 }
 
-/* ── Pill active ── */
 .pill-active {
   background: var(--brand-gradient);
   color: rgb(var(--dz-c-pure-white));
 }
 
-/* ── Sleek hover for search button (no gimmicky pulse) ── */
 @media (hover: hover) {
   .search-btn:hover { box-shadow: 0 6px 20px rgb(var(--dz-c-teal-600) / 0.28); }
 }
 
-/* Feature card glow */
 .feature-card { transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease; }
 
 @media (hover: hover) {
@@ -1275,7 +1331,6 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   }
 }
 
-/* FAQ */
 details.faq { transition: border-color .2s ease; }
 
 details.faq[open] { border-color: rgb(var(--dz-c-teal-500) / .35); }
@@ -1286,16 +1341,11 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
 
 .faq-ico { transition: transform .2s ease; }
 
-/* ===== Listings page ===== */
 .t-all { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
 /* .card-img is shared with property SimilarProperties.jsx, so it stays global. */
 
 .card-img { transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
-
-/* .bhk-pill and .deal-tab rules deleted (dead code, no usages in src/). */
-
-/* .toggle-ui/.toggle-cb, .view-btn, collapsible .fg-* filter groups moved to styles/routes/listings.css (Tier 1). */
 
 #listingsMap { z-index: 1; }
 
@@ -1342,8 +1392,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   pointer-events: auto;
 }
 
-.filter-panel__grabber { display: none; }
-
 .filter-panel {
   position: fixed;
   top: 0;
@@ -1364,30 +1412,52 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
 
 .filter-panel.open { transform: translateX(0); }
 
+/* Below lg the drawer is the same floating glass card as the Draaz assistant panel: it rises from the
+   filters pill, sits above the bottom nav on the nav's 12px edges, and leaves the page readable behind. */
 @media (max-width: 1023.98px) {
-  .filter-panel {
-    top: auto;
-    right: 0;
-    width: 100%;
-    max-width: none;
-    height: min(90dvh, calc(100dvh - var(--dz-safe-t, 0px) - .5rem));
-    max-height: min(90dvh, calc(100dvh - var(--dz-safe-t, 0px) - .5rem));
-    border-radius: 24px 24px 0 0;
-    transform: translateY(100%);
-    overflow: hidden;
+  .filter-overlay {
+    background: var(--dz-float-scrim);
+    backdrop-filter: none;
   }
 
-  .filter-panel.open { transform: translateY(0); }
+  .filter-panel {
+    top: var(--dz-float-top);
+    left: calc(env(safe-area-inset-left, 0px) + var(--dz-float-edge));
+    bottom: var(--dz-float-bottom);
+    width: min(30rem, calc(100% - 2 * var(--dz-float-edge) - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)));
+    max-width: none;
+    height: auto;
+    border-radius: var(--dz-float-radius);
+    background: var(--dz-float-bg);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    box-shadow: var(--dz-float-shadow);
+    overflow: hidden;
+    transform-origin: 0 100%;
+    transform: translateY(16px) scale(0.96);
+    opacity: 0;
+    visibility: hidden;
+    transition: transform .3s cubic-bezier(.32, .72, 0, 1), opacity .2s ease-out, visibility 0s linear .3s;
+  }
 
-  .filter-panel__grabber {
-    display: block;
-    width: 44px;
-    height: 5px;
-    margin: 10px auto 0;
-    border-radius: 999px;
-    background: rgb(var(--dz-c-white) / .22);
+  .filter-panel.open {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+  }
+
+  .filter-panel__badge {
+    display: flex;
     flex: 0 0 auto;
-    touch-action: none;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    color: rgb(var(--dz-c-white));
+    background: linear-gradient(135deg, rgb(var(--dz-c-teal-600)), rgb(var(--dz-c-teal-500)));
+    box-shadow: 0 8px 16px rgb(var(--dz-c-teal-500) / 0.3);
   }
 
   .filter-panel__drag-zone {
@@ -1397,27 +1467,35 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   .filter-panel .filter-scroll {
     -webkit-overflow-scrolling: touch;
   }
+}
 
-  .af-chip {
-    min-height: 44px;
-    padding-inline: .875rem .75rem;
-  }
+/* Paired with components/ScrollRail.jsx, which sizes and moves the thumb. Touch screens hide native
+   scrollbars at rest, so below lg the drawn rail replaces them; above it the native bar stays. */
+.scroll-rail {
+  display: none;
+  position: absolute;
+  top: 8px;
+  right: 4px;
+  bottom: 8px;
+  width: 4px;
+  border-radius: 999px;
+  background: rgb(var(--dz-c-white) / 0.08);
+  pointer-events: none;
+}
 
-  .af-chip:active {
-    transform: scale(.98);
-  }
+.scroll-rail > span {
+  display: block;
+  width: 100%;
+  border-radius: inherit;
+  background: rgb(var(--dz-c-teal-500) / 0.6);
+}
 
-  .af-chip svg {
-    width: 1rem;
-    height: 1rem;
-  }
+@media (max-width: 1023.98px) {
+  .scroll-rail:not([hidden]) { display: block; }
 
-  .af-clear-all {
-    display: inline-flex;
-    min-height: 44px;
-    align-items: center;
-    padding-inline: .25rem;
-  }
+  .scroll-rail-body { scrollbar-width: none; }
+
+  .scroll-rail-body::-webkit-scrollbar { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1494,9 +1572,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
   transform: translateY(0);
 }
 
-/* .sort-dropdown and .near-select rules deleted (dead code, no usages in src/). */
-
-/* ── Native <select> themed via @layer to avoid !important conflicts with Tailwind ── */
 @layer components {
   select {
     -webkit-appearance: none;
@@ -1510,7 +1585,9 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     cursor: pointer;
   }
 
-  select:hover { background-image: var(--select-chevron-active); }
+  @media (hover: hover) {
+    select:hover { background-image: var(--select-chevron-active); }
+  }
 
   select:focus,
   select:focus-visible {
@@ -1537,7 +1614,6 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     font-style: normal;
   }
 
-  /* Legal/policy page prose */
   .legal-prose {
     font-size: 0.875rem;
     line-height: 1.7;
@@ -1643,7 +1719,9 @@ details.faq[open] .faq-ico { transform: rotate(180deg); }
     text-underline-offset: 2px;
   }
 
-  .doc-prose a:hover { text-decoration-thickness: 2px; }
+  @media (hover: hover) {
+    .doc-prose a:hover { text-decoration-thickness: 2px; }
+  }
 
   .doc-prose strong {
     color: rgb(var(--dz-c-slate-200));
@@ -1780,9 +1858,6 @@ select option:checked {
 }
 
 
-/* .page-btn/.page-btn:hover moved to styles/routes/filters.css (Tier 1, shared by both routes). */
-
-/* Skeleton shimmer (listing load transition) */
 .skeleton {
   position: relative;
   overflow: hidden;
@@ -1867,7 +1942,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 }
 
 
-/* OTP box styles — global (used on signin, signup, staff-login, list-property) */
 .otp-container {
   display: flex;
   gap: 10px;
@@ -1913,11 +1987,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   box-shadow: 0 0 0 3px rgb(var(--dz-c-red-500) / .15);
 }
 
-/* .auth-page OTP button + role chips + mobile edge-lit theme moved to styles/routes/auth.css (Tier 1). */
-
-/* .page-btn.active moved to styles/routes/filters.css; .badge-* moved to styles/routes/listings.css (Tier 1). */
-
-/* List view card (redesigned row) — ported from listings.html */
 .list-card { display: block; }
 
 .list-card .lr {
@@ -1978,7 +2047,9 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   white-space: nowrap;
 }
 
-.list-card:hover .lr-cta { gap: 7px; }
+@media (hover: hover) {
+  .list-card:hover .lr-cta { gap: 7px; }
+}
 
 @media (max-width: 768px) {
   .list-card .lr { flex-direction: column; }
@@ -2004,7 +2075,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   }
 }
 
-/* ===== Property page ===== */
 .transition-smooth { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
 .fade-in {
@@ -2023,6 +2093,8 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  /* The light theme's hairline stroke takes `color`, not the fill, so it would outline the gradient in ink. */
+  -webkit-text-stroke-width: 0;
 }
 
 .main-image-wrapper {
@@ -2175,8 +2247,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-/* → moved to styles/components/buttons.css (Tier 0 — shared, loaded from main.jsx) */
-
 .icon-btn {
   width: 48px;
   height: 48px;
@@ -2326,7 +2396,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   .dz-stat-social { display: contents; }
 }
 
-/* Property lightbox & virtual tour modal (ported from property.html) */
 .dz-lightbox {
   position: fixed;
   inset: 0;
@@ -2421,7 +2490,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   }
 }
 
-/* Property insight bars, rent-detail cells, modals, sticky CTA */
 .insight-bar {
   height: 8px;
   border-radius: 9999px;
@@ -2520,7 +2588,7 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 .dz-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: 1500;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2564,32 +2632,27 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 }
 
 /* Every consumer overlay shares .dz-modal-backdrop/.dz-modal, so this one block turns all centred dialogs
-   into bottom sheets. */
+   into floating cards above the bottom nav. */
 @media (max-width: 639.98px) {
   .dz-modal-backdrop {
     align-items: flex-end;
-    padding: 0;
+    padding: var(--dz-float-top) var(--dz-float-edge) var(--dz-float-bottom);
+    background: var(--dz-float-scrim);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
   }
 
   .dz-modal {
     max-width: none;
-    max-height: 88dvh;
-    /* Square off the edge that now meets the screen bottom. */
-    border-radius: 1.25rem 1.25rem 0 0;
-    border-bottom: 0;
-    padding: 0.75rem 1rem calc(1.25rem + var(--dz-safe-b));
-    animation: dzSheetUp 0.24s cubic-bezier(0.32, 0.72, 0, 1);
-  }
-
-  /* Grab handle: the platform signal that a surface is a dismissible sheet. */
-  .dz-modal::before {
-    content: '';
-    display: block;
-    width: 2.25rem;
-    height: 0.25rem;
-    margin: 0 auto 0.75rem;
-    border-radius: 9999px;
-    background: rgb(var(--dz-c-white) / 0.18);
+    max-height: 100%;
+    border: 0;
+    border-radius: var(--dz-float-radius);
+    background: var(--dz-float-bg);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: var(--dz-float-shadow);
+    padding: 1rem;
+    animation: dzFloatIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   /* 36px close button fails the touch minimum; grow the hit area, not the glyph. */
@@ -2597,12 +2660,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
     width: 44px;
     height: 44px;
   }
-}
-
-@keyframes dzSheetUp {
-  from { transform: translateY(100%); }
-
-  to { transform: none; }
 }
 
 .dz-sticky-cta {
@@ -2657,8 +2714,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   }
 }
 
-/* ===== Owner page ===== */
-/* Surfaces moved to styles/components/surfaces.css (Tier 0, loaded from main.jsx). */
 
 .prop-row {
   background: rgb(var(--dz-c-white) / .04);
@@ -2685,8 +2740,10 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   transition: transform .15s;
 }
 
-.star-pick i:hover,
-.star-pick button:hover { transform: scale(1.2); }
+@media (hover: hover) {
+  .star-pick i:hover,
+  .star-pick button:hover { transform: scale(1.2); }
+}
 
 /* Tailwind's preflight sets `color: inherit` on form elements, so a `.field` with no colour utility renders
    white on white. Emitted from @layer components so the ~35 fields bringing their own utilities still win. */
@@ -2704,7 +2761,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   outline: none;
 }
 
-/* Shared inline validation (React port of validation.js PNValidate) */
 .dz-invalid,
 .dz-invalid:focus {
   border-color: rgb(var(--dz-c-red-400)) !important;
@@ -2713,7 +2769,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 
 .dz-shake { animation: dzShake .38s ease; }
 
-/* One-place styling for the inline required-field message (FieldError component). */
 .dz-field-error {
   color: rgb(var(--dz-c-red-400));
   font-size: .75rem;
@@ -2740,7 +2795,9 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   transition: all .2s ease;
 }
 
-.ro-opt:hover { background: rgb(var(--dz-c-white) / .04); }
+@media (hover: hover) {
+  .ro-opt:hover { background: rgb(var(--dz-c-white) / .04); }
+}
 
 .ro-opt.sel {
   border-color: rgb(var(--dz-c-rose-500) / .5);
@@ -2756,9 +2813,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   box-shadow: inset 0 0 0 3px rgb(var(--dz-c-ink-2));
 }
 
-/* Route-only styles live in styles/routes/{compare,services-hub,list-property}.css. */
-
-/* ===== Service landing pages ===== */
 .svc {
   background: rgb(var(--dz-c-white) / .04);
   border: 1px solid rgb(var(--dz-c-white) / calc(.06 * var(--dz-line-boost)));
@@ -2806,9 +2860,11 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 
 .svc-quote .dz-dropdown__value.is-placeholder { color: rgb(var(--dz-c-gray-400)); }
 
-.svc-quote .dz-dropdown__trigger:hover {
-  background: rgb(var(--dz-c-slate-950) / .62);
-  border-color: rgb(var(--dz-c-white) / calc(.24 * var(--dz-line-boost)));
+@media (hover: hover) {
+  .svc-quote .dz-dropdown__trigger:hover {
+    background: rgb(var(--dz-c-slate-950) / .62);
+    border-color: rgb(var(--dz-c-white) / calc(.24 * var(--dz-line-boost)));
+  }
 }
 
 .svc-quote .dz-dropdown.is-open>.dz-dropdown__trigger {
@@ -2816,7 +2872,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   box-shadow: 0 0 0 3px rgb(var(--dz-c-teal-500) / .15);
 }
 
-/* Interior page: image tiles + before/after slider */
 .tile {
   cursor: pointer;
   transition: transform .35s cubic-bezier(.4, 0, .2, 1), box-shadow .35s;
@@ -2890,7 +2945,10 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 .ba-tag {
   position: absolute;
   top: 12px;
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  height: var(--dz-tag-h);
+  padding: 0 10px;
   border-radius: 999px;
   font-size: 11px;
   font-weight: 600;
@@ -2898,8 +2956,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   backdrop-filter: blur(4px);
 }
 
-/* → moved to styles/routes/rent-agreement.css (loaded with its route chunk) */
-/* Notifications page */
 .notif {
   background: rgb(var(--dz-c-white) / .04);
   border: 1px solid rgb(var(--dz-c-white) / calc(.06 * var(--dz-line-boost)));
@@ -2956,7 +3012,6 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
   box-shadow: 0 2px 10px rgb(var(--dz-c-teal-500) / .25);
 }
 
-/* Plans / Refer pages */
 .plan-pop {
   border-color: rgb(var(--dz-c-teal-500) / .5) !important;
   box-shadow: 0 0 40px rgb(var(--dz-c-teal-500) / .12);
@@ -2969,7 +3024,6 @@ details>summary::-webkit-details-marker { display: none; }
 details[open] .faq-chevron { transform: rotate(180deg); }
 
 
-/* Tenant profile + Checkout */
 .fld {
   width: 100%;
   border-radius: .6rem;
@@ -3001,14 +3055,15 @@ label.lbl {
   transition: all .2s;
 }
 
-.method:hover { border-color: rgb(var(--dz-c-white) / .2); }
+@media (hover: hover) {
+  .method:hover { border-color: rgb(var(--dz-c-white) / .2); }
+}
 
 .method.active {
   border-color: rgb(var(--dz-c-teal-500) / .6);
   background: rgb(var(--dz-c-teal-500) / .12);
 }
 
-/* Schedule-visit picks */
 .pick {
   border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
   background: rgb(var(--dz-c-white) / .03);
@@ -3028,7 +3083,6 @@ label.lbl {
   box-shadow: 0 0 0 3px rgb(var(--dz-c-teal-500) / .12);
 }
 
-/* Society page */
 .soc-page .tag {
   font-size: 11px;
   font-weight: 600;
@@ -3044,7 +3098,6 @@ label.lbl {
 
 .soc-page .star { color: rgb(var(--dz-c-amber-500)); }
 
-/* → moved to styles/routes/reels.css (loaded with its route chunk) */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -3056,10 +3109,7 @@ label.lbl {
   white-space: nowrap;
   border: 0;
 }
-/* → moved to styles/routes/reels.css (loaded with its route chunk) */
-/* Saved / shortlist page moved to styles/routes/saved.css (Tier 1). */
 
-/* Pay rent tabs */
 .tabbtn {
   padding: .6rem 1rem;
   border-radius: .75rem;
@@ -3073,7 +3123,6 @@ label.lbl {
   color: rgb(var(--dz-c-teal-300));
 }
 
-/* Property-detail section tabs — left-aligned underline style */
 .dz-detail-tab {
   display: inline-flex;
   align-items: center;
@@ -3098,7 +3147,6 @@ label.lbl {
   border-bottom-color: var(--teal-2);
 }
 
-/* Option info tooltips (<Tip/>) — hover/focus/tap a tile to learn what it means */
 [data-tip] { cursor: help; }
 
 [data-tip]:focus-visible {
@@ -3150,9 +3198,6 @@ label.lbl {
   .dz-tip { animation: none; }
 }
 
-/* Locality insights page moved to styles/routes/locality.css (Tier 1). */
-
-/* Route-only map styles live in styles/routes/{property-map,flatmates}.css. */
 /* AdvancedMarkers reuse the .price-marker / .map-pin DOM above, so only Google's default
    InfoWindow chrome is stripped here, to let our dark popup cards fill it edge-to-edge. */
 .gm-style .gm-style-iw.gm-style-iw-c {
@@ -3181,9 +3226,6 @@ label.lbl {
    stripped here. mapTypeControl / streetViewControl are honoured via <Map> props. */
 .gm-style .gm-fullscreen-control { display: none !important; }
 
-/* View-documents secure viewer moved to styles/routes/view-documents.css (Tier 1). */
-
-/* Route-only chat styles live in styles/routes/messages.css. */
 /* Mobile: Messages is a native, full-screen chat - drop the marketing footer and floating
    assistant, run edge-to-edge, and fill the viewport so the composer pins to the screen bottom. */
 @media (max-width: 767px) {
@@ -3218,8 +3260,6 @@ label.lbl {
   .messages-page .pc-msgs { padding: 14px 14px 6px; }
 }
 
-/* → moved to styles/routes/flatmates.css (loaded with its route chunk) */
-
 .sf-modal {
   position: fixed;
   inset: 0;
@@ -3235,6 +3275,29 @@ label.lbl {
   /* This element is the scroller, and it is modal: reaching the end of the form must not hand the
      gesture to the results page behind it. Same rule .filter-panel carries. */
   overscroll-behavior: contain;
+}
+
+@media (max-width: 639.98px) {
+  .sf-modal {
+    align-items: flex-end;
+    padding: var(--dz-float-top) var(--dz-float-edge) var(--dz-float-bottom);
+    background: var(--dz-float-scrim);
+    backdrop-filter: none;
+    overflow: hidden;
+  }
+
+  .sf-modal > [role="dialog"] {
+    max-height: 100%;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: var(--dz-float-radius);
+    background: var(--dz-float-bg);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: var(--dz-float-shadow);
+    animation: dzFloatIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
+  }
 }
 
 .map-pin {
@@ -3254,7 +3317,6 @@ label.lbl {
   cursor: pointer;
 }
 
-/* .dz-btn / .dz-btn-* are folded into the button system above; only the input helper remains. */
 .dz-input {
   width: 100%;
   height: var(--control-h);
@@ -3283,36 +3345,31 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
   background: var(--glass);
 }
 
-/* Modal panel — solid dark bg so content is always readable over any page */
 .dz-modal-panel {
   background: rgb(var(--dz-c-ink-card));
   box-shadow: 0 24px 80px rgb(var(--dz-c-black) / 0.6), 0 0 0 1px rgb(var(--dz-c-white) / 0.06) inset;
 }
 
-/* Sheet affordance for the shared <Modal> below 640px. Layout is handled by Tailwind classes in
-   Modal.jsx; this only adds the grab handle and the slide-up, both mobile-only. */
+/* The shared <Modal> below 640px; its position comes from Modal.jsx utilities built on the --dz-float-* tokens. */
 @media (max-width: 639.98px) {
-  .dz-modal-sheet { animation: dzSheetUp 0.24s cubic-bezier(0.32, 0.72, 0, 1); }
-
-  .dz-modal-sheet::before {
-    content: '';
-    flex: 0 0 auto;
-    width: 2.25rem;
-    height: 0.25rem;
-    margin: 0.5rem auto 0;
-    border-radius: 9999px;
-    background: rgb(var(--dz-c-white) / 0.18);
+  .dz-modal-sheet {
+    border: 0;
+    background: var(--dz-float-bg);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: var(--dz-float-shadow);
+    animation: dzFloatIn 0.24s cubic-bezier(0.32, 0.72, 0, 1);
   }
+
+  .dz-float-scrim { background: var(--dz-float-scrim); }
 }
 
-/* ===== Reduced motion: cut decorative animation, keep the half that reports state ===== */
 @media (prefers-reduced-motion: reduce) {
 
-  /* Sheets: keep the position change, drop the slide-up */
   .dz-modal,
-  .dz-modal-sheet { animation: none; }
+  .dz-modal-sheet,
+  .sf-modal > [role="dialog"] { animation: none; }
 
-  /* Hero */
   .hero-bg { animation: none; }
 
   .shape,
@@ -3335,7 +3392,6 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
 
   .ticker-ping { animation: none; }
 
-  /* Cards & interactions */
   .heart-pop { animation: none; }
 
   .property-card,
@@ -3343,10 +3399,11 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
 
   .card-img-wrap img { transition: none; }
 
-  .property-card:hover,
-  .cat-card:hover { transform: none; }
+  @media (hover: hover) {
+    .property-card:hover,
+    .cat-card:hover { transform: none; }
+  }
 
-  /* CTA floating shapes */
   [class*="ctaFloat"],
   [class*="cta-float"],
   .animate-pulse,
@@ -3354,23 +3411,19 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
     animation: none !important;
   }
 
-  /* Scroll reveal — show immediately */
   .reveal {
     opacity: 1;
     transform: none;
     transition: none;
   }
 
-  /* Listings stagger */
   .list-reveal {
     animation: none;
     opacity: 1;
   }
 
-  /* Services card pop */
   .svc-pop { animation: none; }
 
-  /* General transitions — keep colors but disable motion */
   .t-all { transition: color 0.2s, background-color 0.2s, border-color 0.2s; }
 }
 
@@ -3408,8 +3461,10 @@ html.dz-reduce-motion .property-card,
 html.dz-reduce-motion .cat-card,
 html.dz-reduce-motion .card-img-wrap img { transition: none; }
 
-html.dz-reduce-motion .property-card:hover,
-html.dz-reduce-motion .cat-card:hover { transform: none; }
+@media (hover: hover) {
+  html.dz-reduce-motion .property-card:hover,
+  html.dz-reduce-motion .cat-card:hover { transform: none; }
+}
 
 html.dz-reduce-motion .reveal {
   opacity: 1;
@@ -3422,9 +3477,6 @@ html.dz-reduce-motion .list-reveal {
   opacity: 1;
 }
 
-/* ===== View Transitions (React Router v7) ===== */
-
-/* Default cross-fade for route changes — fast and subtle */
 ::view-transition-old(root) { animation: 150ms ease-out both fade-out; }
 
 ::view-transition-new(root) { animation: 200ms ease-in both fade-in; }
@@ -3448,7 +3500,6 @@ html.dz-reduce-motion .list-reveal {
 /* Keep the image visible during transition (no fade, just morph position/size) */
 ::view-transition-image-pair(property-hero-*) { isolation: auto; }
 
-/* Respect reduced motion */
 @media (prefers-reduced-motion: reduce) {
 
   ::view-transition-old(root),
@@ -3456,7 +3507,6 @@ html.dz-reduce-motion .list-reveal {
 }
 
 /* The .price-marker.is-active rule below intentionally stays here: it is not .dz-mdp-scoped. */
-/* Active marker highlight on the map */
 .price-marker.is-active {
   background: rgb(var(--dz-c-pure-white));
   color: rgb(var(--dz-c-emerald-950));
@@ -3478,25 +3528,18 @@ html.dz-reduce-motion .list-reveal {
 
   .consumer-main :is(h1, h2, h3).text-7xl { font-size: 3.6rem; }
 
-  /* 4.5  -> 3.6  */
   .consumer-main :is(h1, h2, h3).text-6xl { font-size: 3rem; }
 
-  /* 3.75 -> 3.0  */
   .consumer-main :is(h1, h2, h3).text-5xl { font-size: 2.4rem; }
 
-  /* 3.0  -> 2.4  */
   .consumer-main :is(h1, h2, h3).text-4xl { font-size: 1.8rem; }
 
-  /* 2.25 -> 1.8  */
   .consumer-main :is(h1, h2, h3).text-3xl { font-size: 1.5rem; }
 
-  /* 1.875 -> 1.5 */
   .consumer-main :is(h1, h2, h3).text-2xl { font-size: 1.2rem; }
 
-  /* 1.5  -> 1.2  */
   .consumer-main :is(h1, h2, h3).text-xl { font-size: 1rem; }
 
-  /* 1.25 -> 1.0  */
 }
 
 /* Touch browsers zoom into any editable field under 16px on focus, forcing a pinch back out.
@@ -3511,7 +3554,6 @@ html.dz-reduce-motion .list-reveal {
 /* useKeyboardOpen: the soft keyboard is up, so bottom-pinned chrome would sit on top of the field being typed in. */
 .dz-kbd-open [data-kbd-hide] { display: none !important; }
 html[data-scroll-locked] .dz-assistant-layer:not(.dz-assistant-layer--open) { display: none !important; }
-/* ===== Mobile bottom-chrome consumers (see the --dz-bottom-inset block near the top) ===== */
 
 /* Appended to <body>, so it cannot read the inset .has-bottom-nav sets on the layout wrapper and
    rebuilds it from the same tokens. Rung 90: it reports state, so it must not outrank a dialog. */

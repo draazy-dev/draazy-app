@@ -8,10 +8,17 @@ const TRAILING_UUID = new RegExp(`(?:^|-)(${UUID})$`, 'i');
 
 const words = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-export const bhkLabel = (bhk) => (bhk == null || bhk === '' ? '' : Number(bhk) === 0 ? '1 RK' : `${Number(bhk)} BHK`);
+const NO_BHK_TYPE = /commercial|office|shop|showroom|retail|warehouse|godown|industrial|co-?working|plot|land/i;
+
+/** The one BHK/RK label. Commercial, plot and farm-land types never get one, whatever an old row stored in `bhk`. */
+export const bhkLabel = (bhk, type) => {
+  if (bhk == null || bhk === '' || NO_BHK_TYPE.test(String(type ?? ''))) return '';
+  const n = Number(bhk);
+  return n === 0 ? '1 RK' : n >= 5 ? '5+ BHK' : `${n} BHK`;
+};
 
 export function listingTitle({ bhk, type, deal, locality }) {
-  return [bhkLabel(bhk), type || 'Property', 'for', deal === 'rent' ? 'Rent' : 'Sale', 'in', locality]
+  return [bhkLabel(bhk, type), type || 'Property', 'for', deal === 'rent' ? 'Rent' : 'Sale', 'in', locality]
     .filter(Boolean).join(' ');
 }
 
@@ -37,7 +44,7 @@ export function listingHead(l) {
 export function propertyPath({ id, slug, bhk, type, deal, locality }) {
   if (slug) return `/property/${slug}`;
   if (!BARE_UUID.test(String(id))) return `/property/${id}`;
-  const name = words([bhkLabel(bhk), type || 'property', 'for', deal === 'rent' ? 'rent' : 'sale', locality].filter(Boolean).join(' '));
+  const name = words([bhkLabel(bhk, type), type || 'property', 'for', deal === 'rent' ? 'rent' : 'sale', locality].filter(Boolean).join(' '));
   return `/property/${name}-${String(id).toLowerCase()}`;
 }
 

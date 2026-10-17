@@ -171,22 +171,17 @@ export const PROPERTY_TYPES = [
   { value: 'farmland', label: 'Farm Land' },
 ];
 
-/* Co-working is absent because it is transacted per seat per month and this wizard collects one
- * lump rent. */
 export const COMMERCIAL_SUBTYPES = [
   { value: 'office', label: 'Office Space' },
+  { value: 'coworking', label: 'Co-working Space' },
   { value: 'shop', label: 'Shop / Showroom' },
   { value: 'retail', label: 'Retail / Mall Unit' },
   { value: 'warehouse', label: 'Warehouse / Godown' },
   { value: 'industrial', label: 'Industrial / Factory' },
 ];
 
-const RETIRED_COMMERCIAL_SUBTYPES = [{ value: 'coworking', label: 'Co-working Space' }];
-export const commercialSubtypeOptions = (current) => {
-  const retired = RETIRED_COMMERCIAL_SUBTYPES.find((s) => s.value === current);
-  return retired ? [...COMMERCIAL_SUBTYPES, retired] : COMMERCIAL_SUBTYPES;
-};
-export const commercialLabelOf = (value) => commercialSubtypeOptions(value).find((s) => s.value === value)?.label || '';
+export const commercialSubtypeOptions = () => COMMERCIAL_SUBTYPES;
+export const commercialLabelOf = (value) => COMMERCIAL_SUBTYPES.find((s) => s.value === value)?.label || '';
 
 export const TYPE_CONFIG = {
   flat: { group: 'residential', house: false },
@@ -201,6 +196,7 @@ export const groupOf = (t) => TYPE_CONFIG[t]?.group || 'residential';
 export const isResidentialType = (t) => groupOf(t) === 'residential';
 export const isCommercialType = (t) => groupOf(t) === 'commercial';
 export const isLandType = (t) => groupOf(t) === 'land';
+export const copyContextOf = (t) => (isLandType(t) ? 'land' : isCommercialType(t) ? 'space' : undefined);
 export const isHouseType = (t) => !!TYPE_CONFIG[t]?.house;
 
 /* The flatmate wizard's home-type pills, as one `[propertyType, label]` list because the two are halves of a single

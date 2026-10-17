@@ -1,8 +1,6 @@
 /* Shared chrome (Tier 1) for the filter sheet and result tiles, imported by BOTH /listings and
    /flatmates so the two search surfaces read as one. Listings-only rules belong in routes/listings.css. */
 
-/* --- DualRange ------------------------------------------------------------ */
-
 /* Horizontal breathing room so the range thumbs at 0%/100% aren't clipped
    by the sidebar's overflow-y (which computes overflow-x to auto). */
 .rng-wrap {
@@ -147,8 +145,6 @@
   }
 }
 
-/* --- Checkbox / radio marks ----------------------------------------------- */
-
 .custom-cb {
   display: none;
 }
@@ -264,8 +260,6 @@
   transform: translateY(-50%) scale(1);
 }
 
-/* --- Collapsible filter groups -------------------------------------------- */
-
 .fg-header {
   cursor: pointer;
   user-select: none;
@@ -331,8 +325,6 @@
   contain: layout size;
 }
 
-/* --- The flatmates filter sheet ------------------------------------------- */
-
 /* Flatmates renders its groups from one conditional list, so a rendered <Divider /> would leave a
    stray hairline above the footer; the adjacent-sibling rule holds for any subset of groups. */
 .sf-filter-sheet .filter-group+.filter-group {
@@ -341,7 +333,6 @@
   border-top: 1px solid rgb(var(--dz-c-white) / calc(0.05 * var(--dz-line-boost)));
 }
 
-/* --- Pager ---------------------------------------------------------------- */
 /* components/ui/Pager.jsx, rendered by both routes. Lives here rather than listings.css because
    that file loads with the /listings chunk only, so the flatmates pager would paint unstyled. */
 .page-btn {
@@ -357,9 +348,11 @@
   cursor: pointer;
 }
 
-.page-btn:hover {
-  background: rgb(var(--dz-c-indigo-600) / 0.2);
-  color: rgb(var(--dz-c-white));
+@media (hover: hover) {
+  .page-btn:hover {
+    background: rgb(var(--dz-c-indigo-600) / 0.2);
+    color: rgb(var(--dz-c-white));
+  }
 }
 
 /* Every pager button sits beside another fingertip target, and landing on "3" when you meant "4"

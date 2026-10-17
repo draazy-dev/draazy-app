@@ -24,7 +24,6 @@ const enLazyModules = import.meta.glob('./locales/en/*.json');
 
 const inflight = new Map();
 
-/** Ensure the given English namespaces are in the i18next store. */
 export function loadNamespaces(namespaces) {
   const pending = [];
   for (const ns of namespaces) {
@@ -36,11 +35,13 @@ export function loadNamespaces(namespaces) {
         console.error(`[i18n] Unknown locale namespace "${ns}" — no locales/en/${ns}.json.`);
         continue;
       }
-      promise = importer()
-        .then((mod) => {
-          // Deep merge, overwriting: namespaces may share a top-level key.
-          i18n.addResourceBundle('en', 'translation', mod.default || mod, true, true);
-        })
+      const load = () => importer().then((mod) => {
+        // Deep merge, overwriting: namespaces may share a top-level key.
+        i18n.addResourceBundle('en', 'translation', mod.default || mod, true, true);
+      });
+      // One retry: a single failed fetch otherwise leaves the page on raw keys until reload.
+      promise = load()
+        .catch(load)
         .catch((err) => {
           console.error(`[i18n] Failed to load locale namespace "${ns}"`, err);
           inflight.delete(ns);
@@ -60,6 +61,7 @@ i18n
     fallbackLng: 'en',
     interpolation: { escapeValue: false },
     returnEmptyString: false,
+    react: { bindI18nStore: 'added' },
   });
 
 export default i18n;

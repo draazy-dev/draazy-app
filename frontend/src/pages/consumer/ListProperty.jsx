@@ -6,6 +6,7 @@ import '../../styles/routes/list-property.css';
 import useListProperty from './list-property/useListProperty';
 import ListPropertyModals from './list-property/ListPropertyModals';
 import ProgressMeter from './list-property/ProgressMeter.jsx';
+import { copyContextOf } from './list-property/constants.js';
 import StepNav, { LISTING_STEPS } from './list-property/StepNav.jsx';
 import EditPolicyBanner from './list-property/EditPolicyBanner.jsx';
 import PropertyDetailsStep from './list-property/PropertyDetailsStep.jsx';
@@ -148,6 +149,7 @@ const ListPropertyForm = () => {
           done={progressState.done}
           total={progressState.total}
           nudge={progressState.nudge}
+          context={copyContextOf(form.propertyType)}
         />
 
         {listingLimit != null && !editId && !isFlatmateMode && (

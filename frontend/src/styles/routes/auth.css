@@ -1,6 +1,6 @@
-/* Auth pages (sign in / sign up / staff login): split-screen OTP login. Tier 1, imported from components/auth/AuthShell.jsx. Ported verbatim from index.css, where it sat under the "Listings page" heading. NOTE: the .otp-* box styles stay global in index.css \u2014 OtpBoxes.jsx is shared with list-property, not just auth. */
+/* Auth pages: split-screen OTP login. The .otp-* box styles stay global in index.css:
+   OtpBoxes.jsx is shared with list-property. */
 
-/* ── Auth pages (sign in / sign up): split-screen OTP login (ports signin/signup.html) ── */
 /* The left half is painted over by .auth-left; this gradient only shows through the right (form) column. */
 .auth-page {
   position: relative;
@@ -157,10 +157,12 @@
   transition: all .3s cubic-bezier(.4, 0, .2, 1);
 }
 
-.auth-page .send-otp-btn:hover:not(:disabled) {
-  background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .25), rgb(var(--dz-c-indigo-600) / .25));
-  border-color: rgb(var(--dz-c-teal-500) / .5);
-  transform: translateY(-1px);
+@media (hover: hover) {
+  .auth-page .send-otp-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .25), rgb(var(--dz-c-indigo-600) / .25));
+    border-color: rgb(var(--dz-c-teal-500) / .5);
+    transform: translateY(-1px);
+  }
 }
 
 .auth-page .send-otp-btn:disabled {
@@ -175,9 +177,11 @@
   background: rgb(var(--dz-c-white) / .03);
 }
 
-.auth-page .role-chip:hover {
-  border-color: rgb(var(--dz-c-teal-500) / .4);
-  background: rgb(var(--dz-c-teal-500) / .06);
+@media (hover: hover) {
+  .auth-page .role-chip:hover {
+    border-color: rgb(var(--dz-c-teal-500) / .4);
+    background: rgb(var(--dz-c-teal-500) / .06);
+  }
 }
 
 .auth-page .role-chip.selected {

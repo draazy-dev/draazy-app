@@ -1,7 +1,4 @@
-/* Formatting + small helpers shared across the app (ports AdminUI.esc/fmtINR/fmtNum). */
-
-/** Parse a price/amount string ("₹25,000/mo") into an integer. */
-export const parseAmount = (s) => parseInt(String(s == null ? '' : s).replace(/[^\d]/g, ''), 10) || 0;
+export const parseAmount = (s) => Math.round(parseFloat(String(s == null ? '' : s).replace(/[^\d.]/g, ''))) || 0;
 
 export function isoToDisplay(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || '').trim());

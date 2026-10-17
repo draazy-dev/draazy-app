@@ -10,8 +10,10 @@ import { ADDRESS_PARTS, hasStoredAddress } from '../../../lib/listingFormDetails
 import { createRoom, updateRoom } from '../../../services/flatmateService.js';
 import { canSplitIntoRooms } from '../../../lib/data/flatSplit.js';
 import { loadWizardQuota } from '../../../lib/data/listingQuota.js';
-import { formatIndian } from './format.js';
+import { formatMoneyInput } from './format.js';
+import { toMoney, roundMoney } from './sanitize.js';
 import { haptic } from '../../../lib/haptics.js';
+import { SESSION_ENDED_EVENT } from '../../../services/http.js';
 import {
   isResidentialType, isLandType, isCommercialType, isHouseType, COMMERCIAL_SPEC_KEYS,
   leaseKindOf, LEASE_DEFAULTS, defaultAreaUnitFor, FLOOR_PLAN_CATEGORY, photoCategoriesFor,
@@ -147,6 +149,7 @@ export default function useListProperty() {
   const ownerId = ownerDraftId(user);
   const initialOwnerId = useRef(ownerId);
   const previousOwnerId = useRef(ownerId);
+  const expiredOwnerId = useRef('');
   const signedIn = !!ownerId;
   const draftEnabled = !editId && !editRoomId && !authLoading;
   const writeStepParam = useCallback((step, { replace = false, pushedFrom } = {}) => {
@@ -200,6 +203,7 @@ export default function useListProperty() {
       }
       return;
     }
+    if (field === 'totalFloors' && errors.floor === 'aboveTotal') setErrors(({ floor: _floor, ...rest }) => rest);
     set(field, value);
   };
 
@@ -242,11 +246,20 @@ export default function useListProperty() {
     omit: ['agreementDeclared', 'agreementDoc', 'hostRole', 'ownerConsentMobile', 'ownerConsent'],
     onRestore: restoreDraftExtras,
   });
+  useEffect(() => {
+    const onEnded = () => { expiredOwnerId.current = previousOwnerId.current; };
+    window.addEventListener(SESSION_ENDED_EVENT, onEnded);
+    return () => window.removeEventListener(SESSION_ENDED_EVENT, onEnded);
+  }, []);
   useLayoutEffect(() => {
     const previous = previousOwnerId.current;
     if (previous === ownerId) return;
     previousOwnerId.current = ownerId;
-    if (!previous) return;
+    const expired = expiredOwnerId.current;
+    if (ownerId) expiredOwnerId.current = '';
+    /* An expired session keeps the listing for the same owner signing back in. */
+    if (expired && (!ownerId || ownerId === expired)) return;
+    if (!previous && !expired) return;
     dupSeq.current += 1;
     discardFormDraft();
     media.resetMedia();
@@ -542,8 +555,9 @@ export default function useListProperty() {
   const isHouse = () => isHouseType(form.propertyType);
 
   const money = (field) => ({
-    value: formatIndian(form[field]),
-    onChange: (e) => set(field, e.target.value.replace(/\D/g, '')),
+    value: formatMoneyInput(form[field]),
+    onChange: (e) => set(field, toMoney(e.target.value)),
+    onBlur: (e) => set(field, roundMoney(toMoney(e.target.value))),
   });
   const setDepositMonths = (months) => {
     const rent = parseAmount(form.monthlyRent);
@@ -620,7 +634,10 @@ export default function useListProperty() {
           if (!mine.found) { advance(); return; }
           setDupExistingId(mine.existingId || '');
           setShowDupGuard(true);
-        }, () => { if (stillHere()) advance(); })
+        }, (error) => {
+          if (!stillHere()) return;
+          if (error?.status === 401) requestAuthPrompt(); else advance();
+        })
         .catch(() => {})
         .finally(() => setDupPending(false));
       return;
@@ -660,6 +677,7 @@ export default function useListProperty() {
       return;
     }
     if (res && res.ok === false) {
+      if (res.unauthenticated) { requestAuthPrompt(); return; }
       if (res.fieldErrors && Object.keys(res.fieldErrors).length) {
         const fieldErrors = res.fieldErrors;
         const step = Math.max(1, Math.min(res.fieldErrorStep || currentStep, lastStep));
@@ -718,7 +736,10 @@ export default function useListProperty() {
 
     setPosting(true);
     finalizeListing()
-      .catch(() => toast('Could not post your listing. Please try again.', 'error'))
+      .catch((error) => {
+        if (error?.status === 401) requestAuthPrompt();
+        else toast('Could not post your listing. Please try again.', 'error');
+      })
       .finally(() => setPosting(false));
   };
 

@@ -1,5 +1,5 @@
-/* dz-mdp map detail drawer (Tier 1 - route CSS, imported from components/property/MapDetailPanel.jsx). Moved from index.css. Non-.dz-mdp rules (.price-marker.is-active) stay in index.css. */
-/* ===== Map detail drawer (stay-on-map master–detail) ===== */
+/* Map detail drawer (stay-on-map master–detail), Tier 1 route CSS imported by MapDetailPanel.jsx.
+   Its non-.dz-mdp rule (.price-marker.is-active) lives in index.css. */
 .dz-mdp {
   position: fixed;
   z-index: 150;
@@ -24,18 +24,20 @@
   }
 }
 
-/* Mobile: bottom sheet */
+/* Mobile: floating card (--dz-float-* tokens in index.css) */
 @media (max-width: 767px) {
   .dz-mdp {
-    left: 0;
-    right: 0;
-    bottom: 0;
-    /* dvh, not vh: `vh` is the viewport with the URL bar collapsed, so with the bar showing the
-       sheet is 86% of a box taller than the screen and its footer action is cut off. */
-    max-height: 86dvh;
-    border-radius: 20px 20px 0 0;
-    border-bottom: none;
-    animation: dzMdpUp 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+    left: var(--dz-float-edge);
+    right: var(--dz-float-edge);
+    bottom: var(--dz-float-bottom);
+    max-height: calc(100dvh - var(--dz-float-top) - var(--dz-float-bottom));
+    border: 0;
+    border-radius: var(--dz-float-radius);
+    background: var(--dz-float-bg);
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    box-shadow: var(--dz-float-shadow);
+    animation: dzFloatIn 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
 
@@ -51,33 +53,7 @@
   }
 }
 
-@keyframes dzMdpUp {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-.dz-mdp-grip {
-  display: none;
-}
-
 @media (max-width: 767px) {
-  .dz-mdp-grip {
-    display: block;
-    width: 40px;
-    height: 4px;
-    border-radius: 999px;
-    background: rgb(var(--dz-c-white) / 0.22);
-    margin: 8px auto 2px;
-    flex: none;
-  }
-
   /* A one-finger drag in the fixed sheet must move the sheet or nothing, never the page behind;
      `pinch-zoom` not `none` so the price and address stay magnifiable. */
   .dz-mdp { touch-action: pinch-zoom; }
@@ -123,8 +99,10 @@
   transition: background 0.15s ease;
 }
 
-.dz-mdp-step button:hover:not(:disabled) {
-  background: rgb(var(--dz-c-teal-600) / 0.22);
+@media (hover: hover) {
+  .dz-mdp-step button:hover:not(:disabled) {
+    background: rgb(var(--dz-c-teal-600) / 0.22);
+  }
 }
 
 .dz-mdp-step button:disabled {
@@ -151,8 +129,10 @@
   transition: background 0.15s ease;
 }
 
-.dz-mdp-close:hover {
-  background: rgb(var(--dz-c-white) / 0.14);
+@media (hover: hover) {
+  .dz-mdp-close:hover {
+    background: rgb(var(--dz-c-white) / 0.14);
+  }
 }
 
 .dz-mdp-close svg {
@@ -255,8 +235,10 @@
   transition: background 0.15s ease;
 }
 
-.dz-mdp-nav:hover {
-  background: rgb(var(--dz-c-black) / 0.62);
+@media (hover: hover) {
+  .dz-mdp-nav:hover {
+    background: rgb(var(--dz-c-black) / 0.62);
+  }
 }
 
 .dz-mdp-nav.is-prev {
@@ -506,8 +488,10 @@
   border: none;
 }
 
-.dz-mdp-btn.is-primary:hover {
-  filter: brightness(1.06);
+@media (hover: hover) {
+  .dz-mdp-btn.is-primary:hover {
+    filter: brightness(1.06);
+  }
 }
 
 .dz-mdp-btn.is-ghost {
@@ -516,8 +500,10 @@
   border: 1px solid rgb(var(--dz-c-white) / calc(0.12 * var(--dz-line-boost)));
 }
 
-.dz-mdp-btn.is-ghost:hover {
-  background: rgb(var(--dz-c-white) / 0.1);
+@media (hover: hover) {
+  .dz-mdp-btn.is-ghost:hover {
+    background: rgb(var(--dz-c-white) / 0.1);
+  }
 }
 
 .dz-mdp-full {
@@ -534,8 +520,10 @@
   text-decoration: none;
 }
 
-.dz-mdp-full:hover {
-  color: rgb(var(--dz-c-teal-300));
+@media (hover: hover) {
+  .dz-mdp-full:hover {
+    color: rgb(var(--dz-c-teal-300));
+  }
 }
 
 .dz-mdp-full svg {
@@ -544,8 +532,10 @@
   transition: transform 0.2s ease;
 }
 
-.dz-mdp-full:hover svg {
-  transform: translateX(3px);
+@media (hover: hover) {
+  .dz-mdp-full:hover svg {
+    transform: translateX(3px);
+  }
 }
 
 

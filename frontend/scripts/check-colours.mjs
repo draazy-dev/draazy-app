@@ -12,7 +12,7 @@ const ALLOWED = {
   'styles/theme.css': 'the palette itself',
   'components/ui/PoweredByGoogle.jsx': "Google's attribution mark must keep Google's brand colours",
   'lib/localPrefs.js': 'meta theme-color must match the pre-paint script in index.html',
-  'lib/uploads/image.worker.js': 'JPEG matte for transparent uploads, not UI',
+  'lib/uploads/imageProcess.js': 'JPEG matte for transparent uploads, not UI',
   'pages/consumer/list-property/confetti.js': 'canvas-confetti only parses hex',
 };
 

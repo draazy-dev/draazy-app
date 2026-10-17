@@ -2,72 +2,7 @@
 /* A list row carries counts instead of the gallery, description and amenity list. */
 const photosOf = (l) => l.photoCount ?? ((l.gallery && l.gallery.length) || (l.image ? 1 : 0));
 
-export function computeQualityScore(l) {
-  const isRent = l.deal === 'rent';
-  let score = 0;
-
-  // Photos (25 pts)
-  const photoCount = photosOf(l);
-  if (photoCount >= 3) score += 25;
-  else if (photoCount === 2) score += 16;
-  else if (photoCount === 1) score += 8;
-
-  // Description (15 pts). `desc`, not `description`: `propertyMapper` renames the wire's field on
-  // the way in, so reading `description` here scores every listing zero.
-  const descLen = l.descLength ?? (l.desc || '').length;
-  if (descLen >= 200) score += 15;
-  else if (descLen >= 100) score += 12;
-  else if (descLen >= 50) score += 8;
-  else if (descLen > 0) score += 3;
-
-  // Verification / Documents (20 pts)
-  if (isRent) {
-    if (l.ownerVerified) score += 10;
-  } else {
-    if (l.ownershipVerified) score += 10;
-    if (l.docsCount >= 3) score += 10;
-    else if (l.docsCount >= 1) score += 5;
-  }
-
-  // Completeness (25 pts)
-  if (isRent) {
-    if (l.furnishing && l.furnishing !== 'unfurnished') score += 5;
-    else if (l.furnishing) score += 3;
-    if (l.facing) score += 5;
-    if (l.floor) score += 5;
-    // `ageYears` (`propertyMapper.js:334`). There is no `age` on the view model; the wizard writes
-    // one and `toListingCreate` converts it away (`ageToYears`), so it never survives a round trip.
-    if (l.ageYears != null) score += 5;
-    if (l.deposit || l.availableOn || l.availableFrom) score += 5;
-  } else {
-    if (l.furnishing && l.furnishing !== 'unfurnished') score += 4;
-    else if (l.furnishing) score += 2;
-    if (l.facing) score += 4;
-    if (l.floor) score += 4;
-    if (l.ageYears != null) score += 4;
-    if (l.area) score += 4;
-    // `construction` alone: `possession` is the wire's name and the mapper folds it into
-    // `construction` on the way in, so a second operand would never fire.
-    if (l.construction) score += 5;
-  }
-
-  // Amenities (15 pts)
-  const amenityCount = l.amenityCount ?? (l.amenities && l.amenities.length) ?? 0;
-  if (amenityCount >= 5) score += 15;
-  else if (amenityCount >= 3) score += 10;
-  else if (amenityCount >= 1) score += 5;
-
-  return Math.min(score, 100);
-}
-
-export function qualityLabel(score) {
-  if (score >= 80) return 'high';
-  if (score >= 50) return 'medium';
-  return 'low';
-}
-
-/* `label` is kept for any caller that still reads it; `labelKey` is the i18n key
-   for the same band, so a translated surface never has to re-derive the mapping. */
+/* `label` is the English band name for untranslated chips; `labelKey` is the i18n key for the same band. */
 export function qualityColor(score) {
   if (score >= 80) return { ring: 'text-emerald-400', bg: 'bg-emerald-500/15', text: 'text-emerald-300', label: 'Excellent', labelKey: 'ui.qualityExcellent' };
   if (score >= 50) return { ring: 'text-amber-400', bg: 'bg-amber-500/15', text: 'text-amber-300', label: 'Good', labelKey: 'ui.qualityGood' };

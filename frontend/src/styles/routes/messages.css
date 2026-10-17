@@ -129,8 +129,10 @@
   background: transparent;
 }
 
-.pc-conv:hover {
-  background: rgb(var(--dz-c-white) / .04);
+@media (hover: hover) {
+  .pc-conv:hover {
+    background: rgb(var(--dz-c-white) / .04);
+  }
 }
 
 .pc-conv.active {
@@ -346,8 +348,10 @@
   border: none;
 }
 
-.pc-back:hover {
-  background: rgb(var(--dz-c-white) / .06);
+@media (hover: hover) {
+  .pc-back:hover {
+    background: rgb(var(--dz-c-white) / .06);
+  }
 }
 
 .pc-head-av {
@@ -428,9 +432,11 @@
   text-decoration: none;
 }
 
-.pc-hbtn:hover {
-  background: rgb(var(--dz-c-white) / .06);
-  color: rgb(var(--dz-c-teal-400));
+@media (hover: hover) {
+  .pc-hbtn:hover {
+    background: rgb(var(--dz-c-white) / .06);
+    color: rgb(var(--dz-c-teal-400));
+  }
 }
 
 .pc-propchip {
@@ -495,8 +501,10 @@
   white-space: nowrap;
 }
 
-.pc-propchip a:hover {
-  background: rgb(var(--dz-c-white) / .05);
+@media (hover: hover) {
+  .pc-propchip a:hover {
+    background: rgb(var(--dz-c-white) / .05);
+  }
 }
 
 .pc-msgs {
@@ -721,8 +729,10 @@
   gap: 6px;
 }
 
-.pc-btn:hover {
-  background: rgb(var(--dz-c-white) / .05);
+@media (hover: hover) {
+  .pc-btn:hover {
+    background: rgb(var(--dz-c-white) / .05);
+  }
 }
 
 .pc-btn.primary {
@@ -731,8 +741,10 @@
   color: rgb(var(--dz-c-pure-white));
 }
 
-.pc-btn.primary:hover {
-  filter: brightness(1.08);
+@media (hover: hover) {
+  .pc-btn.primary:hover {
+    filter: brightness(1.08);
+  }
 }
 
 .pc-wait {
@@ -768,10 +780,12 @@
   transition: all .18s;
 }
 
-.pc-quick-chip:hover {
-  background: rgb(var(--dz-c-teal-500) / .12);
-  border-color: rgb(var(--dz-c-teal-500) / .4);
-  color: rgb(var(--dz-c-teal-300));
+@media (hover: hover) {
+  .pc-quick-chip:hover {
+    background: rgb(var(--dz-c-teal-500) / .12);
+    border-color: rgb(var(--dz-c-teal-500) / .4);
+    color: rgb(var(--dz-c-teal-300));
+  }
 }
 
 .pc-composer {
@@ -880,9 +894,11 @@
   color: rgb(var(--dz-c-white));
 }
 
-.pc-icon-btn:hover {
-  background: rgb(var(--dz-c-white) / .06);
-  color: rgb(var(--dz-c-teal-400));
+@media (hover: hover) {
+  .pc-icon-btn:hover {
+    background: rgb(var(--dz-c-white) / .06);
+    color: rgb(var(--dz-c-teal-400));
+  }
 }
 
 .pc-send {
@@ -901,8 +917,10 @@
   border: none;
 }
 
-.pc-send:hover {
-  transform: translateY(-1px) scale(1.04);
+@media (hover: hover) {
+  .pc-send:hover {
+    transform: translateY(-1px) scale(1.04);
+  }
 }
 
 .pc-attach-pop {
@@ -933,8 +951,10 @@
   border: none;
 }
 
-.pc-attach-pop button:hover {
-  background: rgb(var(--dz-c-white) / .06);
+@media (hover: hover) {
+  .pc-attach-pop button:hover {
+    background: rgb(var(--dz-c-white) / .06);
+  }
 }
 
 .pc-wrap.is-narrow .pc-list {

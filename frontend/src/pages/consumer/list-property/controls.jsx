@@ -10,7 +10,7 @@ export const Pill = ({ selected, onClick, children, className = '', dataErr, ari
     {...(role === 'radio' ? { 'aria-checked': !!selected } : { 'aria-pressed': !!selected })}
     aria-label={ariaLabel}
     data-err={dataErr}
-    className={`radio-pill rounded-xl text-sm font-medium cursor-pointer ${selected ? 'selected' : 'text-gray-400'} ${className}`}
+    className={`radio-pill tap-coarse rounded-xl text-sm font-medium cursor-pointer ${selected ? 'selected' : 'text-gray-400'} ${className}`}
   >
     {children}
   </div>

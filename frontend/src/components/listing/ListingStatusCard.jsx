@@ -124,10 +124,9 @@ const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, on
       : { kind: 'link', href: editHref, icon: 'edit', label: tr(t, statusKey('actions.fixNow'), 'Fix now') };
   }
   if (state === 'live') {
+    if (onShare) return { kind: 'button', onClick: onShare, icon: 'share-2', label: tr(t, statusKey('actions.share'), 'Share listing') };
     if (!verified && !badgeRequested) return { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') };
-    return onShare
-      ? { kind: 'button', onClick: onShare, icon: 'share-2', label: tr(t, statusKey('actions.share'), 'Share listing') }
-      : { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
+    return { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
   }
   if (state === 'rejected') {
     return { kind: 'link', href: supportHref, icon: 'life-buoy', label: tr(t, statusKey('actions.contactSupport'), 'Contact support') };
@@ -163,13 +162,18 @@ export default function ListingStatusCard({
   onOpenReview,
   onShare,
   onConfirm,
+  omitView = false,
   t,
   className = '',
 }) {
   const meta = getOwnerListingStatusMeta(listing, review, t);
   const unread = Number(review?.unread) || 0;
   const compact = variant === 'slim';
-  const action = actionFor({ state: meta.state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, onConfirm, t });
+  const resolved = actionFor({ state: meta.state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, onConfirm, t });
+  const action = omitView && resolved.icon === 'eye' ? null : resolved;
+  const getBadge = meta.state === 'live' && onShare && !listing?.ownershipVerified && !hasBadgeRequest(listing)
+    ? { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') }
+    : null;
   const reportWrong = meta.state === 'confirm' && onConfirm
     ? { kind: onOpenReview ? 'button' : 'link', onClick: onOpenReview, href: supportHref, icon: 'alert-circle', label: tr(t, statusKey('actions.reportWrong'), "Something's wrong"), testId: 'report-listing-wrong' }
     : null;
@@ -184,20 +188,20 @@ export default function ListingStatusCard({
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <span className={`relative inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${meta.cls}`}>
+            <span className={`dz-tag relative border font-semibold ${meta.cls}`}>
               <Icon name={meta.icon} className="h-3 w-3" /> {meta.label}
-              {unread ? <span aria-hidden="true" className="ml-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">{unread}</span> : null}
+              {unread ? <span aria-hidden="true" className="dz-count ml-0.5 bg-rose-500 text-white">{unread}</span> : null}
             </span>
             {listing?.ownershipVerified ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-brand-teal/25 bg-brand-teal/10 px-2.5 py-1 text-[11px] font-semibold text-brand-teal-3">
+              <span className="dz-tag border border-brand-teal/25 bg-brand-teal/10 font-semibold text-brand-teal-3">
                 <Icon name="shield-check" className="h-3 w-3" /> {badgeLabel}
               </span>
             ) : seeksOwnershipBadge(listing) ? (
-              <span data-testid="badge-under-review" className="inline-flex items-center gap-1 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-300">
+              <span data-testid="badge-under-review" className="dz-tag border border-amber-500/20 bg-amber-500/10 font-semibold text-amber-300">
                 <Icon name="clock" className="h-3 w-3" /> {tr(t, statusKey('badgeUnderReview'), 'Badge under review')}
               </span>
             ) : listing?.ownershipDeclinedReason ? (
-              <span data-testid="badge-declined" title={listing.ownershipDeclinedReason} className="inline-flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-300">
+              <span data-testid="badge-declined" title={listing.ownershipDeclinedReason} className="dz-tag border border-rose-500/20 bg-rose-500/10 font-semibold text-rose-300">
                 <Icon name="alert-circle" className="h-3 w-3" /> {tr(t, statusKey('badgeDeclined'), 'Badge not granted')}
               </span>
             ) : null}
@@ -205,13 +209,14 @@ export default function ListingStatusCard({
           </div>
           {TRACKED_STATES.has(meta.state) ? <ProgressTracker progress={listing?.progress} ownerView className="mt-2" /> : null}
           {onOpenReview && review?.lastMessage ? (
-            <button type="button" onClick={onOpenReview} data-testid="support-thread-link" className="mt-1 inline-flex min-h-[32px] items-center gap-1 text-xs font-semibold text-brand-teal-3 hover:underline">
+            <button type="button" onClick={onOpenReview} data-testid="support-thread-link" className="tap-coarse mt-1 inline-flex min-h-[32px] items-center gap-1 text-xs font-semibold text-brand-teal-3 hover:underline">
               <Icon name="message-square" className="h-3.5 w-3.5" /> {tr(t, statusKey('actions.supportMessages'), 'Messages from Draazy Support')}
             </button>
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
-          <Action action={action} />
+          {action ? <Action action={action} /> : null}
+          {getBadge ? <Action action={getBadge} secondary /> : null}
           {reportWrong ? <Action action={reportWrong} secondary /> : null}
         </div>
       </div>

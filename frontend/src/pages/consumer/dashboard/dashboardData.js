@@ -1,7 +1,6 @@
-// Group buyer document requests per buyer+property (one due-diligence request =
-// one lead). Mirrors the previous inline useMemo body exactly.
 /* Pure derivations for the consumer Dashboard. */
 import { parseWhen } from '../../../lib/visitWhen.js';
+import { getOwnerListingState } from '../../../components/listing/ListingStatusCard.jsx';
 
 const LEAD_KINDS = new Set(['contact', 'photo', 'doc', 'flatmate', 'app']);
 const OWNER_ROLES = new Set(['owner', 'host', 'listing_owner', 'property_owner']);
@@ -24,6 +23,7 @@ const addUnique = (arr, value) => {
   if (value && !arr.includes(value)) arr.push(value);
 };
 
+// One due-diligence request is one lead, so group buyer document requests per buyer+property.
 export function buildDocGroups(docReqs = [], titleOfOrListings) {
   const titleOf = titleResolver(titleOfOrListings);
   const map = new Map();
@@ -104,7 +104,7 @@ export function attentionFromItems(items = []) {
   return (items || []).reduce((acc, item) => {
     if (LEAD_KINDS.has(item.kind)) acc.leads += 1;
     else if (item.kind === 'visit') acc.visits += 1;
-    else if (item.kind === 'clarify') acc.properties += 1;
+    else if (item.kind === 'clarify' || item.kind === 'message') acc.properties += 1;
     return acc;
   }, { leads: 0, visits: 0, properties: 0 });
 }
@@ -210,16 +210,26 @@ export function buildActionItems({
         ],
       });
     });
-    // "Ops is waiting on you" has no `clarification` status behind it — the honest signal is an
-    // unread message from ops, read off the summaries the container already loaded.
+    // An unread staff message is only "needs info" while the listing is pending with a needs_info review.
     listings.filter((l) => !l.flatmate && (reviewsByProp?.[l.id]?.unread || reviewsByProp?.get?.(l.id)?.unread || 0) > 0).forEach((l) => {
       const rev = reviewsByProp?.[l.id] || reviewsByProp?.get?.(l.id);
+      const open = () => (openReview ? openReview(l.uuid || l.id) : go?.('properties'));
+      if (String(l.status).toLowerCase() === 'pending' && getOwnerListingState(l, rev) === 'needs_info') {
+        actionItems.push({
+          id: `clarify:${l.id}`, kind: 'clarify', tone: 'rose', icon: 'alert-circle',
+          title: `Needs info on "${l.title}"`,
+          sub: 'Draazy verification needs more info',
+          at: rev?.updatedAt || null,
+          actions: [{ label: 'Respond', icon: 'arrow-right', onClick: open }],
+        });
+        return;
+      }
       actionItems.push({
-        id: `clarify:${l.id}`, kind: 'clarify', tone: 'rose', icon: 'alert-circle',
-        title: `Needs info on "${l.title}"`,
-        sub: 'Draazy verification needs more info',
+        id: `message:${l.id}`, kind: 'message', tone: 'teal', icon: 'message-square',
+        title: `New message on "${l.title}"`,
+        sub: 'From Draazy Support',
         at: rev?.updatedAt || null,
-        actions: [{ label: 'Respond', icon: 'arrow-right', onClick: () => (openReview ? openReview(l.uuid || l.id) : go?.('properties')) }],
+        actions: [{ label: 'Read', icon: 'arrow-right', onClick: open }],
       });
     });
   }

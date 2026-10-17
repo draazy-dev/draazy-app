@@ -223,6 +223,8 @@
   transition: transform 0.2s ease;
 }
 
-.dz-mp-card:hover .dz-mp-cta svg {
-  transform: translateX(3px);
+@media (hover: hover) {
+  .dz-mp-card:hover .dz-mp-cta svg {
+    transform: translateX(3px);
+  }
 }

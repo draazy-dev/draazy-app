@@ -1,4 +1,4 @@
-/* Locality insights page (Tier 1 - route CSS, imported from pages/consumer/Locality.jsx; also covers the child EmergingPanel). Moved from index.css. All rules are .loc-page-scoped. */
+/* Locality insights page and its EmergingPanel; every rule is .loc-page-scoped. */
 .loc-page .field {
   transition: all .25s ease;
 }
@@ -14,9 +14,11 @@
   transition: transform .3s cubic-bezier(.4, 0, .2, 1), border-color .3s;
 }
 
-.loc-page .kpi:hover {
-  transform: translateY(-4px);
-  border-color: rgb(var(--dz-c-teal-500) / .3);
+@media (hover: hover) {
+  .loc-page .kpi:hover {
+    transform: translateY(-4px);
+    border-color: rgb(var(--dz-c-teal-500) / .3);
+  }
 }
 
 .loc-page .chip {
@@ -26,9 +28,11 @@
   cursor: pointer;
 }
 
-.loc-page .chip:hover {
-  border-color: rgb(var(--dz-c-teal-500) / .4);
-  color: rgb(var(--dz-c-white));
+@media (hover: hover) {
+  .loc-page .chip:hover {
+    border-color: rgb(var(--dz-c-teal-500) / .4);
+    color: rgb(var(--dz-c-white));
+  }
 }
 
 .loc-page .chip.on {
@@ -42,8 +46,10 @@
   cursor: pointer;
 }
 
-.loc-page .lb-row:hover {
-  background: rgb(var(--dz-c-teal-500) / .06);
+@media (hover: hover) {
+  .loc-page .lb-row:hover {
+    background: rgb(var(--dz-c-teal-500) / .06);
+  }
 }
 
 .loc-page .lb-row.active {
@@ -55,6 +61,8 @@
   user-select: none;
 }
 
-.loc-page th.sortable:hover {
-  color: rgb(var(--dz-c-teal-300));
+@media (hover: hover) {
+  .loc-page th.sortable:hover {
+    color: rgb(var(--dz-c-teal-300));
+  }
 }

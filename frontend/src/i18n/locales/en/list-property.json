@@ -37,7 +37,9 @@
       "photoCount_other": "{{count}} photos",
       "amenityCount_one": "{{count}} amenity",
       "amenityCount_other": "{{count}} amenities",
-      "privacyNote": "Buyers see these facts. Your flat number and phone number are not shown on the listing — buyers reach you through Draazy."
+      "privacyNote": "Buyers see these facts. Your flat number and phone number are not shown on the listing — buyers reach you through Draazy.",
+      "privacyNote_space": "Buyers see these facts. Your unit number and phone number are not shown on the listing — buyers reach you through Draazy.",
+      "privacyNote_land": "Buyers see these facts. Your plot number and phone number are not shown on the listing — buyers reach you through Draazy."
     },
     "stepNav": {
       "ariaLabel": "Listing progress",
@@ -54,7 +56,11 @@
       "strength": "listing strength",
       "nudge": {
         "photos": "Add {{count}} photos so buyers can see more of the home.",
+        "photos_space": "Add {{count}} photos so buyers can see more of the space.",
+        "photos_land": "Add {{count}} photos so buyers can see more of the land.",
         "description": "A few lines about the home help buyers picture it.",
+        "description_space": "A few lines about the space help buyers picture it.",
+        "description_land": "A few lines about the land help buyers picture it.",
         "amenities": "Pick the amenities buyers filter by."
       },
       "cheer": {
@@ -417,6 +423,8 @@
       "monthlyRent": "Enter the monthly rent.",
       "priceMin": "A sale price starts at ₹1,00,000. Enter the full amount, e.g. 85,00,000 for 85 lakh.",
       "monthlyRentMin": "Monthly rent starts at ₹1,000.",
+      "monthlyRentMax": "Monthly rent can't be more than ₹1,00,00,000.",
+      "priceMax": "A sale price can't be more than ₹1,000 crore.",
       "depositMax": "The deposit can't be more than 24 months' rent.",
       "builtUpMin": "Built-up area can't be less than the carpet area.",
       "superBuiltUpMin": "Super built-up area can't be less than the built-up area (or the carpet area, if built-up is blank).",
@@ -484,16 +492,18 @@
       "adding": "Adding…",
       "addFailed": "Couldn't add that society. Check your connection and try again.",
       "notABuilding": "Pick the building, not an area.",
-      "empty": "No match on Google Maps"
+      "empty": "No match on Google Maps",
+      "savedHeading": "Already on Draazy"
     },
     "locationPicker": {
-      "unavailable": "Map picker unavailable"
+      "unavailable": "Map picker unavailable",
+      "down": "Map is down. We'll pin your society or locality; fine-tune it later from Edit."
     },
     "editPolicy": {
       "publishInstantly": "Publishes instantly",
-      "publishInstantlyDesc": "Description, amenities, availability, deposit, address details & new photos.",
+      "publishInstantlyDesc": "Title, deposit, maintenance, availability, floor, facing, age, pets, tenants & other details.",
       "needsRecheck": "Needs a re-check",
-      "needsRecheckDesc": "Price, furnishing & possession — re-checked while your listing stays live. Property type, locality, BHK, buy vs rent & removing verified photos come off search until approved.",
+      "needsRecheckDesc": "Price, furnishing, possession, address, society, description, amenities, photos, video & RERA ID — re-checked while your listing stays live. Property type, locality, BHK, buy vs rent & land use come off search until approved.",
       "updatesGoLive_one": "{{count}} update go live now",
       "updatesGoLive_other": "{{count}} updates go live now",
       "changesRecheck_one": "{{count}} change need a re-check",

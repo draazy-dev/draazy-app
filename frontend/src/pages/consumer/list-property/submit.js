@@ -6,6 +6,7 @@ import {
 } from '../../../services/propertyService.js';
 import { evaluateListingDedup } from '../../../lib/data/propertyIdentity.js';
 import { formatIndian } from './format.js';
+import { bhkLabel as bhkLabelOf } from '../../../lib/listingSeo.js';
 import { commercialLabelOf, COMMERCIAL_SPEC_KEYS, FLOOR_PLAN_CATEGORY, isResidentialType, isCommercialType, isLandType, isHouseType, landUseFor } from './constants.js';
 import {
   classifyChanges, displayValue, recentMaterialEdits,
@@ -63,7 +64,7 @@ const forTheWire = (record, form, isRent, storedAddress = '') => ({
     const value = isRent ? (form.rentMaintMode === 'extra' ? form.rentMaintenance : '') : form.monthlyMaintenance;
     return value === '' || value == null ? undefined : parseAmount(value);
   })(),
-  // The record calls it `rera` and the contract calls it `reraId`; the mismatch dropped it silently.
+  // The record calls it `rera` and the contract calls it `reraId`; so map one to the other.
   reraId: form.reraId || '',
   /* Lifted out of `strongIds` for the request only, and kept out of `record` on purpose: the record is buyer-readable
      (edit prefill, detail page) and a meter number belongs to the owner. */
@@ -75,8 +76,7 @@ const TYPE_LABELS = { flat: 'Flat', villa: 'Villa', independent: 'Independent Ho
 export const listingLabels = (form) => {
   const subtypeLabel = commercialLabelOf(form.commercialType);
   const typeLabel = (form.propertyType === 'commercial' && subtypeLabel) ? subtypeLabel : (TYPE_LABELS[form.propertyType] || 'Property');
-  const bhk = Number(form.bhk);
-  const bhkLabel = (isResidentialType(form.propertyType) && form.bhk) ? (String(form.bhk) === '0' ? '1 RK' : bhk >= 5 ? '5+ BHK' : form.bhk + ' BHK') : '';
+  const bhkLabel = isResidentialType(form.propertyType) ? bhkLabelOf(form.bhk, form.propertyType) : '';
   const title = (bhkLabel ? `${bhkLabel} ` : '') + typeLabel + (form.locality ? ` in ${form.locality}` : '');
   return { typeLabel, bhkLabel, title };
 };
@@ -270,13 +270,19 @@ export const persistListing = async ({ form, user, editId, editListing, photos }
           return { ok: false, fieldErrors: mapped.errors, fieldErrorStep: mapped.step, unknownFields: mapped.unknown };
         }
       }
+      if (err?.code === 'duplicate_submission') {
+        return { ok: false, blocked: true, existingId: err.existingId };
+      }
+      if (err?.code === 'listing_not_editable') {
+        return { ok: false, error: 'This listing is closed and can no longer be edited.' };
+      }
       // An invariant violation names internal tables; the owner gets the generic line, the console
       // keeps the detail.
       if (err?.internal) {
         console.error(err);
         return { ok: false, error: 'Could not save your listing.' };
       }
-      return { ok: false, error: (err && err.message) || 'Could not save your listing.' };
+      return { ok: false, unauthenticated: err?.status === 401, error: (err && err.message) || 'Could not save your listing.' };
     }
     /* Adopt the server's id before anything local is written, or the mirror, the notification
      * link and the documents are filed under an id that exists on no server. */

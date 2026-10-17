@@ -36,6 +36,11 @@ export async function replyToTicket(id, text) {
   );
 }
 
+/** Desk action: the ticket comes back closed, and the customer is told. */
+export async function closeTicket(id) {
+  return toViewModel(await post(`/support/tickets/${encodeURIComponent(id)}/close`));
+}
+
 export async function markTicketRead(id) {
   await post(`/support/tickets/${encodeURIComponent(id)}/read`);
 }

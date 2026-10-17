@@ -17,6 +17,8 @@ const isNonNegative = (v) => { const n = Number(v); return v !== '' && v != null
 const inRange = (v, [min, max]) => { const n = Number(v); return Number.isFinite(n) && n >= min && n <= max; };
 const SALE_PRICE_MIN = 100000;
 const MONTHLY_RENT_MIN = 1000;
+const SALE_PRICE_MAX = 10_000_000_000;
+const MONTHLY_RENT_MAX = 10_000_000;
 const RESIDENTIAL_AREA_RANGE = [100, 20000];
 const DEPOSIT_RENT_MULTIPLE_MAX = 24;
 
@@ -41,8 +43,8 @@ const floorValue = (value) => value === 'Ground' ? 0 : Number(value);
 
 const FIELD_OF = { possession: 'construction' };
 const sanityDependenciesOf = (key, value, form) => {
-  if (key === 'price' && value === 'min') return ['price'];
-  if (key === 'monthlyRent' && value === 'min') return ['monthlyRent'];
+  if (key === 'price' && (value === 'min' || value === 'max')) return ['price'];
+  if (key === 'monthlyRent' && (value === 'min' || value === 'max')) return ['monthlyRent'];
   if (key === 'deposit' && value === 'max') return ['deposit', 'monthlyRent'];
   if (key === 'carpetArea' && value === 'range' && isResidentialType(form.propertyType)) return ['carpetArea'];
   if (key === 'builtUp' && value === 'min') return ['builtUp', 'carpetArea'];
@@ -115,7 +117,7 @@ export const validateStep1 = (form, original) => {
   /* A null floor is excluded, not unfiltered: `PropertySpecs` compares with `ge`/`le`. */
   if (isTowered(form) && isMissing(form.floor)) err.floor = true;
   if (isTowered(form) && isMissing(form.totalFloors)) err.totalFloors = true;
-  if (isTowered(form) && !isMissing(form.floor) && !isMissing(form.totalFloors)
+  if ((isTowered(form) || commercial) && !isMissing(form.floor) && !isMissing(form.totalFloors)
     && floorValue(form.floor) > floorValue(form.totalFloors)) err.floor = 'aboveTotal';
   return keepChangedErrors(err, form, original);
 };
@@ -153,6 +155,7 @@ export const validatePricingStep = (form, original) => {
     const rent = Number(form.monthlyRent);
     if (!isPositive(form.monthlyRent)) err.monthlyRent = true;
     else if (rent < MONTHLY_RENT_MIN) err.monthlyRent = 'min';
+    else if (rent > MONTHLY_RENT_MAX) err.monthlyRent = 'max';
     if (!isNonNegative(form.deposit)) err.deposit = true;
     else if (Number(form.deposit) > rent * DEPOSIT_RENT_MULTIPLE_MAX) err.deposit = 'max';
     if (!form.availableFrom || outOfRange(form.availableFrom, MAX_AVAILABLE_DAYS)) err.availableFrom = true;
@@ -160,6 +163,7 @@ export const validatePricingStep = (form, original) => {
     const price = Number(form.price);
     if (!isPositive(form.price)) err.price = true;
     else if (price < SALE_PRICE_MIN) err.price = 'min';
+    else if (price > SALE_PRICE_MAX) err.price = 'max';
     if (!land && !form.construction) err.possession = true;
     if (isPreCompletion(form) && (!form.availableFrom || outOfRange(form.availableFrom, MAX_POSSESSION_DAYS))) err.availableFrom = true;
     if (!form.ownership) err.ownership = true;
@@ -183,8 +187,7 @@ export const validateStep3 = (form, photos, original, maxPhotos) => {
   if ((!original || original.form?.title !== form.title) && hasContactDetails(form.title)) {
     nextErr = { ...nextErr, title: 'contact' };
   }
-  /* Never demand more of an edit than the listing already carries: the rule arrived after these listings were
-     published, and blocking a price correction on a photo shoot is not a fix. */
+  // Never demand more of an edit than the listing already carries: a price fix must not wait on a photo shoot.
   const had = original ? (original.images || original.gallery || []).filter(Boolean).length : 0;
   const floor = original ? Math.min(MIN_PUBLISH_PHOTOS, Math.max(had, 1)) : MIN_PUBLISH_PHOTOS;
   if (list.length < floor) return { ...nextErr, photos: 'min' };

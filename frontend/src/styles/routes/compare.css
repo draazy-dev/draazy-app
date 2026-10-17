@@ -38,8 +38,10 @@
   border-bottom: 1px solid rgb(var(--dz-c-white) / calc(0.05 * var(--dz-line-boost)));
 }
 
-.cmp-row:hover .cmp-cell {
-  background: rgb(var(--dz-c-white) / 0.02);
+@media (hover: hover) {
+  .cmp-row:hover .cmp-cell {
+    background: rgb(var(--dz-c-white) / 0.02);
+  }
 }
 
 .col-card {
@@ -48,16 +50,20 @@
   transition: all 0.3s ease;
 }
 
-.col-card:hover {
-  border-color: rgb(var(--dz-c-teal-500) / 0.25);
+@media (hover: hover) {
+  .col-card:hover {
+    border-color: rgb(var(--dz-c-teal-500) / 0.25);
+  }
 }
 
 .col-card img {
   transition: transform 0.5s ease;
 }
 
-.col-card:hover img {
-  transform: scale(1.05);
+@media (hover: hover) {
+  .col-card:hover img {
+    transform: scale(1.05);
+  }
 }
 
 .best {
@@ -88,14 +94,11 @@
   transition: all 0.3s ease;
 }
 
-.add-slot:hover {
-  border-color: rgb(var(--dz-c-teal-500) / 0.5);
-  background: rgb(var(--dz-c-teal-500) / 0.05);
-}
-
-.modal-overlay {
-  background: rgb(var(--dz-c-gray-950) / 0.75);
-  backdrop-filter: blur(8px);
+@media (hover: hover) {
+  .add-slot:hover {
+    border-color: rgb(var(--dz-c-teal-500) / 0.5);
+    background: rgb(var(--dz-c-teal-500) / 0.05);
+  }
 }
 
 .modal-pick {
@@ -103,12 +106,13 @@
   border: 1px solid rgb(var(--dz-c-white) / calc(0.07 * var(--dz-line-boost)));
 }
 
-.modal-pick:hover {
-  border-color: rgb(var(--dz-c-teal-500) / 0.4);
-  background: rgb(var(--dz-c-teal-500) / 0.06);
+@media (hover: hover) {
+  .modal-pick:hover {
+    border-color: rgb(var(--dz-c-teal-500) / 0.4);
+    background: rgb(var(--dz-c-teal-500) / 0.06);
+  }
 }
 
-/* Desktop label column keeps its original width (was an inline min-width). */
 .feature-col.cmp-cell {
   min-width: 180px;
 }

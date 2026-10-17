@@ -1,14 +1,11 @@
 import { useTranslation } from 'react-i18next';
-import { computeQualityScore, qualityColor } from '../../lib/qualityScore.js';
+import { qualityColor } from '../../lib/qualityScore.js';
 import { classNames } from '../../lib/format.js';
 
-/**
- * Quality score badge — reusable across consumer and admin pages.
- * @param {'compact'|'full'|'tile'} variant - compact shows just the ring+number, full shows label too, tile matches the stat-tile grid
- */
 export default function QualityScoreBadge({ listing, variant = 'compact' }) {
   const { t } = useTranslation();
-  const score = computeQualityScore(listing);
+  const score = listing?.qualityScore;
+  if (!Number.isFinite(score)) return null;
   const c = qualityColor(score);
 
   if (variant === 'tile') {
@@ -37,7 +34,7 @@ export default function QualityScoreBadge({ listing, variant = 'compact' }) {
   }
 
   return (
-    <div className={classNames('inline-flex items-center gap-1 rounded-full px-2 py-0.5', c.bg, c.text)} title={t('ui.qualityShort', { score })}>
+    <div className={classNames('dz-tag', c.bg, c.text)} title={t('ui.qualityShort', { score })}>
       <ScoreRing score={score} color={c.ring} size={12} />
       <span className="text-[10px] font-semibold tabular-nums">{score}</span>
     </div>

@@ -1,7 +1,8 @@
-/* Every colour the app paints is declared here; scripts/check-colours.mjs fails the build on a literal elsewhere. Dark is the default and
-   `html.light` swaps the palette; channels are bare `R G B` so callers add alpha: rgb(var(--dz-c-teal-500) / 0.2). */
+/* Every colour is declared here; check-colours.mjs fails on a literal elsewhere.
+   Dark is the default, html.light swaps the palette; channels are bare R G B so callers add alpha. */
 
-/* Dark islands keep the dark palette in light mode so `text-white` over a photo or fill stays white; keep this list identical to the island `color` rule at the end of the file. */
+/* Dark islands keep the dark palette in light mode;
+   keep this list identical to the island `color` rule at the end of the file. */
 :root,
 .theme-dark, .btn-teal, .dz-lightbox, .pc-lightbox, .reels-page, .bg-black, [class*="from-black/"],
 .badge-seeker, .sf-match-great, .ba-knob, .ba-tag,
@@ -112,9 +113,9 @@ html.light {
   --dz-c-ink: 243 247 246;
   --dz-c-ink-2: 232 239 238;
   --dz-c-ink-card: 255 255 255;
-  --dz-c-gray-50: 3 7 18; --dz-c-gray-100: 17 24 39; --dz-c-gray-200: 31 41 55; --dz-c-gray-300: 55 65 81; --dz-c-gray-400: 75 85 99; --dz-c-gray-500: 107 114 128; --dz-c-gray-600: 107 114 128; --dz-c-gray-700: 209 213 219; --dz-c-gray-800: 229 231 235; --dz-c-gray-900: 243 244 246; --dz-c-gray-950: 249 250 251;
-  --dz-c-slate-50: 2 6 23; --dz-c-slate-100: 15 23 42; --dz-c-slate-200: 30 41 59; --dz-c-slate-300: 51 65 85; --dz-c-slate-400: 71 85 105; --dz-c-slate-500: 100 116 139; --dz-c-slate-600: 100 116 139; --dz-c-slate-700: 203 213 225; --dz-c-slate-800: 226 232 240; --dz-c-slate-900: 241 245 249; --dz-c-slate-950: 248 250 252;
-  --dz-c-teal-50: 4 47 46; --dz-c-teal-100: 19 78 74; --dz-c-teal-200: 17 94 89; --dz-c-teal-300: 17 94 89; --dz-c-teal-400: 15 118 110;
+  --dz-c-gray-50: 3 7 18; --dz-c-gray-100: 17 24 39; --dz-c-gray-200: 31 41 55; --dz-c-gray-300: 55 65 81; --dz-c-gray-400: 75 85 99; --dz-c-gray-500: 87 96 111; --dz-c-gray-600: 87 96 111; --dz-c-gray-700: 209 213 219; --dz-c-gray-800: 229 231 235; --dz-c-gray-900: 243 244 246; --dz-c-gray-950: 249 250 251;
+  --dz-c-slate-50: 2 6 23; --dz-c-slate-100: 15 23 42; --dz-c-slate-200: 30 41 59; --dz-c-slate-300: 51 65 85; --dz-c-slate-400: 71 85 105; --dz-c-slate-500: 84 98 120; --dz-c-slate-600: 84 98 120; --dz-c-slate-700: 203 213 225; --dz-c-slate-800: 226 232 240; --dz-c-slate-900: 241 245 249; --dz-c-slate-950: 248 250 252;
+  --dz-c-teal-50: 4 47 46; --dz-c-teal-100: 19 78 74; --dz-c-teal-200: 17 94 89; --dz-c-teal-300: 17 94 89; --dz-c-teal-400: 13 107 100; --dz-c-teal-700: 13 107 100;
   --dz-c-emerald-50: 2 44 34; --dz-c-emerald-100: 6 78 59; --dz-c-emerald-200: 6 95 70; --dz-c-emerald-300: 6 95 70; --dz-c-emerald-400: 4 120 87;
   --dz-c-green-50: 5 46 22; --dz-c-green-100: 20 83 45; --dz-c-green-200: 22 101 52; --dz-c-green-300: 22 101 52; --dz-c-green-400: 21 128 61;
   --dz-c-cyan-50: 8 51 68; --dz-c-cyan-100: 22 78 99; --dz-c-cyan-200: 21 94 117; --dz-c-cyan-300: 21 94 117; --dz-c-cyan-400: 14 116 144;

@@ -111,7 +111,8 @@ when the caller must decide something; every row carries a `kind`:
 - **Owner rows:** pending contact request ("wants to contact you", Accept/Decline); pending
   flatmate request (Accept/Decline); pending group application (Accept/Decline, `members/seatsTotal`);
   photo request (Add photos/Decline); pending document group ("wants N documents", Grant all/Decline);
-  listing with an unread verification clarification ("Needs info", Respond).
+  pending listing in needs-info review with an unread staff message ("Needs info", Respond); any other
+  unread staff message is a neutral "New message" row (Read).
 - **Visit row:** a `scheduled` visit **the caller hosts** (`isVisitHost`: rows from
   `myVisitRequests()` are tagged `hostedByMe`). A visitor's own booking is never "waiting on me".
 - **Never a row:** already-contactable enquiries, decided requests, expired contact requests, rent

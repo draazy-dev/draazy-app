@@ -51,17 +51,14 @@ export default function Navbar() {
   // shortlist longer than one page. The context is already empty when signed out.
   const savedCount = isIn ? saved.count : 0;
   const chatBadge = isIn ? chatUnread : 0;
-  // Active-link detection mirroring components.js navHtml().
 
   const path = location.pathname.toLowerCase();
   const dealParam = new URLSearchParams(location.search).get('deal');
   const typeParam = (new URLSearchParams(location.search).get('type') || '').toLowerCase();
   const isHome = path === '/';
-  // Compare Properties is only relevant while browsing buy/rent listings or a
-  // property detail page (mirrors components.js compare:true on listings.html & property.html).
+  // Compare Properties is only relevant while browsing buy/rent listings or a property detail page.
   const showCompare = path.startsWith('/listings') || path.startsWith('/property');
-  // Flatmates is a rent-only feature: surface it only on the Flatmates page
-  // itself or while viewing rent listings (mirrors components.js showFlatmates).
+  // Flatmates is a rent-only feature: surface it only on the Flatmates page or while viewing rent listings.
   const showFlatmates = path.startsWith('/flatmates') || (path.startsWith('/listings') && (dealParam === 'rent' || typeParam === 'flatmates'));
   const activeKey = path.startsWith('/reels') ? 'reels'
     : path === '/services' ? 'services'
@@ -150,7 +147,7 @@ export default function Navbar() {
           : 'py-2.5 hover:bg-teal-400/10')}
     >
       <span className="flex items-center gap-3"><Icon name="gift" className="w-4 h-4 text-teal-300 shrink-0" /> {t('nav.refer')}</span>
-      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-200 px-2 py-0.5 rounded-full bg-teal-400/15 shrink-0">{t('misc1.referForYou')}</span>
+      <span className="dz-tag font-bold uppercase tracking-wider text-teal-200 bg-teal-400/15">{t('misc1.referForYou')}</span>
     </Link>
   );
   const acctLogout = (close) => (
@@ -220,7 +217,6 @@ export default function Navbar() {
     return () => mq.removeEventListener('change', onChange);
   }, []);
   useScrollLock(acctOpen && acctIsDrawer);
-  // Escape closes the account menu, drawer or dropdown.
 
   useEffect(() => {
     if (!acctOpen) return undefined;
@@ -228,7 +224,6 @@ export default function Navbar() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [acctOpen]);
-  // Close the account menu whenever the route changes (a link was followed).
 
   useEffect(() => { setAcctOpen(false); }, [location.pathname, location.search]);
 
@@ -246,7 +241,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="dz-topbar__row flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <Link to="/" className="tap-target sm:min-h-0 sm:min-w-0 flex items-center gap-2 group">
+            <Link to="/" aria-label="Draazy" className="tap-target sm:min-h-0 sm:min-w-0 flex items-center gap-2 group">
               <LogoMark className="dz-topbar__icon-box w-9 h-9 shrink-0 text-teal-400 transition-transform duration-300 group-hover:scale-110" />
               <span className="hidden sm:inline text-xl font-bold tracking-tight bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">Draazy</span>
             </Link>
@@ -287,7 +282,7 @@ export default function Navbar() {
                       onClick={() => { setCity(c.name); setCityOpen(false); }}
                     >
                       <span className="flex items-center gap-2.5"><Icon name="building-2" className="w-4 h-4 text-gray-400" /> {c.name}</span>
-                      {city === c.name ? <Icon name="check" className="w-4 h-4 text-teal-500" /> : <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300">Soon</span>}
+                      {city === c.name ? <Icon name="check" className="w-4 h-4 text-teal-500" /> : <span className="dz-tag bg-amber-500/15 text-amber-300">Soon</span>}
                     </button>
                   ))}
                   <div className="border-t border-white/10 mt-1.5 pt-1.5">
@@ -314,7 +309,7 @@ export default function Navbar() {
             {/* Desktop-only. Below lg the bottom tab bar owns Post — it has the raised centre slot in the thumb arc,
                which is a better home for the primary supply-side CTA than the top-right corner. */}
           <div className="flex items-center gap-3 shrink-0">
-            <Link to="/list-property" className="hidden lg:inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-r from-teal-600 to-teal-500 text-sm font-semibold text-white hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-300 hover:scale-105">
+            <Link to="/list-property" className="h-btn hidden lg:inline-flex items-center gap-2 px-5 rounded-full bg-gradient-to-r from-teal-600 to-teal-500 text-sm font-semibold text-white hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-300 hover:scale-105">
               <Icon name="plus-circle" className="w-4 h-4" />
               {postLabel}
             </Link>
@@ -335,9 +330,7 @@ export default function Navbar() {
                 {flagEnabled('inAppMessaging') && (
                   <Link to="/messages" className="dz-topbar__action tap-target tap-extend relative inline-flex items-center justify-center p-2 rounded-xl hover:bg-white/5 transition-all duration-300 group" title="Messages" aria-label="Messages">
                     <Icon name="message-square" className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
-                    {chatBadge > 0
-                      ? <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 bg-gradient-to-br from-teal-500 to-teal-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-teal-500/30">{chatBadge}</span>
-                      : <span className="absolute top-1 right-1 w-2.5 h-2.5 rounded-full bg-teal-500 shadow-md shadow-teal-500/40" />}
+                    {chatBadge > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 bg-gradient-to-br from-teal-500 to-teal-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-teal-500/30">{chatBadge > 99 ? '99+' : chatBadge}</span>}
                   </Link>
                 )}
                 <div className="relative -mr-4 sm:mr-0" ref={acctRef}>
@@ -361,7 +354,7 @@ export default function Navbar() {
               </>
               /* Visible at every width: it is the only sign-in affordance, so no breakpoint may hide it. */
             ) : (
-              <Link to="/signin" className="dz-topbar__pill tap-extend relative inline-flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-gradient-to-r from-teal-500 to-teal-400 text-sm font-semibold text-white hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-300 hover:scale-105">
+              <Link to="/signin" className="h-btn dz-topbar__pill tap-extend relative inline-flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 rounded-full bg-gradient-to-r from-teal-500 to-teal-400 text-sm font-semibold text-white hover:shadow-lg hover:shadow-teal-500/25 transition-all duration-300 hover:scale-105">
                 <Icon name="log-in" className="w-4 h-4" /> Sign In
               </Link>
             )}
