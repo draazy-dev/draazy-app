@@ -17,7 +17,7 @@ import java.util.Map;
  * never believed — the tier is derived server-side and the listing must genuinely be the caller's. */
 public record FlatmateGroupCreateRequest(
         @NotBlank @Size(min = 3, max = 120) @NoContactDetails(message = NO_CONTACT) String title,
-        @Size(max = 80) String locality,
+        @Size(max = 80) @NoContactDetails(message = NO_CONTACT) String locality,
         @Size(max = 80) String localitySlug,
         String policy,
         @Min(1) @Max(10_000_000) Long rent,

@@ -183,12 +183,12 @@ public class FlatmateSearchQueries {
                       end)""".formatted(ROOM_SHARE_MAX);
     }
 
-    // A suspended author's posts stay hidden until the account is reactivated.
+    // Whitelisted on active so a suspended or erased author's posts are hidden, and any new status fails closed.
     private static String publicRows(String alias, String authorColumn, Map<String, Object> params) {
         params.put("modPublic", FlatmateVocabulary.MOD_PUBLIC);
-        params.put("suspended", UserStatuses.SUSPENDED);
+        params.put("active", UserStatuses.ACTIVE);
         return ("where %1$s.archived = false and %1$s.mod_status in (:modPublic)"
-                + " and not exists (select 1 from users u where u.id = %1$s.%2$s and u.status = :suspended)")
+                + " and not exists (select 1 from users u where u.id = %1$s.%2$s and (u.status <> :active or u.archived))")
                 .formatted(alias, authorColumn);
     }
 

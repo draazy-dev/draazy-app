@@ -52,6 +52,7 @@ class ErasureBoundaryTest extends AbstractApiTest {
         u.setName(name);
         u.setEmail(name.toLowerCase() + "@example.com");
         u.setCity("Pune");
+        u.correctGender("female");
         u.setAvatar("https://cdn.example/" + mobile + ".jpg");
         u.setMobileVerified(true);
         User saved = users.saveAndFlush(u);
@@ -169,6 +170,7 @@ class ErasureBoundaryTest extends AbstractApiTest {
         assertThat(after.getName()).isNull();
         assertThat(after.getEmail()).isNull();
         assertThat(after.getCity()).isNull();
+        assertThat(after.getGender()).isNull();
         assertThat(after.getAvatar()).isNull();
         assertThat(after.getPasswordHash()).isNull();
         assertThat(after.isMobileVerified()).isFalse();

@@ -1,5 +1,8 @@
 package com.draazy.api.engagement.flatmate;
 
+import static com.draazy.api.engagement.flatmate.FlatmateVocabulary.NO_CONTACT;
+
+import com.draazy.api.catalog.listing.NoContactDetails;
 import com.draazy.api.common.web.PageResponse;
 import com.draazy.api.common.web.Pageables;
 import com.draazy.api.common.web.Routes;
@@ -58,6 +61,7 @@ public class FlatmateSeekerController {
     /** No response body; echoing the message would invite clients to render a thread. */
     @PostMapping(Routes.Flatmates.POST_INTEREST)
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public void interest(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody(required = false) InterestRequest body) {
         service.express(principal, id,
@@ -115,7 +119,8 @@ public class FlatmateSeekerController {
         service.withdraw(principal, kind, id);
     }
 
-    public record InterestRequest(String share, @Size(max = 4000) String message, String gender) {
+    public record InterestRequest(String share,
+            @Size(max = 4000) @NoContactDetails(message = NO_CONTACT) String message, String gender) {
     }
 
     public record DecisionRequest(@NotBlank String decision) {

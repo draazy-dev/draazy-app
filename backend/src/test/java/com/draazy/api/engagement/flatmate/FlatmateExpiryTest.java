@@ -164,7 +164,7 @@ class FlatmateExpiryTest extends AbstractApiTest {
 
         mvc.perform(post(Routes.Flatmates.RENEW, "post", id)
                         .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
         mvc.perform(post(Routes.Flatmates.RENEW, "post", UUID.randomUUID())
                         .header(HttpHeaders.AUTHORIZATION, bearer(author)))
                 .andExpect(status().isNotFound());

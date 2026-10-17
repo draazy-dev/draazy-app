@@ -135,8 +135,12 @@ public class IdentityReviewService {
         User user = users.findById(v.getUserId())
                 .orElseThrow(() -> new NotFoundException("User not found"));
         String oldName = user.getName();
+        String oldGender = user.getGender();
         user.setName(legalName);
         user.setVerified(true);
+        if (body.gender() != null) {
+            user.correctGender(body.gender());
+        }
         users.saveAndFlush(user);
         verifications.saveAndFlush(v);
         int listings = ownerBadge.markOwnerVerified(user.getId());
@@ -151,7 +155,8 @@ public class IdentityReviewService {
         recordAudit(reviewer, "identity.verification.approved", v,
                 "docType", v.getDocType(), "userId", v.getUserId().toString(),
                 "numberOverridden", String.valueOf(numberOverridden),
-                "poseChallenge", String.valueOf(v.getLivenessChallenge()));
+                "poseChallenge", String.valueOf(v.getLivenessChallenge()),
+                "genderBefore", String.valueOf(oldGender), "genderAfter", String.valueOf(user.getGender()));
         return read.currentReview(reviewer, v);
     }
 

@@ -317,7 +317,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
             mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", id))
                             .header(HttpHeaders.AUTHORIZATION, bearer(mod))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"modStatus\":\"" + verdict + "\"}"))
+                            .content("{\"modStatus\":\"" + verdict + "\",\"note\":\"Breaks the rules\"}"))
                     .andExpect(status().isOk());
 
             editRoom(owner, id, roomBody(locality, society, "Private room", 15000,

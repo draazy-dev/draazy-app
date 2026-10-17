@@ -71,6 +71,7 @@ class ErasureCoverageTest extends AbstractApiTest {
         map.put("users.email", Outcome.CLEARED);
         map.put("users.avatar", Outcome.CLEARED);
         map.put("users.city", Outcome.CLEARED);
+        map.put("users.gender", Outcome.CLEARED);
         map.put("users.password_hash", Outcome.CLEARED);
         map.put("users.mobile_verified", Outcome.CLEARED);
         map.put("users.verified", Outcome.CLEARED);
@@ -135,6 +136,9 @@ class ErasureCoverageTest extends AbstractApiTest {
         map.put("help_article_feedback.ip_hash", Outcome.ROW_REMOVED);
 
         map.put("personal_documents.file_name", Outcome.ROW_REMOVED);
+
+        map.put("managed_properties.tenant_name", Outcome.CLEARED);
+        map.put("managed_properties.tenant_mobile", Outcome.CLEARED);
 
 
         map.put("service_request_draft_approvals.party_key", Outcome.ROW_REMOVED);
@@ -424,9 +428,6 @@ class ErasureCoverageTest extends AbstractApiTest {
         map.put("city_waitlist.email", "As city_waitlist.mobile.");
         map.put("saved_searches.mobile",
                 "The number property alerts are delivered to. A stored number, not a reference.");
-        map.put("managed_properties.tenant_name",
-                "A third party's name typed in by the owner (V33). Erasing the owner does not touch "
-                        + "it, and the tenant it names has no account here to erase from.");
         map.put("flatmate_groups.owner_consent_mobile",
                 "The flat owner's number, captured as evidence of their consent (V27) — a third "
                         + "party's contact detail sitting on the subject's record.");
@@ -563,6 +564,13 @@ class ErasureCoverageTest extends AbstractApiTest {
         UUID subjectId = subject.getId();
         String oldMobile = subject.getMobile();
         seedEverySweptTable(subjectId, oldMobile);
+        UUID trackedAsTenant = jdbc.queryForObject("""
+                insert into managed_properties
+                       (owner_id, title, deal, property_type, price, locality, rented, tenant_name, tenant_mobile,
+                        monthly_rent)
+                values (?, '1 BHK Flat in Wakad', 'rent', 'Flat', 18000, 'Wakad', true, 'Erasable Person', ?, 18000)
+                returning id
+                """, UUID.class, admin.getId(), oldMobile);
         entityManager.flush();
 
         // DETACHED needs a before-count: after the sweep the rows are unreachable from the subject,
@@ -607,6 +615,8 @@ class ErasureCoverageTest extends AbstractApiTest {
                 + " where mobile_hash = ?", Long.class, Tokens.sha256Hex(oldMobile))).isZero();
         assertThat(jdbc.queryForObject("select count(*) from identity_storage_deletes"
                 + " where storage_key = ?", Long.class, PERSONAL_DOC_KEY)).isEqualTo(1L);
+        assertThat(jdbc.queryForMap("select tenant_name, tenant_mobile from managed_properties where id = ?",
+                trackedAsTenant).values()).containsOnlyNulls();
 
         Map<String, String> survivors = new LinkedHashMap<>();
         for (Map.Entry<String, Outcome> entry : ERASED.entrySet()) {
@@ -731,6 +741,7 @@ class ErasureCoverageTest extends AbstractApiTest {
             Map.entry("tenant_rentals", "tenant_id = ?"),
             Map.entry("help_article_feedback", "user_id = ?"),
             Map.entry("personal_documents", "owner_id = ?"),
+            Map.entry("managed_properties", "owner_id = ?"),
             Map.entry("service_request_draft_approvals", "user_id = ?"),
             Map.entry("service_request_identities",
                     "service_request_id in (select id from service_requests where requester_id = ?)"));
@@ -776,6 +787,7 @@ class ErasureCoverageTest extends AbstractApiTest {
         u.setName("Erasable Person");
         u.setEmail(mobile + "@example.com");
         u.setCity("Pune");
+        u.correctGender("female");
         u.setAvatar("https://cdn.example/" + mobile + ".jpg");
         u.setPasswordHash("$2a$10$notarealhashnotarealhashnotarealhashnotarealhashno");
         u.setMobileVerified(true);
@@ -883,6 +895,13 @@ class ErasureCoverageTest extends AbstractApiTest {
                 insert into personal_documents (owner_id, category, file_name, storage_key, size_bytes, mime_type)
                 values (?, 'Aadhaar Card', 'aadhaar.pdf', ?, 1024, 'application/pdf')
                 """, subjectId, PERSONAL_DOC_KEY);
+        jdbc.update("""
+                insert into managed_properties
+                       (owner_id, title, deal, property_type, price, locality, rented, tenant_name, tenant_mobile,
+                        monthly_rent)
+                values (?, '2 BHK Flat in Baner', 'rent', 'Flat', 26000, 'Baner', true, 'Rohit More', '9123456780',
+                        26000)
+                """, subjectId);
         jdbc.update("""
                 insert into service_request_draft_approvals
                        (request_id, draft_version, party_key, party_label, user_id, method)

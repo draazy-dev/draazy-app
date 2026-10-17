@@ -87,9 +87,9 @@ public class FlatmateGuardrails {
         if (fingerprint == null) {
             return found;
         }
-        rooms.findByAddressFingerprintAndArchivedFalse(fingerprint)
+        rooms.findByAddressFingerprintAndArchivedFalseOrderByIdAsc(fingerprint)
                 .forEach(r -> found.add(new Claim(r.getHostId(), "room", r.getId())));
-        groups.findByAddressFingerprintAndArchivedFalse(fingerprint)
+        groups.findByAddressFingerprintAndArchivedFalseOrderByIdAsc(fingerprint)
                 .forEach(g -> found.add(new Claim(g.getHostId(), "group", g.getId())));
         return found;
     }

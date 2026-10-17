@@ -58,4 +58,9 @@ public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest
     @Modifying
     @Query("delete from FlatmateRequest r where r.id = :id and r.status = 'pending'")
     int deleteIfPending(@Param("id") UUID id);
+
+    @Modifying
+    @Query("delete from FlatmateRequest r "
+            + "where (r.requesterId = :userId or r.hostId = :userId) and r.status = 'pending'")
+    int deletePendingInvolving(@Param("userId") UUID userId);
 }

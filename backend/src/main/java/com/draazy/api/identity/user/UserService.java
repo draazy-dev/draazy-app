@@ -4,6 +4,7 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.UnauthorizedException;
 import com.draazy.api.security.Roles;
+import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -15,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
 
     private final UserRepository users;
+    private final EntityManager entityManager;
 
-    public UserService(UserRepository users) {
+    public UserService(UserRepository users, EntityManager entityManager) {
         this.users = users;
+        this.entityManager = entityManager;
     }
 
     /** The current user's live profile, or {@code 401} if the account is gone/archived. */
@@ -30,6 +33,12 @@ public class UserService {
     @Transactional
     public User updateMe(UUID userId, UserUpdate patch) {
         User user = liveUser(userId);
+        if (patch.gender() != null) {
+            if (!patch.gender().equals(users.claimGender(userId, patch.gender()))) {
+                throw new ConflictException("Your gender is already set. Contact support to change it.");
+            }
+            entityManager.refresh(user);
+        }
         if (patch.name() != null) {
             if (user.isVerified() && !patch.name().equals(user.getName())) {
                 throw new ConflictException(ErrorCodes.NAME_LOCKED_WHILE_VERIFIED,

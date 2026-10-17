@@ -15,6 +15,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
@@ -212,6 +213,11 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
 
     void removeMember(FlatmateGroupMember member) {
         this.members.remove(member);
+    }
+
+    UUID[] parties() {
+        return Stream.concat(Stream.of(hostId),
+                members.stream().map(FlatmateGroupMember::getUserId)).toArray(UUID[]::new);
     }
 
     void hunt(FlatmateGroupPreferences p) {

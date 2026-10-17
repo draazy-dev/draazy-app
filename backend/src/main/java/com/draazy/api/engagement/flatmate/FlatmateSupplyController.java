@@ -78,6 +78,7 @@ public class FlatmateSupplyController {
 
     @PostMapping(Routes.Flatmates.ROOM_INTEREST)
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public void roomInterest(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody(required = false) FlatmateSeekerController.InterestRequest body) {
         service.roomInterest(principal, id,
@@ -115,8 +116,9 @@ public class FlatmateSupplyController {
         return service.setGroupSeats(principal, id, body.seatsOpen());
     }
 
-         @PostMapping(Routes.Flatmates.GROUP_JOIN)
+    @PostMapping(Routes.Flatmates.GROUP_JOIN)
     @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
     public FlatmateRequestDto join(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody(required = false) FlatmateSeekerController.InterestRequest body) {
         return service.join(principal, id,

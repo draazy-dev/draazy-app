@@ -60,6 +60,20 @@ public interface UserRepository extends JpaRepository<User, UUID>, RoleSource {
     int touchLastActive(@Param("id") UUID id, @Param("now") java.time.Instant now,
             @Param("cutoff") java.time.Instant cutoff);
 
+    // No clearAutomatically: callers hold locked room/group entities that must stay managed.
+    @Modifying(flushAutomatically = true)
+    @Query("update User u set u.gender = :gender where u.id = :id and u.gender is null")
+    int claimGenderIfUnset(@Param("id") UUID id, @Param("gender") String gender);
+
+    // A scalar read, so a first-level-cached entity cannot answer with a stale value.
+    @Query("select u.gender from User u where u.id = :id")
+    String genderOf(@Param("id") UUID id);
+
+    /** Saves the gender when none is on file; either way returns the value now stored. */
+    default String claimGender(UUID id, String gender) {
+        return claimGenderIfUnset(id, gender) == 1 ? gender : genderOf(id);
+    }
+
     // Unpaged on purpose: used only by the last-administrator floor.
     @Query("select u from User u where u.role = :role and u.archived = false")
     List<User> findLiveByRole(@Param("role") String role);

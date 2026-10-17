@@ -9,6 +9,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -67,6 +68,11 @@ public interface FlatmateReviewRepository extends JpaRepository<FlatmateReview, 
     List<FlatmateReview> findByGroupIdIn(Collection<UUID> groupIds);
 
     List<FlatmateReview> findByRoomIdIn(Collection<UUID> roomIds);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update FlatmateReview r set r.ownerConsent = true "
+            + "where (r.roomId = :postId or r.groupId = :postId) and r.status = 'pending'")
+    int markOwnerConsent(@Param("postId") UUID postId);
 
     /** A null {@code validTill} deliberately never matches — "no end date recorded" is not expiry.
      * Literal status because JPQL cannot dereference {@link FlatmateVocabulary#STATUS_APPROVED}. */

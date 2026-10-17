@@ -122,15 +122,14 @@ public final class ErasureRetention {
                 "saved_searches.mobile — the number property alerts are delivered to. A stored"
                         + " number rather than a reference, so it outlives the pseudonymised users"
                         + " row that the rest of the saved search hangs off.",
-                "managed_properties.tenant_name — a third party's name typed in by an owner. Erasing"
-                        + " the owner does not touch it, and the tenant it names has no account here"
-                        + " to erase from.",
                 "flatmate_groups.owner_consent_mobile / flatmate_rooms.owner_consent_mobile / "
                         + "flatmate_owner_consents.owner_mobile — the flat owner's number, captured"
                         + " as evidence of their consent to a flatmate post. The consent record keys"
                         + " on the number itself.",
                 "flatmate_seeker_posts — name, age and occupation are stored on the post rather than"
                         + " read through user_id, so the post keeps describing its author after the"
-                        + " users row stops naming anybody.");
+                        + " users row stops naming anybody. The post itself is taken off the board.",
+                "flatmate_requests — an answered ask keeps its message so the other person's inbox"
+                        + " history stays whole; unanswered asks are deleted.");
     }
 }

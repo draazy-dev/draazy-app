@@ -29,8 +29,6 @@ import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -218,8 +216,19 @@ public class FlatmateSupplyService {
         genderGate.admitToRoom(caller.userId(), room.getGender(), gender);
         String intent = FlatmateVocabulary.orDefault(
                 share, FlatmateVocabulary.SHARE_INTENT, "solo", "share intent");
+        if (noSpaceFor(room, "bring".equals(intent) ? 2 : 1)) {
+            throw FlatmateConflicts.roomFull("This room is full right now.");
+        }
         record(caller, "room", room.getId(), room.getHostId(), "request", intent,
                 roomPitch(message, intent), "your room in " + room.getLocality());
+    }
+
+    private boolean noSpaceFor(FlatmateRoom room, int people) {
+        if (room.isSplitRoom()) {
+            int siblings = committedInFlat(room) - room.getOccupants();
+            return room.getOccupants() + people > Math.min(MAX_PER_ROOM, room.getMaxOccupants() - siblings);
+        }
+        return room.isSeatBased() && (room.getSeatsOpen() == null || room.getSeatsOpen() <= 0);
     }
 
     @Transactional
@@ -282,12 +291,7 @@ public class FlatmateSupplyService {
     @Transactional
     public FlatmateRoomDto updateRoom(AuthPrincipal caller, UUID roomId,
             FlatmateRoomCreateRequest body) {
-        FlatmateRoom room = rooms.findById(roomId)
-                .filter(r -> !r.isArchived())
-                .orElseThrow(() -> NotFoundException.of("Room"));
-        if (!room.getHostId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only edit a room you posted.");
-        }
+        FlatmateRoom room = ownedRoom(caller, roomId);
         if (room.isSplitRoom()) {
             throw new ConflictException(FlatmateConflicts.mark(
                     "This room came from splitting a flat, so its address is the flat's. "
@@ -363,12 +367,7 @@ public class FlatmateSupplyService {
     @Transactional
     public FlatmateGroupDto updateGroup(AuthPrincipal caller, UUID groupId,
             FlatmateGroupCreateRequest body) {
-        FlatmateGroup group = groups.findById(groupId)
-                .filter(g -> !g.isArchived())
-                .orElseThrow(() -> NotFoundException.of("Group"));
-        if (!group.getHostId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only edit a group you created.");
-        }
+        FlatmateGroup group = ownedGroup(caller, groupId);
 
         FlatmateGroupClaim claim = FlatmateGroupClaim.of(body,
                 () -> declaresAgreement(caller.userId(), body.agreement(), body.agreementDoc()),
@@ -433,12 +432,7 @@ public class FlatmateSupplyService {
 
     @Transactional
     public void deleteGroup(AuthPrincipal caller, UUID groupId) {
-        FlatmateGroup group = groups.findById(groupId)
-                .filter(g -> !g.isArchived())
-                .orElseThrow(() -> NotFoundException.of("Group"));
-        if (!group.getHostId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only remove a group you created.");
-        }
+        FlatmateGroup group = ownedGroup(caller, groupId);
         group.archive("removed by the host");
         groups.saveAndFlush(group);
         membership.disband(group);
@@ -446,12 +440,7 @@ public class FlatmateSupplyService {
 
     @Transactional
     public FlatmateGroupDto setGroupSeats(AuthPrincipal caller, UUID groupId, int seatsOpen) {
-        FlatmateGroup group = groups.findById(groupId)
-                .filter(g -> !g.isArchived())
-                .orElseThrow(() -> NotFoundException.of("Group"));
-        if (!group.getHostId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only change seats on a group you created.");
-        }
+        FlatmateGroup group = ownedGroup(caller, groupId);
         int taken = group.getSeatsTotal() - group.openSeats();
         int max = FlatmateGroup.MAX_SEATS - taken;
         if (seatsOpen < 0 || seatsOpen > max) {
@@ -682,14 +671,18 @@ public class FlatmateSupplyService {
                 .sum();
     }
 
+    /** Locked, so the host's write and a staff verdict or a seat-taking acceptance cannot interleave;
+     * a stranger's id is a 404 so ids do not become an existence oracle. */
     private FlatmateRoom ownedRoom(AuthPrincipal caller, UUID roomId) {
-        FlatmateRoom room = rooms.findById(roomId)
-                .filter(r -> !r.isArchived())
+        return rooms.lockLive(roomId)
+                .filter(r -> r.getHostId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Room"));
-        if (!room.getHostId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only change a room you posted.");
-        }
-        return room;
+    }
+
+    private FlatmateGroup ownedGroup(AuthPrincipal caller, UUID groupId) {
+        return groups.lockLive(groupId)
+                .filter(g -> g.getHostId().equals(caller.userId()))
+                .orElseThrow(() -> NotFoundException.of("Group"));
     }
 
     private String hostName(UUID hostId) {

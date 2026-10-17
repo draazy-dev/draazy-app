@@ -17,6 +17,6 @@ public record FlatmateModeratorEdit(
         @Size(max = 600) @NoContactDetails(message = NO_CONTACT) String note,
         @Min(1) @Max(10_000_000) Long rent,
         @Min(0) @Max(10_000_000) Long deposit,
-        @Size(min = 1, max = 10) List<@NotBlank @Size(max = 80) String> localities,
+        @Size(min = 1, max = 10) List<@NotBlank @Size(max = 80) @NoContactDetails(message = NO_CONTACT) String> localities,
         LocalDate moveIn) {
 }

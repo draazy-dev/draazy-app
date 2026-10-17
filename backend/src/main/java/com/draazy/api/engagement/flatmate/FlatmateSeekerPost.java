@@ -18,7 +18,7 @@ import org.hibernate.type.SqlTypes;
 @Entity
 @Table(name = "flatmate_seeker_posts")
 @Getter
-public class FlatmateSeekerPost extends AuditedEntity {
+public class FlatmateSeekerPost extends AuditedEntity implements FlatmateModerated {
 
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;

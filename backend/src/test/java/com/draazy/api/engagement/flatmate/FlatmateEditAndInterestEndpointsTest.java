@@ -226,7 +226,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(liveRoomBody(host, "Baner", "Sunrise Heights", 1000)))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isNotFound());
         }
 
         @Test
@@ -309,7 +309,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
-                                    {"message":"Call me on 9811000195."}
+                                    {"message":"Is the room still free?"}
                                     """))
                     .andExpect(status().isCreated());
 

@@ -1,5 +1,8 @@
 package com.draazy.api.engagement.flatmate;
 
+import static com.draazy.api.engagement.flatmate.FlatmateVocabulary.NO_CONTACT;
+
+import com.draazy.api.catalog.listing.NoContactDetails;
 import com.draazy.api.common.error.BadRequestException;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -11,7 +14,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 public record FlatmateGroupPreferences(
-        @NotNull @Size(min = 1, max = MAX_LOCALITIES) List<@NotBlank @Size(max = 80) String> localities,
+        @NotNull @Size(min = 1, max = MAX_LOCALITIES) List<@NotBlank @Size(max = 80) @NoContactDetails(message = NO_CONTACT) String> localities,
         @Size(max = 4) List<@NotBlank String> bhk,
         @Min(0) @Max(10_000_000) Long rentMin,
         @NotNull @Min(1) @Max(10_000_000) Long rentMax,

@@ -1,6 +1,5 @@
 package com.draazy.api.engagement.flatmate;
 
-import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.security.AuthPrincipal;
@@ -76,19 +75,19 @@ public class FlatmateExpiryService {
     public void renew(AuthPrincipal caller, String kind, UUID id) {
         switch (kind == null ? "" : kind) {
             case "room" -> {
-                FlatmateRoom r = rooms.findById(id).filter(x -> !x.isArchived())
+                FlatmateRoom r = rooms.findLockedById(id).filter(x -> !x.isArchived())
                         .orElseThrow(() -> NotFoundException.of("Flatmate room"));
                 requireOwner(caller, r.getHostId());
                 r.setModStatus(r.getExpiry().revive(r.getModStatus()));
             }
             case "group" -> {
-                FlatmateGroup g = groups.findById(id).filter(x -> !x.isArchived())
+                FlatmateGroup g = groups.findLockedById(id).filter(x -> !x.isArchived())
                         .orElseThrow(() -> NotFoundException.of("Flatmate group"));
                 requireOwner(caller, g.getHostId());
                 g.setModStatus(g.getExpiry().revive(g.getModStatus()));
             }
             case "post" -> {
-                FlatmateSeekerPost p = posts.findById(id).filter(x -> !x.isArchived())
+                FlatmateSeekerPost p = posts.findLockedById(id).filter(x -> !x.isArchived())
                         .orElseThrow(() -> NotFoundException.of("Flatmate post"));
                 requireOwner(caller, p.getUserId());
                 p.setModStatus(p.getExpiry().revive(p.getModStatus()));
@@ -97,9 +96,10 @@ public class FlatmateExpiryService {
         }
     }
 
+    /** A stranger's id is a 404, as on every other owner-scoped flatmate write. */
     private static void requireOwner(AuthPrincipal caller, UUID ownerId) {
         if (!ownerId.equals(caller.userId())) {
-            throw new ForbiddenException("You can only renew your own flatmate post.");
+            throw NotFoundException.of("Flatmate post");
         }
     }
 

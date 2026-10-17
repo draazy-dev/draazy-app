@@ -128,10 +128,6 @@ public class FlatmateReview extends AuditedEntity {
                 && doc.get("id") != null && doc.get("id").equals(this.agreementDoc.get("id"));
     }
 
-    void recordOwnerConsent() {
-        this.ownerConsent = true;
-    }
-
     /** One predicate for both {@code requireConsentToApprove} and the unsupervised
      * {@code FlatmateTrustReconciler} sweep, so a new condition cannot be enforced on only one. */
     boolean badgeable() {

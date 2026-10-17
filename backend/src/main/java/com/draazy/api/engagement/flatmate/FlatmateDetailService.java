@@ -94,7 +94,7 @@ public class FlatmateDetailService {
     }
 
     private boolean hostActive(UUID hostId) {
-        return users.findById(hostId).filter(u -> !UserStatuses.SUSPENDED.equals(u.getStatus())).isPresent();
+        return users.findById(hostId).filter(u -> UserStatuses.ACTIVE.equals(u.getStatus()) && !u.isArchived()).isPresent();
     }
 
     private static boolean isHost(AuthPrincipal caller, UUID hostId) {

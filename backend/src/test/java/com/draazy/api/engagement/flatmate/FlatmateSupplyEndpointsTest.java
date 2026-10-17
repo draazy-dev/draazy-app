@@ -289,7 +289,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         return publish("flatmate_groups", idOf(json));
     }
 
-    // The address is the consent's scope (V30), so it must be the one the post will fingerprint at
+    // The address is the consent's scope, so it must be the one the post will fingerprint at
     // — a group names its flat by title, a room by society — or the post is filed without the flag.
     private String recordOwnerConsent(User host, String title, String society, String locality)
             throws Exception {
@@ -680,7 +680,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(other))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"seatsOpen\":0}"))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isNotFound());
         }
     }
 

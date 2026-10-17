@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
+import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -12,29 +13,47 @@ class FlatmateAcceptance {
 
     private final FlatmateGroupRepository groups;
     private final FlatmateRoomRepository rooms;
+    private final FlatmateSeekerPostRepository posts;
     private final UserRepository users;
     private final FlatmateMembershipService membership;
+    private final FlatmateGenderGate genderGate;
 
     FlatmateAcceptance(FlatmateGroupRepository groups, FlatmateRoomRepository rooms,
-            UserRepository users, FlatmateMembershipService membership) {
+            FlatmateSeekerPostRepository posts, UserRepository users,
+            FlatmateMembershipService membership, FlatmateGenderGate genderGate) {
         this.groups = groups;
         this.rooms = rooms;
+        this.posts = posts;
         this.users = users;
         this.membership = membership;
+        this.genderGate = genderGate;
     }
 
+    /** Only a public ad can take someone on: staff may have hidden it since the ask arrived. */
     void apply(FlatmateRequest request) {
         switch (request.getKind()) {
             case "group" -> joinGroup(request);
             case "room" -> takeRoom(request);
-            default -> { }
+            default -> {
+                FlatmateSeekerPost post = posts.findLockedById(request.getTargetId())
+                        .filter(p -> !p.isArchived()).orElse(null);
+                requireLive(post == null ? null : post.getModStatus());
+                genderGate.refuseKnownMismatch(request.getRequesterId(), post.getFlatPref(), "post");
+            }
+        }
+    }
+
+    private static void requireLive(String modStatus) {
+        if (!FlatmateVocabulary.isPublic(modStatus)) {
+            throw new ConflictException("Your ad is not live right now, so you cannot accept requests on it.");
         }
     }
 
     private void joinGroup(FlatmateRequest request) {
         FlatmateGroup group = groups.lockLive(request.getTargetId())
                 .orElseThrow(() -> NotFoundException.of("Group"));
-
+        requireLive(group.getModStatus());
+        genderGate.refuseKnownMismatch(request.getRequesterId(), group.getPolicy(), "group");
         int open = group.openSeats();
         if (open <= 0) {
             throw FlatmateConflicts.groupFull("This group is full.");
@@ -54,6 +73,8 @@ class FlatmateAcceptance {
         FlatmateRoom room = flat.stream().filter(r -> r.getId().equals(roomId)).findFirst()
                 .or(() -> rooms.lockLive(roomId))
                 .orElseThrow(() -> NotFoundException.of("Room"));
+        requireLive(room.getModStatus());
+        genderGate.refuseKnownMismatch(request.getRequesterId(), room.getGender(), "room");
         if (room.isSplitRoom()) {
             addOccupants(room, flat, "bring".equals(request.getShare()) ? 2 : 1);
         } else if (room.isSeatBased()) {

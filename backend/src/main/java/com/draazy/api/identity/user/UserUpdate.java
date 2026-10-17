@@ -13,6 +13,7 @@ public record UserUpdate(
         @Email String email,
         String avatar,
         String city,
+        @Pattern(regexp = "male|female") String gender,
         Boolean hideNumber,
         Boolean verifiedContactOnly,
         Boolean shareActivityStatus,

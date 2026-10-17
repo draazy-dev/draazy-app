@@ -10,14 +10,22 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FlatmateRoomRepository extends JpaRepository<FlatmateRoom, UUID> {
 
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update FlatmateRoom r set r.ownerConsent = true where r.id = :id")
+    int markOwnerConsent(@Param("id") UUID id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from FlatmateRoom r where r.id = :id and r.archived = false")
     Optional<FlatmateRoom> lockLive(@Param("id") UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<FlatmateRoom> findLockedById(UUID id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
@@ -34,7 +42,7 @@ public interface FlatmateRoomRepository extends JpaRepository<FlatmateRoom, UUID
             select r from FlatmateRoom r
             where r.id = :id and r.archived = false
               and r.modStatus in ('live','approved')
-              and not exists (select 1 from User u where u.id = r.hostId and u.status = 'suspended')
+              and not exists (select 1 from User u where u.id = r.hostId and (u.status <> 'active' or u.archived = true))
             """)
     Optional<FlatmateRoom> findVisible(@Param("id") UUID id);
 
@@ -60,21 +68,25 @@ public interface FlatmateRoomRepository extends JpaRepository<FlatmateRoom, UUID
     long countCappedByHost(@Param("hostId") UUID hostId);
 
     /** Live claims on one physical address, for the duplicate/contested check. */
-    List<FlatmateRoom> findByAddressFingerprintAndArchivedFalse(String fingerprint);
+    List<FlatmateRoom> findByAddressFingerprintAndArchivedFalseOrderByIdAsc(String fingerprint);
 
     /** {@code FlatmateGuardrails.fingerprint} writes a {@code prop:} fingerprint only for
      * owner tier, so that prefix names exactly the flat whose Ops approval bought the badge. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select r from FlatmateRoom r
             where r.archived = false and r.verificationTier = 'owner'
               and r.addressFingerprint like 'prop:%'
+            order by r.id
             """)
     List<FlatmateRoom> findOwnerTierClaims();
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select r from FlatmateRoom r
             where r.archived = false and r.modStatus in ('live','approved')
               and r.expiry.activeUntil < :before and (r.expiry.reminded = false or :remindedToo = true)
+            order by r.id
             """)
     List<FlatmateRoom> findPublicActiveUntil(@Param("before") Instant before,
             @Param("remindedToo") boolean remindedToo);

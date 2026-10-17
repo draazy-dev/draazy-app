@@ -205,7 +205,7 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(other))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(body("Gita", "Baner")))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isNotFound());
         }
 
         @Test
@@ -240,7 +240,7 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(requester))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
-                                    {"share":"solo","message":"Hi! Call me on 9810000021."}
+                                    {"share":"solo","message":"Hi! I work nearby and keep early hours."}
                                     """))
                     .andExpect(status().isCreated());
 

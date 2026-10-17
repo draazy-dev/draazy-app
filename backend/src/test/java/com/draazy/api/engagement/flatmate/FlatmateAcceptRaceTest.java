@@ -58,7 +58,9 @@ class FlatmateAcceptRaceTest {
     }
 
     private UUID applicationFrom(User host, UUID listing) {
-        FlatmateGroup group = groups.saveAndFlush(new FlatmateGroup(host.getId(), "Race group", "Baner", 40000L));
+        FlatmateGroup live = new FlatmateGroup(host.getId(), "Race group", "Baner", 40000L);
+        live.setModStatus(FlatmateVocabulary.MOD_LIVE);
+        FlatmateGroup group = groups.saveAndFlush(live);
         groupIds.add(group.getId());
         return applications.saveAndFlush(
                 new FlatmateGroupApplication(listing, group.getId(), host.getId())).getId();

@@ -97,13 +97,18 @@ public class FlatmateTrustReconciler {
      * row's standing verdict, so an {@code approved} row behind a demoted post contradicts itself. */
     @Transactional
     public int reconcileAgreementExpiry() {
-        List<FlatmateReview> lapsed = reviews.findLapsedApprovals(LocalDate.now());
-        for (FlatmateReview review : lapsed) {
+        List<FlatmateReview> lapsed = new ArrayList<>();
+        for (FlatmateReview review : reviews.findLapsedApprovals(LocalDate.now())) {
+            badges.lockWithPost(review);
+            if (!FlatmateVocabulary.STATUS_APPROVED.equals(review.getStatus())) {
+                continue;
+            }
             review.expire(review.getAgreement().getValidTill());
             badges.apply(review, false);
             notifier.notify(review.getHostId(), "flatmate.review.expired",
                     "Your flatmate verification has expired",
                     review.getReason(), FlatmateLinks.of(review));
+            lapsed.add(review);
         }
         reviews.saveAllAndFlush(lapsed);
         return lapsed.size();
@@ -117,6 +122,10 @@ public class FlatmateTrustReconciler {
 
             // The same gate a moderator would face, plus the expiry a standing badge is swept for.
             if (!review.badgeable() || review.getAgreement().expiredOn(LocalDate.now())) {
+                continue;
+            }
+            badges.lockWithPost(review);
+            if (!FlatmateVocabulary.STATUS_PENDING.equals(review.getStatus()) || !review.badgeable()) {
                 continue;
             }
             UUID propertyId = propertyBehind(review);

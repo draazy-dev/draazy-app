@@ -21,11 +21,14 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
     Optional<FlatmateGroup> lockLive(@Param("id") UUID id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<FlatmateGroup> findLockedById(UUID id);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select g from FlatmateGroup g
             where g.id = :id and g.archived = false
               and g.modStatus in ('live','approved')
-              and not exists (select 1 from User u where u.id = g.hostId and u.status = 'suspended')
+              and not exists (select 1 from User u where u.id = g.hostId and (u.status <> 'active' or u.archived = true))
             """)
     Optional<FlatmateGroup> lockVisible(@Param("id") UUID id);
 
@@ -34,6 +37,7 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
             left join fetch g.members
             where g.id = :id and g.archived = false
               and g.modStatus in ('live','approved')
+              and not exists (select 1 from User u where u.id = g.hostId and (u.status <> 'active' or u.archived = true))
             """)
     Optional<FlatmateGroup> findVisible(@Param("id") UUID id);
 
@@ -44,19 +48,25 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
             """)
     long countCappedByHost(@Param("hostId") UUID hostId);
 
-    List<FlatmateGroup> findByAddressFingerprintAndArchivedFalse(String fingerprint);
+    List<FlatmateGroup> findByAddressFingerprintAndArchivedFalseOrderByIdAsc(String fingerprint);
 
+    List<FlatmateGroup> findByHostIdAndArchivedFalse(UUID hostId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select g from FlatmateGroup g
             where g.archived = false and g.verificationTier = 'owner'
               and g.addressFingerprint like 'prop:%'
+            order by g.id
             """)
     List<FlatmateGroup> findOwnerTierClaims();
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             select g from FlatmateGroup g
             where g.archived = false and g.modStatus in ('live','approved')
               and g.expiry.activeUntil < :before and (g.expiry.reminded = false or :remindedToo = true)
+            order by g.id
             """)
     List<FlatmateGroup> findPublicActiveUntil(@Param("before") Instant before,
             @Param("remindedToo") boolean remindedToo);
@@ -120,4 +130,8 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("update FlatmateGroupMember m set m.verified = :verified where m.userId = :userId and m.verified <> :verified")
     int copyMemberBadge(@Param("userId") UUID userId, @Param("verified") boolean verified);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("update FlatmateGroup g set g.ownerConsent = true where g.id = :id")
+    int markOwnerConsent(@Param("id") UUID id);
 }

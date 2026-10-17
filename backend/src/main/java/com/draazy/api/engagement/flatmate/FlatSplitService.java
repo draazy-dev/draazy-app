@@ -10,6 +10,7 @@ import com.draazy.api.catalog.society.SocietyRepository;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.AuthPrincipal;
@@ -39,22 +40,28 @@ public class FlatSplitService {
     private final FlatmateMapper mapper;
     private final UserRepository users;
     private final SocietyRepository societies;
+    private final RateLimitLock locks;
 
     public FlatSplitService(PropertyRepository properties, FlatmateRoomRepository rooms,
-            FlatmateGuardrails guardrails, FlatmateMapper mapper, UserRepository users, SocietyRepository societies) {
+            FlatmateGuardrails guardrails, FlatmateMapper mapper, UserRepository users, SocietyRepository societies,
+            RateLimitLock locks) {
         this.properties = properties;
         this.rooms = rooms;
         this.guardrails = guardrails;
         this.mapper = mapper;
         this.users = users;
         this.societies = societies;
+        this.locks = locks;
     }
 
-    /** A property that is not the caller's answers exactly as an unknown id, so ids cannot be probed. */
+    /** A property that is not the caller's answers exactly as an unknown id, so ids cannot be probed.
+     * Split and unsplit serialise on the listing, so neither acts on a check the other just made stale. */
     private Property ownedBy(AuthPrincipal caller, UUID propertyId) {
-        return properties.findById(propertyId)
+        Property parent = properties.findById(propertyId)
                 .filter(p -> !p.isArchived() && p.getOwner() != null && p.getOwner().getId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Property"));
+        locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION, propertyId.toString());
+        return parent;
     }
 
     /** {@code POST /properties/{id}/split} — owner-only, rent-only, once-only. */
@@ -119,7 +126,7 @@ public class FlatSplitService {
     public void unsplit(AuthPrincipal caller, UUID propertyId) {
         Property parent = ownedBy(caller, propertyId);
 
-        List<FlatmateRoom> siblings = rooms.findByPropertyIdAndArchivedFalse(propertyId);
+        List<FlatmateRoom> siblings = rooms.lockFlat(propertyId);
         if (siblings.isEmpty()) {
             throw NotFoundException.of("Split");
         }

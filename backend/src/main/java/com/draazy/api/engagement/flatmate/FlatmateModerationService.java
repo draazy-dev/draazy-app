@@ -1,9 +1,13 @@
 package com.draazy.api.engagement.flatmate;
 
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -12,6 +16,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
@@ -38,13 +43,16 @@ public class FlatmateModerationService {
     private final GroupApplicationHydrator applicationHydrator;
     private final Notifier notifier;
     private final AuditService audit;
+    private final PropertyRepository properties;
+    private final RateLimitLock locks;
 
     public FlatmateModerationService(FlatmateReviewRepository reviews,
             FlatmateGroupApplicationRepository applications, FlatmateRoomRepository rooms,
             FlatmateGroupRepository groups, FlatmateSeekerPostRepository posts,
             UserRepository users, FlatmateBadges badges,
             GroupApplicationHydrator applicationHydrator,
-            Notifier notifier, AuditService audit) {
+            Notifier notifier, AuditService audit, PropertyRepository properties,
+            RateLimitLock locks) {
         this.reviews = reviews;
         this.applications = applications;
         this.rooms = rooms;
@@ -55,6 +63,8 @@ public class FlatmateModerationService {
         this.applicationHydrator = applicationHydrator;
         this.notifier = notifier;
         this.audit = audit;
+        this.properties = properties;
+        this.locks = locks;
     }
 
     /** Both filters run in the query rather than being re-applied in Java, which paging would turn
@@ -79,7 +89,7 @@ public class FlatmateModerationService {
             String reason) {
         String verdict = FlatmateVocabulary.require(
                 status == null ? "" : status.strip(),
-                java.util.Set.of("approved", "rejected"), "status");
+                Set.of("approved", "rejected"), "status");
         String why = FlatmateVocabulary.blankToNull(reason);
         if ("rejected".equals(verdict) && why == null) {
             throw new BadRequestException(
@@ -88,6 +98,15 @@ public class FlatmateModerationService {
 
         FlatmateReview review = reviews.findById(reviewId)
                 .orElseThrow(() -> NotFoundException.of("Flatmate review"));
+        badges.lockWithPost(review);
+        requireNotParty(caller, badges.partiesOf(review));
+        if (verdict.equals(review.getStatus())) {
+            return reviewDto(review);
+        }
+        if (!FlatmateVocabulary.STATUS_PENDING.equals(review.getStatus())) {
+            throw new ConflictException(
+                    "This badge review is already decided. It reopens when the host edits the post.");
+        }
         requireConsentToApprove(review, verdict);
         review.decide(verdict, why, caller.userId());
         reviews.saveAndFlush(review);
@@ -97,12 +116,24 @@ public class FlatmateModerationService {
         tellHost(review, approved, why);
 
         audit.record(caller, "flatmate.review." + verdict, "flatmateReview",
-                review.getId().toString(), "host", review.getHostId().toString());
+                review.getId().toString(), "host", review.getHostId().toString(), "note", why);
+        return reviewDto(review);
+    }
 
+    private FlatmateReviewDto reviewDto(FlatmateReview review) {
         User host = users.findById(review.getHostId()).orElse(null);
         return FlatmateReviewDto.of(review,
                 host == null ? null : host.getName(),
                 host == null ? null : host.getMobile());
+    }
+
+    /** Staff accounts are separate user rows, so this catches the one identity acting as maker and checker. */
+    static void requireNotParty(AuthPrincipal caller, UUID... parties) {
+        for (UUID party : parties) {
+            if (caller.userId().equals(party)) {
+                throw new ForbiddenException("You cannot moderate something you posted or are part of.");
+            }
+        }
     }
 
     /* The page is global: each source yields its first {@code (page + 1) * size} rows in the shared order,
@@ -117,7 +148,7 @@ public class FlatmateModerationService {
                 recheck ? null : FlatmateVocabulary.MOD_PENDING);
         List<String> wanted = nonBlank(kinds).stream()
                 .map(k -> FlatmateVocabulary.require(k,
-                        java.util.Set.of(FlatmateModerationQueueDto.KIND_POST,
+                        Set.of(FlatmateModerationQueueDto.KIND_POST,
                                 FlatmateModerationQueueDto.KIND_ROOM,
                                 FlatmateModerationQueueDto.KIND_GROUP), "kind"))
                 .distinct().toList();
@@ -165,7 +196,8 @@ public class FlatmateModerationService {
     }
 
     private static final List<String> PUBLISHED = List.of("approved", "live");
-    private static final List<String> HIDDEN = List.of("flagged", "removed", "rejected");
+    private static final List<String> HIDDEN = List.of("flagged", "removed", "rejected",
+            FlatmateVocabulary.MOD_EXPIRED);
 
     /** One card per awaiting post or application, and one per badge claim whose post is not itself
      * awaiting — the same cards the pending tab builds from its three lists. */
@@ -233,12 +265,14 @@ public class FlatmateModerationService {
                 .map(FlatmateVocabulary::blankToNull).filter(java.util.Objects::nonNull).toList();
     }
 
+    /** {@code expired} is filterable but never a verdict: only the host's renewal leaves it. */
     private static List<String> modStates(List<String> requested, String fallback) {
         if (requested.isEmpty()) {
             return fallback == null ? List.of() : List.of(fallback);
         }
         return requested.stream()
-                .map(s -> FlatmateVocabulary.require(s, FlatmateVocabulary.MOD_STATUS, "modStatus"))
+                .map(s -> FlatmateVocabulary.MOD_EXPIRED.equals(s) ? s
+                        : FlatmateVocabulary.require(s, FlatmateVocabulary.MOD_STATUS, "modStatus"))
                 .distinct().toList();
     }
 
@@ -252,8 +286,8 @@ public class FlatmateModerationService {
                 .collect(Collectors.toMap(User::getId, User::getName));
     }
 
-    /** The id may name a post, a room or a group; tried in turn because an admin acting on an abuse
-     * report has an id, not a taxonomy. Any pending re-check is dropped whatever the verdict. */
+    /** The id may name a post, a room or a group, since an abuse report carries an id, not a taxonomy.
+     * Re-stamping the current state is "Looks fine": it only drops the pending re-check. */
     @Transactional
     public void moderate(AuthPrincipal caller, UUID targetId, String modStatus, String note) {
         String requested = FlatmateVocabulary.require(
@@ -261,50 +295,64 @@ public class FlatmateModerationService {
                 FlatmateVocabulary.MOD_STATUS, "modStatus");
         String verdict = FlatmateVocabulary.MOD_LIVE.equals(requested)
                 ? FlatmateVocabulary.MOD_APPROVED : requested;
+        String why = FlatmateVocabulary.blankToNull(note);
 
-        Moderated item = posts.findById(targetId).map(p -> {
-            String before = p.getModStatus();
-            p.setModStatus(verdict);
-            p.getRecheck().clear();
-            p.getExpiry().restart();
-            posts.saveAndFlush(p);
-            return new Moderated("flatmateSeekerPost", "post", p.getUserId(), before);
-        }).or(() -> rooms.findById(targetId).map(r -> {
-            String before = r.getModStatus();
-            r.setModStatus(verdict);
-            r.getRecheck().clear();
-            r.getExpiry().restart();
-            rooms.saveAndFlush(r);
-            return new Moderated("flatmateRoom", "room", r.getHostId(), before);
-        })).or(() -> groups.findById(targetId).map(g -> {
-            String before = g.getModStatus();
-            g.setModStatus(verdict);
-            g.getRecheck().clear();
-            g.getExpiry().restart();
-            groups.saveAndFlush(g);
-            return new Moderated("flatmateGroup", "group", g.getHostId(), before);
-        })).orElseThrow(() -> NotFoundException.of("Flatmate post"));
+        Moderated item = posts.findLockedById(targetId)
+                .map(p -> new Moderated(p, "flatmateSeekerPost", "post", p.getUserId()))
+                .or(() -> rooms.findLockedById(targetId)
+                        .map(r -> new Moderated(r, "flatmateRoom", "room", r.getHostId())))
+                .or(() -> groups.findLockedById(targetId)
+                        .map(g -> new Moderated(g, "flatmateGroup", "group", g.getHostId())))
+                .orElseThrow(() -> NotFoundException.of("Flatmate post"));
+        requireNotParty(caller, item.post() instanceof FlatmateGroup g ? g.parties() : new UUID[] {item.authorId()});
 
-        tellAuthor(item, targetId, verdict);
+        FlatmateModerated post = item.post();
+        String before = post.getModStatus();
+        if (FlatmateVocabulary.MOD_EXPIRED.equals(before) && !"removed".equals(verdict)) {
+            throw new ConflictException("This post has expired; the host must renew it.");
+        }
+        boolean stateChanges = !verdict.equals(before);
+        if (!stateChanges && post.getRecheck().getRequestedAt() == null) {
+            return;
+        }
+        if (stateChanges && why == null && (HIDING.contains(verdict) || UNDOING.contains(before))) {
+            throw new BadRequestException("Add a note saying why — it is kept on the audit trail.");
+        }
 
-        audit.record(caller, "flatmate.moderate", item.auditKind(), targetId.toString(),
-                "modStatus", verdict + (note == null ? "" : " — " + note));
+        post.setModStatus(verdict);
+        post.getRecheck().clear();
+        boolean published = FlatmateVocabulary.isPublic(verdict) && !FlatmateVocabulary.isPublic(before);
+        if (published) {
+            post.getExpiry().restart();
+        }
+        posts.flush();
+
+        tellAuthor(item, targetId, before, verdict);
+
+        audit.record(caller, stateChanges ? "flatmate.moderate" : "flatmate.recheck.clear",
+                item.auditKind(), targetId.toString(),
+                "from", before, "modStatus", verdict, "note", why);
     }
 
-    private record Moderated(String auditKind, String linkKind, UUID authorId, String before) {
+    /** Hiding, and undoing a removal or rejection, are the verdicts a later moderator must be able to explain. */
+    private static final Set<String> HIDING = Set.of("flagged", "removed", "rejected");
+    private static final Set<String> UNDOING = Set.of("removed", "rejected");
+
+    private record Moderated(FlatmateModerated post, String auditKind, String linkKind, UUID authorId) {
     }
 
-    private void tellAuthor(Moderated item, UUID targetId, String verdict) {
-        boolean wasPublic = FlatmateVocabulary.isPublic(item.before());
+    private void tellAuthor(Moderated item, UUID targetId, String before, String verdict) {
+        boolean wasPublic = FlatmateVocabulary.isPublic(before);
         boolean isPublic = FlatmateVocabulary.isPublic(verdict);
         String link = FlatmateLinks.of(item.linkKind(), targetId);
         if (isPublic && !wasPublic) {
             notifier.notify(item.authorId(), "flatmate.moderated.live", "Your flatmate ad is live",
                     "People can now see it and contact you.", link);
-        } else if (!isPublic && !verdict.equals(item.before())
-                && ("rejected".equals(verdict) || "removed".equals(verdict))) {
+        } else if (!verdict.equals(before) && ("rejected".equals(verdict) || "removed".equals(verdict))) {
             notifier.notify(item.authorId(), "flatmate.moderated." + verdict,
-                    "Your flatmate ad is not live", "It did not pass our review.", link);
+                    "Your flatmate ad is not live",
+                    "It did not pass our review. Edit it to follow our posting rules, or contact support from Help.",
+                    link);
         }
     }
 
@@ -327,13 +375,37 @@ public class FlatmateModerationService {
                 modStatus == null ? "" : modStatus.strip(),
                 FlatmateVocabulary.MOD_STATUS, "modStatus");
 
+        UUID listingId = applications.findListingId(applicationId)
+                .orElseThrow(() -> NotFoundException.of("Group application"));
+        locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION, listingId.toString());
         FlatmateGroupApplication application = applications.findById(applicationId)
                 .orElseThrow(() -> NotFoundException.of("Group application"));
-        application.moderate(verdict, FlatmateVocabulary.blankToNull(note));
+        UUID listingOwner = properties.findById(listingId)
+                .map(p -> p.getOwner() == null ? null : p.getOwner().getId()).orElse(null);
+        requireNotParty(caller, application.getApplicantId(), listingOwner);
+        groups.findById(application.getGroupId()).ifPresent(g -> requireNotParty(caller, g.parties()));
+        String why = FlatmateVocabulary.blankToNull(note);
+        String before = application.getModStatus();
+        if (verdict.equals(before)) {
+            return applicationHydrator.hydrateOne(application);
+        }
+        if (why == null && (HIDING.contains(verdict) || UNDOING.contains(before))) {
+            throw new BadRequestException("Add a note saying why — it is kept on the audit trail.");
+        }
+        boolean restoringAccepted = FlatmateVocabulary.STATUS_ACCEPTED.equals(application.getStatus())
+                && FlatmateVocabulary.isPublic(verdict) && !FlatmateVocabulary.isPublic(before);
+        if (restoringAccepted && applications.existsByListingIdAndStatusAndModStatusInAndIdNot(listingId,
+                FlatmateVocabulary.STATUS_ACCEPTED, FlatmateVocabulary.MOD_PUBLIC, applicationId)) {
+            throw new ConflictException("The owner has accepted another group for this flat since.");
+        }
+        if (restoringAccepted && groups.lockVisible(application.getGroupId()).isEmpty()) {
+            throw new ConflictException("This group is not live right now, so it cannot be restored.");
+        }
+        application.moderate(verdict, why);
         applications.saveAndFlush(application);
 
         audit.record(caller, "flatmate.groupApplication.moderate", "flatmateGroupApplication",
-                application.getId().toString(), "modStatus", verdict);
+                application.getId().toString(), "from", before, "modStatus", verdict, "note", why);
         return applicationHydrator.hydrateOne(application);
     }
 

@@ -64,12 +64,14 @@ public class FlatmateSeekerService {
     private final FlatmateEditRules editRules;
     private final FlatmateAcceptance acceptance;
     private final LocalityBinding localities;
+    private final FlatmateGenderGate genderGate;
 
     public FlatmateSeekerService(FlatmateSeekerPostRepository posts,
             FlatmateRequestRepository requests, FlatmateRequestHydrator hydrator,
             FlatmateMapper mapper, UserRepository users,
             Notifier notifier, RateLimitLock locks,
-            FlatmateEditRules editRules, FlatmateAcceptance acceptance, LocalityBinding localities) {
+            FlatmateEditRules editRules, FlatmateAcceptance acceptance, LocalityBinding localities,
+            FlatmateGenderGate genderGate) {
         this.posts = posts;
         this.requests = requests;
         this.hydrator = hydrator;
@@ -80,6 +82,7 @@ public class FlatmateSeekerService {
         this.editRules = editRules;
         this.acceptance = acceptance;
         this.localities = localities;
+        this.genderGate = genderGate;
     }
 
     /** One live post per identity; the partial unique index enforces it, the pre-check only turns
@@ -96,7 +99,7 @@ public class FlatmateSeekerService {
 
         FlatmateSeekerPost post = new FlatmateSeekerPost(
                 caller.userId(), body.name().strip(), body.budget());
-        apply(post, body);
+        apply(post, body, author);
 
         // Snapshotted from the token, never the body: a client that could assert its own
         // verification would make the badge worthless.
@@ -108,24 +111,21 @@ public class FlatmateSeekerService {
     }
 
     /** Classified before a word of it is written, because afterwards there is nothing left to
-     * compare against. */
+     * compare against. Locked so a staff verdict cannot interleave with the edit's re-check. */
     @Transactional
     public FlatmateSeekerPostDto update(AuthPrincipal caller, UUID postId,
             FlatmateSeekerPostCreateRequest body) {
-        FlatmateSeekerPost post = posts.findById(postId)
-                .filter(p -> !p.isArchived())
+        FlatmateSeekerPost post = posts.findLockedById(postId)
+                .filter(p -> !p.isArchived() && p.getUserId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate post"));
-        if (!post.getUserId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only edit your own flatmate post.");
-        }
         FlatmateEditImpact impact = editRules.classify(post, body);
         post.setName(body.name().strip());
         post.setBudget(body.budget());
-        apply(post, body);
-        post.setModStatus(post.getExpiry().revive(post.getModStatus()));
-        post.getRecheck().settle(post.getModStatus(), impact.rechecked());
         User author = users.findById(caller.userId())
                 .orElseThrow(() -> NotFoundException.of("User"));
+        apply(post, body, author);
+        post.setModStatus(post.getExpiry().revive(post.getModStatus()));
+        post.getRecheck().settle(post.getModStatus(), impact.rechecked());
         return mapper.toDto(posts.saveAndFlush(post),
                 new FlatmateMapper.SeekerView(author.getMobile()));
     }
@@ -135,11 +135,8 @@ public class FlatmateSeekerService {
     @Transactional
     public void delete(AuthPrincipal caller, UUID postId) {
         FlatmateSeekerPost post = posts.findById(postId)
-                .filter(p -> !p.isArchived())
+                .filter(p -> !p.isArchived() && p.getUserId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate post"));
-        if (!post.getUserId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only remove your own flatmate post.");
-        }
         post.archive("removed by the poster");
         posts.saveAndFlush(post);
     }
@@ -157,6 +154,7 @@ public class FlatmateSeekerService {
             // 403 rather than 404: the caller can see this post on the public feed.
             throw new ForbiddenException("You cannot express interest in your own post.");
         }
+        genderGate.refuseKnownMismatch(caller.userId(), post.getFlatPref(), "post");
 
         // A missing badge may refuse a request only because the
         // person being contacted asked for exactly that.
@@ -310,9 +308,8 @@ public class FlatmateSeekerService {
         }
     }
 
-    private void apply(FlatmateSeekerPost post, FlatmateSeekerPostCreateRequest body) {
-        post.setGender(FlatmateVocabulary.orDefault(
-                body.gender(), FlatmateVocabulary.GENDER, "any", "gender"));
+    private void apply(FlatmateSeekerPost post, FlatmateSeekerPostCreateRequest body, User author) {
+        post.setGender(genderGate.forPost(author, body.gender()));
         post.setFlatPref(FlatmateVocabulary.orDefault(
                 body.flatPref(), FlatmateVocabulary.FLAT_PREF, "any", "flat preference"));
         post.setRoomPref(FlatmateVocabulary.orDefault(
