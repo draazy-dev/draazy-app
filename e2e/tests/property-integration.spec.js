@@ -322,8 +322,8 @@ test.describe('LIVE: property domain against the real API', () => {
       (r) => /\/api\/me\/listings\/[^/]+$/.test(new URL(r.url()).pathname) && r.request().method() === 'DELETE',
       { timeout: 30_000 },
     );
-    page.once('dialog', (d) => d.accept());
     await page.getByRole('button', { name: /Take down|Withdraw/i }).first().click();
+    await page.getByTestId('confirm-modal-ok').click();
     expect((await removed).status()).toBe(200);
 
     const mineRes = await fetch(`${API}/me/listings?size=100`, { headers });

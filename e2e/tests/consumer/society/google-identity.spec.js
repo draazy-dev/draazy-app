@@ -1,5 +1,6 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { PHOTO_PNG, uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { mintSociety, seedSocietyReviews } from '../../../helpers/liveSociety.js';
@@ -25,11 +26,7 @@ test.afterEach(async () => {
     if (res.status !== 200) continue;
     const body = await res.json();
     for (const row of Array.isArray(body) ? body : (body.content ?? [])) {
-      await fetch(`${API}/properties/${row.id}/status`, {
-        method: 'PATCH',
-        headers: admin,
-        body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup' }),
-      });
+      await rejectListingWithFetch(row.id, admin, { reason: 'Zztest cleanup' });
     }
   }
   owners.clear();

@@ -4,6 +4,7 @@ import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { istInDays } from '../../../helpers/availability.js';
 import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { signedInAsNew, authHeaders, API } from '../../../helpers/liveAuth.js';
+import { rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
 // Track owners before submission so teardown can withdraw listings even after a mid-flow failure.
@@ -18,11 +19,7 @@ test.afterEach(async () => {
     const body = await res.json();
     const rows = Array.isArray(body) ? body : (body.content ?? body.items ?? []);
     for (const row of rows) {
-      await fetch(`${API}/properties/${row.id}/status`, {
-        method: 'PATCH',
-        headers: adminHeaders,
-        body: JSON.stringify({ status: 'rejected', reason: 'Zztest cleanup \u2014 synthetic rent-maintenance fixture' }),
-      });
+      await rejectListingWithFetch(row.id, adminHeaders, { reason: 'Zztest cleanup \u2014 synthetic rent-maintenance fixture' });
     }
   }
   owners.clear();

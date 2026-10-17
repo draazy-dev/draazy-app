@@ -52,6 +52,13 @@ async function checkerFor(makerHeaders) {
   return subjectOf(staff) === subjectOf(makerHeaders) ? authHeaders(ACTORS.admin) : staff;
 }
 
+// PATCH /status refuses to overturn a non-pending listing unless the caller names the status it saw.
+async function withExpectedStatus(id, headers, api, body) {
+  const seen = await fetch(`${api}/properties/${id}`, { headers });
+  const expectedStatus = seen.ok ? (await seen.json()).status : undefined;
+  return expectedStatus ? { ...body, expectedStatus } : body;
+}
+
 async function overrideWithFetch(id, headers, api) {
   const filed = await jsonResult(await fetch(`${api}/properties/${id}/verification/override-requests`, {
     method: 'POST',
@@ -69,7 +76,7 @@ export async function approveListing(request, id, headers, { reason, api = API }
   await tickChecklist(request, id, headers, { api });
   const res = await request.patch(`${api}/properties/${id}/status`, {
     headers,
-    data: { status: 'approved', ...(reason ? { reason } : {}) },
+    data: await withExpectedStatus(id, headers, api, { status: 'approved', ...(reason ? { reason } : {}) }),
   });
   if (res.status() !== 409 || !(await res.text()).includes('second_approver_required')) return res;
   const filed = await request.post(`${api}/properties/${id}/verification/override-requests`, {
@@ -89,7 +96,7 @@ export async function approveListingWithFetch(id, headers, { reason, api = API }
   const res = await jsonResult(await fetch(`${api}/properties/${id}/status`, {
     method: 'PATCH',
     headers,
-    body: JSON.stringify({ status: 'approved', ...(reason ? { reason } : {}) }),
+    body: JSON.stringify(await withExpectedStatus(id, headers, api, { status: 'approved', ...(reason ? { reason } : {}) })),
   }));
   if (res.status !== 409 || !res.text.includes('second_approver_required')) return res;
   return overrideWithFetch(id, headers, api);
@@ -98,7 +105,7 @@ export async function approveListingWithFetch(id, headers, { reason, api = API }
 export async function rejectListing(request, id, headers, { reasonCode = 'wrong_details', reason, api = API } = {}) {
   return request.patch(`${api}/properties/${id}/status`, {
     headers,
-    data: { status: 'rejected', reasonCode, ...(reason ? { reason } : {}) },
+    data: await withExpectedStatus(id, headers, api, { status: 'rejected', reasonCode, ...(reason ? { reason } : {}) }),
   });
 }
 
@@ -110,7 +117,7 @@ export async function rejectListingWithFetch(
   return jsonResult(await fetch(`${api}/properties/${id}/status`, {
     method: 'PATCH',
     headers,
-    body: JSON.stringify({ status: 'rejected', reasonCode, ...(reason ? { reason } : {}) }),
+    body: JSON.stringify(await withExpectedStatus(id, headers, api, { status: 'rejected', reasonCode, ...(reason ? { reason } : {}) })),
   }));
 }
 

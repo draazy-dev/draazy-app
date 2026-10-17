@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAs, uniqueMobile, shownMobile } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { trackErrors } from '../../../helpers/console.js';
@@ -162,7 +162,7 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     await expect(page.getByRole('heading', { name: 'Edit your room' })).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText('agreement.png')).toBeVisible();
     await expect(page.locator('[data-err="ownerConsent"] input[type="checkbox"]')).toBeChecked();
-    await expect(page.locator('input[autocomplete="tel-national"]')).toHaveValue(consentMobile);
+    await expect(page.locator('input[autocomplete="tel-national"]')).toHaveValue(shownMobile(consentMobile));
     await expect(pill('Bathrooms', '2')).toHaveAttribute('aria-pressed', 'true');
     await expect(pill('Balconies', '2')).toHaveAttribute('aria-pressed', 'true');
     await expect(pill('Furnishing', 'Furnished')).toHaveAttribute('aria-pressed', 'true');
@@ -204,7 +204,6 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
     const group = await seed(accessToken, 'groups', { title, name: 'Del Host', locality: 'Hinjawadi', rent: 35000, seats: 4, policy: 'women', role: 'tenant' });
     const post = await seed(accessToken, 'posts', { name: 'Del Seeker', gender: 'female', age: 25, occupation: 'Analyst', budget: 15000, localities: ['Kharadi'], moveIn: '2026-12-01', flatPref: 'women', roomPref: 'private', tags: [], note: 'Dashboard delete coverage' });
     await signedInAs(page, mobile);
-    page.on('dialog', (d) => d.accept());
 
     await page.goto('/dashboard#properties');
     for (const [kind, id, text] of [['groups', group.id, title], ['posts', post.id, 'Looking to share — Kharadi']]) {
@@ -212,6 +211,7 @@ test.describe('LIVE: editing flatmate posts from My properties', () => {
       await expect(card).toBeVisible({ timeout: 20_000 });
       const deleted = page.waitForResponse((r) => r.url().endsWith(`/flatmates/${kind}/${id}`) && r.request().method() === 'DELETE');
       await card.getByRole('button', { name: 'Delete' }).click();
+      await page.getByTestId('confirm-modal-ok').click();
       expect((await deleted).status(), `${kind} delete should reach the server`).toBeLessThan(300);
       await expect(page.locator('.rounded-xl').filter({ hasText: text })).toHaveCount(0, { timeout: 20_000 });
     }

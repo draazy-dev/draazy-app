@@ -350,8 +350,8 @@ test('My Listings draws its chips from the listing rows and a row action re-read
     }
 
     const before = calls.length;
-    page.once('dialog', (dialog) => dialog.accept());
     await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    await page.getByTestId('confirm-modal-ok').click();
     await expect(page.getByRole('button', { name: 'Resume' })).toBeVisible();
     await page.waitForTimeout(1000);
     expect(calls.slice(before).filter((c) => c.startsWith('GET ') && /\/api\/me\/(listings|contact-requests|deals|dashboard)/.test(c))).toEqual([]);

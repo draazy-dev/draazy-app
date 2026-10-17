@@ -72,12 +72,13 @@ test.describe('Mobile listing wizard', () => {
       expect(box.width, 'compact, not a full-width bar').toBeLessThan(vw * 0.6);
       expect(box.height).toBeGreaterThanOrEqual(44);
 
-      // A self-contained floating bar: rounded on every corner and solid, so neither its
-      // corners nor the fields behind it leak out where it docks at the end of the card.
-      expect(await actions.evaluate((el) => {
+      // A solid rounded bar no taller than the bottom nav, so the fields behind it never leak through.
+      const bar = await actions.evaluate((el) => {
         const s = getComputedStyle(el);
-        return [s.borderBottomLeftRadius, s.backgroundColor.startsWith('rgba') ? 'translucent' : 'solid'];
-      })).toEqual(['16px', 'solid']);
+        const nav = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dz-bottom-nav-h'));
+        return { radius: s.borderBottomLeftRadius, fill: s.backgroundColor.startsWith('rgba') ? 'translucent' : 'solid', fits: el.getBoundingClientRect().height <= nav + 0.5 };
+      });
+      expect(bar).toEqual({ radius: '16px', fill: 'solid', fits: true });
 
       // The Ask Draaz launcher must clear the bar rather than sit on its Next button.
       const launcher = await page.locator('.dz-assistant-layer').boundingBox();
@@ -169,27 +170,27 @@ test.describe('Mobile listing wizard', () => {
         await page.setViewportSize({ width, height: 844 });
         const pills = page.getByRole('button', { name: /^(Unfurnished|Semi-Furnished|Furnished)$/ });
         await expect(pills).toHaveCount(3);
-        // Pills animate padding, so measure the settled layout after crossing the breakpoint.
+        // Pills animate, so measure the settled layout after crossing the breakpoint.
         await expect(async () => {
           const boxes = await pills.evaluateAll((elements) => elements.map((el) => {
             const r = el.getBoundingClientRect();
             const parent = el.parentElement.getBoundingClientRect();
             const css = getComputedStyle(el);
             return { top: r.top, left: r.left, right: r.right, parentLeft: parent.left, parentRight: parent.right,
-              font: css.fontSize, padTop: css.paddingTop, padBottom: css.paddingBottom, height: r.height };
+              font: css.fontSize, height: r.height };
           }));
           expect(Math.max(...boxes.map((b) => b.top)) - Math.min(...boxes.map((b) => b.top)), `one row at ${width}px (flatmate=${flatmate}): ${JSON.stringify(boxes)}`).toBeLessThan(1);
           if (width < 640) {
             expect(Math.abs(boxes[0].left - boxes[0].parentLeft), 'first tile starts at the row edge').toBeLessThan(1);
             expect(Math.abs(boxes[2].right - boxes[2].parentRight), 'last tile fills the row to the right edge').toBeLessThan(1);
           }
+          const coarse = await page.evaluate(() => matchMedia('(pointer: coarse)').matches);
           for (const box of boxes) {
             expect(box.left).toBeGreaterThanOrEqual(box.parentLeft - 1);
             expect(box.right).toBeLessThanOrEqual(box.parentRight + 1);
             expect(box.font).toBe('14px');
-            expect(box.padTop).toBe('12px');
-            expect(box.padBottom).toBe('12px');
-            expect(box.height).toBeGreaterThanOrEqual(44);
+            // Tiles take the shared --btn-h (44px on phones, 40px from 640px up); a touch pointer keeps the 44px floor.
+            expect(box.height).toBe(width < 640 || coarse ? 44 : 40);
           }
         }).toPass({ timeout: 3000 });
       }

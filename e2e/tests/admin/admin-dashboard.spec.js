@@ -1,6 +1,7 @@
 // `/admin` — the landing dashboard, against the live API.
 import { expect, test, ACTORS, STAFF } from '../../fixtures/live.js';
 import { API, authHeaders, uploadedListingPhotos, uniqueMobile } from '../../helpers/liveAuth.js';
+import { rejectListingWithFetch } from '../../helpers/moderation.js';
 
 // The server's own answer, read straight from the contract endpoint the screen is supposed to use.
 async function scorecard(mobile) {
@@ -47,11 +48,7 @@ test.afterEach(async () => {
   if (!created.size) return;
   const headers = await authHeaders(ACTORS.admin);
   for (const id of created) {
-    await api('PATCH', `/properties/${id}/status`, headers, {
-      status: 'rejected',
-      reasonCode: 'other',
-      reason: 'Zztest cleanup \u2014 synthetic dashboard fixture',
-    });
+    await rejectListingWithFetch(id, headers, { reasonCode: 'other', reason: 'Zztest cleanup \u2014 synthetic dashboard fixture' });
   }
   created.clear();
 });
@@ -144,7 +141,7 @@ test.describe('/admin dashboard — the scorecard is the server\'s', () => {
   test('a scoped staffer gets a queue tile for each queue function they hold, and for no other', async ({ page, login }) => {
     const { mobile } = await login.scopeStaff('rental', ['reports', 'referrals', 'societies']);
     const mine = await fetch(`${API}/admin/my-work`, { headers: await authHeaders(mobile) }).then((r) => r.json());
-    // Referrals are audited after the fact now, so holding the function adds no queue.
+    // Referrals are audited after the fact, so holding the function adds no queue.
     expect(mine.queues.map((q) => q.function).sort()).toEqual(['reports', 'societies']);
 
     await login.asStaff('rental');

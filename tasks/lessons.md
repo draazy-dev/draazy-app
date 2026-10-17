@@ -200,3 +200,4 @@ in the shared index, so a plain `git commit` would sweep them in. Build the comm
 index: `$env:GIT_INDEX_FILE=<temp>; git read-tree HEAD; git add -- <our paths>`, take shared files'
 hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 `git reset -q -- <our paths>` on the real index. Amend the same way (`read-tree HEAD` first).
+- **`check-comments` passing is not the comment rule**: it misses defect/worker ids (MC-, MOD-, W3, QA-, ADR-, "RC pass"), "now/was" narration and code-restating comments. Read every comment in each touched file, and run ponytail-review + code-simplifier on the uncommitted diff before handing back.

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { API } from '../../../helpers/liveAuth.js';
+import { pickMarker } from '../../../helpers/mapMarker.js';
 
 /* The map marker is clicked by its computed price label because markers overlap; uniqueness is
    asserted first so the live seeded row cannot be confused with neighbouring pins. */
@@ -43,9 +44,7 @@ async function banerStock() {
  *  once 1–5 localities are focused, so the locality is deep-linked to un-gate it. */
 async function openDrawer(page, label) {
   await page.goto('/listings?deal=buy&view=map&loc=baner');
-  const marker = page.locator('.price-marker', { hasText: label }).first();
-  await marker.waitFor({ timeout: 20000 });
-  await marker.click();
+  await pickMarker(page, label);
   const drawer = page.locator('.dz-mdp');
   await drawer.waitFor({ timeout: 10000 });
   return drawer;

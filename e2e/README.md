@@ -61,7 +61,8 @@ A run passes only when no test fails, no error is raised outside a test, every P
 exits 0, **and** every test listed beforehand is reported exactly once (compared by identity, not
 count), so a shard that dies in setup shows as `MISSING`, not as a pass. Missing tests go into
 `last-failed.txt`, so `-Failed` reruns them too. The no-backend specs get their own dev server on
-`:5210`. Output goes to
+`:5210`. Shard 1 serves on `:3322`, the only origin the Google Maps key admits, and every spec that
+`maps-specs.js` flags is pinned to it. Output goes to
 `.shards/` (git-ignored): `html/` (merged report, `npx playwright show-report .shards\html`),
 `report.json`, per-shard logs `shard-<i>.log`, and `last-failed.txt`. JVM logs are in
 `%TEMP%\draazy-shard-<i>.log`.

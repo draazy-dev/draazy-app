@@ -12,7 +12,7 @@ Things code can't close: secrets, deploy steps, real-device checks, human fact-c
 - [ ] Anonymous `/api/flags` on the Pages host should not reach the origin
 - [ ] `SANDBOX_GOOGLE_PLACES_SERVER_KEY`; read Google's lat/lng caching terms
 - [ ] Google Cloud: the **production** browser key (`VITE_GOOGLE_MAPS_API_KEY`) must allow **Maps Embed API** (the dev key already does), or the property Street View tile shows Google's error frame; check a FC Road listing's Location tab after deploy
-- [ ] Google Maps / Routes / Places key with quota on sandbox, then run the SB-09 checklist rows (7, 157, 186, 187, 259) and `e2e\run-fast.ps1` for the Maps reds in `todo.md` QA-E2E-2
+- [ ] Google Maps / Routes / Places key with quota on sandbox, then run the SB-09 checklist rows (7, 157, 186, 187, 259) there (local e2e already loads Maps on `localhost:3322`)
 - [ ] Rotate `backend/.env.local` secrets if in doubt (surfaced 2026-08-09)
 - [ ] DigitalOcean: add the alert policies and the one free Uptime check from `docs/DEPLOY.md` §8; leave log forwarding off
 - [ ] Optional: `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY` for graphify community labels

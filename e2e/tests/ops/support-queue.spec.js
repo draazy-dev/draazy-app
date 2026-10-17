@@ -179,4 +179,20 @@ test.describe('Ops → Support queue (live)', () => {
     await expect(page.getByRole('heading', { name: 'Support queue' })).toBeVisible();
     await expect(page.getByTestId('queue-row').filter({ hasText: subject })).toBeVisible();
   });
+
+  test('the desk can close a ticket, and the customer then sees it as closed', async ({ page, login }) => {
+    await seedConsent(page);
+    const subject = `Closing the loop ${stamp()}`;
+    const ticket = await raiseTicket(subject, 'Please confirm the refund went through.');
+
+    await login.asStaff('rental');
+    await page.goto('/ops/support');
+    await page.getByTestId('queue-row').filter({ hasText: subject }).getByRole('button', { name: 'Reply' }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Close ticket' }).click();
+    await expect(dialog.getByRole('button', { name: 'Close ticket' })).toHaveCount(0);
+
+    const mine = await asCustomer(ticket.id);
+    expect(mine.status).toBe('closed');
+  });
 });

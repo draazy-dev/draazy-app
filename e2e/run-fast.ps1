@@ -26,7 +26,8 @@ Set-Location $E2E
 New-Item -ItemType Directory -Force -Path $STATE | Out-Null
 
 function ApiPort($i) { 8110 + $i }
-function AppPort($i) { 5210 + $i }
+# Google's browser key admits only localhost:3322; shards.mjs pins the Maps specs (maps-specs.js) to shard 1.
+function AppPort($i) { if ($i -eq 1) { 3322 } else { 5210 + $i } }
 function DbName($i) { "draazy_e2e_sh$i" }
 function JvmFile($i) { Join-Path $STATE "jvm-$i.json" }
 function JvmLog($i) { Join-Path $env:TEMP "draazy-shard-$i.log" }
