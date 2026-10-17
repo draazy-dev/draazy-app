@@ -34,9 +34,13 @@ public class ListingQuota implements ListingLiveGate {
     }
 
     public void requirePace(UUID userId) {
-        if (properties.countPostedSince(userId, Instant.now().minus(PACE_WINDOW)) >= maxPostsPerDay) {
+        Instant now = Instant.now();
+        List<Instant> posted = properties.postedTimesSince(userId, now.minus(PACE_WINDOW));
+        if (posted.size() >= maxPostsPerDay) {
+            Instant slotFrees = posted.get(posted.size() - maxPostsPerDay).plus(PACE_WINDOW);
             throw new RateLimitedException("You can post up to " + maxPostsPerDay
-                    + " new listings a day. Please try again tomorrow.", (int) PACE_WINDOW.toSeconds());
+                    + " new listings a day. Please try again later.",
+                    (int) Math.max(1, Duration.between(now, slotFrees).toSeconds()));
         }
     }
 

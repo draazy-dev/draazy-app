@@ -126,11 +126,14 @@ public record PropertyResponse(
          * Rationale: docs/system/cross-cutting.md#private-listing-fields-on-the-detail-response. */
         String flagReason,
 
-        /** Is a stays-live moderation re-check queued? (Q14) Without it the stays-live and
+        /** Is a stays-live moderation re-check queued? Without it the stays-live and
          * revert-to-pending outcomes are indistinguishable on the wire. */
         Boolean recheckPending,
 
         String recheckReason,
+
+        /** Back-office only: what the owner's edit changed, as {@code [{field, before, after}]}; null when none. */
+        List<Map<String, String>> recheckChanges,
 
         Instant recheckRequestedAt,
 

@@ -80,6 +80,12 @@ public final class ErrorCodes {
 
     public static final String LISTING_NOT_LIVE = "listing_not_live";
 
+    public static final String LISTING_NOT_EDITABLE = "listing_not_editable";
+
+    public static final String DUPLICATE_SUBMISSION = "duplicate_submission";
+
+    public static final String OWN_LISTING = "own_listing";
+
     public static final String REFUND_NOT_ELIGIBLE = "refund_not_eligible";
 
     public static final String LISTING_QUOTA_EXHAUSTED = "listing_quota_exhausted";

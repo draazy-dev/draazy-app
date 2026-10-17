@@ -255,10 +255,12 @@ class ListingFoundationTest extends AbstractApiTest {
                 .findFirst()
                 .orElseThrow()
                 .getResubmittedAt()).isNull();
+        assertThat(jdbc.queryForList("select title from notifications where user_id = ? and type = 'listing.under_review'",
+                String.class, o.getId())).hasSize(1);
     }
 
     @Test
-    @DisplayName("owner edit of a rejected listing keeps the final verdict")
+    @DisplayName("owner edit of a rejected listing is refused and keeps the final verdict")
     void rejectedListingEditStaysRejected() throws Exception {
         User o = owner("9876300099");
         Property p = approvedListing(o, "Rejected resubmit");
@@ -269,9 +271,8 @@ class ListingFoundationTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(o))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"locality\":\"Baner\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("rejected"))
-                .andExpect(jsonPath("$.resubmittedAt").doesNotExist());
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("listing_not_editable"));
 
         Property saved = properties.findById(p.getId()).orElseThrow();
         assertThat(saved.getStatus()).isEqualTo(PropertyStatus.REJECTED);

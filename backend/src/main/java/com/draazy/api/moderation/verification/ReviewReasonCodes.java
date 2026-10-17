@@ -59,6 +59,11 @@ public final class ReviewReasonCodes {
             default -> "The listing does not meet moderation guidelines.";
         };
         String base = note == null || note.isBlank() ? message : message + " " + note.trim();
-        return base + " This decision is final. The listing cannot be resubmitted.";
+        return base + "\nThis decision is final. The listing cannot be resubmitted.";
+    }
+
+    /** The thread entry for a final rejection, shared by every route that can reject. */
+    public static String rejectionThread(String reasonCode, String note) {
+        return "\u26D4 Your property could not be approved.\nReason: " + rejectionMessage(reasonCode, note);
     }
 }

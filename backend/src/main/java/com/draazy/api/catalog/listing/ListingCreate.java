@@ -7,6 +7,8 @@ import com.draazy.api.catalog.property.Furnishing;
 import com.draazy.api.catalog.property.LandUse;
 import com.draazy.api.catalog.property.PropertyPossession;
 import com.draazy.api.catalog.property.PropertyTypeLabel;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -39,15 +41,15 @@ public record ListingCreate(
         @PositiveOrZero Long deposit,
         @PositiveOrZero Long maintenance,
         Boolean negotiable,
-        BigDecimal area,
+        @Positive BigDecimal area,
         @Pattern(regexp = AreaUnit.PATTERN, message = AreaUnit.PATTERN_MESSAGE) String areaUnit,
         @Pattern(regexp = Furnishing.PATTERN,
                 message = Furnishing.PATTERN_MESSAGE) String furnishing,
         @NotBlank String locality,
         String localitySlug,
         @NotBlank String city,
-        Double lat,
-        Double lng,
+        @DecimalMin(value = "-90", message = "must be between -90 and 90") @DecimalMax(value = "90", message = "must be between -90 and 90") Double lat,
+        @DecimalMin(value = "-180", message = "must be between -180 and 180") @DecimalMax(value = "180", message = "must be between -180 and 180") Double lng,
 
         /** Blank is honest for a listing with none; a malformed id is worse than silence, because the
          * badge it feeds asserts a registry entry a buyer cannot then look up. */
@@ -56,7 +58,7 @@ public record ListingCreate(
         @Pattern(regexp = PropertyPossession.PATTERN,
                 message = PropertyPossession.PATTERN_MESSAGE) String possession,
 
-        @Size(max = 5) List<@NotNull @Pattern(regexp = "family|bachelors|bachelor-male|bachelor-female|company|anyone") String> tenants,
+        @Size(max = 5) List<@NotNull @Pattern(regexp = "family|bachelors|bachelor-male|bachelor-female|company|anyone", message = "must be family, bachelors, bachelor-male, bachelor-female, company or anyone") String> tenants,
 
         @Size(max = 40) List<@NotNull @Size(max = 60) @NoContactDetails String> amenities,
 
@@ -64,13 +66,13 @@ public record ListingCreate(
         List<@NotNull @Size(max = 512) String> images,
 
         @Size(max = 512) String floorPlan,
-        @Pattern(regexp = "^$|^[A-Za-z0-9_-]{11}$") String video,
+        @Pattern(regexp = "^$|^[A-Za-z0-9_-]{11}$", message = "must be an 11-character YouTube video id") String video,
         @Size(max = 4000) @NoContactDetails String description,
 
         /** @NotNull on the element, not the list: the write copies with List.copyOf, so `[null]`
          * would be a 500 rather than a 422. Same on the three lists below. */
         @Size(max = 300) @NoContactDetails String address,
-        Integer floor,
+        @Min(value = 0, message = "cannot be below the ground floor") Integer floor,
 
         /** A claim the verification checklist catches, not a credential. Accepting it is what lets
          * the (society, floor, bhk) duplicate signal fire on a curated id rather than free text. */
@@ -88,12 +90,12 @@ public record ListingCreate(
         @Min(1) Integer totalFloors,
 
         @Min(0) Integer ageYears,
-        @Pattern(regexp = "^$|^[1-9][0-9]{5}$") String pincode,
+        @Pattern(regexp = "^$|^[1-9][0-9]{5}$", message = "must be a 6-digit pincode") String pincode,
         @Positive BigDecimal carpetArea,
         @Positive BigDecimal builtUpArea,
         @Positive BigDecimal superBuiltUpArea,
 
-        @Pattern(regexp = "^$|now|15|30") String availableFrom,
+        @Pattern(regexp = "^$|now|15|30", message = "must be now, 15 or 30") String availableFrom,
         @Pattern(regexp = AvailableOn.PATTERN, message = AvailableOn.PATTERN_MESSAGE) String availableOn,
 
         Boolean pets,
@@ -101,4 +103,8 @@ public record ListingCreate(
 
         @Pattern(regexp = LandUse.PATTERN, message = LandUse.PATTERN_MESSAGE)
         String landUse) implements CoherentDimensions.Dimensions, ListingSanityLimits.Input {
+
+    public ListingCreate {
+        images = images == null ? null : images.stream().distinct().toList();
+    }
 }

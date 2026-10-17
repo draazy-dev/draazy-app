@@ -1,5 +1,8 @@
 package com.draazy.api.catalog.property;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 /** Units a stated area may be measured in. No {@code CHECK} stands behind the column, so this regex is the
  * whole constraint on text rendered verbatim on the public page; {@code null} means sq.ft. */
 public final class AreaUnit {
@@ -26,4 +29,28 @@ public final class AreaUnit {
 
     public static final String PATTERN_MESSAGE =
             "must be sqft, sqyd, sqm, guntha, acre or hectare";
+
+    /** One unit in sq.ft; the same factors {@code PropertySpecs} filters by. */
+    public static BigDecimal sqftPer(String unit) {
+        return switch (unit == null ? SQFT : unit) {
+            case SQYD -> BigDecimal.valueOf(9);
+            case SQM -> new BigDecimal("10.7639");
+            case GUNTHA -> BigDecimal.valueOf(1089);
+            case ACRE -> BigDecimal.valueOf(43560);
+            case HECTARE -> new BigDecimal("107639.1");
+            default -> BigDecimal.ONE;
+        };
+    }
+
+    /** The units the wizard offers for a kind of property; {@code null} means "no unit stated". */
+    public static boolean offeredFor(PropertyKind kind, String unit) {
+        if (unit == null || kind == null) {
+            return true;
+        }
+        return switch (kind) {
+            case PLOT -> List.of(SQFT, SQYD, SQM, GUNTHA).contains(unit);
+            case FARMLAND -> List.of(ACRE, GUNTHA, HECTARE).contains(unit);
+            default -> SQFT.equals(unit);
+        };
+    }
 }

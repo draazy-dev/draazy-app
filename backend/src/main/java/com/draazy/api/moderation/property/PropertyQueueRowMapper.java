@@ -47,6 +47,7 @@ public class PropertyQueueRowMapper {
                 p.getOwnershipRequestedAt(),
                 p.isRecheckPending(),
                 p.getRecheckReason(),
+                p.getRecheckChanges(),
                 p.getRecheckRequestedAt(),
                 p.isFeatured(),
                 p.isArchived(),

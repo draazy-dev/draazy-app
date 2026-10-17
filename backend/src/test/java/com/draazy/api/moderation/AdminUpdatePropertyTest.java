@@ -254,6 +254,31 @@ class AdminUpdatePropertyTest extends AbstractApiTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    @DisplayName("a staffer cannot correct a listing they own or posted on an owner's behalf")
+    void makerCannotCorrectOwnListing() throws Exception {
+        User landlordStaff = user("9871110017", Roles.Wire.STAFF, "Staff landlord");
+        Property own = approvedListing(landlordStaff);
+        User owner = user("9871110018", Roles.Wire.OWNER, "Owner");
+        User poster = user("9871110019", Roles.Wire.STAFF, "Poster");
+        Property onBehalf = approvedListing(owner);
+        onBehalf.markPostedOnBehalf(poster.getId().toString());
+        properties.saveAndFlush(onBehalf);
+
+        mvc.perform(patch(Routes.Moderation.PROPERTY_ADMIN_UPDATE, own.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(landlordStaff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\":31111}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(patch(Routes.Moderation.PROPERTY_ADMIN_UPDATE, onBehalf.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(poster))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"price\":31111}"))
+                .andExpect(status().isForbidden());
+
+        assertThat(properties.findById(onBehalf.getId()).orElseThrow().getPrice()).isEqualTo(28000L);
+    }
+
     private void grant(User account, String functionsJson) {
         jdbc.update("INSERT INTO back_office_permissions (user_id, permissions) VALUES (?, ?::jsonb)",
                 account.getId(), functionsJson);

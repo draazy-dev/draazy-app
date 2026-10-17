@@ -4,6 +4,7 @@ import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.trust.Notifier;
 import java.time.Instant;
+import java.util.UUID;
 import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,17 @@ public class ContactReturns {
         String listing = properties.findById(row.getPropertyId()).map(Property::getTitle).orElse("The owner");
         notifier.notify(row.getRequesterId(), "contact.returned", "Your contact is back",
                 listing + " " + what + " \u2014 your contact is back.", "/property/" + row.getPropertyId());
+    }
+
+    /** Expires what is still pending on a listing that just closed, telling each seeker their contact is back. */
+    @Transactional
+    public void expirePendingForClosedListing(UUID propertyId) {
+        for (ContactRequest row : requests.findByPropertyIdAndStatus(propertyId, ContactRequestStatuses.PENDING)) {
+            if (requests.updateStatusIfCurrent(row.getId(), ContactRequestStatuses.PENDING,
+                    ContactRequestStatuses.EXPIRED) > 0) {
+                notifySeeker(row, "was closed");
+            }
+        }
     }
 
     /** Stores the expiry of every pending request whose reply window has run out; returns how many. */

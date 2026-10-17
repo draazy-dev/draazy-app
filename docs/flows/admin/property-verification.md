@@ -61,11 +61,16 @@
   - `src/pages/admin/properties/PropertyModals.jsx` - flag / archive / edit / re-check reject modals.
 
 ## 3. Actors & roles
-- **Maker = owner** (or a concierge "post on behalf" staffer). Submits the listing; cannot approve it.
+- **Maker = owner** (or a concierge "post on behalf" staffer). Submits the listing; cannot approve it,
+  correct it through `PATCH /properties/{id}/admin`, or record ownership evidence / grant the badge
+  on it (403 from every one of those, via `Property.isMadeBy`).
 - **Checker = any back-office account with the function.** `/admin` is shared by staff, managers
-  and the admin; the page requires `properties:read`. Verification checks and ownership need
-  `properties:verify` (`propertyVerification`); approve/reject/flag need `properties:moderate`
-  (`listingModeration`).
+  and the admin; the page requires `properties:read`. Every `/properties/{id}/verification/*` route
+  (case file, checklist, thread, `/decision`, override requests, ownership evidence and badge) needs
+  `properties:verify`. `PATCH /properties/{id}/status`, `POST`/`DELETE /properties/{id}/flag`,
+  archive/restore, photo takedown and the duplicate routes need `properties:moderate`; the admin edit
+  (`PATCH /properties/{id}/admin`) takes either. So `/verification/decision` is a verify route even
+  though `/status` can reach the same transitions as a moderate one.
 - **Route guards:**
   - The admin shell is `RoleRoute roles={['staff', 'manager', 'admin']}` (`src/App.jsx`).
   - The page is wrapped in `ModuleRoute moduleKey="properties"`, which tests `properties:read`
@@ -130,19 +135,35 @@ All decisions go through `POST /properties/{id}/verification/decision`
 `{ decision, reasonCode?, note?, expectedStatus? }` or `PATCH /properties/{id}/status`
 `{ status, reason?, reasonCode?, expectedStatus? }`; both share one gate. `expectedStatus` that no
 longer matches answers 409 `stale_decision`, so a second reviewer cannot silently overwrite a first.
+On `/status` it may be omitted only while the listing is `pending` (or to clear an approved listing's
+re-check); otherwise the call is refused as stale, which is what stops a racing approve and reject both
+landing.
 
 | Action | Rule | Effect |
 |--------|------|--------|
-| **Approve** | All 3 checks ticked (409 `checklist_incomplete`); no hard signal unless co-approved (409 `second_approver_required`); a staff-posted listing needs its owner's confirmation (409 `owner_not_confirmed`) | listing `approved` + published, re-check cleared, owner told, audited with a checklist snapshot |
+| **Approve** | All 3 checks ticked (409 `checklist_incomplete`); no hard signal unless co-approved (409 `second_approver_required`); a staff-posted listing needs its owner's confirmation (409 `owner_not_confirmed`, answered before any "no case" 404) | listing `approved` + published (or `paused` when the free tier holds it), re-check cleared, owner told (`listing.approved` / `listing.approved_paused`, naming the listing), audited with a checklist snapshot. Approving an already-approved listing with no pending re-check is a no-op: 200, no audit row, no notice |
 | **Needs info** | `reasonCode` required (`other` also needs a note) | listing stays `pending`; review `needs_info`, `properties.info_requested_at` stamped; owner gets the reason sentence. Owner reply **or** edit resubmits through `reenterPending`. The SLA clock pauses |
 | **Reject (final)** | `reasonCode` required | listing `rejected`. An owner message **no longer** resubmits; reversal needs the two-staff override |
 | Tick a check | `PATCH /verification/checklist`, `properties:verify`, never the owner | one line per call |
-| Flag | reason required; refuses the owner and the staffer who posted on their behalf | off search |
-| Clear flag | `clearFlag` → `reenterPending` (back to review, **not** straight to approved) | checklist unticked |
+| Flag | reason required (blank → 422); refuses the owner and the staffer who posted on their behalf | off search; owner told (`listing.flagged`) |
+| Clear flag | `clearFlag` → `reenterPending` (back to review, **not** straight to approved) | checklist unticked; owner told (`listing.unflagged`) |
 
 Staff thread messages with `clarificationRequested:true` are treated as **Needs info** with
 `reasonCode:"other"` and the message body as `reasonNote`.
-| Archive / Restore | soft-delete; restore → `reenterPending` | audited |
+| Archive / Restore | soft-delete; restore → `reenterPending` | audited (`property.archive` / `property.restore`); a staff archive tells the owner (`listing.archived`) |
+
+**Audit shape.** Every listing transition lands on the listing's own trail (`entity = property`,
+`entity_id` = the listing) with `from` and `to` = the **final persisted** status: a free-tier approval that
+lands paused records `to: paused`. `property.status`, `property.verification.decision`,
+`property.archive`, `property.restore` and `property.flag.clear` carry `from`/`to`; archive also carries
+`reason`. `property.adminUpdate` carries `changes`: `{ field: { before, after } }` for the fields that
+moved, and notifies the owner (`listing.edited_by_staff`) when any did. The two-staff override
+request/approve rows are recorded on the listing too, with the `requestId` in their metadata. The
+`checker` column is reserved and always null: the actor of a decision is the `actor` column, and the
+second approver of an override is its own `override.approved` row.
+
+A decision racing a newer one answers 409 `stale_decision` (refresh); an archived listing with no case
+still answers the generic 409, never 404.
 
 Reason codes: `photos_not_real, duplicate, broker, wrong_details, locality_unclear,
 document_unreadable, name_mismatch, other` (CHECK in V67). Each has an owner outreach template
@@ -179,7 +200,8 @@ the owner-facing sentence together under a `PESSIMISTIC_WRITE` lock on the listi
   - **Off search** — `locality, propertyType, bhk, deal` change *what the listing fundamentally is*,
     so a stale index entry is a wrong answer: a 2BHK appearing under 3BHK, or a rental under sale.
     These still revert to `pending` until a moderator re-approves.
-  - **Stays live, re-checked** — `price, furnishing, possession` change *an attribute of a listing
+  - **Stays live, re-checked** — `price, furnishing, possession, address, description, amenities,
+    photos, video, reraId` (and the items listed below) change *an attribute of a listing
     that is still the same property*, so the worst case is a briefly out-of-date number on a listing
     that is genuinely what it claims to be. The listing stays `approved` and searchable and a
     re-check is queued instead. Fraud risk is handled by the re-check either way; the difference is

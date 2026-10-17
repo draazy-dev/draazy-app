@@ -13,6 +13,7 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertySort;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ListingQuotaExhaustedException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.RateLimitLock;
@@ -46,6 +47,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class ListingService {
 
+    private static final Set<String> NOT_EDITABLE =
+            Set.of(PropertyStatus.REJECTED, PropertyStatus.SOLD, PropertyStatus.RENTED);
+
     private final PropertyRepository properties;
     private final UserRepository users;
     private final LocalityBinding localities;
@@ -59,13 +63,15 @@ public class ListingService {
     private final ListingPhotoSources photoSources;
     private final PhotoLimit photoLimit;
     private final PlatformSettings settings;
+    private final ListingSubmissionGuard submissions;
 
     public ListingService(PropertyRepository properties, UserRepository users,
             LocalityBinding localities, ListingEditRules editRules, PropertyMapper propertyMapper,
             PropertyLifecycle propertyLifecycle, ListingCaseNotes caseNotes, ListingDuplicateProbe duplicates,
             ListingQuota quota, RateLimitLock locks, ListingPhotoSources photoSources,
-            PhotoLimit photoLimit, PlatformSettings settings) {
+            PhotoLimit photoLimit, PlatformSettings settings, ListingSubmissionGuard submissions) {
         this.properties = properties;
+        this.submissions = submissions;
         this.settings = settings;
         this.users = users;
         this.caseNotes = caseNotes;
@@ -144,20 +150,26 @@ public class ListingService {
     /** Trust-critical fields are server-set, so a listing cannot be born approved or attributed to someone else. */
     @Transactional
     public Property create(UUID userId, ListingCreate in) {
-        requirePace(userId);
+        requirePace(userId, in);
         requirePhotosOnCreate(in.images());
-        return createOnBehalf(userId, in, userId);
+        return announced(createOnBehalf(userId, in, userId));
     }
 
     /** An owner's own posting, held to the daily pace; {@link #createOnBehalf} is not. */
     @Transactional
     public Property createWithinAllowance(UUID userId, ListingCreate in, String existingLocalitySlug) {
-        requirePace(userId);
-        return createOnBehalf(userId, in, existingLocalitySlug, userId);
+        requirePace(userId, in);
+        return announced(createOnBehalf(userId, in, existingLocalitySlug, userId));
     }
 
-    private void requirePace(UUID userId) {
+    private Property announced(Property p) {
+        propertyLifecycle.announceSubmitted(p);
+        return p;
+    }
+
+    private void requirePace(UUID userId, ListingCreate in) {
         locks.holdUntilCommit(RateLimitLock.Limit.LISTING_CREATE, userId.toString());
+        submissions.requireNotReplay(userId, in);
         quota.requirePace(userId);
     }
 
@@ -183,6 +195,7 @@ public class ListingService {
         // PropertyMapper's allowlist decides what the client may say, so ListingCreate's
         // "deliberately absent" set is enforced rather than described.
         propertyMapper.applyTo(in, p);
+        ListingShape.clearUnaskedAnswers(p);
         p.setAvailableOn(AvailableOn.resolve(in.availableOn(), in.availableFrom(), false, p.getDeal()));
         ListingEditRules.clearReadyToMoveSaleAvailableDate(p);
         editRules.stampSociety(p, in.societyId(), true);
@@ -232,6 +245,10 @@ public class ListingService {
     public Property update(AuthPrincipal actor, String idOrSlug, ListingUpdate in) {
         Property p = resolveOwnedForWrite(actor.userId(), idOrSlug)
                 .orElseThrow(() -> NotFoundException.of("Listing"));
+        if (p.isArchived() || NOT_EDITABLE.contains(p.getStatus())) {
+            throw new ConflictException(ErrorCodes.LISTING_NOT_EDITABLE,
+                    "This listing is closed and can no longer be edited.");
+        }
         String statusBefore = p.getStatus();
         boolean answeringInfoRequest = PropertyStatus.PENDING.equals(statusBefore) && p.isAwaitingOwnerInfo();
         List<Object> signalBefore = duplicates.signalOf(p);
@@ -258,18 +275,25 @@ public class ListingService {
                     "You changed something fundamental about this listing, so it has gone back "
                     + "for review and is off search until a moderator approves it. We usually get to "
                     + "these within a day.");
+        } else if (impact.remoderationRequired() && PropertyStatus.FLAGGED.equals(p.getStatus())) {
+            // A flag is a moderator's hold, so an owner edit raises a re-check and never lifts it.
+            List<String> held = impact.rechecked().isEmpty() ? List.of("listing basics") : impact.rechecked();
+            String deskItemBefore = p.getRecheckReason();
+            p.requestRecheck(held);
+            p.recordRecheckChanges(impact.changes());
+            if (!Objects.equals(deskItemBefore, p.getRecheckReason())) {
+                caseNotes.post(p.getId(), p.getDeal(), recheckNote(p, held));
+            }
         } else if (impact.recheckOnly()) {
             String deskItemBefore = p.getRecheckReason();
             p.requestRecheck(impact.rechecked());
+            p.recordRecheckChanges(impact.changes());
 
             // Branch on the work item the domain actually raised, and post only when it moved: an
             // owner looping a price edit would otherwise flood the desk queue's sort key.
             if (p.getRecheckRequestedAt() != null
                     && !Objects.equals(deskItemBefore, p.getRecheckReason())) {
-                caseNotes.post(p.getId(), p.getDeal(), "You updated: "
-                        + String.join(", ", impact.rechecked())
-                        + ". Your listing stays live \u2014 our team is re-checking these details and will "
-                        + "confirm shortly.");
+                caseNotes.post(p.getId(), p.getDeal(), recheckNote(p, impact.rechecked()));
             }
         }
 
@@ -281,6 +305,13 @@ public class ListingService {
         return p;
     }
 
+    private static String recheckNote(Property p, List<String> fields) {
+        return "You updated: " + String.join(", ", fields)
+                + (PropertyStatus.FLAGGED.equals(p.getStatus())
+                        ? ". Your listing stays on hold while our team re-checks these details."
+                        : ". Your listing stays live \u2014 our team is re-checking these details and will "
+                        + "confirm shortly.");
+    }
 
     private Optional<Property> resolveOwned(UUID userId, String idOrSlug) {
         UUID id = parseUuid(idOrSlug);

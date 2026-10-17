@@ -1417,6 +1417,12 @@ paths:
       tags: [Listings]
       summary: Create new listing
       operationId: createListing
+      description: >-
+        Bounds and consistency are 422 field errors (see `ListingFields`). Posting is paced: past the
+        daily limit the call is `429` and `Retry-After` / `retryAfterSeconds` is the time until the
+        oldest post in the 24-hour window ages out. Replaying a create the same owner made in the last
+        ten minutes (same normalised title, address, type, deal and price on a non-archived listing) is
+        `409 duplicate_submission` and carries `existingId`.
       requestBody:
         required: true
         content:
@@ -1429,7 +1435,14 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ListingWriteResult' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '409':
+          description: The same listing was posted a moment ago (`duplicate_submission`); `existingId` is that listing.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: duplicate_submission, message: You just posted this listing. Open it from your dashboard instead of posting it again., status: 409, existingId: 6f1c1c0e-6a39-4d1d-9a0b-2f9c5f0f8b11 }
         '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /me/listings/quota:
     get:
       tags: [Listings]
@@ -1522,15 +1535,29 @@ paths:
         moderator re-approves it.
 
 
-        Changing `price`, `furnishing` or `possession` changes an attribute of a listing that is
-        still the same property, so the worst case is a briefly out-of-date value. The response
-        keeps `status: approved`, the listing stays in search, and `recheckPending` comes back true
-        with `recheckReason` naming the fields. A PATCH that does both is treated as the first: the
+        Changing `price`, `furnishing`, `possession`, `address`, `societyId`, `electricityMeterNo`,
+        `description`, `amenities`, `images`, `video`, `reraId` or `plottedProject`, moving the pin
+        more than 500 m, or changing `carpetArea` by 20% or more, leaves the listing the same property,
+        so the worst case is a briefly out-of-date value. The response keeps `status: approved`, the
+        listing stays in search, and `recheckPending` comes back true with `recheckReason` naming the
+        fields. Description, amenities, photos, video, address and RERA id are re-checked on purpose
+        (anti bait-and-switch), so they do **not** publish instantly. The back office reads what
+        changed as `recheckChanges`. A PATCH that does both is treated as the first: the
         full re-moderation covers the attribute change too, so no separate re-check is raised.
 
 
-        Every other field (description, photos, deposit, address, …) publishes immediately and
-        raises nothing.
+        Every other field (title, deposit, maintenance, availability, floor, facing, age, tenants,
+        pets, pincode, other form answers) publishes immediately and raises nothing.
+
+
+        Only a listing that is pending, approved, paused or flagged can be edited: one that is
+        rejected, sold, rented or archived answers `409 listing_not_editable`. A foundation edit on a
+        flagged listing sends it back to `pending`, as it does for a live one.
+
+
+        Bounds and consistency (422, per field): see `ListingFields`. Photo urls are de-duplicated in
+        first-seen order. `bhk` is never stored for commercial, plot or farm land; deposit and the
+        rent-only answers are never stored for a `buy` listing.
       operationId: updateListing
       requestBody:
         required: true
@@ -1544,6 +1571,12 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ListingWriteResult' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The listing is rejected, sold, rented or archived (`listing_not_editable`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: listing_not_editable, message: This listing is closed and can no longer be edited., status: 409 }
         '422': { $ref: '#/components/responses/ValidationError' }
     delete:
       tags: [Listings]
@@ -2043,6 +2076,8 @@ paths:
         In person only. A visit spends one owner contact from the same allowance as `POST /contacts/request`,
         unless the caller already has a counted contact request or visit on this listing; booking your own
         listing is free. Cancelling before the owner first confirms gives it back; after that it stays spent.
+        A closed listing (paused, rented or sold) is `409 listing_not_live`, exactly as for a contact
+        request; a listing that is not visible at all is `404`.
       requestBody:
         required: true
         content:
@@ -2054,7 +2089,12 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Visit' }
-        '409': { $ref: '#/components/responses/Conflict' }
+        '409':
+          description: The listing is closed (`listing_not_live`), or the caller already has a live visit on it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: listing_not_live, message: This listing is not live right now, status: 409 }
         '422':
           description: >
             Invalid body (`validation_failed`), no owner contacts left (`contact_quota_exhausted`), or
@@ -2258,14 +2298,17 @@ paths:
     post:
       tags: [Moderation]
       summary: Flag listing
+      description: A non-blank `reason` is required (422 field error otherwise). The owner is notified.
       operationId: flagProperty
       x-roles: [staff, manager, admin]
       requestBody:
+        required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/ReasonRequest' }
       responses:
         '200': { description: Flagged }
+        '422': { $ref: '#/components/responses/ValidationError' }
     delete:
       tags: [Moderation]
       summary: Clear flag
@@ -2320,7 +2363,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FlatSplitResult' }
-        '403': { description: Caller is not the listing's owner (`not_owner`) }
+        '404': { description: Unknown listing, or one the caller does not own - the same body for both }
         '409':
           description: '`already_split`, `not_splittable` (sale listing), or blocked by the host-eligibility guardrails.'
           content:
@@ -2334,6 +2377,7 @@ paths:
       operationId: unsplitFlat
       responses:
         '204': { description: Split withdrawn }
+        '404': { description: Unknown listing, one the caller does not own, or no split to withdraw }
         '409': { description: Someone has already moved in (`occupied`) }
   /properties/{id}/admin:
     parameters: [ { $ref: '#/components/parameters/PropertyId' } ]
@@ -3409,7 +3453,7 @@ paths:
               schema: { $ref: '#/components/schemas/PropertyReview' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
-          description: second_approver_required when a hard broker signal blocks a plain approve; owner_not_confirmed when a staff-posted listing has not been confirmed by its owner.
+          description: second_approver_required when a hard broker signal blocks a plain approve; owner_not_confirmed when a staff-posted listing has not been confirmed by its owner (checked before the case lookup); stale_decision when `expectedStatus` no longer matches the listing or its case (refresh and retry).
   /properties/{id}/verification/override-requests:
     parameters: [ { $ref: '#/components/parameters/PropertyId' } ]
     post:
@@ -3900,6 +3944,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/ValidationError' }
 
   /admin/properties/duplicates/dismiss:
@@ -4002,12 +4047,10 @@ paths:
         scoped to the caller's own account. Unlike `searchProperties`, `status` here *widens*.
 
 
-        **Owner contact is raw here, not masked**, and this endpoint changed its mind about that.
-        It shipped masked, on the argument that a list leaks the whole catalogue's contacts at once
-        rather than one at a time. The argument was right about the risk and wrong about the work:
-        the desk reading this queue exists to ring owners whose listings are stuck, and a moderator
-        denied the number here gets it from somewhere this platform cannot log. The mask never stood
-        between the owner and staff — only between the disclosure and the audit trail.
+        **Owner contact is raw here, not masked.** The desk reading this queue exists to ring owners
+        whose listings are stuck, and a moderator denied the number here gets it from somewhere this
+        platform cannot log. A mask would never stand between the owner and staff, only between the
+        disclosure and the audit trail.
 
 
         This is not the contact gate relaxing. The gate (`owner|approved|pending|declined|none`) is
@@ -4134,7 +4177,7 @@ paths:
       operationId: createListingOnBehalf
       description: >
         Creates a listing **owned by the person named in `ownerMobile`**, not by the operator making
-        the call. The back-office wizard previously called `createListing`, which attributes the
+        the call. The back-office wizard must not call `createListing`, which attributes the
         listing to the authenticated caller — against a real server that would have made every
         phoned-in listing the operator's: invisible in the owner's own listings, uneditable by them,
         and gating buyers onto the office's number. Attribution is the whole feature, hence a
@@ -4522,6 +4565,7 @@ paths:
     post:
       tags: [Moderation]
       summary: Report a listing
+      description: An account may file 10 reports per hour; the 11th is a 429 with `Retry-After`.
       operationId: createReport
       # No x-roles: any signed-in user must be able to report abuse.
       requestBody:
@@ -4536,6 +4580,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Report' }
         '404': { description: A `user` report whose target is not a user }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /me/erasure:
     post:
       tags: [Account]
@@ -5000,7 +5045,8 @@ paths:
         allowance, contact packs and referrals allow — see `GET /me/entitlements`. Returns `409 listing_not_live`
         when the listing is paused, rented or sold, and `404` when it is archived, not approved or its owner is suspended. A request counts against the allowance from the moment it is made until
         the owner declines it or it lapses after `contactReplyDays`, whatever happens to the listing meanwhile.
-        A visit booked on the same listing (`POST /visits`) shares that one contact.
+        A visit booked on the same listing (`POST /visits`) shares that one contact. An owner asking for
+        contact on their own listing gets `409 own_listing` and nothing is created.
       requestBody:
         required: true
         content:
@@ -5027,7 +5073,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The listing is closed (paused, rented or sold) - `listing_not_live`.
+          description: The listing is closed (paused, rented or sold) - `listing_not_live` - or it is the caller's own (`own_listing`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -6290,7 +6336,7 @@ paths:
         until the grant expires (7 days from the grant). It must never be written to an access log,
         an error report or an analytics event.
 
-        **The token is a header, never a query parameter (D42).** It used to be `?token=…`, which
+        **The token is a header, never a query parameter.** It used to be `?token=…`, which
         made every share link itself a bearer credential — copied into browser history and
         bookmarks, written to any proxy or CDN access log, and forwarded verbatim when the recipient
         pasted it into a chat. The query parameter has been removed outright rather than deprecated:
@@ -6537,6 +6583,22 @@ paths:
       responses:
         '204': { description: Marked }
         '404': { $ref: '#/components/responses/NotFound' }  # Slice-12 spec fix S48
+  /support/tickets/{id}/close:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Services & Support]
+      summary: Close a support ticket (desk)
+      description: >-
+        Marks the ticket closed and tells the customer. Closing an already-closed ticket is a no-op.
+      operationId: closeSupportTicket
+      x-roles: [staff, admin]
+      responses:
+        '200':
+          description: Closed
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SupportTicket' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /admin/support-tickets:
     get:
       tags: [Services & Support]
@@ -10048,8 +10110,7 @@ paths:
           schema: { type: integer, default: 6, minimum: 1, maximum: 25 }
           description: >
             How many hints to return -- a handful of chips, not a report. Out of range is refused
-            with 400 rather than clamped: a caller asking for zero used to get one back, and a
-            caller asking for a thousand got a silently different number, with nothing in the
+            with 400 rather than clamped: a silently different number would leave nothing in the
             response saying so.
       responses:
         '200':
@@ -11311,6 +11372,7 @@ components:
         status: { type: integer, description: HTTP status., example: 404 }
         traceId: { type: string, description: Correlation id for observability. }
         reason: { type: string, description: 'Present only on 422 refund_not_eligible: the policy reason code.' }
+        existingId: { type: string, format: uuid, description: 'Present only on 409 duplicate_submission: the listing the owner already posted.' }
         attemptsRemaining:
           type: integer
           minimum: 0
@@ -11373,10 +11435,9 @@ components:
     SearchEnvelope:
       description: >
         A page envelope plus the one count a page cannot supply about itself. Search results carry
-        a "N homes · M verified" headline, and M was previously counted in the browser over the
-        rows it happened to hold — a statement about a window rendered as a statement about the
-        catalogue, and wrong by construction from the second page onwards. It is now counted over
-        the whole result set in the same statement as `totalElements`, under the same filters.
+        a "N homes · M verified" headline, and M is counted over the whole result set in the same
+        statement as `totalElements`, under the same filters: counting it over the rows a page
+        happens to hold would state a window as a statement about the catalogue.
       allOf:
         - $ref: '#/components/schemas/PageEnvelope'
         - type: object
@@ -11475,13 +11536,9 @@ components:
         The safe assumption for a client is that the number is masked; treat a raw one as a
         bonus, never as a precondition, and never parse the mask for digits.
 
-        This block previously said "masked until the owner has acted", which described no
-        surface correctly. The visits rule above was then written down for years before it
-        was implemented — a client that trusted it saw a reveal that never arrived.
-
         `verified` is stated by the server rather than derived from `mobile`: the mask is
         lossy, so a client matching `98XXXXX210` against a verified-user list can only ever
-        answer false (tech-debt D114).
+        answer false.
       properties:
         id:
           type: string
@@ -11695,7 +11752,7 @@ components:
     ServiceRequestParty:
       type: object
       description: >
-        One side of a co-filled service request (D121). Keyed on the invited *account* wherever
+        One side of a co-filled service request. Keyed on the invited *account* wherever
         there is one to key on, and carrying no contact detail of its own beyond the masked
         `mobile` that V107 made unavoidable — see that property for why the exception is narrow.
 
@@ -12271,6 +12328,7 @@ components:
         photoCount: { type: integer }
         descLength: { type: integer }
         amenityCount: { type: integer }
+        qualityScore: { type: integer, nullable: true, description: The server's listing-quality score, the same number the public page shows. }
         facing: { type: string }
         floor: { type: integer }
         ageYears: { type: integer }
@@ -12696,6 +12754,20 @@ components:
               description: >
                 Which fields raised the pending re-check, accumulated across edits until a moderator
                 clears it. Empty when `recheckPending` is false.
+            recheckChanges:
+              type: array
+              description: >
+                Back office only. What the owner's edit changed, one entry per field kept since the
+                re-check was raised: the first `before` and the latest `after`, as display-agnostic
+                strings (photos as a count, long text cut to 300 characters). Absent when no re-check
+                is pending; cleared with it.
+              items:
+                type: object
+                required: [field, before, after]
+                properties:
+                  field: { type: string, example: price }
+                  before: { type: string, example: '30000' }
+                  after: { type: string, example: '36000' }
             recheckRequestedAt:
               type: [string, 'null']
               format: date-time
@@ -12968,6 +13040,16 @@ components:
         ownershipRequestedAt: { type: string, format: date-time }
         recheckPending: { type: boolean }
         recheckReason: { type: string }
+        recheckChanges:
+          type: array
+          description: What the owner's edit changed, as `[{field, before, after}]` strings; absent when none.
+          items:
+            type: object
+            required: [field, before, after]
+            properties:
+              field: { type: string }
+              before: { type: string }
+              after: { type: string }
         recheckRequestedAt: { type: string, format: date-time }
         featured: { type: boolean }
         archived: { type: boolean }
@@ -13657,19 +13739,25 @@ components:
         title: { type: string }
         deal: { $ref: '#/components/schemas/DealIntent' }
         propertyType: { $ref: '#/components/schemas/PropertyTypeLabel' }
-        bhk: { type: number }
-        price: { $ref: '#/components/schemas/Money' }
+        bhk: { type: number, description: Ignored (stored null) for commercial, plot and farm land. }
+        price:
+          allOf: [ { $ref: '#/components/schemas/Money' } ]
+          description: >-
+            Greater than 0; at most 10,000,000,000 (Rs 1,000 Cr) for a `buy` listing and 10,000,000
+            (Rs 1 Cr) a month for `rent`.
         deposit: { $ref: '#/components/schemas/Money' }
         maintenance: { $ref: '#/components/schemas/Money' }
         negotiable: { type: boolean }
-        area: { type: number }
+        area: { type: number, exclusiveMinimum: 0, description: Greater than 0 and at most 10,000 acres in whatever unit is stated. }
         areaUnit:
           type: string
           default: sqft
           enum: [sqft, sqyd, sqm, guntha, acre, hectare]
           description: >-
             Unit the stated area is measured in. Rendered verbatim beside the number, so it is an
-            allowlist rather than free text. Absent means sq.ft.
+            allowlist rather than free text. Absent means sq.ft. Only the units the wizard offers for the
+            type are accepted: plot sqft, sqyd, sqm, guntha; farm land acre, guntha, hectare; anything
+            else sqft.
         landUse:
           type: string
           enum: [residential, commercial, industrial, agricultural, mixed]
@@ -13677,13 +13765,14 @@ components:
             Permitted zoning, for an open plot or farm land only. The wizard derives it from the
             owner's `plotZone` answer — farm land is never asked and is agricultural by definition.
             Absent leaves it unstated, which is correct for anything with a building on it: a flat
-            has no land use of its own. Blank is not accepted; the column does not permit it.
+            has no land use of its own. Blank is not accepted; the column does not permit it. Sending it
+            for any other type is a 422.
         furnishing: { $ref: '#/components/schemas/Furnishing' }
         locality: { type: string, description: 'Display name; must be a live locality (422 "Pick the locality from the suggestions."). The stored name is the locality''s canonical one.' }
         localitySlug: { type: string, description: 'The picked live locality. Wins over `locality`. On edit an unchanged retired binding is kept.' }
         city: { type: string }
-        lat: { type: number, format: double }
-        lng: { type: number, format: double }
+        lat: { type: number, format: double, minimum: -90, maximum: 90 }
+        lng: { type: number, format: double, minimum: -180, maximum: 180 }
         reraId: { type: string }
         possession: { $ref: '#/components/schemas/PropertyPossession' }
         tenants:
@@ -13713,7 +13802,7 @@ components:
         # The duplicate-detection inputs. None is required — a bulk meter has no number, a plot no
         # floor, a standalone building no society — so the rule reads what is present, else silent.
         address: { type: string, description: Street address; normalised server-side into a duplicate key }
-        floor: { type: integer, description: Which floor the unit is on }
+        floor: { type: integer, minimum: 0, description: Which floor the unit is on (0 is Ground) }
         societyId:
           type: string
           pattern: '^$|^[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}$'
@@ -13835,7 +13924,7 @@ components:
         expectedStatus:
           type: string
           nullable: true
-          description: Optional optimistic guard; 409 stale_decision if the listing status changed.
+          description: The status the caller last saw; 409 stale_decision if it changed. Required unless the listing is pending (or the call only clears an approved listing's re-check), so a concurrent second verdict cannot land on top of the first.
     Offer:
       type: object
       properties:
@@ -14362,7 +14451,8 @@ components:
       type: [object, 'null']
       description: >
         Where an unfinished listing is on its way to live, derived from timestamped facts on the
-        listing. Owner-posted (`owner`): submitted, in_review, live. Staff-posted (`staff`): created,
+        listing. Owner-posted (`owner`): submitted, in_review, live; a rejected listing falls back to
+        submitted. Staff-posted (`staff`): created,
         link_sent, owner_confirmed, in_review, live. Detours are flags rather than steps. Null once
         the listing has left the funnel (paused, sold, rented, archived) and on public reads.
       required: [track, step, flags]
@@ -14556,7 +14646,7 @@ components:
     ErasureRequest:
       type: object
       description: >
-        D177. **`subjectId` is deliberately absent from this schema.** The subject reads their own
+        **`subjectId` is deliberately absent from this schema.** The subject reads their own
         request and knows who they are; an admin decides on whether a live obligation exists, which
         the id does not answer either way. Putting it on the wire would make the admin queue a list
         of everybody who has asked to be forgotten, which is the shape this feature exists to avoid.
@@ -15212,7 +15302,7 @@ components:
           allOf:
             - $ref: '#/components/schemas/Money'
           description: >
-            What the customer accepted when the ticket came off a priced flow (D3). Read *next to*
+            What the customer accepted when the ticket came off a priced flow. Read *next to*
             `value`, never instead of it: `value` is what the desk expects to bill and is ops-owned,
             `quotedValue` is what was promised at the point of sale and is write-once. A gap between
             the two is the desk's cue that the job is not the job that was quoted, which is a signal
@@ -18666,7 +18756,7 @@ components:
         action: { type: string, example: property.approve }
         entity: { type: string, example: property }
         entityId: { type: string }
-        checker: { type: [string, 'null'], description: Approver in maker-checker flows. }
+        checker: { type: [string, 'null'], description: 'Reserved and always null today: the decider is `actor`, and an override second approver is its own `override.approved` row.' }
         at: { type: string, format: date-time }
         metadata: { type: object, additionalProperties: true }
     ClientErrorReport:

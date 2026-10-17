@@ -46,6 +46,7 @@ public record OwnerListingCard(
         int photoCount,
         int descLength,
         int amenityCount,
+        Integer qualityScore,
         String facing,
         Integer floor,
         Integer ageYears,

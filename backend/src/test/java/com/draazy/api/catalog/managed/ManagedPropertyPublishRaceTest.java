@@ -55,6 +55,7 @@ class ManagedPropertyPublishRaceTest {
         String ownerIds = "(select id from users where mobile = ?)";
         jdbc.update("delete from managed_properties where owner_id in " + ownerIds, OWNER_MOBILE);
         jdbc.update("delete from properties where owner_id in " + ownerIds, OWNER_MOBILE);
+        jdbc.update("delete from notifications where user_id in " + ownerIds, OWNER_MOBILE);
         jdbc.update("delete from users where mobile = ?", OWNER_MOBILE);
         jdbc.update("delete from localities where slug = 'publishracetown'");
     }

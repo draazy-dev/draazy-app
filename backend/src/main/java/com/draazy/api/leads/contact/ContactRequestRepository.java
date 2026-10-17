@@ -103,6 +103,8 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
                               @Param("fromStatus") String fromStatus,
                               @Param("toStatus") String toStatus);
 
+    List<ContactRequest> findByPropertyIdAndStatus(UUID propertyId, String status);
+
     // Native: first_requested_at is database-written, so the entity maps it read-only.
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = """

@@ -57,7 +57,8 @@ public class GlobalExceptionHandler {
                 .headers(headers)
                 .body(new ApiError(ex.getCode(), ex.getMessage(), ex.getStatus(), traceId(),
                         attemptsRemaining, retryAfterSeconds,
-                        ex instanceof RefundNotEligibleException refund ? refund.getReason() : null));
+                        ex instanceof RefundNotEligibleException refund ? refund.getReason() : null,
+                        ex instanceof DuplicateSubmissionException dup ? dup.getExistingId().toString() : null));
     }
 
     /** {@code @Valid} on a {@code @RequestBody} — collect per-field messages. */

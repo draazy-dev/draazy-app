@@ -328,7 +328,7 @@ class ModerationBehaviourTest extends AbstractApiTest {
         mvc.perform(patch("/properties/{id}/status", listing.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"approved\"}"))
+                        .content("{\"status\":\"approved\",\"expectedStatus\":\"rented\"}"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("checklist_incomplete"));
     }
@@ -499,6 +499,43 @@ class ModerationBehaviourTest extends AbstractApiTest {
         String reason = jdbc.queryForObject("select metadata->>'reason' from audit_log where id = ?",
                 String.class, row.get("id"));
         assertThat(reason).contains("said \"fake\"");
+    }
+
+    @Test
+    @DisplayName("the losing verdict of two concurrent decisions is refused, not stacked on the winner's")
+    void aSecondVerdictWithoutExpectedStatusIsStale() throws Exception {
+        User owner = user("9800000196", "owner", "Owner");
+        User first = user("9800000197", "staff", "First");
+        User second = user("9800000198", "staff", "Second");
+        Property listing = listing(owner);
+        tickChecklist(listing, first);
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(first))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(second))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"rejected\",\"reasonCode\":\"wrong_details\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("stale_decision"));
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(second))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\"}"))
+                .andExpect(status().isConflict());
+
+        assertThat(properties.findById(listing.getId()).orElseThrow().getStatus()).isEqualTo(PropertyStatus.APPROVED);
+        assertThat(auditRows("property.status", listing.getId())).hasSize(1);
+        assertThat(notificationsFor(owner)).extracting(n -> n.get("type")).doesNotContain("listing.rejected");
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(second))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"rejected\",\"reasonCode\":\"wrong_details\",\"expectedStatus\":\"approved\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test

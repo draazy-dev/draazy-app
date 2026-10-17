@@ -532,6 +532,28 @@ class OwnershipVerificationTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("the staffer who posted a listing on the owner's behalf cannot badge it either")
+    void onBehalfPosterCannotVerify() throws Exception {
+        User poster = user("9820000697", Roles.Wire.STAFF);
+        Property listing = listing(user("9820000698", Roles.Wire.OWNER), "buy");
+        listing.markPostedOnBehalf(poster.getId().toString());
+        properties.saveAndFlush(listing);
+        String token = bearer(poster);
+
+        mvc.perform(post(ownership(listing) + "/evidence")
+                        .header(HttpHeaders.AUTHORIZATION, token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(evidenceBody("index_ii", Instant.now().minus(1, ChronoUnit.DAYS))))
+                .andExpect(status().isForbidden());
+        mvc.perform(post(ownership(listing)).header(HttpHeaders.AUTHORIZATION, token))
+                .andExpect(status().isForbidden());
+        mvc.perform(delete(ownership(listing))
+                        .header(HttpHeaders.AUTHORIZATION, token)
+                        .param("reason", "changed my mind"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     @DisplayName("a badge granted in error can be withdrawn, and the evidence survives the withdrawal")
     void staffCanWithdrawABadgeAndTheCaseFileRemains() throws Exception {
         Property listing = listing(user("9820000619", Roles.Wire.OWNER));

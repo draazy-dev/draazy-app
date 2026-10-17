@@ -10,11 +10,15 @@ import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ForbiddenException;
+import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.security.AuthPrincipal;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,6 +28,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -108,7 +114,7 @@ public class ListingDuplicateClusterService {
         Set<String> settled = found.isEmpty() ? Set.of()
                 : dismissals.findByClusterSignatureIn(found.stream().map(Candidate::signature).toList())
                         .stream().map(ListingDuplicateDismissal::getClusterSignature)
-                        .collect(java.util.stream.Collectors.toSet());
+                        .collect(Collectors.toSet());
 
         List<DuplicateCluster> clusters = found.stream()
                 .filter(c -> !settled.contains(c.signature()))
@@ -126,24 +132,36 @@ public class ListingDuplicateClusterService {
         if (keepId == null || keepId.isBlank()) {
             throw new BadRequestException("Name the listing to keep");
         }
-        List<String> drops = dropIds == null ? List.of() : dropIds.stream()
-                .filter(id -> id != null && !id.isBlank())
-                .filter(id -> !id.equals(keepId))
-                .distinct()
+        UUID keep = parseIds(List.of(keepId)).get(0);
+        List<UUID> drops = parseIds(dropIds == null ? List.of() : dropIds).stream()
+                .filter(id -> !id.equals(keep))
                 .toList();
         if (drops.isEmpty()) {
             throw new BadRequestException("Name at least one listing to archive");
         }
-        for (String dropId : drops) {
-            Property archived = archiveService.archive(actor, dropId,
-                    ListingArchiveService.DUPLICATE_REASON + " — kept " + keepId);
+        // Sorted lock order keeps two crossing merges from deadlocking; the loser then sees the winner's archive.
+        Map<UUID, Property> locked = new HashMap<>();
+        Stream.concat(Stream.of(keep), drops.stream()).sorted().forEach(id ->
+                properties.findForVerificationDecision(id).ifPresent(p -> locked.put(id, p)));
+        Property kept = locked.get(keep);
+        if (kept == null) {
+            throw NotFoundException.of("Listing to keep");
+        }
+        requireNoMaker(actor, locked.values());
+        if (kept.isArchived() || !OCCUPYING.contains(kept.getStatus())
+                || drops.stream().anyMatch(id -> locked.get(id) != null && locked.get(id).isArchived())) {
+            throw new ConflictException("stale_decision", "These listings changed while you were deciding");
+        }
+        for (UUID drop : drops) {
+            Property archived = archiveService.archive(actor, drop.toString(),
+                    ListingArchiveService.DUPLICATE_REASON + " — kept " + keep);
             notifier.notify(archived.getOwner().getId(), "listing.archived_duplicate",
                     "Your listing was archived",
                     "\"" + archived.getTitle() + "\" was archived as a duplicate of another listing.",
                     "/dashboard");
         }
-        audit.record(actor, "property.duplicate.merge", "property", keepId,
-                "archived", String.join(",", drops),
+        audit.record(actor, "property.duplicate.merge", "property", keep.toString(),
+                "archived", drops.stream().map(UUID::toString).collect(Collectors.joining(",")),
                 "count", drops.size());
     }
 
@@ -155,6 +173,7 @@ public class ListingDuplicateClusterService {
             throw new BadRequestException("A cluster is at least two listings");
         }
         String signature = DuplicateClusterSignature.of(ids);
+        requireNoMaker(actor, properties.findAllById(ids));
 
         // Idempotent: a double-clicked button and two operators reaching the same verdict are the
         // same fact, and the unique index would otherwise turn the second into a 500.
@@ -288,6 +307,12 @@ public class ListingDuplicateClusterService {
         long x = a.getHash();
         long y = b.getHash();
         return x < y ? x * 31 + y : y * 31 + x;
+    }
+
+    private void requireNoMaker(AuthPrincipal actor, Collection<Property> members) {
+        if (members.stream().anyMatch(p -> p.isMadeBy(actor.userId()))) {
+            throw new ForbiddenException("You cannot decide a duplicate cluster that holds your own listing");
+        }
     }
 
     private List<UUID> parseIds(List<String> raw) {

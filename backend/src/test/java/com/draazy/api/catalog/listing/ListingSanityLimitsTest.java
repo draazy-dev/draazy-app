@@ -107,7 +107,8 @@ class ListingSanityLimitsTest {
             String carpetArea, String builtUpArea, String superBuiltUpArea, String reraId,
             Map<String, Object> formDetails) {
         return new ListingCreate("Boundary listing", deal, propertyType, BigDecimal.TWO, price,
-                deposit, null, null, bd(carpetArea), "sqft", null, "Baner", null, "Pune",
+                deposit, null, null, bd(carpetArea), "Farm Land".equals(propertyType) ? "acre" : "sqft",
+                null, "Baner", null, "Pune",
                 null, null, reraId, null, null, null, null, null, null, null, null,
                 null, null, null, null, null, null, null, null, null, null, null, bd(carpetArea),
                 bd(builtUpArea), bd(superBuiltUpArea), null, null, null, formDetails, null);

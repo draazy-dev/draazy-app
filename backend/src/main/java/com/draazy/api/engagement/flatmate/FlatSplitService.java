@@ -8,7 +8,6 @@ import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.catalog.society.Society;
 import com.draazy.api.catalog.society.SocietyRepository;
 import com.draazy.api.common.error.ConflictException;
-import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.identity.user.User;
@@ -51,16 +50,17 @@ public class FlatSplitService {
         this.societies = societies;
     }
 
+    /** A property that is not the caller's answers exactly as an unknown id, so ids cannot be probed. */
+    private Property ownedBy(AuthPrincipal caller, UUID propertyId) {
+        return properties.findById(propertyId)
+                .filter(p -> !p.isArchived() && p.getOwner() != null && p.getOwner().getId().equals(caller.userId()))
+                .orElseThrow(() -> NotFoundException.of("Property"));
+    }
+
     /** {@code POST /properties/{id}/split} — owner-only, rent-only, once-only. */
     @Transactional
     public FlatSplitResult split(AuthPrincipal caller, UUID propertyId, FlatSplitRequest body) {
-        Property parent = properties.findById(propertyId)
-                .filter(p -> !p.isArchived())
-                .orElseThrow(() -> NotFoundException.of("Property"));
-
-        if (parent.getOwner() == null || !parent.getOwner().getId().equals(caller.userId())) {
-            throw new ForbiddenException("Only the listing's owner can let it room by room. (not_owner)");
-        }
+        Property parent = ownedBy(caller, propertyId);
         if (!DealIntent.RENT.equals(parent.getDeal())) {
             throw new ConflictException(
                     "Only a rent listing can be let room by room. (not_splittable)");
@@ -117,12 +117,7 @@ public class FlatSplitService {
      * there, and an owner should not make their tenants disappear by pressing undo. */
     @Transactional
     public void unsplit(AuthPrincipal caller, UUID propertyId) {
-        Property parent = properties.findById(propertyId)
-                .filter(p -> !p.isArchived())
-                .orElseThrow(() -> NotFoundException.of("Property"));
-        if (parent.getOwner() == null || !parent.getOwner().getId().equals(caller.userId())) {
-            throw new ForbiddenException("Only the listing's owner can withdraw a split.");
-        }
+        Property parent = ownedBy(caller, propertyId);
 
         List<FlatmateRoom> siblings = rooms.findByPropertyIdAndArchivedFalse(propertyId);
         if (siblings.isEmpty()) {

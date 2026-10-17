@@ -63,9 +63,8 @@ public class PropertyVerificationOverrideService {
             }
         }
         PropertyOverrideRequest request = savePending(property, actor.userId(), action, trimmedReason);
-        audit.record(actor, "property.verification.override.requested", "property_override_request",
-                request.getId().toString(), "propertyId", property.getId().toString(),
-                "action", action, "reason", trimmedReason);
+        audit.record(actor, "property.verification.override.requested", "property", propertyId,
+                "requestId", request.getId().toString(), "action", action, "reason", trimmedReason);
         return verification.get(actor, propertyId);
     }
 
@@ -90,8 +89,8 @@ public class PropertyVerificationOverrideService {
         }
         request.approve(actor.userId(), blankToNull(note));
         overrideRequests.saveAndFlush(request);
-        audit.record(actor, "property.verification.override.approved", "property_override_request",
-                request.getId().toString(), "propertyId", property.getId().toString(),
+        audit.record(actor, "property.verification.override.approved", "property", propertyId,
+                "requestId", request.getId().toString(),
                 "action", request.getAction(), "requestedBy", request.getRequestedBy().toString(),
                 "note", note);
         return verification.get(actor, propertyId);
@@ -106,11 +105,13 @@ public class PropertyVerificationOverrideService {
         if (note != null && !note.isBlank()) {
             review.addInternalNote(note.trim());
         }
-        review.addMessage(actor.userId(), decisionMessage());
+        String from = property.getStatus();
         lifecycle.publishWithSecondApproval(actor, property);
+        review.addApprovalMessage(actor.userId(), lifecycle.approvalMessage(property));
         reviews.saveAndFlush(review);
         audit.record(actor, "property.verification.decision", "property", property.getId().toString(),
-                "decision", PropertyOverrideRequest.APPROVE, "note", note, "reasonCode", null,
+                "decision", PropertyOverrideRequest.APPROVE, "from", from, "to", property.getStatus(),
+                "note", note, "reasonCode", null,
                 "checklist", checklistSnapshot(review),
                 "owner", String.valueOf(property.getOwner().getId()));
         lifecycle.announceApproval(property);
@@ -122,6 +123,7 @@ public class PropertyVerificationOverrideService {
                     "Listing status changed; refresh before deciding");
         }
         lifecycle.reenterPendingAfterSecondApproval(actor, property);
+        lifecycle.announceReopened(property);
     }
 
     private PropertyOverrideRequest savePending(Property property, UUID requestedBy,
@@ -164,10 +166,6 @@ public class PropertyVerificationOverrideService {
             throw new BadRequestException("reason must be 10 to 300 characters after trimming");
         }
         return trimmed;
-    }
-
-    private static String decisionMessage() {
-        return "\u2705 Your property has been verified and is now live.";
     }
 
     private static Map<String, Boolean> checklistSnapshot(PropertyReview review) {

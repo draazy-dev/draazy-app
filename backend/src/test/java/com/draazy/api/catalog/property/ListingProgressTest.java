@@ -72,9 +72,9 @@ class ListingProgressTest {
         assertThat(staffView().flags()).isEmpty();
     }
 
-    @Test void rejectedAndFlaggedSitOnInReview() {
+    @Test void flaggedSitsOnInReviewButRejectedFallsBackToSubmitted() {
         property.setStatus(PropertyStatus.REJECTED);
-        assertThat(staffView()).isEqualTo(new ListingProgress("owner", "in_review", List.of("rejected")));
+        assertThat(staffView()).isEqualTo(new ListingProgress("owner", "submitted", List.of("rejected")));
         property.setStatus(PropertyStatus.FLAGGED);
         assertThat(staffView()).isEqualTo(new ListingProgress("owner", "in_review", List.of("flagged")));
     }

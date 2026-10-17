@@ -143,8 +143,6 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.rooms[0].verified").value(false));
         }
 
-        // `SpecCoverageTest` only proves served routes are declared; this route was declared but absent.
-        // The unauthenticated read must return rooms without leaking sibling owner-only data.
         @Test
         @DisplayName("approving the flat later promotes its split rooms to owner-tier (D287)")
         void approvalPromotesRoomsSplitWhilePending() throws Exception {
@@ -220,7 +218,7 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(splitBody(2, "bedroom")))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isNotFound());
 
             Property sale = new Property(owner, "Sale flat", "buy", "apartment", 9000000L,
                     "Baner", "Pune");
@@ -435,8 +433,7 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                     .andReturn().getResponse().getContentAsString();
             String groupId = groupJson.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
 
-            // No API creates an application yet (see the class note in the summary), so the row
-            // is seeded directly to exercise the two admin operations the contract declares.
+            // No API creates an application, so the row is seeded directly to exercise the two admin operations.
             String appId = jdbc.queryForObject(
                     "insert into flatmate_group_applications (listing_id, group_id, applicant_id) "
                             + "values (?::uuid, ?::uuid, ?::uuid) returning id::text",

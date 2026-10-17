@@ -15,6 +15,7 @@ import com.draazy.api.support.AbstractApiTest;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -84,5 +85,77 @@ class DuplicateMergeOwnerNoticeTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].archived").value(true))
                 .andExpect(jsonPath("$.content[0].archivedNote").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("an unknown keeper archives nothing, and a maker cannot decide their own listing's cluster")
+    void unknownKeeperAndMakerAreRefused() throws Exception {
+        User admin = user("9833340105", "admin");
+        User rival = user("9833340106", "owner");
+        Property own = listing(admin, "meter-merge-maker");
+        Property theirs = listing(rival, "meter-merge-maker");
+        String merge = "{\"keepId\":\"%s\",\"dropIds\":[\"%s\"]}";
+
+        mvc.perform(post("/admin/properties/duplicates/merge")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(merge.formatted(UUID.randomUUID(), theirs.getId())))
+                .andExpect(status().isNotFound());
+        mvc.perform(post("/admin/properties/duplicates/merge")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(merge.formatted(own.getId(), theirs.getId())))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/admin/properties/duplicates/dismiss")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[\"" + own.getId() + "\",\"" + theirs.getId() + "\"]}"))
+                .andExpect(status().isForbidden());
+
+        assertThat(properties.findById(theirs.getId()).orElseThrow().isArchived()).isFalse();
+    }
+
+    @Test
+    @DisplayName("two crossing merges cannot archive both listings: the second is stale")
+    void crossingMergesLeaveOneLive() throws Exception {
+        User admin = user("9891600101", "admin");
+        Property x = listing(user("9891600102", "owner"), "meter-cross");
+        Property y = listing(user("9891600103", "owner"), "meter-cross");
+        String merge = "{\"keepId\":\"%s\",\"dropIds\":[\"%s\"]}";
+
+        mvc.perform(post("/admin/properties/duplicates/merge")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(merge.formatted(x.getId(), y.getId())))
+                .andExpect(status().is2xxSuccessful());
+        mvc.perform(post("/admin/properties/duplicates/merge")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(merge.formatted(y.getId(), x.getId())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("stale_decision"));
+
+        em.clear();
+        assertThat(properties.findById(x.getId()).orElseThrow().isArchived()).isFalse();
+        assertThat(properties.findById(y.getId()).orElseThrow().isArchived()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a different-case keep id inside dropIds is still the keeper and is never archived")
+    void caseVariantKeepIdIsNotDropped() throws Exception {
+        User admin = user("9891600104", "admin");
+        Property keep = listing(user("9891600105", "owner"), "meter-case");
+        Property drop = listing(user("9891600106", "owner"), "meter-case");
+
+        mvc.perform(post("/admin/properties/duplicates/merge")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(admin))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"keepId\":\"" + keep.getId() + "\",\"dropIds\":[\""
+                                + keep.getId().toString().toUpperCase() + "\",\"" + drop.getId() + "\"]}"))
+                .andExpect(status().is2xxSuccessful());
+
+        em.clear();
+        assertThat(properties.findById(keep.getId()).orElseThrow().isArchived()).isFalse();
+        assertThat(properties.findById(drop.getId()).orElseThrow().isArchived()).isTrue();
     }
 }

@@ -7,6 +7,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 /** The owner's number stays because the row prints it for the call;
  * the full record is {@code GET /admin/properties/{id}}. */
@@ -35,6 +37,7 @@ public record PropertyQueueRow(
         Instant ownershipRequestedAt,
         boolean recheckPending,
         String recheckReason,
+        List<Map<String, String>> recheckChanges,
         Instant recheckRequestedAt,
         boolean featured,
         boolean archived,

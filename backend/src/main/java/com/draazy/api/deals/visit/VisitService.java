@@ -1,5 +1,6 @@
 package com.draazy.api.deals.visit;
 
+import com.draazy.api.catalog.property.ListingClosed;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.error.ConflictException;
@@ -48,15 +49,17 @@ public class VisitService {
     }
 
     // The caller must be either the visitor or the listing owner.
-    // Who may do what (the security-critical rule).
     @Transactional
     public VisitDto schedule(UUID callerId, VisitCreateRequest body) {
         UUID propertyId = Ids.parseUuid(body.propertyId()).orElse(null);
         // Row lock: an archive running alongside either waits for this visit or is seen as archived here.
         Property property = propertyId == null ? null
                 : properties.findForVerificationDecision(propertyId).orElse(null);
-        if (property == null || !property.isPubliclyVisible()) {
+        if (property == null) {
             throw NotFoundException.of("Property");
+        }
+        if (!property.isPubliclyVisible()) {
+            throw ListingClosed.refusal(property);
         }
 
         // Duplicate prevention: service pre-check for a clean error message.
@@ -90,7 +93,6 @@ public class VisitService {
     }
 
     // The caller must be either the visitor or the listing owner.
-    // Who may do what (the security-critical rule).
     @Transactional
     public void updateStatus(AuthPrincipal caller, UUID visitId, VisitStatusUpdateRequest body) {
         Visit visit = visits.lockById(visitId)

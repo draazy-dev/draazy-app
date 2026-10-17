@@ -428,7 +428,7 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String flagReason;
 
-    /** Stays-live moderation work item (Q14, ): a nullable timestamp whose age is the queue SLA.
+    /** Stays-live moderation work item: a nullable timestamp whose age is the queue SLA.
      * Not a status value — every status but {@code approved} is off search, the cost this avoids. */
     @Column(name = "recheck_requested_at")
     private Instant recheckRequestedAt;
@@ -438,6 +438,10 @@ public class Property extends SoftDeleteEntity {
 
     @Column(name = "recheck_reason")
     private String recheckReason;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "recheck_changes")
+    private List<Map<String, String>> recheckChanges;
 
     @Column(name = "posted_by_admin", nullable = false)
     private boolean postedByAdmin = false;
@@ -460,6 +464,11 @@ public class Property extends SoftDeleteEntity {
         return value == null ? null : value.toString();
     }
 
+    /** Owner or on-behalf poster: the maker, who may never be its checker. */
+    public boolean isMadeBy(UUID userId) {
+        return userId.equals(owner.getId()) || userId.toString().equals(getPostedByStaff());
+    }
+
     @Column(name = "verified", nullable = false)
     @Setter
     private boolean verified = false;
@@ -477,7 +486,7 @@ public class Property extends SoftDeleteEntity {
     private Instant ownershipVerifiedAt;
 
     /** Earliest expiry among the documents the verdict rested on, or {@code null} when every one of
-     * them was a never-expiring registry or identity document (Q15). */
+     * them was a never-expiring registry or identity document. */
     @Column(name = "ownership_verified_until")
     private Instant ownershipVerifiedUntil;
 
@@ -557,11 +566,12 @@ public class Property extends SoftDeleteEntity {
         this.resubmittedAt = Instant.now();
     }
 
-    /** Queue a stays-live re-check (Q14) on a publicly visible listing only. The timestamp is kept at
+    /** Queue a stays-live re-check on a publicly visible listing only. The timestamp is kept at
      * the first unreviewed edit, so daily price edits cannot reset an owner's place in the queue. */
     public void requestRecheck(List<String> fields) {
         if (fields == null || fields.isEmpty() || isArchived()
-                || (!PropertyStatus.APPROVED.equals(status) && !PropertyStatus.PAUSED.equals(status))) {
+                || !(PropertyStatus.APPROVED.equals(status) || PropertyStatus.PAUSED.equals(status)
+                || PropertyStatus.FLAGGED.equals(status))) {
             return;
         }
         boolean wasBadgeOnly = OWNERSHIP_REVIEW_ITEM.equals(recheckReason);
@@ -575,6 +585,22 @@ public class Property extends SoftDeleteEntity {
             this.recheckRequestedAt = Instant.now();
         }
         recordResubmission();
+    }
+
+    /** Keeps the first "before" and the latest "after" per field until a moderator clears the re-check. */
+    public void recordRecheckChanges(List<Map<String, String>> changes) {
+        if (changes == null || changes.isEmpty() || isArchived()
+                || !(PropertyStatus.APPROVED.equals(status) || PropertyStatus.PAUSED.equals(status)
+                || PropertyStatus.FLAGGED.equals(status))) {
+            return;
+        }
+        Map<String, Map<String, String>> byField = new LinkedHashMap<>();
+        if (recheckChanges != null) {
+            recheckChanges.forEach(change -> byField.put(change.get("field"), change));
+        }
+        changes.forEach(change -> byField.merge(change.get("field"), change, (kept, latest) ->
+                Map.of("field", kept.get("field"), "before", kept.get("before"), "after", latest.get("after"))));
+        this.recheckChanges = List.copyOf(byField.values());
     }
 
     public void requestOwnershipReview(Instant at) {
@@ -603,10 +629,12 @@ public class Property extends SoftDeleteEntity {
                 && (PropertyStatus.APPROVED.equals(status) || PropertyStatus.PAUSED.equals(status))) {
             this.recheckReason = OWNERSHIP_REVIEW_ITEM;
             this.recheckRequestedAt = ownershipRequestedAt;
+            this.recheckChanges = null;
             return;
         }
         this.recheckRequestedAt = null;
         this.recheckReason = null;
+        this.recheckChanges = null;
     }
 
     public boolean isRecheckPending() {
@@ -646,6 +674,7 @@ public class Property extends SoftDeleteEntity {
         if (rest.isEmpty()) {
             this.recheckRequestedAt = null;
             this.recheckReason = null;
+            this.recheckChanges = null;
         } else {
             this.recheckReason = String.join(", ", rest);
         }
