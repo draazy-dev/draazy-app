@@ -91,14 +91,14 @@ export default function ArticleFeedback({ slug, title }) {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="submit"
-              className="rounded-lg bg-teal-500 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal-400"
+              className="h-btn-sm inline-flex items-center justify-center rounded-lg bg-teal-500 px-4 text-xs font-semibold text-white transition-colors hover:bg-teal-400"
             >
               {t('help.sendFeedback')}
             </button>
             <button
               type="button"
               onClick={() => setChoice(null)}
-              className="rounded-lg px-3 py-2 text-xs font-medium text-gray-500 hover:text-gray-300"
+              className="h-btn-sm inline-flex items-center justify-center rounded-lg px-3 text-xs font-medium text-gray-500 hover:text-gray-300"
             >
               {t('help.cancel')}
             </button>
@@ -119,14 +119,14 @@ export default function ArticleFeedback({ slug, title }) {
             <button
               type="button"
               onClick={() => pick(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-teal-400/40 hover:text-teal-300"
+              className="h-btn-sm flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 text-xs font-medium text-gray-300 transition-colors hover:border-teal-400/40 hover:text-teal-300"
             >
               <Icon name="thumbs-up" className="w-4 h-4" /> {t('help.yes')}
             </button>
             <button
               type="button"
               onClick={() => pick(false)}
-              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:text-white"
+              className="h-btn-sm flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/[0.04] px-3.5 text-xs font-medium text-gray-300 transition-colors hover:border-white/25 hover:text-white"
             >
               <Icon name="thumbs-down" className="w-4 h-4" /> {t('help.no')}
             </button>

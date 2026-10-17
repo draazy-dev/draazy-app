@@ -14,8 +14,8 @@ import Card from './listings/Card.jsx';
 import useListingsSearch from './listings/useListingsSearch.js';
 
 const SIZE = 24;
-const chip = 'rounded-full border border-white/10 px-3 py-1.5 text-sm text-gray-300 hover:border-teal-400/40 hover:text-teal-300';
-const chipOn = 'rounded-full border border-teal-400/50 bg-teal-400/10 px-3 py-1.5 text-sm font-semibold text-teal-300';
+const chip = 'dz-chip border border-white/10 text-gray-300 hover:border-teal-400/40 hover:text-teal-300';
+const chipOn = 'dz-chip border border-teal-400/50 bg-teal-400/10 text-teal-300';
 
 function Landing({ target }) {
   const { deal, place, bhk } = target;

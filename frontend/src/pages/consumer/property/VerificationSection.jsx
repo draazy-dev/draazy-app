@@ -2,10 +2,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { listingFreshness } from '../../../lib/freshness.js';
 
-/* Verification tab. Trust is the product in Indian real estate, so instead of two
-   flat cards we surface a data-driven trust checklist + a "trust score" meter that
-   tallies the independent checks Draazy has actually passed for this listing.
-   Every signal is backed by a real field — nothing is implied that we can't show. */
+// Every check is backed by a real listing field; nothing is implied that the data cannot show.
 export function VerificationSection({ p }) {
   const { t } = useTranslation();
   const fresh = listingFreshness(p);
@@ -87,7 +84,7 @@ export function VerificationSection({ p }) {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <p className="font-semibold text-white text-sm">{c.title}</p>
-                  <span className={'text-[11px] font-semibold px-2 py-0.5 rounded-full ' + (c.passed ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-slate-400')}>{c.passed ? c.yesLabel : c.noLabel}</span>
+                  <span className={'dz-tag font-semibold ' + (c.passed ? 'bg-emerald-500/15 text-emerald-300' : 'bg-white/10 text-slate-400')}>{c.passed ? c.yesLabel : c.noLabel}</span>
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">{c.passed ? c.yes : c.no}</p>
               </div>

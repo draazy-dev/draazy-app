@@ -18,33 +18,30 @@ export default function TicketThreadModal({
     <Modal open={threadOpen} onClose={closeThread} title={curTicket?.subject || t('misc.ttmTicket')} size="lg">
       {curTicket && (
         <div className="flex flex-col" style={{ maxHeight: '70vh' }}>
-          {/* Meta */}
           <div className="flex flex-wrap items-center gap-1.5 mb-4 text-[11px]">
             <span className="text-gray-500 font-mono">{curTicket.id}</span>
-            <span className={'inline-flex items-center rounded-full border px-2 py-0.5 font-medium ' + (STATUS_CHIP[curTicket.status] || STATUS_CHIP.open)}>
+            <span className={'dz-tag border font-medium ' + (STATUS_CHIP[curTicket.status] || STATUS_CHIP.open)}>
               {getStatusLabel(curTicket.status)}
             </span>
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/6 text-gray-300 px-2 py-0.5">
+            <span className="dz-tag bg-white/6 text-gray-300">
               <Icon name={getCatIcon(curTicket.category)} className="w-3 h-3" />
               {getCatLabel(curTicket.category)}
             </span>
-            {/* A priority chip stood here. `SupportTicket` has no priority field, so it could only
-                ever have rendered for a browser-stored ticket. */}
+            {/* No priority chip: `SupportTicket` has no priority field. */}
             {curTicket.assignedTo && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-white/6 text-gray-300 px-2 py-0.5">
+              <span className="dz-tag bg-white/6 text-gray-300">
                 <Icon name="user-check" className="w-3 h-3" />
                 {curTicket.assignedTo}
               </span>
             )}
           </div>
 
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto mb-4 space-y-3" style={{ minHeight: 200 }}>
             {curTicket.messages.map((m) => {
               if (m.system) {
                 return (
                   <div key={m.id} className="flex justify-center">
-                    <span className="text-[11px] text-gray-500 bg-white/5 px-3 py-1 rounded-full">{m.text}</span>
+                    <span className="text-[11px] text-gray-500 bg-white/5 px-3 py-1 rounded-xl">{m.text}</span>
                   </div>
                 );
               }
@@ -69,12 +66,10 @@ export default function TicketThreadModal({
             })}
           </div>
 
-          {/* Reply */}
           {(curTicket.status === 'resolved' || curTicket.status === 'closed') && (
             <p className="text-[11px] text-gray-500 text-center mb-2">{t('misc.ttmResolvedNote')}</p>
           )}
-          {/* A pending-attachment tray and a paperclip button stood here. `MessageCreate` is
-              `{ body }` — see TicketForm.jsx. */}
+          {/* No attachment tray: `MessageCreate` is `{ body }` (see TicketForm.jsx). */}
           <div className="flex items-end gap-2">
             <textarea
               value={replyText}

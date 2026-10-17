@@ -129,32 +129,29 @@ export default function InteriorRenovation() {
   return (
     <div ref={rootRef}>
       <div>
-        {/* Hero */}
         <section className="theme-dark relative overflow-hidden">
           <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1600&q=80')" }} />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(120deg,rgb(var(--dz-c-ink) / .96) 0%,rgb(var(--dz-c-ink) / .82) 45%,rgb(var(--dz-c-teal-600) / .45) 100%)' }} />
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 lg:py-28">
             <div className="max-w-2xl reveal">
               <ServiceBreadcrumbs k="interior" />
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs text-teal-200 font-medium mb-5"><Icon name="sparkles" className="w-3.5 h-3.5" /> {tr('services.interior.heroBadge')}</span>
+              <span className="dz-tag bg-white/10 border border-white/20 text-teal-200 font-medium mb-5"><Icon name="sparkles" className="w-3.5 h-3.5" /> {tr('services.interior.heroBadge')}</span>
               <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-[1.05]">{tr('services.interior.heroTitle1')}<br /><span className="gradient-text">{tr('services.interior.heroTitleAccent')}</span></h1>
               <p className="text-gray-200 text-base sm:text-lg mt-5 max-w-xl">{tr('services.interior.heroSubtitle')}</p>
               <div className="flex flex-col sm:flex-row gap-3 mt-8">
                 <button onClick={scrollToForm} className="btn btn-primary btn-lg min-w-[220px]"><Icon name="calendar-heart" className="w-4 h-4" /> {tr('services.interior.bookConsult')}</button>
-                <a href="#gallery" className="min-w-[220px] px-6 py-3.5 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 inline-flex items-center justify-center gap-2 transition-all"><Icon name="image" className="w-4 h-4" /> {tr('services.interior.viewWork')}</a>
+                <a href="#gallery" className="h-btn-lg min-w-[220px] px-6 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 inline-flex items-center justify-center gap-2 transition-all"><Icon name="image" className="w-4 h-4" /> {tr('services.interior.viewWork')}</a>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Stats */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-10 relative z-10">
           <div className="glass-card rounded-2xl p-6 grid grid-cols-2 lg:grid-cols-4 gap-6 reveal">
             {[['Free', 'design'], ['Itemised', 'quote'], ['Agreed', 'handover'], ['Written', 'warranty']].map(([v, slug]) => <div key={slug} className="text-center"><p className="text-3xl font-extrabold gradient-text">{v}</p><p className="text-gray-500 text-xs mt-1">{tr('services.interior.stat.' + slug)}</p></div>)}
           </div>
         </section>
 
-        {/* Services */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-y">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.servicesTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.interior.servicesSub')}</p></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -167,7 +164,6 @@ export default function InteriorRenovation() {
           </div>
         </section>
 
-        {/* Design styles */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.stylesTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.interior.stylesSub')}</p></div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -181,7 +177,6 @@ export default function InteriorRenovation() {
           </div>
         </section>
 
-        {/* Before / After */}
         <section className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-8"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.transformTitle')}</h2><p className="text-gray-400 text-sm mt-2">{tr('services.interior.transformSub')}</p></div>
           <div className="ba glass-card reveal">
@@ -194,7 +189,6 @@ export default function InteriorRenovation() {
           </div>
         </section>
 
-        {/* Project gallery */}
         <section id="gallery" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.projectsTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.interior.projectsSub')}</p></div>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -210,24 +204,22 @@ export default function InteriorRenovation() {
           </div>
         </section>
 
-        {/* Packages */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.packagesTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.interior.packagesSub')}</p></div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {PACKAGES.map(([t, p, d, feats, hot], pi) => (
               <div key={t} className={'glass-card rounded-2xl p-6 relative reveal ' + (hot ? 'border-teal-400/40 ring-1 ring-teal-400/30' : '')}>
-                {hot ? <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-[11px] font-bold px-3 py-1 rounded-full bg-gradient-to-r from-teal-500 to-teal-600 text-white">{tr('services.interior.mostPopular')}</span> : null}
+                {hot ? <span className="dz-tag absolute -top-3 left-1/2 -translate-x-1/2 font-bold bg-gradient-to-r from-teal-500 to-teal-600 text-white">{tr('services.interior.mostPopular')}</span> : null}
                 <h3 className="text-white font-bold text-lg">{tr('services.interior.package.' + pi + '.name')}</h3>
                 <p className="text-gray-400 text-xs mt-1 mb-4">{tr('services.interior.package.' + pi + '.desc')}</p>
                 <p className="mb-5"><span className="text-gray-500 text-sm">{tr('services.interior.priceFrom')} </span><span className="text-3xl font-extrabold gradient-text">₹{p}</span><span className="text-gray-500 text-sm"> {tr('services.interior.perSqft')}</span></p>
                 <ul className="space-y-2.5 mb-6">{feats.map((x, fi) => <li key={x} className="flex items-start gap-2.5 text-gray-300 text-sm"><Icon name="check-circle-2" className="w-4 h-4 text-teal-400 mt-0.5 flex-shrink-0" /><span>{tr('services.interior.package.' + pi + '.feats.' + fi)}</span></li>)}</ul>
-                <button onClick={scrollToForm} className={(hot ? 'btn-teal text-white' : 'border border-white/10 text-gray-200 hover:bg-white/5') + ' w-full py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all'}><Icon name="calendar-heart" className="w-4 h-4" /> {tr('services.interior.getPackage')}</button>
+                <button onClick={scrollToForm} className={(hot ? 'btn-teal text-white' : 'border border-white/10 text-gray-200 hover:bg-white/5') + ' w-full h-btn rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all'}><Icon name="calendar-heart" className="w-4 h-4" /> {tr('services.interior.getPackage')}</button>
               </div>
             ))}
           </div>
         </section>
 
-        {/* How it works */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.howItWorks')}</h2></div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
@@ -242,7 +234,6 @@ export default function InteriorRenovation() {
 
         <ServiceTracker typeFilter="interior" title={tr('services.interior.trackerTitle')} />
 
-        {/* Book consultation */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
             <div className="zoom theme-dark rounded-2xl relative min-h-[320px] hidden lg:block">
@@ -250,8 +241,8 @@ export default function InteriorRenovation() {
               <div className="absolute inset-0 rounded-2xl" style={{ background: 'linear-gradient(180deg,transparent 40%,rgb(var(--dz-c-ink) / .85) 100%)' }} />
               <div className="absolute bottom-6 left-6 right-6">
                 <div className="flex items-center gap-3 mb-3">
-                  <span className="flex items-center gap-1.5 text-xs text-white bg-white/10 border border-white/20 rounded-full px-3 py-1.5"><Icon name="shield-check" className="w-3.5 h-3.5 text-teal-300" /> {tr('services.interior.consultBadge1')}</span>
-                  <span className="flex items-center gap-1.5 text-xs text-white bg-white/10 border border-white/20 rounded-full px-3 py-1.5"><Icon name="badge-indian-rupee" className="w-3.5 h-3.5 text-teal-300" /> {tr('services.interior.consultBadge2')}</span>
+                  <span className="dz-tag flex text-white bg-white/10 border border-white/20"><Icon name="shield-check" className="w-3.5 h-3.5 text-teal-300" /> {tr('services.interior.consultBadge1')}</span>
+                  <span className="dz-tag flex text-white bg-white/10 border border-white/20"><Icon name="badge-indian-rupee" className="w-3.5 h-3.5 text-teal-300" /> {tr('services.interior.consultBadge2')}</span>
                 </div>
                 <p className="text-white font-bold text-lg">{tr('services.interior.consultPromo')}</p>
               </div>
@@ -299,7 +290,6 @@ export default function InteriorRenovation() {
           </div>
         </section>
 
-        {/* Why choose */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.whyTitle')}</h2></div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
@@ -309,7 +299,6 @@ export default function InteriorRenovation() {
           </div>
         </section>
 
-        {/* FAQ */}
         <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.interior.faqTitle')}</h2></div>
           <div className="space-y-3">
@@ -322,7 +311,6 @@ export default function InteriorRenovation() {
           </div>
         </section>
 
-        {/* CTA */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="theme-dark rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden reveal">
             <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=1400&q=80')" }} />
@@ -332,7 +320,7 @@ export default function InteriorRenovation() {
               <p className="text-gray-200 mt-3 mb-7">{tr('services.interior.ctaSub')}</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button onClick={scrollToForm} className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name="calendar-heart" className="w-4 h-4" /> {tr('services.interior.ctaBook')}</button>
-                <a href={SUPPORT_TEL} className="px-6 py-3.5 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 inline-flex items-center justify-center gap-2 transition-all"><Icon name="phone" className="w-4 h-4" /> {tr('services.interior.ctaCall', { phone: SUPPORT_PHONE })}</a>
+                <a href={SUPPORT_TEL} className="h-btn-lg px-6 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 inline-flex items-center justify-center gap-2 transition-all"><Icon name="phone" className="w-4 h-4" /> {tr('services.interior.ctaCall', { phone: SUPPORT_PHONE })}</a>
               </div>
             </div>
           </div>

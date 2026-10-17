@@ -44,7 +44,6 @@ export default function LegalPage({ title, lastUpdated, current, children }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Build the TOC from top-level <h2> headings and inject matching anchor ids.
   const { toc, enhanced } = useMemo(() => {
     const items = [];
     const seen = new Map();
@@ -118,7 +117,7 @@ export default function LegalPage({ title, lastUpdated, current, children }) {
             <Link
               key={to}
               to={to}
-              className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-gray-400 hover:text-teal-400 hover:border-teal-400/40 transition-colors"
+              className="dz-chip border border-white/10 bg-white/[0.03] text-gray-400 hover:text-teal-400 hover:border-teal-400/40"
             >
               {label}
             </Link>

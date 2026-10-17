@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import NativeSelect from '../../../../components/ui/NativeSelect.jsx';
 import Icon from '../../../../components/Icon.jsx';
 import MobileField from '../../../../components/MobileField.jsx';
+import IdInput from '../../../../components/IdInput.jsx';
 import Field from '../../../../components/ui/Field.jsx';
 import { COMMERCIAL_ROUTE, MAX_LICENSORS } from './constants.js';
 import { pickDoc } from './helpers.js';
@@ -79,7 +80,7 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
           <Field label={t('services.ra.owner.age')} required error={errors.oAge && (t(errors.oAge === 'match' ? 'services.ra.err.ageDob' : 'services.ra.err.adult'))}><input inputMode="numeric" value={owner.oAge} onChange={(e) => { setO('oAge', e.target.value.replace(/\D/g, '')); clearErr('oAge'); }} className={fc('oAge')} placeholder={t('services.ra.owner.agePlaceholder')} /></Field>
           <Field label={t('services.ra.owner.gender')}><NativeSelect value={owner.oGender} onChange={(e) => setO('oGender', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm"><option value="">{t('services.ra.owner.genderPlaceholder')}</option>{['Male', 'Female', 'Other'].map((o) => <option key={o}>{o}</option>)}</NativeSelect></Field>
         </div>
-        <Field label={t('services.ra.owner.pan')} required error={errors.oPan && why('oPan', 'services.ra.owner.panErr')}><input maxLength={10} value={owner.oPan} onChange={(e) => { setO('oPan', e.target.value.toUpperCase()); clearErr('oPan'); }} className={fc('oPan') + ' uppercase'} placeholder="ABCDE1234F" /></Field>
+        <Field label={t('services.ra.owner.pan')} required error={errors.oPan && why('oPan', 'services.ra.owner.panErr')}><IdInput kind="pan" value={owner.oPan} onChange={(v) => { setO('oPan', v); clearErr('oPan'); }} className={fc('oPan')} placeholder="ABCDE1234F" /></Field>
         {offline ? (
           <>
             <Field label={t('services.ra.party.passport')} required error={errors.passport && t('services.ra.party.passportErr')}><input maxLength={20} value={owner.passport || ''} onChange={(e) => { setO('passport', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); clearErr('passport'); }} className={fc('passport')} placeholder={t('services.ra.party.passportPlaceholder')} /></Field>
@@ -87,7 +88,7 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
             {owner.residency === 'foreign' && <Field label={t('services.ra.party.frro')}><input maxLength={40} value={owner.frro || ''} onChange={(e) => setO('frro', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={t('services.ra.party.frroPlaceholder')} /></Field>}
           </>
         ) : (
-          <Field label={t('services.ra.owner.aadhaar')} required error={errors.oAadhaar && why('oAadhaar', 'services.ra.owner.aadhaarErr')}><input inputMode="numeric" maxLength={12} value={owner.oAadhaar} onChange={(e) => { setO('oAadhaar', e.target.value.replace(/\D/g, '')); clearErr('oAadhaar'); }} className={fc('oAadhaar')} placeholder={t('services.ra.owner.aadhaarPlaceholder')} /></Field>
+          <Field label={t('services.ra.owner.aadhaar')} required error={errors.oAadhaar && why('oAadhaar', 'services.ra.owner.aadhaarErr')}><IdInput kind="aadhaar" value={owner.oAadhaar} onChange={(v) => { setO('oAadhaar', v); clearErr('oAadhaar'); }} className={fc('oAadhaar')} placeholder={t('services.ra.owner.aadhaarPlaceholder')} /></Field>
         )}
         <Field label={t('services.ra.owner.mobile')} required error={errors.oMobile && why('oMobile', errors.oMobile === 'notOwner' ? 'services.ra.owner.mobileNotYou' : 'services.ra.owner.mobileErr')}><MobileField value={owner.oMobile} onChange={(v) => { setO('oMobile', v); clearErr('oMobile'); }} error={!!errors.oMobile} placeholder={t('services.ra.owner.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
         <Field label={t('services.ra.owner.email')} error={errors.oEmail && t('services.ra.err.email')}><input type="email" value={owner.oEmail} onChange={(e) => { setO('oEmail', e.target.value); clearErr('oEmail'); }} className={fc('oEmail')} placeholder="you@example.com" /></Field>

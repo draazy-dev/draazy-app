@@ -3,23 +3,11 @@ import { createPortal } from 'react-dom';
 import Icon from '../../../components/Icon.jsx';
 import NativeSelect from '../../../components/ui/NativeSelect.jsx';
 import ToolShell, { NumField, Panel, TextField, rupees, toNum } from './ToolShell.jsx';
-import { MAX_RECEIPT_MONTHS, isPan, monthsBetween } from '../../../lib/toolCalc.js';
+import { MAX_RECEIPT_MONTHS, isPan, monthLabel, monthOptions, monthsBetween } from '../../../lib/toolCalc.js';
 
 const MODES = { cash: 'Cash', upi: 'UPI', bank: 'Bank transfer', cheque: 'Cheque' };
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const HRA_PAN_LIMIT = 100000;
 const STAMP_LIMIT = 5000;
-
-const monthLabel = (ym) => `${MONTH_NAMES[Number(ym.slice(5)) - 1]} ${ym.slice(0, 4)}`;
-
-function monthOptions() {
-  const now = new Date();
-  const start = now.getFullYear() * 12 + now.getMonth() - 36;
-  return Array.from({ length: 49 }, (_, i) => {
-    const idx = start + i;
-    return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}`;
-  });
-}
 
 function receiptDate(ym, day) {
   const last = new Date(Number(ym.slice(0, 4)), Number(ym.slice(5)), 0).getDate();
@@ -50,7 +38,7 @@ function Receipts({ list, f, stampBox }) {
 }
 
 export default function RentReceipt() {
-  const options = useMemo(monthOptions, []);
+  const options = useMemo(() => monthOptions(), []);
   const thisMonth = options[36];
   const [f, setF] = useState({ tenant: '', landlord: '', address: '', rent: '', from: thisMonth, to: thisMonth, mode: 'bank', pan: '', day: '1' });
   const set = (k) => (v) => setF((p) => ({ ...p, [k]: v }));
@@ -91,7 +79,7 @@ export default function RentReceipt() {
               {options.map((o) => <option key={o} value={o}>{monthLabel(o)}</option>)}
             </NativeSelect>
           </label>
-          <TextField id="rr-pan" label="Landlord PAN (optional)" value={f.pan} onChange={set('pan')} maxLength={10} upper placeholder="ABCDE1234F" error={panError}
+          <TextField id="rr-pan" label="Landlord PAN (optional)" value={f.pan} onChange={set('pan')} idKind="pan" placeholder="ABCDE1234F" error={panError}
             hint={needsPan ? 'Your employer needs it when yearly rent is above ₹1,00,000.' : undefined} />
           <NumField id="rr-day" label="Day of month paid" value={f.day} onChange={set('day')} prefix="" maxLength={2} />
         </div>

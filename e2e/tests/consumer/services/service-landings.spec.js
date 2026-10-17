@@ -1,7 +1,7 @@
 /* ServiceLanding (packers, home loans, legal) shares one gate, prefill and hero, so each is asserted once;
    valuation and interior are bespoke. Submits: service-landing-ticket.spec.js, interior-lead.spec.js. */
 import { expect, test, ACTORS, STAFF } from '../../../fixtures/live.js';
-import { API, apiLogin, authHeaders, signIn, signedInAs } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, authHeaders, signIn, signedInAs, shownMobile } from '../../../helpers/liveAuth.js';
 import { appReady } from '../../../helpers/app.js';
 
 const nextParam = (path) => new RegExp(`next=${encodeURIComponent(path).replace(/\//g, '%2F')}`);
@@ -10,7 +10,7 @@ const nextParam = (path) => new RegExp(`next=${encodeURIComponent(path).replace(
    regression into a pass and a page reading `draazyUser` cannot pass by coincidence. */
 async function expectFormAddressedToSession(page, user) {
   await expect(page.locator('input[data-err="name"]')).toHaveValue(user.name, { timeout: 15000 });
-  await expect(page.locator('[data-err="mobile"] input')).toHaveValue(new RegExp(String(user.mobile).slice(-10)), { timeout: 15000 });
+  await expect(page.locator('[data-err="mobile"] input')).toHaveValue(shownMobile(String(user.mobile).slice(-10)), { timeout: 15000 });
 }
 
 /* Seed consent because the browser-side bar overlays the CTA; this does not fake server state. */

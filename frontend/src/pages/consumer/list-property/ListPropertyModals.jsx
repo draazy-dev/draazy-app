@@ -37,7 +37,7 @@ export default function ListPropertyModals({ ctx }) {
             <button
               type="button"
               onClick={confirmReset}
-              className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm inline-flex items-center gap-2 transition-colors"
+              className="h-btn px-5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm inline-flex items-center gap-2 transition-colors"
             >
               <RotateCcw className="w-4 h-4" /> {t('listProperty.startOver')}
             </button>

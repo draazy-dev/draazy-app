@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { jsPDF } from 'jspdf';
@@ -8,8 +8,7 @@ import PropertyImage from '../../components/ui/PropertyImage.jsx';
 import { compareProperties, listProperties } from '../../services/propertyService.js';
 import { fmtArea, fmtINR, isSqftUnit } from '../../lib/format.js';
 import { useCompare } from '../../context/CompareContext.jsx';
-import useModalDialog from '../../hooks/useModalDialog.js';
-import useScrollLock from '../../hooks/useScrollLock.js';
+import Modal from '../../components/ui/Modal.jsx';
 import { cityLabelFor } from '../../lib/geoConfig.js';
 
 const MAX = 4;
@@ -84,9 +83,6 @@ export default function Compare() {
   const [pickFailed, setPickFailed] = useState(false);
   const [modal, setModal] = useState(false);
   const [q, setQ] = useState('');
-  useScrollLock(modal);
-  const closeModal = useCallback(() => setModal(false), []);
-  const modalRef = useModalDialog(modal, closeModal);
 
   // Ids that fail to resolve stay in the list as `available: false`.
   useEffect(() => {
@@ -171,7 +167,6 @@ export default function Compare() {
 
       const colX = (i) => marginX + labelW + i * colW;
 
-      // Column headers
       doc.setFontSize(10);
       doc.setTextColor(20, 20, 20);
       cols.forEach((m, i) => {
@@ -217,7 +212,6 @@ export default function Compare() {
     <div>
       <div className="pb-20 min-h-[100dvh]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
             <div>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-sm font-medium mb-4">
@@ -228,7 +222,7 @@ export default function Compare() {
             </div>
             {ids.length > 0 && (
               <div className="flex items-center gap-3">
-                <button type="button" onClick={clear} className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-300 text-sm font-medium hover:bg-white/5 transition-all flex items-center gap-2">
+                <button type="button" onClick={clear} className="h-btn px-4 rounded-xl border border-white/10 text-gray-300 text-sm font-medium hover:bg-white/5 transition-all flex items-center gap-2">
                   <Icon name="rotate-ccw" className="w-4 h-4" /> {t('compare.reset')}
                 </button>
                 {liveItems.length > 0 && (
@@ -270,7 +264,7 @@ export default function Compare() {
                             <div className="col-card rounded-2xl overflow-hidden">
                               <div className="relative h-32 overflow-hidden">
                                 <PropertyImage src={m.img} alt="" className="w-full h-full object-cover" />
-                                <span className="absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/40 backdrop-blur text-teal-300">{m.deal}</span>
+                                <span className="dz-tag absolute top-2 left-2 font-semibold bg-black/40 backdrop-blur text-teal-300">{m.deal}</span>
                                 <button type="button" onClick={() => toggle(m.id)} aria-label={t('compare.removeAria', { title: m.title })} className="absolute top-2 right-2 w-7 h-7 rounded-lg bg-black/40 backdrop-blur flex items-center justify-center text-white hover:bg-red-500/70 transition-colors"><Icon name="x" className="w-4 h-4" /></button>
                               </div>
                               <div className="p-2.5 sm:p-3 text-left">
@@ -333,7 +327,6 @@ export default function Compare() {
                         </tr>
                       );
                     })}
-                    {/* Amenities Summary */}
                     <tr>
                       <td className="feature-col cmp-cell"><span className="row-label text-teal-400"><Icon name="sparkles" className="w-4 h-4" />{t('compare.amenities')}</span></td>
                       {items.map((m) => {
@@ -344,7 +337,6 @@ export default function Compare() {
                       })}
                       {items.length < MAX ? <td className="cmp-cell" /> : null}
                     </tr>
-                    {/* Individual Amenity Rows */}
                     {AMENITIES.map(([key, label, icon]) => (
                       <tr key={key} className="cmp-row">
                         <td className="feature-col cmp-cell">
@@ -380,42 +372,32 @@ export default function Compare() {
         </div>
       </div>
 
-      {modal ? (
-        <div className="fixed inset-0 z-[60] modal-overlay flex items-center justify-center p-4" onClick={() => setModal(false)}>
-          <div ref={modalRef} tabIndex={-1} role="dialog" aria-modal="true" aria-label={t('compare.modalTitle')} className="dz-modal-panel rounded-2xl border border-white/10 w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl outline-none" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-5 border-b border-white/10">
-              <h3 className="text-lg font-bold text-white">{t('compare.modalTitle')}</h3>
-              <button type="button" onClick={() => setModal(false)} aria-label={t('compare.close')} className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/5"><Icon name="x" className="w-5 h-5" /></button>
-            </div>
-            <div className="p-4 border-b border-white/10">
-              <div className="relative">
-                <Icon name="search" className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input value={q} onChange={(e) => setQ(e.target.value)} type="text" placeholder={t('compare.searchPlaceholder')} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-teal-400" />
-              </div>
-            </div>
-            <div className="overflow-y-auto p-4 space-y-2">
-              {/* Three states, not two: `null` is "the search has not answered yet" and
-                 `pickFailed` is "it answered with an error". */}
-              {pickFailed ? (
-                <p className="text-center text-gray-500 text-sm py-6">{t('compare.searchFailed')}</p>
-              ) : pickable === null ? (
-                <p className="text-center text-gray-500 text-sm py-6">{t('compare.searching')}</p>
-              ) : pickable.length === 0 ? (
-                <p className="text-center text-gray-500 text-sm py-6">{t('compare.noMore')}</p>
-              ) : pickable.slice(0, 20).map((p) => (
-                <button type="button" key={p.id} onClick={() => { toggle(p.id); setModal(false); }} className="modal-pick w-full flex items-center gap-3 rounded-xl p-2.5 text-left">
-                  <PropertyImage src={p.image} alt="" className="w-16 h-12 rounded-lg object-cover flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-white text-sm font-semibold truncate">{p.bhkNum ? p.bhkNum + ' BHK ' : ''}{p.type}</p>
-                    <p className="text-gray-500 text-xs truncate">{p.locality}, {cityLabelFor(p)}</p>
-                  </div>
-                  <span className="text-teal-300 text-sm font-bold">{p.deal === 'rent' ? '₹' + (p.price || 0).toLocaleString('en-IN') + '/mo' : fmtINR(p.price)}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+      <Modal open={modal} onClose={() => setModal(false)} title={t('compare.modalTitle')}>
+        <div className="relative mb-4">
+          <Icon name="search" className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} type="text" placeholder={t('compare.searchPlaceholder')} className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:border-teal-400" />
         </div>
-      ) : null}
+        <div className="space-y-2">
+          {/* Three states, not two: `null` is "the search has not answered yet" and
+             `pickFailed` is "it answered with an error". */}
+          {pickFailed ? (
+            <p className="text-center text-gray-500 text-sm py-6">{t('compare.searchFailed')}</p>
+          ) : pickable === null ? (
+            <p className="text-center text-gray-500 text-sm py-6">{t('compare.searching')}</p>
+          ) : pickable.length === 0 ? (
+            <p className="text-center text-gray-500 text-sm py-6">{t('compare.noMore')}</p>
+          ) : pickable.slice(0, 20).map((p) => (
+            <button type="button" key={p.id} onClick={() => { toggle(p.id); setModal(false); }} className="modal-pick w-full flex items-center gap-3 rounded-xl p-2.5 text-left">
+              <PropertyImage src={p.image} alt="" className="w-16 h-12 rounded-lg object-cover flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="text-white text-sm font-semibold truncate">{p.bhkNum ? p.bhkNum + ' BHK ' : ''}{p.type}</p>
+                <p className="text-gray-500 text-xs truncate">{p.locality}, {cityLabelFor(p)}</p>
+              </div>
+              <span className="text-teal-300 text-sm font-bold">{p.deal === 'rent' ? '₹' + (p.price || 0).toLocaleString('en-IN') + '/mo' : fmtINR(p.price)}</span>
+            </button>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -44,7 +44,7 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                 ))}
               </div>
               {p.reraId ? (
-                <a href="https://maharera.maharashtra.gov.in/" target="_blank" rel="noopener noreferrer" className="mb-4 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15">
+                <a href="https://maharera.maharashtra.gov.in/" target="_blank" rel="noopener noreferrer" className="dz-chip mb-4 border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15">
                   <Icon name="badge-check" className="h-3.5 w-3.5" /> {tr('property.mahaReraId', { id: p.reraId })}
                   {p.reraChecked ? <span data-testid="rera-checked" className="border-l border-emerald-500/30 pl-1.5">{tr('property.reraChecked')}</span> : null}
                 </a>
@@ -75,7 +75,7 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                   amber: 'text-amber-300 bg-amber-500/10 border-amber-500/25',
                 }[fr.buyer.tone];
                 return (
-                  <div className={'dz-ph-pill mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium ' + CLS} title={tr('property.freshnessTitle')}>
+                  <div className={'dz-tag dz-ph-pill mt-3 border font-medium ' + CLS} title={tr('property.freshnessTitle')}>
                     {fr.state === 'active' ? (
                       <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" /></span>
                     ) : (
@@ -135,7 +135,7 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                       <p className="text-lg font-bold text-emerald-400">₹{(p.price / 3 / 1000).toFixed(0)}k</p>
                     </div>
                   </div>
-                  <Link to={`/flatmates?startGroup=1&title=${encodeURIComponent(title)}&rent=${p.price}&loc=${encodeURIComponent(p.locality)}`} className="mt-3.5 w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl border border-brand-teal-2/30 bg-brand-teal-1/10 text-brand-teal-3 text-sm font-medium hover:bg-brand-teal-1/20 transition-smooth"><Icon name="users-round" className="w-4 h-4" /> {tr('property.findFlatmates')}</Link>
+                  <Link to={`/flatmates?startGroup=1&title=${encodeURIComponent(title)}&rent=${p.price}&loc=${encodeURIComponent(p.locality)}`} className="h-btn mt-3.5 w-full inline-flex items-center justify-center gap-2 rounded-xl border border-brand-teal-2/30 bg-brand-teal-1/10 text-brand-teal-3 text-sm font-medium hover:bg-brand-teal-1/20 transition-smooth"><Icon name="users-round" className="w-4 h-4" /> {tr('property.findFlatmates')}</Link>
                 </MobileCollapse>
               ) : null}
 
@@ -148,7 +148,7 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                     <div className="flex items-center gap-2 min-w-0">
                       <Icon name="shield-check" className="w-5 h-5 text-emerald-400 flex-shrink-0" />
                       <h3 className="text-white font-bold text-sm">{tr('property.assuredTitle')}</h3>
-                      <span className="text-[10px] text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 font-semibold uppercase tracking-wide">{tr('property.trustedListing')}</span>
+                      <span className="dz-tag text-emerald-300 bg-emerald-500/15 border border-emerald-500/25 font-semibold uppercase tracking-wide">{tr('property.trustedListing')}</span>
                     </div>
                   )}
                 >

@@ -36,7 +36,7 @@ function LeftPanel() {
   const hasData = cityHasData(city);
   return (
     <>
-      <div className="inline-flex items-center gap-2 rounded-full border border-teal-400/25 bg-teal-400/[.08] px-3.5 py-1.5 mt-6 mb-6">
+      <div className="dz-tag border border-teal-400/25 bg-teal-400/[.08] mt-6 mb-6">
         <span className="auth-live-dot inline-block w-1.5 h-1.5 rounded-full bg-teal-300" />
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-200">
           {hasData ? t('auth.marketplaceEyebrow', { city }) : t('auth.launchingSoon', { city })}
@@ -258,7 +258,7 @@ export default function Signup() {
             <>
               {/* Inert without VITE_TURNSTILE_SITE_KEY. Not gating the button — see Signin.jsx. */}
               <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="flex justify-center" />
-              <button type="button" onClick={sendOtp} disabled={otp.sending} className="send-otp-btn w-full py-3 rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
+              <button type="button" onClick={sendOtp} disabled={otp.sending} className="send-otp-btn w-full h-btn-lg rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
                 <Send className="w-4 h-4" /> {otp.sending ? t('auth.sending') : t('auth.sendOtp')}
               </button>
             </>

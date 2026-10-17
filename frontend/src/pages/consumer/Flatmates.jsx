@@ -65,7 +65,7 @@ export default function Flatmates() {
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <p className="text-xs text-gray-500 flex items-center gap-1.5"><Icon name="info" className="w-3.5 h-3.5" /> {t('flatmates.mapInfo', { kind: t('flatmates.kind_' + kindWord) })}</p>
                 {filters.near ? (
-                  <button type="button" onClick={() => setF({ near: '', nearLabel: '', nearRadius: 5, nearMode: 'km' })} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-teal-500/12 border border-teal-400/30 text-teal-200 text-[11px] font-medium hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200 t-all">
+                  <button type="button" onClick={() => setF({ near: '', nearLabel: '', nearRadius: 5, nearMode: 'km' })} className="dz-chip bg-teal-500/12 border border-teal-400/30 text-teal-200 hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200 t-all">
                     <Icon name="map-pinned" className="w-3 h-3" /> {t('flatmates.nearChip', { label: filters.nearLabel || t('flatmates.placeWord'), radius: filters.nearRadius, unit: filters.nearMode === 'km' ? t('flatmates.unitKm') : t('flatmates.unitMin') })} <Icon name="x" className="w-3 h-3" />
                   </button>
                 ) : (

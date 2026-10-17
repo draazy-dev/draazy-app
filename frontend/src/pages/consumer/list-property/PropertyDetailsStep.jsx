@@ -21,10 +21,10 @@ const PropertyDetailsStep = ({
                   <div className="mb-6">
                     <label className={lbl3}>{tr('listProperty.fields.propertyFor')}</label>
                     <div className={`flex flex-wrap gap-3 ${errors.deal ? 'dz-invalid-group' : ''}`} data-err="deal">
-                      <Pill selected={form.deal === 'buy'} onClick={() => set('deal', 'buy')} className="px-6 py-3">
+                      <Pill selected={form.deal === 'buy'} onClick={() => set('deal', 'buy')} className="px-6 h-btn inline-flex items-center justify-center">
                         <span className="flex items-center gap-2"><Tag className="w-4 h-4" />{tr('listProperty.opt.sale')}</span>
                       </Pill>
-                      <Pill selected={form.deal === 'rent'} onClick={() => set('deal', 'rent')} className="px-6 py-3">
+                      <Pill selected={form.deal === 'rent'} onClick={() => set('deal', 'rent')} className="px-6 h-btn inline-flex items-center justify-center">
                         <span className="flex items-center gap-2"><Key className="w-4 h-4" />{tr('listProperty.opt.rent')}</span>
                       </Pill>
                     </div>

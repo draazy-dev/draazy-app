@@ -60,7 +60,7 @@ export default function AlertsPanel() {
             Search for a home or a flatmate, then tap <span className="text-teal-300">Save search</span> or create an alert when nothing matches.
             We’ll notify you the moment a new listing fits — great for tight markets.
           </p>
-          <Link to="/listings" className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-teal-400/30 bg-teal-500/10 px-4 py-2 text-sm font-semibold text-teal-200 transition hover:bg-teal-500/20">
+          <Link to="/listings" className="h-btn-sm mt-4 inline-flex items-center gap-1.5 rounded-xl border border-teal-400/30 bg-teal-500/10 px-4 text-sm font-semibold text-teal-200 transition hover:bg-teal-500/20">
             <Icon name="search" className="h-4 w-4" /> Start a search
           </Link>
         </div>
@@ -77,23 +77,23 @@ export default function AlertsPanel() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     {isShare && (
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-teal-400/30 bg-teal-500/10 px-2 py-0.5 text-[10px] font-semibold text-teal-200">
+                      <span className="dz-tag border border-teal-400/30 bg-teal-500/10 font-semibold text-teal-200">
                         <Icon name={tabMeta(a.tab).icon} className="h-3 w-3" /> {tabMeta(a.tab).word}
                       </span>
                     )}
                     <p className="truncate text-sm font-semibold text-white">{a.label || 'Saved search'}</p>
                     {a.newCount > 0 && (
-                      <span className="shrink-0 rounded-full bg-teal-500/15 px-2 py-0.5 text-[10px] font-bold text-teal-300">{a.newCount} new</span>
+                      <span className="dz-tag bg-teal-500/15 font-bold text-teal-300">{a.newCount} new</span>
                     )}
-                    <span data-testid="dashboard-alert-match-count" className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-bold text-teal-300">{matchCount} matches</span>
+                    <span data-testid="dashboard-alert-match-count" className="dz-tag bg-white/5 font-bold text-teal-300">{matchCount} matches</span>
                   </div>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     {chips.map((c, i) => (
-                      <span key={i} className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-gray-300">
+                      <span key={i} className="dz-tag border border-white/10 bg-white/5 font-medium text-gray-300">
                         <Icon name={c.icon} className="h-3 w-3 text-gray-400" /> {c.text}
                       </span>
                     ))}
-                    <span className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-gray-400">
+                    <span className="dz-tag border border-white/10 bg-white/5 font-medium text-gray-400">
                       <Icon name={ch.icon} className="h-3 w-3" /> {ch.label}
                     </span>
                     {a.at && <span className="text-[11px] text-gray-600">· Created {fmtDate(a.at)}</span>}

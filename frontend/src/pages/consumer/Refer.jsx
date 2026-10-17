@@ -93,7 +93,7 @@ export default function Refer() {
   return (
     <div className="pt-6 pb-14 max-w-3xl mx-auto px-4 sm:px-6">
       <div className="text-center mb-6">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-amber-300 mb-3" style={{ background: 'rgb(var(--dz-c-amber-500) / .12)', border: '1px solid rgb(var(--dz-c-amber-500) / .25)' }}><Icon name="gift" className="w-3.5 h-3.5" /> {t('misc1.referBadge')}</span>
+        <span className="dz-tag font-semibold text-amber-300 mb-3" style={{ background: 'rgb(var(--dz-c-amber-500) / .12)', border: '1px solid rgb(var(--dz-c-amber-500) / .25)' }}><Icon name="gift" className="w-3.5 h-3.5" /> {t('misc1.referBadge')}</span>
         <h1 className="text-3xl sm:text-4xl font-extrabold">{t('misc1.referTitle')}</h1>
         <p className="text-gray-400 mt-2">{t('misc1.referSub')}</p>
       </div>
@@ -149,7 +149,7 @@ export default function Refer() {
 
       <section className={`grid gap-4 mb-5 ${contactRewards ? 'md:grid-cols-2' : ''}`}>
         <div className="glass rounded-2xl p-5 relative" data-testid="refer-owner-track">
-          {hasEverListed && <span className="absolute top-4 right-4 text-[10px] font-bold uppercase tracking-wider text-teal-300 px-2 py-0.5 rounded-full bg-teal-500/15">{t('misc1.referForYou')}</span>}
+          {hasEverListed && <span className="dz-tag absolute top-4 right-4 font-bold uppercase tracking-wider text-teal-300 bg-teal-500/15">{t('misc1.referForYou')}</span>}
           <div className="w-10 h-10 rounded-xl bg-teal-500/15 flex items-center justify-center mb-3"><Icon name="file-check-2" className="w-5 h-5 text-teal-400" /></div>
           <h2 className="text-lg font-extrabold">{t('misc1.referOwnerTitle')}</h2>
           <p className="text-gray-300 text-sm mt-2">{t('misc1.referOwnerThey', { days: referral.ownerFeaturedDays })}</p>
@@ -157,7 +157,7 @@ export default function Refer() {
         </div>
         {contactRewards && (
           <div className="glass rounded-2xl p-5 relative" data-testid="refer-seeker-track">
-            {isIn && !hasEverListed && <span className="absolute top-4 right-4 text-[10px] font-bold uppercase tracking-wider text-teal-300 px-2 py-0.5 rounded-full bg-teal-500/15">{t('misc1.referForYou')}</span>}
+            {isIn && !hasEverListed && <span className="dz-tag absolute top-4 right-4 font-bold uppercase tracking-wider text-teal-300 bg-teal-500/15">{t('misc1.referForYou')}</span>}
             <div className="w-10 h-10 rounded-xl bg-teal-500/15 flex items-center justify-center mb-3"><Icon name="phone-call" className="w-5 h-5 text-teal-400" /></div>
             <h2 className="text-lg font-extrabold">{t('misc1.referSeekerTitle')}</h2>
             <p className="text-gray-300 text-sm mt-2">{t('misc1.referSeekerThey', { count: referral.seekerBonusContacts })}</p>

@@ -144,7 +144,7 @@ export function PriceInsights({ p }) {
             <div className="flex justify-between"><span className="text-slate-400">{t('property.monthlyEmi')}</span><span className="text-brand-teal-3 font-extrabold text-lg">₹{fmtNum(emi)}</span></div>
             <p className="text-[11px] text-slate-500 pt-1">{t('property.emiIndicative')}</p>
           </div>
-          <Link to="/emi-calculator" className="mt-4 w-full block text-center py-2.5 rounded-xl border border-brand-teal-2/40 text-brand-teal-3 text-sm font-semibold hover:bg-brand-teal-1/10 transition-smooth">{t('property.fullEmiCalculator')}</Link>
+          <Link to="/emi-calculator" className="h-btn mt-4 w-full flex items-center justify-center rounded-xl border border-brand-teal-2/40 text-brand-teal-3 text-sm font-semibold hover:bg-brand-teal-1/10 transition-smooth">{t('property.fullEmiCalculator')}</Link>
         </MobileCollapse> : null}
       </div>
 

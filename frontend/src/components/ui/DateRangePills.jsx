@@ -18,8 +18,8 @@ export default function DateRangePills({ value, onChange }) {
           key={o.value}
           onClick={() => onChange(o.value)}
           className={classNames(
-            'rounded-full px-3 py-1 text-sm font-medium transition',
-            value === o.value ? 'bg-brand-teal text-ink' : 'text-gray-400 hover:text-white',
+            'dz-chip',
+            value === o.value ? 'border-transparent bg-brand-teal text-ink' : 'border-transparent bg-transparent text-gray-400 hover:text-white',
           )}
         >
           {o.label}

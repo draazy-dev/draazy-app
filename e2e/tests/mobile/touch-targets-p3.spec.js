@@ -77,6 +77,9 @@ test.describe('Touch targets — controls the audit found under the floor', () =
   test('the budget slider value labels can be tapped to type a figure', async ({ page }) => {
     await consent(page);
     await page.goto('/listings');
+    // The slider lives in the filter card, which is hidden until opened on a phone.
+    await page.locator('.filter-fab').click();
+    await expect(page.locator('.filter-panel')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 0, 0)');
 
     const val = page.locator('.rng-val').first();
     await expect(val).toBeVisible();

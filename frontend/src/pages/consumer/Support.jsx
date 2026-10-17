@@ -189,7 +189,7 @@ export default function Support() {
       <div className="pt-8 lg:pt-10 pb-20 min-h-[100dvh]">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="mb-8 reveal">
-            <div className="inline-flex items-center gap-2 px-3 py-1 mb-3 rounded-full bg-teal-500/10 border border-teal-500/20">
+            <div className="dz-tag mb-3 bg-teal-500/10 border border-teal-500/20">
               <Icon name="life-buoy" className="w-3.5 h-3.5 text-teal-400" />
               <span className="text-xs text-teal-300 font-semibold">{tr('misc.supportBadge')}</span>
             </div>

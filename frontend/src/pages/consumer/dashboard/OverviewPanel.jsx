@@ -15,9 +15,6 @@ import { useVerification } from '../../../context/VerificationContext.jsx';
 const statTile = ({ trend: _trend, ...stat }) => stat;
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
-      {/* Action Center is pinned so waiting requests do not go stale in a sub-tab. */}
-  // /pay-rent is static for now, so links must not promise a real in-app rent flow.
-  // Verified badge is a trust prompt, never a wall; earning the badge hides it.
 function OverviewMetric({ value, label, onClick, ariaLabel }) {
   const body = (
     <>
@@ -33,7 +30,6 @@ function OverviewMetric({ value, label, onClick, ariaLabel }) {
   );
 }
 
-      {/* Verified badge nudge — an opt-in trust prompt (badge-not-gate). */}
 function ResumeSearchCard({ searches, t }) {
   if (!searches.length) return null;
   const [first, ...rest] = searches;
@@ -50,9 +46,7 @@ function ResumeSearchCard({ searches, t }) {
             <p className="mt-1 text-xs text-gray-400">{t('dashboard.resumeSubtitle', 'Your most recent search')}{first.at ? ' · ' + fmtAgo(first.at) : ''}</p>
           </div>
                 {/* `fmtAgo`, not `timeAgo`: the rail's `at` is epoch ms, and a search run twenty minutes ago
-                   should not read "Today" on a card whose point is that you were just here. */}
-                {/* and */}
-      {/* Continue your search — a returning seeker's #1 job is to resume the hunt. */}
+                should not read "Today" on a card whose point is that you were just here. */}
           <Link to={first.url} className="btn-teal inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-semibold">
             {t('dashboard.resumeCta', 'Resume search')} <Icon name="arrow-right" className="h-4 w-4" />
           </Link>
@@ -61,7 +55,7 @@ function ResumeSearchCard({ searches, t }) {
           <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-white/[0.06] pt-4">
             <span className="text-xs text-gray-500">{t('dashboard.resumeAlso', 'Also recent:')}</span>
             {rest.slice(0, 3).map((search) => (
-              <Link key={search.url} to={search.url} className="max-w-[200px] truncate whitespace-nowrap rounded-full bg-white/[0.06] px-3 py-1.5 text-xs text-gray-300 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50">
+              <Link key={search.url} to={search.url} className="dz-chip max-w-[200px] truncate bg-white/[0.06] text-gray-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50">
                 {search.label}
               </Link>
             ))}
@@ -85,7 +79,7 @@ function AlertRow({ match }) {
         <span className="block truncate text-sm font-semibold text-white">{match.label}</span>
         <span className="block text-xs text-gray-500">{badge} right now</span>
       </span>
-      <span className="whitespace-nowrap rounded-full bg-teal-500/15 px-2 py-0.5 text-[11px] font-semibold text-teal-300">{badge}</span>
+      <span className="dz-tag bg-teal-500/15 font-semibold text-teal-300">{badge}</span>
       <Icon name="chevron-right" className="h-4 w-4 text-gray-600 transition-colors group-hover:text-teal-400" />
     </Link>
   );
@@ -120,7 +114,7 @@ function VerifyNudge({ onStart, t }) {
           <div className="min-w-0">
             <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-white sm:text-base">
               {t('verify.overviewTitle')}
-              <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-400">{t('verify.overviewOptional')}</span>
+              <span className="dz-tag bg-white/[0.06] font-semibold uppercase tracking-wide text-gray-400">{t('verify.overviewOptional')}</span>
             </p>
             <p className="mt-1 text-xs text-gray-400 sm:text-sm">{t('verify.overviewBody')}</p>
           </div>
@@ -212,20 +206,18 @@ export default function OverviewPanel({ isOwner, go, recent, recommended = [], s
 
   return (
     <div className="space-y-5 sm:space-y-6">
+      {/* Pinned so waiting requests do not go stale in a sub-tab. */}
       <ActionCenter items={actionItems} limit={3} onSeeAll={isOwner ? () => go('leads') : seekerVisitOnly ? () => go('visits') : undefined} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4" data-testid="dashboard-stats-grid">
         {statTiles.map((stat) => <OverviewMetric key={stat.label} {...stat} />)}
       </div>
 
-      {/* ===== Services & rewards — the demoted growth/utility tail. */}
       {nudge}
       {badgeOpen ? <VerifyIdentityRedirect source="overview_dashboard" onClose={() => setBadgeOpen(false)} /> : null}
 
-        {/* Refer & Earn — aggressive, always-on growth surface. */}
       <ResumeSearchCard searches={recentSearches} t={t} />
 
-        {/* Lower-frequency services + help, collapsed by default to shorten the mobile scroll. */}
       {!isOwner ? <SeekerFeed recent={recent} recommended={recommended} go={go} /> : null}
     </div>
   );

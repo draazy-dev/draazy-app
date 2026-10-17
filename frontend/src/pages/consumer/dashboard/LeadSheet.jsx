@@ -90,7 +90,7 @@ export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation,
               <Icon name={lead.typeIcon} className="h-3.5 w-3.5 text-brand-teal" /> {lead.typeLabel}
             </p>
           </div>
-          {lead.status ? <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] font-semibold text-gray-200">{statusLabel}</span> : null}
+          {lead.status ? <span className="dz-tag bg-white/10 font-semibold text-gray-200">{statusLabel}</span> : null}
         </div>
 
         <div className="space-y-2 rounded-xl bg-white/[0.03] p-3.5 text-sm">

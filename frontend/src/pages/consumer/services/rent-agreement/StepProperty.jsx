@@ -85,7 +85,7 @@ export default function StepProperty({ step, prop, setP, setProp, setSelectedPro
       <div className="mb-5" data-err="gramPanchayat" role="group" aria-label={t('services.ra.property.gramPanchayat')} aria-describedby={errors.gramPanchayat ? 'ra-gram-err' : undefined}>
         <label className="lbl req">{t('services.ra.property.gramPanchayat')}</label>
         <div className="grid grid-cols-2 gap-3">
-          {[true, false].map((v) => <button type="button" key={String(v)} onClick={() => { setP('gramPanchayat', v); clearErr('gramPanchayat'); }} aria-pressed={prop.gramPanchayat === v} data-testid={v ? 'ra-gram-yes' : 'ra-gram-no'} className={'opt-pill rounded-xl px-4 py-3 text-sm font-medium text-center ' + (prop.gramPanchayat === v ? 'sel' : 'text-gray-400')}>{t(v ? 'services.ra.property.gramPanchayatYes' : 'services.ra.property.gramPanchayatNo')}</button>)}
+          {[true, false].map((v) => <button type="button" key={String(v)} onClick={() => { setP('gramPanchayat', v); clearErr('gramPanchayat'); }} aria-pressed={prop.gramPanchayat === v} data-testid={v ? 'ra-gram-yes' : 'ra-gram-no'} className={'h-btn inline-flex items-center justify-center opt-pill rounded-xl px-4 text-sm font-medium text-center ' + (prop.gramPanchayat === v ? 'sel' : 'text-gray-400')}>{t(v ? 'services.ra.property.gramPanchayatYes' : 'services.ra.property.gramPanchayatNo')}</button>)}
         </div>
         <FieldError id="ra-gram-err" alert={false} show={!!errors.gramPanchayat}>{t('services.ra.property.gramPanchayatErr')}</FieldError>
       </div>

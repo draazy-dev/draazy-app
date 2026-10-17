@@ -219,7 +219,7 @@ export default function ServiceTracker({ typeFilter, title = 'Your requests' }) 
               return (
                 <div key={r.id} className="rounded-xl border border-white/10 border-l-4 bg-white/[0.03] p-4" style={{ borderLeftColor: m.color }}>
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold" style={{ background: m.bg, color: m.color }}><Icon name={m.icon} className="w-3.5 h-3.5 flex-shrink-0" /> {m.label}</span>
+                    <span className="dz-tag font-semibold" style={{ background: m.bg, color: m.color }}><Icon name={m.icon} className="w-3.5 h-3.5 flex-shrink-0" /> {m.label}</span>
                     {r.updatedAt ? <span className="text-[11px] text-gray-500 flex-shrink-0 mt-1">{timeAgo(r.updatedAt)}</span> : null}
                   </div>
                   <p className="text-white font-semibold text-sm line-clamp-2">{r.details?.property || r.details?.from || r.service}</p>

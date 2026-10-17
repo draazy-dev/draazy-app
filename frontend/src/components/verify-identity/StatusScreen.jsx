@@ -100,8 +100,8 @@ export default function StatusScreen({ status, verifiedName, withdrawing, withdr
         )}
       </StickyAction>
       {withdrawing && (
-        <div className="fixed inset-0 z-[1500] flex items-end bg-black/60 px-4 pb-[calc(1rem+var(--dz-safe-b))]">
-          <div role="dialog" aria-modal="true" aria-labelledby="withdraw-title" className="mx-auto w-full max-w-md rounded-2xl border border-white/10 bg-[var(--brand-card)] p-5 shadow-2xl">
+        <div className="dz-modal-backdrop">
+          <div role="dialog" aria-modal="true" aria-labelledby="withdraw-title" className="dz-modal">
             <h2 id="withdraw-title" className="text-lg font-semibold">{t('verifyIdentity.withdraw.title')}</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{t('verifyIdentity.withdraw.body')}</p>
             <div className="mt-5 grid grid-cols-2 gap-3">

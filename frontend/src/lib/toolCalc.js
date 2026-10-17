@@ -54,4 +54,16 @@ export function monthsBetween(from, to) {
   });
 }
 
+// 'YYYY-MM' for the last 36 months and the next 12; index 36 is this month.
+export function monthOptions(now = new Date()) {
+  const start = now.getFullYear() * 12 + now.getMonth() - 36;
+  return Array.from({ length: 49 }, (_, i) => {
+    const idx = start + i;
+    return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}`;
+  });
+}
+
+export const monthLabel = (ym, locale = 'en-IN') =>
+  new Date(Number(ym.slice(0, 4)), Number(ym.slice(5)) - 1, 1).toLocaleDateString(locale, { month: 'long', year: 'numeric' });
+
 export const isPan = (s) => /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(s);

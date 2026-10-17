@@ -74,7 +74,7 @@ export function StartScreen({ docType, consented, onDocTypeChange, onConsentChan
                   <span className="grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/[0.05] text-[var(--teal-3)]">
                     <Icon name={item.icon} aria-hidden="true" className="h-5 w-5" />
                   </span>
-                  {item.key === 'aadhaar' && <span className="rounded bg-[var(--emerald)]/15 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-[0.1em] text-[var(--emerald)]">{t('verifyIdentity.documents.aadhaar.tag')}</span>}
+                  {item.key === 'aadhaar' && <span className="dz-tag bg-[var(--emerald)]/15 font-semibold uppercase tracking-[0.1em] text-[var(--emerald)]">{t('verifyIdentity.documents.aadhaar.tag')}</span>}
                 </span>
                 <span className="mt-3 block text-sm font-semibold leading-5">{t(`verifyIdentity.documents.${item.key}.label`)}</span>
                 <span className="mt-1 block text-xs text-[var(--text-subtle)]">{t(`verifyIdentity.documents.${item.key}.hint`)}</span>
@@ -393,8 +393,8 @@ function DisputeSheet({ note, busy, error, onNoteChange, onClose, onSubmit, rest
   }, [restoreRef]);
 
   return (
-    <div className="fixed inset-0 z-[1500] flex items-end bg-black/60 px-4 pb-[calc(1rem+var(--dz-safe-b))]">
-      <div role="dialog" aria-modal="true" aria-labelledby="dispute-title" className="mx-auto w-full max-w-md rounded-2xl border border-white/10 bg-[var(--brand-card)] p-5 shadow-2xl">
+    <div className="dz-modal-backdrop">
+      <div role="dialog" aria-modal="true" aria-labelledby="dispute-title" className="dz-modal">
         <h2 id="dispute-title" className="text-lg font-semibold">{t('verifyIdentity.dispute.sheetTitle')}</h2>
         <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{t('verifyIdentity.dispute.sheetBody')}</p>
         <label className="mt-4 block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-subtle)]" htmlFor="identity-dispute-note">

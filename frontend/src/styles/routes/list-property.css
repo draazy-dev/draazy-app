@@ -1,7 +1,6 @@
 /* Loaded with the /list-property route chunk, not the global stylesheet: 6.1 KB gzip a visitor browsing for a
    home never needs. Safe because no selector here is re-declared in index.css, so cascade order cannot shift. */
 
-/* List Property wizard */
 .progress-track {
   background: rgb(var(--dz-c-white) / 0.06);
 }
@@ -130,7 +129,6 @@
   margin-top: 1px;
 }
 
-/* Active: brand-glow badge + teal accents */
 .lp-steps__item.is-active {
   background: rgb(var(--dz-c-teal-500) / 0.08);
   border-color: rgb(var(--dz-c-teal-500) / 0.35);
@@ -147,7 +145,6 @@
   color: rgb(var(--dz-c-teal-300));
 }
 
-/* Done: solid teal check badge, clickable to go back */
 .lp-steps__item.is-done .lp-steps__badge {
   background: var(--teal-2);
   border-color: var(--teal-2);
@@ -175,7 +172,6 @@
   color: rgb(var(--dz-c-teal-300));
 }
 
-/* Todo: dimmed */
 .lp-steps__item.is-todo {
   opacity: 0.6;
 }
@@ -295,12 +291,15 @@ input.form-input {
     padding-bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h, 0px) + 7.5rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 
+  /* No taller than the bottom nav it floats over, so the two bars read as one family. */
   .lp-step-actions {
     position: sticky;
     z-index: 55;
     bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h, 0px) + 0.5rem);
+    align-items: center;
+    height: var(--dz-bottom-nav-h);
     margin-top: 1.5rem;
-    padding: 0.625rem;
+    padding: 0 6px;
     border: 1px solid rgb(var(--dz-c-white) / calc(0.1 * var(--dz-line-boost)));
     border-radius: 1rem;
     background: rgb(var(--dz-c-ink-card));
@@ -308,7 +307,8 @@ input.form-input {
   }
 
   .lp-step-actions button {
-    min-height: 44px;
+    min-height: 0;
+    height: var(--btn-h);
   }
 }
 

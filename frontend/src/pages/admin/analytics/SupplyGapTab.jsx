@@ -58,7 +58,6 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
           The supply-gap report did not answer, so no locality figures are shown — don&apos;t read this as &ldquo;no demand&rdquo;.
         </LoadFailedNotice>
       ) : supplyGap && (<>
-      {/* KPI summary */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><div className="text-2xl font-bold text-rose-400">{underServed.length}</div><div className="text-xs text-gray-500 mt-0.5">Under-served</div></div>
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><div className="text-2xl font-bold text-emerald-400">{wellServed.length}</div><div className="text-xs text-gray-500 mt-0.5">Well-served</div></div>
@@ -68,7 +67,6 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
         <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4"><div className="text-2xl font-bold text-rose-400">{totalHot}</div><div className="text-xs text-gray-500 mt-0.5">Hot demand users</div></div>
       </div>
 
-      {/* Visual gap chart */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-1">Supply vs Demand by Locality</h3>
         <p className="text-xs text-gray-500 mb-4">Most demand per listing first. Red = under-served.</p>
@@ -90,7 +88,6 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
         </div>
       </div>
 
-      {/* Full table */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <h3 className="text-sm font-semibold text-gray-300 mb-3">All Localities — Detailed Breakdown</h3>
         <div className="overflow-x-auto">
@@ -121,9 +118,9 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
                   <td className={classNames('py-2.5 text-right tabular-nums font-semibold', priorityOf(r) === 'ok' ? 'text-emerald-300' : 'text-rose-300')}>{r.demandPerListing.toFixed(1)}</td>
                   <td className="py-2.5 text-center">
                     {priorityOf(r) == null ? <span className="text-[10px] text-gray-500">—</span>
-                    : priorityOf(r) === 'high' ? <span className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[10px] font-semibold text-rose-300">High</span>
-                    : priorityOf(r) === 'medium' ? <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">Medium</span>
-                    : <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">OK</span>}
+                    : priorityOf(r) === 'high' ? <span className="dz-tag bg-rose-500/15 font-semibold text-rose-300">High</span>
+                    : priorityOf(r) === 'medium' ? <span className="dz-tag bg-amber-500/15 font-semibold text-amber-300">Medium</span>
+                    : <span className="dz-tag bg-emerald-500/15 font-semibold text-emerald-300">OK</span>}
                   </td>
                 </tr>
               ))}
@@ -132,11 +129,10 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
         </div>
       </div>
 
-      {/* Demand Alerts by Locality — "wanted here" signal from listings alerts */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-sm font-semibold text-gray-300">Demand Alerts by Locality</h3>
-          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-400">
+          <span className="dz-tag border border-white/10 bg-white/5 text-gray-400">
             {totalLocalityAlerts} alert{totalLocalityAlerts !== 1 ? 's' : ''}
           </span>
         </div>
@@ -179,12 +175,11 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
       </div>
       </>)}
 
-      {/* City Expansion Requests — where people want Draazy to launch next (GET /admin/cities/waitlist) */}
       <div className="rounded-xl border border-white/10 bg-white/[0.02] p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-sm font-semibold text-gray-300">City Expansion Requests</h3>
           {cityWaitlist && (
-            <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-gray-400">
+            <span className="dz-tag border border-white/10 bg-white/5 text-gray-400">
               {totalCityRequests} request{totalCityRequests !== 1 ? 's' : ''}
             </span>
           )}

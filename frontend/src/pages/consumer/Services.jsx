@@ -260,7 +260,7 @@ export default function Services() {
           <div className="absolute -top-20 -right-20 w-96 h-96 rounded-full bg-teal-500/20 blur-3xl" />
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-12 sm:py-20 lg:py-28">
             <div className="max-w-2xl reveal">
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs text-teal-200 font-medium mb-4 sm:mb-5"><Icon name="sparkles" className="w-3.5 h-3.5" /> {tr('services.hub.heroBadge')}</span>
+              <span className="dz-tag bg-white/10 border border-white/20 text-teal-200 font-medium mb-4 sm:mb-5"><Icon name="sparkles" className="w-3.5 h-3.5" /> {tr('services.hub.heroBadge')}</span>
               <h1 className="text-4xl sm:text-6xl font-extrabold leading-[1.05]">{tr('services.hub.heroTitle1')}<br /><span className="gradient-text">{tr('services.hub.heroTitleAccent')}</span></h1>
               <p className="text-gray-200 text-[15px] sm:text-lg mt-3 sm:mt-5 max-w-xl">{tr('services.hub.heroSubtitle')}</p>
               <div className="hero-cta-row flex flex-row gap-2 sm:gap-3 mt-5 sm:mt-8">
@@ -278,7 +278,7 @@ export default function Services() {
                 <Icon name="file-signature" className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
               </span>
               <div className="ra-spot-body min-w-0 flex-1">
-                <span className="ra-spot-badge inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] sm:text-[11px] font-bold uppercase tracking-wide text-teal-200" style={{ background: 'rgb(var(--dz-c-teal-500) / .16)' }}>
+                <span className="dz-tag ra-spot-badge font-bold uppercase tracking-wide text-teal-200" style={{ background: 'rgb(var(--dz-c-teal-500) / .16)' }}>
                   <Icon name="sparkles" className="w-3 h-3" /> {tr('services.hub.spotlight.badge')}
                 </span>
                 <h2 className="text-[19px] sm:text-2xl font-extrabold text-white mt-2.5 sm:mt-2 leading-tight">{tr('services.hub.spotlight.title')}</h2>
@@ -334,7 +334,7 @@ export default function Services() {
                     <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,rgb(var(--dz-c-ink) / .1) 40%,rgb(var(--dz-c-ink) / .65) 100%)' }} />
                     <div className="absolute inset-0 sm:hidden" style={{ background: 'linear-gradient(180deg,rgb(var(--dz-c-ink) / 0) 34%,rgb(var(--dz-c-ink) / .55) 62%,rgb(var(--dz-c-ink) / .9) 100%)' }} />
                     <div className="absolute top-2.5 left-2.5 sm:top-3 sm:left-3 w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-teal-600 to-teal-500 flex items-center justify-center shadow-lg shadow-teal-500/30"><Icon name={ic} className="w-4 h-4 sm:w-5 sm:h-5 text-white" /></div>
-                    <span className={'absolute top-2.5 right-2.5 sm:top-3 sm:right-3 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full backdrop-blur ' + (featured ? 'svc-ribbon text-white' : 'bg-black/45 text-teal-100')}>{featured ? tr('services.hub.mostBooked') : tr('services.hub.catBadge.' + c)}</span>
+                    <span className={'dz-tag absolute top-2.5 right-2.5 sm:top-3 sm:right-3 font-bold uppercase tracking-wider backdrop-blur ' + (featured ? 'svc-ribbon text-white' : 'bg-black/45 text-teal-100')}>{featured ? tr('services.hub.mostBooked') : tr('services.hub.catBadge.' + c)}</span>
                     <div className="absolute inset-x-0 bottom-0 p-3 flex items-end justify-between gap-2 sm:hidden">
                       <h3 className="text-white font-bold text-sm leading-tight line-clamp-2 drop-shadow-sm">{cardName}</h3>
                       <span className="lm w-7 h-7 rounded-full bg-white/15 backdrop-blur flex items-center justify-center shrink-0"><Icon name="arrow-right" className="w-4 h-4" /></span>
@@ -384,9 +384,9 @@ export default function Services() {
             <div className="flex flex-col lg:flex-row gap-6 items-start">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-teal-300" style={{ background: 'rgb(var(--dz-c-teal-500) / .15)' }}><Icon name="package" className="w-3.5 h-3.5" /> {tr('services.hub.packBadge')}</span>
+                  <span className="dz-tag font-semibold text-teal-300" style={{ background: 'rgb(var(--dz-c-teal-500) / .15)' }}><Icon name="package" className="w-3.5 h-3.5" /> {tr('services.hub.packBadge')}</span>
                   {!packLive && (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-amber-300" style={{ background: 'rgb(var(--dz-c-amber-500) / .15)' }}><Icon name="clock" className="w-3.5 h-3.5" /> {tr('services.hub.packComingSoon')}</span>
+                    <span className="dz-tag font-semibold text-amber-300" style={{ background: 'rgb(var(--dz-c-amber-500) / .15)' }}><Icon name="clock" className="w-3.5 h-3.5" /> {tr('services.hub.packComingSoon')}</span>
                   )}
                 </div>
                 <h2 className="text-2xl font-bold text-white">{tr('services.hub.packTitle')}</h2>
@@ -456,7 +456,7 @@ export default function Services() {
               <p className="text-gray-200 mt-3 mb-7">{tr('services.hub.ctaSub')}</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link to="/listings" className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name="search" className="w-4 h-4" /> {tr('services.hub.ctaBrowse')}</Link>
-                <Link to="/list-property" className="px-6 py-3.5 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 inline-flex items-center justify-center gap-2 transition-all"><Icon name="plus" className="w-4 h-4" /> {tr('services.hub.ctaList')}</Link>
+                <Link to="/list-property" className="h-btn-lg px-6 rounded-xl bg-white/10 border border-white/20 text-white text-sm font-semibold hover:bg-white/15 inline-flex items-center justify-center gap-2 transition-all"><Icon name="plus" className="w-4 h-4" /> {tr('services.hub.ctaList')}</Link>
               </div>
             </div>
           </div>

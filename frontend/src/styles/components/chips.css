@@ -1,0 +1,143 @@
+/* Compact controls; sizes come from the --dz-* scale in index.css :root.
+   Pill = tappable (.dz-chip, .dz-segmented). 6px corner = display-only (.dz-tag). */
+
+/* Zero specificity so layout utilities (hidden, sm:flex, absolute) still place a converted control. */
+:where(.dz-chip, .dz-segmented > button, .dz-tag, .dz-count) { display: inline-flex; }
+:where(.dz-chip, .dz-segmented > button) { position: relative; }
+
+.dz-chip,
+.dz-segmented > button {
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--control-radius-pill);
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease;
+}
+
+.dz-chip::before,
+.dz-segmented > button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.dz-chip:focus-visible,
+.dz-segmented > button:focus-visible {
+  outline: 2px solid var(--teal-2);
+  outline-offset: 2px;
+}
+
+.dz-chip {
+  gap: .375rem;
+  height: var(--dz-chip-h);
+  padding: 0 .75rem;
+  border-width: 1px;
+  border-style: solid;
+  font-size: .8125rem;
+  font-weight: 500;
+}
+
+/* Surfaces are element-specific (0,0,1): above preflight's button reset, below tone utilities (bg-*, text-*),
+   so a utility can recolour a chip while the geometry above stays fixed. */
+:is(button, a, span, label):where(.dz-chip) {
+  border-color: rgb(var(--dz-c-white) / calc(.12 * var(--dz-line-boost)));
+  background: var(--control-bg);
+  color: rgb(var(--dz-c-gray-200));
+}
+
+.dz-chip svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+:is(button, a, span, label):where(.dz-chip--accent) {
+  border-color: rgb(var(--dz-c-teal-400) / .35);
+  background: rgb(var(--dz-c-teal-500) / .12);
+  color: rgb(var(--dz-c-teal-200));
+}
+
+@media (hover: hover) {
+  :is(button, a, span, label):where(.dz-chip:hover) {
+    border-color: rgb(var(--dz-c-teal-400) / .5);
+    background: rgb(var(--dz-c-teal-500) / .16);
+    color: rgb(var(--dz-c-white));
+  }
+}
+
+/* Icon-only segmented toggle, the same shape as listings DealToggle: a --control-h pill whose
+   segments land on --dz-icon-btn on a phone, so it lines up with the select and search beside it. */
+.dz-segmented {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  height: var(--control-h);
+  padding: 3px;
+  box-sizing: border-box;
+  border: 1px solid rgb(var(--dz-c-white) / calc(.12 * var(--dz-line-boost)));
+  border-radius: var(--control-radius-pill);
+  background: var(--control-bg);
+}
+
+.dz-segmented > button {
+  width: 2.5rem;
+  color: rgb(var(--dz-c-gray-400));
+}
+
+.dz-segmented > button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.dz-segmented > button[aria-pressed="true"] {
+  background: rgb(var(--dz-c-teal-500) / .18);
+  color: rgb(var(--dz-c-teal-300));
+}
+
+@media (hover: hover) {
+  .dz-segmented > button:not([aria-pressed="true"]):hover { color: rgb(var(--dz-c-white)); }
+}
+
+/* Colour only through tone utilities; --muted is an element-specificity default they can override. */
+.dz-tag {
+  flex: none;
+  align-items: center;
+  gap: .25rem;
+  height: var(--dz-tag-h);
+  padding: 0 .5rem;
+  border-radius: 6px;
+  font-size: .75rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.dz-tag svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+
+:is(button, a, span, label):where(.dz-tag--muted) {
+  border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
+  background: rgb(var(--dz-c-white) / .05);
+  color: rgb(var(--dz-c-gray-300));
+}
+
+.dz-count {
+  align-items: center;
+  justify-content: center;
+  min-width: var(--dz-count-h);
+  height: var(--dz-count-h);
+  padding: 0 .375rem;
+  border-radius: var(--control-radius-pill);
+  font-size: .75rem;
+  font-weight: 700;
+  line-height: 1;
+}

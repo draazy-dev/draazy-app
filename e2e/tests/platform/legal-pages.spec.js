@@ -93,7 +93,8 @@ test.describe('Cookie consent (DPDPA)', () => {
       expect(consent.analytics).toBe(false);
       await page.getByRole('button', { name: 'Cookie preferences' }).click();
       await expect(dialog).toBeVisible();
-      await expect(page.getByRole('switch', { name: /Analytics cookies/i })).toBeVisible();
+      await expect(dialog.getByRole('button')).toHaveText(['Reject non-essential', 'Accept all']);
+      await expect(page.getByRole('switch')).toHaveCount(0);
     });
   });
 });

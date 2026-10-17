@@ -111,6 +111,10 @@ test.describe('Messages inbox — live API', () => {
     await expect(page.locator('.pc-conv').first()).toBeVisible();
     await page.locator('.pc-search input').fill('zzzz-no-live-conversation');
     await expect(page.locator('.pc-empty-list')).toBeVisible();
+
+    // Reading the thread cleared the only unread message, so the top-bar icon drops its count badge.
+    await page.goto('/');
+    await expect(page.locator('a[href="/messages"]').first().locator('span')).toHaveCount(0);
   });
 
   test('the owner sees the requester contact and can open the report modal', async ({ page }) => {
@@ -201,7 +205,7 @@ test.describe('Messages inbox — live API', () => {
     await expect(page.getByRole('button', { name: /Archived \(\d+\)/ })).toBeVisible();
   });
 
-  test('the dashboard Messages entry delegates to the canonical inbox', async ({ page }) => {
+  test('an old dashboard #messages link opens the canonical inbox', async ({ page }) => {
     await signedInAs(page, thread.buyer.mobile);
     const inbox = page.waitForResponse((response) =>
       new URL(response.url()).pathname === '/api/messages' && response.status() === 200,

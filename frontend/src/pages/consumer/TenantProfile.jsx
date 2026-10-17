@@ -106,8 +106,7 @@ export default function TenantProfile() {
       if (saved && saved.score != null) setScore(saved.score);
       return true;
     } catch (err) {
-      // `ApiError` carries `code`/`message`/`status`/`traceId`/`fields` and never a `body`, so the
-      // old `err.body.error` read undefined and every save failure fell through to the generic copy.
+      // `ApiError` never carries a `body`; the refused field is in `fields`.
       const first = err?.isValidation ? err.fields?.[0]?.field : null;
       const labelKey = FIELD_LABEL_KEY[first];
       toast(
@@ -180,7 +179,7 @@ export default function TenantProfile() {
           <p className="text-gray-400 text-sm">{t('misc.tpSubtitle')}</p>
         </div>
         {form.idVerified && (
-          <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/25 px-3 py-1 text-xs font-bold text-emerald-300 whitespace-nowrap">
+          <span className="dz-tag ml-auto bg-emerald-500/15 border border-emerald-500/25 font-bold text-emerald-300">
             <Icon name="shield-check" className="w-3.5 h-3.5" /> {t('misc.tpSeriousBuyer')}
           </span>
         )}
@@ -265,7 +264,6 @@ export default function TenantProfile() {
             </div>
           )}
         </form>
-        {/* Live preview + score booster */}
 
         <aside className="flex flex-col gap-4">
           <div className="glass rounded-2xl p-6 order-2 lg:order-1">
@@ -279,7 +277,6 @@ export default function TenantProfile() {
             </div>
             <p className="text-xs text-gray-400">{t('misc.tpOwnersSeeNote')}</p>
           </div>
-          {/* Booster checklist — the actionable core of the page. */}
 
           <div className="glass rounded-2xl p-5 order-1 lg:order-2">
             <h3 className="font-bold text-sm mb-1 flex items-center gap-2"><Icon name="trending-up" className="w-4 h-4 text-emerald-400" /> {t('misc.tpBoostTitle')}</h3>

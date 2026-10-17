@@ -165,7 +165,7 @@ export default function Featured({ navigate }) {
         {!loading && (
           <button
             onClick={() => navigate('/listings')}
-            className="sm:hidden mt-6 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 py-3 text-sm font-semibold text-teal-500 hover:bg-white/10 hover:text-teal-400 transition-all"
+            className="h-btn sm:hidden mt-6 w-full inline-flex items-center justify-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-5 text-sm font-semibold text-teal-500 hover:bg-white/10 hover:text-teal-400 transition-all"
           >
             {t('home.featured.viewAllProperties')} <Icon name="arrow-right" className="w-4 h-4" />
           </button>

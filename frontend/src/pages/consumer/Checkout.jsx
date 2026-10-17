@@ -102,8 +102,7 @@ export default function Checkout() {
     return () => { alive = false; };
   }, [needsProperty, propertyId, isIn]);
 
-  // The amount charged is the server's plan row, so that is the one to display. Showing the
-  // back-office fee here was how a customer came to click "Pay ₹999" and be billed ₹2,499.
+  // The charged amount is the server's plan row, so display that rather than the back-office fee.
   const price = base && (serverPlan?.price ?? prices[base.priceKey]);
   const termDays = serverPlan?.termDays ?? base?.termDays;
   const P = base && { ...base, price };
@@ -213,7 +212,7 @@ export default function Checkout() {
           <p className="text-gray-400 text-sm mb-6">{t('misc.coPausedBody')}</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to="/dashboard" className="btn-teal px-5 py-2.5 rounded-xl font-semibold text-sm">{t('misc.coGoToDashboard')}</Link>
-            <Link to="/plans" className="px-5 py-2.5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coViewPlans')}</Link>
+            <Link to="/plans" className="h-btn inline-flex items-center justify-center px-5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coViewPlans')}</Link>
           </div>
         </div>
       ) : waiting ? (
@@ -227,7 +226,7 @@ export default function Checkout() {
             {phase === 'timeout'
               ? <button type="button" onClick={() => setPhase('verifying')} className="btn-teal px-5 py-2.5 rounded-xl font-semibold text-sm">{t('misc.coCheckAgain')}</button>
               : <span className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm text-gray-400"><Icon name="loader-2" className="w-4 h-4 animate-spin" /> {t('misc.coProcessing')}</span>}
-            <Link to="/dashboard" className="px-5 py-2.5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coGoToDashboard')}</Link>
+            <Link to="/dashboard" className="h-btn inline-flex items-center justify-center px-5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coGoToDashboard')}</Link>
           </div>
         </div>
       ) : paid ? (
@@ -239,13 +238,12 @@ export default function Checkout() {
           {orderRef && <p className="text-gray-500 text-xs mb-6">{t('misc.coOrderReference')} · <span className="text-gray-400 font-mono">{orderRef}</span></p>}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link to={doneHref} className="btn-teal px-5 py-2.5 rounded-xl font-semibold text-sm">{doneCta}</Link>
-            <Link to="/dashboard" className="px-5 py-2.5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coGoToDashboard')}</Link>
+            <Link to="/dashboard" className="h-btn inline-flex items-center justify-center px-5 rounded-xl font-semibold text-sm border border-white/10 text-gray-200 hover:bg-white/5 transition-colors">{t('misc.coGoToDashboard')}</Link>
           </div>
         </div>
       ) : (
         <>
         <div className="grid md:grid-cols-2 gap-6 items-start">
-          {/* Order summary */}
           <div className="glass rounded-2xl p-5 sm:p-6">
             <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">{t('misc.coOrderSummary')}</h2>
             <div className="flex items-start gap-3 mb-4">
@@ -263,7 +261,6 @@ export default function Checkout() {
             </div>
           </div>
 
-          {/* Payment method */}
           <div className="glass rounded-2xl p-5 sm:p-6">
             <h2 id="co-method-label" className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">{t('misc.coPaymentMethod')}</h2>
             <div role="radiogroup" aria-labelledby="co-method-label" className="space-y-2.5 mb-5">

@@ -1,14 +1,12 @@
 import { useCallback, useState } from 'react';
 import { useLocation } from 'react-router';
-import { X } from 'lucide-react';
 import { useCity } from '../context/CityContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import MobileField from './MobileField.jsx';
 import TurnstileWidget from './security/TurnstileWidget.jsx';
 import { useTurnstile } from './security/useTurnstile.js';
-import useScrollLock from '../hooks/useScrollLock.js';
-import useModalDialog from '../hooks/useModalDialog.js';
+import Modal from './ui/Modal.jsx';
 
 /* The +91 prefix only comes off a number longer than ten digits: a real mobile can begin 91. */
 const digits = (s) => String(s || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
@@ -96,8 +94,7 @@ export default function CityChrome() {
 function CityModal({ modal, user, onClose, onSubmit }) {
   const isWaitlist = modal.type === 'waitlist';
   const cityName = modal.city;
-  /* No `name` field: `requestCity` never forwarded it, `CityWaitlistCreateRequest` has no such
-     property and `city_waitlist` has no column. */
+  /* No `name` field: `CityWaitlistCreateRequest` has no such property and `city_waitlist` has no column. */
   const [form, setForm] = useState({ city: '', mobile: digits(user?.mobile), email: user?.email || '' });
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
@@ -107,9 +104,6 @@ function CityModal({ modal, user, onClose, onSubmit }) {
   /* Every way out is sealed while the POST is in flight: `onSubmit` closes over `CityChrome`,
      which does not unmount with the modal, so a mid-flight close still ran the continuation. */
   const requestClose = useCallback(() => { if (!busy) onClose(); }, [busy, onClose]);
-
-  useScrollLock();
-  const panelRef = useModalDialog(true, requestClose);
 
   const submit = async () => {
     if (busy) return;
@@ -142,55 +136,45 @@ function CityModal({ modal, user, onClose, onSubmit }) {
   const fld = 'w-full rounded-[11px] border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white outline-none focus:border-brand-teal focus:ring-2 focus:ring-brand-teal/20';
 
   return (
-    <div className="fixed inset-0 z-[1500] flex items-center justify-center p-4" onMouseDown={(e) => e.target === e.currentTarget && requestClose()}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-      <div
-        ref={panelRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-label={isWaitlist ? `Join the ${cityName} waitlist` : 'Request your city'}
-        className="relative w-full max-w-[440px] overflow-hidden rounded-[20px] border border-white/12 bg-ink-card shadow-2xl outline-none"
-      >
-        <div className="flex items-center justify-between border-b border-white/8 px-[18px] py-4">
-          <h3 className="text-base font-bold text-white">{isWaitlist ? `Join the ${cityName} waitlist` : 'Request your city'}</h3>
-          <button onClick={requestClose} disabled={busy} aria-label="Close" className="text-gray-400 hover:text-white"><X className="h-5 w-5" /></button>
-        </div>
-        <div className="px-[18px] py-4">
-          <p className="mb-3.5 text-[13px] leading-relaxed text-gray-400">
-            {isWaitlist ? (
-              <>We're launching in <b className="text-brand-teal">{cityName}</b> soon. Join the waitlist and we'll notify you the moment we go live.</>
-            ) : (
-              <>Tell us where you'd like Draazy next. The most-requested cities jump our expansion queue.</>
-            )}
-          </p>
-          {!isWaitlist ? (
-            <label className="mb-3 block text-[12.5px] font-semibold text-gray-300">Which city?
-              {/* `maxLength` mirrors `CityWaitlistCreateRequest`'s `@Size(max = 120)` — free text
-                against a server bound is an unwinnable retry the error message can't name. */}
-            <input value={form.city} onChange={(e) => set('city', e.target.value)} maxLength={120} className={fld + ' mt-1.5'} placeholder="City name" />
-            </label>
-          ) : null}
-          <label className="mb-3 block text-[12.5px] font-semibold text-gray-300">Mobile number
-            <MobileField value={form.mobile} onChange={(v) => set('mobile', v)} className="mt-1.5" />
-          </label>
-          {isWaitlist ? (
-            <label className="mb-1 block text-[12.5px] font-semibold text-gray-300">Email (optional)
-              <input value={form.email} onChange={(e) => set('email', e.target.value)} className={fld + ' mt-1.5'} placeholder="you@example.com" />
-            </label>
-          ) : null}
-          <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="mt-2 flex justify-center" />
-          {/* `role="alert"` because this message arrives *after* an await, with focus parked on a
-             button that has gone quiet, so it would otherwise never be announced. */}
-          {err ? <p role="alert" className="mt-1 text-xs text-rose-300">{err}</p> : null}
-        </div>
-        <div className="flex justify-end gap-2.5 border-t border-white/8 px-[18px] py-3">
+    <Modal
+      open
+      onClose={requestClose}
+      title={isWaitlist ? `Join the ${cityName} waitlist` : 'Request your city'}
+      footer={(
+        <>
           <button onClick={requestClose} disabled={busy} className="btn btn-secondary">Cancel</button>
           <button onClick={submit} disabled={busy} aria-busy={busy} className="btn btn-primary">
             {busy ? 'Sending…' : isWaitlist ? 'Notify me when live' : 'Request city'}
           </button>
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    >
+      <p className="mb-3.5 text-[13px] leading-relaxed text-gray-400">
+        {isWaitlist ? (
+          <>We're launching in <b className="text-brand-teal">{cityName}</b> soon. Join the waitlist and we'll notify you the moment we go live.</>
+        ) : (
+          <>Tell us where you'd like Draazy next. The most-requested cities jump our expansion queue.</>
+        )}
+      </p>
+      {!isWaitlist ? (
+        <label className="mb-3 block text-[12.5px] font-semibold text-gray-300">Which city?
+          {/* `maxLength` mirrors `CityWaitlistCreateRequest`'s `@Size(max = 120)` — free text
+            against a server bound is an unwinnable retry the error message can't name. */}
+        <input value={form.city} onChange={(e) => set('city', e.target.value)} maxLength={120} className={fld + ' mt-1.5'} placeholder="City name" />
+        </label>
+      ) : null}
+      <label className="mb-3 block text-[12.5px] font-semibold text-gray-300">Mobile number
+        <MobileField value={form.mobile} onChange={(v) => set('mobile', v)} className="mt-1.5" />
+      </label>
+      {isWaitlist ? (
+        <label className="mb-1 block text-[12.5px] font-semibold text-gray-300">Email (optional)
+          <input value={form.email} onChange={(e) => set('email', e.target.value)} className={fld + ' mt-1.5'} placeholder="you@example.com" />
+        </label>
+      ) : null}
+      <TurnstileWidget key={turnstile.round} onToken={turnstile.onToken} className="mt-2 flex justify-center" />
+      {/* `role="alert"` because this message arrives *after* an await, with focus parked on a
+         button that has gone quiet, so it would otherwise never be announced. */}
+      {err ? <p role="alert" className="mt-1 text-xs text-rose-300">{err}</p> : null}
+    </Modal>
   );
 }

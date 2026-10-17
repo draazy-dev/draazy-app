@@ -47,13 +47,14 @@ public class SocietyService {
     }
 
     /** A handful of queries for any page size, never one per row;
-     * {@code hasListings} is {@code TRUE} only from the home rail. */
+     * {@code hasListings} is {@code TRUE} only from the home rail; {@code mapped} keeps Google-picked rows only. */
     @Transactional(readOnly = true)
-    public Page<SocietyResponse> browse(String q, String localitySlug, Boolean hasListings, Pageable pageable) {
-        Specification<Society> spec = SocietySpecs.browse(q, localitySlug, hasListings);
+    public Page<SocietyResponse> browse(String q, String localitySlug, Boolean hasListings, Boolean mapped,
+            Pageable pageable) {
+        Specification<Society> spec = SocietySpecs.browse(q, localitySlug, hasListings, mapped);
         Optional<String> ranking = SocietySort.ranking(pageable);
         if (ranking.isPresent()) {
-            return ranked(spec, q, localitySlug, hasListings, ranking.get(), pageable);
+            return ranked(spec, q, localitySlug, hasListings, mapped, ranking.get(), pageable);
         }
         Pageable safe = SocietySort.sanitize(pageable);
         Page<Society> page = societies.findAll(spec, SocietySort.tieBroken(safe));
@@ -63,9 +64,10 @@ public class SocietyService {
 
     /** The database ranks the filtered set and returns only the page's ids, so page 2 continues page 1. */
     private Page<SocietyResponse> ranked(Specification<Society> spec, String q, String localitySlug,
-            Boolean hasListings, String mode, Pageable pageable) {
+            Boolean hasListings, Boolean mapped, String mode, Pageable pageable) {
         List<Object[]> rows = societies.rankedIds(SocietySpecs.likePattern(q), SocietySpecs.trimmed(localitySlug),
-                Boolean.TRUE.equals(hasListings), mode, pageable.getPageSize(), pageable.getOffset());
+                Boolean.TRUE.equals(hasListings), Boolean.TRUE.equals(mapped), mode,
+                pageable.getPageSize(), pageable.getOffset());
         List<UUID> ids = rows.stream().map(r -> (UUID) r[0]).toList();
         // A page past the end carries no window total, so only that case pays for a count.
         long total = rows.isEmpty()

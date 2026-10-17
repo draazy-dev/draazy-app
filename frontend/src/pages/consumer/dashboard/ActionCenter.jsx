@@ -23,7 +23,7 @@ function AgePill({ at, atText }) {
     if (isStale(at)) {
       const days = Math.max(1, Math.round((Date.now() - at) / 86400000));
       return (
-        <span className="whitespace-nowrap rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-bold text-rose-300">
+        <span className="dz-tag bg-rose-500/15 font-bold text-rose-300">
           {days}d waiting
         </span>
       );
@@ -62,7 +62,7 @@ export default function ActionCenter({ items = [], limit, onSeeAll }) {
         title="Needs your attention"
         sub="Respond to these so no request goes stale waiting on you."
         action={
-          <span className="whitespace-nowrap rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-amber-300">
+          <span className="dz-tag bg-amber-500/15 font-semibold text-amber-300">
             {items.length} pending
           </span>
         }
@@ -102,7 +102,6 @@ export default function ActionCenter({ items = [], limit, onSeeAll }) {
                 </div>
                 <AgePill at={it.at} atText={it.atText} />
               </div>
-              {/* Full-width, 44px-tall actions on phones (comfortable thumb targets); compact inline buttons from sm+. */}
               <div className="flex w-full gap-4 sm:w-auto sm:flex-shrink-0">
                 {it.actions.map((a, i) => (
                   a.to ? (

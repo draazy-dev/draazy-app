@@ -8,7 +8,7 @@ export const STAFF_SUBMIT =
 function StaffPanel() {
   return (
     <>
-      <div className="inline-flex items-center gap-2 rounded-full border border-teal-400/25 bg-teal-400/[.08] px-3.5 py-1.5 mt-6 mb-6">
+      <div className="dz-tag border border-teal-400/25 bg-teal-400/[.08] mt-6 mb-6">
         <span className="auth-live-dot inline-block w-1.5 h-1.5 rounded-full bg-teal-300" />
         <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-teal-200">Internal console</span>
       </div>

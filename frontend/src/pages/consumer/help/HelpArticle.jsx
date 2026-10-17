@@ -68,7 +68,7 @@ export default function HelpArticle() {
 
           <header className="mb-7">
             {article.access === 'staff' && (
-              <p className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-amber-400/25 bg-amber-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-amber-300">
+              <p className="dz-tag mb-3 border border-amber-400/25 bg-amber-400/10 font-semibold uppercase tracking-widest text-amber-300">
                 <Icon name="lock" className="w-3 h-3" /> {t('help.internalBadge')}
               </p>
             )}
@@ -101,7 +101,7 @@ export default function HelpArticle() {
                 <Link
                   key={tag}
                   to={`/help/search?q=${encodeURIComponent(tag)}`}
-                  className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] text-gray-500 transition-colors hover:border-teal-400/40 hover:text-teal-300"
+                  className="dz-chip border border-white/10 text-gray-500 hover:border-teal-400/40 hover:text-teal-300"
                 >
                   {tag}
                 </Link>

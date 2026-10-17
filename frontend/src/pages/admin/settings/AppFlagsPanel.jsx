@@ -62,7 +62,6 @@ export default function AppFlagsPanel({ flags, onToggle }) {
 
   return (
     <div className="flex flex-col lg:flex-row rounded-3xl border border-white/[0.08] overflow-hidden lg:h-[calc(100vh-280px)] lg:min-h-[440px] lg:max-h-[680px] shadow-xl shadow-black/20">
-      {/* Left column */}
       <div className="w-full lg:w-[280px] shrink-0 border-b lg:border-b-0 lg:border-r border-white/[0.06] bg-gradient-to-b from-white/[0.02] to-transparent overflow-y-auto">
         <div className="px-5 py-4">
           <div className="flex items-center gap-2">
@@ -99,7 +98,6 @@ export default function AppFlagsPanel({ flags, onToggle }) {
         </div>
       </div>
 
-      {/* Right column */}
       <div className="flex-1 overflow-y-auto min-w-0">
         {active && <ActiveSection active={active} flags={flags} onToggle={onToggle} />}
       </div>
@@ -129,7 +127,7 @@ function ActiveSection({ active, flags, onToggle }) {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-gray-200">{flag.label}</span>
-                  {flag.danger && <span className="rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-400">Caution</span>}
+                  {flag.danger && <span className="dz-tag border border-rose-500/30 bg-rose-500/10 font-semibold text-rose-400">Caution</span>}
                 </div>
                 <p className="text-[11px] text-gray-500 mt-0.5">{flag.desc}</p>
               </div>

@@ -47,7 +47,7 @@ Under India's DPDP Act you can ask us to:
 - **Access** a copy of your data - **Dashboard > Profile > Privacy & Account > Download my data**
 - **Correct** anything inaccurate
 - **Request erasure** of your account and associated data
-- **Withdraw consent** for optional processing - location, and analytics cookies (reopen **Cookie preferences** in the site footer; the banner offers Accept all, Customize or Reject non-essential)
+- **Withdraw consent** for optional processing - location, and analytics cookies (reopen **Cookie preferences** in the site footer; the banner offers Accept all or Reject non-essential)
 
 > [!NOTE]
 > Erasure is a reviewed request, not an instant delete button. Some records are retained where the law, safety duties or another person's rights require it.

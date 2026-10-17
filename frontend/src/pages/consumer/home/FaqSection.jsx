@@ -25,16 +25,15 @@ export default function FaqSection() {
           <h2 id="faqHeading" className="text-3xl sm:text-4xl font-extrabold text-white">{t('home.faq.title')}</h2>
           <p className="text-gray-400 mt-3">{t('home.faq.subtitle')}</p>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-2">
           {items.map(({ key, q, a }) => (
-            <details key={key} className="faq group rounded-2xl border border-white/10 bg-white/5 p-5">
-              {/* The whole summary row is the toggle, so it carries the touch floor
-                  rather than relying on the question happening to wrap to two lines. */}
-              <summary className="flex min-h-[44px] sm:min-h-0 items-center justify-between gap-4 cursor-pointer list-none text-white font-semibold text-base">
+            <details key={key} className="faq group rounded-xl border border-white/10 bg-white/5 px-4 sm:px-5">
+              {/* Padding lives on the summary so the whole row is the toggle and keeps the 44px touch floor. */}
+              <summary className="flex min-h-[48px] items-center justify-between gap-3 py-2.5 cursor-pointer list-none text-white font-semibold text-[15px] leading-snug sm:min-h-[56px]">
                 <span>{q}</span>
                 <Icon name="chevron-down" className="faq-ico w-5 h-5 text-teal-400 flex-shrink-0" />
               </summary>
-              <p className="text-gray-400 text-sm mt-3 leading-relaxed">{a}</p>
+              <p className="text-gray-400 text-sm pb-4 leading-relaxed">{a}</p>
             </details>
           ))}
         </div>

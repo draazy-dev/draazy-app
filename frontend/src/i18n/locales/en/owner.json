@@ -38,7 +38,6 @@
     "reviewsSummary_one": "{{count}} review",
     "reviewsSummary_other": "{{count}} reviews",
     "rateExperience": "Rate your experience with this owner",
-    "starAria": "{{count}} star",
     "reviewPlaceholder": "Share your experience...",
     "postReview": "Post Review",
     "errRating": "Please add a star rating",

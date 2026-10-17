@@ -77,14 +77,13 @@ export default function PropertyPassport() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
         <Link to="/dashboard#properties" className="inline-flex items-center gap-1.5 text-gray-400 text-sm hover:text-white mb-4"><Icon name="arrow-left" className="w-4 h-4" /> {t('ownerHub.myProperties')}</Link>
 
-        {/* Header */}
         <div className="glass-card rounded-2xl p-6">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1.5">
                 {prop.publishedListingId
-                  ? <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 text-xs font-medium"><Icon name="globe" className="w-3.5 h-3.5" /> {t('ownerHub.listedToBuyers')}</span>
-                  : <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-gray-300 text-xs font-medium"><Icon name="lock" className="w-3.5 h-3.5" /> {t('ownerHub.private')}</span>}
+                  ? <span className="dz-tag bg-brand-teal-1/15 border border-brand-teal-2/25 text-brand-teal-3 font-medium"><Icon name="globe" className="w-3.5 h-3.5" /> {t('ownerHub.listedToBuyers')}</span>
+                  : <span className="dz-tag bg-white/5 border border-white/10 text-gray-300 font-medium"><Icon name="lock" className="w-3.5 h-3.5" /> {t('ownerHub.private')}</span>}
               </div>
               <h1 className="text-2xl font-bold text-white truncate">{prop.title}</h1>
               <p className="text-gray-400 text-sm mt-1 flex items-center gap-1.5"><Icon name="map-pin" className="w-4 h-4 text-brand-teal-2" /> {prop.loc || prop.locality}</p>
@@ -92,7 +91,7 @@ export default function PropertyPassport() {
             </div>
             <div className="flex gap-2.5 flex-shrink-0">
               {prop.publishedListingId ? (
-                <Link to={`/property/${prop.publishedListingId}`} className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="external-link" className="w-4 h-4 text-brand-teal-2" /> {t('ownerHub.viewListing')}</Link>
+                <Link to={`/property/${prop.publishedListingId}`} className="h-btn px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="external-link" className="w-4 h-4 text-brand-teal-2" /> {t('ownerHub.viewListing')}</Link>
               ) : (
                 <button onClick={publish} className="btn-teal px-4 py-2.5 rounded-xl text-white text-sm font-semibold flex items-center gap-2"><Icon name="megaphone" className="w-4 h-4" /> {t('ownerHub.publishAsListing')}</button>
               )}
@@ -100,7 +99,6 @@ export default function PropertyPassport() {
             </div>
           </div>
 
-          {/* Completeness meter */}
           <div className="mt-5 pt-5 border-t border-white/10">
             <div className="flex items-center justify-between text-sm mb-2"><span className="text-gray-300 font-medium">{t('ownerHub.completeness')}</span><span data-testid="passport-percent" className="text-brand-teal-3 font-bold">{pct}%</span></div>
             <div className="insight-bar mb-3"><span style={{ width: `${pct}%` }} /></div>
@@ -138,7 +136,7 @@ export default function PropertyPassport() {
                   <div className="rd-cell flex items-center justify-between"><span className="text-gray-400 text-sm">{t('ownerHub.estSale')}</span><span className="text-white font-semibold">{fmtINR(val.sale.mid)}</span></div>
                   <div className="rd-cell flex items-center justify-between"><span className="text-gray-400 text-sm">{t('ownerHub.localityRate')}</span><span className="text-white font-semibold">₹{fmtNum(val.perSqft)}{t('locality.perSqft')}</span></div>
                 </div>
-                <Link to="/services/property-valuation" className="mt-4 w-full block text-center py-2.5 rounded-xl border border-brand-teal-2/40 text-brand-teal-3 text-sm font-semibold hover:bg-brand-teal-1/10 transition-all">{t('ownerHub.getAccurate')}</Link>
+                <Link to="/services/property-valuation" className="h-btn mt-4 w-full flex items-center justify-center rounded-xl border border-brand-teal-2/40 text-brand-teal-3 text-sm font-semibold hover:bg-brand-teal-1/10 transition-all">{t('ownerHub.getAccurate')}</Link>
               </div>
             )}
           </div>
@@ -152,8 +150,8 @@ export default function PropertyPassport() {
         size="sm"
         footer={(
           <>
-            <button onClick={() => setConfirmDel(false)} className="px-4 py-2.5 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5">{t('ownerHub.keepIt')}</button>
-            <button onClick={remove} className="px-4 py-2.5 rounded-xl bg-rose-500/90 hover:bg-rose-500 text-white text-sm font-semibold flex items-center gap-2"><Icon name="trash-2" className="w-4 h-4" /> {t('ownerHub.remove')}</button>
+            <button onClick={() => setConfirmDel(false)} className="h-btn inline-flex items-center justify-center px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5">{t('ownerHub.keepIt')}</button>
+            <button onClick={remove} className="h-btn px-4 rounded-xl bg-rose-500/90 hover:bg-rose-500 text-white text-sm font-semibold flex items-center gap-2"><Icon name="trash-2" className="w-4 h-4" /> {t('ownerHub.remove')}</button>
           </>
         )}
       >

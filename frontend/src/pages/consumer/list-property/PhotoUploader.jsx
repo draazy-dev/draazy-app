@@ -105,7 +105,7 @@ const PhotoUploader = ({
         <>
           <div className="flex flex-wrap gap-2 mt-4 mb-3">
             {KEY_CATS.map((k) => (
-              <span key={k} className={`text-[11px] px-2.5 py-1 rounded-full border flex items-center gap-1 ${hasCat(k) ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300' : 'bg-white/5 border-white/10 text-gray-400'}`}>
+              <span key={k} className={`dz-tag border flex ${hasCat(k) ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300' : 'bg-white/5 border-white/10 text-gray-400'}`}>
                 {hasCat(k) ? <Check className="w-3 h-3" /> : <Circle className="w-3 h-3" />} {k}
               </span>
             ))}
@@ -126,7 +126,7 @@ const PhotoUploader = ({
               >
                 <div className="relative h-[122px] group">
                   {(p.url || p.previewUrl) && <img src={p.url || p.previewUrl} alt="" draggable={false} className="w-full h-full object-cover pointer-events-none" />}
-                  {i === 0 && !p.error && <span className="absolute top-2 left-2 text-[9px] font-bold px-2 py-0.5 rounded-full bg-teal-500 text-white">{t('listProperty.photoUploader.cover')}</span>}
+                  {i === 0 && !p.error && <span className="dz-tag absolute top-2 left-2 font-bold bg-teal-500 text-white">{t('listProperty.photoUploader.cover')}</span>}
                   {p.uploading && (
                     <div className="absolute inset-0 bg-black/45 flex items-center justify-center text-pure-white text-xs gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" /> {t('listProperty.photoUx.uploading')}

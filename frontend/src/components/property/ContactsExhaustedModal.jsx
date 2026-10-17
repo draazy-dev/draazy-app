@@ -51,7 +51,7 @@ export default function ContactsExhaustedModal({ onClose }) {
             <div className="flex items-center gap-2 mb-1">
               <Icon name="gift" className="w-4 h-4 text-teal-300" />
               <span className="text-sm font-bold text-white">{t('property.contactsExhausted.referTitle')}</span>
-              <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/15">{t('property.contactsExhausted.freeBadge')}</span>
+              <span className="dz-tag ml-auto font-bold uppercase tracking-wider text-emerald-300 bg-emerald-500/15">{t('property.contactsExhausted.freeBadge')}</span>
             </div>
             <p className="text-xs text-slate-300 leading-relaxed">{t('property.contactsExhausted.referBody', { count: referral.contactBonus })}</p>
             <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-teal-300">
@@ -60,7 +60,6 @@ export default function ContactsExhaustedModal({ onClose }) {
           </Link>
         )}
 
-        {/* Paid path — always available. */}
         <Link
           to={`/checkout?plan=contact-pack&next=${encodeURIComponent(pathname + search)}`}
           onClick={onClose}

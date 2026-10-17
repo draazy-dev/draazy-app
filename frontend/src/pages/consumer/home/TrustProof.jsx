@@ -44,7 +44,7 @@ export function TrustChips({ className = '', compact = false }) {
       {CHIPS.map((c) => {
         const Tag = c.to ? Link : 'span';
         return (
-          <Tag key={c.key} to={c.to} className={'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs sm:text-sm font-semibold ' + c.tone}>
+          <Tag key={c.key} to={c.to} className={'dz-chip border ' + c.tone}>
             <Icon name={c.icon} className="w-4 h-4" /> {t('home.hero.' + c.key)}
           </Tag>
         );

@@ -101,8 +101,11 @@ test('rent receipts: one per month, PAN checked, cash stamp box, and only receip
   await expect(page.getByText('A PAN has 5 letters')).toBeVisible();
   await expect(page.getByRole('button', { name: /Print or save as PDF/ })).toBeDisabled();
   await page.getByLabel(/Landlord PAN/).fill('abcde1234f');
+  await expect(page.getByLabel(/Landlord PAN/)).toHaveValue('ABCDE1234F');
   await expect(page.getByText('A PAN has 5 letters')).toHaveCount(0);
   await expect(page.getByTestId('receipt-preview')).toContainText('PAN: ABCDE1234F');
+  await page.getByLabel(/Landlord PAN/).fill('1abcde12x34f9');
+  await expect(page.getByLabel(/Landlord PAN/), 'a character out of place in AAAAA9999A is dropped').toHaveValue('ABCDE1234F');
 
   await expect(page.getByTestId('receipt-preview')).not.toContainText('revenue stamp');
   await pick(page, 'Payment mode', 'Cash');

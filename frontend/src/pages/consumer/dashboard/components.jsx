@@ -28,7 +28,7 @@ export function Stat({ icon, bg, fg, value, label, trend, onClick, ariaLabel }) 
       </div>
       <p className="mt-2 truncate text-xs font-medium text-gray-300">{label}</p>
       {trend ? (
-        <span className={'mt-2 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ' + tChip}>
+        <span className={'dz-tag mt-2 max-w-full font-semibold ' + tChip}>
           {tIcon ? <Icon name={tIcon} className="h-2.5 w-2.5 flex-shrink-0" /> : null}
           <span className="truncate">{trend.text}</span>
         </span>
@@ -73,7 +73,7 @@ export function SubNav({ items, active, onChange, variant = 'pill' }) {
             {it.icon ? <Icon name={it.icon} className="w-4 h-4" /> : null}
             <span>{it.label}</span>
             {it.count > 0 ? (
-              <span className={'inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold ' + (active === it.key ? 'bg-brand-teal/20 text-brand-teal' : 'bg-white/10 text-gray-300')}>{it.count}</span>
+              <span className={'dz-count ' + (active === it.key ? 'bg-brand-teal/20 text-brand-teal' : 'bg-white/10 text-gray-300')}>{it.count}</span>
             ) : null}
           </button>
         ))}
@@ -88,11 +88,11 @@ export function SubNav({ items, active, onChange, variant = 'pill' }) {
           key={it.key}
           onClick={() => onChange(it.key)}
           aria-current={active === it.key ? 'page' : undefined}
-          className={'inline-flex min-h-[44px] sm:min-h-[40px] items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 py-2 text-sm font-medium transition ' + (active === it.key ? 'border-brand-teal/30 bg-brand-teal/15 text-brand-teal' : 'border-transparent bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white')}
+          className={'h-btn inline-flex items-center gap-2 whitespace-nowrap rounded-xl border px-3.5 text-sm font-medium transition ' + (active === it.key ? 'border-brand-teal/30 bg-brand-teal/15 text-brand-teal' : 'border-transparent bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white')}
         >
           {it.icon ? <Icon name={it.icon} className="w-4 h-4" /> : null} {it.label}
           {it.count > 0 ? (
-            <span className={'ml-0.5 inline-flex min-w-[18px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold ' + (active === it.key ? 'bg-brand-teal/25 text-brand-teal' : 'bg-white/10 text-gray-300')}>{it.count}</span>
+            <span className={'dz-count ml-0.5 ' + (active === it.key ? 'bg-brand-teal/25 text-brand-teal' : 'bg-white/10 text-gray-300')}>{it.count}</span>
           ) : null}
         </button>
       ))}
@@ -111,7 +111,6 @@ export const SectionHead = ({ icon, iconCls = 'text-teal-400', title, sub, actio
     {action ? <div className="w-full sm:w-auto sm:flex-shrink-0">{action}</div> : null}
   </div>
 );
-/* Tints for the request-row leading chip. */
 
 const CHIP_TINTS = {
   teal: 'bg-brand-teal/15 text-brand-teal',
@@ -126,7 +125,6 @@ const CHIP_TINTS = {
 export const RequestList = ({ children }) => (
   <div className="-mx-3 divide-y divide-white/[0.05]">{children}</div>
 );
-/* Per-row urgency pill tints. */
 
 const URGENCY_TINTS = {
   hot: 'bg-rose-500/15 text-rose-300',
@@ -151,12 +149,12 @@ export function RequestRow({ icon, tint = 'teal', avatar, title, badge, meta, ti
         <span className="flex items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">{title}</span>
           {badge ? (
-            <span className="inline-flex flex-shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+            <span className="dz-tag bg-emerald-500/15 font-bold text-emerald-300">
               <Icon name="shield-check" className="h-2.5 w-2.5" />{badge}
             </span>
           ) : null}
           {urgency ? (
-            <span className={'inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ' + (URGENCY_TINTS[urgency.level] || URGENCY_TINTS.warm)}>
+            <span className={'dz-tag font-bold ' + (URGENCY_TINTS[urgency.level] || URGENCY_TINTS.warm)}>
               <Icon name="timer" className="h-2.5 w-2.5" />{urgency.label}
             </span>
           ) : time ? (
@@ -190,7 +188,6 @@ export function RequestRow({ icon, tint = 'teal', avatar, title, badge, meta, ti
     </div>
   );
 }
-/* Shared quick-action chips for a lead's contact number. */
 
 const dialDigits = (m) => String(m == null ? '' : m).replace(/\D/g, '');
 export function CallBtn({ mobile, name, label }) {
@@ -213,13 +210,12 @@ export function WhatsAppBtn({ mobile, name, label }) {
     </a>
   );
 }
-/* Small amber chip flagging a lead the owner scheduled a follow-up for. */
 
 export function FollowUpChip({ ts }) {
   if (!ts) return null;
   const label = new Date(ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-1 text-[11px] font-semibold text-amber-300">
+    <span className="dz-tag bg-amber-400/15 font-semibold text-amber-300">
       <Icon name="calendar-clock" className="h-3 w-3" /> {label}
     </span>
   );
@@ -233,7 +229,7 @@ export const RequestEmpty = ({ icon = 'inbox', text, cta }) => (
     </div>
     <p className="text-sm text-gray-500">{text}</p>
     {cta ? (
-      <Link to={cta.to} className="inline-flex items-center gap-1.5 rounded-lg bg-brand-teal/15 px-3.5 py-2 text-xs font-semibold text-brand-teal transition hover:bg-brand-teal/25">
+      <Link to={cta.to} className="h-btn-sm inline-flex items-center gap-1.5 rounded-lg bg-brand-teal/15 px-3.5 text-xs font-semibold text-brand-teal transition hover:bg-brand-teal/25">
         {cta.icon ? <Icon name={cta.icon} className="h-3.5 w-3.5" /> : null} {cta.label}
       </Link>
     ) : null}
@@ -264,7 +260,7 @@ export const StatusBadge = ({ status }) => {
   };
   const label = displayLabel[statusKey] || String(status || '').replace('_', ' ');
   return (
-    <span className={'text-[11px] px-2 py-0.5 rounded-full font-semibold capitalize ' + (map[statusKey] || 'bg-white/10 text-gray-300')}>
+    <span className={'dz-tag font-semibold capitalize ' + (map[statusKey] || 'bg-white/10 text-gray-300')}>
       {label}
     </span>
   );

@@ -37,29 +37,29 @@ public class SocietyController {
         this.resolveService = resolveService;
     }
 
-    /** {@code sort} is clamped to {@link SocietySort}'s whitelist;
-     *  {@code hasListings=true} narrows to societies with a live listing. */
+    /** {@code sort} is clamped to {@link SocietySort}'s whitelist; {@code hasListings=true} keeps societies with a live
+     *  listing, {@code mapped=true} only Google-picked ones (the listing wizard's Maps-down fallback). */
     @GetMapping(Routes.Societies.BASE)
     public PageResponse<SocietyResponse> browse(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String locality,
             @RequestParam(required = false) Boolean hasListings,
+            @RequestParam(required = false) Boolean mapped,
             @PageableDefault(size = 20) Pageable pageable) {
         return PageResponse.of(
-                societyService.browse(q, locality, hasListings, pageable),
+                societyService.browse(q, locality, hasListings, mapped, pageable),
                 Function.identity());
     }
 
     /** {@code GET /societies/top}: caller-independent, so it is cached like the other public reference reads. */
     @GetMapping(Routes.Societies.TOP)
     public List<SocietyCard> top() {
-        return societyService.browse(null, null, true,
+        return societyService.browse(null, null, true, null,
                         PageRequest.of(0, TOP_RAIL, Sort.by(SocietySort.HOMES)))
                 .map(s -> new SocietyCard(s.slug(), s.name(), s.localitySlug(), s.listingCount()))
                 .getContent();
     }
 
-    /** {@code GET /societies/{slug}} — one society hub; 404 if no such society. */
     @GetMapping(Routes.Societies.BY_SLUG)
     public SocietyDetailResponse get(@PathVariable String slug) {
         return societyService.get(slug);

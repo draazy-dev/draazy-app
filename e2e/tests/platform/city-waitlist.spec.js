@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { shownMobile } from '../../helpers/liveAuth.js';
 
 /* The waitlist must leave the browser and refusal must preserve the filled form; a toast alone
    cannot distinguish server persistence from localStorage. */
@@ -55,7 +56,17 @@ test.describe('City waitlist (live)', () => {
     // And the form survives, so "try again" is a retry rather than a re-type. The mobile is the
     // field worth checking: it is the one the shopper typed and the only one the ask needs.
     await expect(page.getByRole('heading', { name: new RegExp(`Join the ${CITY} waitlist`, 'i') })).toBeVisible();
-    await expect(page.getByPlaceholder('Enter mobile number')).toHaveValue('9876543210');
+    await expect(page.getByPlaceholder('Enter mobile number')).toHaveValue(shownMobile('9876543210'));
+    await page.getByPlaceholder('Enter mobile number').fill('+91 98765 43210');
+    await expect(page.getByPlaceholder('Enter mobile number'), 'a pasted +91 is dropped').toHaveValue('98765 43210');
+    await page.getByPlaceholder('Enter mobile number').fill('9876543210');
+    await expect(page.getByPlaceholder('Enter mobile number'), 're-entering the same number keeps every digit')
+      .toHaveValue('98765 43210');
+    await page.getByPlaceholder('Enter mobile number').evaluate((el) => el.setSelectionRange(6, 6));
+    await page.getByPlaceholder('Enter mobile number').press('Backspace');
+    await expect(page.getByPlaceholder('Enter mobile number'), 'backspace over the space removes the digit before it')
+      .toHaveValue('98764 3210');
+    await page.getByPlaceholder('Enter mobile number').fill('9876543210');
     await expect(page.getByRole('button', { name: 'Notify me when live' })).toBeEnabled();
   });
 

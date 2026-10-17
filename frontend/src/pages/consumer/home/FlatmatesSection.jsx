@@ -11,7 +11,7 @@ export default function FlatmatesSection({ navigate }) {
           <div className="absolute bottom-0 left-1/4 w-32 h-32 rounded-full" style={{ background: 'radial-gradient(circle,rgb(var(--dz-c-pink-500) / .18),transparent 70%)' }} />
           <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-10 items-center">
             <div>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 sm:px-3 rounded-full bg-white/10 border border-white/15 text-teal-200 text-[11px] sm:text-xs font-semibold mb-2.5 sm:mb-4"><Icon name="users-round" className="w-3.5 h-3.5" /> {t('home.flatmates.badge')}</span>
+              <span className="dz-tag bg-white/10 border border-white/15 text-teal-200 font-semibold mb-2.5 sm:mb-4"><Icon name="users-round" className="w-3.5 h-3.5" /> {t('home.flatmates.badge')}</span>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight mb-2 sm:mb-3">{t('home.flatmates.headingLead')} <span className="text-teal-400">{t('home.flatmates.headingHighlight')}</span></h2>
               <p className="text-gray-300 text-[13px] sm:text-base leading-relaxed mb-3.5 sm:mb-6 max-w-xl">{t('home.flatmates.body')}</p>
               <div className="grid grid-flow-col auto-cols-max items-start gap-x-2 sm:gap-x-5 mb-4 sm:mb-7 text-[11px] sm:text-sm text-gray-200 overflow-x-auto no-scrollbar max-[399px]:[mask-image:linear-gradient(to_right,#000_88%,transparent)]">
@@ -20,10 +20,10 @@ export default function FlatmatesSection({ navigate }) {
                 <span className="flex shrink-0 items-center gap-1 sm:gap-1.5 whitespace-nowrap"><Icon name="phone-off" className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-300" /> {t('home.flatmates.featNoNumber')}</span>
               </div>
               <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3">
-                <button onClick={() => navigate('/flatmates?view=team-up')} className="inline-flex w-full sm:w-auto justify-center items-center gap-2 px-6 py-3 sm:py-3.5 rounded-full bg-cta-btn text-cta-btn-text font-bold text-sm hover:opacity-90 transition-all duration-300 sm:hover:scale-105 shadow-2xl shadow-black/20">
+                <button onClick={() => navigate('/flatmates?view=team-up')} className="inline-flex w-full sm:w-auto justify-center items-center gap-2 px-6 h-btn sm:h-btn-lg rounded-full bg-cta-btn text-cta-btn-text font-bold text-sm hover:opacity-90 transition-all duration-300 sm:hover:scale-105 shadow-2xl shadow-black/20">
                   <Icon name="hand-heart" className="w-5 h-5" /> {t('home.flatmates.ctaFind')}
                 </button>
-                <button onClick={() => navigate('/flatmates?post=1')} className="inline-flex w-full sm:w-auto justify-center items-center gap-1.5 px-5 py-3 sm:py-3.5 rounded-full border border-white/20 text-white font-semibold text-sm hover:bg-white/10 transition-all duration-300">
+                <button onClick={() => navigate('/flatmates?post=1')} className="h-btn sm:h-btn-lg inline-flex w-full sm:w-auto justify-center items-center gap-1.5 px-5 rounded-full border border-white/20 text-white font-semibold text-sm hover:bg-white/10 transition-all duration-300">
                   {t('home.flatmates.ctaPost')} <Icon name="arrow-right" className="w-4 h-4" />
                 </button>
               </div>

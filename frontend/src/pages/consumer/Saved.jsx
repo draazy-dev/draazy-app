@@ -268,7 +268,7 @@ export default function Saved() {
       <div className="pt-5 sm:pt-8 lg:pt-10 pb-20 min-h-[100dvh]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={'mb-5 sm:mb-8 fade-in' + (mounted ? ' visible' : '')}>
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-semibold mb-3">
+            <span className="dz-tag bg-teal-500/10 border border-teal-500/20 text-teal-400 font-semibold mb-3">
               <Icon name="heart" className="w-3.5 h-3.5" /> {tr('saved.badge')}
             </span>
             <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">{tr('saved.title')}</h1>
@@ -316,7 +316,7 @@ export default function Saved() {
                     <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
                       <Icon name={c.icon} className="h-3.5 w-3.5 flex-shrink-0 max-[389px]:hidden" />
                       <span>{catLabel(c)}</span>
-                      <span className="tab-count rounded-full px-1.5 py-0.5 text-[10px]">{counts[c.key]}</span>
+                      <span className="dz-count tab-count">{counts[c.key]}</span>
                     </span>
                   </button>
                 ))}
@@ -354,7 +354,7 @@ export default function Saved() {
                           <div className="card-image relative h-[88px] w-[88px] flex-shrink-0 rounded-xl md:h-56 md:w-full md:rounded-none">
                             <PropertyImage src={c.img} sizes={`(max-width: 767px) 88px, ${CARD_SIZES}`} alt={c.title} className="w-full h-full object-cover" />
                             <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                            <div className="hidden md:block absolute top-4 left-4"><span className="type-badge px-3 py-1.5 rounded-full text-xs font-semibold text-teal-300 backdrop-blur-md">{c.badge}</span></div>
+                            <div className="hidden md:block absolute top-4 left-4"><span className="dz-tag type-badge font-semibold text-teal-300 backdrop-blur-md">{c.badge}</span></div>
                             <div className="hidden md:block absolute bottom-4 left-4"><p className="text-2xl font-bold text-white">{c.price}</p></div>
                           </div>
                           <div className="min-w-0 flex-1 md:p-5">
@@ -364,7 +364,7 @@ export default function Saved() {
                                 <h3 className="truncate text-sm font-semibold text-white md:mt-2 md:text-lg">{c.title}</h3>
                                 <p className="mt-0.5 truncate text-xs text-gray-400 md:text-sm">{c.cat === 'flatmates' ? c.sub : [c.bhk, c.loc].filter(Boolean).join(' · ')}</p>
                               </div>
-                              {c.unavailable && <span className="shrink-0 rounded-full border border-rose-400/30 bg-rose-500/10 px-2 py-1 text-[10px] font-semibold text-rose-200">{tr('saved.noLongerAvailable')}</span>}
+                              {c.unavailable && <span className="dz-tag border border-rose-400/30 bg-rose-500/10 font-semibold text-rose-200">{tr('saved.noLongerAvailable')}</span>}
                             </div>
                           </div>
                         </Link>
@@ -382,7 +382,7 @@ export default function Saved() {
                               </span>
                             </>
                           ) : (
-                            <button type="button" onClick={() => stageRemove(c)} className="remove-btn w-full min-h-[44px] py-2.5 rounded-xl border border-white/10 text-gray-400 text-sm font-medium flex items-center justify-center gap-2">
+                            <button type="button" onClick={() => stageRemove(c)} className="h-btn remove-btn w-full rounded-xl border border-white/10 text-gray-400 text-sm font-medium flex items-center justify-center gap-2">
                               <Icon name="trash-2" className="w-4 h-4" /> {tr('saved.removeBtn')}
                             </button>
                           )}

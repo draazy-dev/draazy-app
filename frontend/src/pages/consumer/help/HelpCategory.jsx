@@ -75,7 +75,7 @@ export default function HelpCategory() {
               <Link
                 key={c.id}
                 to={`/help/c/${c.id}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs text-gray-400 transition-colors hover:border-teal-400/40 hover:text-teal-300"
+                className="dz-chip border border-white/10 bg-white/[0.03] text-gray-400 hover:border-teal-400/40 hover:text-teal-300"
               >
                 <Icon name={c.icon} className="w-3.5 h-3.5" /> {c.title}
               </Link>

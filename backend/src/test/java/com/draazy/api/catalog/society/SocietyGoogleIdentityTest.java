@@ -1,6 +1,8 @@
 package com.draazy.api.catalog.society;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -61,6 +63,22 @@ class SocietyGoogleIdentityTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.society.slug").value("gid-exact-towers"))
                 .andExpect(jsonPath("$.candidates.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("mapped=true lists only societies picked from Google, under either sort path")
+    void mappedListsOnlyGooglePicks() throws Exception {
+        society("gid-mapped-meadows", "Gid Mapped Meadows", "gid-p-mapped", LAT, LNG, false);
+        society("gid-unmapped-meadows", "Gid Unmapped Meadows", null, LAT, LNG, false);
+
+        for (String sort : new String[] {"name", "homes"}) {
+            mvc.perform(get(Routes.Societies.BASE).param("q", "meadows").param("mapped", "true").param("sort", sort))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[*].slug").value(hasItem("gid-mapped-meadows")))
+                    .andExpect(jsonPath("$.content[*].slug").value(not(hasItem("gid-unmapped-meadows"))));
+        }
+        mvc.perform(get(Routes.Societies.BASE).param("q", "meadows"))
+                .andExpect(jsonPath("$.content[*].slug").value(hasItem("gid-unmapped-meadows")));
     }
 
     @Test

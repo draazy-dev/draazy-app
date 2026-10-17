@@ -134,7 +134,7 @@ export default function PropertyValuation() {
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-20 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div className="reveal">
               <ServiceBreadcrumbs k="valuation" />
-              <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/15 text-xs text-teal-200 font-medium mb-5"><Icon name="trending-up" className="w-3.5 h-3.5" /> {tr('services.valuation.heroBadge')}</span>
+              <span className="dz-tag bg-white/10 border border-white/15 text-teal-200 font-medium mb-5"><Icon name="trending-up" className="w-3.5 h-3.5" /> {tr('services.valuation.heroBadge')}</span>
               <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight">{tr('services.valuation.heroTitle1')}<br /><span className="gradient-text">{tr('services.valuation.heroTitleAccent')}</span></h1>
               <p className="text-gray-200 text-base sm:text-lg mt-5 max-w-xl">{tr('services.valuation.heroSubtitle')}</p>
               <div className="flex flex-wrap gap-x-6 gap-y-3 mt-7">
@@ -144,7 +144,6 @@ export default function PropertyValuation() {
               </div>
             </div>
 
-            {/* Estimate widget */}
             <div className="glass-card svc-quote rounded-2xl p-6 sm:p-7 reveal">
               <div className="flex items-center gap-2 mb-1"><Icon name="calculator" className="w-5 h-5 text-teal-400" /><h2 className="text-lg font-bold text-white">{tr('services.valuation.widgetTitle')}</h2></div>
               <p className="text-gray-400 text-xs mb-5">{tr('services.valuation.widgetSub')}</p>
@@ -181,7 +180,7 @@ export default function PropertyValuation() {
                 </div>
 
                 <div className="mt-1 rounded-xl bg-teal-500/8 border border-teal-400/20 p-5 text-center">
-                  <p className="text-xs text-gray-400 mb-1 flex items-center justify-center gap-1.5"><span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider text-teal-200 bg-teal-500/25"><Icon name="sparkles" className="w-2.5 h-2.5" /> AI</span> {tr('services.valuation.aiEstLabel')}</p>
+                  <p className="text-xs text-gray-400 mb-1 flex items-center justify-center gap-1.5"><span className="dz-tag font-bold uppercase tracking-wider text-teal-200 bg-teal-500/25"><Icon name="sparkles" className="w-2.5 h-2.5" /> AI</span> {tr('services.valuation.aiEstLabel')}</p>
                   <p className="text-2xl font-extrabold gradient-text">{est ? est.range : '—'}</p>
                   <p className="text-[11px] text-gray-500 mt-1.5">{est ? tr(est.known ? 'services.valuation.rateBasedComparables' : 'services.valuation.rateBasedCityAvg', { rate: est.rateValue, comps: est.comps, loc: est.loc }) : '—'}</p>
                   <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-3 gap-2 text-center">
@@ -197,14 +196,12 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* Stats */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-10">
           <div className="glass-card rounded-2xl p-6 grid grid-cols-2 lg:grid-cols-4 gap-6 reveal">
             {[['Free', 'estimate'], ['Pune', 'comparables'], ['24 hrs', 'callback'], ['Fixed', 'fees']].map(([v, slug]) => <div key={slug} className="text-center"><p className="text-3xl font-extrabold gradient-text">{v}</p><p className="text-gray-500 text-xs mt-1">{tr('services.valuation.stat.' + slug)}</p></div>)}
           </div>
         </section>
 
-        {/* Locality price-trend strip — the valuation page's signature data touch */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-y">
           <div className="text-center mb-8 reveal">
             <h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.trend.title')}</h2>
@@ -224,7 +221,6 @@ export default function PropertyValuation() {
           <p className="text-[11px] text-gray-500 mt-4 text-center reveal">{tr('services.valuation.trend.note')}</p>
         </section>
 
-        {/* Services */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-y">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.servicesTitle')}</h2><p className="text-gray-400 text-sm mt-2 max-w-2xl mx-auto">{tr('services.valuation.servicesSub')}</p></div>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
@@ -234,7 +230,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* Report form + factors */}
         <ServiceTracker typeFilter="valuation" title={tr('services.valuation.trackerTitle')} />
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
@@ -299,7 +294,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* How it works */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.howItWorks')}</h2></div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-5">
@@ -312,7 +306,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* Why choose */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-6 sm:mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.whyTitle')}</h2></div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
@@ -322,7 +315,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* FAQ */}
         <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="text-center mb-10 reveal"><h2 className="text-2xl sm:text-3xl font-bold text-white">{tr('services.valuation.faqTitle')}</h2></div>
           <div className="space-y-3">
@@ -335,7 +327,6 @@ export default function PropertyValuation() {
           </div>
         </section>
 
-        {/* CTA */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 section-pb">
           <div className="glass-card rounded-2xl p-8 sm:p-12 text-center relative overflow-hidden reveal">
             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 30% 50%,rgb(var(--dz-c-teal-500)) 0,transparent 40%),radial-gradient(circle at 70% 50%,rgb(var(--dz-c-teal-600)) 0,transparent 40%)' }} />
@@ -344,7 +335,7 @@ export default function PropertyValuation() {
               <p className="text-gray-400 mt-3 mb-7">{tr('services.valuation.ctaSub')}</p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <button onClick={scrollToForm} className="btn-teal px-6 py-3.5 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2"><Icon name="file-badge" className="w-4 h-4" /> {tr('services.valuation.ctaRequest')}</button>
-                <a href={SUPPORT_TEL} className="px-6 py-3.5 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> {tr('services.valuation.ctaCall', { phone: SUPPORT_PHONE })}</a>
+                <a href={SUPPORT_TEL} className="h-btn-lg px-6 rounded-xl border border-white/10 text-gray-200 text-sm font-semibold hover:bg-white/5 inline-flex items-center justify-center gap-2"><Icon name="phone" className="w-4 h-4" /> {tr('services.valuation.ctaCall', { phone: SUPPORT_PHONE })}</a>
               </div>
             </div>
           </div>

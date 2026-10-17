@@ -96,7 +96,7 @@ export default function NotificationBell() {
     <span ref={rootRef} className="relative inline-flex">
       <Link to="/notifications" className="dz-topbar__action tap-target tap-extend relative inline-flex items-center justify-center rounded-xl p-2 transition-all duration-300 hover:bg-white/5 sm:hidden" title="Notifications" aria-label={label}>
         <Icon name="bell" className="h-5 w-5 text-gray-300 transition-colors" />
-        {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-orange-400 px-1 text-[10px] font-bold text-white shadow-lg shadow-orange-500/30">{badgeText(unread)}</span>}
+        {unread > 0 && <span className="dz-count absolute -right-0.5 -top-0.5 flex bg-gradient-to-br from-orange-500 to-orange-400 text-white shadow-lg shadow-orange-500/30">{badgeText(unread)}</span>}
       </Link>
       <button
         ref={buttonRef}
@@ -109,7 +109,7 @@ export default function NotificationBell() {
         aria-expanded={open}
       >
         <Icon name="bell" className="h-5 w-5 text-gray-300 transition-colors" />
-        {unread > 0 && <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-orange-400 px-1 text-[10px] font-bold text-white shadow-lg shadow-orange-500/30">{badgeText(unread)}</span>}
+        {unread > 0 && <span className="dz-count absolute -right-0.5 -top-0.5 flex bg-gradient-to-br from-orange-500 to-orange-400 text-white shadow-lg shadow-orange-500/30">{badgeText(unread)}</span>}
       </button>
       {open && (
         <div

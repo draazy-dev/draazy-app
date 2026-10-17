@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../../components/Icon.jsx';
-import { digits } from './helpers.js';
+import IdInput from '../../../../components/IdInput.jsx';
 
 export default function DeclinedInvitePanel({ stalled, onRecover, busy }) {
   const { t } = useTranslation();
@@ -18,7 +18,7 @@ export default function DeclinedInvitePanel({ stalled, onRecover, busy }) {
       <p className="text-gray-400 text-xs mt-1 leading-relaxed">{t('services.ra.declined.desc', side)}</p>
       <label className="lbl mt-3" htmlFor="ra-reinvite-mobile">{t('services.ra.declined.mobileLabel', side)}</label>
       <div className="flex flex-col sm:flex-row gap-2">
-        <input id="ra-reinvite-mobile" inputMode="numeric" maxLength={10} value={mobile} onChange={(e) => setMobile(digits(e.target.value))}
+        <IdInput kind="mobile" id="ra-reinvite-mobile" value={mobile} onChange={setMobile}
           className="field flex-1 px-4 py-3 rounded-xl text-white text-sm" placeholder={t('services.ra.declined.mobilePlaceholder')} />
         <button type="button" disabled={!valid || busy} onClick={() => onRecover('reinvite', mobile)}
           className="btn-teal px-4 py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center justify-center gap-2 min-h-[44px] disabled:opacity-50">

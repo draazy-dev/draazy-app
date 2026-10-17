@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Icon from './Icon.jsx';
+import IdInput from './IdInput.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { recordServiceRequestIdentities } from '../services/serviceRequestService.js';
 import { digits, isAadhaar, isPan } from '../pages/consumer/services/rent-agreement/helpers.js';
@@ -83,9 +84,9 @@ export default function IdentityRefill({ request, viewerMobile, onSaved }) {
             <li key={slotKey(slot)} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr] sm:items-center">
               <span className="text-xs text-gray-200">{slot.name} <span className="text-gray-500">· {ROLE_LABEL[slot.role]}</span></span>
               {slot.pan ? (
-                <input value={v.pan || ''} onChange={(e) => set(slot, 'pan', e.target.value.slice(0, 10))} aria-label={`PAN of ${slot.name}`} placeholder="PAN" autoComplete="off" className={input} />
+                <IdInput kind="pan" value={v.pan || ''} onChange={(val) => set(slot, 'pan', val)} aria-label={`PAN of ${slot.name}`} placeholder="PAN" className={input} />
               ) : <span className="hidden sm:block" />}
-              <input value={v.aadhaar || ''} onChange={(e) => set(slot, 'aadhaar', e.target.value.replace(/[^\d ]/g, '').slice(0, 14))} aria-label={`Aadhaar of ${slot.name}`} placeholder="Aadhaar" inputMode="numeric" autoComplete="off" className={input} />
+              <IdInput kind="aadhaar" value={v.aadhaar || ''} onChange={(val) => set(slot, 'aadhaar', val)} aria-label={`Aadhaar of ${slot.name}`} placeholder="Aadhaar" className={input} />
             </li>
           );
         })}

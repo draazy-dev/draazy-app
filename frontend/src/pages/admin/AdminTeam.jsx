@@ -20,6 +20,7 @@ import { useToast } from '../../context/ToastContext.jsx';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Select from '../../components/ui/Select.jsx';
+import IdInput from '../../components/IdInput.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
@@ -378,14 +379,17 @@ export default function AdminTeam() {
               <label className="block">
                 <span className="mb-1.5 block text-xs font-semibold text-gray-300">Mobile{memberModal.id ? null : <span className="text-rose-400"> *</span>}</span>
                 {/* Read-only on an existing record: it is the sign-in credential, and no route changes it. */}
-                <input
-                  value={memberModal.mobile}
-                  onChange={(e) => setMemberModal({ ...memberModal, mobile: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-                  readOnly={!!memberModal.id}
-                  inputMode="numeric"
-                  className={`dz-input w-full${memberModal.id ? ' cursor-not-allowed opacity-60' : ''}`}
-                  placeholder="10-digit number"
-                />
+                {memberModal.id ? (
+                  <input value={memberModal.mobile} readOnly className="dz-input w-full cursor-not-allowed opacity-60" />
+                ) : (
+                  <IdInput
+                    kind="mobile"
+                    value={memberModal.mobile}
+                    onChange={(v) => setMemberModal({ ...memberModal, mobile: v })}
+                    className="dz-input w-full"
+                    placeholder="10-digit number"
+                  />
+                )}
                 {memberModal.id ? (
                   <span className="mt-1 block text-[11px] text-gray-500">Fixed for the life of the account — it is how they sign in.</span>
                 ) : null}

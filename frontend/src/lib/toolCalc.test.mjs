@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { computeStampDuty, leaveLicenceStamp, monthsBetween, rentalYield } from './toolCalc.js';
+import { computeStampDuty, leaveLicenceStamp, monthLabel, monthOptions, monthsBetween, rentalYield } from './toolCalc.js';
+
+const opts = monthOptions(new Date(2025, 5, 15));
+assert.equal(opts.length, 49);
+assert.equal(opts[0], '2022-06');
+assert.equal(opts[36], '2025-06');
+assert.equal(opts[48], '2026-06');
+assert.equal(monthLabel('2025-01'), 'January 2025');
 
 assert.deepEqual(computeStampDuty(7500000, 7), { stamp: 525000, reg: 30000, total: 555000, rate: 7 });
 assert.equal(computeStampDuty(1000000, 7).reg, 10000);

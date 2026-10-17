@@ -35,7 +35,7 @@ export default function TicketList({ tickets, openThread }) {
                   <span className="text-[11px] text-gray-500 font-mono">{t.id}</span>
                   <div className="flex items-center gap-1.5">
                     {unread && <span className="w-2 h-2 rounded-full bg-teal-400 flex-shrink-0" />}
-                    <span className={'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium ' + (STATUS_CHIP[t.status] || STATUS_CHIP.open)}>
+                    <span className={'dz-tag border font-medium ' + (STATUS_CHIP[t.status] || STATUS_CHIP.open)}>
                       {getStatusLabel(t.status)}
                     </span>
                   </div>
@@ -43,7 +43,7 @@ export default function TicketList({ tickets, openThread }) {
                 <p className="text-white text-sm font-semibold truncate">{t.subject}</p>
                 <p className="text-gray-500 text-xs mt-1 truncate">{prevText}</p>
                 <div className="flex items-center justify-between gap-2 mt-2.5">
-                  <span className="inline-flex items-center gap-1 text-[11px] rounded-full bg-white/6 text-gray-300 px-2 py-0.5">
+                  <span className="dz-tag bg-white/6 text-gray-300">
                     <Icon name={getCatIcon(t.category)} className="w-3 h-3" />
                     {getCatLabel(t.category)}
                   </span>

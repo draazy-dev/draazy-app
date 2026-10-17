@@ -36,7 +36,6 @@ const NEXT_TONE = {
 };
 const NEXT_WHO = { desk: 'Your move', customer: "Customer's move", colleague: 'Colleague check', done: 'Closed' };
 
-/** One rent agreement case: everything to read on the left, every action in the rail on the right. */
 export default function RaCaseModal({ request, nextId, onNext, onClose, onChanged }) {
   const s = request ? caseSummary(request.details) : null;
   const footer = (
@@ -168,7 +167,7 @@ function CaseView({ initial, onChanged }) {
                 key={label}
                 aria-current={state === 'current' ? 'step' : undefined}
                 className={classNames(
-                  'flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs',
+                  'dz-tag flex border',
                   state === 'done' && 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200',
                   state === 'current' && 'border-brand-teal/50 bg-brand-teal/15 font-semibold text-white',
                   state === 'todo' && 'border-white/10 text-gray-500',

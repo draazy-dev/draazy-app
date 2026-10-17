@@ -28,7 +28,7 @@ export default function PrivateListingCard({ l, onPublish, onDelete }) {
               <div className="insight-bar"><span style={{ width: `${l.passportPct}%` }} /></div>
             </div>
           </div>
-          <span className={'text-[13px] px-2.5 py-1 rounded-full font-semibold inline-flex items-center gap-1 flex-shrink-0 self-start ' + LISTING_STATUS_CLS.private}>
+          <span className={'dz-tag font-semibold self-start ' + LISTING_STATUS_CLS.private}>
             <Icon name="lock" className="w-3 h-3" />Private
           </span>
         </div>

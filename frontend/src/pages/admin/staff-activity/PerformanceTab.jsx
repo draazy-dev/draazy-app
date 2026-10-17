@@ -91,7 +91,7 @@ export default function PerformanceTab() {
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {s.functions.length === 0 && <span className="text-xs text-gray-500">No functions</span>}
                       {s.functions.map((fn) => (
-                        <span key={fn} className="rounded-full bg-white/5 px-2 py-0.5 text-xs text-gray-300">
+                        <span key={fn} className="dz-tag bg-white/5 text-gray-300">
                           {label(fn)} · {fmtNum(s.byFunction?.[fn] || 0)}
                         </span>
                       ))}

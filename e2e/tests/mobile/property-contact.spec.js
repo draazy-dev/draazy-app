@@ -1,17 +1,9 @@
 import { test, expect } from '../../fixtures/live.js';
 import { trackErrors } from '../../helpers/console.js';
+import { expectFloatingCard } from '../../helpers/floatCard.js';
 
-/* The lead-capture step on a phone — §G.2 `mobile-property-contact`.
-
-   This is the conversion moment the whole mobile-first pass exists to protect, and
-   it is also the one most exposed to the on-screen keyboard: a 640px viewport with
-   the keyboard up leaves ~300px usable, so a centred dialog buries its own submit.
-   The fix was to let the shared .dz-modal sheet rules take over below 640px; these
-   tests are what stop that regressing.
-
-   Runs under `mobile` (412x915) and `mobile-small` (360x640). Desktop's centred
-   dialog is asserted in desktop-noleak-guardrails.spec.js, not here — the mobile
-   projects can never disprove a min-width rule. */
+/* With the keyboard up a 640px phone leaves ~300px, so the enquiry form must stay a bounded floating card.
+   Desktop's centred dialog is asserted in desktop-noleak-guardrails.spec.js. */
 
 const PROP = 'p5000'; // approved seed listing, same one contact-owner-gate.spec.js uses. Lower-case:
                       // the server matches the slug exactly, and `P5000` is a 404.
@@ -26,16 +18,8 @@ async function withConsent(page) {
   });
 }
 
-/* The enquiry sheet is the fallback contact channel: with `inAppMessaging` ON,
-   Contact Owner queues a chat and navigates to /messages instead (see
-   useProperty.handleContact). Turning the flag off is what puts this app in the
-   configuration where the enquiry form — the thing this file is about — is the
-   contact surface.
-
-   Against the API the flag is a row, not a localStorage key, so it has to be written before the
-   page loads and restored afterwards; the `flags` fixture does both. That also makes the flip a
-   per-worker global rather than a per-tab one, which is why every test here that needs the sheet
-   sets it for itself rather than relying on a neighbour. */
+/* The enquiry form only shows with `inAppMessaging` OFF (else Contact Owner opens /messages). The flag is a
+   per-worker server row, so every test that needs the form sets it itself rather than relying on a neighbour. */
 
 /** Opens the enquiry sheet the way a user does: the sticky CTA, not a direct URL. */
 async function openContactSheet(page, flags) {
@@ -46,9 +30,8 @@ async function openContactSheet(page, flags) {
   await cta.click();
   const panel = page.locator('.dz-modal');
   await panel.waitFor({ timeout: 10000 });
-  /* The sheet enters with `dzSheetUp` (translateY(100%) -> 0). Measuring synchronously
-     catches it mid-slide, a full sheet-height below the fold, and every geometry
-     assertion below then fails for a reason that has nothing to do with layout. */
+  /* The card enters with `dzFloatIn`; measuring synchronously catches it mid-animation, and every
+     geometry assertion below then fails for a reason that has nothing to do with layout. */
   await page.evaluate(() => {
     const back = document.querySelector('.dz-modal-backdrop');
     if (!back) return undefined;
@@ -79,42 +62,20 @@ test.describe('Mobile property contact', () => {
     }
   });
 
-  test('the enquiry overlay is a bounded bottom sheet that keeps its submit, keyboard hint and close control reachable', async ({ page, login, flags }) => {
+  test('the enquiry overlay is a bounded floating card that keeps its submit, keyboard hint and close control reachable', async ({ page, login, flags }) => {
     const errors = trackErrors(page);
     await withConsent(page);
     await login.asBuyer();
     await openContactSheet(page, flags);
 
-    await test.step('the enquiry overlay opens as a bottom sheet, not a centred dialog', async () => {
-      const geom = await page.evaluate(() => {
-        const panel = document.querySelector('.dz-modal');
-        const back = document.querySelector('.dz-modal-backdrop');
-        const p = panel.getBoundingClientRect();
-        const b = back.getBoundingClientRect();
-        return {
-          panelBottom: p.bottom,
-          backBottom: b.bottom,
-          panelWidth: p.width,
-          backWidth: b.width,
-          align: getComputedStyle(back).alignItems,
-          radius: getComputedStyle(panel).borderBottomLeftRadius,
-          maxH: p.height,
-          viewportH: window.innerHeight,
-        };
-      });
-
-      expect(geom.align, 'backdrop docks its child to the bottom').toBe('flex-end');
-      expect(geom.radius, 'the edge meeting the screen is squared off').toBe('0px');
-      expect(Math.abs(geom.panelBottom - geom.backBottom), 'flush with the viewport bottom')
-        .toBeLessThanOrEqual(1);
-      expect(geom.panelWidth, 'full-bleed').toBeCloseTo(geom.backWidth, 0);
-      // 88dvh: the sheet must leave the page visible behind it, so it reads as a sheet
-      // over content rather than a takeover.
-      expect(geom.maxH, 'sheet is bounded, not full-screen').toBeLessThan(geom.viewportH);
+    await test.step('the enquiry overlay opens as a floating card, not a centred dialog', async () => {
+      const box = await expectFloatingCard(page, page.locator('.dz-modal'));
+      // The page must stay visible behind it, so it reads as a card over content rather than a takeover.
+      expect(box.height, 'card is bounded, not full-screen').toBeLessThan(page.viewportSize().height);
     });
 
-    await test.step('the sheet scrolls internally instead of growing past the viewport', async () => {
-      // An unbounded panel pushes its own submit off-screen, which is what the centred dialog used to do.
+    await test.step('the card scrolls internally instead of growing past the viewport', async () => {
+      // An unbounded panel pushes its own submit off-screen.
       const r = await page.evaluate(() => {
         const panel = document.querySelector('.dz-modal');
         return {
@@ -157,10 +118,8 @@ test.describe('Mobile property contact', () => {
 
     expect(errors, 'opening the sheet does not log console errors').toEqual([]);
   });
-  /* The owner card is `lg:` only, so on a phone this sheet is the sole surface carrying the number
-     reveal, the owner's profile and the tenant badge. The absence is asserted *after* the sheet has
-     shown the button and been closed again: on the same page load the gate is provably resolved, so
-     a count of zero cannot be the merely-not-fetched-yet reading it would be on arrival. */
+  /* The owner card is `lg:` only, so on a phone this card is its sole surface. Absence is asserted after the
+     card has shown the button and closed, so a zero count cannot be a not-fetched-yet reading. */
   test('the owner card lives in the sheet and nowhere else on the page', async ({ page, login, flags }) => {
     await withConsent(page);
     await login.asBuyer();

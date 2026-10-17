@@ -15,22 +15,20 @@ import { CLAIM_HOLD_LIMIT, DOC_OPTIONS, STATUS_LABELS, dateLabel, docLabel, elap
 
 const PAGE_SIZE = 10;
 const TABS = [
-  { key: 'needs', label: 'Needs review', status: 'pending', count: (s) => s.pending, empty: 'All caught up — no KYC cases waiting.', note: 'Pending cases, oldest first. Opening one claims it for 30 minutes, so nobody else can decide it.' },
+  { key: 'needs', label: 'Needs review', status: 'pending', count: (s) => s.pending, empty: 'All caught up — no KYC cases waiting.', note: 'Pending cases, newest first. Opening one claims it for 30 minutes, so nobody else can decide it.' },
   { key: 'qa', label: 'QA sample', status: 'qa', count: (s) => s.qa, empty: 'No approvals waiting for a QA check.', note: 'Approvals picked at random for a second check by a different reviewer. Your own approvals are not listed.' },
   { key: 'decided', label: 'Decided', status: 'decided', count: (s) => s.decided, empty: 'Nothing decided yet.', note: 'Verified, rejected and revoked cases — open one to revoke a badge or read its history.' },
   { key: 'appeal', label: 'Appeals', status: 'appeal', count: (s) => s.appeals, empty: 'No identity appeals waiting.', note: 'Rejected cases the applicant asked to have checked again. Someone other than the original reviewer decides: uphold the rejection or reopen it for a fresh review.' },
 ];
 const TAB_KEYS = TABS.map((t) => t.key);
-const EMPTY_FILTERS = { q: '', docType: '', claim: '', overdue: false, outcome: '', sort: 'oldest' };
-const defaultsFor = (tab) => (tab === 'decided' ? { ...EMPTY_FILTERS, sort: 'newest' } : EMPTY_FILTERS);
+const EMPTY_FILTERS = { q: '', docType: '', claim: '', overdue: false, outcome: '' };
 const OUTCOME_CHIPS = [{ value: '', label: 'Any outcome' }, { value: 'verified', label: 'Verified' }, { value: 'rejected', label: 'Rejected' }, { value: 'revoked', label: 'Revoked' }];
-const SORT_CHIPS = [{ value: 'oldest', label: 'Oldest' }, { value: 'newest', label: 'Newest' }];
 const GRID = 'grid grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)_4.5rem] items-center gap-3';
 const AGE_TONE = { ok: 'text-gray-400', warn: 'font-semibold text-amber-300', breach: 'font-semibold text-rose-300' };
 
 /* Only the filters the tab's server query understands go on the wire. */
 function queryFor(tab, f, page) {
-  const base = { status: TABS.find((t) => t.key === tab).status, q: f.q.trim() || undefined, docType: f.docType || undefined, sort: f.sort, page: page - 1, size: PAGE_SIZE };
+  const base = { status: TABS.find((t) => t.key === tab).status, q: f.q.trim() || undefined, docType: f.docType || undefined, sort: 'newest', page: page - 1, size: PAGE_SIZE };
   if (tab === 'needs') return { ...base, claim: f.claim || undefined, overdue: f.overdue || undefined };
   if (tab === 'decided') return { ...base, outcome: f.outcome || undefined };
   return base;
@@ -59,17 +57,16 @@ export default function OpsIdentityReview() {
   const { user } = useAuth();
   const canWrite = hasPermission(user, 'identity:write');
   const [tab, setTab] = useTabParam(TAB_KEYS, 'needs');
-  const [filters, setFilters] = useState(() => defaultsFor(tab));
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
   // Reset during render, not in an effect: the tab also changes from outside (back button).
   const [filtersTab, setFiltersTab] = useState(tab);
   if (filtersTab !== tab) {
     setFiltersTab(tab);
-    setFilters(defaultsFor(tab));
+    setFilters(EMPTY_FILTERS);
     setPage(1);
   }
-  const defaults = defaultsFor(tab);
-  const filtered = Object.keys(defaults).some((k) => filters[k] !== defaults[k]);
+  const filtered = Object.keys(EMPTY_FILTERS).some((k) => filters[k] !== EMPTY_FILTERS[k]);
   const changeFilters = (patch) => { setFilters((f) => ({ ...f, ...patch })); setPage(1); };
 
   // `null` on failure, so a tab count is omitted rather than reading "0" — an all-clear nobody issued.
@@ -153,8 +150,7 @@ export default function OpsIdentityReview() {
             </>
           ) : null}
           {tab === 'decided' ? <Chips label="Outcome" options={OUTCOME_CHIPS} value={filters.outcome} onChange={(outcome) => changeFilters({ outcome })} /> : null}
-          <Chips label="Sort" options={SORT_CHIPS} value={filters.sort} onChange={(sort) => changeFilters({ sort })} />
-          {filtered ? <ClearFilters onClick={() => changeFilters(defaults)} /> : null}
+          {filtered ? <ClearFilters onClick={() => changeFilters(EMPTY_FILTERS)} /> : null}
           <div className="ml-auto"><PageNav {...paging} /></div>
         </div>
 
@@ -205,7 +201,7 @@ function QueueRow({ row, tab, onOpen }) {
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-white">
             {row.userName || 'Unknown user'}
-            {row.appeal ? <span data-testid="kyc-appeal-tag" className="ml-2 rounded-full border border-sky-400/30 bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-200">Appeal</span> : null}
+            {row.appeal ? <span data-testid="kyc-appeal-tag" className="dz-tag ml-2 border border-sky-400/30 bg-sky-500/15 font-medium text-sky-200">Appeal</span> : null}
           </div>
           <div className="truncate text-xs tabular-nums text-gray-500">{row.userMobile || '—'}</div>
         </div>
@@ -216,7 +212,7 @@ function QueueRow({ row, tab, onOpen }) {
         <div className="min-w-0 truncate text-xs">
           {tab === 'needs' ? (
             row.claimedByMe ? <span className="text-teal-200">Claimed by you</span>
-              : lockedByOther ? <span className="rounded-full border border-amber-400/30 bg-amber-500/15 px-2 py-0.5 text-amber-200">In review · {row.claimedByName}</span>
+              : lockedByOther ? <span className="dz-tag border border-amber-400/30 bg-amber-500/15 text-amber-200">In review · {row.claimedByName}</span>
                 : <span className="text-gray-500">Unclaimed</span>
           ) : tab === 'qa' ? (
             <span className="text-gray-300">{row.approvedByName || '—'}</span>

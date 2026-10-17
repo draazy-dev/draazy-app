@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
+import IdInput from '../IdInput.jsx';
 import { pmfEnabled, track, captureLead } from '../../lib/pmf.js';
 
 // Gate-free fake-door capture for the PMF test: asks only for an email or WhatsApp number, so the
@@ -52,10 +53,10 @@ export default function NotifyMe() {
                 placeholder="you@email.com"
                 className="flex-1 px-4 py-3 rounded-xl text-white text-sm border border-white/10 bg-white/[0.03] focus:border-brand-teal-2 outline-none"
               />
-              <input
-                type="tel"
+              <IdInput
+                kind="mobile"
                 value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
+                onChange={setWhatsapp}
                 placeholder={t('pmf.whatsappNumber')}
                 className="flex-1 px-4 py-3 rounded-xl text-white text-sm border border-white/10 bg-white/[0.03] focus:border-brand-teal-2 outline-none"
               />

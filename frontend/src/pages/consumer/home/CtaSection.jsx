@@ -18,10 +18,10 @@ export default function CtaSection({ navigate }) {
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">{t('home.cta.headingLead')} <span className="text-teal-400">{t('home.cta.headingHighlight')}</span></h2>
             <p className="text-gray-300 text-sm sm:text-base mb-6 sm:mb-8 leading-relaxed">{t('home.cta.body')}</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <button onClick={() => navigate('/dashboard#owner-hub')} className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-cta-btn text-cta-btn-text font-bold text-sm hover:opacity-90 transition-all duration-300 hover:scale-105 shadow-2xl shadow-black/20">
+              <button onClick={() => navigate('/dashboard#owner-hub')} className="h-btn-lg inline-flex items-center gap-2 px-8 rounded-full bg-cta-btn text-cta-btn-text font-bold text-sm hover:opacity-90 transition-all duration-300 hover:scale-105 shadow-2xl shadow-black/20">
                 <Icon name="gauge" className="w-5 h-5" /> {t('home.cta.worth')}
               </button>
-              <button onClick={() => navigate('/list-property')} className="inline-flex items-center gap-2 px-8 py-4 rounded-full bg-white/10 text-white font-semibold text-sm border border-white/20 hover:bg-white/15 transition-all duration-300">
+              <button onClick={() => navigate('/list-property')} className="h-btn-lg inline-flex items-center gap-2 px-8 rounded-full bg-white/10 text-white font-semibold text-sm border border-white/20 hover:bg-white/15 transition-all duration-300">
                 <Icon name="plus-circle" className="w-5 h-5" /> {t('home.cta.listFree')}
               </button>
             </div>

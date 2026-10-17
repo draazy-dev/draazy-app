@@ -52,7 +52,7 @@ export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-white text-sm font-semibold truncate">{t('dash.badge.title')}</p>
-            <span data-testid="badge-state" className={'text-[10px] px-2 py-0.5 rounded-full font-semibold ' + chipCls}>{t(chipKey)}</span>
+            <span data-testid="badge-state" className={'dz-tag font-semibold ' + chipCls}>{t(chipKey)}</span>
           </div>
           <p className="text-gray-400 text-xs mt-0.5">
             {state === 'verified' ? t('dash.badge.lineVerified')

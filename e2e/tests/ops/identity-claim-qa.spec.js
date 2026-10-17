@@ -143,7 +143,7 @@ async function openMockReview(page, { user = mockUser(), review = mockCase(), cl
     localStorage.setItem('dz_cookie_consent_v1', JSON.stringify({ necessary: true, functional: true, analytics: false, marketing: false, version: 1, ts: Date.now() }));
   }, user);
   await page.route('**/api/auth/me', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(user) }));
-  // Unmocked reads answer the fake token with 401; a refused refresh would now sign the mocked reviewer out.
+  // Unmocked reads answer the fake token with 401; a refused refresh would sign the mocked reviewer out.
   await page.route('**/api/auth/refresh', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ accessToken: 'mock-token' }) }));
   await page.route('**/api/moderation/identity-reviews**', async (route) => {
     const url = new URL(route.request().url());
@@ -225,7 +225,7 @@ test('mocked requested pose must be confirmed before approval', async ({ page })
   });
   await page.getByRole('button', { name: /97XXXXX001/ }).click();
   await expect(page.getByText("Requested pose: Turned to their left (nose toward the photo's right edge)")).toBeVisible();
-  await page.getByLabel('Document number').fill('1234');
+  await page.getByLabel('Document number').fill('ABCDE1234F');
   await page.getByLabel('Holder name').fill('Mock Subject');
   await pickDate(page, '[aria-label="Date of birth"]:visible', '1990-01-01');
   await tickChecklist(page);

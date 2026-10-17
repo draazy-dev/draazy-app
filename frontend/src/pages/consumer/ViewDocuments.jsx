@@ -412,7 +412,7 @@ export default function ViewDocuments({ shared: byToken = false }) {
   const { shared, sub, errorState, loading } = byToken ? fromToken : fromRequest;
   const [active, setActive] = useState(0);
 
-  // View-only protections (match original: block right-click, drag, Ctrl/Cmd+S/P).
+  // View-only protections (block right-click, drag, Ctrl/Cmd+S/P).
   useEffect(() => {
     const noCtx = (e) => e.preventDefault();
     const noDrag = (e) => e.preventDefault();
@@ -448,7 +448,6 @@ export default function ViewDocuments({ shared: byToken = false }) {
 
   return (
     <div className="vd-page min-h-[100dvh]" style={{ background: 'rgb(var(--dz-c-ink))' }}>
-      {/* Top bar */}
       <nav className="glass-nav sticky top-0 z-40">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
@@ -465,7 +464,7 @@ export default function ViewDocuments({ shared: byToken = false }) {
             >
               <Icon name="x" className="w-4 h-4" /> <span className="hidden sm:inline">{t('viewDocs.close')}</span>
             </Link>
-            <span className="flex items-center gap-2 text-xs font-semibold px-3 py-1.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-400/25 whitespace-nowrap">
+            <span className="dz-tag flex font-semibold bg-amber-500/15 text-amber-300 border border-amber-400/25">
               <Icon name="lock" className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="hidden sm:inline">{t('viewDocs.viewOnlyLong')}</span>
               <span className="sm:hidden">{t('viewDocs.viewOnlyShort')}</span>

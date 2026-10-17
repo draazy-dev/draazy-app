@@ -88,7 +88,7 @@ test.describe('Property detail — photo lightbox', () => {
 
     await test.step('the arrows give way to the swipe that already works', async () => {
       // Two 48px arrows either side of a full-width photo do not fit a 390px screen, and the
-      // <img> has carried its own swipe handler since before they were hidden.
+      // <img> has its own swipe handler.
       await expect(lb.locator('.dz-lb-nav')).toHaveCount(2);
       await expect(lb.locator('.dz-lb-nav').first()).toBeHidden();
     });
@@ -139,10 +139,11 @@ test.describe('Property detail — hero carousel', () => {
     await test.step('the hero is a real scroll container, and it snaps', async () => {
       const m = await track(page).evaluate((el) => {
         const s = getComputedStyle(el);
-        return { overflowX: s.overflowX, snap: s.scrollSnapType, overscrollX: s.overscrollBehaviorX };
+        return { overflowX: s.overflowX, overflowY: s.overflowY, snap: s.scrollSnapType, overscrollX: s.overscrollBehaviorX };
       });
       // `auto`, not `hidden`: the whole point is that the finger drives the scroller directly.
       expect(m.overflowX, 'the hero must be scrollable by the finger, not by a JS threshold').toBe('auto');
+      expect(m.overflowY, 'x `auto` alone computes y to `auto`, and the photo drags vertically under a swipe').toBe('hidden');
       // Mandatory, so a settled scrollLeft is always an exact multiple of the slide width — the
       // rounding in the scroll handler depends on it.
       expect(m.snap, 'without mandatory snapping the hero rests between two photos').toContain('mandatory');
@@ -180,7 +181,7 @@ test.describe('Property detail — hero carousel', () => {
     await test.step('the request-photos card is the last slide, and nothing lies past it', async () => {
       const ask = page.locator('[data-photo-ask]');
 
-      // It is a slide now rather than an overlay, so it has to be the terminus — a slide after it
+      // It is a slide, not an overlay, so it has to be the terminus — a slide after it
       // would be a photo the ask card hides.
       expect(await ask.evaluate((el) => el === el.parentElement.lastElementChild), 'the ask card must be the last slide').toBe(true);
 

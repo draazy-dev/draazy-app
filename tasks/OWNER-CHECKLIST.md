@@ -16,6 +16,7 @@ Things code can't close: secrets, deploy steps, real-device checks, human fact-c
 - [ ] Rotate `backend/.env.local` secrets if in doubt (surfaced 2026-08-09)
 - [ ] DigitalOcean: add the alert policies and the one free Uptime check from `docs/DEPLOY.md` §8; leave log forwarding off
 - [ ] Optional: `ANTHROPIC_API_KEY` or `GOOGLE_API_KEY` for graphify community labels
+- [ ] GitHub repo **variables** (not secrets): `VITE_POSTHOG_KEY=phc_BYWgUQHA2LvRkSCRQ4bSDFUdkKWjwRDRsyshdrAW4LzQ`, `VITE_POSTHOG_APP_URL=https://us.posthog.com/project/666838/dashboard/2218193`, then redeploy the frontend
 
 ## Real phones
 - [ ] Real Safari (Mac + iPhone), Firefox, Android: the SB-11 checklist rows (25, 194, 195, 216, 260, 261), incl. a contrast audit with a real tool

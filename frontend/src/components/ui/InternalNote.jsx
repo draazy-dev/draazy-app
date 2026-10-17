@@ -3,32 +3,8 @@ import { ChevronDown, ChevronUp, MessageSquareText } from 'lucide-react';
 import { addNote, listNotes } from '../../services/noteService.js';
 import { classNames } from '../../lib/format.js';
 
-/**
- * Inline "Internal note (optional)" input for maker-checker actions.
- * - Compact by default: single-line label that expands on click.
- * - Optionally shows note history for the entity.
- *
- * ## The history used to be a lie (D29)
- *
- * This read was a synchronous `useMemo` over `getInternalNotes(...)`, a localStorage bucket that
- * only this browser ever wrote. Two members of staff working the same queue each saw their own
- * notes and none of each other's, and neither had any way to tell — an empty history and a history
- * nobody else could see render identically. It now reads `noteService`, so in live mode the history
- * is the team's.
- *
- * The count in the toggle is deliberately withheld until the read lands rather than starting at 0
- * and jumping. "0 previous notes" is a claim about the case; "nothing yet" while loading is the
- * honest version of not knowing, and this widget's whole failure mode was confidently saying
- * nothing was there.
- *
- * @param {object} props
- * @param {string} props.entityType - 'listing' | 'user' | 'review' | 'report' | 'service_request'
- * @param {string} props.entityId - the record ID
- * @param {string} props.value - controlled textarea value
- * @param {(v: string) => void} props.onChange - controlled setter
- * @param {boolean} [props.showHistory=false] - show past notes
- * @param {string} [props.className] - wrapper class
- */
+/* The history count is withheld until the read lands: "0 previous notes" is a claim about the case, and showing it
+   while still loading would be a false one. */
 export default function InternalNote({ entityType, entityId, value, onChange, showHistory = false, className }) {
   const [expanded, setExpanded] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -51,7 +27,6 @@ export default function InternalNote({ entityType, entityId, value, onChange, sh
 
   return (
     <div className={classNames('mt-3', className)}>
-      {/* Toggle label */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -62,7 +37,6 @@ export default function InternalNote({ entityType, entityId, value, onChange, sh
         {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
       </button>
 
-      {/* Textarea */}
       {expanded && (
         <textarea
           value={value}
@@ -73,7 +47,6 @@ export default function InternalNote({ entityType, entityId, value, onChange, sh
         />
       )}
 
-      {/* Note history */}
       {showHistory && notes?.length > 0 && (
         <div className="mt-2">
           <button
@@ -90,7 +63,7 @@ export default function InternalNote({ entityType, entityId, value, onChange, sh
                 <div key={n.id} className="text-[11px] leading-relaxed">
                   <div className="flex items-center gap-1.5 text-gray-500">
                     <span className="font-medium text-gray-300">{n.author}</span>
-                    {n.action && <span className="rounded bg-white/5 px-1 py-0.5 text-[10px]">{n.action}</span>}
+                    {n.action && <span className="dz-tag bg-white/5">{n.action}</span>}
                     {n.at && <span>{new Date(n.at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}</span>}
                     {n.editedAt && <span className="text-[10px] italic">edited</span>}
                   </div>
@@ -105,41 +78,11 @@ export default function InternalNote({ entityType, entityId, value, onChange, sh
   );
 }
 
-/**
- * The write half, re-exported so a caller that renders the textarea can also submit it.
- *
- * Now async, and now rejects rather than returning null on a blank note. Callers guard on the text
- * being non-empty before calling — the label says "optional", and an action taken without a note is
- * the ordinary case, not a failure.
- *
- * @param {'listing'|'user'|'review'|'report'|'service_request'} entityType
- * @param {string} entityId
- * @param {string} text
- * @param {string} [action] the decision this note was filed beside
- * @returns {Promise<object>} the stored note
- */
+// Rejects on a blank note, so callers check the text first; acting without a note is the ordinary case.
 export { addNote as submitNote };
 
-/**
- * Save the note beside a decision, if the moderator wrote one.
- *
- * Every caller of this is in the same position: a decision has *already* landed on the server and
- * the note is the second write. That rules out both of the obvious ways to handle a failure. Letting
- * it throw puts the rejection in the same `catch` as the decision, so the screen says "could not
- * approve this listing" about a listing that is now approved and published — the worst available
- * lie. Swallowing it silently is the bug this whole item exists to fix.
- *
- * So it reports instead: the caller gets back whether anything was written and what went wrong, and
- * says so in the toast it was already showing. The moderator finds out while they still have the
- * words in front of them.
- *
- * @param {'listing'|'user'|'review'|'report'|'service_request'} entityType
- * @param {string} entityId
- * @param {string} text the textarea's contents; blank means the moderator chose not to note
- *   anything, which is the ordinary case and not a failure
- * @param {string} [action] the decision this note was filed beside
- * @returns {Promise<{written: boolean, error: Error|null}>}
- */
+/* The decision has already landed when this runs, so a failed note is reported, not thrown: throwing would make the
+   caller say the decision failed. */
 export async function saveNoteIfAny(entityType, entityId, text, action) {
   const clean = String(text ?? '').trim();
   if (!clean) return { written: false, error: null };
