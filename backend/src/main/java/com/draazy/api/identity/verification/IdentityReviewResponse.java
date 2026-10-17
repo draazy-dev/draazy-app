@@ -12,6 +12,7 @@ public record IdentityReviewResponse(
         String userName,
         String accountName,
         String accountEmail,
+        String accountGender,
         String userMobile,
         String userRole,
         String status,

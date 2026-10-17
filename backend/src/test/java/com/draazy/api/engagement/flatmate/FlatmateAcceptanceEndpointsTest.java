@@ -58,8 +58,14 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
         return json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
     }
 
+    @Autowired
+    jakarta.persistence.EntityManager em;
+
+    /** The created entity is still cached as pending, so the context is cleared after the out-of-band publish. */
     private String publish(String table, String id) {
+        em.flush();
         jdbc.update("update " + table + " set mod_status = 'approved' where id = ?::uuid", id);
+        em.clear();
         return id;
     }
 
@@ -243,5 +249,31 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
 
         decide(host, requestId, "declined").andExpect(status().isOk());
         assertThat(column("flatmate_rooms", "seats_open", roomId)).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("a room with no space left refuses a new ask as room_full")
+    void fullRoomRefusesNewAsks() throws Exception {
+        User host = user("9847000016", "Host");
+        String seat = seatRoom(host);
+        decide(host, ask(Routes.Flatmates.ROOM_INTEREST, seat, user("9847000017", "A"), "solo"), "accepted")
+                .andExpect(status().isOk());
+
+        User owner = user("9847000018", "Owner");
+        String split = splitRoom(owner, 2);
+        decide(owner, ask(Routes.Flatmates.ROOM_INTEREST, split, user("9847000019", "B"), "bring"), "accepted")
+                .andExpect(status().isOk());
+
+        User late = user("9847000020", "Late");
+        for (String roomId : List.of(seat, split)) {
+            mvc.perform(post(Routes.Flatmates.ROOM_INTEREST, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(late))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"share\":\"solo\",\"gender\":\"female\"}"))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message", Matchers.endsWith("(room_full)")));
+        }
+        assertThat(jdbc.queryForObject("select count(*) from flatmate_requests where requester_id = ?::uuid",
+                Integer.class, late.getId().toString())).isZero();
     }
 }

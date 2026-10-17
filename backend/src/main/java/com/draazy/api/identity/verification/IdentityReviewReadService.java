@@ -143,6 +143,7 @@ public class IdentityReviewReadService {
                 user == null ? null : user.getName(),
                 user == null ? null : user.getName(),
                 user == null ? null : user.getEmail(),
+                user == null ? null : user.getGender(),
                 user == null ? null : user.getMobile(),
                 user == null ? null : user.getRole(),
                 v.getStatus(),

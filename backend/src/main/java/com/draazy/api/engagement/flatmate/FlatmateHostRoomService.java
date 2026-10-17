@@ -1,7 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.error.ConflictException;
-import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.List;
@@ -39,11 +38,8 @@ public class FlatmateHostRoomService {
     @Transactional
     public void withdraw(AuthPrincipal caller, UUID roomId) {
         FlatmateRoom room = rooms.findById(roomId)
-                .filter(r -> !r.isArchived())
+                .filter(r -> !r.isArchived() && r.getHostId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Room"));
-        if (!room.getHostId().equals(caller.userId())) {
-            throw new ForbiddenException("You can only withdraw a room you posted.");
-        }
         if (room.isSplitRoom()) {
             throw new ConflictException(
                     "This room is part of a flat let room by room, so it cannot be withdrawn on "

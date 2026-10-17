@@ -46,7 +46,7 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
     }
 
     @Test
-    @DisplayName("DELETE /flatmates/posts/{id} by another user is a 403 and the post stays live")
+    @DisplayName("DELETE /flatmates/posts/{id} by another user is a 404 and the post stays live")
     void deletingSomeoneElsesSeekerPost() throws Exception {
         User a = user("9898100001", BUYER);
         User b = user("9898100002", BUYER);
@@ -54,7 +54,7 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
         String before = row("flatmate_seeker_posts", uuid(id));
 
         mvc.perform(delete(Routes.Flatmates.POST_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(b)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
 
         assertThat(row("flatmate_seeker_posts", uuid(id))).isEqualTo(before);
         assertThat(count("select count(*) from flatmate_seeker_posts where id = ?::uuid and archived = false", id))
@@ -62,7 +62,7 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
     }
 
     @Test
-    @DisplayName("PATCH /flatmates/rooms/{id} by another user is a 403 and the room is unchanged")
+    @DisplayName("PATCH /flatmates/rooms/{id} by another user is a 404 and the room is unchanged")
     void editingSomeoneElsesRoom() throws Exception {
         User a = user("9898100003", BUYER);
         User b = user("9898100004", BUYER);
@@ -71,13 +71,13 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
 
         mvc.perform(patch(Routes.Flatmates.ROOM_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(b))
                         .contentType(JSON).content(room(b, 1000)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
 
         assertThat(row("flatmate_rooms", uuid(id))).isEqualTo(before);
     }
 
     @Test
-    @DisplayName("PATCH /flatmates/groups/{id} by another user is a 403 and the group is unchanged")
+    @DisplayName("PATCH /flatmates/groups/{id} by another user is a 404 and the group is unchanged")
     void editingSomeoneElsesGroup() throws Exception {
         User a = user("9898100005", BUYER);
         User b = user("9898100006", BUYER);
@@ -86,13 +86,13 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
 
         mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(b))
                         .contentType(JSON).content(group("Hijacked")))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
 
         assertThat(row("flatmate_groups", uuid(id))).isEqualTo(before);
     }
 
     @Test
-    @DisplayName("DELETE /flatmates/groups/{id} by another user is a 403 and the group stays live")
+    @DisplayName("DELETE /flatmates/groups/{id} by another user is a 404 and the group stays live")
     void deletingSomeoneElsesGroup() throws Exception {
         User a = user("9898100007", BUYER);
         User b = user("9898100008", BUYER);
@@ -100,7 +100,7 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
         String before = row("flatmate_groups", uuid(id));
 
         mvc.perform(delete(Routes.Flatmates.GROUP_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(b)))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isNotFound());
 
         assertThat(row("flatmate_groups", uuid(id))).isEqualTo(before);
         assertThat(count("select count(*) from flatmate_groups where id = ?::uuid and archived = false", id))

@@ -88,6 +88,10 @@ public class User extends SoftDeleteEntity implements TokenSubject {
     @Setter
     private String avatar;
 
+    // No setter: the user sets it once through UserRepository.claimGender, afterwards only staff correct it.
+    @Column(name = "gender")
+    private String gender;
+
     // Hibernate-populated because DEFAULT now only covers raw-SQL inserts.
     @CreationTimestamp
     @Column(name = "joined_at", nullable = false, updatable = false)
@@ -138,6 +142,10 @@ public class User extends SoftDeleteEntity implements TokenSubject {
         this.flaggedBy = null;
     }
 
+    public void correctGender(String value) {
+        gender = value;
+    }
+
     // Monotonic on purpose; lost-update race is accepted for this persona predicate.
     public void recordListingPosted() {
         this.listingsCount++;
@@ -150,6 +158,7 @@ public class User extends SoftDeleteEntity implements TokenSubject {
         this.email = null;
         this.avatar = null;
         this.city = null;
+        this.gender = null;
 
         this.passwordHash = null;
         this.mobileVerified = false;

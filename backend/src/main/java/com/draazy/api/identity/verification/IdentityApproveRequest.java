@@ -1,6 +1,7 @@
 package com.draazy.api.identity.verification;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
@@ -10,9 +11,10 @@ public record IdentityApproveRequest(
         LocalDate dob,
         Integer birthYear,
         Boolean poseConfirmed,
-        Boolean numberOverride) {
+        Boolean numberOverride,
+        @Pattern(regexp = "male|female") String gender) {
 
     public IdentityApproveRequest(String number, String name, LocalDate dob, Integer birthYear) {
-        this(number, name, dob, birthYear, null, null);
+        this(number, name, dob, birthYear, null, null, null);
     }
 }

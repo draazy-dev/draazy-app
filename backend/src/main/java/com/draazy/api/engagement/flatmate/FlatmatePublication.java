@@ -50,26 +50,6 @@ class FlatmatePublication {
             boolean ownerConsent, UUID tenancyPropertyId) {
     }
 
-        void recordOwnerConsent(UUID groupId) {
-        reviews.findByGroupId(groupId)
-            .filter(review -> FlatmateVocabulary.STATUS_PENDING.equals(review.getStatus()))
-            .ifPresent(review -> {
-                review.recordOwnerConsent();
-                reviews.saveAndFlush(review);
-            });
-        }
-
-    /** The room twin of {@link #recordOwnerConsent(UUID)}. Consent is commonly taken after
-     * the post exists; without this the queued review keeps {@code owner_consent = false} forever. */
-        void recordOwnerConsentForRoom(UUID roomId) {
-        reviews.findByRoomId(roomId)
-            .filter(review -> FlatmateVocabulary.STATUS_PENDING.equals(review.getStatus()))
-            .ifPresent(review -> {
-                review.recordOwnerConsent();
-                reviews.saveAndFlush(review);
-            });
-        }
-
     String stateFor(String tier, boolean flagged, boolean flatless) {
         if (!flagged && (flatless || FlatmateVocabulary.TIER_OWNER.equals(tier))) {
             return FlatmateVocabulary.MOD_LIVE;

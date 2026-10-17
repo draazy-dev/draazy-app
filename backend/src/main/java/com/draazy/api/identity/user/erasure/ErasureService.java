@@ -237,6 +237,20 @@ public class ErasureService {
 
         erased.put("personal_documents", erasePersonalDocuments(subjectId));
 
+        // Both sides of a rent tracker: the subject as someone's tenant, and the tenants on the subject's own records.
+        erased.put("managed_properties", entityManager
+                .createNativeQuery("""
+                        update managed_properties
+                           set rented = false,
+                               tenant_name = null,
+                               tenant_mobile = null,
+                               tenant_since = null
+                         where tenant_mobile = :mobile or owner_id = :id
+                        """)
+                .setParameter("mobile", MobileMask.normalise(oldMobile))
+                .setParameter("id", subjectId)
+                .executeUpdate());
+
         events.publishEvent(new AccountErased(subjectId));
 
         erased.put("service_request_draft_approvals", entityManager

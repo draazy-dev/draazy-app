@@ -119,7 +119,7 @@ class SavedSearchMatcher {
                 select r.id
                 from flatmate_rooms r
                 where r.archived = false and r.mod_status in (:publicStatuses)
-                  and not exists (select 1 from users u where u.id = r.host_id and u.status = 'suspended')
+                  and not exists (select 1 from users u where u.id = r.host_id and (u.status <> 'active' or u.archived))
                 """);
         commonFlatmateFilters(sql, "r", criteria, params, baseline);
         Long min = longValue(criteria, "budgetMin");
@@ -158,7 +158,7 @@ class SavedSearchMatcher {
                 select g.id
                 from flatmate_groups g
                 where g.archived = false and g.mod_status in (:publicStatuses)
-                  and not exists (select 1 from users u where u.id = g.host_id and u.status = 'suspended')
+                  and not exists (select 1 from users u where u.id = g.host_id and (u.status <> 'active' or u.archived))
                 """);
         sql.append(housed ? " and g.property_id is not null" : " and g.property_id is null");
         commonFlatmateFilters(sql, "g", criteria, params, baseline);
@@ -199,7 +199,7 @@ class SavedSearchMatcher {
                 select p.id
                 from flatmate_seeker_posts p
                 where p.archived = false and p.mod_status in (:publicStatuses)
-                  and not exists (select 1 from users u where u.id = p.user_id and u.status = 'suspended')
+                  and not exists (select 1 from users u where u.id = p.user_id and (u.status <> 'active' or u.archived))
                 """);
         commonFlatmateFilters(sql, "p", criteria, params, baseline);
         Long min = longValue(criteria, "budgetMin");

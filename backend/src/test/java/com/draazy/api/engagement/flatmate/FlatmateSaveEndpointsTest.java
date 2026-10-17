@@ -33,6 +33,16 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
     @Autowired
     UserRepository users;
 
+    @Autowired
+    jakarta.persistence.EntityManager em;
+
+    /** Only a public item can be saved; the created entity is still cached as pending, hence the clear. */
+    private String published(String table, String id) {
+        em.flush();
+        jdbc.update("update " + table + " set mod_status = 'approved' where id = ?::uuid", id);
+        em.clear();
+        return id;
+    }
     /** Audit writes run {@code REQUIRES_NEW} and escape this test's rollback. */
     private final List<String> createdActors = new ArrayList<>();
 
@@ -71,7 +81,7 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return idOf(json);
+        return published("flatmate_rooms", idOf(json));
     }
 
     private String createGroup(User host, String title) throws Exception {
@@ -85,7 +95,7 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
                         .content(body))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
-        return idOf(json);
+        return published("flatmate_groups", idOf(json));
     }
 
     private String createPost(User author, String name) throws Exception {

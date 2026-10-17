@@ -96,7 +96,7 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
         mvc.perform(patch(Routes.Moderation.FLATMATE_MODERATION.replace("{id}", id))
                         .header(HttpHeaders.AUTHORIZATION, bearer(mod))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"modStatus\":\"" + state + "\"}"))
+                        .content("{\"modStatus\":\"" + state + "\",\"note\":\"Desk verdict\"}"))
                 .andExpect(status().isOk());
     }
 
@@ -215,7 +215,7 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
         mvc.perform(patch(Routes.Moderation.GROUP_APPLICATION_BY_ID, appId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"modStatus\":\"removed\"}"))
+                        .content("{\"modStatus\":\"removed\",\"note\":\"Fake group\"}"))
                 .andExpect(status().isOk());
 
         mvc.perform(get(Routes.Moderation.GROUP_APPLICATIONS)

@@ -59,15 +59,12 @@ public class FlatmateApplicationService {
                 group.getPropertyId(), group.getModStatus(), group.getCreatedAt());
     }
 
-    /** Host-only: applying binds every group member to a flat and rent. */
+    /** Host-only, and a stranger's group id is a 404: applying binds every group member to a flat and rent. */
     @Transactional
     public GroupApplicationDto apply(AuthPrincipal caller, UUID groupId, UUID listingId) {
         FlatmateGroup group = groups.findById(groupId)
+                .filter(g -> g.getHostId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate group"));
-        if (!group.getHostId().equals(caller.userId())) {
-            throw new BadRequestException(
-                    "Only the person who started this group can apply it to a flat.");
-        }
         if (!group.isVisible()) {
             throw new BadRequestException(
                     "This group is not live yet, so it cannot apply to a flat.");
@@ -136,6 +133,9 @@ public class FlatmateApplicationService {
 
         locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION,
                 listing.getId().toString());
+        if (!applications.existsByIdAndModStatusIn(application.getId(), FlatmateVocabulary.MOD_PUBLIC)) {
+            throw new ConflictException("This application was taken down by our team.");
+        }
         if (verdict.equals(application.getStatus())) {
             return hydrator.hydrateOne(application);
         }
@@ -144,6 +144,9 @@ public class FlatmateApplicationService {
         }
 
         boolean accepting = FlatmateVocabulary.STATUS_ACCEPTED.equals(verdict);
+        if (accepting && groups.lockVisible(application.getGroupId()).isEmpty()) {
+            throw new ConflictException("This group is not live right now, so it cannot be accepted.");
+        }
         if (accepting && applications.existsByListingIdAndStatusAndModStatusInAndIdNot(listing.getId(),
                 FlatmateVocabulary.STATUS_ACCEPTED, FlatmateVocabulary.MOD_PUBLIC, application.getId())) {
             throw new ConflictException(CLOSED_TO_GROUPS);

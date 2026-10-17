@@ -289,7 +289,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
         }
 
         @Test
-        @DisplayName("someone else's room is a 403 — a room id is public, so nothing leaks")
+        @DisplayName("someone else's room is a 404, so a room id is no existence oracle")
         void strangerRefused() throws Exception {
             User host = user("9840000013", "Host Thirteen");
             User stranger = user("9840000014", "Stranger");
@@ -297,7 +297,7 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
 
             mvc.perform(delete(Routes.Flatmates.ROOM_BY_ID, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger)))
-                    .andExpect(status().isForbidden());
+                    .andExpect(status().isNotFound());
 
             assertThat(jdbc.queryForObject(
                     "select archived from flatmate_rooms where id = ?::uuid", Boolean.class, id))

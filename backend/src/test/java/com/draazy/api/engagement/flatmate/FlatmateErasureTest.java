@@ -5,12 +5,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import jakarta.persistence.EntityManager;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -28,6 +31,9 @@ class FlatmateErasureTest extends AbstractApiTest {
 
     @Autowired
     EntityManager entityManager;
+
+    @Autowired
+    PropertyRepository properties;
 
     private final List<String> createdActors = new ArrayList<>();
     private int nextMobile = 1;
@@ -109,5 +115,53 @@ class FlatmateErasureTest extends AbstractApiTest {
                 .isEqualTo(1);
         assertThat(count("select count(*) from notifications where user_id = ?::uuid "
                 + "and type = 'flatmate.group.left'", host.getId().toString())).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("an erased author's unanswered incoming asks are deleted, not left dangling")
+    void erasedAuthorsIncomingAsksGo() throws Exception {
+        User author = user("Author", Roles.Wire.BUYER);
+        User asker = user("Asker", Roles.Wire.BUYER);
+        User admin = user("Admin", Roles.Wire.ADMIN);
+        String postId = mvc.perform(post(Routes.Flatmates.POSTS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(author))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Asha\",\"budget\":18000,\"localities\":[\"Baner\"]}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString()
+                .replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        mvc.perform(post(Routes.Flatmates.POST_INTEREST, postId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(asker))
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isCreated());
+
+        erase(author, admin);
+
+        assertThat(count("select count(*) from flatmate_requests where target_id = ?::uuid", postId)).isZero();
+    }
+
+    @Test
+    @DisplayName("an erased group host's unanswered applications leave the owner's inbox")
+    void erasedHostsApplicationsGo() throws Exception {
+        User owner = user("Owner", Roles.Wire.OWNER);
+        User host = user("Host", Roles.Wire.BUYER);
+        User admin = user("Admin", Roles.Wire.ADMIN);
+        Property flat = new Property(owner, "3BHK in Baner", "rent", "apartment", 30000L, "Baner", "Pune");
+        flat.setBhk(new BigDecimal("3"));
+        flat.setStatus("approved");
+        flat.setPriceUnit("per-month");
+        flat.setArea(new BigDecimal("1100"));
+        properties.saveAndFlush(flat);
+        String groupId = group(host);
+        mvc.perform(post(Routes.Flatmates.GROUP_APPLY.replace("{id}", groupId))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"listingId\":\"" + flat.getId() + "\"}"))
+                .andExpect(status().isCreated());
+
+        erase(host, admin);
+
+        assertThat(count("select count(*) from flatmate_group_applications where group_id = ?::uuid", groupId))
+                .isZero();
     }
 }

@@ -1797,6 +1797,42 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ManagedProperty' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /me/managed-properties/{id}/rent-tracking:
+    parameters:
+      - { $ref: '#/components/parameters/PropertyId' }
+    delete:
+      tags: [Listings]
+      summary: Stop rent tracking (owner)
+      description: >-
+        Turns rent tracking off and clears the tenant name, mobile, rent and due day. Receipts
+        already recorded are kept, because each is an issued tax document.
+      operationId: stopManagedRentTracking
+      responses:
+        '200':
+          description: The updated record
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ManagedProperty' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /me/tracked-rent:
+    get:
+      tags: [Listings]
+      summary: Rent an owner tracks against the caller's mobile (tenant)
+      description: >-
+        Every rented managed property whose tenant mobile is the caller's own, so a tenant who signs
+        up after the owner named them is linked without an invite step. Receipts are only those
+        recorded since the caller was named as the tenant.
+      operationId: listMyTrackedRent
+      responses:
+        '200':
+          description: Tracked homes, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/TrackedRent' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /me/managed-properties/{id}/rent-receipts:
     parameters:
       - { $ref: '#/components/parameters/PropertyId' }
@@ -4732,6 +4768,11 @@ paths:
         call is refused with 422. A tenant who sub-lets without the owner's consent gives that owner
         a ground for eviction under the Maharashtra Rent Control Act 1999, so the platform will not
         vouch for the arrangement. The post itself is unaffected and stays live at `identity` tier.
+
+
+        A decided review is terminal: the same verdict again is an idempotent 200, a different one
+        is a 409. A staffer may not decide the review of a post they authored or a group they belong
+        to (403).
       operationId: decideFlatmateReview
       requestBody:
         required: true
@@ -4744,6 +4785,10 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FlatmateReview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Already decided with a different verdict }
         '422': { $ref: '#/components/responses/ValidationError' }
   /admin/rent-agreements/{id}:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
@@ -4912,7 +4957,8 @@ paths:
         `flatmates:write`. Omitted fields are left as they are. `rent` is a room's share, a group's
         rent and a seeker's budget; `moveIn` is a room's available-from date, a hunting group's
         move-in-by and a seeker's move-in. A field the kind does not have is 422. Audited as
-        `flatmate.adminUpdate`; the post is not sent back for review.
+        `flatmate.adminUpdate`; the post is not sent back for review. Refused (403) on an item the
+        caller authored or whose group they belong to.
       operationId: editFlatmateAsModerator
       requestBody:
         required: true
@@ -4950,6 +4996,12 @@ paths:
         Admin moderation axis only. It must never write a group application's owner decision, and
         a `flagged` / `removed` post must disappear from every consumer feed, the map and the alert
         matcher — not merely change a label.
+
+
+        A note is required to flag or remove, and to restore a removed or rejected item
+        (400). An `expired` item accepts only `removed`; anything else is a 409 because only the
+        host's renewal revives it. A staffer may not moderate an item they authored or whose group
+        they belong to (403).
       operationId: moderateFlatmatePost
       externalDocs: { description: Behaviour, url: docs/flows/ops/flatmate-moderation.md }
       requestBody:
@@ -4961,10 +5013,13 @@ paths:
               required: [modStatus]
               properties:
                 modStatus: { $ref: '#/components/schemas/FlatmateModStatus' }
-                note: { type: string, description: Internal note, never exposed to consumers. Expected on flag/remove. }
+                note: { type: string, description: Internal note, never exposed to consumers. Required to hide or restore. }
       responses:
         '200': { description: Moderated }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: The item has expired and the verdict is not `removed` }
   /admin/group-applications:
     get:
       tags: [Moderation]
@@ -5002,6 +5057,11 @@ paths:
       tags: [Moderation]
       summary: Moderate a group application
       operationId: decideGroupApplication
+      description: >
+        Writes only `modStatus`, never the owner's accept or decline. A note is required to hide, and
+        to restore a removed or rejected application (400). Refused (403) to the applicant, a member of the applying group and the
+        listing's owner. Restoring an application the owner had accepted is a 409 once another group
+        holds the flat or when its group is no longer live.
       requestBody:
         required: true
         content:
@@ -5018,6 +5078,10 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/GroupApplication' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: Restoring an accepted application another group has replaced, or whose group is not live }
   /contacts/status:
     get:
       tags: [Leads & Contact]
@@ -8648,6 +8712,42 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
+  /reviews/{id}:
+    parameters:
+      - { $ref: '#/components/parameters/GenericId' }
+    put:
+      tags: [Engagement]
+      summary: Edit your own review
+      operationId: updateReview
+      description: >
+        Replaces the rating, text, categories and recommend of the caller's own review; the
+        `context` badge, target and `createdAt` stay as first posted. 404 when the review is not
+        the caller's or staff have rejected it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReviewCreate' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Review' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Engagement]
+      summary: Delete your own review
+      operationId: deleteReview
+      description: >
+        Removes the caller's own review, after which they may review the target again. 404 when
+        the review is not the caller's or staff have rejected it.
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /flatmates/feed:
     get:
       tags: [Engagement]
@@ -9243,7 +9343,10 @@ paths:
             schema: { $ref: '#/components/schemas/FlatmateInterestCreate' }
       responses:
         '201': { description: Sent }
-        '409': { description: Interest already expressed (`already_interested`) }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { description: Not a seeker role, or the caller hosts this room }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: "Interest already expressed (`already_interested`), or no seat or space is left (`room_full`)" }
         '422': { $ref: '#/components/responses/ValidationError' }
   /flatmates/groups/{id}/join:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
@@ -9422,7 +9525,7 @@ paths:
               schema: { $ref: '#/components/schemas/GroupApplication' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: Already answered, or another group on this listing is already accepted }
+        '409': { description: "Already answered, another group on this listing is already accepted, the application was taken down by moderation, or (on accept) the group is not live" }
         '422': { $ref: '#/components/responses/ValidationError' }
   /me/flatmate-requests:
     get:
@@ -9473,7 +9576,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FlatmateRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { description: "Accepting would over-fill the ad (`group_full`, `room_full`), the request is already answered (`already_decided`), or the requester is already in `settings.flatmates.maxGroupsPerPerson` groups (`group_limit`)" }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: "Accepting would over-fill the ad (`group_full`, `room_full`), the request is already answered (`already_decided`), the requester is already in `settings.flatmates.maxGroupsPerPerson` groups (`group_limit`), or the host's ad is not live" }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /me/flatmate-interests:
     get:
       tags: [Engagement]
@@ -9485,9 +9590,9 @@ paths:
         what strangers sent to this account's ads; this lists what this account sent to theirs.
 
 
-        The button state on the flatmates board used to come from `localStorage`, which meant an ask
-        made on a phone was invisible on a laptop and clearing site data made it invisible
-        everywhere. This is the same fact read from the place that actually holds it.
+        The button state on the flatmates board comes from the server rather than `localStorage`, so an ask
+        made on a phone is visible on a laptop and clearing site data does not hide it.
+        This is the fact read from the place that actually holds it.
 
 
         **Nothing travels back toward the host.** `requesterMobile` on these rows is the caller's own
@@ -12212,6 +12317,7 @@ components:
         role: { $ref: '#/components/schemas/Role' }
         verified: { type: boolean }
         city: { type: string, example: Pune }
+        gender: { type: string, enum: [male, female], description: 'Set once by the user, then locked; the flatmates gender gate reads it. Absent until set. Staff correct it from the ID on identity approval.' }
         verifiedContactOnly: { type: boolean }
         hideNumber: { type: boolean }
         shareActivityStatus: { type: boolean }
@@ -12448,6 +12554,7 @@ components:
         avatar: { type: string, format: uri }
         city: { type: string, description: 'Home city. The profile form has always sent this; the contract lacked it, so it was accepted and silently dropped (D20).' }
         hideNumber: { type: boolean, description: 'Owner preference - stay masked even after approving a contact request; reach me in-app instead. Not a second gate: approval still unlocks the conversation (D5).' }
+        gender: { type: string, enum: [male, female], description: 'Set once; the same value again is a no-op and a different one is 409 (contact support). The flatmates gender gate reads it.' }
         shareActivityStatus: { type: boolean, description: Share online/last-seen activity with message counterparties who also share theirs. }
         shareReadReceipts: { type: boolean, description: Share pair-thread read receipts with counterparties who also share theirs. }
 
@@ -14281,6 +14388,7 @@ components:
         userName: { type: string }
         accountName: { type: [string, 'null'], description: Current `users.name`; approval will overwrite it with the confirmed holder name. }
         accountEmail: { type: [string, 'null'], description: Current `users.email`; editable from the case via `kycUpdateUser`. }
+        accountGender: { type: [string, 'null'], enum: [male, female, null], description: 'Current `users.gender`, shown so the reviewer can correct it from the document on approval.' }
         userMobile: { $ref: '#/components/schemas/Mobile' }
         userRole: { $ref: '#/components/schemas/Role' }
         status: { $ref: '#/components/schemas/IdentityVerificationStatus' }
@@ -14341,6 +14449,7 @@ components:
         birthYear: { type: [integer, 'null'], minimum: 1900, description: Year-only documents store holderDob as YYYY-01-01 and holderDobYearOnly true. Exactly one of `dob` or `birthYear` is required. }
         poseConfirmed: { type: [boolean, 'null'], description: Required `true` when the case carries a `livenessChallenge` — the selfie shows the requested pose. }
         numberOverride: { type: [boolean, 'null'], description: 'Required `true` to approve a number that differs from the applicant''s entry; audited and always QA-sampled.' }
+        gender: { type: [string, 'null'], enum: [male, female, null], description: 'Gender on the document. When present it replaces the applicant''s profile gender, which is otherwise locked; the change is in the approval audit.' }
     IdentityRejectRequest:
       type: object
       required: [reason]
@@ -15128,6 +15237,7 @@ components:
         status: { type: string }
         rented: { type: boolean, description: Owner rent-tracker — currently rented. }
         tenantName: { type: [string, 'null'] }
+        tenantMobile: { type: [string, 'null'], example: '9876543201', description: The tenant's 10-digit mobile; links the tenant to this record. }
         monthlyRent: { type: [integer, 'null'], format: int64 }
         dueDay: { type: [integer, 'null'], description: Rent due day of month. }
         valuation: { type: [object, 'null'], additionalProperties: true, description: Opaque Rent-o-meter snapshot. }
@@ -15153,9 +15263,10 @@ components:
         areaUnit: { type: [string, 'null'], enum: [sqft, sqyd, sqm, guntha, acre, hectare, null], description: Defaults sqft when null. }
         furnishing: { type: [string, 'null'] }
         rented: { type: [boolean, 'null'], description: Rent-tracker; defaults false. }
-        tenantName: { type: [string, 'null'] }
-        monthlyRent: { type: [integer, 'null'], format: int64, description: Defaults to price for a rent deal when omitted. }
-        dueDay: { type: [integer, 'null'] }
+        tenantName: { type: [string, 'null'], maxLength: 80, description: Required when `rented` is true. }
+        tenantMobile: { type: [string, 'null'], description: "Indian mobile, optional +91. Required when `rented` is true and must not be the owner's own number; stored as the bare 10 digits." }
+        monthlyRent: { type: [integer, 'null'], format: int64, minimum: 0, maximum: 10000000, description: Defaults to price for a rent deal when omitted; above zero when `rented` is true. }
+        dueDay: { type: [integer, 'null'], minimum: 1, maximum: 28 }
         valuation: { type: [object, 'null'], additionalProperties: true }
         publishedListingId:
           type: [string, 'null']
@@ -15181,10 +15292,11 @@ components:
         area: { type: [number, 'null'] }
         areaUnit: { type: [string, 'null'], enum: [sqft, sqyd, sqm, guntha, acre, hectare, null] }
         furnishing: { type: [string, 'null'] }
-        rented: { type: [boolean, 'null'] }
-        tenantName: { type: [string, 'null'] }
-        monthlyRent: { type: [integer, 'null'], format: int64 }
-        dueDay: { type: [integer, 'null'] }
+        rented: { type: [boolean, 'null'], description: Any rent field in the patch re-checks the result; a rented record needs tenantName, tenantMobile and a monthlyRent above zero (422 otherwise). }
+        tenantName: { type: [string, 'null'], maxLength: 80 }
+        tenantMobile: { type: [string, 'null'], description: "Indian mobile, optional +91; must not be the owner's own number. Stored as the bare 10 digits." }
+        monthlyRent: { type: [integer, 'null'], format: int64, minimum: 0, maximum: 10000000 }
+        dueDay: { type: [integer, 'null'], minimum: 1, maximum: 28 }
         valuation: { type: [object, 'null'], additionalProperties: true }
     ManagedRentReceipt:
       type: object
@@ -15207,6 +15319,27 @@ components:
         landlordName: { type: string }
         propertyAddress: { type: string, description: '"society, locality, Pune" as it stood then.' }
         createdAt: { type: string, format: date-time, description: The receipt date — when the owner recorded the month. }
+    TrackedRent:
+      type: object
+      required: [id, title, address, landlordName, monthlyRent, dueDay, status, dueOn, receipts]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        address: { type: string, description: '"society, locality, Pune".' }
+        landlordName: { type: string }
+        monthlyRent: { type: integer, format: int64 }
+        dueDay: { type: integer, minimum: 1, maximum: 28 }
+        status:
+          type: string
+          enum: [paid, due, overdue]
+          description: >-
+            This month, in IST. A month whose due date fell before the caller was named is never theirs,
+            so it reads as due next month rather than overdue.
+        dueOn: { type: string, format: date, description: The due date the status refers to. }
+        receipts:
+          type: array
+          description: Newest month first, at most 12.
+          items: { $ref: '#/components/schemas/ManagedRentReceipt' }
     ManagedRentReceiptCreate:
       type: object
       required: [rentMonth]
@@ -16125,6 +16258,12 @@ components:
             from "would not recommend" (`r.recommend != null`), so `false` and absent are not
             the same answer.
         createdAt: { type: string, format: date-time }
+        mine:
+          type: boolean
+          readOnly: true
+          description: >
+            Present and true only on the signed-in caller's own review, so the page can offer
+            edit and delete. Absent for every other row and for anonymous readers.
     ReviewModerationRow:
       type: object
       description: One row of the review moderation queue - only what the queue renders, with the review's own moderation state.
@@ -16490,7 +16629,7 @@ components:
       required: [name, budget, localities]
       properties:
         name: { type: string }
-        gender: { type: string, enum: [any, male, female], default: female }
+        gender: { type: string, enum: [any, male, female], default: any, description: What the poster picked, stored as given and never copied from the profile. A male/female value saves to an empty profile gender and is a 422 when it contradicts a set one. }
         age: { type: integer, minimum: 18 }
         occupation: { type: string }
         budget: { $ref: '#/components/schemas/Money' }
@@ -16997,7 +17136,7 @@ components:
       properties:
         share: { $ref: '#/components/schemas/ShareIntent', description: Rooms only — how many people are moving in. }
         message: { type: string, maxLength: 4000, description: Optional override; the server generates a share-intent-appropriate opener when absent. }
-        gender: { type: string, enum: [any, male, female], description: Rooms and groups restricted to women or men only. Ignored when the caller's own seeker post states a gender; without either the request is refused with 422. }
+        gender: { type: string, enum: [any, male, female], description: Rooms and groups restricted to women or men only. Ignored once the caller's profile has a gender, which is what the gate checks; otherwise a male/female value here is saved to the profile, and without either the request is refused with 422. }
     FlatmateRoomCard:
       type: object
       description: >

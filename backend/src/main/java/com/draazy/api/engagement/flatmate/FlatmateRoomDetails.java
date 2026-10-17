@@ -16,8 +16,8 @@ public record FlatmateRoomDetails(
         @Min(1) @Max(4) Integer floorsInHouse,
         @Min(1) @Max(4) Integer bathrooms,
         @Min(0) @Max(3) Integer balconies,
-        @Size(max = 40) List<@NotBlank @Size(max = 60) String> furniture,
-        @Size(max = 30) String tower,
+        @Size(max = 40) List<@NotBlank @Size(max = 60) @NoContactDetails(message = NO_CONTACT) String> furniture,
+        @Size(max = 30) @NoContactDetails(message = NO_CONTACT) String tower,
         @Size(max = 60) @NoContactDetails(message = NO_CONTACT) String street,
         @Size(max = 60) @NoContactDetails(message = NO_CONTACT) String landmark,
         @Pattern(regexp = "[0-9]{6}") String pincode) {

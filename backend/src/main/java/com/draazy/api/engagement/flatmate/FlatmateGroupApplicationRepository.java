@@ -2,6 +2,7 @@ package com.draazy.api.engagement.flatmate;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +21,12 @@ public interface FlatmateGroupApplicationRepository
 
     long countByModStatusIn(Collection<String> modStatuses);
 
+    /** A query rather than the entity, so a staff take-down committed while waiting on the listing lock is seen. */
+    boolean existsByIdAndModStatusIn(UUID id, Collection<String> modStatuses);
+
+    @Query("select a.listingId from FlatmateGroupApplication a where a.id = :id")
+    Optional<UUID> findListingId(@Param("id") UUID id);
+
     List<FlatmateGroupApplication> findByListingIdOrderByCreatedAtDesc(UUID listingId);
 
     /** {@code modStatus} hides removed spam while leaving owner-facing status pending. */
@@ -37,6 +44,10 @@ public interface FlatmateGroupApplicationRepository
             Collection<String> modStatuses, UUID id);
 
     List<FlatmateGroupApplication> findByListingIdAndStatus(UUID listingId, String status);
+
+    @Modifying
+    @Query("delete from FlatmateGroupApplication a where a.applicantId = :userId and a.status = 'pending'")
+    int deletePendingByApplicant(@Param("userId") UUID userId);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""

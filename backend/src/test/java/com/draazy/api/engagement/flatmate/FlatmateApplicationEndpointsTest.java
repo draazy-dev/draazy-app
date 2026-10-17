@@ -151,8 +151,7 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(stranger))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{\"listingId\":\"" + flat.getId() + "\"}"))
-                    .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.message", Matchers.containsString("started this group")));
+                    .andExpect(status().isNotFound());
         }
 
         @Test

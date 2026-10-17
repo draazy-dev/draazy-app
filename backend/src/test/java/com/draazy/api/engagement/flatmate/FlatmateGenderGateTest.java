@@ -92,7 +92,11 @@ class FlatmateGenderGateTest extends AbstractApiTest {
     }
 
     private void seekerPost(User author, String gender) throws Exception {
-        mvc.perform(post(Routes.Flatmates.POSTS)
+        seekerPostAs(author, gender).andExpect(status().isCreated());
+    }
+
+    private ResultActions seekerPostAs(User author, String gender) throws Exception {
+        return mvc.perform(post(Routes.Flatmates.POSTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(author))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -100,8 +104,7 @@ class FlatmateGenderGateTest extends AbstractApiTest {
                                  "budget":18000,"localities":["Baner"],"moveIn":"2026-09-01",
                                  "flatPref":"any","roomPref":"private","tags":["Vegetarian"],
                                  "note":"Quiet, tidy, work from home twice a week."}
-                                """.formatted(gender)))
-                .andExpect(status().isCreated());
+                                """.formatted(gender)));
     }
 
     private ResultActions interest(String roomId, User who, String body) throws Exception {
@@ -169,6 +172,69 @@ class FlatmateGenderGateTest extends AbstractApiTest {
     @DisplayName("rooms open to anyone never ask")
     void openRoomNeverAsks() throws Exception {
         interest(room("any"), user("Anyone"), "{}").andExpect(status().isCreated());
+    }
+
+    private String profileGender(User who) {
+        entityManager.flush();
+        return jdbc.queryForObject("select gender from users where id = ?", String.class, who.getId());
+    }
+
+    private void setProfileGender(User who, String gender) {
+        entityManager.flush();
+        jdbc.update("update users set gender = ? where id = ?", gender, who.getId());
+        entityManager.clear();
+    }
+
+    @Test
+    @DisplayName("a gender stated on a restricted ask is saved to the profile, and the profile wins after")
+    void statedGenderClaimsTheProfile() throws Exception {
+        User asha = user("Asha");
+        interest(room("female"), asha, "{\"gender\":\"female\"}").andExpect(status().isCreated());
+        assertThat(profileGender(asha)).isEqualTo("female");
+
+        interest(room("male"), asha, "{\"gender\":\"male\"}")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message", containsString("open to men only")));
+        interest(room("female"), asha, "{}").andExpect(status().isCreated());
+    }
+
+    @Test
+    @DisplayName("a man on file is refused a women-only room whatever the request states")
+    void profileMaleCannotStateHisWayIn() throws Exception {
+        User ravi = user("Ravi");
+        setProfileGender(ravi, "male");
+
+        interest(room("female"), ravi, "{\"gender\":\"female\"}")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message", containsString("open to women only")));
+        interest(room("male"), ravi, "{}").andExpect(status().isCreated());
+        assertThat(profileGender(ravi)).isEqualTo("male");
+    }
+
+    @Test
+    @DisplayName("a seeker post keeps what was picked; a binary pick claims an empty profile and must match a set one")
+    void seekerPostKeepsThePick() throws Exception {
+        User asha = user("Asha");
+        setProfileGender(asha, "female");
+        seekerPost(asha, "any");
+        assertThat(jdbc.queryForObject("select gender from flatmate_seeker_posts where user_id = ?",
+                String.class, asha.getId())).isEqualTo("any");
+
+        User mia = user("Mia");
+        setProfileGender(mia, "female");
+        seekerPostAs(mia, "male").andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message", containsString("doesn't match the gender on your profile")));
+        User zoe = user("Zoe");
+        setProfileGender(zoe, "female");
+        seekerPost(zoe, "female");
+
+        User ravi = user("Ravi");
+        seekerPost(ravi, "male");
+        assertThat(profileGender(ravi)).isEqualTo("male");
+
+        User kit = user("Kit");
+        seekerPost(kit, "any");
+        assertThat(profileGender(kit)).isNull();
     }
 
     @Test

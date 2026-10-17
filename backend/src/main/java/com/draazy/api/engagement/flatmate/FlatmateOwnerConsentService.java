@@ -14,7 +14,9 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.provider.OtpSender;
 import com.draazy.api.security.AuthPrincipal;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,20 +28,20 @@ public class FlatmateOwnerConsentService {
     private final FlatmateGroupRepository groups;
     private final FlatmateGuardrails guardrails;
 
-    private final FlatmatePublication publication;
+    private final FlatmateReviewRepository reviews;
     private final UserRepository users;
     private final OtpService otpService;
     private final AuditService audit;
 
     public FlatmateOwnerConsentService(FlatmateOwnerConsentRepository consents,
             FlatmateRoomRepository rooms, FlatmateGroupRepository groups,
-            FlatmateGuardrails guardrails, FlatmatePublication publication,
+            FlatmateGuardrails guardrails, FlatmateReviewRepository reviews,
             UserRepository users, OtpService otpService, AuditService audit) {
         this.consents = consents;
         this.rooms = rooms;
         this.groups = groups;
         this.guardrails = guardrails;
-        this.publication = publication;
+        this.reviews = reviews;
         this.users = users;
         this.otpService = otpService;
         this.audit = audit;
@@ -74,26 +76,20 @@ public class FlatmateOwnerConsentService {
                 has(room.getOwnerConsentMobile(), caller.userId(), room.getAddressFingerprint()));
     }
 
-    /** Without this sweep nothing re-reads the consent table when the post already exists, so the
-     * flag stays false, Ops cannot approve it, and {@code reconcileDraazyAgreements} skips it forever. */
+    /** Without this sweep the flag stays false and Ops cannot approve the post. Single-column updates in
+     * id order, posts before reviews, so they neither overwrite a newer verdict nor deadlock the jobs. */
     private void applyConsentToLivePosts(AuthPrincipal caller, String mobile, String fingerprint) {
-        rooms.findByAddressFingerprintAndArchivedFalse(fingerprint).stream()
+        List<UUID> roomIds = rooms.findByAddressFingerprintAndArchivedFalseOrderByIdAsc(fingerprint).stream()
                 .filter(room -> caller.userId().equals(room.getHostId()))
                 .filter(room -> mobile.equals(room.getOwnerConsentMobile()))
-                .forEach(room -> {
-                    settleRoomConsent(caller, room);
-                    rooms.saveAndFlush(room);
-                    publication.recordOwnerConsentForRoom(room.getId());
-                });
-        groups.findByAddressFingerprintAndArchivedFalse(fingerprint).stream()
+                .map(FlatmateRoom::getId).toList();
+        List<UUID> groupIds = groups.findByAddressFingerprintAndArchivedFalseOrderByIdAsc(fingerprint).stream()
                 .filter(group -> caller.userId().equals(group.getHostId()))
                 .filter(group -> mobile.equals(group.getOwnerConsentMobile()))
-                .forEach(group -> {
-                    group.setOwnerConsent(has(group.getOwnerConsentMobile(),
-                            caller.userId(), group.getAddressFingerprint()));
-                    groups.saveAndFlush(group);
-                    publication.recordOwnerConsent(group.getId());
-                });
+                .map(FlatmateGroup::getId).toList();
+        roomIds.forEach(rooms::markOwnerConsent);
+        groupIds.forEach(groups::markOwnerConsent);
+        Stream.concat(roomIds.stream(), groupIds.stream()).forEach(reviews::markOwnerConsent);
     }
 
     /** Canonicalise the owner's number so the self-check, the OTP and the stored row key off the

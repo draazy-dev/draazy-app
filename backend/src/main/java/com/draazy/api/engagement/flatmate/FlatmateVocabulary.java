@@ -113,7 +113,7 @@ public final class FlatmateVocabulary {
             + " People reach you through Draazy";
 
     public static boolean isPublic(String modStatus) {
-        return MOD_PUBLIC.contains(modStatus);
+        return modStatus != null && MOD_PUBLIC.contains(modStatus);
     }
 
     /** Deprecated {@code ?view=} values, kept as read aliases so old deep links and saved alerts

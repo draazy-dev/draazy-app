@@ -33,6 +33,9 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
     @Autowired
     UserRepository users;
 
+    @Autowired
+    jakarta.persistence.EntityManager em;
+
     private final List<String> createdActors = new ArrayList<>();
     private int nextMobile = 1;
 
@@ -67,7 +70,9 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = json.replaceAll(".*?\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+        em.flush();
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
+        em.clear();
         return id;
     }
 

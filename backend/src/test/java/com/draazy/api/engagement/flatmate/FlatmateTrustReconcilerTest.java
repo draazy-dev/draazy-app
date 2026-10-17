@@ -2,9 +2,12 @@ package com.draazy.api.engagement.flatmate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.draazy.api.catalog.property.Property;
@@ -65,6 +68,7 @@ class FlatmateTrustReconcilerTest {
         UUID roomId = UUID.randomUUID();
         FlatmateReview review = tenantReview(hostId, roomId,
                 LocalDate.now().minusDays(1));
+        review.decide(FlatmateVocabulary.STATUS_APPROVED, null, UUID.randomUUID());
         when(reviews.findLapsedApprovals(any())).thenReturn(List.of(review));
 
         int expired = reconciler.reconcileAgreementExpiry();
@@ -76,6 +80,18 @@ class FlatmateTrustReconcilerTest {
         verify(reviews).saveAllAndFlush(List.of(review));
         verify(notifier).notify(eq(hostId), eq("flatmate.review.expired"), any(), any(),
                 eq("/flatmates/room/" + roomId));
+    }
+
+    @Test
+    void skipsALapsedClaimNoLongerApprovedOnceLocked() {
+        FlatmateReview review = tenantReview(UUID.randomUUID(), UUID.randomUUID(),
+                LocalDate.now().minusDays(1));
+        when(reviews.findLapsedApprovals(any())).thenReturn(List.of(review));
+
+        assertThat(reconciler.reconcileAgreementExpiry()).isZero();
+        verify(badges).lockWithPost(review);
+        verifyNoMoreInteractions(badges);
+        verifyNoInteractions(notifier);
     }
 
     @Test
@@ -116,7 +132,8 @@ class FlatmateTrustReconcilerTest {
 
         assertThat(approved).isZero();
         assertThat(review.getStatus()).isNotEqualTo(FlatmateVocabulary.STATUS_APPROVED);
-        verifyNoInteractions(agreements, badges, notifier);
+        verifyNoInteractions(agreements, notifier);
+        verify(badges, never()).apply(any(), anyBoolean());
     }
 
     // Both halves name the same building, which is strictly stronger than the locality fallback:
@@ -154,7 +171,8 @@ class FlatmateTrustReconcilerTest {
 
         assertThat(reconciler.reconcileDraazyAgreements()).isZero();
         assertThat(review.getStatus()).isNotEqualTo(FlatmateVocabulary.STATUS_APPROVED);
-        verifyNoInteractions(agreements, badges, notifier);
+        verifyNoInteractions(agreements, notifier);
+        verify(badges, never()).apply(any(), anyBoolean());
     }
 
     @Test
@@ -189,7 +207,8 @@ class FlatmateTrustReconcilerTest {
         when(properties.findById(claimedId)).thenReturn(Optional.of(propertyIn("Baner", UUID.randomUUID())));
 
         assertThat(reconciler.reconcileDraazyAgreements()).isZero();
-        verifyNoInteractions(agreements, badges, notifier);
+        verifyNoInteractions(agreements, notifier);
+        verify(badges, never()).apply(any(), anyBoolean());
     }
 
     @Test

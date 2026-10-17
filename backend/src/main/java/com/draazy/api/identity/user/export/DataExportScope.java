@@ -47,7 +47,7 @@ public final class DataExportScope {
                 "Your account: the name, number, email and city you gave us, and the trust flags we "
                         + "derived from them.",
                 """
-                select id, name, mobile, email, role, team, status, city,
+                select id, name, mobile, email, role, team, status, city, gender,
                        mobile_verified, verified, verified_contact_only,
                        hide_number, listings_count, avatar, joined_at, last_active,
                        flagged, flagged_at, archived, archived_at, created_at, updated_at
@@ -306,13 +306,26 @@ public final class DataExportScope {
                 """
                 select id, title, deal, property_type, bhk, price, locality, locality_slug,
                        society, area, area_unit, furnishing, visibility, status, rented,
-                       tenant_name, monthly_rent, due_day, valuation, published_listing_id,
+                       tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day, valuation,
+                       published_listing_id,
                        created_at, updated_at
                   from managed_properties
                  where owner_id = :subjectId
                  order by created_at desc
                 """,
                 Map.of()));
+
+        out.add(new Dataset("listings", "managed_properties_as_tenant",
+                "Owners' rent records that name your number as the tenant.",
+                """
+                select id, locality, rented, tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day,
+                      created_at, updated_at,
+                      owner_id as party_ref_src
+                 from managed_properties
+                where tenant_mobile = :subjectMobile
+                order by created_at desc
+                """,
+                withheld("owner_id", "Replaced by partyRef.")));
 
         out.add(new Dataset("listings", "managed_property_documents",
                 "Papers you filed against a property in your Owner Hub.",
