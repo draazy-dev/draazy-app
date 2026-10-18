@@ -92,6 +92,7 @@ test('Edit listing offers Remove photo too', async ({ page, login }) => {
   await row.getByRole('button', { name: 'Edit', exact: true }).click();
 
   const modal = page.getByRole('dialog', { name: 'Edit listing' });
+  await modal.getByRole('tab', { name: 'Photos' }).click();
   await expect(modal.getByTestId('remove-photo')).toHaveCount(2);
   await modal.getByTestId('remove-photo').first().click();
   await modal.getByTestId('remove-photo-reason').selectOption('other');

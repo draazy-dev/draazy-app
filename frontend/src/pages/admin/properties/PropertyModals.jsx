@@ -1,110 +1,13 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { Archive, ExternalLink, Flag, MapPin, Save, XCircle } from 'lucide-react';
+import { Archive, ExternalLink, Flag, MapPin, XCircle } from 'lucide-react';
 import { classNames } from '../../../lib/format.js';
 import { fmtINR } from '../../../lib/format.js';
 import Modal from '../../../components/ui/Modal.jsx';
 import Badge from '../../../components/ui/Badge.jsx';
-import Select from '../../../components/ui/Select.jsx';
-import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import InternalNote from '../../../components/ui/InternalNote.jsx';
-import { EDIT_DEAL_OPTS, EDIT_STATUS_OPTS, editBhkOpts, editTypeOpts, dealLabel, perSqftLabel, liveHref, detailKvs, fmtAgo, statusLabel } from './constants.js';
+import { dealLabel, perSqftLabel, liveHref, detailKvs, fmtAgo, statusLabel } from './constants.js';
 import { REVIEW_REASONS, ownerMessagePreview } from './reviewReasons.js';
-import { SubmittedPhotos } from './review-modal/SubmittedContent.jsx';
-import { getModerationProperty } from '../../../services/propertyService.js';
 
-// Queue rows carry no gallery, so the photos come from the whole listing.
-function EditPhotos({ id, onStatus }) {
-  const [full, setFull] = useState(null);
-  useEffect(() => {
-    let live = true;
-    getModerationProperty(id).then((listing) => { if (live) setFull(listing); }).catch(() => {});
-    return () => { live = false; };
-  }, [id]);
-  if (!full) return null;
-  const removed = (updated) => {
-    setFull({ ...full, gallery: updated?.gallery ?? [], image: updated?.image ?? null });
-    onStatus(updated?.status);
-  };
-  return <SubmittedPhotos listing={full} onPhotoRemoved={removed} />;
-}
-
-export function PropertyEditModal({ edit, setEdit, onClose, onSubmit, saving, canSetStatus }) {
-  const [picking, setPicking] = useState(false);
-  if (!edit) return null;
-  const rejected = edit._ref?.status === 'rejected';
-  const syncStatus = (status) => (status && status !== edit._ref.status
-    ? setEdit({ ...edit, status, _ref: { ...edit._ref, status } })
-    : undefined);
-  return (
-    <Modal
-      open={!!edit}
-      onClose={onClose}
-      title="Edit listing"
-      size="lg"
-      footer={
-        <>
-          <button type="button" onClick={onClose} disabled={saving} className="dz-btn dz-btn-ghost">Cancel</button>
-          <button type="button" onClick={onSubmit} disabled={saving || picking} className="dz-btn dz-btn-primary disabled:opacity-40"><Save className="h-4 w-4" /> {saving ? 'Saving…' : 'Save changes'}</button>
-        </>
-      }
-    >
-      <div className="space-y-3">
-        <label className="block text-sm">
-          <span className="mb-1 block text-gray-300">Title <span className="text-rose-400">*</span></span>
-          <input value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} className="dz-input" />
-        </label>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Price ({'\u20B9'}) <span className="text-rose-400">*</span></span>
-            <input type="number" min="0" value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} className="dz-input" />
-          </label>
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Built-up area (sq.ft)</span>
-            <input type="number" min="0" value={edit.area} onChange={(e) => setEdit({ ...edit, area: e.target.value })} className="dz-input" />
-          </label>
-          <div className="block text-sm">
-            <span className="mb-1 block text-gray-300">Configuration (BHK)</span>
-            <Select value={edit.bhk} onChange={(v) => setEdit({ ...edit, bhk: v })} options={editBhkOpts(edit._ref?.bhkNum == null ? '' : String(edit._ref.bhkNum))} ariaLabel="Configuration (BHK)" />
-          </div>
-          <div className="block text-sm">
-            <span className="mb-1 block text-gray-300">Property type</span>
-            <Select value={edit.type} onChange={(v) => setEdit({ ...edit, type: v })} options={editTypeOpts(edit._ref?.type)} ariaLabel="Property type" />
-          </div>
-          <div className="block text-sm">
-            <span className="mb-1 block text-gray-300">Locality <span className="text-rose-400">*</span></span>
-            <LocalitySelect
-              value={edit.locality}
-              onChange={(v) => setEdit({ ...edit, locality: v, localitySlug: '' })}
-              onSelect={(sel) => setEdit({ ...edit, locality: sel.name, localitySlug: sel.slug || '' })}
-              onBusyChange={setPicking}
-              placeholder="Select locality"
-              ariaLabel="Locality"
-              className="w-full"
-            />
-          </div>
-          <div className="block text-sm">
-            <span className="mb-1 block text-gray-300">Deal</span>
-            <Select value={edit.deal} onChange={(v) => setEdit({ ...edit, deal: v })} options={EDIT_DEAL_OPTS} ariaLabel="Deal" />
-          </div>
-        </div>
-        {canSetStatus ? (
-          <label className="block text-sm">
-            <span className="mb-1 block text-gray-300">Status</span>
-            {rejected ? (
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-sm text-gray-300">
-                {statusLabel(edit.status)} — use Request reopen in the review panel to reverse a final rejection.
-              </div>
-            ) : (
-              <Select value={edit.status} onChange={(v) => setEdit({ ...edit, status: v })} options={EDIT_STATUS_OPTS} ariaLabel="Status" />
-            )}
-          </label>
-        ) : null}
-        {canSetStatus ? <EditPhotos id={edit.id} onStatus={syncStatus} /> : null}
-      </div>
-    </Modal>
-  );
-}
 export function PropertyFlagModal({ flagFor, setFlagFor, flagReason, setFlagReason, internalNote, setInternalNote, onSubmit }) {
   return (
     <Modal

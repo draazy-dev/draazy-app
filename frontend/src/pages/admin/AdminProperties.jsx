@@ -16,7 +16,9 @@ import Loading from '../../components/ui/Loading.jsx';
 import { PageNav, QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import QueueTable from './properties/QueueTable.jsx';
 import QueueFilterBar, { EMPTY_FILTERS } from './properties/QueueFilterBar.jsx';
-import { PropertyEditModal, PropertyFlagModal, PropertyArchiveModal, PropertyViewModal, PropertyRecheckRejectModal } from './properties/PropertyModals.jsx';
+import { PropertyFlagModal, PropertyArchiveModal, PropertyViewModal, PropertyRecheckRejectModal } from './properties/PropertyModals.jsx';
+import PropertyEditModal from './properties/PropertyEditModal.jsx';
+import { basicsOf, editPatch } from './properties/editForm.js';
 import { statusQuery, PAGE_LIMIT, exportCsv, isMadeBy, MAKER_REASON } from './properties/constants.js';
 
 const loadReviewModal = () => import('./properties/PropertyReviewModal.jsx');
@@ -28,7 +30,7 @@ const DuplicatesTab = lazy(() => import('./properties/DuplicatesTab.jsx'));
 const pid = (listing) => listing?.uuid || listing?.id;
 
 const TABS = [
-  { key: 'verify', label: 'To verify', count: (s) => s?.pending, note: 'Open only: new and resubmitted listings with no decision yet, including ones waiting on the owner. A listing leaves once you approve or reject it. Oldest first.' },
+  { key: 'verify', label: 'To verify', count: (s) => s?.pending, note: 'Open only: new and resubmitted listings with no decision yet, including ones waiting on the owner. A listing leaves once you approve or reject it. Newest first.' },
   { key: 'recheck', label: 'Re-checks', count: (s) => s?.recheck, note: 'Open only: live listings whose owner changed price, furnishing or possession. They stay in search until you check them, and leave this tab once you pass or take them down.' },
   { key: 'badge', label: 'Badge requests', count: (s) => s?.badgeRequests, note: 'Open only: owners asking for the Verified badge. Check the vault documents in the review; a request leaves once you grant or decline it.' },
   { key: 'followup', label: 'Follow-up', count: (s) => s?.unconfirmed, note: 'Open only: live listings not confirmed as available in over 14 days. Send a WhatsApp nudge; a listing leaves once the owner confirms.' },
@@ -41,11 +43,7 @@ const TAB_KEYS = TABS.map((t) => t.key);
 const CSV_NAMES = { verify: 'verification-queue', recheck: 'recheck-queue', badge: 'badge-requests', followup: 'follow-up', flagged: 'flagged', all: 'listings' };
 
 const SORT_COLUMN = { recheck: 'recheck', badge: 'badge', followup: 'confirmed' };
-// Work queues are oldest first so the longest-waiting item is decided first; All is a browse view.
-const sortFor = (tab) => {
-  const dir = tab === 'all' ? 'newest' : 'oldest';
-  return SORT_COLUMN[tab] ? `${SORT_COLUMN[tab]}-${dir}` : dir;
-};
+const sortFor = (tab) => (SORT_COLUMN[tab] ? `${SORT_COLUMN[tab]}-newest` : 'newest');
 
 function queueFilters(tab, f) {
   const common = { q: f.q.trim() || undefined, deal: f.deal || undefined };
@@ -349,42 +347,16 @@ export default function AdminProperties() {
     toast(noted.error ? 'Listing flagged \u2014 but the internal note could not be saved' : 'Listing flagged', noted.error ? 'error' : undefined);
     refresh();
   };
-  // `bhkNum`, not the rendered `bhk`: the label is "3 BHK", and the contract wants an integer.
-  const openEdit = (l, fromReview = false) => { setEdit({ id: l.id, title: l.title || '', price: l.price ?? '', area: l.area ?? '', bhk: l.bhkNum == null ? '' : String(l.bhkNum), type: l.type || '', locality: l.locality || '', localitySlug: l.localitySlug || '', deal: l.deal || 'buy', status: l.status || 'pending', _ref: l, _fromReview: fromReview }); };
+  const openEdit = (l, fromReview = false) => { setEdit({ ...basicsOf(l), _ref: l, _fromReview: fromReview }); };
   const closeEdit = () => {
     if (edit?._fromReview) setReview(edit._ref);
     setEdit(null);
   };
   // Two calls: `ListingUpdate` deliberately omits `status` so a PATCH cannot self-escalate.
   const submitEdit = async () => {
-    const title = edit.title.trim();
-    const price = +edit.price;
-    const area = edit.area === '' ? '' : +edit.area;
     const ref = edit._ref || {};
-    const loc = edit.locality.trim();
-    const locChanged = loc !== (ref.locality || '') || (edit.localitySlug && edit.localitySlug !== (ref.localitySlug || ''));
-    if (!title) return toast('Title is required', 'error');
-    if (Number.isNaN(price) || price <= 0) return toast('Enter a valid price', 'error');
-    if (area !== '' && (Number.isNaN(area) || area < 0)) return toast('Area must be a positive number', 'error');
-    if (!loc) return toast('Locality is required', 'error');
-    const bhkRaw = String(edit.bhk ?? '').trim();
-    const bhkNum = bhkRaw === '' ? undefined : Number(bhkRaw);
-    if (bhkNum !== undefined && (!Number.isInteger(bhkNum) || bhkNum < 0)) {
-      return toast('Configuration must be a whole number of bedrooms', 'error');
-    }
-    if (edit._ref.status === 'rejected' && edit.status !== edit._ref.status) {
-      return toast('Use Request reopen in the review panel to reverse a final rejection', 'error');
-    }
-    const nextPatch = Object.fromEntries(Object.entries({
-      title: title !== (ref.title || '') ? title : undefined,
-      price: price !== Number(ref.price) ? price : undefined,
-      area: area !== '' && area !== Number(ref.area) ? area : undefined,
-      bhk: bhkNum !== undefined && bhkNum !== ref.bhkNum ? bhkNum : undefined,
-      type: edit.type.trim() !== (ref.type || '') ? edit.type.trim() : undefined,
-      locality: locChanged ? loc : undefined,
-      localitySlug: locChanged && edit.localitySlug ? edit.localitySlug : undefined,
-      deal: edit.deal !== (ref.deal || 'buy') ? edit.deal : undefined,
-    }).filter(([, value]) => value !== undefined));
+    const { patch: nextPatch, error } = editPatch(edit);
+    if (error) return toast(error, 'error');
     if (savingEdit) return;
     setSavingEdit(true);
     try {

@@ -44,7 +44,7 @@ export const EDIT_DEAL_OPTS = [
   { value: 'buy', label: 'Buy' },
   { value: 'rent', label: 'Rent' },
 ];
-export const EDIT_STATUS_OPTS = [
+const EDIT_STATUS_OPTS = [
   { value: 'approved', label: 'Approved' },
   { value: 'pending', label: 'Pending' },
 ];
@@ -66,6 +66,7 @@ const EDIT_BHKS = [
   { value: '5', label: '5+ BHK' },
 ];
 export const editBhkOpts = (current) => withCurrent(EDIT_BHKS, current, `${current} BHK`);
+export const editStatusOpts = (current) => withCurrent(EDIT_STATUS_OPTS, current, `${statusLabel(current)} (current)`);
 
 export const PAGE_LIMIT = 10;
 
