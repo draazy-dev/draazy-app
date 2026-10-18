@@ -154,23 +154,28 @@ test.describe('Property alerts (live)', () => {
     await page.goto('/dashboard#alerts');
 
     await expect(page.getByText(label), 'the alert never appeared in the dashboard list').toBeVisible();
-    const freq = page.getByTestId('alert-frequency').first();
-    // A row created with `daily` must read `daily`, not an empty select: a row that predates the column
+    const freq = page.getByRole('button', { name: /Alert frequency for/ }).first();
+    // A row created with `daily` must read `daily`, not an empty picker: a row that predates the column
     // has no stored cadence at all.
-    await expect(freq).toHaveValue('daily');
+    await expect(freq).toHaveText(/Daily/);
+    const pick = async (option) => {
+      await freq.click();
+      await page.getByRole('option', { name: new RegExp(`^${option}`) }).click();
+    };
 
-    for (const cadence of ['instant', 'weekly']) {
-      await freq.selectOption(cadence);
+    for (const [cadence, option] of [['instant', 'Instant'], ['weekly', 'Weekly']]) {
+      await pick(option);
       await expect.poll(stored, { message: `the server never stored ${cadence}` }).toBe(cadence);
 
-      await freq.selectOption('off');
+      await pick('Paused');
       await expect.poll(stored, { message: 'the server never stored off' }).toBe('off');
     }
     // Back to a real cadence so the delete below is removing a live alert rather than a muted one.
-    await freq.selectOption('daily');
+    await pick('Daily');
     await expect.poll(stored).toBe('daily');
 
     await page.getByRole('button', { name: /Delete alert/i }).click();
+    await page.getByTestId('confirm-modal-ok').click();
     await expect(page.getByText('No alerts yet')).toBeVisible();
     // `remove` is optimistic too: the empty state above appears before the DELETE is issued and
     // stays if it fails, so the row is only gone once the server says so.
@@ -178,5 +183,74 @@ test.describe('Property alerts (live)', () => {
       async () => (await savedSearchesOf(headers)).length,
       { message: 'the row vanished from the screen but not from the server' },
     ).toBe(0);
+  });
+
+  test('the listings bell opens a pre-filled pop-up and saves the criteria picked there', async ({ page }) => {
+    const mobile = await signedInAsNew(page);
+    const headers = await authHeaders(mobile);
+
+    await page.goto('/listings?deal=buy&loc=baner&bhks=3');
+    await page.getByRole('button', { name: 'Alert me', exact: true }).filter({ visible: true }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Create an alert' });
+    await expect(dialog.getByTestId('alert-setup-label')).toContainText('3 BHK');
+    await expect(dialog.getByTestId('alert-setup-label')).toContainText('Baner');
+    await expect(dialog.getByRole('button', { name: '3 BHK' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await savedSearchesOf(headers), 'opening the pop-up must not save anything').toEqual([]);
+
+    await dialog.getByRole('button', { name: '2 BHK' }).click();
+    await dialog.getByRole('radio', { name: 'Weekly' }).click();
+    await dialog.getByRole('button', { name: 'Create alert', exact: true }).click();
+    await expect(dialog).toBeHidden();
+
+    await expect.poll(async () => (await savedSearchesOf(headers)).length).toBe(1);
+    const [saved] = await savedSearchesOf(headers);
+    expect(saved.alertFrequency).toBe('weekly');
+    expect(saved.filters?.deal).toBe('buy');
+    expect(saved.filters?.localities).toEqual(['baner']);
+    expect([...saved.filters.bhk].sort()).toEqual(['2', '3']);
+  });
+
+  test('editing an alert from the dashboard updates it in place', async ({ page }) => {
+    const mobile = uniqueMobile();
+    const headers = await authHeaders(mobile);
+    const label = `Zztest edit ${Date.now()}`;
+    const created = await api('POST', '/me/saved-searches', headers, {
+      kind: 'listings',
+      name: label,
+      query: label,
+      filters: { deal: 'rent', localities: ['baner'], bhk: ['2'], pets: true },
+      alertFrequency: 'off',
+    });
+    expect(created.status, 'creating the alert under test').toBe(201);
+
+    await signedInAs(page, mobile);
+    await page.goto('/dashboard#alerts');
+    const row = page.getByTestId('dashboard-alert-row').filter({ hasText: label });
+    await expect(row.getByRole('link', { name: /View matches/ })).toHaveAttribute('href', /loc=baner.*bhks=2|bhks=2.*loc=baner/);
+
+    await row.getByRole('button', { name: 'Edit', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Edit alert' });
+    await expect(dialog.getByRole('button', { name: '2 BHK' })).toHaveAttribute('aria-pressed', 'true');
+    await expect(dialog.getByRole('radio', { name: 'Paused' })).toHaveAttribute('aria-checked', 'true');
+    await dialog.getByRole('button', { name: '3 BHK' }).click();
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(dialog).toBeHidden();
+
+    await expect.poll(async () => {
+      const rows = await savedSearchesOf(headers);
+      return rows.length === 1 && rows[0].id === created.body.id ? [...rows[0].filters.bhk].sort() : null;
+    }, { message: 'the edit did not update the alert in place' }).toEqual(['2', '3']);
+    const [saved] = await savedSearchesOf(headers);
+    expect(saved.alertFrequency, 'a paused alert stays paused through an edit').toBe('off');
+    expect(saved.filters.pets, 'a facet the form has no control for survives the edit').toBe(true);
+
+    await page.getByTestId('dashboard-alert-row').getByRole('button', { name: 'Edit', exact: true }).click();
+    await dialog.getByRole('radio', { name: 'Weekly' }).click();
+    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await expect(dialog).toBeHidden();
+    await expect(page.getByTestId('dashboard-alert-row')).toHaveCount(1);
+    await expect.poll(async () => (await savedSearchesOf(headers)).map((r) => [r.id, r.alertFrequency]))
+      .toEqual([[created.body.id, 'weekly']]);
   });
 });

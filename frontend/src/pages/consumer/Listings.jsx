@@ -9,7 +9,7 @@ import { getLocality, localitiesIn } from '../../services/localityService.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { setLastSearch, getLastSearch } from '../../lib/localPrefs.js';
 import { useSavedSearchCreate } from '../../context/SavedSearchContext.jsx';
-import { buildAlertRecord } from './listings/alertCriteria.js';
+import AlertSetupModal from './listings/AlertSetupModal.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCity } from '../../context/CityContext.jsx';
 import { cityHasData } from '../../lib/geoConfig.js';
@@ -123,6 +123,7 @@ export default function Listings() {
   const [drawer, setDrawer] = useState(false);
   const [aiQuery, setAiQuery] = useState('');
   const [savingSearch, setSavingSearch] = useState(false);
+  const [alertSeed, setAlertSeed] = useState(null);
   /* Held in state and mirrored to `?q=` by the same effect that writes the filters, because the
    * address bar tolerates only one writer. */
   const [freeText, setFreeText] = useState(() => backRestoreInitial?.freeText || params.get('q') || (!initialHadUrlParams.current ? initialListingsSearch?.q || '' : ''));
@@ -450,17 +451,12 @@ export default function Listings() {
     }
     if (savingSearch) return;
     setSavingSearch(true);
-    // If the box has a typed query, parse it so the saved criteria match the label/text
-    // (and apply it to the results) — no more "label says X but filters say Y" mismatch.
     try {
-      const typed = aiQuery.trim();
-      const parsed = typed ? await parseTyped() : null;
+      // A typed query is parsed first so the pop-up opens on the criteria the user is reading; if parsing fails
+      // the pop-up still opens on the visible filters, which it shows in full before anything is saved.
+      const parsed = aiQuery.trim() ? await parseTyped().catch(() => null) : null;
       if (parsed) applyParsed(parsed);
-      const record = buildAlertRecord(parsed ? parsed.next : f, parsed ? parsed.locNames : locNameBySlug);
-      await createSavedSearch({ ...record, label: typed || record.label, query: typed });
-      toast(tr('listings.searchSavedToast'), 'success');
-    } catch {
-      toast(tr('listings.searchSaveFailedToast'), 'error');
+      setAlertSeed(parsed ? { filters: parsed.next, names: parsed.locNames } : { filters: f, names: locNameBySlug });
     } finally {
       setSavingSearch(false);
     }
@@ -468,6 +464,9 @@ export default function Listings() {
   return (
     <>
       <MobileFilterDrawer drawer={drawer} setDrawer={setDrawer} f={f} set={set} localities={localities} onAddLocality={addLocalityOption} clearAll={clearAll} total={total} triggerRef={filterTriggerRef} onBackClose={markDrawerBackClose} />
+      {alertSeed ? (
+        <AlertSetupModal initial={alertSeed.filters} locNameBySlug={alertSeed.names} onSubmit={createSavedSearch} onClose={() => setAlertSeed(null)} />
+      ) : null}
 
       {/* This route is selfPadded, so the top offset derives from the navbar token plus a breathing gap rather than
          restating the bar's height. */}

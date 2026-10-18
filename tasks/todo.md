@@ -7,6 +7,11 @@
 
 ## Open
 
+- [ ] **ALERT-SETUP** Listings bell opens `AlertSetupModal` (pre-filled from current filters; deal, localities, BHK, budget/rent, type, furnishing, cadence); dashboard `AlertsPanel` redesigned with themed cadence `Select`, Edit in place (`PATCH /me/saved-searches/{id}` now takes `filters`+`query`+`name`; restarts the new-match count, 409 on a duplicate, 400 for flatmates), View matches carrying the filters:
+  - [x] Backend: `SavedSearchUpdateRequest`/`SavedSearchService.update`, OpenAPI; `SavedSearchUpdateTest` +4 (saved-search, spec parity, size guard green)
+  - [x] Frontend: modal, Listings/ResultsArea wiring, AlertsPanel, `searchHref` carries facets
+  - [x] E2E `property/alerts` + `alert-match-count` + `flatmates/alerts-card` updated, plus saved/home-payload/integration-account neighbours (45/45 green on a private lane); new bell-modal + in-place edit tests; COVERAGE row
+  - [ ] PENDING `run-fast.ps1 -Full` (shard lanes busy with another session at the time)
 - [ ] **ONE-KEY** single-staff approvals (#330), migrations 26.10.34–36; dashboard shows identity pending/verified. e2e green on a private lane (117/118: identity, property moderation, registration-check, service-desk, plans-checkout, kyc-growth-levers). `docs/Draazy-Tester-Checklist.xlsx` rows 92, 132, 309–311 still describe held drafts.
 - [x] **INBOX-UNREAD** `/notifications` opens on unread only; read rows behind "Show read notifications" (`GET /notifications?read=`). Retention: read rows purged at 30 days, all at 90. Backend 65 green; e2e `account/notifications` + neighbours green. `account/notification-types` "2 new enquiries" green again once `photo.requested` also links to `/messages?tab=requests` (REQ-INBOX).
 - [ ] **E2E-METER** possibly pre-existing: `ops/verification-thread` "a duplicate meter files a staff-only note" fails, since `POST /me/listings` stores no `electricity_meter_key` for `electricityMeterNo`, so `ListingDuplicateProbe` never fires.

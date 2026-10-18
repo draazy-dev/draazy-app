@@ -15,13 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
-/**
- * {@code PATCH /me/saved-searches/{id}} — the update path saved-search alerts shipped without.
- *
- * <p>Alerts were a complete consumer feature with create and delete and nothing in between, so the
- * toggle the UI renders had nowhere to send its change. The frontend mock has carried a
- * {@code toggleSearchAlert} operation the whole time; this is the backend catching up to it.
- */
 @DisplayName("Saved searches — alert preferences are editable")
 class SavedSearchUpdateTest extends AbstractApiTest {
 
@@ -61,11 +54,7 @@ class SavedSearchUpdateTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.channel").value("push"));
     }
 
-    /**
-     * The gesture the UI actually needs. {@code off} is a value in the vocabulary rather than a
-     * null, which is why this record does not need the absent-vs-null distinction that tech-debt
-     * D46 records as missing on {@code TicketUpdate}.
-     */
+    /** {@code off} is a vocabulary value, not a null, so this record needs no absent-vs-null distinction. */
     @Test
     @DisplayName("turning alerts off is a value, not an absence")
     void alertsCanBeTurnedOff() throws Exception {
@@ -94,10 +83,81 @@ class SavedSearchUpdateTest extends AbstractApiTest {
                 .andExpect(status().isUnprocessableEntity());
     }
 
-    /**
-     * User-scoping, asserted as 404 rather than 403. Telling a caller "that exists but is not
-     * yours" is itself a disclosure — it confirms the id is real.
-     */
+    @Test
+    @DisplayName("an edited listings alert keeps its id and swaps its filters in place")
+    void filtersAreReplacedInPlace() throws Exception {
+        User u = seeker("9820000006");
+        String id = createSearch(u);
+
+        mvc.perform(patch("/me/saved-searches/" + id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"3 BHK · Buy · Kothrud\",\"query\":\"3 BHK · Buy · Kothrud\","
+                                + "\"filters\":{\"deal\":\"buy\",\"bhk\":[\"3\"],\"localities\":[\"kothrud\"]},"
+                                + "\"alertFrequency\":\"weekly\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.name").value("3 BHK · Buy · Kothrud"))
+                .andExpect(jsonPath("$.filters.bhk[0]").value("3"))
+                .andExpect(jsonPath("$.filters.localities[0]").value("kothrud"))
+                .andExpect(jsonPath("$.alertFrequency").value("weekly"))
+                .andExpect(jsonPath("$.newCount").value(0));
+
+        mvc.perform(get("/me/saved-searches").header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
+    @DisplayName("editing an alert into a copy of another one is a 409")
+    void editIntoDuplicateConflicts() throws Exception {
+        User u = seeker("9820000007");
+        String id = createSearch(u);
+        mvc.perform(post("/me/saved-searches")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\":\"1bhk wakad\",\"filters\":{\"bhk\":[\"1\"]}}"))
+                .andExpect(status().isCreated());
+
+        mvc.perform(patch("/me/saved-searches/" + id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\":\"1BHK Wakad\",\"filters\":{\"bhk\":[\"1\"]}}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("new filters without a query are a 422")
+    void filtersNeedAQuery() throws Exception {
+        User u = seeker("9820000008");
+        String id = createSearch(u);
+
+        mvc.perform(patch("/me/saved-searches/" + id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"filters\":{\"bhk\":[\"2\"]}}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    @DisplayName("a flatmates alert's filters are not editable here")
+    void flatmateFiltersAreRejected() throws Exception {
+        User u = seeker("9820000009");
+        String body = mvc.perform(post("/me/saved-searches")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"kind\":\"flatmates\",\"criteria\":{\"tab\":\"rooms\"}}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String id = body.replaceAll("(?s).*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+
+        mvc.perform(patch("/me/saved-searches/" + id)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(u))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"query\":\"rooms\",\"filters\":{\"tab\":\"rooms\"}}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    /** 404, not 403: "exists but not yours" would confirm the id is real. */
     @Test
     @DisplayName("another user's saved search is 404, never 403")
     void crossUserUpdateIsNotFound() throws Exception {

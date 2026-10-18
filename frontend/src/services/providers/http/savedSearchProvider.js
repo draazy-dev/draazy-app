@@ -78,6 +78,11 @@ export async function updateSavedSearch(id, changes = {}) {
   return toViewModel(await patch(`/me/saved-searches/${encodeURIComponent(id)}`, changes));
 }
 
+export async function editSavedSearch(id, record = {}) {
+  const { name, query, filters, alertFrequency } = toCreateRequest(record);
+  return updateSavedSearch(id, { name, query, filters, alertFrequency });
+}
+
 export async function deleteSavedSearch(id) {
   await del(`/me/saved-searches/${encodeURIComponent(id)}`);
 }

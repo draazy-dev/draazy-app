@@ -1,4 +1,5 @@
 import { fmtINR } from '../../../lib/format.js';
+import { deserializeF, filtersToParams } from '../../../lib/listings/filterState.js';
 import { fmtRent } from './format.js';
 import { BUY_TYPES, RENT_TYPES, COMMERCIAL_TYPES } from '../../../data/propertyTypes.js';
 import { BHK_BUY, BHK_RENT, FURN_LBL, AMEN_LBL } from './constants.js';
@@ -111,9 +112,6 @@ export function countMatches(rec, props = []) {
 }
 
 export function searchHref(rec) {
-  const params = new URLSearchParams();
-  params.set('deal', rec.deal === 'rent' ? 'rent' : 'buy');
-  const loc = asArr(rec.localities)[0];
-  if (loc) params.set('q', String(loc).toLowerCase());
+  const params = new URLSearchParams({ deal: rec.deal === 'rent' ? 'rent' : 'buy', ...filtersToParams(deserializeF(rec)) });
   return '/listings?' + params.toString();
 }

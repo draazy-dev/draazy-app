@@ -28,6 +28,7 @@ public class SavedSearch extends BaseEntity {
 
     /** Nullable since V27: a flatmates alert carries {@link #criteria} instead. */
     @Column(name = "query")
+    @Setter
     private String query;
 
     // A listings alert is a URL query string; a flatmates alert is a criteria object, so the kind is explicit.

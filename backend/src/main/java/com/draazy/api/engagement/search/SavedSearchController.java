@@ -16,11 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * {@code /me/saved-searches} — persisted searches with alert preferences.
- *
- * <p>No {@code @PreAuthorize}: the contract carries no {@code x-roles}. Caller-scoping is the guard.
- */
+/** No {@code @PreAuthorize}: the contract carries no {@code x-roles}; caller-scoping is the guard. */
 @RestController
 public class SavedSearchController {
 
@@ -44,13 +40,7 @@ public class SavedSearchController {
         return service.create(principal.userId(), request);
     }
 
-    /**
-     * {@code PATCH /me/saved-searches/{id}} (contract {@code updateSavedSearch}) — alert
-     * preferences only.
-     *
-     * <p>The query itself is not editable: changing it replaces the alert rather than modifying it.
-     * See {@link SavedSearchUpdateRequest}.
-     */
+    /** {@code PATCH /me/saved-searches/{id}} (contract {@code updateSavedSearch}). */
     @PatchMapping(Routes.Engagement.SAVED_SEARCH_BY_ID)
     public SavedSearchResponse update(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody SavedSearchUpdateRequest request) {

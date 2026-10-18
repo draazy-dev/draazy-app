@@ -88,13 +88,13 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
 
                     {/* `search-submit-shape.spec.js` pins its diameter to `barH - 8`. */}
                     <div className="sm:hidden absolute inset-y-0 right-1 flex items-center gap-1">
-                      <button type="button" onClick={saveSearch} disabled={savingSearch} aria-busy={savingSearch || undefined} aria-label={t('listings.saveSearch')} className="lst-search-bell w-11 self-stretch flex items-center justify-center text-gray-400 hover:text-teal-300 disabled:opacity-50 disabled:pointer-events-none t-all"><Icon name={savingSearch ? 'loader' : 'bell-plus'} className={'w-4 h-4' + (savingSearch ? ' animate-spin' : '')} /></button>
+                      <button type="button" onClick={saveSearch} disabled={savingSearch} aria-busy={savingSearch || undefined} aria-label={t('listings.alertMe')} className="lst-search-bell w-11 self-stretch flex items-center justify-center text-gray-400 hover:text-teal-300 disabled:opacity-50 disabled:pointer-events-none t-all"><Icon name={savingSearch ? 'loader' : 'bell-plus'} className={'w-4 h-4' + (savingSearch ? ' animate-spin' : '')} /></button>
                       <button type="button" onClick={smartSearch} aria-label={t('listings.smartSearch')} className="lst-search-go tap-extend relative w-9 h-9 rounded-full btn-primary flex items-center justify-center"><Icon name="search" className="w-4 h-4" /></button>
                     </div>
                   </div>
                   <div className="hidden sm:flex gap-2">
                     <Button onClick={smartSearch} variant="primary" icon="search">{t('listings.smartSearch')}</Button>
-                    <Button onClick={saveSearch} variant="secondary" icon="bell-plus" loading={savingSearch} aria-label={t('listings.saveSearch')}><span className="hidden sm:inline">{t('listings.saveSearch')}</span></Button>
+                    <Button onClick={saveSearch} variant="secondary" icon="bell-plus" loading={savingSearch} aria-label={t('listings.alertMe')}><span className="hidden sm:inline">{t('listings.alertMe')}</span></Button>
                   </div>
                 </div>
               </div>
