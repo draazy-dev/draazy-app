@@ -17,7 +17,7 @@ import { useVerification } from '../../../context/VerificationContext.jsx';
 import { track, captureLead } from '../../../lib/pmf.js';
 import useScrollLock from '../../../hooks/useScrollLock.js';
 import useModalDialog from '../../../hooks/useModalDialog.js';
-import { dialableMobile, telHref, whatsappHref } from './contactPhone.js';
+import { dialableMobile, telHref } from './contactPhone.js';
 import { ownerVerificationMeta, OwnerRoleLine, OwnerVerifiedMark } from './ownerVerification.jsx';
 import { propertyKey } from '../../../lib/listingSeo.js';
 
@@ -224,10 +224,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
             <>
               <p className="text-xs text-slate-400 mb-1">{t('property.ownersNumber')}</p>
               {ownerDialable ? (
-                <>
-                  <a href={telHref(ownerMobile)} className="flex items-center gap-2 text-base font-semibold text-brand-teal-3 hover:underline"><Icon name="phone" className="w-4 h-4" /> {fmtPhone(ownerMobile)}</a>
-                  <a href={whatsappHref(ownerMobile)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 mt-2 text-emerald-400 text-xs font-medium hover:underline"><Icon name="message-circle" className="w-3.5 h-3.5" /> {t('property.messageOnWhatsapp')}</a>
-                </>
+                <a href={telHref(ownerMobile)} className="flex items-center gap-2 text-base font-semibold text-brand-teal-3 hover:underline"><Icon name="phone" className="w-4 h-4" /> {fmtPhone(ownerMobile)}</a>
               ) : (
                 <div className="flex items-center gap-2 text-sm text-slate-300 mb-2"><Icon name="phone-off" className="w-4 h-4 text-slate-500" /> <span className="tracking-wider">{maskPhone(ownerMobile)}</span></div>
               )}

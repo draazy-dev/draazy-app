@@ -10,13 +10,14 @@ import { OwnerCard } from './OwnerCard.jsx';
 import { DealPanel } from './DealPanel.jsx';
 import { GroupApplyCard } from './GroupApplyCard.jsx';
 import { CompareToggleBar } from './CompareToggleBar.jsx';
+import { VisitCta } from './ActionCtas.jsx';
 
 export default function PropertyHeader({ ctx, priceOnHero = false }) {
   const {
     tags, priceStr, isRent, isLand, tr, title, p,
     perUnitVal, perUnitLabel, showPerUnit, kind,
-    setReportOpen, isIn, toast, contactApproved, ownerHidesNumber, ownerMob, handleContact, handleSchedule, canChat,
-    flagEnabled,
+    setReportOpen, isIn, toast, contactApproved, ownerMob, handleContact, handleSchedule, canChat,
+    flagEnabled, contactStatus, myVisits,
   } = ctx;
   const deposit = Number(p.deposit) > 0 ? fmtINR(p.deposit) : '';
   const dateKey = p.freshenedAt ? 'property.updatedAgo' : 'property.postedAgo';
@@ -168,14 +169,14 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
             <div className="space-y-4">
 
               <div className="dz-owner-rail hidden lg:block">
-                <OwnerCard p={p} isIn={isIn} toast={toast} contactApproved={contactApproved} ownerHidesNumber={ownerHidesNumber} ownerMob={ownerMob} onContact={handleContact} canChat={canChat} />
+                <OwnerCard p={p} isIn={isIn} toast={toast} contactApproved={contactApproved} contactStatus={contactStatus} ownerMob={ownerMob} onContact={handleContact} canChat={canChat} />
               </div>
 
               {/* Hidden on mobile: the sticky bottom bar already exposes "Visit", so this standalone button would be
                  a third copy of the same action. */}
               {flagEnabled('scheduleVisit') && (
                 <div className="hidden lg:block">
-                  <button onClick={handleSchedule} className="btn-teal w-full flex items-center justify-center gap-2 py-3 shadow-none"><Icon name="calendar" className="w-5 h-5" /> {tr('property.scheduleVisit')}</button>
+                  <VisitCta visits={myVisits} onSchedule={handleSchedule} label={tr('property.scheduleVisit')} iconClassName="w-5 h-5" className="btn-teal w-full flex items-center justify-center gap-2 py-3 shadow-none" />
                 </div>
               )}
 

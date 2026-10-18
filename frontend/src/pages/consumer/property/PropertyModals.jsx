@@ -7,8 +7,8 @@ import InlineOtpSheet from '../../../components/auth/InlineOtpSheet.jsx';
 
 export default function PropertyModals({ ctx }) {
   const {
-    contactOpen, setContactOpen,
-    visitOpen, setVisitOpen, reportOpen, setReportOpen,
+    contactOpen, closeContact,
+    visitOpen, closeVisit, reportOpen, setReportOpen,
     lightbox, setLightbox,
     p, isIn, toast, flagEnabled,
     inlineOtpReason, closeInlineOtp, onInlineOtpVerified,
@@ -18,8 +18,8 @@ export default function PropertyModals({ ctx }) {
   return (
     <>
       <InlineOtpSheet open={!!inlineOtpReason} reason={inlineOtpReason || 'contact'} onClose={closeInlineOtp} onVerified={onInlineOtpVerified} />
-      {contactOpen ? <ContactOwnerModal p={p} isIn={isIn} onClose={() => setContactOpen(false)} toast={toast} /> : null}
-      {visitOpen && flagEnabled('scheduleVisit') ? <ScheduleVisitModal p={p} isIn={isIn} onClose={() => setVisitOpen(false)} toast={toast} /> : null}
+      {contactOpen ? <ContactOwnerModal p={p} isIn={isIn} onClose={closeContact} toast={toast} /> : null}
+      {visitOpen && flagEnabled('scheduleVisit') ? <ScheduleVisitModal p={p} isIn={isIn} onClose={closeVisit} toast={toast} /> : null}
       {reportOpen ? <ReportModal p={p} onClose={() => setReportOpen(false)} toast={toast} /> : null}
 
       {lightbox && gallery[active] ? <PhotoLightbox photos={gallery} active={active} setActive={setActive} title={title} onClose={closeLightbox} /> : null}

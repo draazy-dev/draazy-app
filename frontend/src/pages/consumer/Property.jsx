@@ -13,6 +13,7 @@ import PropertyHeader from './property/PropertyHeader.jsx';
 import PropertyTabs from './property/PropertyTabs.jsx';
 import PropertyModals from './property/PropertyModals.jsx';
 import ListingUnavailable from './property/ListingUnavailable.jsx';
+import { ContactCta, VisitCta } from './property/ActionCtas.jsx';
 import usePageHead from '../../lib/usePageHead.js';
 import { listingHead, listingJsonLd, propertyHref } from '../../lib/listingSeo.js';
 
@@ -77,6 +78,7 @@ export default function Property() {
     rootRef, returnTo, isRent, title, gallery, active, setActive,
     setLightbox, requestPhotos, tabs, current, selectTab,
     contactApproved, handleContact, handleSchedule, canChat, isOwner, ownerPreview, staffPreview,
+    contactStatus, myVisits,
   } = ctx;
   const openChat = async (event) => {
     event?.preventDefault();
@@ -144,9 +146,7 @@ export default function Property() {
               ) : (
                 /* Deliberately no wa.me deep link and no number on this surface: it routes through the same gate as
                    every other contact entry point, so an always-visible CTA is not a way around it. */
-                <button type="button" onClick={handleContact} className="btn-teal flex items-center gap-1.5 text-sm font-semibold py-2 px-4 shadow-none">
-                  <Icon name="message-circle" className="w-4 h-4" /> {tr('property.contactOwner')}
-                </button>
+                <ContactCta status={contactStatus} onClick={handleContact} className="btn-teal flex items-center gap-1.5 text-sm font-semibold py-2 px-4 shadow-none" />
               )}
             </div>
           </div>
@@ -162,10 +162,10 @@ export default function Property() {
         ) : (
           /* Never branches on approval: the sidebar owner card is `lg:` only, so this sheet is
            * a phone's only surface for the number, WhatsApp and chat in every gate state. */
-          <button type="button" onClick={handleContact} className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4"><Icon name="message-circle" className="w-4 h-4" /> {tr('property.contactOwner')}</button>
+          <ContactCta status={contactStatus} onClick={handleContact} className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4" />
         )}
 
-        {!isOwner && flagEnabled('scheduleVisit') && <button type="button" onClick={handleSchedule} className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl border border-white/15 text-slate-200 text-sm font-semibold px-[1.125rem]"><Icon name="calendar" className="w-4 h-4" /> {tr('property.visit')}</button>}
+        {!isOwner && flagEnabled('scheduleVisit') && <VisitCta visits={myVisits} onSchedule={handleSchedule} className="flex-1 min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl border border-white/15 text-slate-200 text-sm font-semibold px-[1.125rem]" />}
       </div>
 
       <PropertyModals ctx={ctx} />
