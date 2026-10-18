@@ -257,9 +257,8 @@ const TINY_PNG = Buffer.from(
 );
 
 // Two calls: the simulate endpoint 404s on an account with no pending case, so file one first.
-export async function grantIdentityBadge(mobile, { api = API } = {}) {
+export async function fileIdentityCase(mobile, { api = API } = {}) {
   const { authorization } = await authHeaders(mobile, { api });
-
   const form = new FormData();
   form.set('docType', 'pan');
   form.set('consent', 'true');
@@ -274,6 +273,11 @@ export async function grantIdentityBadge(mobile, { api = API } = {}) {
   if (!filed.ok) {
     throw new Error(`filing an identity case failed for ${mobile}: ${filed.status} ${await filed.text()}`);
   }
+  return authorization;
+}
+
+export async function grantIdentityBadge(mobile, { api = API } = {}) {
+  const authorization = await fileIdentityCase(mobile, { api });
 
   const res = await fetch(`${api}/me/verification/identity/simulate`, {
     method: 'POST',

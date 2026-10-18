@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
@@ -102,6 +102,24 @@ function AlertNudge({ matches, go }) {
   );
 }
 
+function VerifyPending({ submittedAt, t }) {
+  const ago = fmtAgo(submittedAt);
+  return (
+    <Card className="p-5 sm:p-6" data-testid="verify-badge-pending">
+      <Link to="/verify-identity" className="flex items-center gap-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50">
+        <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-amber-500/15">
+          <Icon name="clock" className="h-5 w-5 text-amber-300" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-white sm:text-base">{t('verify.overviewPendingTitle')}</span>
+          <span className="mt-0.5 block text-xs text-gray-400 sm:text-sm">{ago ? t('verify.overviewPendingBodyAgo', { ago }) : t('verify.overviewPendingBody')}</span>
+        </span>
+        <Icon name="chevron-right" className="h-4 w-4 text-gray-600" />
+      </Link>
+    </Card>
+  );
+}
+
 function VerifyNudge({ onStart, t }) {
   return (
     <Card className="relative overflow-hidden p-5 sm:p-6" data-testid="verify-badge-cta">
@@ -190,13 +208,19 @@ function SeekerFeed({ recent, recommended, go }) {
 export default function OverviewPanel({ isOwner, go, recent, recommended = [], stats = [], alertMatches = [], profile = null, actionItems = [], recentSearches = [] }) {
   const { t } = useTranslation();
   const [badgeOpen, setBadgeOpen] = useState(false);
-  const { verified, loading: verifying } = useVerification();
+  const { verified, status: verifyStatus, submittedAt, loading: verifying, refresh: refreshVerification } = useVerification();
+  // The badge is read once per session, so a decision made since then must be re-read here.
+  useEffect(() => {
+    if (verifyStatus === 'pending') refreshVerification().catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- once per dashboard visit, not on every status change
   const statTiles = stats.map(statTile);
   const showProfile = profile && profile.percent < 100;
   const nudge = alertMatches.length
     ? <AlertNudge matches={alertMatches} go={go} />
     : verifying
       ? null
+      : verifyStatus === 'pending'
+      ? <VerifyPending submittedAt={submittedAt} t={t} />
       : !verified
       ? <VerifyNudge onStart={() => setBadgeOpen(true)} t={t} />
       : showProfile

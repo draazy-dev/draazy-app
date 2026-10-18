@@ -205,3 +205,4 @@ hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 - **Staff work queues list newest first** (To verify, Re-checks, Badge requests, Follow-up, Flagged, KYC, Flatmates): the user wants a new listing on top; overdue rows are found by their rose tag, not by FIFO order.
 - **Back-office mobiles are never masked or hidden**: every staff/admin page shows a customer's full mobile wherever it shows the customer, with no reveal step and no list audit; masking stays on consumer surfaces only.
 - **One staff decision is final** (#330): never add a second-reviewer, QA-sample or override-request step to an approval; only refunds are two-person. Self-action guards (own listing/case/upload) stay.
+- **A submitted case is "in review", not "unverified"**: consumer cards must show what the user already sent (identity, listing) instead of re-asking.
