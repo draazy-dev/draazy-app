@@ -59,6 +59,28 @@ test.describe('PWA installability', () => {
     }
   });
 
+  test('home-screen icons use the light tile, and the iOS icon is an opaque full square', async ({ page }) => {
+    await page.goto('/');
+    const touch = await page.locator('link[rel="apple-touch-icon"]').getAttribute('href');
+    const { icons } = await (await page.request.get('/manifest.webmanifest')).json();
+    // Top-centre is tile on every icon; the corner is tile only on the iOS one, which must not be transparent.
+    const probe = (src) => page.evaluate(async (url) => {
+      const img = new Image();
+      img.src = url;
+      await img.decode();
+      const c = Object.assign(document.createElement('canvas'), { width: img.width, height: img.height });
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const px = (x, y) => [...ctx.getImageData(x, y, 1, 1).data];
+      return { tile: px(img.width >> 1, Math.round(img.height * 0.1)), corner: px(0, 0) };
+    }, src);
+    const LIGHT_TILE = [0xf3, 0xf7, 0xf6, 255];
+    for (const src of [touch, ...icons.map((i) => i.src)]) {
+      expect((await probe(src)).tile, `${src} is not on the light tile`).toEqual(LIGHT_TILE);
+    }
+    expect((await probe(touch)).corner, 'iOS paints transparent corners black').toEqual(LIGHT_TILE);
+  });
+
   test('no service worker is active in dev, so the suite stays deterministic', async ({ page }) => {
     await page.goto('/');
     const state = await page.evaluate(async () => ({

@@ -3,20 +3,25 @@ import { useTranslation } from 'react-i18next';
 import Icon from './Icon.jsx';
 import { useConnectivity } from '../hooks/useConnectivity.js';
 import { reportError } from '../lib/errorReporter.js';
+import { reloadOnceForStaleShell, updateWorkerThenReload } from '../lib/seamErrors.js';
 
 /* Catches a render error so a broken route shows a recoverable card, not a white screen. `resetKey` (the
    pathname, in layouts) clears it on navigation; the shown reference matches the admin Error Log row. */
 
 const CHUNK_LOAD_ERROR = /dynamically imported module|Importing a module script failed|Loading chunk|ChunkLoadError/i;
 
-/* A rejected `React.lazy` stays rejected, so re-rendering cannot recover it — only a reload can. */
+/* A rejected `React.lazy` stays rejected, so re-rendering cannot recover it — only a reload can. Online, that
+   is almost always a deploy that deleted the chunk an old cached shell names, so it reloads once by itself. */
 function ChunkLoadFallback({ reference }) {
   const { t } = useTranslation();
   const { status } = useConnectivity();
   const offline = status === 'offline';
 
   useEffect(() => {
-    if (!offline) return undefined;
+    if (!offline) {
+      reloadOnceForStaleShell();
+      return undefined;
+    }
     const reload = () => window.location.reload();
     window.addEventListener('online', reload);
     return () => window.removeEventListener('online', reload);
@@ -34,7 +39,7 @@ function ChunkLoadFallback({ reference }) {
         </p>
         <button
           type="button"
-          onClick={() => window.location.reload()}
+          onClick={updateWorkerThenReload}
           disabled={offline}
           className="dz-control dz-control--action px-4 gap-1.5 mt-1 disabled:opacity-50"
         >
