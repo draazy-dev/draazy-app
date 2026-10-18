@@ -13662,7 +13662,11 @@ components:
       required: [mobile, city]
       properties:
         mobile: { $ref: '#/components/schemas/Mobile' }
-        city: { type: string }
+        city:
+          type: string
+          maxLength: 120
+          pattern: '^\s*\p{L}[\p{L}\p{M} .''-]*$'
+          description: A place name - letters, spaces, and . ' - only.
         email: { type: string, format: email }
     CityAdminUpdate:
       type: object
@@ -18532,10 +18536,12 @@ components:
         localitySlug:
           type: string
           maxLength: 120
+          pattern: '^\s*$|^[a-z0-9]+(-[a-z0-9]+)*$'
           description: >
             Where they were looking. Not a foreign key, and not required - a signal for a place the
             platform does not cover is the most valuable row this endpoint can produce, and a
-            missing one still counts toward "people are searching".
+            missing one still counts toward "people are searching". Must be slug-shaped, so
+            scanner payloads cannot appear in the supply-gap report as places.
         deal: { type: string, enum: [buy, rent] }
         bhk: { type: string, maxLength: 40, description: As typed in the filter, not normalised. }
         propertyId:

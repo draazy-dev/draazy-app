@@ -203,6 +203,31 @@ test('a failed supply-gap read says so instead of zeroing every locality KPI', a
   await expect(page.getByRole('heading', { name: 'City Expansion Requests' })).toBeVisible();
 });
 
+test('scanner payloads cannot become localities or cities, and a long label cannot widen the supply-gap table', async ({ page, login, request }) => {
+  await login.asAdmin();
+  for (const localitySlug of ['/etc/passwd', '../../../etc/passwd', 'c:\\Windows\\win.ini', '/']) {
+    const res = await request.post(`${API}/demand-signals`, { data: { kind: 'alert', localitySlug } });
+    expect(res.status(), localitySlug).toBe(422);
+  }
+  const city = await request.post(`${API}/cities/waitlist`, { data: { city: '<img src=x>', mobile: '9830000099' } });
+  expect(city.status()).toBe(422);
+
+  // Slug- and letter-shaped values still pass validation at full length, so the layout must hold them.
+  const long = 'a'.repeat(120);
+  await page.route('**/admin/supply-gap*', (route) => route.fulfill({
+    json: [{ localitySlug: long, supply: 0, searches: 1, alerts: 1, views: 0, repeatSeekers: 0, demand: 7, demandPerListing: 7 }],
+  }));
+  await page.route('**/admin/cities/waitlist', (route) => route.fulfill({
+    json: [{ city: 'B'.repeat(120), requests: 1, lastRequestedAt: new Date().toISOString() }],
+  }));
+  await openAnalytics(page, 'supply-gap');
+  const table = page.locator('#analytics-panel table');
+  await expect(table).toContainText('Per listing');
+  const { scroll, client } = await table.evaluate((t) => ({ scroll: t.scrollWidth, client: t.parentElement.clientWidth }));
+  expect(scroll).toBeLessThanOrEqual(client);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
 test('Funnel tab totals each stage over the window the API reports', async ({ page, login, request }) => {
   await login.asAdmin();
   const res = await request.get(`${API}/admin/analytics/funnel?days=30`, { headers: await admin() });

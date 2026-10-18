@@ -137,7 +137,9 @@ class CatalogEndpointsTest extends AbstractApiTest {
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
             "waitlistRejectsAMalformedMobile | {\"mobile\":\"12345\",\"city\":\"Nashik\"}",
-            "waitlistRequiresACity           | {\"mobile\":\"9830000005\",\"city\":\"  \"}"})
+            "waitlistRequiresACity           | {\"mobile\":\"9830000005\",\"city\":\"  \"}",
+            "waitlistRefusesAPathAsACity     | {\"mobile\":\"9830000006\",\"city\":\"../../etc/passwd\"}",
+            "waitlistRefusesMarkupAsACity    | {\"mobile\":\"9830000007\",\"city\":\"<img src=x>\"}"})
     void waitlistRejectsAnInvalidSignup(String name, String body) throws Exception {
         mvc.perform(post("/cities/waitlist").contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isUnprocessableEntity());
