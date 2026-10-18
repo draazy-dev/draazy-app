@@ -112,6 +112,21 @@ class DemandSignalTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("a locality that is not slug-shaped is refused, so scanner payloads never reach the report")
+    void theLocalityIsSlugShaped() throws Exception {
+        for (String junk : new String[] {"/etc/passwd", "../../etc/passwd", "c:\\\\Windows\\\\win.ini", "/",
+                "<script>", "Baner", "' OR '1'='1"}) {
+            mvc.perform(post("/demand-signals").contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"kind\":\"alert\",\"localitySlug\":\"" + junk + "\"}"))
+                    .andExpect(status().isUnprocessableEntity());
+        }
+        em.flush();
+
+        assertThat(jdbc.queryForObject("select count(*) from demand_signals where locality_slug !~ '^[a-z0-9]+(-[a-z0-9]+)*$'",
+                Integer.class)).isZero();
+    }
+
+    @Test
     @DisplayName("an empty locality is stored as absent, not as a place named nothing")
     void blankLocalityBecomesNull() throws Exception {
         send("{\"kind\":\"search\",\"localitySlug\":\"\"}");
