@@ -58,7 +58,11 @@
   - `src/pages/admin/properties/PropertyReviewModal.jsx` - per-listing review (docs, thread, decision).
   - `src/pages/admin/properties/review-modal/*` - `DocPill`, `DocViewerModal`, `WhatsappTemplates`,
     `CommunicationLog`.
-  - `src/pages/admin/properties/PropertyModals.jsx` - flag / archive / edit / re-check reject modals.
+  - `src/pages/admin/properties/PropertyModals.jsx` - flag / archive / re-check reject modals.
+  - `src/pages/admin/properties/PropertyEditModal.jsx` + `editForm.js` - the tabbed Edit listing popup
+    (Basics, Details, Location, Pricing, Description, Photos). It sends only the changed fields to
+    `PATCH /properties/{id}/admin`. Status offers only Approved and Pending, plus the listing's current
+    status, because `/status` refuses the rest.
 
 ## 3. Actors & roles
 - **Maker = owner** (or a concierge "post on behalf" staffer). Submits the listing; cannot approve it,

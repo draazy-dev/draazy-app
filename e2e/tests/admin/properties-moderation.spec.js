@@ -287,3 +287,53 @@ test('moving a listing to another locality moves its map pin to that locality', 
   expect([Number(after.lat), Number(after.lng)]).toEqual([Number(wakad.lat), Number(wakad.lng)]);
   expect(after.status).toBe('approved');
 });
+
+test('a paused listing shows its own status, and every tab of the edit popup saves what the owner entered', async ({ page, request, consoleErrors }) => {
+  const title = `Full edit ${Date.now()}`;
+  const { id, headers } = await freshListing(title);
+  expect((await approveListing(request, id, await admin())).status()).toBe(200);
+  // The free tier may already have held it back as paused, in which case the owner's pause is refused.
+  await fetch(`${API}/me/listings/${id}/pause`, { method: 'POST', headers, body: '{}' });
+  expect((await (await fetch(`${API}/me/listings/${id}`, { headers })).json()).status).toBe('paused');
+
+  await signIn(page, ACTORS.admin, { screen: 'staff' });
+  await page.goto('/admin/properties?tab=all');
+  await page.getByPlaceholder('Title, owner, mobile or ID').first().fill(title);
+  const row = page.getByTestId('queue-row').filter({ has: page.getByRole('heading', { name: title }) });
+  await expect(row).toHaveCount(1, { timeout: 20000 });
+  await row.getByRole('button', { name: 'Edit', exact: true }).click();
+  const modal = page.getByRole('dialog', { name: 'Edit listing' });
+
+  const statusBox = modal.getByRole('button', { name: 'Status' });
+  await expect(statusBox).toContainText('Paused (current)');
+  await statusBox.click();
+  await expect(page.getByRole('option')).toHaveText(['Approved', 'Pending', 'Paused (current)']);
+  await page.keyboard.press('Escape');
+  await expect(modal.getByRole('tab')).toHaveText(['Basics', 'Details', 'Location', 'Pricing', 'Description', 'Photos']);
+
+  await modal.getByRole('tab', { name: 'Details' }).click();
+  await modal.getByLabel('Bathrooms').fill('2');
+  await modal.getByRole('button', { name: 'Furnishing' }).click();
+  await page.getByRole('option', { name: 'Semi-furnished', exact: true }).click();
+  await modal.getByRole('tab', { name: 'Location' }).click();
+  await modal.getByLabel('Address').fill('A-302, Green Acres, Baner Road');
+  await modal.getByLabel('Pincode').fill('411045');
+  await modal.getByRole('tab', { name: 'Pricing' }).click();
+  await modal.getByLabel(/Security deposit/).fill('60000');
+  await modal.getByRole('group', { name: 'Preferred tenants' }).getByRole('button', { name: 'Family' }).click();
+  await modal.getByRole('tab', { name: 'Description' }).click();
+  await modal.getByRole('textbox', { name: 'Description' }).fill('Sunny two-bedroom flat close to the Baner high street, corrected by the desk.');
+  await modal.getByRole('group', { name: 'Amenities' }).getByRole('button', { name: 'Lift' }).click();
+  await modal.getByRole('button', { name: /Save changes/i }).click();
+  await expect(modal).toHaveCount(0);
+
+  const after = await (await fetch(`${API}/me/listings/${id}`, { headers })).json();
+  expect(after).toMatchObject({
+    status: 'paused', bathrooms: 2, furnishing: 'semi-furnished', address: 'A-302, Green Acres, Baner Road',
+    pincode: '411045', description: 'Sunny two-bedroom flat close to the Baner high street, corrected by the desk.',
+  });
+  expect(Number(after.deposit)).toBe(60000);
+  expect(after.tenants).toContain('family');
+  expect(after.amenities).toContain('Lift');
+  expect(consoleErrors).toEqual([]);
+});
