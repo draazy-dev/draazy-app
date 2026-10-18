@@ -170,18 +170,27 @@ public interface PropertyRepository
 
     /** Featured-first live listings for the homepage strip; the {@link Pageable} caps the result
      * because the contract endpoint takes no limit. Summary projection, so no owner graph. */
-    List<Property> findByStatusAndArchivedFalseAndOwner_StatusNotOrderByFeaturedDescCreatedAtDesc(
-            String status, String ownerStatus, Pageable limit);
+    @Query("""
+            select p from Property p
+            where p.status = :status and p.archived = false and p.owner.status <> :ownerStatus
+              and (p.demo = true or coalesce(p.lastConfirmedAt, p.createdAt) > :cutoff)
+            order by p.featured desc, p.createdAt desc, p.id desc""")
+    List<Property> featuredVisible(@Param("status") String status, @Param("ownerStatus") String ownerStatus,
+            @Param("cutoff") Instant cutoff, Pageable limit);
 
     /** Live listings for one society, newest first — the {@code homes} array on the society hub.
      * Summary projection, so no owner graph and no contact data. */
-    List<Property> findBySocietyIdAndStatusAndArchivedFalseOrderByCreatedAtDesc(
-            UUID societyId, String status, Pageable limit);
-
     /** The same over a society and everything merged into it: a merge moves nothing, so the survivor's
      * hub finds those listings only by asking for the whole family (docs/flows/consumer/societies.md). */
-    List<Property> findBySocietyIdInAndStatusAndArchivedFalseAndOwner_StatusNotOrderByCreatedAtDesc(
-            Collection<UUID> societyIds, String status, String ownerStatus, Pageable limit);
+    @Query("""
+            select p from Property p
+            where p.societyId in :societyIds and p.status = :status and p.archived = false
+              and p.owner.status <> :ownerStatus
+              and (p.demo = true or coalesce(p.lastConfirmedAt, p.createdAt) > :cutoff)
+            order by p.createdAt desc, p.id desc""")
+    List<Property> visibleSocietyHomes(@Param("societyIds") Collection<UUID> societyIds,
+            @Param("status") String status, @Param("ownerStatus") String ownerStatus,
+            @Param("cutoff") Instant cutoff, Pageable limit);
 
     default long countVisibleMatching(PropertySearchQuery filters, ListingFacets facets,
             Instant baseline) {
@@ -218,17 +227,20 @@ public interface PropertyRepository
             where p.status = :status and p.archived = false and p.locality_slug is not null
               and (cast(:slug as text) is null or p.locality_slug = cast(:slug as text))
               and not exists (select 1 from users u where u.id = p.owner_id and u.status = 'suspended')
+              and (p.demo or coalesce(p.last_confirmed_at, p.created_at) > :cutoff)
             group by p.locality_slug""")
-    List<Object[]> liveLocalityStats(@Param("status") String status, @Param("slug") String slug);
+    List<Object[]> liveLocalityStats(@Param("status") String status, @Param("slug") String slug,
+            @Param("cutoff") Instant cutoff);
 
     @Query("""
             select p.societyId, count(p)
             from Property p
             where p.status = :status and p.archived = false and p.societyId in :societyIds
               and p.owner.status <> 'suspended'
+              and (p.demo = true or coalesce(p.lastConfirmedAt, p.createdAt) > :cutoff)
             group by p.societyId""")
     List<Object[]> countLiveBySocietyId(@Param("status") String status,
-            @Param("societyIds") Collection<UUID> societyIds);
+            @Param("societyIds") Collection<UUID> societyIds, @Param("cutoff") Instant cutoff);
 
     /** Rows are [live, forSale, forRent, avgSaleRatePerArea, avgRent] over the given societies. */
     @Query(nativeQuery = true, value = """
@@ -239,20 +251,30 @@ public interface PropertyRepository
                    avg(p.price) filter (where p.deal = 'rent')
             from properties p
             where p.status = :status and p.archived = false and p.society_id in (:societyIds)
-              and not exists (select 1 from users u where u.id = p.owner_id and u.status = 'suspended')""")
+              and not exists (select 1 from users u where u.id = p.owner_id and u.status = 'suspended')
+              and (p.demo or coalesce(p.last_confirmed_at, p.created_at) > :cutoff)""")
     List<Object[]> societyHomeStats(@Param("status") String status,
-            @Param("societyIds") Collection<UUID> societyIds);
+            @Param("societyIds") Collection<UUID> societyIds, @Param("cutoff") Instant cutoff);
 
     @Query("""
             select lower(p.city), count(p)
             from Property p
             where p.status = :status and p.archived = false and p.owner.status <> 'suspended'
+              and (p.demo = true or coalesce(p.lastConfirmedAt, p.createdAt) > :cutoff)
             group by lower(p.city)""")
-    List<Object[]> countLiveByCity(@Param("status") String status);
+    List<Object[]> countLiveByCity(@Param("status") String status, @Param("cutoff") Instant cutoff);
 
     /** How many listings this owner currently has live. Counted, never {@code users.listings_count},
      * which tallies every row ever posted (docs/system/data-model.md). */
     long countByOwnerIdAndStatusAndArchivedFalse(UUID ownerId, String status);
+
+    @Query("""
+            select count(p) from Property p
+            where p.owner.id = :ownerId and p.status = :status and p.archived = false
+              and p.owner.status <> 'suspended'
+              and (p.demo = true or coalesce(p.lastConfirmedAt, p.createdAt) > :cutoff)""")
+    long countPublicByOwner(@Param("ownerId") UUID ownerId, @Param("status") String status,
+            @Param("cutoff") Instant cutoff);
 
     /** The listing-pass predicate for a row aliased {@code p}: an unexpired, entitling pass is bound to it. */
     String ACTIVE_PASS_SQL = """
@@ -332,10 +354,11 @@ public interface PropertyRepository
             from Property p
             where p.status = :status
               and p.archived = false
-              and p.owner.status <> 'suspended'""")
+              and p.owner.status <> 'suspended'
+              and (p.demo = true or coalesce(p.lastConfirmedAt, p.createdAt) > :cutoff)""")
     TrustTally tallyTrust(
             @Param("status") String status,
-            @Param("now") Instant now);
+            @Param("now") Instant now, @Param("cutoff") Instant cutoff);
 
     /** Count live listings matching a saved search's facets; the alert sweep and the saved-search list
      * share one query so the two readings cannot drift. {@code unbounded} drops the recency predicate. */

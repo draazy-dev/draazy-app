@@ -424,6 +424,9 @@ public class Property extends SoftDeleteEntity {
     @Formula("(" + FEATURED_SQL + ")")
     private boolean featured;
 
+    @Column(name = "demo", nullable = false)
+    private boolean demo;
+
     @Column(name = "flag_reason")
     @Setter
     private String flagReason;

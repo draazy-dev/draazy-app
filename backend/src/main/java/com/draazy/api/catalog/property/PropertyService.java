@@ -99,8 +99,9 @@ public class PropertyService {
 
     @Transactional(readOnly = true)
     public List<Property> featured() {
-        return properties.findByStatusAndArchivedFalseAndOwner_StatusNotOrderByFeaturedDescCreatedAtDesc(
-                PropertyStatus.APPROVED, UserStatuses.SUSPENDED, PageRequest.of(0, FEATURED_CAP));
+        return properties.featuredVisible(
+                PropertyStatus.APPROVED, UserStatuses.SUSPENDED,
+                Freshness.dormantCutoff(Instant.now()), PageRequest.of(0, FEATURED_CAP));
     }
 
     /** The publicly live rows among {@code ids} (slugs or UUIDs), in no particular order. */

@@ -42,10 +42,6 @@ public enum Freshness {
         return name().toLowerCase();
     }
 
-    public boolean hiddenFromBuyers() {
-        return this == DORMANT;
-    }
-
     public boolean needsOwnerAttention() {
         return this != ACTIVE;
     }
@@ -58,5 +54,9 @@ public enum Freshness {
     /** Keep the query cutoff aligned with {@link #of}, where stale begins after day fourteen. */
     public static Instant unconfirmedBefore(Instant now) {
         return now.minus(Duration.ofDays(AGING_DAYS + 1L));
+    }
+
+    public static Instant dormantCutoff(Instant now) {
+        return now.minus(Duration.ofDays(STALE_DAYS + 1L));
     }
 }

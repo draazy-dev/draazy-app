@@ -19,6 +19,8 @@ import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -118,6 +120,32 @@ class SocietyDirectoryPagingTest extends AbstractApiTest {
     private int count(String where) {
         return jdbc.queryForObject("select count(*) from societies where merged_into is null and " + where,
                 Integer.class);
+    }
+
+    @Test
+    void dormantRealHomesAreAbsentFromSocietyCountsAndTiles() throws Exception {
+        user = new User("9865200099", "owner");
+        user.setName("Freshness owner");
+        user.setMobileVerified(true);
+        user = users.saveAndFlush(user);
+        UUID societyId = society("freshness");
+        listings(societyId, 3);
+        List<UUID> ids = jdbc.queryForList(
+                "select id from properties where society_id = ? order by id", UUID.class, societyId);
+        jdbc.update("update properties set created_at = ? where society_id = ?",
+                java.sql.Timestamp.from(Instant.now().minus(32, ChronoUnit.DAYS)), societyId);
+        jdbc.update("update properties set demo = true where id = ?", ids.get(0));
+        jdbc.update("update properties set last_confirmed_at = ? where id = ?",
+                java.sql.Timestamp.from(Instant.now()), ids.get(1));
+
+        mvc.perform(get("/societies/zz-socpage-freshness"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.listingCount").value(2))
+                .andExpect(jsonPath("$.homes.length()").value(2));
+        assertThat(walk("q=zz socpage freshness&hasListings=true&sort=homes", 10))
+                .containsExactly("zz-socpage-freshness");
+        mvc.perform(get("/societies?q=zz socpage freshness&hasListings=true"))
+                .andExpect(jsonPath("$.totalElements").value(1));
     }
 
     @Test

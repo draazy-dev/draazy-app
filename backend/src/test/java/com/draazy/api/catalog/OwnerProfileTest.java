@@ -15,6 +15,7 @@ import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -123,6 +124,9 @@ class OwnerProfileTest extends AbstractApiTest {
     void theListingCountCountsOnlyWhatAVisitorCanOpen() throws Exception {
         User u = owner("9811000005");
         listing(u, "Live one", PropertyStatus.APPROVED);
+        Property dormant = listing(u, "Dormant real listing", PropertyStatus.APPROVED);
+        jdbc.update("update properties set created_at = ? where id = ?",
+                java.sql.Timestamp.from(Instant.now().minus(32, ChronoUnit.DAYS)), dormant.getId());
         listing(u, "Still pending", "pending");
         Property archived = listing(u, "Taken down", PropertyStatus.APPROVED);
         archived.archive("rented out");
