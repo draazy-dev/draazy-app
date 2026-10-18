@@ -162,13 +162,15 @@ test('the dashboard panel silences an alert and deletes it, on the server both t
   await expect(page.getByRole('link', { name: /View matches/i })).toHaveAttribute('href', '/flatmates?view=move-in');
 
   // The cadence picker is the persisted control, not an on/off switch.
-  await page.getByTestId('alert-frequency').first().selectOption('off');
-  // Poll: the select fires an async PATCH, and a one-shot read races it.
+  await page.getByRole('button', { name: /Alert frequency for/ }).first().click();
+  await page.getByRole('option', { name: /^Paused/ }).click();
+  // Poll: the picker fires an async PATCH, and a one-shot read races it.
   await expect
     .poll(async () => (await myAlerts(accessToken))[0]?.alertFrequency, { timeout: 10000 })
     .toBe('off');
 
   await page.getByRole('button', { name: /Delete alert/i }).first().click();
+  await page.getByTestId('confirm-modal-ok').click();
   // The row leaving the panel is the render half of the same write the API read below checks.
   await expect(page.getByRole('button', { name: /Delete alert/i })).toHaveCount(0);
   await expect.poll(async () => (await myAlerts(accessToken)).length, { timeout: 10000 }).toBe(0);

@@ -57,7 +57,7 @@ export const KB = [
     id: 'save-search',
     keywords: ['save', 'saved', 'search', 'alert', 'alerts', 'notify', 'notification', 'shortlist', 'favourite', 'favorite', 'wishlist', 'bookmark'],
     q: 'How do saved searches and alerts work?',
-    a: "Tap Save search on any Listings result and we'll tell you in the app when a new home matches — daily by default. When results are thin, the Create alert card does the same. Tap the heart on a property to shortlist it; everything you saved is under Saved. Flatmates and locality pages have their own alerts too. You can keep up to 10 saved searches and alerts, and you need to be signed in.",
+    a: "Tap Alert me on any Listings result, pick what you want to hear about, and we'll tell you in the app when a new home matches. When results are thin, the Create alert card does the same. Tap the heart on a property to shortlist it; everything you saved is under Saved. Flatmates and locality pages have their own alerts too. You can keep up to 10 saved searches and alerts, and you need to be signed in.",
     actions: [
       { label: 'Go to Saved', to: '/saved', icon: 'heart' },
       { label: 'Notifications', to: '/notifications', icon: 'bell' },

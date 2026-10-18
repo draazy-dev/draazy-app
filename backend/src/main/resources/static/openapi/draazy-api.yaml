@@ -8430,11 +8430,11 @@ paths:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     patch:
       tags: [Engagement]
-      summary: Change alert preferences on a saved search
+      summary: Edit a saved search
       description: >
-        Updates how the caller is alerted, not what is searched for. The query, filters and criteria
-        are the identity of the alert — changing them replaces it rather than modifying it, so they
-        are not accepted here. Turn alerts off with `alertFrequency: off`.
+        Changes alert preferences and, for a listings alert, its filters. New filters need the
+        `query` too, restart the new-match count, and 409 when another of the caller's alerts already
+        has them; a flatmates alert's filters are a 400. Turn alerts off with `alertFrequency: off`.
       operationId: updateSavedSearch
       requestBody:
         required: true
@@ -8447,7 +8447,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SavedSearch' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/ValidationError' }
     delete:
       tags: [Engagement]
@@ -16026,10 +16028,12 @@ components:
         channel: { type: string, enum: [whatsapp, sms, email, push], default: whatsapp }
         mobile: { $ref: '#/components/schemas/Mobile' }
     SavedSearchUpdate:
-      # Delivery half only: the query is the alert's identity, and editing it in place would
-      # silently change what a new-match count was counted against. Absent means unchanged.
+      # Absent means unchanged. `filters` (listings only) needs `query` alongside it.
       type: object
       properties:
+        name: { type: string }
+        query: { type: string }
+        filters: { type: object, additionalProperties: true }
         alertFrequency: { type: string, enum: ["off", instant, daily, weekly] }
         channel: { type: string, enum: [whatsapp, sms, email, push] }
     RecentSearch:

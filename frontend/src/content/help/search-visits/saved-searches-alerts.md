@@ -14,9 +14,9 @@ In a tight locality, the good listings are taken within 48 hours. Saved searches
 ## Saving a search
 
 1. Apply your filters on [Listings](/listings).
-2. Tap **Save search** (the bell) beside the smart-search bar above the results. You will be asked to sign in first if you have not.
-3. That is it — the search is saved straight away, named after its filters (or after the text you typed in smart search), and starts on **Daily**.
-4. Change the alert frequency any time from your dashboard.
+2. Tap **Alert me** (the bell) beside the smart-search bar above the results. You will be asked to sign in first if you have not.
+3. A pop-up opens with your current filters already picked. Adjust the deal, localities, BHK, budget, property type, furnishing and how often you hear from us, then tap **Create alert**.
+4. Change the alert any time from your dashboard.
 
 If a search finds nothing, or fewer than three homes, the page also offers **Create alert** so you hear about new matches.
 
@@ -36,7 +36,7 @@ Alerts arrive as in-app notifications, and only when new matches have appeared. 
 
 ## Managing them
 
-All saved searches live under **Dashboard → Saved → Alerts**. Each shows how many homes match it right now across all listings. From there you can view matches, switch between Off, Instant, Daily and Weekly, or delete the search.
+All saved searches live under **Dashboard → Saved → Alerts**. Each shows how many homes match it right now across all listings. From there you can view matches, edit what the alert watches, switch between Paused, Instant, Daily and Weekly, or delete it.
 
 You can hold up to 10 saved searches, including flatmate alerts and similar-home alerts, and saving the same search twice does not use a second slot. Delete the ones you have stopped acting on — alert fatigue is the main reason people miss a match.
 

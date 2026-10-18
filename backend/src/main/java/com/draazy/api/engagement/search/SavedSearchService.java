@@ -111,6 +111,9 @@ public class SavedSearchService {
     public SavedSearchResponse update(UUID userId, UUID searchId, SavedSearchUpdateRequest request) {
         SavedSearch entity = repo.findByIdAndUserId(searchId, userId)
                 .orElseThrow(() -> NotFoundException.of("Saved search"));
+        if (request.filters() != null) {
+            replaceFilters(userId, entity, request);
+        }
         if (request.alertFrequency() != null) {
             entity.setAlertFrequency(request.alertFrequency());
         }
@@ -119,6 +122,30 @@ public class SavedSearchService {
         }
         SavedSearch saved = repo.saveAndFlush(entity);
         return mapper.toResponse(saved).withMatchCount(countMatchingNow(saved));
+    }
+
+    // lastAlertedAt is the new-count baseline, so moving it to now counts only matches after the edit.
+    private void replaceFilters(UUID userId, SavedSearch entity, SavedSearchUpdateRequest request) {
+        if (!"listings".equals(entity.getKind())) {
+            throw new BadRequestException("Only a listings alert can change its filters.");
+        }
+        String filters = serializeFilters(request.filters());
+        String query = request.query().strip();
+        String key = duplicateKey("listings", filters, query);
+        boolean taken = repo.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .anyMatch(other -> !other.getId().equals(entity.getId())
+                        && "listings".equals(other.getKind())
+                        && key.equals(duplicateKey("listings", other.getFilters(), other.getQuery())));
+        if (taken) {
+            throw new ConflictException("You already have an alert for this search.");
+        }
+        entity.setFilters(filters);
+        entity.setQuery(query);
+        if (request.name() != null && !request.name().isBlank()) {
+            entity.setName(request.name().strip());
+        }
+        entity.setNewCount(0);
+        entity.setLastAlertedAt(Instant.now());
     }
 
     // User-scoped: another user's id is a 404, never a 403.

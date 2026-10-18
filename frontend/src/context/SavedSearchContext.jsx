@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   createSavedSearch,
   deleteSavedSearch,
+  editSavedSearch,
   listSavedSearches,
   setAlertFrequency,
 } from '../services/savedSearchService.js';
@@ -87,14 +88,19 @@ export function SavedSearchProvider({ children }) {
 
   const create = useCallback(async (record) => {
     const created = await createSavedSearch(record);
-    // Prepend rather than refetch: the list is newest-first and we already hold the new row, so a
-    // round trip here would only re-fetch what we just sent.
+    // Prepend, not refetch: we already hold the row. A duplicate comes back as the existing row, so drop its old copy.
     if (created) {
-      setSearches((prev) => [created, ...prev]);
+      setSearches((prev) => [created, ...prev.filter((s) => s.id !== created.id)]);
       setError(null);
       setStatus('ready');
     }
     return created;
+  }, []);
+
+  const edit = useCallback(async (id, record) => {
+    const updated = await editSavedSearch(id, record);
+    setSearches((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    return updated;
   }, []);
 
   const reload = useCallback(async () => {
@@ -136,8 +142,8 @@ export function SavedSearchProvider({ children }) {
   }, [searches]);
 
   const value = useMemo(
-    () => ({ searches, count: searches.length, loading, status, error, want, create, setFrequency, remove, reload, refresh: reload }),
-    [searches, loading, status, error, want, create, setFrequency, remove, reload],
+    () => ({ searches, count: searches.length, loading, status, error, want, create, edit, setFrequency, remove, reload, refresh: reload }),
+    [searches, loading, status, error, want, create, edit, setFrequency, remove, reload],
   );
   return <SavedSearchContext.Provider value={value}>{children}</SavedSearchContext.Provider>;
 }
@@ -162,6 +168,7 @@ const EMPTY = {
   status: 'ready',
   error: null,
   create: async () => null,
+  edit: async () => null,
   setFrequency: async () => {},
   remove: async () => {},
   reload: async () => [],
