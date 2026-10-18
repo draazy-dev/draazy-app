@@ -1,5 +1,6 @@
 package com.draazy.api.catalog.locality;
 
+import com.draazy.api.catalog.property.Freshness;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.audit.AuditService;
@@ -33,7 +34,8 @@ public class LocalityService {
     @Transactional(readOnly = true)
     public List<LocalityResponse> list() {
         Map<String, LocalityStats> stats = statsBySlug(null);
-        return localities.findDirectory(PropertyStatus.APPROVED).stream()
+        return localities.findDirectory(PropertyStatus.APPROVED,
+                Freshness.dormantCutoff(Instant.now())).stream()
                 .map(l -> localityMapper.toResponse(l, stats.getOrDefault(l.getSlug(), LocalityStats.NONE)))
                 .toList();
     }
@@ -90,7 +92,8 @@ public class LocalityService {
 
     private Map<String, LocalityStats> statsBySlug(String slug) {
         Map<String, LocalityStats> out = new HashMap<>();
-        for (Object[] row : properties.liveLocalityStats(PropertyStatus.APPROVED, slug)) {
+        for (Object[] row : properties.liveLocalityStats(PropertyStatus.APPROVED, slug,
+                Freshness.dormantCutoff(Instant.now()))) {
             out.put((String) row[0], LocalityStats.of(row));
         }
         return out;

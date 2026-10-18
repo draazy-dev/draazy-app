@@ -244,8 +244,11 @@ result set; see cross-cutting soft-delete/status (section 4).
   when `total > markers shown` (100 cap).
 - **Map unavailable:** info note when `view=map` but `mapSearch` flag is off.
 - **New/empty city:** `NewCityEmptyState` instead of results.
-- **Dormant listings:** the search endpoint hides dormant real posts from public results
-  (anti-staleness); seed/demo stock stays visible.
+- **Dormant listings:** public search, totals, city/society/locality counts, featured cards,
+  society homes, reels and similar-listing results exclude
+  real posts more than 30 full days past their last confirmation (or posting if never confirmed).
+  Dev/demo seed rows marked `demo` stay visible. Direct detail links and owner/admin views remain
+  accessible so the owner can reconfirm.
 - **Range "and above":** default-ceiling thumbs are treated as no upper bound (`openHi`), avoiding
   silently hidden high-value listings.
 
@@ -331,6 +334,9 @@ The weights are spaced so each tier dominates the sum of everything beneath it: 
 outranks a perfect unfeatured one, and no amount of completeness substitutes for a verification.
 Freshness is computed from timestamps rather than read from a column because it cannot be one - it
 is a function of the clock, so any stored tier is correct only at the instant it was written.
+The public search predicate hides dormant non-demo posts regardless of sort; its cutoff is the same
+day-31 boundary as `Freshness.of`. Demo stock is explicitly marked by the dev seed, never inferred
+from a user, slug, or age; production migrations leave `demo` false by default.
 `Freshness` states the same boundaries for the response and the cutoffs come from the same
 constants, so the badge a buyer sees and the rank that put the listing in front of them cannot
 disagree. Lapsed ownership verification stops earning its 200 points, because the facet, the

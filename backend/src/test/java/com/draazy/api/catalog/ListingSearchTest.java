@@ -172,6 +172,69 @@ class ListingSearchTest extends AbstractApiTest {
         }
 
         @Test
+        void dormantRealPostsDisappearFromSearchButRemainDirectlyReachable() throws Exception {
+            Property dormant = persist(rent("Dormant real listing"));
+            jdbc.update("update properties set created_at = ? where id = ?",
+                    java.sql.Timestamp.from(Instant.now().minus(32, ChronoUnit.DAYS)), dormant.getId());
+            em.clear();
+
+            mvc.perform(get("/properties?owner=" + seller.getId()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(0));
+            mvc.perform(get("/properties/" + dormant.getId()))
+                    .andExpect(status().isOk());
+        }
+
+        @Test
+        void demoStockSurvivesAndReconfirmationRestoresRealPosts() throws Exception {
+            Property demo = persist(rent("Old demo stock"));
+            Property real = persist(rent("Old real post"));
+            Property recent = persist(rent("Recent real post"));
+            Instant old = Instant.now().minus(32, ChronoUnit.DAYS);
+            jdbc.update("update properties set created_at = ?, demo = true where id = ?",
+                    java.sql.Timestamp.from(old), demo.getId());
+            jdbc.update("update properties set created_at = ? where id = ?",
+                    java.sql.Timestamp.from(old), real.getId());
+            jdbc.update("update properties set created_at = ? where id = ?",
+                    java.sql.Timestamp.from(Instant.now().minus(30, ChronoUnit.DAYS)), recent.getId());
+            em.clear();
+
+            String url = "/properties?owner=" + seller.getId();
+            String before = mvc.perform(get(url))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(2))
+                    .andExpect(jsonPath("$.content.length()").value(2))
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(before).contains("Old demo stock", "Recent real post")
+                    .doesNotContain("Old real post");
+            String featured = mvc.perform(get("/properties/featured"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(featured).doesNotContain(real.getId().toString());
+            jdbc.update("update properties set last_confirmed_at = ? where id = ?",
+                    java.sql.Timestamp.from(Instant.now()), real.getId());
+            String after = mvc.perform(get(url))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(3))
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(after).contains("Old real post");
+        }
+
+        @Test
+        void dormantExactMatchDoesNotBlockTypoRecoveryForVisibleHomes() throws Exception {
+            Property dormant = persist(rent("Koregoan hidden"));
+            persist(rent("Koregaon visible"));
+            jdbc.update("update properties set created_at = ? where id = ?",
+                    java.sql.Timestamp.from(Instant.now().minus(32, ChronoUnit.DAYS)), dormant.getId());
+            em.clear();
+
+            mvc.perform(get("/properties?q=koregoan&owner=" + seller.getId()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].title").value("Koregaon visible"));
+        }
+
+        @Test
         @DisplayName("each boundary lands on the tier it names")
         void boundariesAreInclusive() throws Exception {
             Instant now = Instant.now();

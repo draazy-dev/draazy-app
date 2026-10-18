@@ -20,7 +20,7 @@ Every listing carries a freshness state derived from when you last confirmed ava
 | Active | Up to 7 days | Full ranking weight |
 | Ageing | 8–14 days | Slightly lower ranking. Buyers see when you last confirmed availability. |
 | Stale | 15–30 days | Demoted, and buyers see that availability is unconfirmed |
-| Dormant | Over 30 days | Ranks lowest in search until you reconfirm |
+| Dormant | Over 30 days | Hidden from search until you reconfirm |
 
 The state is recalculated on every read, so it is never stale in itself — and one tap on **Confirm available** (**Reactivate** on a dormant listing) from **Dashboard → My Properties** puts it straight back to Active. Your card shows Confirm soon when it is ageing.
 
@@ -38,7 +38,7 @@ On the default **Relevance** sort, listings are scored. In descending order of w
 1. **Featured placement** — given for a limited time (shown on the [Plans page](/plans)) after your listing's ownership is verified, then it ends; it outranks everything below it
 2. **ID verified owner** — ID and selfie reviewed by our trust team
 3. **Verified property** — ownership documents seen, and still current
-4. **Freshness** — Active, then Ageing, then Stale. Dormant scores zero.
+4. **Freshness** — Active, then Ageing, then Stale. Dormant listings are hidden from search.
 5. **RERA registered** — a valid registration number on the project
 6. **Completeness** — photos, description, key details and amenities
 

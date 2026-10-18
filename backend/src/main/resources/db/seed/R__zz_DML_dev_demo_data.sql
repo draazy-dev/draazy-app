@@ -1303,6 +1303,30 @@ update public.users u
 UPDATE public.properties SET owner_confirmed_at = updated_at
 WHERE posted_by_admin AND owner_confirmed_at IS NULL AND status IN ('approved', 'paused', 'sold', 'rented');
 
+UPDATE public.properties SET demo = true
+WHERE id::text LIKE 'f1c70000-%'
+   OR id IN (
+       '5b574629-f24f-5c25-9fa0-b29d9c26a41d', '8d1de836-4df8-5787-9172-45ef78ec02df',
+       'c2d88790-14ab-506d-b7cb-a9698fd9549e', '8996ddbc-d9ea-5ca3-83bb-fd14c3f430f7',
+       '0dcd8871-ffdd-56d6-b989-be6f53aa579e', '9ecd9412-9bdd-5ecd-8600-0d0b70a4d868',
+       '2199b3df-a31a-5596-b37c-211725ff0bb6', 'b72f5635-afe1-5c5e-b6d6-381295cd4f0e',
+       'c8a81a88-d713-50e9-8b43-2ce04931e4bd', 'fcf15613-bf67-5234-b464-3e030a30eea7',
+       'f7140411-1046-5096-a038-126bb676e06b', '995e2cbb-c454-502c-98d0-cdb0853fb8de',
+       '1078d711-d3eb-5961-ab3c-30d4bdc5f377', '4a72dfe1-ad8e-5dd1-a83a-718946d65ec3',
+       '3272b9df-34f5-59b7-8190-47678479828c', '75e78160-b695-5517-9d95-c2c09aa187b5',
+       '2b33ff9c-a2c3-54dd-88a9-a37e88294482', '6a10df11-32fd-52fa-b024-e30f44828453',
+       '615287b3-7a3b-530f-84aa-773753e8682b', 'd87532db-4b22-5356-8795-b48e8dbb0c98',
+       '8c6141a4-9acf-5d2b-8cb7-7795f9aa70c7', '7847ad81-cc55-5db2-bacb-67d085e3ef4e',
+       '3806a3e6-2bee-5ac0-b7a1-a3348e807471', '91f50379-b8d5-5588-b686-3305ef657c03',
+       '886059e2-7b1e-5cd3-8139-f0e1605eb67b', '9fd5a65b-0607-50e4-8f1c-3d1de0090017',
+       '76c86c78-795d-59a9-9a4d-d80f4ede25d3', '42ba0880-ee4f-5a78-9a8d-e70200409791',
+       'd2bbb508-9b79-59b7-9657-d617ad57b74e', '65684789-52c5-5212-b2d9-70e344b464fa',
+       '5fdcd76e-966b-59ee-9320-f23f7348a5a3', '291e5cb6-b46b-5f83-aae4-a1c5e27761bf',
+       'd92efc2e-a501-589d-b6ea-6d3173c5c59d', 'e3b80978-d91f-5b92-b082-f321598591da',
+       '11d1c69c-2e33-55a8-ac83-af36deb1b31c', '3b7a0839-a64a-5686-b459-6589e78fbd8e',
+       '2b49c102-4f97-5ef1-bd2a-1559640f071a', '51897b51-f1a2-56ce-9687-2be847ff4dee'
+   );
+
 WITH ordered(function_name, sort_order) AS (
     VALUES
         ('kyc', 10),

@@ -74,9 +74,7 @@ final class PropertySpecs {
             publicTextSearch(filters, root, query, cb, where);
             listingFacets(extra, root, cb, where);
 
-            where.add(cb.isFalse(root.get("archived")));
-            where.add(cb.equal(root.get("status"), PropertyStatus.APPROVED));
-            where.add(cb.notEqual(root.get("owner").get("status"), UserStatuses.SUSPENDED));
+            where.add(publiclyVisible(root, cb));
 
             // A status param can only narrow within approved (an impossible AND yields an empty page).
             if (filters.status() != null && !PropertyStatus.APPROVED.equals(filters.status())) {
@@ -84,6 +82,16 @@ final class PropertySpecs {
             }
             return cb.and(where.toArray(Predicate[]::new));
         };
+    }
+
+    private static Predicate publiclyVisible(Root<Property> root, CriteriaBuilder cb) {
+        return cb.and(
+                cb.isFalse(root.get("archived")),
+                cb.equal(root.get("status"), PropertyStatus.APPROVED),
+                cb.notEqual(root.get("owner").get("status"), UserStatuses.SUSPENDED),
+                cb.or(cb.isTrue(root.get("demo")),
+                        cb.greaterThan(cb.coalesce(root.get("lastConfirmedAt"), root.get("createdAt")),
+                                Freshness.dormantCutoff(Instant.now()))));
     }
 
     static Specification<Property> residential() {
@@ -341,8 +349,7 @@ final class PropertySpecs {
         Subquery<Integer> sub = query.subquery(Integer.class);
         Root<Property> other = sub.from(Property.class);
         return sub.select(cb.literal(1)).where(
-                cb.isFalse(other.get("archived")),
-                cb.equal(other.get("status"), PropertyStatus.APPROVED),
+                publiclyVisible(other, cb),
                 cb.or(cardText(other, cb).stream()
                         .map(column -> cb.like(column, like, LIKE_ESCAPE)).toArray(Predicate[]::new)));
     }

@@ -38,7 +38,8 @@ class SuspendedOwnerListingsTest extends AbstractApiTest {
     }
 
     private long liveInPune() {
-        return properties.countLiveByCity(PropertyStatus.APPROVED).stream()
+        return properties.countLiveByCity(PropertyStatus.APPROVED,
+                Freshness.dormantCutoff(java.time.Instant.now())).stream()
                 .filter(row -> "pune".equals(row[0])).mapToLong(row -> ((Number) row[1]).longValue()).sum();
     }
 

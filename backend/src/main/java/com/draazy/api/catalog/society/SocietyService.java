@@ -1,5 +1,6 @@
 package com.draazy.api.catalog.society;
 
+import com.draazy.api.catalog.property.Freshness;
 import com.draazy.api.catalog.property.ListingCounts;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
@@ -8,6 +9,7 @@ import com.draazy.api.common.trust.RatingLookup;
 import com.draazy.api.identity.user.UserStatuses;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,7 +69,7 @@ public class SocietyService {
             Boolean hasListings, Boolean mapped, String mode, Pageable pageable) {
         List<Object[]> rows = societies.rankedIds(SocietySpecs.likePattern(q), SocietySpecs.trimmed(localitySlug),
                 Boolean.TRUE.equals(hasListings), Boolean.TRUE.equals(mapped), mode,
-                pageable.getPageSize(), pageable.getOffset());
+                pageable.getPageSize(), pageable.getOffset(), Freshness.dormantCutoff(Instant.now()));
         List<UUID> ids = rows.stream().map(r -> (UUID) r[0]).toList();
         // A page past the end carries no window total, so only that case pays for a count.
         long total = rows.isEmpty()
@@ -133,14 +135,15 @@ public class SocietyService {
         Society society = live(slug);
         List<UUID> family = families(List.of(society.getId())).get(society.getId());
         List<SocietyHome> homes = properties
-                .findBySocietyIdInAndStatusAndArchivedFalseAndOwner_StatusNotOrderByCreatedAtDesc(
-                        family, PropertyStatus.APPROVED, UserStatuses.SUSPENDED, PageRequest.of(0, HUB_HOMES))
+                .visibleSocietyHomes(family, PropertyStatus.APPROVED, UserStatuses.SUSPENDED,
+                        Freshness.dormantCutoff(Instant.now()), PageRequest.of(0, HUB_HOMES))
                 .stream()
                 .map(p -> new SocietyHome(p.getId(), p.getSlug(), p.getTitle(), p.getDeal(), p.getBhk(),
                         p.getPrice(), p.getArea()))
                 .toList();
         SocietyHomeStats stats = SocietyHomeStats.of(
-                properties.societyHomeStats(PropertyStatus.APPROVED, family).getFirst());
+                properties.societyHomeStats(PropertyStatus.APPROVED, family,
+                        Freshness.dormantCutoff(Instant.now())).getFirst());
         return societyMapper.toDetail(society, stats, homes);
     }
 

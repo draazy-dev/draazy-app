@@ -1,5 +1,6 @@
 package com.draazy.api.catalog.society;
 
+import com.draazy.api.catalog.property.Freshness;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.persistence.LikePatterns;
@@ -10,6 +11,7 @@ import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import jakarta.persistence.criteria.Root;
 import jakarta.persistence.criteria.Subquery;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.data.jpa.domain.Specification;
@@ -78,6 +80,9 @@ public final class SocietySpecs {
                         cb.equal(owner.get("mergedInto"), society.get("id"))),
                 cb.equal(listing.get("status"), PropertyStatus.APPROVED),
                 cb.isFalse(listing.get("archived")),
+                cb.or(cb.isTrue(listing.get("demo")),
+                        cb.greaterThan(cb.coalesce(listing.get("lastConfirmedAt"), listing.get("createdAt")),
+                                Freshness.dormantCutoff(Instant.now()))),
                 cb.notEqual(listing.get("owner").get("status"), UserStatuses.SUSPENDED));
     }
 }

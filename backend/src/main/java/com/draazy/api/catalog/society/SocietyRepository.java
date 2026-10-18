@@ -1,5 +1,6 @@
 package com.draazy.api.catalog.society;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -56,6 +57,8 @@ public interface SocietyRepository
                 select fam.sid, count(*) as n
                 from fam join properties p on p.society_id = fam.fid
                 where p.status = 'approved' and p.archived = false
+                  and not exists (select 1 from users u where u.id = p.owner_id and u.status = 'suspended')
+                  and (p.demo or coalesce(p.last_confirmed_at, p.created_at) > :cutoff)
                 group by fam.sid
             ), rated as (
                 select fam.sid, sum(r.avg_rating * r.cnt) as weighted, sum(r.cnt) as cnt
@@ -85,7 +88,7 @@ public interface SocietyRepository
             limit :limit offset :offset""", nativeQuery = true)
     List<Object[]> rankedIds(@Param("like") String like, @Param("locality") String locality,
             @Param("hasListings") boolean hasListings, @Param("mapped") boolean mapped, @Param("mode") String mode,
-            @Param("limit") int limit, @Param("offset") long offset);
+            @Param("limit") int limit, @Param("offset") long offset, @Param("cutoff") Instant cutoff);
 
     /** Merged-away rows are excluded so a duplicate already dealt with does not return;
      * {@code like} is a lower-cased pattern over name and locality words. */

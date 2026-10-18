@@ -32,6 +32,18 @@ const get = async (query) => {
   return res.json();
 };
 
+test('old demo stock remains searchable even though its freshness is dormant', async ({ page }) => {
+  const detail = await fetch(`${API}/properties/p5140`);
+  expect(detail.ok).toBe(true);
+  const demo = await detail.json();
+  expect(demo.freshness).toBe('dormant');
+
+  const results = await get('deal=buy&localities=wagholi&size=100');
+  expect(results.content.map(ref)).toContain('p5140');
+  await page.goto('/listings?deal=buy&loc=Wagholi');
+  await expect(page.locator('a[href="/property/p5140"]')).toBeVisible();
+});
+
 test('a filter narrows the catalogue, not the page you are holding', async ({ page }) => {
   /* Wagholi's buy listings are the oldest rows, so default order splits them across pages 1 and 2:
      a browser filtering its current page has only half to work with. */

@@ -13,6 +13,8 @@ import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
 import com.jayway.jsonpath.JsonPath;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +61,31 @@ class LocalityReadEndpointsTest extends AbstractApiTest {
 
     private void live(String slug, String deal, long price, String area) {
         listing(slug, deal, "apartment", price, area, PropertyStatus.APPROVED, false);
+    }
+
+    @Test
+    void dormantRealStockDoesNotKeepAnArchivedLocalityInThePublicDirectory() throws Exception {
+        String slug = "zz-freshness-locality";
+        locality(slug, "Zz Freshness Locality", true);
+        Property real = listing(slug, "rent", "apartment", 25000, "900", PropertyStatus.APPROVED, false);
+        Property demo = listing(slug, "rent", "apartment", 26000, "900", PropertyStatus.APPROVED, false);
+        Instant old = Instant.now().minus(32, ChronoUnit.DAYS);
+        jdbc.update("update properties set created_at = ? where id in (?, ?)",
+                java.sql.Timestamp.from(old), real.getId(), demo.getId());
+        jdbc.update("update properties set demo = true where id = ?", demo.getId());
+
+        mvc.perform(get("/localities"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.slug == 'zz-freshness-locality')].liveListings")
+                        .value(org.hamcrest.Matchers.contains(1)));
+        jdbc.update("update properties set demo = false where id = ?", demo.getId());
+        mvc.perform(get("/localities"))
+                .andExpect(jsonPath("$[?(@.slug == 'zz-freshness-locality')]").isEmpty());
+        jdbc.update("update properties set last_confirmed_at = ? where id = ?",
+                java.sql.Timestamp.from(Instant.now()), real.getId());
+        mvc.perform(get("/localities"))
+                .andExpect(jsonPath("$[?(@.slug == 'zz-freshness-locality')].liveListings")
+                        .value(org.hamcrest.Matchers.contains(1)));
     }
 
     @Test
