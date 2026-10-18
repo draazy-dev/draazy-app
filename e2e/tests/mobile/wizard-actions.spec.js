@@ -1,7 +1,7 @@
 import { test, expect } from '../../fixtures/live.js';
 import { trackErrors } from '../../helpers/console.js';
 import { authHeaders, ownerIdOf } from '../../helpers/liveAuth.js';
-import { LIST_PROPERTY_DRAFT_KEY as DRAFT_KEY } from '../../helpers/listingForm.helper.js';
+import { LIST_PROPERTY_DRAFT_KEY as DRAFT_KEY, pickFloors } from '../../helpers/listingForm.helper.js';
 
 // Seed consent because the bar overlaps the wizard's phone-bottom fields.
 async function withConsent(page) {
@@ -235,6 +235,32 @@ test.describe('Mobile listing wizard', () => {
     await page.reload();
     await page.locator('.lp-step-actions').first().waitFor({ timeout: 15000 });
     await expect(page.locator('input[placeholder="e.g. 1050"]').first()).toHaveValue('1234');
+  });
+
+  test('Next and Back open the new step at its top, not at the footer', async ({ page, login }) => {
+    await withConsent(page);
+    await login.asNewOwner();
+    await openWizard(page);
+    const opensAtTop = async (heading) => {
+      await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+      await expect.poll(() => page.evaluate(() => window.scrollY), { timeout: 3000 }).toBe(0);
+      await page.waitForTimeout(600);
+      expect(await page.evaluate(() => window.scrollY), 'nothing scrolls the page back down').toBe(0);
+    };
+    const tapFromBottom = async (name) => {
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+      await page.locator('.lp-step-actions').last().getByRole('button', { name }).click();
+    };
+
+    await page.locator('[data-err="propertyType"]').click();
+    await page.getByRole('option', { name: 'Flat / Apartment', exact: true }).click();
+    await page.locator('input[data-err="carpetArea"]').fill('1200');
+    await pickFloors(page);
+
+    await tapFromBottom(/Next Step/i);
+    await opensAtTop('Location');
+    await tapFromBottom(/Back/i);
+    await opensAtTop('Property details');
   });
 
 });
