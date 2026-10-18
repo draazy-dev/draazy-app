@@ -24,9 +24,9 @@ export default function LocalitySection({ f, set, localities, onAddLocality }) {
                   type="button"
                   onClick={() => remove(l.slug)}
                   aria-label={t('ui.removeItem', { label: l.name })}
-                  className="flex items-center gap-1 rounded-lg bg-teal-500/15 px-2.5 py-1 text-[11px] font-semibold text-teal-200 hover:bg-teal-500/25"
+                  className="dz-chip dz-chip--accent dz-chip--sm"
                 >
-                  {l.name} <Icon name="x" className="h-3 w-3" />
+                  {l.name} <Icon name="x" />
                 </button>
               ))}
             </div>

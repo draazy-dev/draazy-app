@@ -125,13 +125,13 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                       type="button"
                       onClick={c.remove}
                       aria-label={t('listings.removeFilter', { label: c.label })}
-                      className="af-chip dz-chip dz-chip--accent"
+                      className="af-chip dz-chip dz-chip--accent dz-chip--sm"
                     >
                       {c.label}
                       <Icon name="x" />
                     </button>
                   ))}
-                  <button type="button" onClick={clearAll} className="af-clear-all dz-chip">{t('listings.clearAllLower')}</button>
+                  <button type="button" onClick={clearAll} className="af-clear-all dz-chip dz-chip--sm">{t('listings.clearAllLower')}</button>
                 </div>
               ) : null}
 

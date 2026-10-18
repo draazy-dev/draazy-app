@@ -81,10 +81,10 @@ export default function MapGate({ localities, f, set, locNameBySlug, maxAreas, s
                   type="button"
                   onClick={() => toggleArea(slug)}
                   aria-label={t('listings.removeArea', { name: locNameBySlug[slug] || slug })}
-                  className="inline-flex items-center gap-1.5 min-h-[44px] sm:min-h-0 pl-3 pr-2 py-1.5 rounded-full bg-teal-500/12 border border-teal-400/30 text-teal-200 text-xs font-medium hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200 t-all"
+                  className="dz-chip dz-chip--accent dz-chip--sm hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200"
                 >
                   {locNameBySlug[slug] || slug}
-                  <Icon name="x" className="w-3 h-3" />
+                  <Icon name="x" />
                 </button>
               ))}
             </div>
