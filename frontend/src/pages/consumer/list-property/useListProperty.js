@@ -581,18 +581,24 @@ export default function useListProperty() {
     const next = Math.max(1, Math.min(Number(step) || 1, maxReachableStep(), lastStep));
     setCurrentStep(next);
     writeStepParam(next, { replace, pushedFrom: replace ? undefined : currentStep });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [currentStep, editReady, lastStep, maxReachableStep, writeStepParam]);
   useEffect(() => {
     if (!editReady || (draftEnabled && !draftHydrated)) return;
     const requested = Math.min(entryStep, lastStep);
     const clamped = Math.min(requested, maxReachableStep());
-    setCurrentStep((current) => {
-      if (current !== clamped) window.scrollTo({ top: 0, behavior: 'auto' });
-      return clamped;
-    });
+    setCurrentStep(clamped);
     if (requested !== clamped || (clamped === 1 && rawStepParam)) writeStepParam(clamped, { replace: true });
   }, [draftEnabled, draftHydrated, editReady, entryStep, lastStep, maxReachableStep, rawStepParam, writeStepParam]);
+  // After the swap, not before: on phones a smooth scroll started over the old step is cut short
+  // as the page height changes.
+  useLayoutEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }); }, [currentStep]);
+  // Back between steps is a history pop; the browser would restore the old step's footer position
+  // over the scroll above.
+  useEffect(() => {
+    const previous = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+    return () => { window.history.scrollRestoration = previous; };
+  }, []);
   useEffect(() => { stepRef.current = currentStep; }, [currentStep]);
   useEffect(() => () => { dupSeq.current += 1; }, []);
   const nextStep = () => {
