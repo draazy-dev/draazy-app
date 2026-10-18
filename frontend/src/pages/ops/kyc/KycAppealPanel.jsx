@@ -28,7 +28,7 @@ export default function KycAppealPanel({ detail, kase, canWrite, onSettled }) {
             ) : <p data-testid="kyc-appeal-purged" className="self-center text-xs text-amber-200">Photos are purged, so this can only be upheld.</p>}
           </div>
         ) : (
-          <p className="mt-3 text-xs text-amber-200">A different reviewer than the one who rejected this case must decide the appeal.</p>
+          <p className="mt-3 text-xs text-amber-200">You cannot decide an appeal on your own identity case.</p>
         )
       ) : null}
     </section>

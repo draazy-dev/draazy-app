@@ -18,7 +18,6 @@ export function stagesDone(request, checklist) {
 
 /** The one move this case is waiting on, and whose move it is. */
 export function nextStep(request, checklist) {
-  if (request.draftCheck?.status === 'pending') return { who: 'colleague', text: 'A colleague must check this draft before the customer sees it' };
   switch (request.status) {
     case 'submitted': return { who: 'desk', text: 'Take the case and start the paper check' };
     case 'docs_review':

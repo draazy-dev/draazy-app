@@ -138,19 +138,15 @@ public class IdentityVerification extends AuditedEntity {
     private Instant claimedAt;
 
     @Column(name = "qa_sampled_at")
-    @Setter
     private Instant qaSampledAt;
 
     @Column(name = "qa_reviewed_by")
-    @Setter
     private UUID qaReviewedBy;
 
     @Column(name = "qa_reviewed_at")
-    @Setter
     private Instant qaReviewedAt;
 
     @Column(name = "qa_outcome")
-    @Setter
     private String qaOutcome;
 
     @Column(name = "liveness_challenge")

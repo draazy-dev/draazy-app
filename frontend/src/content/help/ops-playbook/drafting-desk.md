@@ -27,7 +27,6 @@ modules: [desk:rental, desk:legal, desk:interior, desk:packers, desk:valuation]
 
 - Work **Overdue** rent agreements first, then **To pick up** with **Take case**.
 - Finish first drafts and **changes-requested** revisions before the targets run out.
-- Release or send back drafts held for a second check ? it must be a different operator.
 - Upload the registered copy for **approved** cases, then run **Registration check** and **Police intimation**.
 
 ## Desk and access
@@ -90,17 +89,7 @@ The **SLA** cell shows **Due in**, **Overdue by**, or **Customer's turn** from t
 
 Before **Share draft**, tick every drafting check: identity numbers, title proof, POA, address, and terms. The server refuses rent-agreement drafts without these checks.
 
-A second-operator draft check is held when any risk reason applies:
-
-| Reason shown | What to verify |
-| --- | --- |
-| **Rent is ₹50k or more** | High-value terms and tax exposure |
-| **Co-owner is named** | Every licensor is on the deed |
-| **Power of attorney is used** | POA is registered and covers leave-and-licence |
-| **NRI / foreign party** | SRO route and passport particulars |
-| **MOD-7 overlap** | Overlapping tenancy explanation |
-
-The person who shared the draft and the current holder cannot release the risky draft. A different operator must **Check and release** or **Send back** with a note.
+A draft you share goes straight to the customer; no second operator checks it first. Share it only after the checklist is verified and every drafting check is ticked.
 
 ## Registration and trust evidence
 

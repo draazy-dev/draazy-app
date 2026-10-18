@@ -23,10 +23,8 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,12 +52,10 @@ public class IdentityReviewService {
     private final AuditService audit;
     private final Clock clock;
     private final IdentityReviewReadService read;
-    private final double qaSampleRate;
 
     public IdentityReviewService(IdentityVerificationRepository verifications, UserRepository users,
             IdentityHasher hasher, OwnerBadgeSink ownerBadge, Notifier notifier,
-            DecisionMessenger decisionMessenger, AuditService audit, Clock clock, IdentityReviewReadService read,
-            @Value("${draazy.identity.qa-sample-rate:0.25}") double qaSampleRate) {
+            DecisionMessenger decisionMessenger, AuditService audit, Clock clock, IdentityReviewReadService read) {
         this.verifications = verifications;
         this.users = users;
         this.hasher = hasher;
@@ -69,7 +65,6 @@ public class IdentityReviewService {
         this.audit = audit;
         this.clock = clock;
         this.read = read;
-        this.qaSampleRate = qaSampleRate;
     }
 
     @Transactional(readOnly = true)
@@ -127,9 +122,6 @@ public class IdentityReviewService {
         v.setDecidedAt(now);
         v.setClaimedBy(null);
         v.setClaimedAt(null);
-        if (shouldSampleQa(v)) {
-            v.setQaSampledAt(now);
-        }
         flushIdentityHash();
 
         User user = users.findById(v.getUserId())
@@ -207,15 +199,9 @@ public class IdentityReviewService {
         if (!VerificationStatuses.VERIFIED.equals(v.getStatus())) {
             throw new ConflictException("Only a verified identity can be revoked");
         }
-        requireNoOpenQaByMaker(reviewer, v);
         Instant now = Instant.now(clock);
         String reason = body.reason().trim();
         requireReasonLength(reason);
-        revokeVerified(reviewer, v, reason, now);
-        return read.currentReview(reviewer, v);
-    }
-
-    void revokeVerified(AuthPrincipal reviewer, IdentityVerification v, String reason, Instant now) {
         v.setStatus(VerificationStatuses.REVOKED);
         v.setRevokedAt(now);
         v.setRevokedBy(reviewer.userId());
@@ -238,6 +224,7 @@ public class IdentityReviewService {
                 "Your Draazy verified badge was withdrawn. Open the app to see the reason and submit again.");
         recordAudit(reviewer, "identity.verification.revoked", v,
                 "reason", reason, "userId", v.getUserId().toString());
+        return read.currentReview(reviewer, v);
     }
 
     private void requireFreshClaimHolderOrUnclaimed(AuthPrincipal reviewer, IdentityVerification v) {
@@ -256,21 +243,6 @@ public class IdentityReviewService {
         String name = users.findById(v.getClaimedBy()).map(User::getName).orElse("another reviewer");
         throw new ConflictException(ErrorCodes.IDENTITY_CASE_CLAIMED,
                 "This case is claimed by " + name);
-    }
-
-    private boolean shouldSampleQa(IdentityVerification v) {
-        return !"passed".equals(v.getLiveness())
-                || v.getLivenessChallenge() == null
-                || v.isNumberOverridden()
-                || isResubmission(v)
-                || ThreadLocalRandom.current().nextDouble() < qaSampleRate;
-    }
-
-    private static boolean isResubmission(IdentityVerification v) {
-        return v.getAttemptCount() > 1
-                || (v.getCreatedAt() != null
-                && v.getSubmittedAt() != null
-                && v.getSubmittedAt().isAfter(v.getCreatedAt().plus(Duration.ofSeconds(1))));
     }
 
     private static String normaliseName(String value) {
@@ -313,17 +285,6 @@ public class IdentityReviewService {
     static void requireReasonLength(String reason) {
         if (reason.length() < 10 || reason.length() > 300) {
             throw new BadRequestException("reason must be between 10 and 300 characters");
-        }
-    }
-
-    private static void requireNoOpenQaByMaker(AuthPrincipal reviewer, IdentityVerification v) {
-        if (reviewer != null
-                && v.getReviewerId() != null
-                && reviewer.userId().equals(v.getReviewerId())
-                && v.getQaSampledAt() != null
-                && v.getQaReviewedAt() == null) {
-            throw new ConflictException(ErrorCodes.IDENTITY_QA_OPEN,
-                    "This sampled approval is still awaiting QA review");
         }
     }
 

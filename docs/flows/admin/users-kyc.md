@@ -88,7 +88,7 @@
   from `/moderation/identity-reviews/summary`):
   - *Needs review* (`pending`) — the work. Claim chips All / Unclaimed / Mine n/3 /
     Others replace a separate "my cases" tab, since a reviewer holds at most three.
-  - *QA sample* (`qa`) — sampled approvals awaiting a second reviewer; the approver's own are hidden.
+  - *Appeals* (`appeal`) — rejections the applicant asked to have checked again; uphold or reopen.
   - *Decided* (`verified`/`rejected`/`revoked`, Outcome chips) — revoke a badge or
     read a case's history.
 
@@ -170,17 +170,13 @@ rather than an absent panel, so "nobody has written one" is distinguishable from
 | Path | Maker | Checker | Enforced by |
 |---|---|---|---|
 | Earned badge (document + selfie) | the user (submits case) | identity reviewer (`identity:write`) | service 403 when reviewer = subject |
-| QA sample of an earned badge | identity reviewer who approved | second identity reviewer | service 403 + V62 CHECKs: checker ≠ approver, checker ≠ subject |
 | Hand-granted badge | - | single manager or admin (`PATCH /users/{id}/badge`), reason 10..300 | service 403 when actor = subject; 409 if already verified; audited `user.badge` |
 | Revoke earned badge | - | single admin, reason 10..300 | protective direction; audited |
 | Withdraw hand-granted badge | - | single manager or admin, reason | protective direction; audited |
 
 Every decision and every staff detail view of a case (it mints signed image URLs) writes an audit
 row. See [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2.
-Approvals always enter `status=qa` when client liveness is not `passed`, the selfie carried no
-server-signed pose challenge, the reviewer overrode a number mismatch, or the case is a resubmission.
-A 25% random sample (`draazy.identity.qa-sample-rate`) covers the rest. Approvers do not see or
-work their own QA rows, and cannot revoke them while QA is open.
+A single approval is final: there is no second-review sample. The approver or another reviewer can still revoke the badge with a reason.
 
 **Approval checks (in order):** the number the reviewer types is the source of truth for the
 dedup hash. A hash already verified on another account is a hard stop (409
@@ -188,7 +184,7 @@ dedup hash. A hash already verified on another account is a hard stop (409
 `smile`, issued by `POST /me/verification/identity/challenge`, HMAC-signed to the user, 15 min), the
 reviewer must tick "selfie shows the pose" (400 `identity_pose_unconfirmed`). A typed number that
 differs from the applicant's entry is a soft stop (409 `identity_number_mismatch`); a
-`numberOverride` is stored (`number_overridden`), audited and always QA-sampled. The dev
+`numberOverride` is stored (`number_overridden`), audited. The dev
 `simulate` system actor skips both human checks.
 
 ## 7. State machine
@@ -200,8 +196,6 @@ differs from the applicant's entry is a soft stop (409 `identity_number_mismatch
   and claims erased, badge removed; the row keeps the attempt window, and a revoked or not_holder
   case keeps its document hash so withdrawal cannot launder a fraud block). Reads as `none` to the
   user.
-- **Identity QA:** `verified + qa_sampled_at → confirmed | revoked`; `confirmed` closes the sample,
-  `revoked` runs the earned-badge revoke path with the QA reviewer as revoker.
 - **`flagged`:** `false <-> true` (advisory marker; does not change access).
 - **Terminal-ish:** `archived` (re-openable by restore, which forces `status='active'`).
 

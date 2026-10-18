@@ -276,16 +276,6 @@ export async function approveServiceRequestDraftParty(id, partyKey, otp) {
   return post(`/service-requests/${encodeURIComponent(id)}/draft/otp`, body);
 }
 
-export async function checkServiceRequestDraft(id, decision, note) {
-  const wire = decision === 'release' ? 'release' : 'send-back';
-  return toViewModel(
-    await post(`/service-requests/${encodeURIComponent(id)}/draft/check`, {
-      decision: wire,
-      note: note || '',
-    }),
-  );
-}
-
 /** Mark messages from the other side as read. The endpoint intentionally returns no body. */
 export async function markServiceRequestRead(id) {
   await post(`/service-requests/${encodeURIComponent(id)}/read`, {});

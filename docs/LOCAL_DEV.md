@@ -85,7 +85,7 @@ header before changing it; it records three traps that cost real time (seed orde
 scope, and one row that violated a constraint added after the data was created).
 
 `db/seed-local/R__zz_DML_dev_kyc_desk.sql` fills the KYC desk (`/ops/kyc-review`) with 21 cases, one per
-review state (overdue, claimed by others, QA sample, your own approval, rejected, revoked). Only
+review state (overdue, claimed by others, your own approval, rejected, revoked). Only
 `application-local.properties` lists `db/seed-local`; the e2e profile replaces the list, so the lanes
 never see it. `DevKycSeedImages` draws the placeholder document images on boot.
 

@@ -934,9 +934,9 @@ against mocks; this section covers only what it cannot reach:
   self-grant Verified badge are `@LocalOnly` and do not exist outside `local`
   ([`system/profiles.md`](./system/profiles.md#local-only)). There is no shortcut, and adding one to
   a deployed environment would be a login bypass.
-- **Maker-checker needs two operators.** Rent-agreement refund approval and hard-signal listing
-  co-approval refuse the same person on both sides, so each environment needs a second back-office
-  account with the relevant permission, not a second administrator.
+- **Maker-checker needs two operators.** Rent-agreement refund approval refuses the same person on
+  both sides, so each environment needs a second back-office account with the relevant permission,
+  not a second administrator.
 - **Production never-do list** — these touch real people:
   - Never **approve** a test listing. It goes public, into search, sitemaps and alerts.
   - Never **unlock a real owner's contact** from a test account. That discloses a real person's

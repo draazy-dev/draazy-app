@@ -4,7 +4,7 @@ import { pickDate } from '../../helpers/datePicker.helper.js';
 test.use({ viewport: { width: 1440, height: 900 } });
 
 const TOTAL = 23;
-const SUMMARY = { pending: TOTAL, overdue: 4, mine: 1, qa: 2, decided: 40 };
+const SUMMARY = { pending: TOTAL, overdue: 4, mine: 1, decided: 40 };
 const IMG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
 
 const kycCase = (n, overrides = {}) => ({
@@ -60,7 +60,7 @@ test('the queue shows 10 cases a page with the total, and pages on the server', 
   await expect(page.getByTestId('kyc-row')).toHaveCount(10);
   await expect(page.getByTestId('queue-range').first()).toHaveText('1–10 of 23');
   await expect(page.getByTestId('kyc-count-needs')).toHaveText('23');
-  await expect(page.getByTestId('kyc-count-qa')).toHaveText('2');
+  await expect(page.getByRole('tab', { name: /QA sample/ })).toHaveCount(0);
   await expect(page.getByTestId('kyc-count-decided')).toHaveText('40');
   expect(desk.last()).toMatchObject({ status: 'pending', page: '0', size: '10', sort: 'newest' });
   await expect(page.getByRole('group', { name: 'Sort' })).toHaveCount(0);
@@ -102,8 +102,8 @@ test('every filter is a server query, and each tab only sends its own', async ({
   await page.getByRole('group', { name: 'Outcome' }).getByRole('button', { name: 'Revoked' }).click();
   await expect.poll(() => desk.last().outcome).toBe('revoked');
 
-  await page.getByRole('tab', { name: /^QA sample/ }).click();
-  await expect.poll(() => desk.last()).toMatchObject({ status: 'qa', sort: 'newest' });
+  await page.getByRole('tab', { name: /^Appeals/ }).click();
+  await expect.poll(() => desk.last()).toMatchObject({ status: 'appeal', sort: 'newest' });
   expect(desk.last()).not.toHaveProperty('outcome');
   expect(consoleErrors).toEqual([]);
 });

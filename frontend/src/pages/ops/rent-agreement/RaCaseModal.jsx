@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Hand } from 'lucide-react';
 import {
-  addServiceRequestMessage, cancelServiceRequestAsOps, checkServiceRequestDraft, getServiceRequest, readServiceRequestChecklist,
+  addServiceRequestMessage, cancelServiceRequestAsOps, getServiceRequest, readServiceRequestChecklist,
   shareServiceRequestDraft, takeServiceRequest, uploadServiceRequestFinalDoc,
 } from '../../../services/serviceRequestService.js';
 import { classNames, fmtINR } from '../../../lib/format.js';
@@ -13,7 +13,6 @@ import InternalNote, { saveNoteIfAny } from '../../../components/ui/InternalNote
 import AgeTone from '../service-queue/AgeTone.jsx';
 import AmendTerms from '../service-queue/AmendTerms.jsx';
 import CancelDialog from '../service-queue/CancelDialog.jsx';
-import DraftSecondCheck from '../service-queue/DraftSecondCheck.jsx';
 import MessageThread from '../service-queue/MessageThread.jsx';
 import OverlapCheck from '../service-queue/OverlapCheck.jsx';
 import PartyIdentities from '../service-queue/PartyIdentities.jsx';
@@ -31,10 +30,9 @@ const PRE_DRAFT = new Set(['submitted', 'docs_review', 'changes_requested']);
 const NEXT_TONE = {
   desk: 'border-brand-teal/40 bg-brand-teal/10 text-teal-100',
   customer: 'border-white/10 bg-white/5 text-gray-300',
-  colleague: 'border-amber-400/30 bg-amber-500/10 text-amber-100',
   done: 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100',
 };
-const NEXT_WHO = { desk: 'Your move', customer: "Customer's move", colleague: 'Colleague check', done: 'Closed' };
+const NEXT_WHO = { desk: 'Your move', customer: "Customer's move", done: 'Closed' };
 
 export default function RaCaseModal({ request, nextId, onNext, onClose, onChanged }) {
   const s = request ? caseSummary(request.details) : null;
@@ -136,15 +134,9 @@ function CaseView({ initial, onChanged }) {
     }
   };
 
-  const shareDraft = act(async (id, payload) => {
-    const updated = await shareServiceRequestDraft(id, payload);
-    toast(updated?.draftCheck?.status === 'pending'
-      ? 'The draft is waiting for a colleague to check it before the customer sees it.'
-      : 'The draft was shared with the customer.', 'success');
-    return updated;
-  }, null, 'Draft shared');
+  const shareDraft = act(shareServiceRequestDraft, 'The draft was shared with the customer.', 'Draft shared');
+
   const uploadFinal = act(uploadServiceRequestFinalDoc, 'The registered copy was uploaded.', 'Registered copy uploaded');
-  const decideDraftCheck = act(checkServiceRequestDraft, ([decision]) => (decision === 'release' ? 'Draft released to the customer.' : 'Draft sent back to the holder.'));
   const sendMessage = act(addServiceRequestMessage);
   const cancel = act(cancelServiceRequestAsOps, 'The case was cancelled and the customer was notified.', 'Cancelled');
 
@@ -234,8 +226,6 @@ function CaseView({ initial, onChanged }) {
             </button>
           ) : null}
         </div>
-
-        {detail.draftCheck?.status === 'pending' ? <DraftSecondCheck request={detail} onDecide={decideDraftCheck} /> : null}
 
         <StaffWorkflowActions request={detail} onShareDraft={shareDraft} onUploadFinal={uploadFinal} />
 

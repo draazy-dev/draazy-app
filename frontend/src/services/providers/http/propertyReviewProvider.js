@@ -5,7 +5,6 @@ import { toCaseFile, toReviewBadge } from './propertyReviewMapper.js';
 
 const caseFilePath = (propertyId) => `/properties/${encodeURIComponent(propertyId)}/verification`;
 const ownershipPath = (propertyId) => `${caseFilePath(propertyId)}/ownership`;
-export const OVERRIDE_REQUESTS_ENABLED = true;
 
 /** Keep the raw response: verified, verifiedAt, verifiedUntil, missingKinds and evidence. */
 export function getOwnershipVerification(propertyId) {
@@ -100,15 +99,6 @@ export async function decidePropertyReview(propertyId, decision, options) {
     ? { decision: verb, reasonCode: options.reasonCode, note: options.note, expectedStatus: options.expectedStatus }
     : { decision: verb, note: options };
   return toCaseFile(await post(`${caseFilePath(propertyId)}/decision`, body));
-}
-
-export async function requestPropertyReviewOverride(propertyId, reason) {
-  return toCaseFile(await post(`${caseFilePath(propertyId)}/override-requests`, { reason }));
-}
-
-export async function approvePropertyReviewOverride(propertyId, requestId, note) {
-  const body = note ? { note } : {};
-  return toCaseFile(await post(`${caseFilePath(propertyId)}/override-requests/${encodeURIComponent(requestId)}/approve`, body));
 }
 
 export async function listMyPropertyReviews({ page = 0, size = 20 } = {}) {

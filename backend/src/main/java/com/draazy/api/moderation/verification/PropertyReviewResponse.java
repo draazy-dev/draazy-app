@@ -16,7 +16,6 @@ public record PropertyReviewResponse(
         String notes,
         String reasonCode,
         String reasonNote,
-        OverrideRequest overrideRequest,
         ListingSignals signals,
         Instant decidedAt,
         ListingProgress progress,
@@ -28,8 +27,5 @@ public record PropertyReviewResponse(
     // from is server-derived; internal is always false in the owner's copy.
     public record MessageEntry(String id, String from, String body, Instant at, boolean read,
             boolean internal, boolean clarificationRequested) {
-    }
-
-    public record OverrideRequest(String id, String requestedBy, String reason, Instant at) {
     }
 }

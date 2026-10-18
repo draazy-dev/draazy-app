@@ -103,9 +103,9 @@ public class IdentityAppealService {
                 .filter(a -> VerificationStatuses.REJECTED.equals(v.getStatus()))
                 .orElseThrow(() -> new ConflictException(ErrorCodes.IDENTITY_APPEAL_NONE,
                         "This case has no open appeal"));
-        if (staff.userId().equals(v.getUserId()) || staff.userId().equals(v.getReviewerId())) {
-            throw new ForbiddenException(ErrorCodes.IDENTITY_APPEAL_SAME_REVIEWER,
-                    "A different reviewer than the one who rejected this case must decide its appeal");
+        if (staff.userId().equals(v.getUserId())) {
+            throw new ForbiddenException(ErrorCodes.IDENTITY_APPEAL_OWN_CASE,
+                    "You cannot decide an appeal on your own identity case");
         }
         Instant now = Instant.now(clock);
         if (reopen) {

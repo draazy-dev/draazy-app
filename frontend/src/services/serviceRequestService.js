@@ -132,9 +132,6 @@ export const decideServiceRequestDraft = async (id, decision, note) =>
 export const approveServiceRequestDraftParty = async (id, partyKey, otp) =>
   (await provider()).approveServiceRequestDraftParty(id, partyKey, otp);
 
-export const checkServiceRequestDraft = async (id, decision, note) =>
-  (await provider()).checkServiceRequestDraft(id, decision, note);
-
 /** Record that the caller opened the other side's messages. */
 export const markServiceRequestRead = async (id) => (await provider()).markServiceRequestRead(id);
 

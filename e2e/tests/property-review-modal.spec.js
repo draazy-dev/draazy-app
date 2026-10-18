@@ -83,38 +83,10 @@ test('the review modal shows the submitted photos, description and address', asy
     await box.click();
     await expect(box).toBeChecked();
   }
-  await page.route(`**/api/properties/${id}/verification/decision`, async (route) => {
-    if (route.request().method() !== 'POST') return route.fallback();
-    return route.fulfill({
-      status: 409,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: 'second_approver_required', message: 'Second approver required' }),
-    });
-  });
-  await page.route(`**/api/properties/${id}/verification/override-requests`, async (route) => {
-    expect(route.request().postDataJSON()).toEqual({ reason: 'Hard broker signal is a false positive' });
-    return route.fulfill({
-      status: 201,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        propertyId: id,
-        status: 'in_review',
-        checklist: REVIEW_CHECKLIST.map((item) => ({ item, pass: true })),
-        messages: [],
-        overrideRequest: {
-          id: 'override-1',
-          requestedBy: 'another-staff',
-          reason: 'Hard broker signal is a false positive',
-          at: new Date().toISOString(),
-        },
-      }),
-    });
-  });
   await modal.getByRole('button', { name: 'Approve', exact: true }).click();
-  await expect(modal.getByRole('button', { name: 'Request second approval', exact: true })).toBeVisible();
-  await modal.getByPlaceholder('Why should this hard signal be overridden?').fill('Hard broker signal is a false positive');
-  await modal.getByRole('button', { name: 'Request second approval', exact: true }).click();
-  await expect(modal.getByText('Hard broker signal is a false positive')).toBeVisible();
+  await expect(modal).toBeHidden();
+  const seen = await request.get(`${API}/properties/${id}`, { headers: await authHeaders(ACTORS.admin) });
+  expect((await seen.json()).status).toBe('approved');
 });
 
 test('a needs-info listing pauses at In review and its console card says it is awaiting the owner', async ({ page, login, request }) => {
@@ -141,7 +113,7 @@ test('a needs-info listing pauses at In review and its console card says it is a
   await expect(card.getByTestId('awaiting-owner')).toBeVisible();
 });
 
-test('a rejected case offers the second-review reopen flow', async ({ page, login, request }) => {
+test('one staff member reopens a rejected case from the review modal', async ({ page, login, request }) => {
   const { id } = await createListing(request, { title: `Rejected ${seeded.title}` });
   await page.route((url) => url.pathname === `/api/properties/${id}/verification`, async (route) => {
     if (route.request().method() !== 'POST') return route.fallback();
@@ -155,37 +127,22 @@ test('a rejected case offers the second-review reopen flow', async ({ page, logi
         messages: [],
         reasonCode: 'duplicate',
         reasonNote: null,
-        overrideRequest: null,
       }),
     });
   });
   await page.route(`**/api/properties/${id}/verification/read`, (route) => route.fulfill({ status: 204, body: '' }));
-  await page.route(`**/api/properties/${id}/verification/override-requests`, async (route) => {
-    expect(route.request().postDataJSON()).toEqual({ reason: 'Owner proved this was not the duplicate listing' });
-    return route.fulfill({
-      status: 201,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        propertyId: id,
-        status: 'rejected',
-        checklist: REVIEW_CHECKLIST.map((item) => ({ item, pass: true })),
-        messages: [],
-        overrideRequest: {
-          id: 'reopen-1',
-          requestedBy: 'another-staff',
-          reason: 'Owner proved this was not the duplicate listing',
-          at: new Date().toISOString(),
-        },
-      }),
-    });
+  let reopenBody = null;
+  await page.route(`**/api/properties/${id}/status`, async (route) => {
+    if (route.request().method() !== 'PATCH') return route.fallback();
+    reopenBody = route.request().postDataJSON();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
   });
 
   await login.asAdmin();
   await page.goto(`/admin/properties?review=${id}`);
 
   const modal = page.getByRole('dialog');
-  await expect(modal.getByRole('button', { name: 'Request reopen', exact: true })).toBeVisible();
-  await modal.getByPlaceholder('Why should this final reject be reopened?').fill('Owner proved this was not the duplicate listing');
-  await modal.getByRole('button', { name: 'Request reopen', exact: true }).click();
-  await expect(modal.getByText('Reopen requested:')).toBeVisible();
+  await modal.getByRole('button', { name: 'Reopen for review', exact: true }).click();
+  await expect(modal).toBeHidden();
+  expect(reopenBody).toEqual({ status: 'pending', expectedStatus: 'rejected' });
 });

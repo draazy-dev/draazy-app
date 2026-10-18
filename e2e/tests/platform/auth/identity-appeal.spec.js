@@ -110,7 +110,7 @@ async function mockAppealDesk(page, login, { canDecide = true, purged = false } 
   await page.route('**/api/moderation/identity-reviews**', async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
-    if (url.pathname.endsWith('/summary')) return route.fulfill({ json: { pending: 0, overdue: 0, mine: 0, qa: 0, decided: 1, appeals: 1 } });
+    if (url.pathname.endsWith('/summary')) return route.fulfill({ json: { pending: 0, overdue: 0, mine: 0, decided: 1, appeals: 1 } });
     if (method === 'GET' && !/case-1/.test(url.pathname)) {
       state.lists.push(Object.fromEntries(url.searchParams));
       const row = { ...kycCase(null, false), appeal: true };
@@ -129,7 +129,7 @@ async function mockAppealDesk(page, login, { canDecide = true, purged = false } 
   return state;
 }
 
-test('the ops queue tags an appeal and a different reviewer can uphold it', async ({ page, login }) => {
+test('the ops queue tags an appeal and a reviewer can uphold it', async ({ page, login }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   const desk = await mockAppealDesk(page, login);
   await page.goto('/ops/kyc-review');
@@ -162,13 +162,13 @@ test('reopening an appeal sends the case back to review', async ({ page, login }
   await expect(page.getByTestId('kyc-appeal-reopen')).toHaveCount(0);
 });
 
-test('the reviewer who rejected the case sees who must decide instead of the buttons', async ({ page, login }) => {
+test('a reviewer who cannot decide the appeal sees why instead of the buttons', async ({ page, login }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await mockAppealDesk(page, login, { canDecide: false });
   await page.goto('/ops/kyc-review?tab=appeal');
 
   await page.getByTestId('kyc-row').click();
-  await expect(page.getByTestId('kyc-appeal-panel')).toContainText('A different reviewer');
+  await expect(page.getByTestId('kyc-appeal-panel')).toContainText('your own identity case');
   await expect(page.getByTestId('kyc-appeal-uphold')).toHaveCount(0);
   await expect(page.getByTestId('kyc-appeal-reopen')).toHaveCount(0);
 });

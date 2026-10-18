@@ -137,12 +137,6 @@ test('ops can approve with year-only DOB and revoke a verified case', async ({ p
   expect(approval.request().postDataJSON()).toMatchObject({ gender: 'female' });
   expect((await approval.json()).accountGender).toBe('female');
 
-  if ((await approval.json()).awaitingQa) {
-    await expect(page.getByText('You approved this — another reviewer must check it.')).toBeVisible();
-    await expect(page.getByTestId('ops-identity-revoke-confirm')).toHaveCount(0);
-    return;
-  }
-
   await page.getByTestId('ops-identity-revoke-reason').fill('Verified badge granted during e2e revoke coverage.');
   await page.getByRole('button', { name: 'Revoke badge', exact: true }).click();
   await expect(page.getByText('Confirm revocation.')).toBeVisible();

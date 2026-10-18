@@ -452,7 +452,7 @@ live listing + stays-live edit -> stays approved + re-check queued
 live listing + off-search edit -> pending (checklist unticked)
 approved  --owner pause-->  paused  --owner resume-->  approved (no new moderation decision)
 ```
-- **Terminal-ish:** `approved` (live), `rejected` (final; only a two-staff override reopens it),
+- **Terminal-ish:** `approved` (live), `rejected` (final for the owner; staff can reopen it),
   `archived` (soft-delete; restore resets to `pending`, cross-cutting section 4). Rooms follow the same
   `pending -> ...` shape plus a separate Ops share-review for tenant/flagged posts.
 - **Owner-facing labels:** Pending (amber) / Needs info (rose) / Live (teal) + optional

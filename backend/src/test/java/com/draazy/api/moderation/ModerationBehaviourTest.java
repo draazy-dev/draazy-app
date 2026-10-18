@@ -172,8 +172,8 @@ class ModerationBehaviourTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("queue approval with a hard broker signal requires a second approver")
-    void queueApprovalWithHardSignalRequiresOverride() throws Exception {
+    @DisplayName("one staff member approves a listing that carries a hard broker signal")
+    void queueApprovalWithHardSignalNeedsOneApprover() throws Exception {
         User owner = user("9800000167", "owner", "Owner");
         User staff = user("9800000168", "staff", "Ops");
         User reporter = user("9800000169", "buyer", "Reporter");
@@ -185,15 +185,37 @@ class ModerationBehaviourTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"approved\",\"reason\":\"docs verified\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("second_approver_required"));
+                .andExpect(status().isOk());
+
+        assertThat(properties.findById(listing.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.APPROVED);
     }
 
     @Test
-    @DisplayName("queue approval cannot reverse a final rejection")
-    void queueApprovalCannotReverseFinalReject() throws Exception {
+    @DisplayName("one staff member approves a rejected listing whose checklist is complete")
+    void queueApprovalReversesARejection() throws Exception {
         User owner = user("9800000170", "owner", "Owner");
         User staff = user("9800000171", "staff", "Ops");
+        Property listing = listing(owner);
+        tickChecklist(listing, staff);
+        listing.setStatus(PropertyStatus.REJECTED);
+        properties.saveAndFlush(listing);
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"appeal accepted\",\"expectedStatus\":\"rejected\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(properties.findById(listing.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.APPROVED);
+    }
+
+    @Test
+    @DisplayName("one staff member reopens a rejected listing to pending and the owner is told")
+    void queueReopensARejection() throws Exception {
+        User owner = user("9800000176", "owner", "Owner");
+        User staff = user("9800000177", "staff", "Ops");
         Property listing = listing(owner);
         listing.setStatus(PropertyStatus.REJECTED);
         properties.saveAndFlush(listing);
@@ -201,14 +223,41 @@ class ModerationBehaviourTest extends AbstractApiTest {
         mvc.perform(patch("/properties/{id}/status", listing.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"approved\",\"reason\":\"appeal accepted\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("second_approver_required"));
+                        .content("{\"status\":\"pending\",\"reason\":\"appeal accepted\",\"expectedStatus\":\"rejected\"}"))
+                .andExpect(status().isOk());
+
+        assertThat(properties.findById(listing.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.PENDING);
+        assertThat(jdbc.queryForObject(
+                "select count(*) from notifications where user_id = ? and type = 'listing.reopened'",
+                Integer.class, owner.getId())).isEqualTo(1);
     }
 
     @Test
-    @DisplayName("a rejected listing cannot be flagged or clear-flag reopened")
-    void rejectedListingCannotBeFlagReopened() throws Exception {
+    @DisplayName("staff still cannot approve or reopen their own listing")
+    void staffCannotModerateTheirOwnListing() throws Exception {
+        User staff = user("9800000178", "staff", "Ops");
+        Property listing = listing(staff);
+        tickChecklist(listing, user("9800000179", "staff", "Other"));
+
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"approved\",\"reason\":\"my own\"}"))
+                .andExpect(status().isForbidden());
+
+        listing.setStatus(PropertyStatus.REJECTED);
+        properties.saveAndFlush(listing);
+        mvc.perform(patch("/properties/{id}/status", listing.getId())
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"pending\",\"expectedStatus\":\"rejected\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("a rejected listing can be flagged, and clearing the flag sends it back to pending")
+    void rejectedListingCanBeFlaggedAndReopened() throws Exception {
         User owner = user("9800000172", "owner", "Owner");
         User staff = user("9800000173", "staff", "Ops");
         Property listing = listing(owner);
@@ -219,15 +268,16 @@ class ModerationBehaviourTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"complaint\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("second_approver_required"));
+                .andExpect(status().isOk());
+        assertThat(properties.findById(listing.getId()).orElseThrow().getStatus())
+                .isEqualTo(PropertyStatus.FLAGGED);
+
         mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .delete("/properties/{id}/flag", listing.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
-                .andExpect(status().isConflict());
-
+                .andExpect(status().is2xxSuccessful());
         assertThat(properties.findById(listing.getId()).orElseThrow().getStatus())
-                .isEqualTo(PropertyStatus.REJECTED);
+                .isEqualTo(PropertyStatus.PENDING);
     }
 
     @Test
@@ -370,8 +420,8 @@ class ModerationBehaviourTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a hard signal first raised after approval escalates the stays-live re-check")
-    void recheckPassEscalatesASignalRaisedAfterApproval() throws Exception {
+    @DisplayName("a hard signal first raised after approval does not block the re-check pass")
+    void recheckPassOverASignalRaisedAfterApproval() throws Exception {
         User owner = user("9800000181", "owner", "Owner");
         User desk = user("9800000182", "staff", "Desk");
         User other = user("9800000183", "staff", "Other");
@@ -381,45 +431,6 @@ class ModerationBehaviourTest extends AbstractApiTest {
 
         mvc.perform(patch("/properties/{id}/status", listing.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(other))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\":\"approved\",\"reason\":\"Owner edits reviewed\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("second_approver_required"));
-
-        assertThat(properties.findById(listing.getId()).orElseThrow().isRecheckPending()).isTrue();
-    }
-
-    @Test
-    @DisplayName("a re-check passes over a signal a second approver already cleared at approval")
-    void recheckPassKeepsAnOverriddenApproval() throws Exception {
-        User owner = user("9800000185", "owner", "Owner");
-        User desk = user("9800000186", "staff", "Desk");
-        User peer = user("9800000187", "staff", "Peer");
-        User reporter = user("9800000188", "buyer", "Reporter");
-        Property listing = listing(owner);
-        mvc.perform(post("/properties/{id}/verification/start", listing.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
-                .andExpect(status().isOk());
-        tickChecklist(listing, desk);
-        hardBrokerSignal(listing, reporter);
-        String requested = mvc.perform(post("/properties/{id}/verification/override-requests", listing.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"Hard broker signal reviewed\"}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        String requestId = com.jayway.jsonpath.JsonPath.read(requested, "$.overrideRequest.id");
-        mvc.perform(post("/properties/{id}/verification/override-requests/{rid}/approve", listing.getId(), requestId)
-                        .header(HttpHeaders.AUTHORIZATION, bearer(peer))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"note\":\"second approval\"}"))
-                .andExpect(status().isOk());
-        Property approved = properties.findById(listing.getId()).orElseThrow();
-        approved.requestRecheck(List.of("price"));
-        properties.saveAndFlush(approved);
-
-        mvc.perform(patch("/properties/{id}/status", listing.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"status\":\"approved\",\"reason\":\"Owner edits reviewed\"}"))
                 .andExpect(status().isOk());

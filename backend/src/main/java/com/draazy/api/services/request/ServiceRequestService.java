@@ -535,8 +535,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
     @Transactional
     void completeDraftApproval(AuthPrincipal caller, String id) {
         ServiceRequest request = foundForUpdate(id);
-        if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED || draftApprovals.held(request)
-                || !draftApprovals.complete(request)) {
+        if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED || !draftApprovals.complete(request)) {
             return;
         }
         ServiceRequestStatus from = transition(request, ServiceRequestStatus.APPROVED);

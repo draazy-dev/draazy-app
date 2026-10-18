@@ -28,14 +28,11 @@ public class ServiceRequestDrafting {
     private final Notifier notifier;
     private final ServiceRequestDocumentReviews documentReviews;
     private final ServiceRequestAmendments amendments;
-    private final ServiceRequestDraftApprovals approvals;
-    private final ServiceRequestDraftChecks draftChecks;
 
     public ServiceRequestDrafting(ServiceRequestService requests, ServiceRequestMapper mapper,
             RentAgreementRegistration registration, ServiceRequestRegistrationRepository registrations,
             AuditService audit, Notifier notifier, ServiceRequestDocumentReviews documentReviews,
-            ServiceRequestAmendments amendments, ServiceRequestDraftApprovals approvals,
-            ServiceRequestDraftChecks draftChecks) {
+            ServiceRequestAmendments amendments) {
         this.requests = requests;
         this.mapper = mapper;
         this.registration = registration;
@@ -44,8 +41,6 @@ public class ServiceRequestDrafting {
         this.notifier = notifier;
         this.documentReviews = documentReviews;
         this.amendments = amendments;
-        this.approvals = approvals;
-        this.draftChecks = draftChecks;
     }
 
     // Notify requester in the transaction; only they can decide, so silence stalls both sides.
@@ -62,10 +57,6 @@ public class ServiceRequestDrafting {
                     + " — no draft can be shared from here.");
         }
         requests.storeDocument(caller, request, DRAFT, file, null);
-        int version = approvals.currentVersion(request);
-        if (draftChecks.holdIfRisky(caller, request, version)) {
-            return mapper.toDto(request, caller);
-        }
         ServiceRequestStatus from = requests.transition(request, ServiceRequestStatus.DRAFT_SHARED);
         requests.record(request, ServiceRequestReadReceipts.DRAFT_SHARED, requests.displayName(caller.userId()));
         audit.record(caller, "service-request.draft-shared", "service_request",

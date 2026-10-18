@@ -17,7 +17,7 @@ const PAGE_SIZE = 20;
 const TABS = stageTabs('case');
 const TAB_KEYS = TABS.map((t) => t.key);
 const GRID = 'lg:grid lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1.5fr)_minmax(0,0.9fr)_minmax(0,0.7fr)] lg:items-center lg:gap-3';
-const NEXT_TONE = { desk: 'text-teal-200', customer: 'text-gray-400', colleague: 'text-amber-200', done: 'text-gray-500' };
+const NEXT_TONE = { desk: 'text-teal-200', customer: 'text-gray-400', done: 'text-gray-500' };
 
 export default function RentAgreementDesk() {
   const [tab, setTab] = useTabParam(TAB_KEYS, 'pickup');

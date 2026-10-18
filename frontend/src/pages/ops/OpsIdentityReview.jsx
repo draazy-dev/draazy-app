@@ -7,18 +7,15 @@ import Loading from '../../components/ui/Loading.jsx';
 import Select from '../../components/ui/Select.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { hasPermission } from '../../lib/adminModules.js';
-import { classNames, fmtNum } from '../../lib/format.js';
 import { useTabParam } from '../../lib/useTabParam.js';
 import { Chips, ClearFilters, PageNav, QueueTabs, SearchBox } from '../../components/admin/WorkQueue.jsx';
 import KycReviewModal from './kyc/KycReviewModal.jsx';
-import { CLAIM_HOLD_LIMIT, DOC_OPTIONS, STATUS_LABELS, dateLabel, docLabel, elapsed } from './kyc/vocabulary.js';
 
 const PAGE_SIZE = 10;
 const TABS = [
   { key: 'needs', label: 'Needs review', status: 'pending', count: (s) => s.pending, empty: 'All caught up — no KYC cases waiting.', note: 'Pending cases, newest first. Opening one claims it for 30 minutes, so nobody else can decide it.' },
-  { key: 'qa', label: 'QA sample', status: 'qa', count: (s) => s.qa, empty: 'No approvals waiting for a QA check.', note: 'Approvals picked at random for a second check by a different reviewer. Your own approvals are not listed.' },
   { key: 'decided', label: 'Decided', status: 'decided', count: (s) => s.decided, empty: 'Nothing decided yet.', note: 'Verified, rejected and revoked cases — open one to revoke a badge or read its history.' },
-  { key: 'appeal', label: 'Appeals', status: 'appeal', count: (s) => s.appeals, empty: 'No identity appeals waiting.', note: 'Rejected cases the applicant asked to have checked again. Someone other than the original reviewer decides: uphold the rejection or reopen it for a fresh review.' },
+  { key: 'appeal', label: 'Appeals', status: 'appeal', count: (s) => s.appeals, empty: 'No identity appeals waiting.', note: 'Rejected cases the applicant asked to have checked again. Uphold the rejection or reopen it for a fresh review.' },
 ];
 const TAB_KEYS = TABS.map((t) => t.key);
 const EMPTY_FILTERS = { q: '', docType: '', claim: '', overdue: false, outcome: '' };
@@ -166,8 +163,8 @@ export default function OpsIdentityReview() {
               <div aria-hidden="true" className={classNames(GRID, 'border-b border-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500')}>
                 <div>Applicant</div>
                 <div>Document</div>
-                <div>{tab === 'needs' ? 'Waiting' : tab === 'qa' ? 'Sampled' : 'Decided'}</div>
-                <div>{tab === 'needs' ? 'Claim' : tab === 'qa' ? 'Approved by' : 'Outcome'}</div>
+                <div>{tab === 'needs' ? 'Waiting' : 'Decided'}</div>
+                <div>{tab === 'needs' ? 'Claim' : 'Outcome'}</div>
                 <div />
               </div>
               <ul>

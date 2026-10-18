@@ -28,11 +28,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
-@TestPropertySource(properties = "draazy.identity.qa-sample-rate=0.0")
 class VerificationEndpointsTest extends AbstractApiTest {
 
     private static final String PAN = "ABCDE1234F";

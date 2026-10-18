@@ -90,9 +90,6 @@ public class IdentityReviewReadService {
             if (v.getClaimedBy() != null) {
                 ids.add(v.getClaimedBy());
             }
-            if (v.getQaReviewedBy() != null) {
-                ids.add(v.getQaReviewedBy());
-            }
         }
         Map<UUID, User> byId = new HashMap<>();
         users.findAllById(ids).forEach(u -> byId.put(u.getId(), u));
@@ -105,7 +102,6 @@ public class IdentityReviewReadService {
         User reviewer = v.getReviewerId() == null ? null : lookup.apply(v.getReviewerId());
         boolean freshClaim = isFreshClaim(v);
         User claimedBy = freshClaim ? lookup.apply(v.getClaimedBy()) : null;
-        boolean hideQa = actorId != null && actorId.equals(v.getReviewerId());
         return new IdentityReviewRow(
                 v.getId(),
                 v.getStatus(),
@@ -118,7 +114,6 @@ public class IdentityReviewReadService {
                 reviewer == null ? null : reviewer.getName(),
                 claimedBy == null ? null : claimedBy.getName(),
                 freshClaim && actorId != null && actorId.equals(v.getClaimedBy()),
-                hideQa ? null : v.getQaSampledAt(),
                 appeal);
     }
 
@@ -129,14 +124,11 @@ public class IdentityReviewReadService {
         User revokedBy = v.getRevokedBy() == null ? null : lookup.apply(v.getRevokedBy());
         boolean freshClaim = isFreshClaim(v);
         User claimedBy = freshClaim ? lookup.apply(v.getClaimedBy()) : null;
-        User qaReviewedBy = v.getQaReviewedBy() == null ? null : lookup.apply(v.getQaReviewedBy());
         boolean claimedByMe = freshClaim && actorId != null && actorId.equals(v.getClaimedBy());
-        boolean hideQa = actorId != null && actorId.equals(v.getReviewerId());
         Optional<IdentityAppealInfo> appeal = appeals.current(v);
         boolean canDecideAppeal = appeal.filter(a -> IdentityAppeal.OPEN.equals(a.status())).isPresent()
                 && actorId != null
-                && !actorId.equals(v.getUserId())
-                && !actorId.equals(v.getReviewerId());
+                && !actorId.equals(v.getUserId());
         return new IdentityReviewResponse(
                 v.getId(),
                 v.getUserId(),
@@ -168,12 +160,6 @@ public class IdentityReviewReadService {
                 v.getRevocationReason(),
                 claimedBy == null ? null : claimedBy.getName(),
                 claimedByMe,
-                hideQa ? null : v.getQaSampledAt(),
-                hideQa ? null : v.getQaReviewedAt(),
-                hideQa ? null : v.getQaOutcome(),
-                hideQa || qaReviewedBy == null ? null : qaReviewedBy.getName(),
-
-                v.getQaSampledAt() != null && v.getQaReviewedAt() == null,
                 v.getFilesPurgedAt(),
                 images(stored),
                 warnings(v),

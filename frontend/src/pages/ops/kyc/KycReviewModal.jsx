@@ -14,8 +14,6 @@ import {
   dateLabel,
   docLabel,
   elapsed,
-  isOpenQa,
-  isOwnQaApproval,
   reasonLabel,
 } from './vocabulary.js';
 
@@ -67,7 +65,7 @@ export default function KycReviewModal({ openId, nextId, onNext, onClose, onChan
       {!detail && !loading && error ? <div role="alert" data-testid="ops-identity-decision-error" className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div> : null}
       {detail ? (
         <CaseBody
-          key={`${detail.id}|${detail.status}|${detail.qaOutcome || ''}`}
+          key={`${detail.id}|${detail.status}`}
           detail={detail}
           kase={kase}
           user={user}
@@ -84,7 +82,6 @@ function CaseBody({ detail, kase, user, canWrite, summaryRef, onSettled }) {
   const [checked, setChecked] = useState(() => new Set());
   const [poseConfirmed, setPoseConfirmed] = useState(false);
   const pending = detail.status === 'pending';
-  const openQa = isOpenQa(detail);
   const checklist = CHECKLISTS[detail.docType] || DEFAULT_CHECKLIST;
   const age = pending ? elapsed(detail.submittedAt) : null;
   const chip = livenessChip(detail);
@@ -102,7 +99,6 @@ function CaseBody({ detail, kase, user, canWrite, summaryRef, onSettled }) {
           <span>· {detail.userRole || '—'} · {docLabel(detail.docType)}</span>
           <Badge status={detail.status}>{STATUS_LABELS[detail.status] || detail.status}</Badge>
           {age ? <Chip tone={TONE[age.tone]}>Waiting {age.text}{age.tone === 'breach' ? ' · overdue' : ''}</Chip> : null}
-          {openQa ? <Chip tone={TONE.warn}>QA: pending</Chip> : detail.qaOutcome ? <Chip tone={TONE.ok}>QA: {detail.qaOutcome}</Chip> : null}
           {detail.numberOverridden ? <Chip tone="border-[var(--teal-2)]/30 bg-[var(--teal-2)]/10 text-[var(--teal-2)]">Number corrected by reviewer</Chip> : null}
         </div>
 
@@ -134,7 +130,7 @@ function CaseBody({ detail, kase, user, canWrite, summaryRef, onSettled }) {
                 </dl>
                 <KycAccountEditor detail={detail} canWrite={canWrite} onSaved={kase.refresh} />
               </div>
-              {pending || (openQa && !isOwnQaApproval(detail)) ? (
+              {pending ? (
                 <fieldset data-testid="ops-identity-checklist">
                   <legend className="text-xs font-semibold text-gray-300">Check on the image</legend>
                   <div className="mt-2 space-y-1.5">
@@ -207,9 +203,6 @@ function History({ detail }) {
     detail.submittedAt && ['Submitted', `${dateLabel(detail.submittedAt)}${detail.attemptCount > 1 ? ` · attempt ${detail.attemptCount}` : ''}`],
     detail.decidedAt && ['Decided', `${dateLabel(detail.decidedAt)} by ${detail.reviewerName || '—'}`],
     detail.rejectionReason && ['Rejection', `${reasonLabel(detail.rejectionReason)}${detail.rejectionNote ? ` — ${detail.rejectionNote}` : ''}`],
-    detail.qaSampledAt && ['QA', detail.qaOutcome
-      ? `${detail.qaOutcome} by ${detail.qaReviewedByName || '—'} · ${dateLabel(detail.qaReviewedAt)}`
-      : `Sampled ${dateLabel(detail.qaSampledAt)} · awaiting check`],
     detail.revokedAt && ['Revoked', `${dateLabel(detail.revokedAt)} by ${detail.revokedByName || '—'} · ${detail.revocationReason || 'No reason recorded'}`],
     detail.filesPurgedAt && ['Images purged', dateLabel(detail.filesPurgedAt)],
   ].filter(Boolean);

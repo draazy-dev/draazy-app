@@ -68,19 +68,11 @@ public class PropertyLifecycle {
     }
 
     public void publish(AuthPrincipal actor, Property property) {
-        publish(actor, property, false);
-    }
-
-    public void publishWithSecondApproval(AuthPrincipal actor, Property property) {
-        publish(actor, property, true);
-    }
-
-    private void publish(AuthPrincipal actor, Property property, boolean secondApprovalSatisfied) {
         requireChecker(actor, property);
         requireActive(property);
         requireFiled(property);
         requireOwnerConfirmed(property);
-        publicationGate.requirePublishable(actor, property, secondApprovalSatisfied);
+        publicationGate.requirePublishable(actor, property);
         boolean alreadyLive = PropertyStatus.APPROVED.equals(property.getStatus());
         boolean live = alreadyLive || liveGate.mayGoLive(property);
         property.setStatus(live ? PropertyStatus.APPROVED : PropertyStatus.PAUSED);
@@ -128,7 +120,7 @@ public class PropertyLifecycle {
 
     public void announceReopened(Property property) {
         notifier.notify(property.getOwner().getId(), "listing.reopened", "Your listing is back under review",
-                label(property) + " was not final after all: a second reviewer reopened it and it is being reviewed again.",
+                label(property) + " was reopened by our team and is being reviewed again.",
                 reviewLink(property));
     }
 
@@ -171,16 +163,6 @@ public class PropertyLifecycle {
     }
 
     public void reenterPending(AuthPrincipal actor, Property property) {
-        if (PropertyStatus.REJECTED.equals(property.getStatus())) {
-            throw new ConflictException("second_approver_required",
-                    "A final rejection requires a second staff approver to reopen.");
-        }
-        reenterPendingAfterSecondApproval(actor, property);
-    }
-
-    public void reenterPendingAfterSecondApproval(AuthPrincipal actor, Property property) {
-            // The rejection told the owner to reply here to resubmit, and this is the only route out of
-            // REJECTED that needs no moderator. Owner-track only: "in_review" is not in the staff vocabulary.
         property.revertToPending();
         publishReentry(actor, property);
     }

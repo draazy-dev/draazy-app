@@ -14,9 +14,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
-/** Builds desk queue rows in four small reads, none of which touches a file, thread or party. */
+/** Builds desk queue rows in three small reads, none of which touches a file, thread or party. */
 @Component
 class ServiceRequestQueueRows {
 
@@ -27,14 +28,12 @@ class ServiceRequestQueueRows {
             "timeline", "ptype", "area", "purpose", "from", "to", "moveDate", "homeSize");
 
     private final UserRepository users;
-    private final ServiceRequestDraftCheckRepository draftChecks;
     private final ServiceRequestPoliceIntimationRepository policeIntimations;
     private final ServiceRequestEventRepository events;
 
-    ServiceRequestQueueRows(UserRepository users, ServiceRequestDraftCheckRepository draftChecks,
+    ServiceRequestQueueRows(UserRepository users,
             ServiceRequestPoliceIntimationRepository policeIntimations, ServiceRequestEventRepository events) {
         this.users = users;
-        this.draftChecks = draftChecks;
         this.policeIntimations = policeIntimations;
         this.events = events;
     }
@@ -43,15 +42,13 @@ class ServiceRequestQueueRows {
         if (requests.isEmpty()) {
             return List.of();
         }
-        List<UUID> ids = requests.stream().map(ServiceRequest::getId).toList();
         List<UUID> completed = idsWhere(requests, ServiceRequestStatus.COMPLETED);
         List<UUID> approvedRentals = requests.stream()
                 .filter(r -> r.getStatus() == ServiceRequestStatus.APPROVED
                         && ServiceRequestTypes.RENT_AGREEMENT.equals(r.getType()))
                 .map(ServiceRequest::getId).toList();
 
-        Map<UUID, String> names = names(requests);
-        Map<UUID, String> checks = latestCheckStatus(ids);
+        Map<UUID, User> people = people(requests);
         Set<UUID> confirmed = completed.isEmpty() ? Set.of()
                 : policeIntimations.findByServiceRequestIdIn(completed).stream()
                         .map(ServiceRequestPoliceIntimation::getServiceRequestId).collect(Collectors.toSet());
@@ -63,12 +60,13 @@ class ServiceRequestQueueRows {
                 r.getType(),
                 r.getStatus(),
                 projected(r.getDetails()),
-                names.get(r.getAssigneeId()),
+                nameOf(people.get(r.getRequesterId())),
+                mobileOf(people.get(r.getRequesterId())),
+                nameOf(people.get(r.getAssigneeId())),
                 Objects.equals(r.getAssigneeId(), viewer.userId()),
                 r.getCreatedAt(),
                 r.getAmount(),
                 RentAgreementSla.of(r, now),
-                checks.get(r.getId()),
                 confirmed.contains(r.getId()),
                 approvedAt.get(r.getId()))).toList();
     }
@@ -77,27 +75,27 @@ class ServiceRequestQueueRows {
         return requests.stream().filter(r -> r.getStatus() == status).map(ServiceRequest::getId).toList();
     }
 
-    private Map<UUID, String> names(List<ServiceRequest> requests) {
-        Set<UUID> assignees = requests.stream().map(ServiceRequest::getAssigneeId).filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-        Map<UUID, String> names = new HashMap<>();
-        if (!assignees.isEmpty()) {
-            for (User u : users.findAllById(assignees)) {
-                names.put(u.getId(), u.getName());
+    private Map<UUID, User> people(List<ServiceRequest> requests) {
+        Set<UUID> ids = requests.stream()
+                .flatMap(r -> Stream.of(r.getAssigneeId(), r.getRequesterId()))
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<UUID, User> people = new HashMap<>();
+        if (!ids.isEmpty()) {
+            for (User u : users.findAllById(ids)) {
+                people.put(u.getId(), u);
             }
         }
-        return names;
+        return people;
     }
 
-    private Map<UUID, String> latestCheckStatus(List<UUID> ids) {
-        Map<UUID, ServiceRequestDraftCheck> latest = new HashMap<>();
-        for (ServiceRequestDraftCheck c : draftChecks.findByRequestIdIn(ids)) {
-            latest.merge(c.getRequestId(), c, (a, b) -> b.getDraftVersion() > a.getDraftVersion() ? b : a);
-        }
-        Map<UUID, String> status = new HashMap<>();
-        latest.forEach((id, c) -> status.put(id, c.getStatus()));
-        return status;
+    private static String nameOf(User u) {
+        return u == null ? null : u.getName();
     }
+
+    private static String mobileOf(User u) {
+        return u == null ? null : u.getMobile();
+    }
+
 
     private Map<UUID, Instant> approvedAt(Collection<UUID> ids) {
         Map<UUID, Instant> out = new HashMap<>();

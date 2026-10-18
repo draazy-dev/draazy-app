@@ -16,14 +16,7 @@ const toMessage = (m) => ({
 /** One checklist line. `pass` is a boolean on the wire; anything falsy reads as not yet passed. */
 const toChecklistItem = (c) => ({ item: c?.item ?? '', pass: Boolean(c?.pass) });
 
-const toOverrideRequest = (row) => row ? {
-  id: row.id ? String(row.id) : '',
-  requestedBy: row.requestedBy ? String(row.requestedBy) : null,
-  reason: row.reason ?? '',
-  at: row.at ?? null,
-} : null;
-
-const toSignals = (signals) => signals ? {
+const toSignals =  (signals) => signals ? {
   possibleBroker: Boolean(signals.possibleBroker),
   hardBlock: Boolean(signals.hardBlock),
   conflict: Boolean(signals.conflict),
@@ -49,7 +42,6 @@ export function toCaseFile(res) {
     reasonCode: res.reasonCode ?? null,
     reasonNote: res.reasonNote ?? null,
     reraCheck: res.reraCheck ?? null,
-    overrideRequest: toOverrideRequest(res.overrideRequest),
     signals: toSignals(res.signals),
     decidedAt: res.decidedAt ?? null,
   };

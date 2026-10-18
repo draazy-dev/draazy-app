@@ -36,7 +36,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
 
     @Autowired ServiceRequestRepository requests;
-    @Autowired ServiceRequestDraftCheckRepository checks;
     @MockitoSpyBean ServiceRequestDraftApprovals approvals;
     @MockitoSpyBean OtpSender sender;
     @Autowired ServiceRequestPartyRepository parties;
@@ -56,7 +55,7 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
         tx.executeWithoutResult(s -> {
             String mine = "(select id from service_requests where requester_id in "
                     + "(select id from users where mobile like '" + mobilePrefix() + "%'))";
-            for (String child : List.of("service_request_timeline", "service_request_draft_checks",
+            for (String child : List.of("service_request_timeline",
                     "service_request_draft_approvals", "service_request_parties")) {
                 jdbc.update("delete from " + child + " where request_id in " + mine);
             }
@@ -65,29 +64,6 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
             jdbc.update("delete from service_requests where id in " + mine);
             jdbc.update("delete from otp_codes where mobile = ?", INLINE_TENANT);
         });
-    }
-
-    @Test
-    @DisplayName("release racing send-back on a held draft: one decision, and it matches what the customer sees")
-    void secondCheckDecidesOnce() {
-        User owner = user("01", "buyer");
-        User holder = deskStaff("02");
-        UUID id = filed(owner, holder, ServiceRequestStatus.ASSIGNED, 55_000);
-        tx.executeWithoutResult(s -> checks.save(new ServiceRequestDraftCheck(id, 1, List.of("rent_ge_50000"),
-                holder.getId())));
-        User[] checkers = {deskStaff("03"), deskStaff("04")};
-        String[] bodies = {"{\"decision\":\"release\"}", "{\"decision\":\"send-back\",\"note\":\"Fix clause 7\"}"};
-        List<Integer> outcomes = Collections.synchronizedList(new ArrayList<>());
-
-        Races.run(2, i -> outcomes.add(send(Routes.ServiceRequests.DRAFT_CHECK, checkers[i], bodies[i], id)));
-
-        assertThat(outcomes).as("outcomes=" + outcomes).containsExactlyInAnyOrder(200, 409);
-        String check = jdbc.queryForObject("select status from service_request_draft_checks where request_id = ?",
-                String.class, id);
-        String status = jdbc.queryForObject("select status from service_requests where id = ?", String.class, id);
-        assertThat(status).isEqualTo("released".equals(check) ? "draft-shared" : "assigned");
-        assertThat(count("select count(*) from notifications where user_id = ? and type = 'service.draft-shared'",
-                owner.getId())).isEqualTo("released".equals(check) ? 1L : 0L);
     }
 
     @Test
@@ -117,18 +93,12 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
     }
 
     @Test
-    @DisplayName("a risky revision racing the last approval: never approved while a draft is still held")
-    void shareRacingApprovalNeverStrandsAHeldDraft() {
+    @DisplayName("a revision racing the last approval: exactly one wins, and an approved request never has an unseen revision")
+    void shareRacingApprovalHasOneWinner() {
         User owner = user("08", "buyer");
         User holder = deskStaff("09");
         UUID id = filed(owner, holder, ServiceRequestStatus.DRAFT_SHARED, 55_000);
-        tx.executeWithoutResult(s -> {
-            ServiceRequestDraftCheck released = new ServiceRequestDraftCheck(id, 1, List.of("rent_ge_50000"),
-                    holder.getId());
-            released.release(holder.getId());
-            checks.save(released);
-            DocumentReviewFixture.verifyAll(requests, documents, reviews, id);
-        });
+        tx.executeWithoutResult(s -> DocumentReviewFixture.verifyAll(requests, documents, reviews, id));
         assertThat(send(Routes.ServiceRequests.DRAFT_OPENED, owner, "{}", id)).isEqualTo(204);
         List<Integer> outcomes = Collections.synchronizedList(new ArrayList<>());
 
@@ -136,19 +106,18 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
                 : send(Routes.ServiceRequests.DRAFT_DECISION, owner, "{\"decision\":\"approve\"}", id)));
 
         String status = jdbc.queryForObject("select status from service_requests where id = ?", String.class, id);
-        long held = count("select count(*) from service_request_draft_checks where request_id = ? "
-                + "and status <> 'released'", id);
-        assertThat(status + "/held=" + held).as("outcomes=" + outcomes)
-                .isIn("approved/held=0", "draft-shared/held=1");
+        long drafts = count("select count(*) from documents where service_request_id = ? and category = 'draft'", id);
+        assertThat(status + "/drafts=" + drafts).as("outcomes=" + outcomes)
+                .isIn("approved/drafts=1", "draft-shared/drafts=2");
         assertThat(outcomes).as("outcomes=" + outcomes).containsExactlyInAnyOrder(200, 409);
     }
 
     @Test
-    @DisplayName("a risky re-share landing while an approval OTP is sent: the code is voided and the send is refused")
+    @DisplayName("a re-share landing while an approval OTP is sent: the code is voided and the send is refused")
     void otpSentAcrossAReshareIsVoided() throws Exception {
         User owner = user("10", "buyer");
         User holder = deskStaff("11");
-        UUID id = sharedWithReleasedV1(owner, holder, Map.of("owner", Map.of("oMobile", owner.getMobile()),
+        UUID id = sharedV1(owner, holder, Map.of("owner", Map.of("oMobile", owner.getMobile()),
                 "tenants", List.of(Map.of("name", "Ria", "mobile", INLINE_TENANT))));
         String partyKey = "tenant:0:" + Tokens.sha256Hex(INLINE_TENANT);
         Thread caller = Thread.currentThread();
@@ -167,11 +136,11 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
     }
 
     @Test
-    @DisplayName("a risky re-share landing while the draft is being opened: the receipt never lands on the held version")
-    void openingAcrossAReshareNeverMarksTheHeldVersion() throws Exception {
+    @DisplayName("a re-share landing while the draft is being opened: the receipt never lands on the new version")
+    void openingAcrossAReshareNeverMarksTheNewVersion() throws Exception {
         User owner = user("12", "buyer");
         User holder = deskStaff("13");
-        UUID id = sharedWithReleasedV1(owner, holder, Map.of());
+        UUID id = sharedV1(owner, holder, Map.of());
         Thread caller = Thread.currentThread();
         Thread[] share = new Thread[1];
         doAnswer(inv -> {
@@ -187,19 +156,13 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
         assertThat(opened).isEqualTo(204);
         assertThat(count("select count(*) from service_request_draft_approvals where request_id = ? "
                 + "and draft_version = 2 and opened_at is not null", id)).isZero();
-        assertThat(count("select count(*) from service_request_draft_checks where request_id = ? "
-                + "and draft_version = 2 and status = 'pending'", id)).isEqualTo(1L);
+        assertThat(count("select count(*) from documents where service_request_id = ? and category = 'draft'", id))
+                .isEqualTo(2L);
     }
 
-    private UUID sharedWithReleasedV1(User owner, User holder, Map<String, Object> state) {
+    private UUID sharedV1(User owner, User holder, Map<String, Object> state) {
         UUID id = filed(owner, holder, ServiceRequestStatus.DRAFT_SHARED, 55_000, state);
-        tx.executeWithoutResult(s -> {
-            ServiceRequestDraftCheck released = new ServiceRequestDraftCheck(id, 1, List.of("rent_ge_50000"),
-                    holder.getId());
-            released.release(holder.getId());
-            checks.save(released);
-            DocumentReviewFixture.verifyAll(requests, documents, reviews, id);
-        });
+        tx.executeWithoutResult(s -> DocumentReviewFixture.verifyAll(requests, documents, reviews, id));
         return id;
     }
 
@@ -234,6 +197,7 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
                 """, staff.getId().toString(), "[\"support\",\"desk:" + Teams.RENTAL + "\"]");
         return users.findById(staff.getId()).orElseThrow();
     }
+
 
     private UUID filed(User owner, User holder, ServiceRequestStatus status, long rent) {
         return filed(owner, holder, status, rent, Map.of());

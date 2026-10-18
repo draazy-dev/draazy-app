@@ -20,8 +20,7 @@ final class TeamPerformanceAuditFunctions {
             return BackOfficeFunctions.KYC;
         }
         if (starts(action, "property.verification.") || starts(action, "property.ownership.")
-                || "property.documents.read".equals(action)
-                || "property_override_request".equals(entity)) {
+                || "property.documents.read".equals(action)) {
             return BackOfficeFunctions.PROPERTY_VERIFICATION;
         }
         if (starts(action, "property.status") || starts(action, "property.flag")

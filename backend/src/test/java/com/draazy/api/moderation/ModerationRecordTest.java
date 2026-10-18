@@ -272,27 +272,17 @@ class ModerationRecordTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a second approver reopening a final rejection tells the owner it is back under review")
+    @DisplayName("reopening a rejected listing tells the owner it is back under review")
     void reopenedRejectionNotifiesTheOwner() throws Exception {
         User owner = user("9891200017", "owner");
         User ops = user("9891200018", "staff");
-        User peer = user("9891200019", "staff");
         Property listing = listing(owner);
         setStatus(listing, ops, "{\"status\":\"rejected\",\"reasonCode\":\"wrong_details\"}", 200);
 
-        String response = mvc.perform(post("/properties/{id}/verification/override-requests", listing.getId())
-                        .header(HttpHeaders.AUTHORIZATION, bearer(ops))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"reason\":\"Owner appeal has evidence\"}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        String requestId = com.jayway.jsonpath.JsonPath.read(response, "$.overrideRequest.id");
+        setStatus(listing, ops, "{\"status\":\"pending\",\"reason\":\"Owner appeal has evidence\","
+                + "\"expectedStatus\":\"rejected\"}", 200);
 
-        assertThat(auditRows("property.verification.override.requested", listing.getId())).hasSize(1);
-        json(post("/properties/{id}/verification/override-requests/" + requestId + "/approve", listing.getId()),
-                peer, "{\"note\":\"reopen\"}", 200);
-
-        assertThat(auditRows("property.verification.override.approved", listing.getId())).hasSize(1);
+        assertThat(auditRows("property.status", listing.getId())).hasSize(2);
         Map<String, Object> told = notices(owner, "listing.reopened").get(0);
         assertThat((String) told.get("body")).contains("2BHK in Baner");
         assertThat(told.get("link")).isEqualTo("/dashboard?review=" + listing.getId());

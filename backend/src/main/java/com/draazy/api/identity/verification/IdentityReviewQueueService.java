@@ -24,7 +24,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class IdentityReviewQueueService {
 
-    static final String QA = "qa";
     static final String DECIDED = "decided";
     static final String APPEAL = "appeal";
 
@@ -40,7 +39,7 @@ public class IdentityReviewQueueService {
             String outcome, String sort) {
     }
 
-    public record Summary(long pending, long overdue, long mine, long qa, long decided, long appeals) {
+    public record Summary(long pending, long overdue, long mine, long decided, long appeals) {
     }
 
     private final IdentityVerificationRepository verifications;
@@ -68,7 +67,7 @@ public class IdentityReviewQueueService {
         Instant now = Instant.now(clock);
         UUID me = actor == null ? new UUID(0, 0) : actor.userId();
         var c = verifications.summaryCounts(now.minus(OVERDUE_AFTER), now.minus(IdentityReviewClaimService.CLAIM_TTL), me);
-        return new Summary(c.getPending(), c.getOverdue(), c.getMine(), c.getQa(), c.getDecided(),
+        return new Summary(c.getPending(), c.getOverdue(), c.getMine(), c.getDecided(),
                 appeals.countByStatus(IdentityAppeal.OPEN));
     }
 
@@ -90,7 +89,6 @@ public class IdentityReviewQueueService {
     private Specification<IdentityVerification> spec(AuthPrincipal actor, Filters f) {
         Specification<IdentityVerification> base = switch (f.status() == null ? "" : f.status()) {
             case "" -> Specification.not(statusIs(VerificationStatuses.WITHDRAWN));
-            case QA -> qaOpen(actor);
             case APPEAL -> appealOpen();
             case DECIDED -> decided(f.outcome());
             default -> statusIs(f.status());
@@ -112,11 +110,9 @@ public class IdentityReviewQueueService {
         String status = f.status() == null ? "" : f.status();
         String column = switch (status) {
             case VerificationStatuses.PENDING, "" -> "submittedAt";
-            case QA -> "qaSampledAt";
             default -> "decidedAt";
         };
-        boolean oldestByDefault = VerificationStatuses.PENDING.equals(status) || QA.equals(status)
-                || APPEAL.equals(status);
+        boolean oldestByDefault = VerificationStatuses.PENDING.equals(status) || APPEAL.equals(status);
         boolean oldest = f.sort() == null ? oldestByDefault : "oldest".equals(f.sort());
         Sort.Direction dir = oldest ? Sort.Direction.ASC : Sort.Direction.DESC;
         return Sort.by(new Sort.Order(dir, column).nullsLast(), new Sort.Order(dir, "id"));
@@ -130,17 +126,6 @@ public class IdentityReviewQueueService {
         return outcome == null
                 ? (root, query, cb) -> root.get("status").in(DECIDED_STATUSES)
                 : statusIs(outcome);
-    }
-
-    private static Specification<IdentityVerification> qaOpen(AuthPrincipal actor) {
-        UUID me = actor == null ? null : actor.userId();
-        return (root, query, cb) -> cb.and(
-                cb.equal(root.get("status"), VerificationStatuses.VERIFIED),
-                cb.isNotNull(root.get("qaSampledAt")),
-                cb.isNull(root.get("qaReviewedAt")),
-                me == null
-                        ? cb.conjunction()
-                        : cb.or(cb.isNull(root.get("reviewerId")), cb.notEqual(root.get("reviewerId"), me)));
     }
 
     private static Specification<IdentityVerification> appealOpen() {

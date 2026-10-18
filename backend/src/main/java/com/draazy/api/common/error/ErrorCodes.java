@@ -53,7 +53,6 @@ public final class ErrorCodes {
 
     public static final String IDENTITY_CASE_CLAIM_LIMIT = "identity_case_claim_limit";
 
-    public static final String IDENTITY_QA_OPEN = "identity_qa_open";
 
     public static final String IDENTITY_CHALLENGE_INVALID = "identity_challenge_invalid";
 
@@ -63,7 +62,7 @@ public final class ErrorCodes {
     public static final String IDENTITY_APPEAL_OPEN = "identity_appeal_open";
     public static final String IDENTITY_APPEAL_NOT_ALLOWED = "identity_appeal_not_allowed";
     public static final String IDENTITY_APPEAL_NONE = "identity_appeal_none";
-    public static final String IDENTITY_APPEAL_SAME_REVIEWER = "identity_appeal_same_reviewer";
+    public static final String IDENTITY_APPEAL_OWN_CASE = "identity_appeal_own_case";
 
     public static final String OWNER_CONSENT_SELF = "owner_consent_self";
 

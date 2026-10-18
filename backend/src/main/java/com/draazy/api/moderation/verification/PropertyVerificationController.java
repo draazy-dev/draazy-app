@@ -34,15 +34,12 @@ public class PropertyVerificationController {
             STAFF_OR_ADMIN + " and " + BackOfficePermissions.REQUIRE_PROPERTIES_VERIFY;
 
     private final PropertyVerificationService service;
-    private final PropertyVerificationOverrideService overrides;
     private final PropertyReviewQueue queue;
     private final PropertyReraCheckService reraChecks;
 
     public PropertyVerificationController(PropertyVerificationService service,
-            PropertyVerificationOverrideService overrides, PropertyReviewQueue queue,
-            PropertyReraCheckService reraChecks) {
+            PropertyReviewQueue queue, PropertyReraCheckService reraChecks) {
         this.service = service;
-        this.overrides = overrides;
         this.queue = queue;
         this.reraChecks = reraChecks;
     }
@@ -96,22 +93,6 @@ public class PropertyVerificationController {
                 body.reasonCode(), body.expectedStatus());
     }
 
-    @PostMapping("/properties/{id}/verification/override-requests")
-    @PreAuthorize(PROPERTIES_VERIFY)
-    @ResponseStatus(HttpStatus.CREATED)
-    public PropertyReviewResponse requestOverride(@CurrentUser AuthPrincipal principal,
-            @PathVariable String id, @Valid @RequestBody OverrideRequest body) {
-        return overrides.request(principal, id, body.reason());
-    }
-
-    @PostMapping("/properties/{id}/verification/override-requests/{requestId}/approve")
-    @PreAuthorize(PROPERTIES_VERIFY)
-    public PropertyReviewResponse approveOverride(@CurrentUser AuthPrincipal principal,
-            @PathVariable String id, @PathVariable String requestId,
-            @Valid @RequestBody(required = false) OverrideApproval body) {
-        return overrides.approve(principal, id, requestId, body == null ? null : body.note());
-    }
-
     // One line per PATCH so reviewers cannot overwrite each other's checklist changes.
     @PatchMapping(Routes.Moderation.VERIFICATION_CHECKLIST)
     @PreAuthorize(PROPERTIES_VERIFY)
@@ -140,11 +121,5 @@ public class PropertyVerificationController {
     }
 
     public record ReraCheckRequest(@NotBlank String result) {
-    }
-
-    public record OverrideRequest(@NotBlank @Size(max = 300) String reason) {
-    }
-
-    public record OverrideApproval(@Size(max = 2000) String note) {
     }
 }

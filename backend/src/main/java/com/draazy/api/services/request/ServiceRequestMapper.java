@@ -39,7 +39,6 @@ public class ServiceRequestMapper {
     private final ServiceRequestAmendmentRepository amendments;
     private final ServiceRequestPoliceIntimationRepository policeIntimations;
     private final ServiceRequestDraftApprovalRepository draftApprovals;
-    private final ServiceRequestDraftCheckRepository draftChecks;
     private final ServiceRequestDraftApprovals approvalSummary;
 
     public ServiceRequestMapper(ServiceRequestEventRepository events,
@@ -52,7 +51,6 @@ public class ServiceRequestMapper {
             ServiceRequestAmendmentRepository amendments,
             ServiceRequestPoliceIntimationRepository policeIntimations,
             ServiceRequestDraftApprovalRepository draftApprovals,
-            ServiceRequestDraftCheckRepository draftChecks,
             ServiceRequestDraftApprovals approvalSummary) {
         this.events = events;
         this.messages = messages;
@@ -64,7 +62,6 @@ public class ServiceRequestMapper {
         this.amendments = amendments;
         this.policeIntimations = policeIntimations;
         this.draftApprovals = draftApprovals;
-        this.draftChecks = draftChecks;
         this.approvalSummary = approvalSummary;
     }
 
@@ -94,17 +91,13 @@ public class ServiceRequestMapper {
                 policeIntimations.findByServiceRequestIdIn(ids).stream().collect(Collectors.toMap(ServiceRequestPoliceIntimation::getServiceRequestId, p -> p));
         Map<UUID, List<ServiceRequestDraftApproval>> approvals =
                 draftApprovals.findByRequestIdIn(ids).stream().collect(Collectors.groupingBy(ServiceRequestDraftApproval::getRequestId));
-        Map<UUID, List<ServiceRequestDraftCheck>> checks =
-                draftChecks.findByRequestIdIn(ids).stream().collect(Collectors.groupingBy(ServiceRequestDraftCheck::getRequestId));
         Map<UUID, String> names = names(requests, threads.values(), sides.values(), registered.values(),
-                police.values(), checks.values());
+                police.values());
         Instant now = Instant.now();
 
         return requests.stream().map(r -> {
             List<ServiceRequestParty> side = sides.getOrDefault(r.getId(), List.of());
-            List<ServiceRequestDraftCheck> rowChecks = checks.getOrDefault(r.getId(), List.of());
-            List<Document> rowFiles = files.getOrDefault(r.getId(), List.of());
-            boolean desk = deskView(viewer, r, side);
+
             return new ServiceRequestDto(
                         r.getId().toString(),
                         r.getType(),
@@ -115,10 +108,8 @@ public class ServiceRequestMapper {
                         visibleDetails(r.getDetails()),
                         names.get(r.getAssigneeId()),
                         Objects.equals(r.getAssigneeId(), viewer.userId()),
-                        timelines.getOrDefault(r.getId(), List.of()).stream()
-                                .filter(e -> desk || !e.getEvent().startsWith("draft.check-"))
-                                .map(e -> new ServiceRequestDto.TimelineEntry(e.getAt(), e.getEvent(), e.getBy())).toList(),
-                        visibleFiles(rowFiles, rowChecks, desk).stream().map(d -> toDocumentSummary(d, r, side, viewer)).toList(),
+                        timelines.getOrDefault(r.getId(), List.of()).stream().map(e -> new ServiceRequestDto.TimelineEntry(e.getAt(), e.getEvent(), e.getBy())).toList(),
+                        files.getOrDefault(r.getId(), List.of()).stream().map(d -> toDocumentSummary(d, r, side, viewer)).toList(),
                         threads.getOrDefault(r.getId(), List.of()).stream().map(m -> toMessageDto(m, names)).toList(),
                         side.stream().map(p -> CoFillParties.toDto(p, r.getType(),
                                         names.get(p.getUserId()), names.get(p.getInvitedBy()))).toList(),
@@ -129,9 +120,7 @@ public class ServiceRequestMapper {
                         policeIntimation(police.get(r.getId()), names),
                         RentAgreementSla.of(r, now),
                         amendment(proposed.get(r.getId())),
-                        !desk && currentDraftHeld(rowFiles, rowChecks) ? null
-                                : approvalSummary.summary(r, approvals.getOrDefault(r.getId(), List.of())),
-                        desk ? draftCheck(r, rowChecks, names) : null);
+                        approvalSummary.summary(r, approvals.getOrDefault(r.getId(), List.of())));
         }).toList();
     }
 
@@ -142,36 +131,6 @@ public class ServiceRequestMapper {
                         && viewer.userId().equals(p.getUserId()));
     }
 
-    // The customer side never learns of a draft a second operator has not released.
-    private static boolean currentDraftHeld(List<Document> files, List<ServiceRequestDraftCheck> checks) {
-        long version = files.stream().filter(d -> "draft".equals(d.getCategory())).count();
-        return checks.stream().anyMatch(c -> c.getDraftVersion() == version && c.holdsDraft());
-    }
-
-    // Drafts come newest first, so the n-th from the end is version n; the customer side sees only released ones.
-    private static List<Document> visibleFiles(List<Document> files, List<ServiceRequestDraftCheck> checks,
-            boolean desk) {
-        if (checks.isEmpty() || desk) {
-            return files;
-        }
-        Set<Integer> withheld = checks.stream().filter(ServiceRequestDraftCheck::holdsDraft)
-                .map(ServiceRequestDraftCheck::getDraftVersion).collect(Collectors.toSet());
-        List<Document> drafts = files.stream().filter(d -> "draft".equals(d.getCategory())).toList();
-        boolean currentHeld = withheld.contains(drafts.size());
-        return files.stream().filter(d -> !"draft".equals(d.getCategory())
-                || !currentHeld && !withheld.contains(drafts.size() - drafts.indexOf(d))).toList();
-    }
-
-    private static ServiceRequestDto.DraftCheck draftCheck(ServiceRequest request,
-            List<ServiceRequestDraftCheck> checks, Map<UUID, String> names) {
-        if (checks.isEmpty()) {
-            return null;
-        }
-        ServiceRequestDraftCheck latest = checks.stream().max((a, b) -> Integer.compare(a.getDraftVersion(), b.getDraftVersion())).orElse(null);
-        return latest == null ? null : new ServiceRequestDto.DraftCheck(latest.getDraftVersion(),
-                latest.getStatus(), latest.reasonsList(), latest.getNote(), names.get(latest.getSharedBy()),
-                names.get(latest.getCheckedBy()), latest.getCheckedAt());
-    }
 
     private static PoliceIntimationDto policeIntimation(ServiceRequestPoliceIntimation p,
             Map<UUID, String> names) {
@@ -217,9 +176,8 @@ public class ServiceRequestMapper {
     Optional<String> documentUrl(ServiceRequest request, UUID documentId, AuthPrincipal viewer) {
         List<UUID> ids = List.of(request.getId());
         List<ServiceRequestParty> sides = parties.findByRequestIdIn(ids);
-        List<Document> files = visibleFiles(documents.findByServiceRequestIdInOrderByUploadedAtDesc(ids),
-                draftChecks.findByRequestIdIn(ids), deskView(viewer, request, sides));
-        return files.stream().filter(d -> d.getId().equals(documentId)).findFirst()
+        return documents.findByServiceRequestIdInOrderByUploadedAtDesc(ids).stream()
+                .filter(d -> d.getId().equals(documentId)).findFirst()
                 .filter(d -> readable(d, request, sides, viewer))
                 .map(documentMapper::urlOf);
     }
@@ -259,7 +217,7 @@ public class ServiceRequestMapper {
 
     public MessageDto toMessageDto(ServiceRequestMessage message) {
         return toMessageDto(message, names(List.of(), List.of(List.of(message)), List.of(), List.of(),
-                List.of(), List.of()));
+                List.of()));
     }
 
     private MessageDto toMessageDto(ServiceRequestMessage m, Map<UUID, String> names) {
@@ -279,8 +237,7 @@ public class ServiceRequestMapper {
             Iterable<List<ServiceRequestMessage>> threads,
             Iterable<List<ServiceRequestParty>> sides,
             Iterable<ServiceRequestRegistration> registered,
-            Iterable<ServiceRequestPoliceIntimation> police,
-            Iterable<List<ServiceRequestDraftCheck>> checks) {
+            Iterable<ServiceRequestPoliceIntimation> police) {
         Set<UUID> ids = new HashSet<>();
         requests.stream().map(ServiceRequest::getAssigneeId).filter(Objects::nonNull).forEach(ids::add);
         threads.forEach(thread -> thread.stream().map(ServiceRequestMessage::getAuthorId).filter(Objects::nonNull).forEach(ids::add));
@@ -290,10 +247,6 @@ public class ServiceRequestMapper {
         }));
         registered.forEach(g -> ids.add(g.getRecordedBy()));
         police.forEach(p -> ids.add(p.getConfirmedBy()));
-        checks.forEach(list -> list.forEach(c -> {
-            ids.add(c.getSharedBy());
-            ids.add(c.getCheckedBy());
-        }));
         ids.removeIf(Objects::isNull);
         Map<UUID, String> names = new HashMap<>();
         if (ids.isEmpty()) {

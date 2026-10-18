@@ -50,7 +50,7 @@
   link for the pin), Changes (only for an owner edit; opens first), Verified badge (opens first for a
   badge-only request: verdict strip, then flat sections for the facts to compare, owner's documents,
   recorded checks, record a check, badge decision) and Messages (thread with its composer in one box,
-  then WhatsApp chasers and comms log). Right rail: checklist, decision, second approval, internal
+  then WhatsApp chasers and comms log). Right rail: checklist, decision, internal
   note. One column on a phone.
 - **Source components:**
   - `src/pages/admin/AdminProperties.jsx` - tabs, paging, CSV export.
@@ -66,7 +66,7 @@
   on it (403 from every one of those, via `Property.isMadeBy`).
 - **Checker = any back-office account with the function.** `/admin` is shared by staff, managers
   and the admin; the page requires `properties:read`. Every `/properties/{id}/verification/*` route
-  (case file, checklist, thread, `/decision`, override requests, ownership evidence and badge) needs
+  (case file, checklist, thread, `/decision`, ownership evidence and badge) needs
   `properties:verify`. `PATCH /properties/{id}/status`, `POST`/`DELETE /properties/{id}/flag`,
   archive/restore, photo takedown and the duplicate routes need `properties:moderate`; the admin edit
   (`PATCH /properties/{id}/admin`) takes either. So `/verification/decision` is a verify route even
@@ -128,22 +128,22 @@ One `property_reviews` row per listing (UNIQUE `property_id`), with a thread and
   duplicate conflict beside facts 1–2, the rule-based broker signals beside fact 3. Hard:
   `photo_match_other_account`, `brokerage_reports` (≥ 2). Soft: `many_societies` (> 2 active),
   `broker_wording`, `copied_description`, `many_localities_30d` (≥ 3). `possibleBroker` = any hard or
-  ≥ 2 soft. A hard signal needs a second approver (§6).
+  ≥ 2 soft. Signals are warnings only: a hard signal does not block one staff member's approval (§6).
 
 ### 5.3 Reviewer actions and their side-effects
 All decisions go through `POST /properties/{id}/verification/decision`
 `{ decision, reasonCode?, note?, expectedStatus? }` or `PATCH /properties/{id}/status`
 `{ status, reason?, reasonCode?, expectedStatus? }`; both share one gate. `expectedStatus` that no
-longer matches answers 409 `stale_decision`, so a second reviewer cannot silently overwrite a first.
+longer matches answers 409 `stale_decision`, so a reviewer working from a stale view cannot silently overwrite a newer decision.
 On `/status` it may be omitted only while the listing is `pending` (or to clear an approved listing's
 re-check); otherwise the call is refused as stale, which is what stops a racing approve and reject both
 landing.
 
 | Action | Rule | Effect |
 |--------|------|--------|
-| **Approve** | All 3 checks ticked (409 `checklist_incomplete`); no hard signal unless co-approved (409 `second_approver_required`); a staff-posted listing needs its owner's confirmation (409 `owner_not_confirmed`, answered before any "no case" 404) | listing `approved` + published (or `paused` when the free tier holds it), re-check cleared, owner told (`listing.approved` / `listing.approved_paused`, naming the listing), audited with a checklist snapshot. Approving an already-approved listing with no pending re-check is a no-op: 200, no audit row, no notice |
+| **Approve** | All 3 checks ticked (409 `checklist_incomplete`); a staff-posted listing needs its owner's confirmation (409 `owner_not_confirmed`, answered before any "no case" 404) | listing `approved` + published (or `paused` when the free tier holds it), re-check cleared, owner told (`listing.approved` / `listing.approved_paused`, naming the listing), audited with a checklist snapshot. Approving an already-approved listing with no pending re-check is a no-op: 200, no audit row, no notice |
 | **Needs info** | `reasonCode` required (`other` also needs a note) | listing stays `pending`; review `needs_info`, `properties.info_requested_at` stamped; owner gets the reason sentence. Owner reply **or** edit resubmits through `reenterPending`. The SLA clock pauses |
-| **Reject (final)** | `reasonCode` required | listing `rejected`. An owner message **no longer** resubmits; reversal needs the two-staff override |
+| **Reject (final)** | `reasonCode` required | listing `rejected`. An owner message **no longer** resubmits; one staff member reopens it through `PATCH /status` to `pending` (expectedStatus: rejected, checklist unticked, owner told listing.reopened) or approves it directly when the checklist is already ticked |
 | Tick a check | `PATCH /verification/checklist`, `properties:verify`, never the owner | one line per call |
 | Flag | reason required (blank → 422); refuses the owner and the staffer who posted on their behalf | off search; owner told (`listing.flagged`) |
 | Clear flag | `clearFlag` → `reenterPending` (back to review, **not** straight to approved) | checklist unticked; owner told (`listing.unflagged`) |
@@ -157,10 +157,8 @@ Staff thread messages with `clarificationRequested:true` are treated as **Needs 
 lands paused records `to: paused`. `property.status`, `property.verification.decision`,
 `property.archive`, `property.restore` and `property.flag.clear` carry `from`/`to`; archive also carries
 `reason`. `property.adminUpdate` carries `changes`: `{ field: { before, after } }` for the fields that
-moved, and notifies the owner (`listing.edited_by_staff`) when any did. The two-staff override
-request/approve rows are recorded on the listing too, with the `requestId` in their metadata. The
-`checker` column is reserved and always null: the actor of a decision is the `actor` column, and the
-second approver of an override is its own `override.approved` row.
+moved, and notifies the owner (`listing.edited_by_staff`) when any did. The
+`checker` column is reserved and always null: the actor of a decision is the `actor` column.
 
 A decision racing a newer one answers 409 `stale_decision` (refresh); an archived listing with no case
 still answers the generic 409, never 404.
@@ -231,7 +229,7 @@ the owner-facing sentence together under a `PESSIMISTIC_WRITE` lock on the listi
   Two moderator outcomes, both existing transitions: **Looks fine** (`approved`, listing stays live,
   re-check cleared) and **Reject** (`rejected` with a mandatory reason — a takedown with no recorded
   cause is unappealable). A stays-live re-check keeps the case's checklist ticks, and **Looks fine**
-  skips the hard-signal co-approval (the listing is already live) but still requires the checklist,
+  does not reopen the listing (it is already live) but still requires the checklist,
   a checker who is not the owner, and an audit row. The same strip renders on every other tab too, because on `All Listings`
   an un-reviewed price change is otherwise indistinguishable from a verified one.
   Covered by `e2e/tests/admin/property-recheck-queue.spec.js`, which seeds through the product
@@ -265,12 +263,10 @@ the owner-facing sentence together under a `PESSIMISTIC_WRITE` lock on the listi
 - **On approve:** every check ticked, listing `approved` and published, owner notified, audit row
   with the checklist snapshot.
 - **On needs info:** listing stays `pending`, owner told the reason; their reply or edit resubmits.
-- **On reject:** final, with a reason code. No owner resubmission.
-- **Two-staff override** (V68 `property_verification_override_requests`): approving over a hard signal, or reopening a final reject, needs a maker
-  (`POST /verification/override-requests {reason}`) and a *different* checker
-  (`POST /verification/override-requests/{rid}/approve`). The maker, the owner and `postedByStaff`
-  are refused; the checklist is still required; both steps are audited. The staff case file shows
-  `overrideRequest` so the desk can see "Awaiting second approver".
+- **On reject:** a reason code is required. No owner resubmission; one staff member reopens it.
+- **One staff approval is final.** A hard duplicate or broker signal stays visible as a warning but needs no
+  second person. A rejected listing can be reopened to `pending` (or approved, with the checklist already
+  ticked) by one staff member; only the owner and the poster are refused.
 - **A staffer cannot decide their own listing.** `PropertyVerificationService.decide` compares the
   caller against `property.owner` and answers 403 *before* `requireCase`, because this is the one
   case where every other guard passes: a staffer listing their own flat is a participant in the
@@ -382,14 +378,14 @@ them a file has been opened on them (D218).
                    needs-info reply/edit) — unticks the checklist
                  +--------------------------------------------------+
                  v                                                  |
-submitted --> pending --(4 checks [+ 2nd approver if hard signal])--> approved(live)
+submitted --> pending --(3 checks)--> approved(live)
                  |   \--(needs_info)--> pending[needs_info] --(14 d silent)--> archived
                  |                                                  |
-                 +--(reject, final)--> rejected --(two-staff override)--> pending
+                 +--(reject)--> rejected --(staff reopen)--> pending
 approved --(flag)--> flagged --(clearFlag)--> pending
 approved|pending|flagged --(archive)--> archived --(restore)--> pending
 ```
-- **Terminal-ish:** `rejected` (reopened only by the two-staff override), `archived` (restore ->
+- **Terminal-ish:** `rejected` (reopened by staff), `archived` (restore ->
   pending).
 - **Live** requires `status='approved'`; only this state is buyer-visible.
 

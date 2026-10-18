@@ -44,8 +44,6 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
             select count(case when v.status = 'pending' then 1 end) as pending,
                    count(case when v.status = 'pending' and v.submittedAt < :overdueBefore then 1 end) as overdue,
                    count(case when v.status = 'pending' and v.claimedBy = :me and v.claimedAt > :freshAfter then 1 end) as mine,
-                   count(case when v.status = 'verified' and v.qaSampledAt is not null and v.qaReviewedAt is null
-                              and (v.reviewerId is null or v.reviewerId <> :me) then 1 end) as qa,
                    count(case when v.status in ('verified', 'rejected', 'revoked') then 1 end) as decided
               from IdentityVerification v
             """)
@@ -57,8 +55,6 @@ public interface IdentityVerificationRepository extends JpaRepository<IdentityVe
         long getOverdue();
 
         long getMine();
-
-        long getQa();
 
         long getDecided();
     }

@@ -45,7 +45,7 @@ class IdentityDecisionWhatsappTest {
     private final List<UUID> created = new ArrayList<>();
 
     // These decisions must commit for the after-commit WhatsApp to fire, so the cases are erased by hand;
-    // a left-over verified case would otherwise sit in every later reviewer's QA tab.
+    // a left-over verified case would otherwise leak into later tests.
     @AfterEach
     void eraseCases() {
         created.forEach(identity::erase);

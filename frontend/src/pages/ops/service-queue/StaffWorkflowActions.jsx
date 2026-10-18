@@ -72,14 +72,6 @@ export default function StaffWorkflowActions({ request, onShareDraft, onUploadFi
     }
   };
 
-  if (request.draftCheck?.status === 'pending') {
-    return (
-      <section className="rounded-2xl border border-white/10 p-4">
-        <h4 className="text-sm font-semibold">Drafting workflow</h4>
-        <p className="mt-2 text-sm text-amber-200">Waiting for a second-operator check before this draft reaches the customer.</p>
-      </section>
-    );
-  }
   if (!DRAFTABLE.has(request.status) && request.status !== 'approved') return null;
   return (
     <section className="rounded-2xl border border-white/10 p-4" aria-labelledby="workflow-actions-title">

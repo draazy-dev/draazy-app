@@ -60,7 +60,6 @@ public class ServiceRequestsController {
     private final ServiceRequestDrafting drafting;
     private final ServiceRequestDocumentReviews documentReviews;
     private final ServiceRequestDraftApprovals draftApprovals;
-    private final ServiceRequestDraftChecks draftChecks;
 
     // CANCEL is local only because this slice did not touch Routes; same constant value.
     private static final String CANCEL = Routes.ServiceRequests.BY_ID + "/cancel";
@@ -94,8 +93,7 @@ public class ServiceRequestsController {
             ServiceRequestReadReceipts receipts,
             ServiceRequestDrafting drafting,
             ServiceRequestDocumentReviews documentReviews,
-            ServiceRequestDraftApprovals draftApprovals,
-            ServiceRequestDraftChecks draftChecks) {
+            ServiceRequestDraftApprovals draftApprovals) {
         this.service = service;
         this.staffTransitions = staffTransitions;
         this.identities = identities;
@@ -106,7 +104,6 @@ public class ServiceRequestsController {
         this.drafting = drafting;
         this.documentReviews = documentReviews;
         this.draftApprovals = draftApprovals;
-        this.draftChecks = draftChecks;
     }
 
     // Strip sort: newest-first is fixed and index-backed; unmapped sort would 500.
@@ -302,13 +299,6 @@ public class ServiceRequestsController {
                 : new DraftOtpResult(true, null);
     }
 
-    @PostMapping(Routes.ServiceRequests.DRAFT_CHECK)
-    @PreAuthorize(SERVICES_WRITE)
-    public ServiceRequestDto checkDraft(@CurrentUser AuthPrincipal principal,
-            @PathVariable String id, @Valid @RequestBody DraftCheckRequest body) {
-        return draftChecks.decide(principal, id, body.decision(), body.note());
-    }
-
     @PostMapping(value = Routes.ServiceRequests.FINAL_DOC,
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize(SERVICES_WRITE)
@@ -371,9 +361,6 @@ public class ServiceRequestsController {
     }
 
     public record DraftOtpResult(boolean approvalRecorded, Integer resendAfterSeconds) {
-    }
-
-    public record DraftCheckRequest(@NotBlank String decision, @Size(max = 500) String note) {
     }
 
     public record PartyInvite(@NotBlank String role, Integer partyIndex,

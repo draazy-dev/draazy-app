@@ -3,7 +3,7 @@ import { Hand, RefreshCw } from 'lucide-react';
 import {
   addServiceRequestMessage, cancelServiceRequestAsOps, getServiceRequest, getServiceRequestQueueSummary,
   readServiceRequestChecklist, shareServiceRequestDraft,
-  takeServiceRequest, uploadServiceRequestFinalDoc, checkServiceRequestDraft,
+  takeServiceRequest, uploadServiceRequestFinalDoc,
 } from '../../services/serviceRequestService.js';
 import { classNames, fmtINR } from '../../lib/format.js';
 import { useToast } from '../../context/ToastContext.jsx';
@@ -25,7 +25,6 @@ import MessageThread from './service-queue/MessageThread.jsx';
 import DocumentChecklist from './service-queue/DocumentChecklist.jsx';
 import ServiceDocuments from './service-queue/ServiceDocuments.jsx';
 import StaffWorkflowActions from './service-queue/StaffWorkflowActions.jsx';
-import DraftSecondCheck from './service-queue/DraftSecondCheck.jsx';
 import PartyIdentities from './service-queue/PartyIdentities.jsx';
 import { OverdueToggle, stageTabs, useQueue } from './service-queue/deskQueue.jsx';
 import { fmtAgo } from './service-queue/helpers.js';
@@ -187,9 +186,8 @@ export default function OpsDraftingDesk({ desk }) {
       const updated = await shareServiceRequestDraft(detail.id, payload);
       applyUpdate(updated);
       await fileInternalNote('Draft shared');
-      toast(updated?.draftCheck?.status === 'pending'
-        ? 'The draft is waiting for a colleague to check it before the customer sees it.'
-        : 'The draft was shared with the customer.', 'success');
+      toast('The draft was shared with the customer.', 'success');
+
     } catch (err) {
       toast(err?.message || 'The draft could not be shared.', 'error');
       throw err;
@@ -204,17 +202,6 @@ export default function OpsDraftingDesk({ desk }) {
       toast('The registered copy was uploaded.', 'success');
     } catch (err) {
       toast(err?.message || 'The registered copy could not be uploaded.', 'error');
-      throw err;
-    }
-  };
-
-  const decideDraftCheck = async (decision, note) => {
-    try {
-      const updated = await checkServiceRequestDraft(detail.id, decision, note);
-      applyUpdate(updated);
-      toast(decision === 'release' ? 'Draft released to the customer.' : 'Draft sent back to the holder.', 'success');
-    } catch (err) {
-      toast(err?.message || 'The draft check could not be saved.', 'error');
       throw err;
     }
   };
@@ -356,9 +343,6 @@ export default function OpsDraftingDesk({ desk }) {
               <ServiceDocuments requestId={detail.id} documents={detail.docs} onUnavailable={docUnavailable} />
             </DocumentChecklist>
 
-            {detail.draftCheck?.status === 'pending' ? (
-              <DraftSecondCheck request={detail} onDecide={decideDraftCheck} />
-            ) : null}
 
             <StaffWorkflowActions request={detail} onShareDraft={shareDraft} onUploadFinal={uploadFinal} />
 

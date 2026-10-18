@@ -38,12 +38,11 @@ public class PropertyVerificationService {
     private final DocumentRepository documents;
     private final Notifier notifier;
     private final ListingSignalService signals;
-    private final PropertyOverrideRequestRepository overrideRequests;
 
     public PropertyVerificationService(PropertyReviewRepository reviews, PropertyRepository properties,
             VerificationCases cases, AccountPermissions permissions, AuditService audit,
             PropertyLifecycle lifecycle, DocumentRepository documents, Notifier notifier,
-            ListingSignalService signals, PropertyOverrideRequestRepository overrideRequests) {
+            ListingSignalService signals) {
         this.reviews = reviews;
         this.properties = properties;
         this.cases = cases;
@@ -53,7 +52,6 @@ public class PropertyVerificationService {
         this.documents = documents;
         this.notifier = notifier;
         this.signals = signals;
-        this.overrideRequests = overrideRequests;
     }
 
     @Transactional(readOnly = true)
@@ -159,7 +157,6 @@ public class PropertyVerificationService {
         }
         if (approve) {
             ApprovalGate.require(review, property);
-            requireNoSecondApproverBlock(property);
 
                 // Checked before the verdict is written, not left to `publish` below: the rollback would
                 // take the verdict with it and cost the reviewer the whole checklist.
@@ -325,27 +322,8 @@ public class PropertyVerificationService {
                 review.getNotes(),
                 review.getReasonCode(),
                 showsReason(review) ? review.getNotes() : null,
-                staff ? pendingOverride(property.getId()) : null,
                 listingSignals,
                 review.getDecidedAt(), ListingProgress.of(property, staff), staff ? property.getReraCheck() : null);
-    }
-
-    private PropertyReviewResponse.OverrideRequest pendingOverride(UUID propertyId) {
-        return overrideRequests.findFirstByPropertyIdAndStatusOrderByCreatedAtDesc(
-                        propertyId, PropertyOverrideRequest.PENDING)
-                .map(request -> new PropertyReviewResponse.OverrideRequest(
-                        request.getId().toString(),
-                        request.getRequestedBy().toString(),
-                        request.getReason(),
-                        request.getCreatedAt()))
-                .orElse(null);
-    }
-
-    private void requireNoSecondApproverBlock(Property property) {
-        if (signals.hasHardSignal(property.getId())) {
-            throw new ConflictException("second_approver_required",
-                    "A hard broker signal requires a second staff approver.");
-        }
     }
 
     // Before the lifecycle guards, so the loser of a race is told the listing moved, not how to restore it.
