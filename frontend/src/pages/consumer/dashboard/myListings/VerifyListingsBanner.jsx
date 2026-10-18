@@ -8,12 +8,12 @@ import { trackKyc } from '../../../../lib/kycTrack.js';
 
 export default function VerifyListingsBanner({ enquiryCount = 0 }) {
   const { t } = useTranslation();
-  const { verified, loading } = useVerification();
+  const { verified, status, loading } = useVerification();
   const [open, setOpen] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
-  if (verified || loading || dismissed) return null;
-  // C2: when the owner already has enquiries, lead with that value moment.
+  if (verified || status === 'pending' || loading || dismissed) return null;
+  // An owner who already has enquiries is shown that value first.
 
   const hasLeads = enquiryCount > 0;
   const headline = hasLeads
