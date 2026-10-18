@@ -13,7 +13,6 @@ import {
   confirmTenancyDeclaration,
   revokeTenancyDeclaration,
 } from '../../../services/rentService.js';
-import { listVisits } from '../../../services/visitService.js';
 import { Stars } from './Stars.jsx';
 import { ReviewModal } from './ReviewModal.jsx';
 import { OwnReviewBar } from './OwnReviewBar.jsx';
@@ -25,7 +24,7 @@ function initials(name) {
 
 export const RV_CATS = [['locality', 'Locality'], ['condition', 'Condition'], ['value', 'Value'], ['owner', 'Owner'], ['accuracy', 'Accuracy']];
 
-export function ReviewsSection({ p, isIn, onReport, toast }) {
+export function ReviewsSection({ p, isIn, myVisits, onReport, toast }) {
   const { t } = useTranslation();
   const sendToSignIn = useSignInGate();
   const { user } = useAuth();
@@ -136,22 +135,8 @@ export function ReviewsSection({ p, isIn, onReport, toast }) {
   /* `status`, never the row's existence. */
   const hasTenancy = brokeredTenancy || myDeclaration?.status === 'confirmed';
 
-  /* The anti-fake-review gate: only someone who actually visited may rate, asked of the caller's own visits so it
-     works off the identity the session already proves. */
-  const [myVisit, setMyVisit] = useState(null);
-  useEffect(() => {
-    if (!isIn || !propId) { setMyVisit(null); return undefined; }
-    let alive = true;
-    listVisits({ propertyId: propId })
-      .then((mine) => {
-        if (!alive) return;
-        if (mine.some((v) => v.status === 'completed')) setMyVisit('completed');
-        else if (mine.some((v) => v.status === 'scheduled' || v.status === 'confirmed')) setMyVisit('scheduled');
-        else setMyVisit(null);
-      })
-      .catch(() => { if (alive) setMyVisit(null); });
-    return () => { alive = false; };
-  }, [isIn, propId]);
+  // The anti-fake-review gate: a completed visit or a declared tenancy is what earns a review.
+  const myVisit = myVisits?.completed ? 'completed' : myVisits?.booked ? 'scheduled' : null;
 
   const eligible = isIn && !isOwner && (myVisit === 'completed' || hasTenancy);
 

@@ -9,9 +9,9 @@ import HeaderActions from './HeaderActions.jsx';
 
 const pref = (labels, v) => (v && v !== 'any' ? labels[v] : null);
 
-export default function SeekerDetail({ r, owned, interested, saved, onSave, onAsk, onReport, ownerPanel, back }) {
+export default function SeekerDetail({ r, owned, ask, saved, onSave, onAsk, onReport, ownerPanel, back }) {
   const { t } = useTranslation();
-  const cta = !owned && <SeekerAskButton r={r} interested={interested} onInterest={onAsk} />;
+  const cta = !owned && <SeekerAskButton r={r} ask={ask} onInterest={onAsk} />;
   const prefs = [
     [t('flatmates.detailRoomPref'), pref(ROOM_PREF_LBL, r.roomPref)],
     [t('flatmates.detailFlatPref'), pref(FLAT_PREF_LBL, r.flatPref)],

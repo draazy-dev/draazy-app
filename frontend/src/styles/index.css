@@ -876,7 +876,8 @@ html.dz-reduce-motion .hero-mist { animation: none; }
   100% { transform: scale(1); }
 }
 
-.heart-pop { animation: heartPop 0.4s ease; }
+.heart-pop,
+.dz-cta-pop { animation: heartPop 0.4s ease; }
 
 /* Bare save heart over a photo: no chip behind it, so the shadow carries the contrast. */
 .heart-on-photo {
@@ -3392,7 +3393,8 @@ textarea.dz-input { height: auto; padding: .625rem 1rem; line-height: 1.5; }
 
   .ticker-ping { animation: none; }
 
-  .heart-pop { animation: none; }
+  .heart-pop,
+  .dz-cta-pop { animation: none; }
 
   .property-card,
   .cat-card { transition: none; }
@@ -3438,6 +3440,7 @@ html.dz-reduce-motion .shape-4,
 html.dz-reduce-motion .shape-5,
 html.dz-reduce-motion .ticker-ping,
 html.dz-reduce-motion .heart-pop,
+html.dz-reduce-motion .dz-cta-pop,
 html.dz-reduce-motion .svc-pop,
 html.dz-reduce-motion [class*="ctaFloat"],
 html.dz-reduce-motion [class*="cta-float"],

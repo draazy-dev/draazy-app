@@ -1,14 +1,27 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
+import { useToast } from '../../../context/ToastContext.jsx';
+import { useTapPop } from '../../../lib/useTapPop.js';
 import { avatarGrad, initials, genderLabel, seekerBudget, matchFor, moveInLabel, detailPath, seekerTitle } from './helpers.js';
 import { SaveBtn, TileChip, MatchPill, Fresh, CardLink } from './atoms.jsx';
 
-export function SeekerAskButton({ r, owned, interested, onInterest }) {
+export function SeekerAskButton({ r, owned, ask, onInterest }) {
   const { t: tr } = useTranslation();
+  const { toast } = useToast();
+  const [taps, pop] = useTapPop();
   const base = 'flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold ';
   if (owned) return <span className={base + 'btn-ghost text-teal-300 cursor-default'}><Icon name="megaphone" className="w-4 h-4" /> {tr('flatmates.detailYourPost')}</span>;
-  if (interested) return <button className={base + 'btn-ghost text-emerald-300 cursor-default'} disabled><Icon name="check-check" className="w-4 h-4" /> {tr('flatmates.interested')}</button>;
+  if (ask) {
+    const declined = ask.status === 'declined';
+    const name = r.name || seekerTitle(r);
+    const remind = () => { pop(); toast(tr(declined ? 'flatmates.seekerDeclinedToast' : 'flatmates.interestAlreadyRecorded', { name }), 'info'); };
+    return (
+      <button type="button" onClick={remind} data-ask-state={ask.status || 'pending'} className={base + (declined ? 'btn-ghost text-gray-300' : 'btn-ghost text-emerald-300')}>
+        <Icon key={taps} name={declined ? 'x-circle' : 'check-check'} className={'w-4 h-4' + (taps ? ' dz-cta-pop' : '')} /> {tr(declined ? 'flatmates.notAccepted' : 'flatmates.interested')}
+      </button>
+    );
+  }
   return <button onClick={() => onInterest(r)} className={base + 'exp-btn btn-teal text-white'}><Icon name="hand-heart" className="w-4 h-4" /> {tr('flatmates.expressInterest')}</button>;
 }
 

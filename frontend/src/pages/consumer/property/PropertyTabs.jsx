@@ -38,7 +38,7 @@ const AmenityGrid = ({ title, items }) => items.length ? (
 export default function PropertyTabs({ ctx }) {
   const {
     current, tr, topHighlights, details, p, ovOpen, setOvOpen, overviewMore,
-    isLand, kind, flagEnabled, isIn, setReportOpen, toast, isRent, user,
+    isLand, kind, flagEnabled, isIn, setReportOpen, toast, isRent, user, myVisits,
   } = ctx;
   const home = withInFlatAsFurniture({ amenities: p.amenities || [], furniture: p.furniture || [] });
   const inFlat = kind === 'residential' ? home.furniture : [];
@@ -119,7 +119,7 @@ export default function PropertyTabs({ ctx }) {
 
               {kind === 'residential' ? <SocietySection p={p} /> : null}
 
-              {flagEnabled('reviewsEnabled') && <ReviewsSection p={p} isIn={isIn} onReport={() => setReportOpen(true)} toast={toast} />}
+              {flagEnabled('reviewsEnabled') && <ReviewsSection p={p} isIn={isIn} myVisits={myVisits} onReport={() => setReportOpen(true)} toast={toast} />}
             </>
           ) : null}
 

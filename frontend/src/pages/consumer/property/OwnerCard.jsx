@@ -6,20 +6,17 @@ import { digits, maskPhone } from '../../../lib/contact.js';
 import { messagesLinkForProp } from '../../../lib/chatFormat.js';
 import { queuePendingChat } from '../../../services/conversationService.js';
 import { ContactBox } from './ContactBox.jsx';
-import { whatsappHref } from './contactPhone.js';
+import { ContactCta } from './ActionCtas.jsx';
 import { ownerVerificationMeta, OwnerRoleLine, OwnerVerifiedMark } from './ownerVerification.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 
 const BEST_TIME_KEYS = new Set(['anytime', 'morning', 'afternoon', 'evening']);
 
-/* `ownerHidesNumber` arrives as a prop, from the same gate answer that produced `contactApproved`, so the WhatsApp
-   button and the number reveal decide from one value. */
-export function OwnerCard({ p, isIn, toast, contactApproved, ownerHidesNumber = false, ownerMob, onContact, canChat }) {
+export function OwnerCard({ p, isIn, toast, contactApproved, contactStatus, ownerMob, onContact, canChat }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { identityVerified, anyVerified, roleAndVerification } = ownerVerificationMeta(p, t);
-  const waHref = whatsappHref(ownerMob, `Hi, I'm interested in your property "${p.title}" listed on Draazy. Is it still available?`);
   const isOwnerViewer = isIn && digits(ownerMob) && digits(ownerMob) === digits(user?.mobile);
   const openChat = async (event) => {
     event.preventDefault();
@@ -81,16 +78,11 @@ export function OwnerCard({ p, isIn, toast, contactApproved, ownerHidesNumber = 
           </div>
         ) : (
           <div className="hidden lg:flex flex-1">
-            <button onClick={onContact} className="w-full flex items-center justify-center gap-1.5 rounded-lg btn-teal text-xs font-semibold py-2 px-3 shadow-none"><Icon name="message-circle" className="w-3.5 h-3.5" /> {t('property.contactOwner')}</button>
+            <ContactCta status={contactStatus} onClick={onContact} iconClassName="w-3.5 h-3.5" className="w-full flex items-center justify-center gap-1.5 rounded-lg btn-teal text-xs font-semibold py-2 px-3 shadow-none" />
           </div>
         )}
         <Link to={`/owner/${p.ownerId}`} className="h-btn flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-white/10 text-slate-300 text-[13px] sm:text-xs font-medium hover:bg-white/5 transition-smooth"><Icon name="user" className="w-3.5 h-3.5" /> {t('property.profile')}</Link>
       </div>
-      {!isOwnerViewer && contactApproved && !ownerHidesNumber && waHref && (
-        <a href={waHref} target="_blank" rel="noopener noreferrer" className="h-btn mt-2 flex items-center justify-center gap-2 rounded-lg bg-emerald-600 text-sm font-semibold text-white hover:bg-emerald-500 transition">
-          <Icon name="message-circle" className="w-4 h-4" /> {t('property.chatOnWhatsapp')}
-        </a>
-      )}
       <Link to="/tenant-profile" className="mt-3 flex items-center justify-center gap-1.5 min-h-[44px] sm:min-h-0 text-[13px] sm:text-[11px] text-emerald-300 hover:text-emerald-200"><Icon name="user-check" className="w-3.5 h-3.5" /> {t('property.verifiedTenantBadge')}</Link>
     </div>
   );

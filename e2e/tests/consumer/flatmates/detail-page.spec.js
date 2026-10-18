@@ -186,6 +186,35 @@ test.describe('LIVE: flatmate detail page', () => {
     }
   });
 
+  test('a seeker who already said Interested gets a reminder on tap, not a dead button', async ({ page }) => {
+    const author = await apiLogin(uniqueMobile());
+    const post = await hostsPost(author.accessToken);
+    const admin = await apiLogin(ACTORS.admin);
+    const live = await fetch(`${API}/admin/flatmates/${post.id}/moderation`, {
+      method: 'PATCH',
+      headers: auth(admin.accessToken),
+      body: JSON.stringify({ modStatus: 'live', note: 'e2e' }),
+    });
+    expect(live.status, 'letting the post out of moderation').toBeLessThan(300);
+
+    const seeker = uniqueMobile();
+    await apiLogin(seeker);
+    await signedInAs(page, seeker);
+    const errors = trackErrors(page);
+    await page.goto(`/flatmates/post/${post.id}`);
+    const door = (name) => page.getByRole('button', { name }).filter({ visible: true }).first();
+    await door(/Express interest/i).click({ timeout: 20_000 });
+    await expect(page.getByText('Interest sent to Detail Seeker. Continue in Messages.')).toBeVisible({ timeout: 10_000 });
+
+    const sent = door(/^\s*Interested\s*$/);
+    await expect(sent).toBeEnabled();
+    await sent.click();
+    await expect(page.getByText('Detail Seeker already has your interest.')).toBeVisible();
+    await sent.click();
+    await expect(page.getByText('Detail Seeker already has your interest.'), 'a second tap re-arms the toast, not a stack').toHaveCount(1);
+    expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
+  });
+
   test('an unknown id shows a plain not-found state', async ({ page }) => {
     const errors = trackErrors(page);
     await page.goto('/flatmates/room/00000000-0000-0000-0000-000000000000');

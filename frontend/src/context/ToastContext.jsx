@@ -77,6 +77,7 @@ export function ToastProvider({ children }) {
   const { t } = useTranslation();
   const [toasts, setToasts] = useState([]);
   const timers = useRef(new Map());
+  const shown = useRef(new Map());
 
   const dismiss = useCallback((id) => {
     const timer = timers.current.get(id);
@@ -84,12 +85,20 @@ export function ToastProvider({ children }) {
       clearTimeout(timer);
       timers.current.delete(id);
     }
+    shown.current.forEach((v, k) => { if (v === id) shown.current.delete(k); });
     setToasts((t) => t.filter((x) => x.id !== id));
   }, []);
   const toast = useCallback(
     (message, type = 'info') => {
-      const id = ++nextId;
-      setToasts((t) => [...t, { id, message, type }]);
+      // A repeat of a message still on screen re-arms that toast instead of stacking a copy.
+      const key = typeof message === 'string' ? `${type}:${message}` : null;
+      const live = key && shown.current.get(key);
+      const id = live || ++nextId;
+      clearTimeout(timers.current.get(id));
+      if (!live) {
+        if (key) shown.current.set(key, id);
+        setToasts((t) => [...t, { id, message, type }]);
+      }
       timers.current.set(id, setTimeout(() => dismiss(id), AUTO_DISMISS_MS));
     },
     [dismiss],

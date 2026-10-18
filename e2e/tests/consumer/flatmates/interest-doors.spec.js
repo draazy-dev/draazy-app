@@ -149,7 +149,10 @@ test.describe('Flatmate interest doors (live)', () => {
       await expect(page.getByText(`Interest sent to the owner of ${society}.`)).toBeVisible({ timeout: 10_000 });
       expect(await isErrorToast(page), 'a successful enquiry must not render as an error').toBe(false);
       await expect(door(page, /Interest sent/i).first()).toBeVisible();
-      // The half the mock could not assert.
+      await expect(door(page, /Interest sent/i).first()).toHaveAttribute('data-ask-state', 'pending');
+      await door(page, /Interest sent/i).first().click();
+      await expect(page.getByText("Waiting for the owner. We'll notify you when they reply."), 'a sent door still answers a tap')
+        .toBeVisible();
       expect(await hostInboxTitles(host.accessToken), 'the host should be holding the enquiry')
         .toContain(society);
       expect(errors, `console errors: ${errors.join('\n')}`).toEqual([]);

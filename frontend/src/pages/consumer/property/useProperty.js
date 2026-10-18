@@ -12,6 +12,7 @@ import { useAuth } from '../../../context/AuthContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useAppFlags } from '../../../context/AppFlagsContext.jsx';
 import { useContactGate } from './useContactGate.js';
+import { useMyVisits } from './useMyVisits.js';
 import { requestPhotos as askForPhotos } from '../../../services/photoRequestService.js';
 import { pushRecentProp, getLastSearch } from '../../../lib/localPrefs.js';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
@@ -41,7 +42,8 @@ export default function useProperty() {
   const { flagEnabled } = useAppFlags();
   // Keyed on the route param, not `p.id`, so the gate is requested in parallel with the listing —
   // and because a hook cannot sit below this function's `p === undefined` early return.
-  const { gate: contactGate, loading: contactGateLoading } = useContactGate(id, authIdentity);
+  const { gate: contactGate, loading: contactGateLoading, refresh: refreshContactGate } = useContactGate(id, authIdentity);
+  const { visits: myVisits, refresh: refreshMyVisits } = useMyVisits(p?.uuid, isIn && authIdentity);
   const rootRef = useScrollReveal([p]);
   /* Declared up here rather than beside its handler because everything below line 86 is past an early return — a hook
      there changes call order between the found and not-found renders. */
@@ -336,11 +338,15 @@ export default function useProperty() {
     tr, p, active, setActive, ovOpen, setOvOpen, lightbox, setLightbox,
     reportOpen, setReportOpen, contactOpen, setContactOpen,
     visitOpen, setVisitOpen,
+    // A request or a booking changes what the CTAs offer next, so both re-read once their modal closes.
+    closeContact: () => { setContactOpen(false); refreshContactGate().catch(() => {}); },
+    closeVisit: () => { setVisitOpen(false); refreshMyVisits(); refreshContactGate().catch(() => {}); },
+    contactStatus: contactGate.status, myVisits,
     isIn, user, toast, flagEnabled, rootRef, gallery, activeTab,
     handleContact, handleSchedule, inlineOtpReason,
     closeInlineOtp: () => { setInlineOtpReason(null); setResumeAction(null); },
     onInlineOtpVerified: () => { setInlineOtpReason(null); setResumeAfterVerify((n) => n + 1); },
-    ownerMob, contactApproved, ownerHidesNumber: contactGate.ownerHidesNumber, canChat, isOwner, isAdmin, isApproved,
+    ownerMob, contactApproved, canChat, isOwner, isAdmin, isApproved,
     // Owner and staff previews both need saying out loud: otherwise the only difference between a
     // live page and a pending one is invisible. Not `!isApproved` — sold/rented is also unapproved.
     ownerPreview: (isOwner || isAdmin) && (p.status === 'pending' || p.status === 'flagged'),

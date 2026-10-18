@@ -62,7 +62,6 @@ export default function FlatmateDetail() {
   const rootRef = useScrollReveal([]);
   const [state, setState] = useState({ status: 'loading' });
   const [myAsk, setMyAsk] = useState(null);
-  const interested = !!myAsk;
   const [saved, setSaved] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [verifyOpen, setVerifyOpen] = useState(false);
@@ -216,7 +215,7 @@ export default function FlatmateDetail() {
             <>
               {kind === 'room' && <RoomDetail {...viewProps} r={item} ask={myAsk} onAsk={onAsk} />}
               {kind === 'group' && <GroupDetail {...viewProps} g={item} myStatus={myAsk?.status || null} onJoin={onAsk} onLeave={onLeave} onCancel={onCancel} onRemoveMember={onRemoveMember} />}
-              {kind === 'post' && <SeekerDetail {...viewProps} r={item} interested={interested} onAsk={onAsk} />}
+              {kind === 'post' && <SeekerDetail {...viewProps} r={item} ask={myAsk} onAsk={onAsk} />}
             </>
           )}
         </div>
