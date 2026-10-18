@@ -77,6 +77,18 @@ export async function mintLocality(name, { lat = 18.52, lng = 73.85 } = {}) {
 
 export const uniqueLocalityName = (prefix = 'Zztest Mint') => `${prefix} ${Date.now().toString(36)}`;
 
+// Flatmates map gate: Google is stubbed empty so the saved-locality fallback answers deterministically.
+export async function focusFlatmateMap(page, names = ['Baner']) {
+  await stubGooglePlaces(page, { empty: true });
+  const search = page.getByPlaceholder('Search any Pune locality');
+  for (const name of names) {
+    await search.fill(name);
+    await page.getByRole('option', { name: new RegExp(`^${escapeRe(name)}`) }).first().click({ timeout: 15000 });
+    await expect(page.locator(`[data-sf-area="${name}"]`)).toBeVisible();
+  }
+  await page.getByRole('button', { name: 'Show Map view' }).click();
+}
+
 // What the home search offers by name: a locality is suggested only while it has approved listings for the deal.
 export async function stockBySlug(deal = 'buy') {
   const stock = new Map();
