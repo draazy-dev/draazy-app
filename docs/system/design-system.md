@@ -58,7 +58,8 @@ keep the 44px **target** with a transparent `::before` (built into each tappable
 | Token | Size | Class | For |
 |---|---|---|---|
 | `--dz-icon-btn` | 36px | `.dz-segmented > button[aria-pressed]` inside a `--control-h` pill (same shape as `DealToggle`) | Icon-only toggles (listings Grid/List/Map) |
-| `--dz-chip-h` | 32px | `.dz-chip`, `.dz-chip--accent` (selected/removable) | Tappable filter chips, "Clear all", broaden-search suggestions |
+| `--dz-chip-h` | 32px | `.dz-chip`, `.dz-chip--accent` (selected) | Tappable filter chips, broaden-search suggestions |
+| `--dz-chip-sm-h` | 24px | `.dz-chip.dz-chip--sm` (+ `--accent`) | Removable selections: active-filter chips and "Clear all", picked localities, map-gate areas, lifestyle tags |
 | `--dz-tag-h` | 24px | `.dz-tag`, `.dz-tag--muted` (neutral surface) | Display-only labels: SALE/RENT/RERA, amenities, alert criteria |
 | `--dz-count-h` | 20px | `.dz-count` | Numeric count badges (filter FAB, notification bell, tab counts) |
 

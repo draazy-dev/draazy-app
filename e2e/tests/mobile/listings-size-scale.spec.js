@@ -23,7 +23,7 @@ test.describe('Listings compact size scale', () => {
 
     const chips = page.locator('.af-chip');
     await expect(chips.first()).toBeVisible();
-    const [controlH, iconBtn, chipH, tagH] = await Promise.all(['--control-h', '--dz-icon-btn', '--dz-chip-h', '--dz-tag-h'].map((n) => token(page, n)));
+    const [controlH, iconBtn, chipH, tagH] = await Promise.all(['--control-h', '--dz-icon-btn', '--dz-chip-sm-h', '--dz-tag-h'].map((n) => token(page, n)));
     expect(iconBtn, 'the scale is defined').toBeGreaterThan(0);
 
     await test.step('the view toggle matches the sort trigger, and its segments are --dz-icon-btn', async () => {
@@ -36,7 +36,7 @@ test.describe('Listings compact size scale', () => {
       await expect(grid).toHaveAttribute('aria-pressed', 'true');
     });
 
-    await test.step('active-filter chips are one scrolling row of --dz-chip-h pills', async () => {
+    await test.step('active-filter chips are one scrolling row of --dz-chip-sm-h pills, the size of a picked locality', async () => {
       const clear = page.locator('.af-clear-all');
       expect(await height(chips.first())).toBeCloseTo(chipH, 0);
       expect(await height(clear)).toBeCloseTo(chipH, 0);
@@ -54,6 +54,15 @@ test.describe('Listings compact size scale', () => {
       const tag = page.locator('.dz-tag:visible').first();
       await expect(tag).toBeVisible();
       expect(await height(tag)).toBeCloseTo(tagH, 0);
+    });
+
+    await test.step('a picked locality in the filter drawer is the same size as an active-filter chip', async () => {
+      await page.locator('.filter-fab').click();
+      const picked = page.locator('.filter-panel.open').getByRole('button', { name: 'Remove Baner', exact: true });
+      await expect(picked).toBeVisible();
+      expect(await height(picked)).toBeCloseTo(chipH, 0);
+      await page.keyboard.press('Escape');
+      await expect(page.locator('.filter-panel.open')).toHaveCount(0);
     });
 
     await test.step('a tap just outside the drawn chip still lands on it', async () => {

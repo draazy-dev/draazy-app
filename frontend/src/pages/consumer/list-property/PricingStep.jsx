@@ -253,7 +253,7 @@ const PricingStep = ({
               <FieldError show={!!errors.deposit}>{errors.deposit === 'max' ? t('listProperty.err.depositMax') : t('listProperty.err.deposit')}</FieldError>
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {DEPOSIT_MONTHS[leaseKind].map((m) => (
-                  <button key={m} type="button" onClick={() => setDepositMonths(m)} className="dz-chip tap-coarse relative border border-white/10 text-gray-400 hover:border-teal-400/40 hover:text-teal-300 transition-all">{t('listProperty.depositMonths', { count: m })}</button>
+                  <button key={m} type="button" onClick={() => setDepositMonths(m)} className="dz-chip">{t('listProperty.depositMonths', { count: m })}</button>
                 ))}
               </div>
             </div>

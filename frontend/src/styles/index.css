@@ -31,6 +31,7 @@
      tappable class restores the target with a transparent ::before, as .tap-extend does. */
   --dz-icon-btn: 36px;
   --dz-chip-h: 32px;
+  --dz-chip-sm-h: 24px;
   --dz-tag-h: 24px;
   --dz-count-h: 20px;
 

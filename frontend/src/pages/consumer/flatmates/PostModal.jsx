@@ -75,8 +75,8 @@ export default function PostModal({ setPostOpen, submitPost, postFormRef, postDr
               {post.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2 mt-2">
                   {post.tags.map((t) => (
-                    <button key={t} type="button" onClick={() => setPost({ ...post, tags: post.tags.filter((x) => x !== t) })} className="pick active inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs" aria-label={tr('flatmates.ariaRemoveTag', { tag: t })}>
-                      {t} <Icon name="x" className="w-3 h-3" />
+                    <button key={t} type="button" onClick={() => setPost({ ...post, tags: post.tags.filter((x) => x !== t) })} className="dz-chip dz-chip--accent dz-chip--sm" aria-label={tr('flatmates.ariaRemoveTag', { tag: t })}>
+                      {t} <Icon name="x" />
                     </button>
                   ))}
                 </div>

@@ -64,6 +64,21 @@
   color: rgb(var(--dz-c-teal-200));
 }
 
+/* Removable selections (picked areas, active filters, "Clear all").
+   Must follow .dz-chip to win on equal specificity. */
+.dz-chip--sm {
+  gap: .25rem;
+  height: var(--dz-chip-sm-h);
+  padding: 0 .625rem;
+  font-size: .6875rem;
+  font-weight: 600;
+}
+
+.dz-chip--sm svg {
+  width: 12px;
+  height: 12px;
+}
+
 @media (hover: hover) {
   :is(button, a, span, label):where(.dz-chip:hover) {
     border-color: rgb(var(--dz-c-teal-400) / .5);

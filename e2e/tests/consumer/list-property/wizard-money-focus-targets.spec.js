@@ -140,14 +140,19 @@ test.describe('details step floors and dropdown focus', () => {
 test.describe('touch targets on a phone', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
-  test('pricing chips and the suggestion/write links are at least 44px tall', async ({ page }) => {
+  test('deposit chips are drawn at the compact chip height and keep a 44px tap target', async ({ page }) => {
     await gotoPricing(page, 'rent');
     const chips = page.locator('button.dz-chip');
     const count = await chips.count();
     expect(count).toBeGreaterThan(0);
     for (let i = 0; i < count; i++) {
-      const box = await chips.nth(i).boundingBox();
-      expect(box.height, `deposit chip ${i}`).toBeGreaterThanOrEqual(43.5);
+      const size = await chips.nth(i).evaluate((el) => ({
+        drawn: el.getBoundingClientRect().height,
+        chip: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dz-chip-h')),
+        target: parseFloat(getComputedStyle(el, '::before').height),
+      }));
+      expect(size.drawn, `deposit chip ${i} is drawn at --dz-chip-h`).toBe(size.chip);
+      expect(size.target, `deposit chip ${i} keeps the 44px target`).toBeGreaterThanOrEqual(44);
     }
   });
 });
