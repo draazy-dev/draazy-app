@@ -108,7 +108,9 @@ class IdentityReviewSlimTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(reviewer)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.warnings[?(@.kind == 'same_document_claimed')].userName",
-                        hasItems("Twin Two", "Twin Three")));
+                        hasItems("Twin Two", "Twin Three")))
+                .andExpect(jsonPath("$.warnings[?(@.kind == 'same_document_claimed')].userMobile",
+                        hasItems("9830018806", "9830018807")));
     }
 
     @Test

@@ -121,6 +121,7 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.listingTitle").value("3BHK in Kothrud"))
                     .andExpect(jsonPath("$.groupTitle").value("Three of us for a 3BHK"))
                     .andExpect(jsonPath("$.applicantName").value("Host One"))
+                    .andExpect(jsonPath("$.applicantMobile").value(org.hamcrest.Matchers.nullValue()))
                     .andExpect(jsonPath("$.status").value("pending"))
                     // The owner reads the per-head figure, which comes from intended seats
                     // rather than current members.

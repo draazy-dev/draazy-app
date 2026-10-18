@@ -50,8 +50,7 @@ export function toReviewViewModel(row) {
   };
 }
 
-/** A card on the verification desk. The agreement file and the host's number come with the popup's
- * detail read, so a row carries neither. */
+/** A card on the verification desk. The agreement file comes with the popup's detail read. */
 export function toReviewRowViewModel(row) {
   return {
     id: row?.id || '',
@@ -59,6 +58,7 @@ export function toReviewRowViewModel(row) {
     roomId: row?.roomId || null,
     groupId: row?.groupId || null,
     host: text(row?.host),
+    hostMobile: text(row?.hostMobile),
     address: text(row?.address),
     tier: row?.tier || 'identity',
     flagForReview: !!row?.flagForReview,
@@ -77,6 +77,7 @@ export function toModerationRowViewModel(row) {
     // `pending` | `live` | `approved` | `flagged` | `removed` | `rejected`.
     modStatus: row?.modStatus || 'pending',
     authorName: text(row?.authorName),
+    authorMobile: text(row?.authorMobile),
     headline: text(row?.headline),
     locality: text(row?.locality),
     freeText: text(row?.freeText),
@@ -117,6 +118,7 @@ export function toGroupApplicationViewModel(row) {
     perHead: row?.perHead ?? null,
     groupTitle: text(row?.groupTitle),
     applicantName: text(row?.applicantName),
+    applicantMobile: text(row?.applicantMobile),
     members: Number(row?.members) || 0,
     seatsTotal: Number(row?.seatsTotal) || 0,
     // The OWNER's decision: `pending` | `accepted` | `declined`. Read-only here.

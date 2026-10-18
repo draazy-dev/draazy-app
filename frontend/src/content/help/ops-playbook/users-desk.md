@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 20
-updated: 2026-10-10
+updated: 2026-10-18
 summary: How to look up owner and buyer accounts, read their activity, and what only an administrator can change.
 tags: [ops, internal, users, lookup, badges]
 modules: [users]
@@ -45,8 +45,8 @@ modules: [users]
 | Tabs | **All users**, **Active**, **Suspended**, **Archived**. Counts come from the server. **All users** does not include archived accounts. |
 | Search | Type the start of a name, or a full 10-digit mobile. Email and part of a number are not searched. |
 | Role chips | **All**, **Owners**, **Buyers**. |
-| **Export CSV** | Shown only when that feature is switched on. Exports the first 100 matching rows. Mobile numbers are masked. |
-| Rows | Name, status, **Verified**, **Flagged** (with reason), **Badge pending**, masked mobile, role, city, listings count, joined date. |
+| **Export CSV** | Shown only when that feature is switched on. Exports the first 100 matching rows, with full mobile numbers. |
+| Rows | Name, status, **Verified**, **Flagged** (with reason), **Badge pending**, full mobile, role, city, listings count, joined date. |
 
 The page shows 20 rows at a time.
 

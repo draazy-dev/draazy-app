@@ -106,7 +106,7 @@ function CaseBody({ detail, kase, user, canWrite, summaryRef, onSettled }) {
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-100">
             <p className="font-semibold">Duplicate warnings</p>
             <ul className="mt-1 space-y-0.5 text-xs">
-              {detail.warnings.map((w) => <li key={`${w.kind}:${w.reviewId}`}>{w.kind.replaceAll('_', ' ')} · {w.userName || w.userId}</li>)}
+              {detail.warnings.map((w) => <li key={`${w.kind}:${w.reviewId}`}>{w.kind.replaceAll('_', ' ')} · {w.userName || w.userId}{w.userMobile ? ` · ${w.userMobile}` : ''}</li>)}
             </ul>
           </div>
         ) : null}

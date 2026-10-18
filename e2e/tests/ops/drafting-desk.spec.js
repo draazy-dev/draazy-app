@@ -1,6 +1,6 @@
 // Live drafting-desk checks cover behaviour the mock desks could not prove.
 import { execFileSync } from 'node:child_process';
-import { test, expect, ACTORS, MOBILE, STAFF } from '../../fixtures/live.js';
+import { test, expect, ACTORS, STAFF } from '../../fixtures/live.js';
 import { API, apiLogin, authHeaders, signIn, signedInAsNew, uniqueMobile } from '../../helpers/liveAuth.js';
 
 const DOCUMENT = {
@@ -64,7 +64,7 @@ async function seedRequest({ withProperty = false } = {}) {
   });
   if (put.status >= 300) throw new Error(`identities failed (${put.status}): ${await put.text()}`);
 
-  return { ...dto, auth, property };
+  return { ...dto, auth, property, mobile };
 }
 
 function settle(requestId) {
@@ -101,7 +101,7 @@ async function seedRentAgreement() {
   const dto = await request.json();
   if (request.status >= 300) throw new Error(`rent agreement create failed (${request.status}): ${JSON.stringify(dto)}`);
   settle(dto.id);
-  return dto;
+  return { ...dto, mobile };
 }
 
 async function countFor(page, key) {
@@ -133,9 +133,10 @@ const openRow = (row) => row.getByRole('button', { name: 'Open', exact: true }).
 const showTab = (page, name) => page.getByRole('tab', { name: new RegExp(`^${name}`) }).click();
 
 test.describe('Ops → Drafting desk (live)', () => {
-  test.beforeEach(async () => { await seedRequest(); });
+  let seeded;
+  test.beforeEach(async () => { seeded = await seedRequest(); });
 
-  test('the desk lists the server queue with its filters, the age cue, and no identity number or mobile in it', async ({ page }) => {
+  test("the desk lists the server queue with its filters, the age cue, the requester's full mobile and no identity number", async ({ page }) => {
     test.slow();
     await openDesk(page);
     await test.step('the desk lists the server queue with its filters', async () => {
@@ -152,14 +153,13 @@ test.describe('Ops → Drafting desk (live)', () => {
     await test.step('a fresh request has the opened-age cue', async () => {
       await expect(ourRow(page).getByTestId('service-request-age-fresh')).toBeVisible();
     });
-    await test.step('the queue itself never carries an identity number or a mobile', async () => {
-      await expect(ourRow(page)).toBeVisible();
+    await test.step("the queue shows the requester's full mobile but never an identity number", async () => {
+      await expect(rowFor(page, seeded.property).getByTestId('requester-mobile')).toContainText(seeded.mobile);
 
       const table = await page.getByRole('tabpanel').innerText();
       const tableWithoutUuids = table.replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '');
       expect(tableWithoutUuids).not.toMatch(/\b[A-Z]{5}\d{4}[A-Z]\b/);
       expect(tableWithoutUuids).not.toMatch(/\b\d{4}\s?\d{4}\s?\d{4}\b/);
-      expect(tableWithoutUuids).not.toMatch(MOBILE);
     });
     await test.step('a desk can search its queue', async () => {
       await page.getByPlaceholder('Name, mobile or request id').fill('Live Desk Owner');
@@ -299,7 +299,7 @@ test.describe('Ops → Drafting desk (live)', () => {
 
       const body = await dialog.innerText();
       expect(body).not.toMatch(/_state/);
-      expect(body).not.toMatch(MOBILE);
+      await expect(dialog.getByTestId('requester-mobile')).toContainText(request.mobile);
 
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -437,6 +437,7 @@ test.describe('Ops → Drafting desk (live)', () => {
     const mineBefore = await countFor(page, 'mine');
     await page.getByPlaceholder('Name, mobile or request id').fill(request.id);
     await expect(page.getByTestId('ra-row')).toHaveCount(1);
+    await expect(page.getByTestId('ra-row').first().getByTestId('requester-mobile')).toContainText(request.mobile);
     await page.getByTestId('ra-row').first().click();
 
     const dialog = page.getByRole('dialog');

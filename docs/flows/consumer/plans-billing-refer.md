@@ -418,10 +418,8 @@ size in `ContactAllocator`.
 free tier); `listingLimit` resolves to the free-tier floor of one when null and is never
 unlimited; `contactLimit` is null for unlimited / not-applicable.
 
-`ReferralDto` is the admin/ops fraud-desk view (spec fixes S52, S53, S54). Both mobiles are
-masked because it is a paginated privileged list, following the same rule as `UserAdminService`
-— unmasked reads are a separate, audited, single-record operation the contract does not declare
-for referrals. `rewardAmount` is the count the track grants (owner contacts or free agreements), 0
+`ReferralDto` is the admin/ops fraud-desk view (spec fixes S52, S53, S54). Both mobiles are in
+full, as on every back-office surface. `rewardAmount` is the count the track grants (owner contacts or free agreements), 0
 until the referral qualifies; `track` (`owner`/`seeker`), `holdUntil` and `autoReason` show the
 system's decision. `channel` is which side the referred party joined
 on (not `shareChannel`, which is how the link travelled — D60). `sameDevice` / `sameIp` false

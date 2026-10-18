@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 21
-updated: 2026-10-10
+updated: 2026-10-18
 summary: How to read the Enquiries and Deals board - enquiries, visits, deals and the funnel - and what staff can and cannot do there.
 tags: [ops, internal, enquiries, visits, deals, funnel]
 modules: [enquiries]
@@ -51,9 +51,9 @@ Four tabs: **Enquiries**, **Visits**, **Deals**, **Funnel**. Lists show 10 rows 
 
 - Date chips on every tab: **All**, **Today**, **7d**, **30d**. **Clear filters** appears when one is set.
 - Search ("Listing, customer or mobile"): part of a listing title or customer name works. A mobile number must be the whole number.
-- Mobile numbers in lists are masked.
-- **View** (eye icon) opens the detail with the full mobile number. Each time you open it, the system records that you looked.
-- **Export CSV** (not on Funnel) exports the first 100 matching rows, with masked numbers.
+- Mobile numbers are shown in full in lists and in the detail.
+- **View** (eye icon) opens the detail. Each time you open it, the system records that you looked.
+- **Export CSV** (not on Funnel) exports the first 100 matching rows, with full numbers.
 - The Deals tab shows total GMV (deal value) across all deals.
 
 ### Funnel tab

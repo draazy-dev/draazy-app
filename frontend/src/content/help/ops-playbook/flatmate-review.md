@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 12
-updated: 2026-10-10
+updated: 2026-10-18
 summary: How staff publish, hide, badge, and re-check flatmate posts and group applications.
 tags: [ops, flatmates, moderation, badges, internal]
 modules: [flatmates]
@@ -18,14 +18,14 @@ modules: [flatmates]
 
 **Monitor**
 
-- **Pending** tab count, oldest first by default.
+- **Pending** tab count, newest first.
 - Card chips: **Awaiting publish**, **Edited since review**, **Live ? not yet reviewed**, **Badge claim**, **Owner consent missing**, **Contested address**.
 - The "first 100 of each list" note ? decide some cards to see the rest.
 - **Published** tab ? new group applications go live on submission.
 
 **Work on**
 
-- Clear **Pending** oldest first: **Publish**, **Hide for review** or **Remove**.
+- Clear **Pending**: **Publish**, **Hide for review** or **Remove**.
 - Read the changed fields on **Edited since review** cards, then **Looks fine** or choose another decision.
 - Decide badge claims: **Approve badge**, or **Reject badge** with a reason. Never approve a tenant badge without **Owner consent**.
 - Scan new group applications under **Published**: **Clear** or **Remove**.
@@ -44,7 +44,7 @@ The desk is merged: publication moderation, badge verification, edit re-checks, 
 | **Published** | `approved` and legacy `live` moderation rows, plus live and cleared applications |
 | **Hidden & removed** | `flagged`, `removed`, and `rejected` moderation rows |
 
-Filter by **All / Room / Group / Seeker post**, search title, author, or locality, and sort oldest or newest. Pending defaults to oldest first. Each source is capped at 100 rows; when capped, decide visible rows to reveal more.
+Filter by **All / Room / Group / Seeker post**, search title, author, or locality. Every tab lists newest first, and each card shows when the item was created or last updated. Each source is capped at 100 rows; when capped, decide visible rows to reveal more.
 
 ## Card signals
 

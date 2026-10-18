@@ -2507,7 +2507,6 @@ paths:
       tags: [Moderation]
       summary: List all users (admin)
       operationId: listUsers
-      # Rows carry a masked mobile.
       x-roles: [staff, manager, admin]
       parameters:
         - { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }
@@ -4191,8 +4190,7 @@ paths:
         letting ops write the owner's decision field.
 
 
-        Requester mobiles are masked on the list; opening one row (`revealEnquiryForOps`) returns the full
-        number and is audited.
+        Requester mobiles are in full on the list; opening one row (`revealEnquiryForOps`) is audited.
       x-roles: [staff, admin]
       parameters:
         - name: status
@@ -4260,7 +4258,7 @@ paths:
       operationId: listVisitsForOps
       description: >
         Every site visit on the platform, newest first. Read-only for the same reason as
-        `listEnquiriesForOps`; visitor mobiles are masked here and in full on `revealVisitForOps`.
+        `listEnquiriesForOps`; visitor mobiles are in full here and on `revealVisitForOps`.
       x-roles: [staff, admin]
       parameters:
         - name: status
@@ -4308,7 +4306,7 @@ paths:
       description: >
         Every deal on the platform, newest first — the funnel's floor, and the rows the board's GMV
         tile sums. `agreedPrice` is null until a deal closes, so GMV is a sum over closed deals by
-        construction. Read-only; counterparty mobiles are masked here (full on `revealDealForOps`),
+        construction. Read-only; counterparty mobiles are in full here and on `revealDealForOps`,
         preferring the number an owner typed on an off-platform close.
       x-roles: [staff, admin]
       parameters:
@@ -12132,11 +12130,11 @@ components:
             badge request.
     AdminUserRow:
       type: object
-      description: One row of the back-office users list. The full record, with the unmasked mobile, is `GET /users/{id}`.
+      description: One row of the back-office users list. The full record is `GET /users/{id}`.
       properties:
         id: { type: string }
         name: { type: string }
-        mobile: { type: string, description: Masked, e.g. 98XXXXX210 }
+        mobile: { type: string, description: In full }
         role: { $ref: '#/components/schemas/Role' }
         status: { type: string, enum: [active, suspended, archived] }
         verified: { type: boolean }
@@ -12181,6 +12179,7 @@ components:
         title: { type: string }
         locality: { type: string }
         owner: { type: string }
+        ownerMobile: { type: string, description: In full }
         status: { type: string }
     Self:
       type: object
@@ -13284,7 +13283,7 @@ components:
       type: object
       description: >
         One contact request on the ops demand board. Not `ContactRequest`: that is the owner's view
-        of their own inbox. The mobile is masked on the list and in full on the audited detail.
+        of their own inbox. The mobile is in full on the list and on the audited detail.
       properties:
         id: { type: string, format: uuid }
         propertyId: { type: string, format: uuid }
@@ -14569,7 +14568,7 @@ components:
           format: int64
           description: Reports ever filed against the same target; present on `GET /reports` rows only.
         targetName: { type: string, description: Name of the reported person; `GET /reports` rows about a user only }
-        targetMobile: { type: string, description: Masked mobile of the reported person; `GET /reports` rows about a user only }
+        targetMobile: { type: string, description: Mobile of the reported person, in full; `GET /reports` rows about a user only }
         targetTitle: { type: string, description: Title of the reported listing, or the reported person's name }
     ReportTriage:
       type: object
@@ -15419,9 +15418,8 @@ components:
         subject: { type: string }
         category: { type: [string, 'null'] }
         status: { type: string, enum: [open, in-progress, waiting, resolved, closed] }
-        # Who is waiting. No mobile here: the ticket detail already reveals it to the same callers,
-        # and a list is the shape that gets exported — this one is the whole support traffic.
         raiser: { type: [string, 'null'], description: Display name of the customer who raised it }
+        raiserMobile: { type: [string, 'null'], description: The raiser's mobile, in full }
         awaitingReply:
           type: boolean
           description: A customer message nobody on the desk has read.
@@ -16117,6 +16115,13 @@ components:
         targetType: { type: string, enum: [property, locality, society, owner] }
         targetId: { type: string }
         author: { type: string }
+        authorMobile: { type: [string, 'null'], description: The author's mobile, in full }
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [pending, published, rejected]
         rating: { type: integer, minimum: 1, maximum: 5 }
         body: { type: string }
         createdAt: { type: string, format: date-time }
@@ -16329,6 +16334,7 @@ components:
         kind: { type: string, enum: [post, room, group], description: Which board this came from. }
         modStatus: { $ref: '#/components/schemas/FlatmateModStatus' }
         authorName: { type: [string, 'null'] }
+        authorMobile: { type: [string, 'null'], description: In full }
         headline:
           type: [string, 'null']
           description: >
@@ -16366,6 +16372,7 @@ components:
         kind: { type: string, enum: [post, room, group] }
         modStatus: { $ref: '#/components/schemas/FlatmateModStatus' }
         authorName: { type: [string, 'null'] }
+        authorMobile: { type: [string, 'null'], description: In full }
         headline: { type: [string, 'null'] }
         locality: { type: [string, 'null'] }
         freeText: { type: [string, 'null'] }
@@ -17076,15 +17083,15 @@ components:
     FlatmateReviewRow:
       type: object
       description: >
-        One card of the verification queue: `FlatmateReview` without the agreement file, the host's
-        number, the registration particulars and the verdict, all of which the popup reads from the
-        detail.
+        One card of the verification queue: `FlatmateReview` without the agreement file, the
+        registration particulars and the verdict, all of which the popup reads from the detail.
       properties:
         id: { type: string }
         kind: { type: string, enum: [room, group] }
         roomId: { type: [string, 'null'] }
         groupId: { type: [string, 'null'] }
         host: { type: string }
+        hostMobile: { type: [string, 'null'], description: In full }
         address: { type: string }
         tier: { $ref: '#/components/schemas/VerificationTier' }
         flagForReview: { type: boolean }
@@ -17428,6 +17435,7 @@ components:
         label: { type: string }
         customerId: { type: string }
         customerName: { type: string }
+        customerMobile: { type: [string, 'null'], description: In full }
         orderRef: { type: string }
         amount: { type: integer }
         basis: { type: string }
@@ -17879,6 +17887,7 @@ components:
                   locality: { type: string }
                   price: { type: integer }
                   owner: { type: string }
+                  ownerMobile: { type: string, description: In full }
         demand:
           type: object
           properties:
@@ -17899,6 +17908,7 @@ components:
                   team: { type: string }
                   service: { type: string }
                   customer: { type: string }
+                  mobile: { type: string, description: In full }
                   detail: { type: string }
                   status: { type: string }
         owners: { type: integer, description: Non-archived owner accounts. }
@@ -17924,6 +17934,7 @@ components:
                   title: { type: string }
                   locality: { type: string }
                   owner: { type: string }
+                  ownerMobile: { type: string, description: In full }
         openTickets:
           type: object
           properties:
@@ -17937,7 +17948,7 @@ components:
                   team: { type: string }
                   service: { type: string }
                   customer: { type: string }
-                  mobile: { type: string, description: Masked }
+                  mobile: { type: string, description: In full }
         ownerReplies:
           type: object
           properties:

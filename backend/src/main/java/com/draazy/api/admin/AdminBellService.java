@@ -1,7 +1,6 @@
 package com.draazy.api.admin;
 
 import com.draazy.api.common.error.ForbiddenException;
-import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.moderation.property.PendingQueue;
 import com.draazy.api.moderation.verification.PropertyReviewQueue;
 import com.draazy.api.security.AccountPermissions;
@@ -45,7 +44,7 @@ public class AdminBellService {
         return new AdminBell.Listings(
                 pending.counts(Instant.now()).pending(),
                 pending.pending(ROWS, false).stream()
-                        .map(r -> new AdminBell.Listing(r.id(), r.title(), r.locality(), r.owner()))
+                        .map(r -> new AdminBell.Listing(r.id(), r.title(), r.locality(), r.owner(), r.ownerMobile()))
                         .toList());
     }
 
@@ -61,7 +60,7 @@ public class AdminBellService {
         try {
             var page = tickets.list(caller, null, TicketStatuses.OPEN, PageRequest.of(0, ROWS));
             return new AdminBell.Tickets(page.getTotalElements(), page.getContent().stream()
-                    .map(t -> new AdminBell.Ticket(t.id(), t.team(), t.service(), t.customer(), MobileMask.mask(t.mobile())))
+                    .map(t -> new AdminBell.Ticket(t.id(), t.team(), t.service(), t.customer(), t.mobile()))
                     .toList());
         } catch (ForbiddenException noDesk) {
             return null;

@@ -101,29 +101,33 @@ public class SupportTicketMapper {
     /** Names are resolved for the whole page before {@code Page#map} walks it; a per-element lookup
      * inside the lambda would be an N+1 that only shows under load. */
     public Page<AdminSupportTicketDto> toAdminPage(Page<SupportTicket> page) {
-        Map<UUID, String> names = raiserNames(page.getContent());
-        return page.map(t -> new AdminSupportTicketDto(
-                t.getId().toString(),
-                t.getSubject(),
-                t.getCategory(),
-                t.getStatus(),
-                names.get(t.getUserId()),
-                t.isStaffUnread(),
-                t.isUnread(),
-                t.getCreatedAt()));
+        Map<UUID, User> raisers = raisers(page.getContent());
+        return page.map(t -> {
+            User raiser = raisers.get(t.getUserId());
+            return new AdminSupportTicketDto(
+                    t.getId().toString(),
+                    t.getSubject(),
+                    t.getCategory(),
+                    t.getStatus(),
+                    raiser == null ? null : raiser.getName(),
+                    raiser == null ? null : raiser.getMobile(),
+                    t.isStaffUnread(),
+                    t.isUnread(),
+                    t.getCreatedAt());
+        });
     }
 
-    private Map<UUID, String> raiserNames(List<SupportTicket> tickets) {
+    private Map<UUID, User> raisers(List<SupportTicket> tickets) {
         Set<UUID> ids = tickets.stream()
                 .map(SupportTicket::getUserId)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toCollection(HashSet::new));
-        Map<UUID, String> names = new HashMap<>();
+        Map<UUID, User> out = new HashMap<>();
         if (!ids.isEmpty()) {
             for (User u : users.findAllById(ids)) {
-                names.put(u.getId(), u.getName());
+                out.put(u.getId(), u);
             }
         }
-        return names;
+        return out;
     }
 }

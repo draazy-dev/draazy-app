@@ -42,7 +42,8 @@ public class PropertyLookupController {
     }
 
     private static PropertyLookupRow row(Property p) {
+        var owner = p.getOwner();
         return new PropertyLookupRow(p.getId().toString(), p.getSlug(), p.getTitle(), p.getLocality(),
-                p.getOwner() == null ? null : p.getOwner().getName(), p.getStatus());
+                owner == null ? null : owner.getName(), owner == null ? null : owner.getMobile(), p.getStatus());
     }
 }

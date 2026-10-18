@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class PendingQueue {
 
-    public record Row(String id, String title, String locality, Long price, String owner) {
+    public record Row(String id, String title, String locality, Long price, String owner, String ownerMobile) {
     }
 
     public record Counts(long pending, long flagged, long followUp) {
@@ -20,7 +20,7 @@ public class PendingQueue {
 
     // id desc is the admin search's own tiebreak, so these rows line up with that list.
     private static final String ROWS = """
-            select p.id, p.title, p.locality, p.price, o.name
+            select p.id, p.title, p.locality, p.price, o.name, o.mobile
               from Property p join p.owner o
              where p.status = :pending and p.archived = false
              order by p.createdAt %s, p.id desc
@@ -53,7 +53,7 @@ public class PendingQueue {
                 .getResultList();
         return rows.stream()
                 .map(r -> new Row(r[0].toString(), (String) r[1], (String) r[2], (Long) r[3],
-                        (String) r[4]))
+                        (String) r[4], (String) r[5]))
                 .toList();
     }
 

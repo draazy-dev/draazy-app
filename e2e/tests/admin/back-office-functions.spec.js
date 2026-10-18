@@ -5,7 +5,7 @@ async function staffId(mobile) {
   const res = await fetch(`${API}/users?role=staff&q=${mobile}&size=5`, { headers: await authHeaders(ACTORS.admin) });
   expect(res.status).toBe(200);
   const body = await res.json();
-  const row = (body.content || body.items || []).find((u) => u.mobile === `${mobile.slice(0, 2)}XXXXX${mobile.slice(-3)}`);
+  const row = (body.content || body.items || []).find((u) => u.mobile === mobile);
   expect(row, `staff account ${mobile} exists`).toBeTruthy();
   return row.id;
 }

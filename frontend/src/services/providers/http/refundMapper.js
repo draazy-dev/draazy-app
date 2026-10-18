@@ -37,6 +37,7 @@ export function toRefundRow(dto) {
     amount: num(dto.amount),
     customerId: dto.customerId ?? null,
     customerName: dto.customerName || '',
+    customerMobile: dto.customerMobile || '',
     at: epoch(dto.requestedAt),
     decidedAt: epoch(dto.decidedAt),
     status: dto.status || 'pending_review',

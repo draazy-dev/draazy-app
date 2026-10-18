@@ -3,8 +3,8 @@ import { API, E2E_OTP, apiLogin, uniqueMobile, uploadedListingPhotos } from '../
 import { tenantRoomAgreement } from '../../helpers/flatmateAgreement.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
 
-const REVIEW_KEYS = ['id', 'kind', 'roomId', 'groupId', 'host', 'address', 'tier', 'flagForReview', 'ownerConsent', 'createdAt'];
-const QUEUE_KEYS = ['id', 'kind', 'modStatus', 'authorName', 'headline', 'locality', 'freeText', 'photoCount',
+const REVIEW_KEYS = ['id', 'kind', 'roomId', 'groupId', 'host', 'hostMobile', 'address', 'tier', 'flagForReview', 'ownerConsent', 'createdAt'];
+const QUEUE_KEYS = ['id', 'kind', 'modStatus', 'authorName', 'authorMobile', 'headline', 'locality', 'freeText', 'photoCount',
   'recheckReason', 'recheckRequestedAt', 'createdAt'];
 const DESK = /\/api\/admin\/(flatmate-reviews|flatmates\/moderation(\/summary)?|flatmates\/[^/]+)$/;
 
@@ -43,7 +43,7 @@ async function seedTenantRoom(host, society) {
   });
 }
 
-test('the flatmate desk reads slim cards and true tab counts; the popup alone reads the agreement and mobile', async ({ page, login, consoleErrors }) => {
+test("the flatmate desk reads slim cards with the host's full mobile and true tab counts; the popup alone reads the agreement", async ({ page, login, consoleErrors }) => {
   const host = { mobile: uniqueMobile(), name: 'Payload Host' };
   const society = `Payload Heights ${Date.now().toString(36).slice(-5)}`;
   const room = await seedTenantRoom(host, society);
@@ -57,17 +57,19 @@ test('the flatmate desk reads slim cards and true tab counts; the popup alone re
   });
 
   await page.goto('/ops/flatmate-review');
-  await expect(page.getByTestId('flatmate-queue-card').filter({ hasText: society }).first()).toBeVisible();
+  await expect(page.getByTestId('flatmate-queue-card').filter({ hasText: society }).first().getByTestId('author-mobile')).toContainText(host.mobile);
 
   const reviews = calls.find((c) => c.pathname.endsWith('/flatmate-reviews'));
   expect(reviews.body.content.length).toBeGreaterThan(0);
   for (const row of reviews.body.content) expect(Object.keys(row).filter((k) => !REVIEW_KEYS.includes(k))).toEqual([]);
-  expect(JSON.stringify(reviews.body)).not.toMatch(/agreementDoc|dataUrl|hostMobile|agreementValidTill/);
+  expect(JSON.stringify(reviews.body)).not.toMatch(/agreementDoc|dataUrl|agreementValidTill/);
+  expect(reviews.body.content.find((r) => r.roomId === room.id)?.hostMobile).toBe(host.mobile);
 
   const queue = calls.find((c) => c.pathname.endsWith('/flatmates/moderation'));
   expect(queue.body.content.length).toBeLessThanOrEqual(100);
   for (const row of queue.body.content) expect(Object.keys(row).filter((k) => !QUEUE_KEYS.includes(k))).toEqual([]);
   expect(queue.body.content.find((r) => r.id === room.id).photoCount).toBe(2);
+  expect(queue.body.content.find((r) => r.id === room.id).authorMobile).toBe(host.mobile);
 
   const summaries = calls.filter((c) => c.pathname.endsWith('/moderation/summary'));
   expect(summaries).toHaveLength(1);

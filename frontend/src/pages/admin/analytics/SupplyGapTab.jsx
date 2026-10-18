@@ -73,7 +73,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
         <div className="space-y-2.5">
           {rows.slice(0, 12).map((r) => (
             <div key={rowKey(r)} className="flex items-center gap-3">
-              <span className="text-xs text-gray-300 w-28 shrink-0 truncate font-medium">{rowLabel(r)}</span>
+              <span className="text-xs text-gray-300 w-28 shrink-0 truncate font-medium" title={rowLabel(r)}>{rowLabel(r)}</span>
               <div className="flex-1 flex items-center gap-1 h-5">
                 <div className="flex-1 relative h-full rounded bg-white/5 overflow-hidden"><div className="absolute inset-y-0 left-0 rounded bg-teal-500/60" style={{ width: `${(r.supply / maxSupply) * 100}%` }} /></div>
                 <div className="flex-1 relative h-full rounded bg-white/5 overflow-hidden"><div className="absolute inset-y-0 left-0 rounded bg-indigo-500/60" style={{ width: `${(r.demand / maxDemand) * 100}%` }} /></div>
@@ -108,7 +108,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <tbody>
               {rows.map((r) => (
                 <tr key={rowKey(r)} className="border-b border-white/5">
-                  <td className="py-2.5 text-white font-medium">{rowLabel(r)}</td>
+                  <td className="py-2.5 text-white font-medium"><span className="block max-w-[14rem] truncate" title={rowLabel(r)}>{rowLabel(r)}</span></td>
                   <td className="py-2.5 text-right tabular-nums text-teal-300">{r.supply}</td>
                   <td className="py-2.5 text-right tabular-nums text-indigo-300">{r.demand}</td>
                   <td className="py-2.5 text-right tabular-nums text-amber-300">{r.searches || '—'}</td>
@@ -148,7 +148,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <div className="space-y-2 mb-4">
               {localityAlerts.map((a) => (
                 <div key={rowKey(a)} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 truncate">
+                  <span className="w-28 shrink-0 truncate" title={rowLabel(a)}>
                     <span className="text-xs text-gray-300 font-medium">{rowLabel(a)}</span>
                   </span>
                   <div className="flex-1 relative h-6 rounded bg-white/5 overflow-hidden">
@@ -168,7 +168,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <div className="flex items-center gap-4 text-[11px] text-gray-500 border-t border-white/5 pt-3">
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-amber-500/60" /> Alert count</span>
               <span>Current supply shown on right</span>
-              {localityAlerts[0] && <span className="ml-auto text-amber-300 font-semibold">Top: {rowLabel(localityAlerts[0])} ({localityAlerts[0].alerts})</span>}
+              {localityAlerts[0] && <span className="ml-auto min-w-0 truncate text-amber-300 font-semibold">Top: {rowLabel(localityAlerts[0])} ({localityAlerts[0].alerts})</span>}
             </div>
           </>
         )}
@@ -207,7 +207,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <div className="space-y-2 mb-4">
               {cityRows.map((c) => (
                 <div key={c.city.toLowerCase()} className="flex items-center gap-3">
-                  <span className="w-28 shrink-0 truncate">
+                  <span className="w-28 shrink-0 truncate" title={c.city}>
                     <span className="text-xs text-gray-300 font-medium">{c.city}</span>
                   </span>
                   <div className="flex-1 relative h-6 rounded bg-white/5 overflow-hidden">
@@ -227,7 +227,7 @@ export default function SupplyGapTab({ supplyGap, failed, days, cityWaitlist, ci
             <div className="flex items-center gap-4 text-[11px] text-gray-500 border-t border-white/5 pt-3">
               <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-sky-500/60" /> People asking</span>
               <span>Most recent ask shown on right</span>
-              <span className="ml-auto text-sky-300 font-semibold">Top: {cityRows[0].city} ({cityRows[0].requests})</span>
+              <span className="ml-auto min-w-0 truncate text-sky-300 font-semibold">Top: {cityRows[0].city} ({cityRows[0].requests})</span>
             </div>
           </>
         )}

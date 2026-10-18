@@ -8,6 +8,7 @@ import com.draazy.api.billing.plan.PlanRepository;
 import com.draazy.api.billing.plan.Subscription;
 import com.draazy.api.billing.plan.SubscriptionRepository;
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import java.time.Instant;
 import java.util.Collection;
@@ -36,13 +37,24 @@ public class RefundDesk {
     }
 
     public record Row(String id, String status, String kind, String label, String customerId, String customerName,
-            String orderRef, long amount, String basis, String customerReason, Instant requestedAt,
-            Instant decidedAt, String decisionReason, String propertyId, String creditNoteNo, Signals signals) {
+            String customerMobile, String orderRef, long amount, String basis, String customerReason,
+            Instant requestedAt, Instant decidedAt, String decisionReason, String propertyId, String creditNoteNo,
+            Signals signals) {
     }
 
     // What one page of rows needs, loaded once for the whole page.
-    private record Lookup(Map<UUID, Subscription> orders, Map<UUID, Plan> plans, Map<UUID, String> names,
+    private record Lookup(Map<UUID, Subscription> orders, Map<UUID, Plan> plans, Map<UUID, User> people,
             Map<UUID, String> notes) {
+
+        String name(UUID userId) {
+            User u = userId == null ? null : people.get(userId);
+            return u == null ? null : u.getName();
+        }
+
+        String mobile(UUID userId) {
+            User u = userId == null ? null : people.get(userId);
+            return u == null ? null : u.getMobile();
+        }
     }
 
     private final RefundRequestRepository requests;
@@ -118,7 +130,8 @@ public class RefundDesk {
         Signals signals = RefundStatuses.PENDING_REVIEW.equals(request.getStatus())
                 ? signals(order, plan, request.getDeviceIdHash(), request.getCreatedAt()) : null;
         return new Row(request.getId().toString(), request.getStatus(), request.getKind(), plan.getName(),
-                request.getUserId().toString(), lookup.names().get(request.getUserId()), order.getPaymentRef(),
+                request.getUserId().toString(), lookup.name(request.getUserId()), lookup.mobile(request.getUserId()),
+                order.getPaymentRef(),
                 request.getAmount(), request.getBasis(), request.getCustomerReason(), request.getCreatedAt(),
                 request.getDecidedAt(), request.getDecisionReason(), idOf(order.getPropertyId()),
                 lookup.notes().get(order.getId()), signals);
@@ -127,7 +140,8 @@ public class RefundDesk {
     private Row autoRow(Subscription order, Lookup lookup) {
         Plan plan = lookup.plans().get(order.getPlanId());
         return new Row(order.getId().toString(), RefundStatuses.AUTO, RefundAssessor.kindOf(plan), plan.getName(),
-                order.getUserId().toString(), lookup.names().get(order.getUserId()), order.getPaymentRef(),
+                order.getUserId().toString(), lookup.name(order.getUserId()), lookup.mobile(order.getUserId()),
+                order.getPaymentRef(),
                 order.getRefundAmount() != null ? order.getRefundAmount() : order.getAmount(), null, null,
                 order.getRefundDueAt(), null, null, idOf(order.getPropertyId()), lookup.notes().get(order.getId()),
                 null);
@@ -140,7 +154,7 @@ public class RefundDesk {
         return new Row(dispute.getId().toString(), RefundStatuses.DISPUTED,
                 plan == null ? null : RefundAssessor.kindOf(plan),
                 plan == null ? null : plan.getName(), customer == null ? null : customer.toString(),
-                customer == null ? null : lookup.names().get(customer), dispute.getOrderRef(),
+                lookup.name(customer), lookup.mobile(customer), dispute.getOrderRef(),
                 dispute.getAmount() != null ? dispute.getAmount() : order == null ? 0L : order.getAmount(), null,
                 dispute.getReason(), dispute.getOpenedAt(), dispute.getClosedAt(), null,
                 order == null ? null : idOf(order.getPropertyId()), null, null);
@@ -163,12 +177,12 @@ public class RefundDesk {
         List<UUID> planIds = orders.values().stream().map(Subscription::getPlanId).distinct().toList();
         Map<UUID, Plan> planById = plans.findAllById(planIds).stream()
                 .collect(Collectors.toMap(Plan::getId, Function.identity()));
-        Map<UUID, String> names = new HashMap<>();
+        Map<UUID, User> people = new HashMap<>();
         users.findAllById(userIds.stream().filter(Objects::nonNull).distinct().toList())
-                .forEach(u -> names.put(u.getId(), u.getName()));
+                .forEach(u -> people.put(u.getId(), u));
         Map<UUID, String> notes = creditNotes.findBySourceTypeAndSourceIdIn(CreditNotes.SUBSCRIPTION, ids).stream()
                 .collect(Collectors.toMap(CreditNote::getSourceId, CreditNote::getNumber, (a, b) -> a));
-        return new Lookup(orders, planById, names, notes);
+        return new Lookup(orders, planById, people, notes);
     }
 
     private static String idOf(UUID id) {

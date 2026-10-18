@@ -76,7 +76,7 @@ export function toSummaryList(rows) {
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-/** No thread and no mobile: the queue is platform-wide and lists get exported. `awaitingReply` (unanswered)
+/** No thread: the queue is platform-wide. `awaitingReply` (unanswered)
  * and `unread` (reply not opened) are different facts and must not be collapsed. */
 export function toQueueRow(t) {
   if (!t) return null;
@@ -88,6 +88,7 @@ export function toQueueRow(t) {
     category: t.category || 'other',
     status: t.status || 'open',
     raiser: t.raiser || '',
+    raiserMobile: t.raiserMobile || '',
     awaitingReply: !!t.awaitingReply,
     unread: !!t.unread,
     createdAt: epoch(t.createdAt),

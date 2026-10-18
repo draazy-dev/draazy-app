@@ -76,7 +76,7 @@ public class FlatmateModerationService {
 
         Page<FlatmateReviewRepository.QueueRow> page = reviews.findForQueue(filter, flagged, pageable);
 
-        Map<UUID, String> hosts = namesOf(
+        Map<UUID, User> hosts = peopleOf(
                 page.getContent().stream().map(FlatmateReviewRepository.QueueRow::getHostId).toList());
 
         return page.map(r -> FlatmateReviewRow.of(r, hosts.get(r.getHostId())));
@@ -243,19 +243,19 @@ public class FlatmateModerationService {
     }
 
     private Page<FlatmateModerationQueueDto> presentPosts(Page<FlatmateSeekerPost> page) {
-        Map<UUID, String> names = namesOf(
+        Map<UUID, User> names = peopleOf(
                 page.getContent().stream().map(FlatmateSeekerPost::getUserId).toList());
         return page.map(p -> FlatmateModerationQueueDto.of(p, names.get(p.getUserId())));
     }
 
     private Page<FlatmateModerationQueueDto> presentRooms(Page<FlatmateRoom> page) {
-        Map<UUID, String> names = namesOf(
+        Map<UUID, User> names = peopleOf(
                 page.getContent().stream().map(FlatmateRoom::getHostId).toList());
         return page.map(r -> FlatmateModerationQueueDto.of(r, names.get(r.getHostId())));
     }
 
     private Page<FlatmateModerationQueueDto> presentGroups(Page<FlatmateGroup> page) {
-        Map<UUID, String> names = namesOf(
+        Map<UUID, User> names = peopleOf(
                 page.getContent().stream().map(FlatmateGroup::getHostId).toList());
         return page.map(g -> FlatmateModerationQueueDto.of(g, names.get(g.getHostId())));
     }
@@ -276,14 +276,13 @@ public class FlatmateModerationService {
                 .distinct().toList();
     }
 
-    /** Author names for one page, in one query rather than one per row. */
-    private Map<UUID, String> namesOf(List<UUID> userIds) {
+    /** Authors for one page, in one query rather than one per row. */
+    private Map<UUID, User> peopleOf(List<UUID> userIds) {
         if (userIds.isEmpty()) {
             return Map.of();
         }
         return users.findAllById(userIds.stream().distinct().toList()).stream()
-                .filter(u -> u.getName() != null)
-                .collect(Collectors.toMap(User::getId, User::getName));
+                .collect(Collectors.toMap(User::getId, u -> u));
     }
 
     /** The id may name a post, a room or a group, since an abuse report carries an id, not a taxonomy.
@@ -362,7 +361,7 @@ public class FlatmateModerationService {
         Page<FlatmateGroupApplication> page = states.isEmpty()
                 ? applications.findByOrderByCreatedAtDesc(pageable)
                 : applications.findByModStatusIn(states, pageable);
-        List<GroupApplicationDto> hydrated = applicationHydrator.hydrate(page.getContent());
+        List<GroupApplicationDto> hydrated = applicationHydrator.hydrateForStaff(page.getContent());
         return new PageImpl<>(hydrated, page.getPageable(), page.getTotalElements());
     }
 
@@ -387,7 +386,7 @@ public class FlatmateModerationService {
         String why = FlatmateVocabulary.blankToNull(note);
         String before = application.getModStatus();
         if (verdict.equals(before)) {
-            return applicationHydrator.hydrateOne(application);
+            return applicationHydrator.hydrateOneForStaff(application);
         }
         if (why == null && (HIDING.contains(verdict) || UNDOING.contains(before))) {
             throw new BadRequestException("Add a note saying why — it is kept on the audit trail.");
@@ -406,7 +405,7 @@ public class FlatmateModerationService {
 
         audit.record(caller, "flatmate.groupApplication.moderate", "flatmateGroupApplication",
                 application.getId().toString(), "from", before, "modStatus", verdict, "note", why);
-        return applicationHydrator.hydrateOne(application);
+        return applicationHydrator.hydrateOneForStaff(application);
     }
 
     /** A sub-let without the owner's written consent is a ground for eviction under the Maharashtra

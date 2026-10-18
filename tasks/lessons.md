@@ -201,4 +201,7 @@ index: `$env:GIT_INDEX_FILE=<temp>; git read-tree HEAD; git add -- <our paths>`,
 hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 `git reset -q -- <our paths>` on the real index. Amend the same way (`read-tree HEAD` first).
 - **`check-comments` passing is not the comment rule**: it misses defect/worker ids (MC-, MOD-, W3, QA-, ADR-, "RC pass"), "now/was" narration and code-restating comments. Read every comment in each touched file, and run ponytail-review + code-simplifier on the uncommitted diff before handing back.
+- **Social/Reddit copy must read human, not AI**: plain casual paragraphs, no bold headers or bullet lists, contractions, an empathetic opener/closer; never invent personal anecdotes to fake emotion.
+- **Staff work queues list newest first** (To verify, Re-checks, Badge requests, Follow-up, Flagged, KYC, Flatmates): the user wants a new listing on top; overdue rows are found by their rose tag, not by FIFO order.
+- **Back-office mobiles are never masked or hidden**: every staff/admin page shows a customer's full mobile wherever it shows the customer, with no reveal step and no list audit; masking stays on consumer surfaces only.
 - **One staff decision is final** (#330): never add a second-reviewer, QA-sample or override-request step to an approval; only refunds are two-person. Self-action guards (own listing/case/upload) stay.

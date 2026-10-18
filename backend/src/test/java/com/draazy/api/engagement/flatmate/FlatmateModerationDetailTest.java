@@ -210,7 +210,8 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
                         .param("modStatus", "live")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content", Matchers.hasSize(1)));
+                .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
+                .andExpect(jsonPath("$.content[0].applicantMobile").value(applicant.getMobile()));
 
         mvc.perform(patch(Routes.Moderation.GROUP_APPLICATION_BY_ID, appId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff))

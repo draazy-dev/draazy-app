@@ -33,7 +33,7 @@ const PAGE_SIZE = 20;
 const TABS = stageTabs('request');
 const TAB_KEYS = TABS.map((t) => t.key);
 
-/** Allow-list details so free-form `_state` snapshots cannot leak mobile or identity fields. */
+/** Allow-list details so free-form `_state` snapshots cannot leak identity fields. */
 const DETAIL_FIELDS = [
   ['property', 'Property'],
   ['location', 'Location'],
@@ -283,7 +283,7 @@ export default function OpsDraftingDesk({ desk }) {
                     id={r.id}
                     title={r.service}
                     badges={<><Badge status={r.status} />{r.assignedToMe ? <span className={classNames(CHIP, CHIP_TONE.teal)}>Yours</span> : null}</>}
-                    meta={<><span>{detailRows(r.details)[0]?.[1] || '—'}</span><Dot /><AgeTone request={r} /></>}
+                    meta={<><span>{detailRows(r.details)[0]?.[1] || '—'}</span>{r.requesterMobile ? <><Dot /><span className="tabular-nums" data-testid="requester-mobile">{r.requesterName ? `${r.requesterName} · ` : ''}{r.requesterMobile}</span></> : null}<Dot /><AgeTone request={r} /></>}
                     facts={(
                       <FactRow label="Held by">
                         <Cell className={r.assignedTo ? undefined : 'text-gray-500'}>{holder(r)}</Cell>
@@ -313,6 +313,7 @@ export default function OpsDraftingDesk({ desk }) {
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <Badge status={detail.status} />
               <span className="text-gray-400">Held by {detail.assignedTo || 'nobody'}</span>
+              {target?.requesterMobile ? (<><span className="text-gray-600">·</span><span className="tabular-nums text-gray-400" data-testid="requester-mobile">{target.requesterName ? `${target.requesterName} · ` : ''}{target.requesterMobile}</span></>) : null}
               {detail.amount ? (<><span className="text-gray-600">·</span><span className="text-gray-400">{fmtINR(detail.amount)}</span></>) : null}
               <button type="button" onClick={take} className="dz-btn dz-btn-ghost ml-auto">
                 <Hand className="h-4 w-4" /> Take this request

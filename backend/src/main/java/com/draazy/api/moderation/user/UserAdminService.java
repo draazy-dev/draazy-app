@@ -82,7 +82,6 @@ public class UserAdminService {
         this.baseUrl = baseUrl.replaceAll("/+$", "");
     }
 
-    // Lists carry masked mobiles.
     @Transactional(readOnly = true)
     public Page<AdminUserRow> list(String role, boolean customers, String q, String status, Boolean flagged,
             boolean archived, Pageable pageable) {

@@ -319,8 +319,8 @@ class FlatmateModerationGateTest extends AbstractApiTest {
         }
 
         @Test
-        @DisplayName("the queue carries no phone number, however many rows it has")
-        void theQueueIsNotAContactList() throws Exception {
+        @DisplayName("the queue shows each author's number in full")
+        void theQueueShowsTheAuthorsMobile() throws Exception {
             createPost(seeker("9811000026", "Eshan"), "Eshan", "GateTownJ");
 
             mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
@@ -328,8 +328,7 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(admin("9811000027"))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].id").exists())
-                    .andExpect(jsonPath("$.content[0].mobile").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].authorMobile").doesNotExist());
+                    .andExpect(jsonPath("$.content[*].authorMobile", Matchers.hasItem("9811000026")));
         }
 
         @Test

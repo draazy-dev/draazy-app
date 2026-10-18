@@ -51,6 +51,6 @@ public record IdentityReviewResponse(
     public record Images(String front, String back, String selfie) {
     }
 
-    public record Warning(String kind, UUID userId, String userName, UUID reviewId) {
+    public record Warning(String kind, UUID userId, String userName, String userMobile, UUID reviewId) {
     }
 }

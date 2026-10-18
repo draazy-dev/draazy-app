@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Archive, Bell, CheckCircle, ClipboardCheck, Clock, Eye, Flag, MapPin, Pencil, RotateCcw, XCircle } from 'lucide-react';
-import { fmtArea, fmtINR, fmtNum, isSqftUnit, classNames } from '../../../lib/format.js';
+import { fmtArea, fmtINR, fmtNum, isSqftUnit, classNames, lastActivity } from '../../../lib/format.js';
 import Badge from '../../../components/ui/Badge.jsx';
 import NoPhotoPlaceholder from '../../../components/ui/NoPhotoPlaceholder.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
@@ -140,6 +140,7 @@ function QueueRow({ listing: l, tab, ownerReplied, actions, showScore }) {
   const isRent = l.deal === 'rent';
   const [more, setMore] = useState(false);
   const moreCls = more ? undefined : 'max-md:hidden';
+  const stamp = lastActivity(l.submittedAt, l.resubmittedAt, l.recheckRequestedAt, l.ownershipRequestedAt, l.confirmedAt);
   return (
     <li data-testid="queue-row" data-id={l.id} className="list-card glass min-w-0 overflow-hidden rounded-2xl transition hover:border-white/15 max-md:[&_.lr-img]:h-28">
       <div className="lr min-w-0">
@@ -184,6 +185,11 @@ function QueueRow({ listing: l, tab, ownerReplied, actions, showScore }) {
                 <Cell className="tabular-nums">{`${fmtNum(l.enquiries || 0)} enquiries`}</Cell>
                 <span className="col-span-2 min-w-0 truncate"><Waiting listing={l} tab={tab} /></span>
               </FactRow>
+              {stamp ? (
+                <FactRow label={stamp.verb}>
+                  <Cell className="tabular-nums md:col-span-2"><span data-testid="activity-stamp">{stamp.text}</span></Cell>
+                </FactRow>
+              ) : null}
             </dl>
             <div className={classNames(GROUP, 'min-w-0 space-y-2')}>
               <RowChips listing={l} ownerReplied={ownerReplied} hasPhoto={Boolean(photo)} />

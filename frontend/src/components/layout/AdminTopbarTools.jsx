@@ -405,7 +405,7 @@ export default function AdminTopbarTools() {
                       {results.listings.map((l) => (
                         <button key={l.id} onClick={() => go('/admin/properties?review=' + l.id)} className={rowCls('l' + l.id)}>
                           <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/15 text-teal-300"><Building2 className="h-4 w-4" /></span>
-                          <span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{l.title}</span><span className="block truncate text-xs text-gray-400">{l.locality} &middot; {l.owner}</span></span>
+                          <span className="min-w-0 flex-1"><span className="block truncate text-sm text-white">{l.title}</span><span className="block truncate text-xs text-gray-400">{l.locality} &middot; {l.owner}{l.ownerMobile ? <> &middot; {l.ownerMobile}</> : null}</span></span>
                           <StatusPill status={l.status} />
                         </button>
                       ))}
@@ -482,7 +482,7 @@ export default function AdminTopbarTools() {
                     {notif.pending.map((l) => (
                       <button key={l.id} onClick={() => go('/admin/properties')} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
                         <span className="grid h-8 w-8 place-items-center rounded-lg bg-teal-500/15 text-teal-300"><Building2 className="h-4 w-4" /></span>
-                        <span className="min-w-0"><span className="block truncate text-sm text-white">{l.title}</span><span className="block truncate text-xs text-gray-400">{l.locality} &middot; {l.owner}</span></span>
+                        <span className="min-w-0"><span className="block truncate text-sm text-white">{l.title}</span><span className="block truncate text-xs text-gray-400">{l.locality} &middot; {l.owner}{l.ownerMobile ? <> &middot; {l.ownerMobile}</> : null}</span></span>
                       </button>
                     ))}
                   </>

@@ -106,6 +106,8 @@ test.describe('admin review moderation', () => {
       /* The author name proves the row came from the server, not from a plausible-looking localStorage fixture. */
       const table = page.locator('#queue-panel');
       await expect(table.getByText(row.author, { exact: true }).first()).toBeVisible();
+      expect(row.authorMobile).toMatch(/^\d{10}$/);
+      await expect(table.getByTestId('author-mobile').filter({ hasText: row.authorMobile }).first()).toBeVisible();
 
       // And the target, which the mapper composes from `targetType` + `targetId`. A moderator who
       // cannot see what is being reviewed cannot judge whether the review is fair.

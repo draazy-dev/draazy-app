@@ -213,12 +213,15 @@ public class IdentityReviewReadService {
         if (hits.isEmpty()) {
             return List.of();
         }
-        Map<UUID, String> names = new HashMap<>();
+        Map<UUID, User> people = new HashMap<>();
         users.findAllById(hits.stream().map(h -> h.other().getUserId()).distinct().toList())
-                .forEach(u -> names.put(u.getId(), u.getName()));
+                .forEach(u -> people.put(u.getId(), u));
         return hits.stream()
-                .map(h -> new IdentityReviewResponse.Warning(h.kind(), h.other().getUserId(),
-                        names.get(h.other().getUserId()), h.other().getId()))
+                .map(h -> {
+                    User u = people.get(h.other().getUserId());
+                    return new IdentityReviewResponse.Warning(h.kind(), h.other().getUserId(),
+                            u == null ? null : u.getName(), u == null ? null : u.getMobile(), h.other().getId());
+                })
                 .toList();
     }
 
