@@ -33,7 +33,6 @@ public class ServiceRequestDraftApprovals {
     static final String METHOD_OTP = "otp";
 
     private final ServiceRequestDraftApprovalRepository approvals;
-    private final ServiceRequestDraftCheckRepository checks;
     private final ServiceRequestRepository requestRows;
     private final ServiceRequestPartyRepository parties;
     private final DocumentRepository documents;
@@ -42,11 +41,9 @@ public class ServiceRequestDraftApprovals {
     private final AuditService audit;
 
     ServiceRequestDraftApprovals(ServiceRequestDraftApprovalRepository approvals,
-            ServiceRequestDraftCheckRepository checks, ServiceRequestRepository requestRows,
-            ServiceRequestPartyRepository parties, DocumentRepository documents, UserRepository users,
+            ServiceRequestRepository requestRows, ServiceRequestPartyRepository parties, DocumentRepository documents, UserRepository users,
             OtpService otp, AuditService audit) {
         this.approvals = approvals;
-        this.checks = checks;
         this.requestRows = requestRows;
         this.parties = parties;
         this.documents = documents;
@@ -59,20 +56,11 @@ public class ServiceRequestDraftApprovals {
         return Math.toIntExact(documents.countByServiceRequestIdAndCategory(request.getId(), "draft"));
     }
 
-    // A revision shared while draft-shared stays held there, so the status alone does not prove the customer may act.
     void requireOutForReview(ServiceRequest request) {
         if (request.getStatus() != ServiceRequestStatus.DRAFT_SHARED) {
             throw new ConflictException("There is no draft awaiting your decision \u2014 this request is "
                     + request.getStatus() + ".");
         }
-        if (held(request)) {
-            throw new ConflictException("There is no draft awaiting your decision right now.");
-        }
-    }
-
-    boolean held(ServiceRequest request) {
-        return checks.findByRequestIdAndDraftVersion(request.getId(), currentVersion(request))
-                .filter(ServiceRequestDraftCheck::holdsDraft).isPresent();
     }
 
     List<RequiredApproval> required(ServiceRequest request) {

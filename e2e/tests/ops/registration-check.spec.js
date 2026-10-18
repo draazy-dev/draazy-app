@@ -161,7 +161,7 @@ async function openCase(page, requestId, tab = 'progress') {
 }
 
 test.describe('Ops → Drafting desk → registration check (live)', () => {
-  test('a high-rent draft waits for a second operator before the customer sees it', async () => {
+  test('a high-rent draft shared by one operator reaches the customer at once', async () => {
     const customer = (await apiLogin(uniqueMobile())).accessToken;
     const listing = await ok('POST', '/me/listings', customer, {
       title: '3BHK in Aundh', deal: 'rent', propertyType: 'apartment', price: 55000, bhk: 3,
@@ -178,34 +178,19 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     });
     settle(request.id);
     const holder = (await apiLogin(STAFF.rental)).accessToken;
-    const checker = (await apiLogin(ACTORS.admin)).accessToken;
     await ok('PATCH', `/service-requests/${request.id}/status`, holder, { status: 'assigned' });
     await fileAndVerify(request.id, holder, { licensor: customer });
     await ok('POST', `/service-requests/${request.id}/draft`, holder, upload('draft.png', CHECKS));
 
-    const hidden = await ok('GET', `/service-requests/${request.id}`, customer);
-    expect(hidden.status).toBe('assigned');
-    expect(hidden.documents.filter((doc) => doc.category === 'draft')).toHaveLength(0);
-    const holderCheck = await call('POST', `/service-requests/${request.id}/draft/check`, holder, { decision: 'release' });
-    expect(holderCheck.status).toBe(403);
-    const released = await ok('POST', `/service-requests/${request.id}/draft/check`, checker, { decision: 'release' });
-    expect(released.status).toBe('draft-shared');
-    expect(released.draftCheck.reasons).toContain('rent_ge_50000');
-    const visible = await ok('GET', `/service-requests/${request.id}`, customer);
-    expect(visible.documents.some((doc) => doc.category === 'draft')).toBe(true);
+    const first = await ok('GET', `/service-requests/${request.id}`, customer);
+    expect(first.status).toBe('draft-shared');
+    expect(first.documents.filter((doc) => doc.category === 'draft')).toHaveLength(1);
 
     await ok('POST', `/service-requests/${request.id}/draft`, holder, upload('draft-v2.png', CHECKS));
-    const held = await ok('GET', `/service-requests/${request.id}`, customer);
-    expect(held.status).toBe('draft-shared');
-    expect(held.draftCheck ?? null).toBeNull();
-    expect(held.draftApproval ?? null).toBeNull();
-    expect(held.documents.filter((doc) => doc.category === 'draft')).toHaveLength(0);
-    expect(held.timeline.filter((e) => e.event.startsWith('draft.check-'))).toHaveLength(0);
-    for (const [path, body] of [['draft/opened'], ['draft/decision', { decision: 'approve' }], ['draft/otp', { partyKey: 'tenant-0' }]]) {
-      const refused = await call('POST', `/service-requests/${request.id}/${path}`, customer, body);
-      expect(refused.status, `${path} on a held revision`).toBe(409);
-    }
-    await ok('POST', `/service-requests/${request.id}/draft/check`, checker, { decision: 'release' });
+    const revised = await ok('GET', `/service-requests/${request.id}`, customer);
+    expect(revised.status).toBe('draft-shared');
+    expect(revised.draftApproval.version).toBe(2);
+    expect(revised.documents.filter((doc) => doc.category === 'draft')).toHaveLength(2);
     await ok('POST', `/service-requests/${request.id}/draft/opened`, customer);
     await ok('POST', `/service-requests/${request.id}/draft/decision`, customer, { decision: 'approve' });
   });
@@ -312,9 +297,9 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     await expect(share).toBeDisabled();
     await boxes.nth(4).check();
     await share.click();
-    await expect(page.getByRole('alert').filter({ hasText: 'The draft is waiting for a colleague' })).toBeVisible();
-    const held = await ok('GET', `/service-requests/${request.id}`, staff);
-    expect(held.draftCheck?.status, 'a POA draft waits for a second operator (D-i)').toBe('pending');
+    await expect(page.getByRole('alert').filter({ hasText: 'The draft was shared with the customer' })).toBeVisible();
+    const shared = await ok('GET', `/service-requests/${request.id}`, customer);
+    expect(shared.status, 'a POA draft goes out on one operator\'s share').toBe('draft-shared');
   });
 
   test('the desk sends a paper back with a reason, the customer re-uploads it, and the new copy is what gets verified', async ({ page, browser }) => {

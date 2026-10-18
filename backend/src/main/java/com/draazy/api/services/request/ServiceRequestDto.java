@@ -28,8 +28,7 @@ public record ServiceRequestDto(
         PoliceIntimationDto policeIntimation,
         Sla sla,
         Amendment amendment,
-        DraftApproval draftApproval,
-        DraftCheck draftCheck) {
+        DraftApproval draftApproval) {
 
     public record TimelineEntry(Instant at, String event, String by) {
     }
@@ -49,14 +48,10 @@ public record ServiceRequestDto(
             boolean opened, boolean approved, Instant approvedAt) {
     }
 
-    public record DraftCheck(int version, String status, List<String> reasons, String note,
-            String sharedBy, String checkedBy, Instant checkedAt) {
-    }
-
     // Stitches the single-use gateway session onto create response; it is never stored.
     public ServiceRequestDto withPaymentSessionId(String sessionId) {
         return new ServiceRequestDto(id, type, team, status, propertyId, ticketId, details, assignee,
                 assignedToMe, timeline, documents, messages, parties, createdAt, amount, sessionId, registration,
-                policeIntimation, sla, amendment, draftApproval, draftCheck);
+                policeIntimation, sla, amendment, draftApproval);
     }
 }

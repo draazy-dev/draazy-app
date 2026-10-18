@@ -213,7 +213,8 @@ visibly (D184).
   approved, which completes the request. Only the **holder** (or an admin) may share a draft or
   upload the registered copy - an unassigned or colleague-held matter is a 409 naming who holds
   it. Moving an unheld matter to `in-progress` takes it, and a colleague-held one is refused like
-  a seizure, so an approved matter always has someone to complete it.
+  a seizure, so an approved matter always has someone to complete it. A shared draft reaches the
+  customer at once: no second operator checks it first.
 - **Registration check (`RegistrationCheck`, completed rentals):** the registered copy prepares one
   `rent_agreements` row per tenant, status `draft`, linked to the request and the uploaded document
   (V39). Tenant mobiles are **derived, never typed** by the desk: the wizard's `_state.tenants[]`

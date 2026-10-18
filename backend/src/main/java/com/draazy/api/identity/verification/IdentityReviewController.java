@@ -35,14 +35,12 @@ public class IdentityReviewController {
     private final IdentityReviewService service;
     private final IdentityReviewQueueService queue;
     private final IdentityReviewClaimService claims;
-    private final IdentityQaService qa;
 
     public IdentityReviewController(IdentityReviewService service, IdentityReviewQueueService queue,
-            IdentityReviewClaimService claims, IdentityQaService qa) {
+            IdentityReviewClaimService claims) {
         this.service = service;
         this.queue = queue;
         this.claims = claims;
-        this.qa = qa;
     }
 
     /** {@code GET /moderation/identity-reviews} (contract {@code listIdentityReviews}). */
@@ -109,12 +107,5 @@ public class IdentityReviewController {
     public void releaseClaim(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @RequestParam(defaultValue = "false") boolean force) {
         claims.releaseClaim(principal, id, force);
-    }
-
-    @PostMapping(Routes.Moderation.IDENTITY_REVIEW_BY_ID + "/qa")
-    @PreAuthorize(IDENTITY_WRITE)
-    public IdentityReviewResponse qa(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
-            @Valid @RequestBody IdentityQaRequest body) {
-        return qa.qa(principal, id, body);
     }
 }

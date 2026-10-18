@@ -225,15 +225,16 @@ Grounded in `moderation.verification.PropertyVerificationService` / `ApprovalGat
   edit that sends the listing back to `pending` unticks them.
 - **Decision.** `approve | needs_info | reject`, one server transaction with the listing status,
   guarded by `expectedStatus` (`409 stale_decision`). `needs_info` and `reject` need a reason code;
-  reject is final. A duplicate or hard broker signal needs a second staff member through the
-  override request (`second_approver_required`).
-- **Audit.** Every decision, checklist tick and override writes an `audit_log` row (section 4).
+  reject is final for the owner. A duplicate or hard broker signal is shown as a warning and does not
+  block approval; one staff member's decision stands. A rejected listing returns to `pending` through
+  the status route.
+- **Audit.** Every decision and checklist tick writes an `audit_log` row (section 4).
 
 ### 2.4 The same pattern in other contexts
 
 | Context | Maker (proposes) | Checker (approves/rejects) | Approval side-effect | Code |
 |---------|------------------|----------------------------|----------------------|------|
-| Listing verification | owner submits listing | staff/admin, never the owner; a second staff member for a flagged override | listing `status -> approved`, goes live | `moderation.verification.PropertyVerificationService` |
+| Listing verification | owner submits listing | one staff/admin member, never the owner or the poster; their decision is final | listing `status -> approved`, goes live | `moderation.verification.PropertyVerificationService` |
 | Deal finalization | buyer requests finalize | owner accepts/declines | accept closes the deal (`closeDeal`) and auto-declines the other pending requests for that property | `src/lib/store/deals.js` `requestFinalize` / `acceptFinalize` / `declineFinalize` |
 | Contact reveal | buyer requests contact | owner approves/declines | owner phone unmasks for that buyer (subject to owner privacy prefs) | `src/lib/contact.js` `requestContact` / `setContactStatus` |
 | Document access | buyer requests a doc category | owner grants/declines | on grant, matching uploaded docs are shared (`sharedDocIds`) | `src/lib/data/documents.js` `addDocRequest` / `respondDocRequest` |

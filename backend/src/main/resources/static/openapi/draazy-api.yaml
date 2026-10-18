@@ -2984,7 +2984,7 @@ paths:
                   type: string
                   description: JSON-encoded `IdentityClaims` as read by the on-device OCR. Optional.
                 liveness: { type: string, enum: [passed, bypassed, unavailable], description: Optional on-device liveness result. }
-                challenge: { type: string, description: 'Token from `POST /me/verification/identity/challenge`. Optional; without it the case is always QA-sampled after approval.' }
+                challenge: { type: string, description: 'Token from `POST /me/verification/identity/challenge`. Optional; approval needs the reviewer to confirm the pose only when one was signed.' }
                 front: { type: string, format: binary, description: JPEG of the document front. }
                 back: { type: string, format: binary, description: 'JPEG of the document back — required for `aadhaar` and `voter_id`, refused for `pan`, `driving_licence`, and `passport`.' }
                 selfie: { type: string, format: binary, description: JPEG of the live selfie. }
@@ -3115,20 +3115,18 @@ paths:
       operationId: listIdentityReviews
       x-roles: [staff, admin]
       description: >
-        Submitted cases filtered by `status` (default `pending`, oldest first). `status=qa` lists
-        approved cases sampled for second-staff review, oldest sample first, excluding cases the
-        caller approved. `status=decided` lists verified, rejected and revoked cases, newest decision
+        Submitted cases filtered by `status` (default `pending`, oldest first). `status=decided` lists verified, rejected and revoked cases, newest decision
         first, narrowed by `outcome`. `status=appeal` lists rejected cases with an open appeal, oldest
         first. Every filter is applied in the database before paging. Rows
         carry only what a queue line shows; claims, images and warnings are the detail read.
       parameters:
-        - { name: status, in: query, schema: { type: string, enum: [pending, verified, rejected, revoked, qa, decided, appeal] } }
+        - { name: status, in: query, schema: { type: string, enum: [pending, verified, rejected, revoked, decided, appeal] } }
         - { name: q, in: query, description: Applicant name contains, or mobile contains the typed digits (3+), schema: { type: string } }
         - { name: docType, in: query, schema: { type: string, enum: [aadhaar, pan, driving_licence, passport, voter_id] } }
         - { name: claim, in: query, description: Fresh (30-minute) claim held by the caller, by nobody, or by someone else, schema: { type: string, enum: [mine, unclaimed, others] } }
         - { name: overdue, in: query, description: Submitted more than 48 hours ago, schema: { type: boolean, default: false } }
         - { name: outcome, in: query, description: With `status=decided` only, schema: { type: string, enum: [verified, rejected, revoked] } }
-        - { name: sort, in: query, description: "Defaults: oldest for pending and qa, newest otherwise", schema: { type: string, enum: [oldest, newest] } }
+        - { name: sort, in: query, description: "Defaults: oldest for pending and appeal, newest otherwise", schema: { type: string, enum: [oldest, newest] } }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
       responses:
@@ -3158,12 +3156,11 @@ paths:
             application/json:
               schema:
                 type: object
-                required: [pending, overdue, mine, qa, decided, appeals]
+                required: [pending, overdue, mine, decided, appeals]
                 properties:
                   pending: { type: integer, format: int64 }
                   overdue: { type: integer, format: int64, description: Pending for more than 48 hours }
                   mine: { type: integer, format: int64, description: Pending cases the caller currently holds }
-                  qa: { type: integer, format: int64, description: Open QA samples the caller may check }
                   decided: { type: integer, format: int64 }
                   appeals: { type: integer, format: int64, description: Rejected cases with an open appeal }
   /moderation/identity-reviews/{id}:
@@ -3248,9 +3245,8 @@ paths:
         format characters, Unicode separators are collapsed, and `users.name`
         is overwritten with that legal name even if the profile name is otherwise locked while
         verified. Flips the applicant's `verified` badge, propagates it to their listings, and
-        notifies them in-app and on WhatsApp. QA sampling is mandatory when liveness is not
-        `passed`, the selfie carried no signed pose challenge, the number was overridden, or the
-        case is a resubmission; otherwise it follows the configured sample rate.
+        notifies them in-app and on WhatsApp. The decision is final: no second reviewer is
+        required.
       requestBody:
         required: true
         content:
@@ -3309,7 +3305,7 @@ paths:
       description: >
         Keeps the case rejected, closes the appeal ticket and tells the applicant in-app and on
         WhatsApp. Needs the same permission as the other identity decisions, and the caller must be
-        neither the applicant nor the reviewer who rejected the case (`403 identity_appeal_same_reviewer`).
+        not be the applicant (`403 identity_appeal_own_case`); the reviewer who rejected the case may decide it.
       responses:
         '200':
           description: Upheld
@@ -3360,34 +3356,7 @@ paths:
               schema: { $ref: '#/components/schemas/IdentityReview' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: Case is not verified, or the approver is trying to revoke while QA is still open }
-        '422': { $ref: '#/components/responses/ValidationError' }
-  /moderation/identity-reviews/{id}/qa:
-    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
-    post:
-      tags: [Moderation]
-      summary: Complete second-staff QA for a sampled identity approval
-      operationId: qaIdentityReview
-      x-roles: [staff, admin]
-      description: >
-        Applies the maker-checker review for an approved case returned by `status=qa`. The caller
-        must be neither the original approver nor the subject. `confirmed` closes the QA sample;
-        `revoked` requires a 10–300 character reason, records the QA reviewer as `revokedBy`,
-        and runs the same verified-badge revoke path.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/IdentityQaRequest' }
-      responses:
-        '200':
-          description: QA recorded
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/IdentityReview' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: Case is not verified, was not sampled, or QA is already complete }
+        '409': { description: Case is not verified }
         '422': { $ref: '#/components/responses/ValidationError' }
   /webhooks/cashfree/payment:
     post:
@@ -3473,7 +3442,7 @@ paths:
     post:
       tags: [Moderation]
       summary: Verify or reject a property without publishing it
-      description: Approval records verification only. Pending listings stay pending; live rechecks stay live. Requires a different checker with properties read/write grants.
+      description: Approval records verification only. Pending listings stay pending; live rechecks stay live. Requires properties verify grant and a reviewer who neither owns nor posted the listing.
       operationId: verificationDecision
       x-roles: [staff, admin]
       requestBody:
@@ -3489,54 +3458,7 @@ paths:
               schema: { $ref: '#/components/schemas/PropertyReview' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
-          description: second_approver_required when a hard broker signal blocks a plain approve; owner_not_confirmed when a staff-posted listing has not been confirmed by its owner (checked before the case lookup); stale_decision when `expectedStatus` no longer matches the listing or its case (refresh and retry).
-  /properties/{id}/verification/override-requests:
-    parameters: [ { $ref: '#/components/parameters/PropertyId' } ]
-    post:
-      tags: [Moderation]
-      summary: Request second-staff verification override
-      operationId: requestOverride
-      x-roles: [staff, admin]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/PropertyVerificationOverrideRequestCreate' }
-      responses:
-        '201':
-          description: Override request opened
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/PropertyReview' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409':
-          description: override_request_pending or override_not_required.
-  /properties/{id}/verification/override-requests/{requestId}/approve:
-    parameters:
-      - { $ref: '#/components/parameters/PropertyId' }
-      - name: requestId
-        in: path
-        required: true
-        schema: { type: string, format: uuid }
-    post:
-      tags: [Moderation]
-      summary: Co-approve a verification override
-      operationId: approveOverride
-      x-roles: [staff, admin]
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/PropertyVerificationOverrideApproval' }
-      responses:
-        '200':
-          description: Override approved and the gated action applied
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/PropertyReview' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409':
-          description: override_request_decided or stale_decision.
+          description: owner_not_confirmed when a staff-posted listing has not been confirmed by its owner (checked before the case lookup); stale_decision when `expectedStatus` no longer matches the listing or its case (refresh and retry).
   /properties/{id}/verification/start:
     parameters: [ { $ref: '#/components/parameters/PropertyId' } ]
     post:
@@ -6982,8 +6904,8 @@ paths:
       operationId: getServiceRequestDocumentUrl
       description: >
         Minted when the file is opened, not with every read of the request. Visible on the same terms
-        as `getServiceRequest` lists it: a request the caller cannot see, a file that is not on it, a
-        draft held back for a colleague's check, or another side's identity scan is a 404.
+        as `getServiceRequest` lists it: a request the caller cannot see, a file that is not on it, or
+        another side's identity scan is a 404.
       responses:
         '200':
           description: Signed URL
@@ -7324,33 +7246,6 @@ paths:
           description: Caller is not the requester
         '409':
           description: No draft awaits approval
-  /service-requests/{id}/draft/check:
-    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
-    post:
-      tags: [Services & Support]
-      summary: Check and release a risky draft
-      operationId: checkServiceRequestDraft
-      x-roles: [staff, admin]
-      description: >
-        Risky rent-agreement drafts (rent at least ₹50k, co-owner or POA, NRI/foreign party, or a
-        MOD-7 overlap) wait here until a different services:write operator releases them to the
-        customer or sends them back to the holder with a note.
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/DraftCheckRequest' }
-      responses:
-        '200':
-          description: Checked
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ServiceRequest' }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '403':
-          description: Checker is the holder, a party, or lacks services:write
-        '409':
-          description: No current draft is pending a second check
   /service-requests/{id}/draft/opened:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -11771,22 +11666,6 @@ components:
           type: string
           nullable: true
           description: Optional optimistic guard; 409 stale_decision if the listing status changed.
-    PropertyVerificationOverrideRequestCreate:
-      type: object
-      required: [reason]
-      properties:
-        reason:
-          type: string
-          minLength: 10
-          maxLength: 300
-          description: Staff reason shown to the second approver.
-    PropertyVerificationOverrideApproval:
-      type: object
-      properties:
-        note:
-          type: string
-          maxLength: 2000
-          nullable: true
     ServiceRequestPartyInvite:
       type: object
       required: [role, mobile]
@@ -13202,7 +13081,7 @@ components:
           description: True when any hard broker signal fired, or at least two soft broker signals fired.
         hardBlock:
           type: boolean
-          description: True when a hard broker signal fired and a plain approval must not pass.
+          description: True when a hard broker signal fired; the reviewer sees it as a warning and one staff approval still decides.
         conflict:
           type: boolean
           description: True when this listing has an unresolved cross-owner duplicate conflict.
@@ -14375,7 +14254,6 @@ components:
         approvedByName: { type: [string, 'null'], description: Reviewer who decided the case. }
         claimedByName: { type: [string, 'null'], description: Fresh claim holder; null when unclaimed or stale. }
         claimedByMe: { type: boolean }
-        qaSampledAt: { type: [string, 'null'], format: date-time, description: Hidden from the original approver. }
         appeal: { type: boolean, description: An appeal against this rejection is open — the queue's "Appeal" tag. }
     IdentityClaimState:
       type: object
@@ -14404,12 +14282,12 @@ components:
         liveness: { oneOf: [ { $ref: '#/components/schemas/IdentityLiveness' }, { type: 'null' } ] }
         livenessSource: { type: [string, 'null'], enum: [challenge, client, null], description: '`challenge` when the selfie answered a server-signed pose (see `livenessChallenge`); `client` when only the browser verdict exists.' }
         livenessChallenge: { type: [string, 'null'], enum: [left, right, smile, null], description: Pose the server asked the selfie to show; the reviewer must confirm it on approval. }
-        numberOverridden: { type: boolean, description: The approver confirmed a number that differs from the applicant's entry; such cases always go to QA. }
+        numberOverridden: { type: boolean, description: The approver confirmed a number that differs from the applicant's entry. }
         attemptCount: { type: integer }
         submittedAt: { type: string, format: date-time }
         decidedAt: { type: [string, 'null'], format: date-time }
         reviewerName: { type: [string, 'null'] }
-        approvedByName: { type: [string, 'null'], description: Reviewer who approved the badge; populated on QA rows. }
+        approvedByName: { type: [string, 'null'], description: Reviewer who approved the badge. }
         rejectionReason: { oneOf: [ { $ref: '#/components/schemas/IdentityRejectionReason' }, { type: 'null' } ] }
         rejectionNote: { type: [string, 'null'] }
         revokedAt: { type: [string, 'null'], format: date-time }
@@ -14417,11 +14295,6 @@ components:
         revocationReason: { type: [string, 'null'] }
         claimedByName: { type: [string, 'null'], description: Fresh claim holder; null when unclaimed or stale. }
         claimedByMe: { type: boolean }
-        qaSampledAt: { type: [string, 'null'], format: date-time, description: Hidden from the original approver. }
-        qaReviewedAt: { type: [string, 'null'], format: date-time }
-        qaOutcome: { oneOf: [ { type: string, enum: [confirmed, revoked] }, { type: 'null' } ], description: Hidden from the original approver. }
-        qaReviewedByName: { type: [string, 'null'], description: Hidden from the original approver. }
-        awaitingQa: { type: boolean, description: 'Sampled for QA and not yet checked. Sent to the approver too, whose revoke it blocks (409 identity_qa_open).' }
         filesPurgedAt: { type: [string, 'null'], format: date-time, description: Set once the images were deleted (7 days after the decision). }
         images:
           type: object
@@ -14439,9 +14312,10 @@ components:
               kind: { type: string, enum: [same_document_verified, same_document_claimed, same_person_key] }
               userId: { type: string, format: uuid }
               userName: { type: string }
+              userMobile: { type: string, description: In full }
               reviewId: { type: string, format: uuid }
         appeal: { oneOf: [ { $ref: '#/components/schemas/IdentityAppeal' }, { type: 'null' } ], description: The appeal still describing this case; null when none. }
-        appealCanDecide: { type: boolean, description: An appeal is open and the caller is neither the applicant nor the reviewer who rejected the case. }
+        appealCanDecide: { type: boolean, description: An appeal is open and the caller is not the applicant. }
         appealCanReopen: { type: boolean, description: appealCanDecide and the photos are still stored; a purged case can only be upheld. }
     IdentityApproveRequest:
       type: object
@@ -14452,7 +14326,7 @@ components:
         dob: { type: [string, 'null'], format: date, description: Full date of birth. Exactly one of `dob` or `birthYear` is required. }
         birthYear: { type: [integer, 'null'], minimum: 1900, description: Year-only documents store holderDob as YYYY-01-01 and holderDobYearOnly true. Exactly one of `dob` or `birthYear` is required. }
         poseConfirmed: { type: [boolean, 'null'], description: Required `true` when the case carries a `livenessChallenge` — the selfie shows the requested pose. }
-        numberOverride: { type: [boolean, 'null'], description: 'Required `true` to approve a number that differs from the applicant''s entry; audited and always QA-sampled.' }
+        numberOverride: { type: [boolean, 'null'], description: 'Required `true` to approve a number that differs from the applicant''s entry; audited.' }
         gender: { type: [string, 'null'], enum: [male, female, null], description: 'Gender on the document. When present it replaces the applicant''s profile gender, which is otherwise locked; the change is in the approval audit.' }
     IdentityRejectRequest:
       type: object
@@ -14465,12 +14339,6 @@ components:
       required: [reason]
       properties:
         reason: { type: string, minLength: 10, maxLength: 300 }
-    IdentityQaRequest:
-      type: object
-      required: [outcome]
-      properties:
-        outcome: { type: string, enum: [confirmed, revoked] }
-        reason: { type: [string, 'null'], minLength: 10, maxLength: 300, description: Required when `outcome` is `revoked`. }
     PaymentWebhook:
       type: object
       description: >
@@ -14539,14 +14407,6 @@ components:
           type: [string, 'null']
           enum: [verified, not_found, mismatch, null]
           description: Staff-only MahaRERA lookup result; null until checked or when no RERA ID is quoted.
-        overrideRequest:
-          type: ['null', object]
-          description: Staff-only pending second-approver request, null otherwise.
-          properties:
-            id: { type: string, format: uuid }
-            requestedBy: { type: string, format: uuid }
-            reason: { type: string }
-            at: { type: string, format: date-time }
         signals:
           oneOf:
             - $ref: '#/components/schemas/ListingSignals'
@@ -15647,8 +15507,6 @@ components:
           oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestAmendment' } ]
         draftApproval:
           oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestDraftApproval' } ]
-        draftCheck:
-          oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestDraftCheck' } ]
     ServiceRequestQueueRow:
       type: object
       description: >-
@@ -15664,13 +15522,14 @@ components:
           description: >-
             Only the scalar request fields a row summarises, plus `_state` reduced to the owner and tenant
             names, the flat (`prop`) and the terms.
+        requesterName: { type: [string, 'null'], description: The customer who raised the request. }
+        requesterMobile: { type: [string, 'null'], description: The requester's mobile, in full. }
         assignee: { type: [string, 'null'] }
         assignedToMe: { type: boolean }
         createdAt: { type: string, format: date-time }
         amount: { type: [integer, 'null'], format: int64 }
         sla:
           oneOf: [ { type: 'null' }, { $ref: '#/components/schemas/ServiceRequestSla' } ]
-        draftCheckStatus: { type: [string, 'null'], description: Status of the newest second-check on the draft; null when none was needed }
         policeConfirmed: { type: boolean, description: Police intimation confirmed; read only on completed rows }
         approvedAt: { type: [string, 'null'], format: date-time, description: When the customer approved the draft; read only on approved rent agreements }
     ServiceQueueSummary:
@@ -15706,18 +15565,6 @@ components:
               opened: { type: boolean }
               approved: { type: boolean }
               approvedAt: { type: [string, 'null'], format: date-time }
-    ServiceRequestDraftCheck:
-      type: object
-      properties:
-        version: { type: integer }
-        status: { type: string, enum: [pending, released, sent-back] }
-        reasons:
-          type: array
-          items: { type: string, enum: [rent_ge_50000, co_owner, poa, nri_or_foreign, overlap] }
-        note: { type: [string, 'null'] }
-        sharedBy: { type: [string, 'null'] }
-        checkedBy: { type: [string, 'null'] }
-        checkedAt: { type: [string, 'null'], format: date-time }
     DraftOtpRequest:
       type: object
       required: [partyKey]
@@ -15729,12 +15576,6 @@ components:
       properties:
         approvalRecorded: { type: boolean }
         resendAfterSeconds: { type: [integer, 'null'] }
-    DraftCheckRequest:
-      type: object
-      required: [decision]
-      properties:
-        decision: { type: string, enum: [release, send-back] }
-        note: { type: [string, 'null'], maxLength: 500 }
     ServiceRequestPoliceIntimation:
       type: object
       properties:
@@ -18901,7 +18742,7 @@ components:
         action: { type: string, example: property.approve }
         entity: { type: string, example: property }
         entityId: { type: string }
-        checker: { type: [string, 'null'], description: 'Reserved and always null today: the decider is `actor`, and an override second approver is its own `override.approved` row.' }
+        checker: { type: [string, 'null'], description: 'Reserved and always null today: the decider is `actor`.' }
         at: { type: string, format: date-time }
         metadata: { type: object, additionalProperties: true }
     ClientErrorReport:

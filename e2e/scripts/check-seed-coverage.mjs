@@ -26,7 +26,7 @@ const WAIVED = new Map([
   ['internal_notes', 'written by staff on a listing or a user'],
   ['staff_invites', 'written by the invite flow'],
   ['admin_bootstrap_runs', 'written by the single-admin recovery bootstrap'],
-  ['property_verification_override_requests', 'written by the property verification override maker-checker flow'],
+  ['property_verification_override_requests', 'no writer remains; kept only so existing rows survive'],
   ['identity_conflicts', 'written when an identity submit hits the dedup 409'],
   ['identity_appeals', 'written when a user asks for a second look at a rejected identity check'],
   ['identity_storage_deletes', 'holds only storage deletes that failed and await retry'],

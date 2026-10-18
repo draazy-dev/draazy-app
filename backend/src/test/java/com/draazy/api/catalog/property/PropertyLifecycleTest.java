@@ -22,7 +22,7 @@ class PropertyLifecycleTest {
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
     private final PropertyLifecycle lifecycle =
             new PropertyLifecycle(permissions, events,
-                    (actor, property, secondApprovalSatisfied) -> {
+                    (actor, property) -> {
                     }, liveGate, notifier, settings);
     private final AuthPrincipal staff = new AuthPrincipal(UUID.randomUUID(), "staff", null, true, false);
     private Property property;
@@ -108,6 +108,12 @@ class PropertyLifecycleTest {
         property.setStatus(PropertyStatus.REJECTED);
         lifecycle.message(owner, property, false);
         assertThat(property.getStatus()).isEqualTo(PropertyStatus.REJECTED);
+    }
+
+    @Test void oneStaffMemberReopensARejectedListing() {
+        property.setStatus(PropertyStatus.REJECTED);
+        lifecycle.reenterPending(staff, property);
+        assertThat(property.getStatus()).isEqualTo(PropertyStatus.PENDING);
     }
 
     @Test void revokedWriteGrantCannotPublishOrStart() {

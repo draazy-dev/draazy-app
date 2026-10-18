@@ -12,14 +12,11 @@ import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.moderation.verification.ApprovalGate;
-import com.draazy.api.moderation.verification.PropertyOverrideRequest;
-import com.draazy.api.moderation.verification.PropertyOverrideRequestRepository;
 import com.draazy.api.moderation.verification.PropertyReview;
 import com.draazy.api.moderation.verification.PropertyReviewRepository;
 import com.draazy.api.moderation.verification.ReviewChecklistItem;
 import com.draazy.api.moderation.verification.ReviewReasonCodes;
 import com.draazy.api.moderation.verification.VerificationCases;
-import com.draazy.api.moderation.signal.ListingSignalService;
 import com.draazy.api.security.AuthPrincipal;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -41,22 +38,17 @@ public class PropertyModerationService {
     private final PropertyLifecycle lifecycle;
     private final VerificationCases cases;
     private final PropertyReviewRepository reviews;
-    private final ListingSignalService signals;
-    private final PropertyOverrideRequestRepository overrideRequests;
     private final ReferralTriggers referralTriggers;
 
     public PropertyModerationService(PropertyRepository properties, AuditService audit,
             Notifier notifier, PropertyLifecycle lifecycle, VerificationCases cases,
-            PropertyReviewRepository reviews, ListingSignalService signals,
-            PropertyOverrideRequestRepository overrideRequests, ReferralTriggers referralTriggers) {
+            PropertyReviewRepository reviews, ReferralTriggers referralTriggers) {
         this.properties = properties;
         this.audit = audit;
         this.notifier = notifier;
         this.lifecycle = lifecycle;
         this.cases = cases;
         this.reviews = reviews;
-        this.signals = signals;
-        this.overrideRequests = overrideRequests;
         this.referralTriggers = referralTriggers;
     }
 
@@ -73,10 +65,6 @@ public class PropertyModerationService {
         boolean clearingApprovedRecheck = PropertyStatus.APPROVED.equals(status)
                 && PropertyStatus.APPROVED.equals(from) && property.isRecheckPending();
         if (PropertyStatus.APPROVED.equals(status)) {
-            if (PropertyStatus.REJECTED.equals(from)) {
-                throw new ConflictException("second_approver_required",
-                        "A final rejection requires a second staff approver to approve.");
-            }
 
             // Before anything is written, so a refusal costs the moderator nothing to retry.
             lifecycle.requireFiled(property);
@@ -84,9 +72,6 @@ public class PropertyModerationService {
             ReviewReasonCodes.require("reject", reasonCode, reason);
         } else if (property.isArchived() || PropertyStatus.SOLD.equals(from) || PropertyStatus.RENTED.equals(from)) {
             throw new ConflictException("Restore or reopen this listing first");
-        } else if (PropertyStatus.REJECTED.equals(from)) {
-            throw new ConflictException("second_approver_required",
-                    "A final rejection requires a second staff approver to reopen.");
         }
         requireExpected(from, expectedStatus, clearingApprovedRecheck);
         if (PropertyStatus.APPROVED.equals(status) && PropertyStatus.APPROVED.equals(from) && !clearingApprovedRecheck) {
@@ -100,12 +85,14 @@ public class PropertyModerationService {
             if (!property.isArchived() && (PropertyStatus.SOLD.equals(from) || PropertyStatus.RENTED.equals(from))) {
                 lifecycle.reenterPending(actor, property);
             }
+
+            // Not reenterPending: that resets the checklist, and an approval must stand on the ticks already made.
+            if (PropertyStatus.REJECTED.equals(from)) {
+                property.revertToPending();
+            }
             PropertyReview review = cases.ensure(property.getId(), property.getDeal());
             ApprovalGate.require(review, property);
-            if (clearingApprovedRecheck) {
-                requireSignalAlreadyOverridden(property);
-            } else {
-                requireNoSecondApproverBlock(property);
+            if (!clearingApprovedRecheck) {
                 if (review.getDecidedAt() == null || !PropertyStatus.APPROVED.equals(review.getStatus())) {
                     review.decide(PropertyStatus.APPROVED, actor.userId().toString(), reason, null);
                     reviews.saveAndFlush(review);
@@ -122,6 +109,9 @@ public class PropertyModerationService {
             referralTriggers.listingTakenDown(property.getId());
         } else {
             lifecycle.reenterPending(actor, property);
+            if (PropertyStatus.REJECTED.equals(from)) {
+                lifecycle.announceReopened(property);
+            }
         }
         property.clearRecheck();
         audit.record(actor, "property.status", "property", id, "from", from, "to", property.getStatus(),
@@ -149,10 +139,6 @@ public class PropertyModerationService {
     public Property flag(AuthPrincipal actor, String id, String reason) {
         Property property = load(id);
         lifecycle.requireChecker(actor, property);
-        if (PropertyStatus.REJECTED.equals(property.getStatus())) {
-            throw new ConflictException("second_approver_required",
-                    "A final rejection requires a second staff approver to reopen.");
-        }
 
         String from = property.getStatus();
         property.setStatus(PropertyStatus.FLAGGED);
@@ -217,21 +203,6 @@ public class PropertyModerationService {
                     return snapshot;
                 })
                 .orElseGet(Map::of);
-    }
-
-    /** An approval that needed no second approver was made with no hard signal, so one standing now is new. */
-    private void requireSignalAlreadyOverridden(Property property) {
-        if (!overrideRequests.existsByPropertyIdAndActionAndStatus(property.getId(),
-                PropertyOverrideRequest.APPROVE, PropertyOverrideRequest.APPROVED)) {
-            requireNoSecondApproverBlock(property);
-        }
-    }
-
-    private void requireNoSecondApproverBlock(Property property) {
-        if (signals.hasHardSignal(property.getId())) {
-            throw new ConflictException("second_approver_required",
-                    "A hard broker signal requires a second staff approver.");
-        }
     }
 
     /** The desk's read of one listing by id or slug, archived rows included; no lock, no write. */

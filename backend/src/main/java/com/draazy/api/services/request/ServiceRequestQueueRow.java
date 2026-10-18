@@ -10,12 +10,13 @@ public record ServiceRequestQueueRow(
         String type,
         ServiceRequestStatus status,
         Map<String, Object> details,
+        String requesterName,
+        String requesterMobile,
         String assignee,
         boolean assignedToMe,
         Instant createdAt,
         Long amount,
         ServiceRequestDto.Sla sla,
-        String draftCheckStatus,
         boolean policeConfirmed,
         Instant approvedAt) {
 }

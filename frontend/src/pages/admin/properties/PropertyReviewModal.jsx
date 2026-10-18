@@ -6,8 +6,7 @@ import {
 } from 'lucide-react';
 import {
   startPropertyReview, beginPropertyReview,
-  setPropertyReviewChecklistItem, addPropertyReviewMessage, decidePropertyReview,
-  requestPropertyReviewOverride, approvePropertyReviewOverride, recordPropertyReraCheck,
+  setPropertyReviewChecklistItem, addPropertyReviewMessage, decidePropertyReview, recordPropertyReraCheck,
 } from '../../../services/propertyReviewService.js';
 import { setListingStatus } from '../../../services/propertyService.js';
 import { getLocality } from '../../../services/localityService.js';
@@ -71,8 +70,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   const [decisionMode, setDecisionMode] = useState(null);
   const [reasonCode, setReasonCode] = useState('');
   const [reasonNote, setReasonNote] = useState('');
-  const [overrideReason, setOverrideReason] = useState('');
-  const [secondApprovalNeeded, setSecondApprovalNeeded] = useState(false);
   const [msg, setMsg] = useState('');
   const [internalNote, setInternalNote] = useState('');
   // Decisions stay disabled while their server write is pending.
@@ -139,8 +136,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     setDecisionMode(null);
     setReasonCode('');
     setReasonNote('');
-    setOverrideReason('');
-    setSecondApprovalNeeded(false);
     setMsg('');
     setInternalNote('');
     setWaOpen(false);
@@ -272,21 +267,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
       try { await reloadCase(); } catch { onRefresh?.(); }
       return;
     }
-    if (err?.code === 'second_approver_required' || err?.code === 'override_request_pending') {
-      setSecondApprovalNeeded(true);
-      try { await reloadCase(); } catch { onRefresh?.(); }
-      toast(err?.code === 'override_request_pending'
-        ? 'Second approval is already pending — refreshed'
-        : 'This listing needs second approval before it can go live', 'error');
-      return;
-    }
-    if (err?.code === 'override_request_decided' || err?.code === 'override_not_required') {
-      try { await reloadCase(); } catch { onRefresh?.(); }
-      toast(err?.code === 'override_request_decided'
-        ? 'This second approval was already decided — refreshed'
-        : 'Second approval is no longer required — refreshed', 'error');
-      return;
-    }
     toast(err?.message || fallback, 'error');
   };
 
@@ -363,31 +343,17 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
     }
   };
 
-  const requestOverride = async () => {
-    if (busy || !overrideReason.trim()) return;
+  // The status route reopens the case and tells the owner in one step, so no separate case write follows.
+  const reopenCase = async () => {
+    if (busy) return;
     setBusy(true);
     try {
-      setThread(await requestPropertyReviewOverride(pid(review), overrideReason.trim()));
-      setOverrideReason('');
-      toast(thread?.status === 'rejected' ? 'Reopen requested' : 'Second approval requested', 'success');
+      await setListingStatus(pid(review), 'pending', { expectedStatus: 'rejected' });
+      handleClose();
+      toast('Listing reopened for review — owner notified', 'success');
       onRefresh();
     } catch (err) {
-      await handleDecisionError(err, thread?.status === 'rejected' ? 'Could not request reopen' : 'Could not request second approval');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const approveOverride = async () => {
-    const requestId = thread?.overrideRequest?.id;
-    if (busy || !requestId) return;
-    setBusy(true);
-    try {
-      setThread(await approvePropertyReviewOverride(pid(review), requestId));
-      toast(thread?.status === 'rejected' ? 'Reopen approved' : 'Second approval recorded', 'success');
-      onRefresh();
-    } catch (err) {
-      await handleDecisionError(err, thread?.status === 'rejected' ? 'Could not approve reopen' : 'Could not approve as second reviewer');
+      await handleDecisionError(err, 'Could not reopen this listing');
     } finally {
       setBusy(false);
     }
@@ -488,19 +454,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
   const badgeRequestedAt = liveBadgeCase ? liveBadgeCase.requestedAt : review.ownershipRequestedAt;
   const seeksBadge = liveBadgeCase ? Boolean(liveBadgeCase.requestedAt && !liveBadgeCase.verified) : seeksOwnershipBadge(review);
   const trackBadgeCase = (verification) => setBadgeCase({ id: pid(review), requestedAt: verification.requestedAt, verified: verification.verified });
-  const overrideCopy = caseRejected ? {
-    requestHeading: 'Request reopen',
-    requestPlaceholder: 'Why should this final reject be reopened?',
-    pending: 'Awaiting second reviewer to reopen',
-    approve: 'Approve reopen as second reviewer',
-    label: 'Reopen requested:',
-  } : {
-    requestHeading: 'Request second approval',
-    requestPlaceholder: 'Why should this hard signal be overridden?',
-    pending: 'Awaiting second approver',
-    approve: 'Approve as second reviewer',
-    label: 'Second approval requested:',
-  };
 
   const sections = [
     ['overview', 'Overview'],
@@ -795,7 +748,12 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
               <CheckCircle className="h-4 w-4 text-brand-teal" /> Decision
             </div>
             {caseRejected ? (
-              <p className="text-sm text-gray-300">This listing was not approved. Reopening it needs a second reviewer.</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-sm text-gray-300">This listing was not approved.</p>
+                {hasPermission(user, 'properties:moderate') ? (
+                  <button type="button" onClick={reopenCase} disabled={busy || maker} title={maker ? MAKER_REASON : undefined} className="dz-btn dz-btn-primary min-h-[44px]">Reopen for review</button>
+                ) : null}
+              </div>
             ) : maker ? (
               <p data-testid="maker-notice" role="note" className="text-sm font-semibold text-amber-300">{MAKER_REASON}</p>
             ) : (
@@ -844,27 +802,6 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                     {decisionMode === 'reject' ? 'Reject final' : 'Send needs info'}
                   </button>
                 </div>
-              </div>
-            ) : null}
-            {(caseRejected || secondApprovalNeeded || thread.overrideRequest) ? (
-              <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-3 text-sm text-amber-100">
-                {thread.overrideRequest?.requestedBy && String(thread.overrideRequest.requestedBy) === String(user?.id) ? (
-                  <p className="font-semibold">{overrideCopy.pending}</p>
-                ) : thread.overrideRequest ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold">{overrideCopy.label}</span>
-                    <span>{thread.overrideRequest.reason}</span>
-                    <button type="button" onClick={approveOverride} disabled={busy} className="dz-btn dz-btn-primary dz-btn-sm">{overrideCopy.approve}</button>
-                  </div>
-                ) : (
-                  <>
-                    <label className="block">
-                      <span className="mb-1 block font-semibold">{overrideCopy.requestHeading}</span>
-                      <textarea value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} rows={2} className="dz-input resize-none" placeholder={overrideCopy.requestPlaceholder} />
-                    </label>
-                    <button type="button" onClick={requestOverride} disabled={busy || !overrideReason.trim()} className="dz-btn dz-btn-primary mt-2">{overrideCopy.requestHeading}</button>
-                  </>
-                )}
               </div>
             ) : null}
           </div>

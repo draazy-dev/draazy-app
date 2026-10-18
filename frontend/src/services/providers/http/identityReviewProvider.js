@@ -14,8 +14,6 @@ function mapReview(row) {
     decidedAt: parseTime(row?.decidedAt),
     filesPurgedAt: parseTime(row?.filesPurgedAt),
     revokedAt: parseTime(row?.revokedAt),
-    qaSampledAt: parseTime(row?.qaSampledAt),
-    qaReviewedAt: parseTime(row?.qaReviewedAt),
   };
 }
 
@@ -66,10 +64,6 @@ export async function rejectIdentityReview(id, payload) {
 
 export async function revokeIdentityReview(id, reason) {
   return mapReview(await post(`${reviewPath(id)}/revoke`, { reason }));
-}
-
-export async function qaIdentityReview(id, payload) {
-  return mapReview(await post(`${reviewPath(id)}/qa`, payload));
 }
 
 export async function decideIdentityAppeal(id, outcome) {

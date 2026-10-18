@@ -118,9 +118,7 @@
   written to the timeline and audit, and the customer is told, so the desk can ask again.
   **Draft approvals** (MC-4/MC-8). Every executing party approves the current draft version:
   in-app for account holders, by OTP for inline parties (witnesses are not asked). Any rejection
-  sends it back to changes-requested, and a new version resets every approval. A risky draft
-  (rent ≥ ₹50k, a co-owner or POA, an NRI/foreign party, an overlap) stays hidden from the customer
-  until a different `services:write` operator releases it or sends it back.
+  sends it back to changes-requested, and a new version resets every approval. A draft the holder shares goes to the customer at once; no second operator checks it first.
   **Police intimation** (LEG-2). After the registered copy, the tracker links the Pune City and
   Pimpri-Chinchwad Police portals; the step stays pending until ops records the owner's
   confirmation (optional reference number and date).

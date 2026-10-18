@@ -137,7 +137,7 @@ class ReviewLifecycleTest extends AbstractApiTest {
                 p.getId())).isEqualTo("approved");
     }
 
-    @Test void deskApprovalStillNeedsTheSecondApproverOnAHardSignal() throws Exception {
+    @Test void deskApprovalNeedsOneStaffMemberOnAHardSignal() throws Exception {
         User staff = user("9800011920", "staff");
         User reporter = user("9800011921", "buyer");
         Property p = listing(user("9800011922", "owner"));
@@ -150,12 +150,11 @@ class ReviewLifecycleTest extends AbstractApiTest {
         mvc.perform(post("/properties/" + p.getId() + "/verification/decision")
                 .header("Authorization", bearer(staff)).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"decision\":\"approve\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("second_approver_required"));
+                .andExpect(status().isOk());
 
         properties.flush();
         assertThat(jdbc.queryForObject("select status from properties where id= ?", String.class,
-                p.getId())).isEqualTo("pending");
+                p.getId())).isEqualTo("approved");
     }
 
     @Test void staffOwnerCannotVerifyOrPublishTheirOwnListing() throws Exception {

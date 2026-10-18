@@ -49,3 +49,4 @@ Nothing.
 | 327 | Send the ID number at identity submit | No; appeals go through `POST /me/verification/identity/appeal` |
 | 328 | Access token in web storage | Accepted: refresh token is HttpOnly and the strict CSP is the control |
 | 329 | API fuzzer (Schemathesis) | No; `BoundaryValidationTest` covers it |
+| 330 | Second staff check on approvals (identity QA, property overrides, held drafts, appeals)? | No: one staff decision is final. Refunds keep two-person approval; staff still can't act on their own listing, case, appeal or uploaded registered copy |

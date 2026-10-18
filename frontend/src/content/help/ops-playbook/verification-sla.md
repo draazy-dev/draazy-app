@@ -59,7 +59,7 @@ The SLA panel is green at 90% or better, amber from 75% to 89%, and rose below 7
 | `pending` | Waiting, in review, or awaiting owner info | Hidden from public search |
 | `approved` | Published | Visible unless archived |
 | `needs_info` review | Staff asked for a correction | Listing stays `pending`; owner sees the reason |
-| `rejected` | Final refusal | Hidden; reopen needs second reviewer override |
+| `rejected` | Refusal | Hidden; **Reopen for review** returns it to `pending` |
 | `flagged` | Unsafe or disputed | Hidden until the flag is cleared or archived |
 | `archived` | Soft-deleted | Hidden; restore returns to `pending` |
 
@@ -68,7 +68,7 @@ The SLA panel is green at 90% or better, amber from 75% to 89%, and rose below 7
 1. Open the listing from **To verify** or **Re-checks**.
 2. Check the photos, duplicate result, details, address and locality.
 3. Tick every checklist item before approving. The **Approve** button stays locked until the checklist is complete, and the server rejects incomplete approvals.
-4. Read fraud signals before deciding. Hard signals require the second-approver path; do not approve directly.
+4. Read fraud signals before deciding. Hard signals stay visible as warnings; weigh them, then decide yourself.
 5. Add an internal note when the decision depends on evidence not visible in the fields.
 6. Decide with **Approve**, **Needs info**, or **Reject**.
 
@@ -76,7 +76,7 @@ The SLA panel is green at 90% or better, amber from 75% to 89%, and rose below 7
 
 ### Approve listing
 
-Use **Approve** only when the checklist is complete, no unresolved duplicate exists, the address and locality are believable, and any hard-signal override has a different second reviewer.
+Use **Approve** only when the checklist is complete, you have weighed any duplicate or broker signal, and the address and locality are believable. One approval is final; you cannot approve a listing you posted or own.
 
 ### Send needs info
 
@@ -86,7 +86,7 @@ The hourly sweep sends owner reminders after 3 days and 7 days. If there is no r
 
 ### Reject listing
 
-Use **Reject** for non-fixable or unsafe listings. A reason code is required. A rejected listing does not reopen just because the owner replies; use the second-reviewer override when a rejected case must re-enter review.
+Use **Reject** for non-fixable or unsafe listings. A reason code is required. A rejected listing does not reopen just because the owner replies; use **Reopen for review** when a rejected case must re-enter review.
 
 ### Work re-checks while live
 
@@ -99,14 +99,14 @@ Use **Keep this, archive the rest** only when the cluster really points to the s
 ## Never do in listing verification
 
 - Do not approve with an unticked checklist.
-- Do not approve a hard-signal case through your own override.
+- Do not approve a listing you posted or own.
 - Do not use **Reject** for a fixable photo, address or document gap.
 - Do not publish a staff-posted listing before the owner confirms it.
 - Do not treat **Follow-up** as a breach queue; send the owner nudge and record the outreach.
 
 ## Escalation path
 
-Escalate suspected organised fraud, legal or police references, minors, media contact, or repeated override attempts through the ticket ladder. Record the listing id, reason code, signals and action already taken.
+Escalate suspected organised fraud, legal or police references, minors, media contact, or repeated attempts to reopen rejected listings through the ticket ladder. Record the listing id, reason code, signals and action already taken.
 
 ## Related
 

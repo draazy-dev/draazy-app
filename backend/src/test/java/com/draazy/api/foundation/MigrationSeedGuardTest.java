@@ -25,7 +25,9 @@ class MigrationSeedGuardTest {
     private static final Path REFERENCE_SEED = MIGRATIONS.resolve("R__DML_seed_reference_data.sql");
 
     // Versions whose inserts are one-time backfills, each with why losing them to the reset costs nothing.
-    private static final Map<String, String> BACKFILLS = Map.of();
+    private static final Map<String, String> BACKFILLS = Map.of(
+            "26.10.36",
+            "Inserts one timeline row per held draft it releases; a reset database has no held drafts to release.");
 
     // Tables whose rows a versioned migration once seeded, and which the repeatable seed now owns alone.
     // Keyed by table because the seed owns these rows with no version to point at.

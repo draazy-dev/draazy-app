@@ -262,9 +262,7 @@ for pending). `reason_code` is required for `needs_info` and `rejected` (values 
 `ReviewReasonCodes`, CHECK-backed); `properties.info_requested_at` (V81) starts the 3/7/14-day
 reminder-and-archive clock (the daily `needs-info` job). Listing progress is derived from timestamp facts on
 `properties` (`claim_link_sent_at`, `claim_link_opened_at`, `owner_confirmed_at`,
-`review_started_at`, `info_requested_at`) — see `docs/flows/admin/property-verification.md` §7. A duplicate or hard broker signal is approved only through
-`property_override_requests` (V68): a requester and a different approver, both staff, neither the
-owner. Ownership evidence types add `share_certificate` (V66); a rent badge needs any one document,
+`review_started_at`, `info_requested_at`) — see `docs/flows/admin/property-verification.md` §7. A duplicate or hard broker signal is a warning on the review, not an approval block. Ownership evidence types add `share_certificate` (V66); a rent badge needs any one document,
 a sale badge one title document. Aadhaar and PAN are no longer accepted as evidence.
 
 ## Catalogue query notes (`PropertyRepository`)

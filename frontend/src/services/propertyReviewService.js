@@ -81,18 +81,6 @@ export async function decidePropertyReview(propertyId, decision, options) {
   return (await provider()).decidePropertyReview(propertyId, decision, options);
 }
 
-export async function requestPropertyReviewOverride(propertyId, reason) {
-  return (await provider()).requestPropertyReviewOverride(propertyId, reason);
-}
-
-export async function approvePropertyReviewOverride(propertyId, requestId, note) {
-  return (await provider()).approvePropertyReviewOverride(propertyId, requestId, note);
-}
-
-export async function propertyReviewOverrideAvailable() {
-  return Boolean((await provider()).OVERRIDE_REQUESTS_ENABLED);
-}
-
 export async function listMyPropertyReviews(params) {
   return (await provider()).listMyPropertyReviews(params);
 }

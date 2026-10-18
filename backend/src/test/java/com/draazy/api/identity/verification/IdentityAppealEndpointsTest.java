@@ -132,20 +132,32 @@ class IdentityAppealEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.appeals").value(1));
         detail(other, v).andExpect(jsonPath("$.appeal.note").value(NOTE))
                 .andExpect(jsonPath("$.appealCanDecide").value(true));
-        detail(rejecter, v).andExpect(jsonPath("$.appealCanDecide").value(false));
+        detail(rejecter, v).andExpect(jsonPath("$.appealCanDecide").value(true));
     }
 
     @Test
-    @DisplayName("the reviewer who rejected the case cannot decide its appeal")
-    void sameReviewerRefused() throws Exception {
+    @DisplayName("the reviewer who rejected the case may decide its appeal")
+    void rejectingReviewerMayUphold() throws Exception {
         User applicant = person("9849100014", Roles.Wire.BUYER);
         User rejecter = person("9849100015", Roles.Wire.ADMIN);
         IdentityVerification v = rejected(applicant, rejecter);
         appeal(applicant, NOTE).andExpect(status().isCreated());
 
-        decide(rejecter, v, "uphold").andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value(ErrorCodes.IDENTITY_APPEAL_SAME_REVIEWER));
-        decide(rejecter, v, "reopen").andExpect(status().isForbidden());
+        decide(rejecter, v, "uphold").andExpect(status().isOk());
+        assertThat(appealStatus(v)).isEqualTo("upheld");
+    }
+
+    @Test
+    @DisplayName("staff cannot decide an appeal on their own identity case")
+    void ownCaseRefused() throws Exception {
+        User staffApplicant = person("9849100014", Roles.Wire.ADMIN);
+        User rejecter = person("9849100015", Roles.Wire.ADMIN);
+        IdentityVerification v = rejected(staffApplicant, rejecter);
+        appeal(staffApplicant, NOTE).andExpect(status().isCreated());
+
+        decide(staffApplicant, v, "uphold").andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value(ErrorCodes.IDENTITY_APPEAL_OWN_CASE));
+        decide(staffApplicant, v, "reopen").andExpect(status().isForbidden());
         assertThat(appealStatus(v)).isEqualTo("open");
         assertThat(verifications.findById(v.getId()).orElseThrow().getStatus())
                 .isEqualTo(VerificationStatuses.REJECTED);

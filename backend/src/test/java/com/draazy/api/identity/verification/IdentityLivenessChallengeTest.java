@@ -21,11 +21,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 
-@TestPropertySource(properties = "draazy.identity.qa-sample-rate=0.0")
 class IdentityLivenessChallengeTest extends AbstractApiTest {
 
     private static final String PAN = "ABCDE1234F";
@@ -92,11 +90,10 @@ class IdentityLivenessChallengeTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.livenessSource").value("challenge"))
                 .andExpect(jsonPath("$.numberOverridden").value(false));
-        assertThat(caseOf(subject).getQaSampledAt()).isNull();
     }
 
     @Test
-    void numberMismatchIsASoftStopAndTheOverrideAlwaysGoesToQa() throws Exception {
+    void numberMismatchIsASoftStopUntilTheReviewerOverrides() throws Exception {
         User subject = user("9830012006", "buyer");
         User reviewer = user("9830012007", Roles.Wire.ADMIN);
         mvc.perform(submission(subject, PAN).param("challenge", liveness.issue(subject.getId()).token()))
@@ -113,7 +110,6 @@ class IdentityLivenessChallengeTest extends AbstractApiTest {
 
         IdentityVerification v = caseOf(subject);
         assertThat(v.isNumberOverridden()).isTrue();
-        assertThat(v.getQaSampledAt()).as("an overridden number always gets a second look").isNotNull();
         assertThat(jdbc.queryForObject("""
                 select metadata ->> 'numberOverridden' from audit_log
                  where action = 'identity.verification.approved' and entity_id = ?
@@ -121,7 +117,7 @@ class IdentityLivenessChallengeTest extends AbstractApiTest {
     }
 
     @Test
-    void submissionWithoutAChallengeIsAlwaysSampledForQa() throws Exception {
+    void submissionWithoutAChallengeIsApprovedWithClientLiveness() throws Exception {
         User subject = user("9830012008", "buyer");
         User reviewer = user("9830012009", Roles.Wire.ADMIN);
         mvc.perform(submission(subject, PAN)).andExpect(status().isAccepted());
@@ -129,7 +125,6 @@ class IdentityLivenessChallengeTest extends AbstractApiTest {
         approve(reviewer, caseOf(subject).getId(), PAN, "")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.livenessSource").value("client"));
-        assertThat(caseOf(subject).getQaSampledAt()).isNotNull();
     }
 
     @Test

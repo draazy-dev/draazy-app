@@ -21,10 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.ResultActions;
 
-@TestPropertySource(properties = "draazy.identity.qa-sample-rate=0.0")
 class IdentityReviewSlimTest extends AbstractApiTest {
 
     private static final String PAN = "ABCDE1234F";
@@ -163,7 +161,7 @@ class IdentityReviewSlimTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.overdue").value(overdueBefore))
                 .andExpect(jsonPath("$.decided").value(decidedBefore))
                 .andExpect(jsonPath("$.mine").value(1))
-                .andExpect(jsonPath("$.qa").value(0));
+                .andExpect(jsonPath("$.qa").doesNotExist());
         mvc.perform(get(Routes.Moderation.IDENTITY_REVIEW_SUMMARY).header(HttpHeaders.AUTHORIZATION, bearer(other)))
                 .andExpect(jsonPath("$.mine").value(0));
     }

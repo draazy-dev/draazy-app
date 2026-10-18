@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { API, authHeaders } from './liveAuth.js';
-import { ACTORS, STAFF } from '../fixtures/live.js';
+import { STAFF } from '../fixtures/live.js';
 
 export const REVIEW_CHECKLIST = [
   'Photos are real and match the listing',
@@ -44,14 +44,6 @@ export async function tickChecklistWithFetch(id, headers, { api = API } = {}) {
   }
 }
 
-const subjectOf = (headers) =>
-  JSON.parse(Buffer.from(headers.authorization.split(' ')[1].split('.')[1], 'base64url').toString()).sub;
-
-async function checkerFor(makerHeaders) {
-  const staff = await authHeaders(STAFF.rental);
-  return subjectOf(staff) === subjectOf(makerHeaders) ? authHeaders(ACTORS.admin) : staff;
-}
-
 // PATCH /status refuses to overturn a non-pending listing unless the caller names the status it saw.
 async function withExpectedStatus(id, headers, api, body) {
   const seen = await fetch(`${api}/properties/${id}`, { headers });
@@ -59,47 +51,21 @@ async function withExpectedStatus(id, headers, api, body) {
   return expectedStatus ? { ...body, expectedStatus } : body;
 }
 
-async function overrideWithFetch(id, headers, api) {
-  const filed = await jsonResult(await fetch(`${api}/properties/${id}/verification/override-requests`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ reason: 'e2e fixture reuses shared test photos and addresses' }),
-  }));
-  expect(filed.status, `filing override for ${id}: ${filed.text}`).toBe(201);
-  return jsonResult(await fetch(
-    `${api}/properties/${id}/verification/override-requests/${filed.json.overrideRequest.id}/approve`,
-    { method: 'POST', headers: await checkerFor(headers), body: JSON.stringify({}) },
-  ));
-}
-
 export async function approveListing(request, id, headers, { reason, api = API } = {}) {
   await tickChecklist(request, id, headers, { api });
-  const res = await request.patch(`${api}/properties/${id}/status`, {
+  return request.patch(`${api}/properties/${id}/status`, {
     headers,
     data: await withExpectedStatus(id, headers, api, { status: 'approved', ...(reason ? { reason } : {}) }),
-  });
-  if (res.status() !== 409 || !(await res.text()).includes('second_approver_required')) return res;
-  const filed = await request.post(`${api}/properties/${id}/verification/override-requests`, {
-    headers,
-    data: { reason: 'e2e fixture reuses shared test photos and addresses' },
-  });
-  expect(filed.status(), `filing override for ${id}: ${await filed.text()}`).toBe(201);
-  const { overrideRequest } = await filed.json();
-  return request.post(`${api}/properties/${id}/verification/override-requests/${overrideRequest.id}/approve`, {
-    headers: await checkerFor(headers),
-    data: {},
   });
 }
 
 export async function approveListingWithFetch(id, headers, { reason, api = API } = {}) {
   await tickChecklistWithFetch(id, headers, { api });
-  const res = await jsonResult(await fetch(`${api}/properties/${id}/status`, {
+  return jsonResult(await fetch(`${api}/properties/${id}/status`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify(await withExpectedStatus(id, headers, api, { status: 'approved', ...(reason ? { reason } : {}) })),
   }));
-  if (res.status !== 409 || !res.text.includes('second_approver_required')) return res;
-  return overrideWithFetch(id, headers, api);
 }
 
 export async function rejectListing(request, id, headers, { reasonCode = 'wrong_details', reason, api = API } = {}) {

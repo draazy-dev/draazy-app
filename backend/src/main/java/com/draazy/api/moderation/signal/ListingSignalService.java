@@ -93,16 +93,6 @@ public class ListingSignalService {
         return out;
     }
 
-    @Transactional(readOnly = true)
-    public boolean hasHardSignal(UUID propertyId) {
-        Property property = em.find(Property.class, propertyId);
-        if (property == null) {
-            return false;
-        }
-        ListingSignals listingSignals = forProperties(List.of(property)).getOrDefault(propertyId, ListingSignals.NONE);
-        return listingSignals.hardBlock() || listingSignals.conflict();
-    }
-
     private Set<UUID> photoMatches(List<UUID> ids) {
         Query query = em.createNativeQuery("""
                 select mh.property_id, mh.hash, oh.hash

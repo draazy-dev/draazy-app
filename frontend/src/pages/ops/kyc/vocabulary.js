@@ -54,7 +54,6 @@ export const OVERDUE_HOURS = 48;
 
 const ERROR_MESSAGES = {
   identity_case_claim_limit: `You already hold ${CLAIM_HOLD_LIMIT} cases — release one first.`,
-  identity_qa_open: 'This sampled approval is still awaiting QA review.',
   identity_pose_unconfirmed: 'Confirm the requested pose before approving.',
 };
 
@@ -76,8 +75,3 @@ export function elapsed(at) {
   const tone = hours >= OVERDUE_HOURS ? 'breach' : hours >= WARN_HOURS ? 'warn' : 'ok';
   return { text, tone };
 }
-
-export const isOpenQa = (detail) => detail?.status === 'verified' && Boolean(detail?.awaitingQa);
-
-// The server withholds the sample date from the approver alone (maker-checker).
-export const isOwnQaApproval = (detail) => isOpenQa(detail) && !detail.qaSampledAt;

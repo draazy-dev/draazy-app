@@ -78,7 +78,7 @@ seed constants. Locality demand now lives on Supply Gap, measured prices on Pric
 ### 5.4a Funnel tab (`GET /admin/analytics/funnel?days=`, `AdminFunnelService`)
 Weekly (IST, Monday-start, zero-filled) counts of five stages over the window (1–365 days, default 90):
 - **Posted** — non-archived `properties.created_at`.
-- **Approved** — the first approval audit row per non-archived listing: `property.status` → `approved`, or the console's case-file / second-approver `property.verification.decision` = `approve` (re-approvals don't recount).
+- **Approved** — the first approval audit row per non-archived listing: `property.status` → `approved`, or the console's case-file `property.verification.decision` = `approve` (re-approvals don't recount).
 - **Contacts** — `contact_requests.created_at` (requests sent; there is no reliable approval timestamp).
 - **Visits** — `visits.created_at`. **Deals** — `deals.closed_at` where `status = 'closed'`.
 

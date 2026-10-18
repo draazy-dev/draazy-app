@@ -218,11 +218,10 @@ class VerificationThreadTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a hard broker signal needs a second staff approver")
-    void hardSignalApprovalNeedsSecondApprover() throws Exception {
+    @DisplayName("one staff member approves a listing with a hard broker signal; the signal stays visible")
+    void hardSignalApprovalNeedsOneStaffMember() throws Exception {
         User owner = user("9820000531", Roles.Wire.OWNER);
         User ops = user("9820000532", Roles.Wire.STAFF);
-        User peer = user("9820000533", Roles.Wire.STAFF);
         User poster = user("9820000534", Roles.Wire.STAFF);
         User reporter = user("9820000535", Roles.Wire.BUYER);
         Property listing = listing(owner, "rent");
@@ -235,70 +234,27 @@ class VerificationThreadTest extends AbstractApiTest {
         readyForApproval(listing, ops);
         hardBrokerSignal(listing, reporter);
 
-        mvc.perform(post(path(listing, "/decision")).header(HttpHeaders.AUTHORIZATION, bearer(ops))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decision\":\"approve\",\"note\":\"checklist passed\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("second_approver_required"));
         mvc.perform(get(path(listing, "")).header(HttpHeaders.AUTHORIZATION, bearer(ops)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.signals.hardBlock").value(true));
-
-        String response = mvc.perform(post(path(listing, "/override-requests"))
-                .header(HttpHeaders.AUTHORIZATION, bearer(ops))
+        mvc.perform(post(path(listing, "/decision")).header(HttpHeaders.AUTHORIZATION, bearer(poster))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"reason\":\"Hard broker signal reviewed\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.overrideRequest.requestedBy").value(ops.getId().toString()))
-                .andReturn().getResponse().getContentAsString();
-        String requestId = com.jayway.jsonpath.JsonPath.read(response, "$.overrideRequest.id");
-
-        mvc.perform(post(path(listing, "/override-requests/" + requestId + "/approve"))
-                .header(HttpHeaders.AUTHORIZATION, bearer(ops))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"note\":\"same staff\"}"))
+                .content("{\"decision\":\"approve\"}"))
                 .andExpect(status().isForbidden());
-        mvc.perform(post(path(listing, "/override-requests/" + requestId + "/approve"))
-                .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+        mvc.perform(post(path(listing, "/decision")).header(HttpHeaders.AUTHORIZATION, bearer(ops))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"note\":\"owner\"}"))
-                .andExpect(status().isForbidden());
-        mvc.perform(post(path(listing, "/override-requests/" + requestId + "/approve"))
-                .header(HttpHeaders.AUTHORIZATION, bearer(poster))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"note\":\"poster\"}"))
-                .andExpect(status().isForbidden());
-
-        mvc.perform(post(path(listing, "/override-requests/" + requestId + "/approve"))
-                .header(HttpHeaders.AUTHORIZATION, bearer(peer))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"note\":\"second approval\"}"))
+                .content("{\"decision\":\"approve\",\"note\":\"checklist passed\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("approved"));
-        String ownerView = mvc.perform(get(path(listing, ""))
-                .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.notes").doesNotExist())
-                .andExpect(jsonPath("$.messages[0].body")
-                        .value("\u2705 Your property has been verified and is now live."))
-                .andReturn().getResponse().getContentAsString();
-        assertThat(ownerView).doesNotContain("second approval");
 
         properties.flush();
         assertThat(jdbc.queryForObject("select status from properties where id = ?",
                 String.class, listing.getId())).isEqualTo(PropertyStatus.APPROVED);
-        assertThat(jdbc.queryForObject("""
-                select count(*) from audit_log
-                where entity = 'property'
-                  and action in ('property.verification.override.requested',
-                                 'property.verification.override.approved')
-                  and entity_id = ?
-                """, Integer.class, listing.getId().toString())).isEqualTo(2);
     }
 
     @Test
-    @DisplayName("an unresolved cross-owner duplicate conflict needs a second staff approver")
-    void duplicateConflictApprovalNeedsSecondApprover() throws Exception {
+    @DisplayName("one staff member approves a listing with an unresolved cross-owner duplicate conflict")
+    void duplicateConflictApprovalNeedsOneStaffMember() throws Exception {
         User owner = user("9820000540", Roles.Wire.OWNER);
         User ops = user("9820000541", Roles.Wire.STAFF);
         Property listing = listing(owner, "rent");
@@ -311,22 +267,15 @@ class VerificationThreadTest extends AbstractApiTest {
         mvc.perform(post(path(listing, "/decision")).header(HttpHeaders.AUTHORIZATION, bearer(ops))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"decision\":\"approve\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("second_approver_required"));
-        mvc.perform(post(path(listing, "/override-requests"))
-                .header(HttpHeaders.AUTHORIZATION, bearer(ops))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"reason\":\"Cross-owner duplicate reviewed\"}"))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.overrideRequest.requestedBy").value(ops.getId().toString()));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("approved"));
     }
 
     @Test
-    @DisplayName("a final rejection reopens only through a second staff approver")
-    void finalRejectReversalNeedsSecondApprover() throws Exception {
+    @DisplayName("a rejection reopens with one staff member")
+    void finalRejectReopensWithOneStaffMember() throws Exception {
         User owner = user("9820000536", Roles.Wire.OWNER);
         User ops = user("9820000537", Roles.Wire.STAFF);
-        User peer = user("9820000538", Roles.Wire.STAFF);
         Property listing = listing(owner, "rent");
 
         mvc.perform(post(path(listing, "")).header(HttpHeaders.AUTHORIZATION, bearer(owner)))
@@ -339,24 +288,8 @@ class VerificationThreadTest extends AbstractApiTest {
         mvc.perform(patch("/properties/{id}/status", listing.getId())
                 .header(HttpHeaders.AUTHORIZATION, bearer(ops))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"status\":\"pending\",\"reason\":\"appeal accepted\"}"))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("second_approver_required"));
-
-        String response = mvc.perform(post(path(listing, "/override-requests"))
-                .header(HttpHeaders.AUTHORIZATION, bearer(ops))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"reason\":\"Owner appeal has evidence\"}"))
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString();
-        String requestId = com.jayway.jsonpath.JsonPath.read(response, "$.overrideRequest.id");
-
-        mvc.perform(post(path(listing, "/override-requests/" + requestId + "/approve"))
-                .header(HttpHeaders.AUTHORIZATION, bearer(peer))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"note\":\"reopen\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("in_review"));
+                .content("{\"status\":\"pending\",\"reason\":\"appeal accepted\",\"expectedStatus\":\"rejected\"}"))
+                .andExpect(status().isOk());
 
         properties.flush();
         assertThat(jdbc.queryForObject("select status from properties where id = ?",

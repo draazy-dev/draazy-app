@@ -106,11 +106,6 @@ async function approveFromUi(page, owner, holderName = owner.claims.name) {
   expect((await approved).status()).toBe(200);
 }
 
-async function openQaCase(page, owner) {
-  await (await findCase(page, owner, /^QA sample/)).click();
-  await expect(page.getByRole('region', { name: 'QA check' })).toBeVisible();
-}
-
 const mockUser = (role = 'admin') => ({
   id: `${role}-reviewer`,
   name: role === 'admin' ? 'Admin Reviewer' : 'Staff Reviewer',
@@ -153,12 +148,11 @@ async function openMockReview(page, { user = mockUser(), review = mockCase(), cl
     const isApprove = /\/identity-reviews\/[^/]+\/approve$/.test(url.pathname);
     const listedStatus = url.searchParams.get('status');
     if (method === 'GET' && url.pathname.endsWith('/identity-reviews/summary')) {
-      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ pending: 1, overdue: 0, mine: 0, qa: 0, decided: 0 }) });
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ pending: 1, overdue: 0, mine: 0, decided: 0 }) });
       return;
     }
     if (method === 'GET' && !isDetail) {
       const matches = listedStatus === current.status
-        || (listedStatus === 'qa' && current.awaitingQa)
         || (listedStatus === 'decided' && current.status !== 'pending');
       const content = matches ? [current] : [];
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ content, totalElements: content.length, number: 0, size: 50, totalPages: content.length ? 1 : 0 }) });
@@ -197,8 +191,6 @@ async function openMockReview(page, { user = mockUser(), review = mockCase(), cl
         approvedByName: user.name,
         reviewerName: user.name,
         decidedAt: Date.now(),
-        qaSampledAt: null,
-        awaitingQa: true,
       };
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(current) });
       return;
@@ -208,15 +200,13 @@ async function openMockReview(page, { user = mockUser(), review = mockCase(), cl
   await page.goto('/ops/kyc-review');
 }
 
-test('mocked security UI labels client-reported liveness and omits absent QA fields', async ({ page }) => {
+test('mocked security UI labels client-reported liveness', async ({ page }) => {
   await openMockReview(page, {
     review: mockCase({ status: 'verified', liveness: 'unavailable', reviewerName: 'Approver Name' }),
   });
   await page.getByRole('tab', { name: /^Decided/ }).click();
   await page.getByRole('button', { name: /97XXXXX001/ }).click();
   await expect(page.getByText('Client-reported: liveness unavailable — check selfie closely')).toBeVisible();
-  await expect(page.getByText(/^QA:/)).toHaveCount(0);
-  await expect(page.getByRole('region', { name: 'QA check' })).toHaveCount(0);
 });
 
 test('mocked requested pose must be confirmed before approval', async ({ page }) => {
@@ -234,7 +224,7 @@ test('mocked requested pose must be confirmed before approval', async ({ page })
   await expect(page.getByRole('button', { name: 'Approve review', exact: true })).toBeEnabled();
 });
 
-test('mocked number mismatch can be overridden and is shown in QA', async ({ page }) => {
+test('mocked number mismatch can be overridden and the approval is final', async ({ page }) => {
   await openMockReview(page, {
     review: mockCase({ livenessChallenge: 'smile', livenessSource: 'challenge', liveness: 'passed', claimedByName: 'Admin Reviewer', claimedByMe: true }),
   });
@@ -249,7 +239,7 @@ test('mocked number mismatch can be overridden and is shown in QA', async ({ pag
   await page.getByLabel("I read it from the image — the applicant's entry was wrong").check();
   await page.getByRole('button', { name: 'Approve review', exact: true }).click();
   await expect(page.getByText('Number corrected by reviewer')).toBeVisible();
-  await expect(page.getByText('You approved this — another reviewer must check it.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Revoke badge' })).toBeVisible();
 });
 
 test('mocked claim limit error is mapped from the backend code', async ({ page }) => {
@@ -333,56 +323,24 @@ test('claims lock a pending case for other reviewers and approval overwrites the
   await staffContext.close();
 });
 
-test('QA sampled approvals are hidden from the approver and can be confirmed by another reviewer', async ({ page, browser, login, request }) => {
+test('an approval is final: no QA tab, and the approver can revoke it with a reason', async ({ page, login, request }) => {
   const owner = await submitCase(request, {
-    claims: { name: 'Qa Confirm Holder', dob: '1990-03-11' },
+    claims: { name: 'Final Approval Holder', dob: '1990-03-11' },
     liveness: 'bypassed',
   });
   await login.asAdmin();
   await approveFromUi(page, owner);
 
-  const qaQueue = page.waitForResponse((response) => response.request().method() === 'GET'
-    && /\/moderation\/identity-reviews$/.test(new URL(response.url()).pathname)
-    && new URL(response.url()).searchParams.get('status') === 'qa'
-    && new URL(response.url()).searchParams.get('q') === owner.mobile);
-  await findCase(page, owner, /^QA sample/);
-  expect((await qaQueue).status()).toBe(200);
-  await expect(page.getByText('No cases match these filters.')).toBeVisible();
-  await expect(page.getByRole('button', { name: owner.row })).toHaveCount(0);
-
-  const staffContext = await browser.newContext();
-  const staffPage = await staffContext.newPage();
-  await signIn(staffPage, MANAGER, { screen: 'staff', role: /Manager/ });
-  await openQaCase(staffPage, owner);
-  const confirmed = staffPage.waitForResponse((response) => response.request().method() === 'POST' && /\/moderation\/identity-reviews\/[^/]+\/qa$/.test(new URL(response.url()).pathname));
-  await staffPage.getByRole('button', { name: 'Confirm', exact: true }).click();
-  expect((await confirmed).status()).toBe(200);
-  await expect(staffPage.getByRole('button', { name: owner.row })).toHaveCount(0);
-  await staffContext.close();
-});
-
-test('QA reviewer can revoke a sampled approval with a reason', async ({ page, browser, login, request }) => {
-  const owner = await submitCase(request, {
-    claims: { name: 'Qa Revoke Holder', dob: '1989-09-09' },
-    liveness: 'unavailable',
-  });
-  await login.asAdmin();
-  await approveFromUi(page, owner);
-
-  const staffContext = await browser.newContext();
-  const staffPage = await staffContext.newPage();
-  await signIn(staffPage, MANAGER, { screen: 'staff', role: /Manager/ });
-  await openQaCase(staffPage, owner);
-  await staffPage.getByTestId('ops-identity-qa-revoke-reason').fill('QA found that the selfie does not match the approved holder.');
-  await staffPage.getByRole('button', { name: 'Revoke', exact: true }).click();
-  await expect(staffPage.getByText('Confirm QA revocation.')).toBeVisible();
-  const revoked = staffPage.waitForResponse((response) => response.request().method() === 'POST' && /\/moderation\/identity-reviews\/[^/]+\/qa$/.test(new URL(response.url()).pathname));
-  await staffPage.getByRole('button', { name: 'Confirm revoke', exact: true }).click();
+  await (await findCase(page, owner, /^Decided/)).click();
+  await expect(page.getByRole('tab', { name: /QA sample/ })).toHaveCount(0);
+  await page.getByTestId('ops-identity-revoke-reason').fill('Selfie does not match the approved holder.');
+  await page.getByTestId('ops-identity-revoke-confirm').click();
+  await expect(page.getByText('Confirm revocation.')).toBeVisible();
+  const revoked = page.waitForResponse((response) => response.request().method() === 'POST' && /\/moderation\/identity-reviews\/[^/]+\/revoke$/.test(new URL(response.url()).pathname));
+  await page.getByTestId('ops-identity-revoke-confirm').click();
   expect((await revoked).status()).toBe(200);
-  await expect(staffPage.getByRole('button', { name: owner.row })).toHaveCount(0);
 
   const status = await request.get(`${API}/me/verification/identity`, { headers: { authorization: owner.headers.authorization } });
   expect(status.status()).toBe(200);
   expect(await status.json()).toMatchObject({ status: 'revoked' });
-  await staffContext.close();
 });

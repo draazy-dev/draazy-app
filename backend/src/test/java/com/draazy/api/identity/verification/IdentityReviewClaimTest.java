@@ -32,17 +32,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-@TestPropertySource(properties = "draazy.identity.qa-sample-rate=0.0")
-class IdentityReviewClaimQaTest extends AbstractApiTest {
+class IdentityReviewClaimTest extends AbstractApiTest {
 
     private static final String PAN = "ABCDE1234F";
-    private static final String REVOKE_REASON = "The approved document failed the second review";
+    private static final String REVOKE_REASON = "The approved document failed re-inspection";
 
     @Autowired
     UserRepository users;
@@ -61,13 +59,11 @@ class IdentityReviewClaimQaTest extends AbstractApiTest {
                 + "'identity.review.claimed',"
                 + "'identity.review.released',"
                 + "'identity.claim.force_released',"
-                + "'identity.review.qa_confirmed',"
-                + "'identity.review.qa_revoked',"
                 + "'user.name.set_from_identity')");
     }
 
     @Test
-    void approveSetsTheAccountNameAuditsItAndDoesNotSamplePassedLivenessAtZeroRate() throws Exception {
+    void approveSetsTheAccountNameAndAuditsIt() throws Exception {
         User subject = user("9830011001", "buyer", "Old Profile Name");
         User reviewer = user("9830011002", Roles.Wire.ADMIN, "Ops Admin A");
         submitPan(subject, "passed").andExpect(status().isAccepted());
@@ -82,8 +78,7 @@ class IdentityReviewClaimQaTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.holderName").value("Asha Legal Patil"))
                 .andExpect(jsonPath("$.accountName").value("Asha Legal Patil"))
-                .andExpect(jsonPath("$.livenessSource").value("challenge"))
-                .andExpect(jsonPath("$.qaSampledAt").doesNotExist());
+                .andExpect(jsonPath("$.livenessSource").value("challenge"));
 
         assertThat(users.findById(subject.getId()).orElseThrow().getName())
                 .isEqualTo("Asha Legal Patil");
@@ -283,104 +278,23 @@ class IdentityReviewClaimQaTest extends AbstractApiTest {
     }
 
     @Test
-    void bypassedLivenessIsSampledAndAnotherStafferCanConfirmQa() throws Exception {
-        User subject = user("9830011009", "buyer", "QA Subject");
+    void approvalOfBypassedLivenessIsFinalAndTheApproverCanRevokeIt() throws Exception {
+        User subject = user("9830011009", "buyer", "Final Subject");
         User approver = user("9830011010", Roles.Wire.ADMIN, "Ops Admin A");
-        User checker = user("9830011011", Roles.Wire.ADMIN, "Ops Admin B");
         submitPan(subject, "bypassed").andExpect(status().isAccepted());
         UUID id = caseOf(subject);
 
         approve(approver, id, "Asha Patil")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.qaSampledAt").doesNotExist())
-                .andExpect(jsonPath("$.livenessSource").value("challenge"))
+                .andExpect(jsonPath("$.status").value(VerificationStatuses.VERIFIED))
                 .andExpect(jsonPath("$.approvedByName").value("Ops Admin A"));
 
-        mvc.perform(get(reviewPath(Routes.Moderation.IDENTITY_REVIEW_BY_ID, id))
-                        .header(HttpHeaders.AUTHORIZATION, bearer(approver)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.qaSampledAt").doesNotExist())
-                .andExpect(jsonPath("$.awaitingQa").value(true))
-                .andExpect(jsonPath("$.qaOutcome").doesNotExist())
-                .andExpect(jsonPath("$.qaReviewedByName").doesNotExist());
-        mvc.perform(get(Routes.Moderation.IDENTITY_REVIEWS).param("status", "qa")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(approver)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(0));
-        mvc.perform(get(Routes.Moderation.IDENTITY_REVIEWS).param("status", "qa")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].id").value(id.toString()))
-                .andExpect(jsonPath("$.content[0].qaSampledAt").exists())
-                .andExpect(jsonPath("$.content[0].approvedByName").value("Ops Admin A"));
-
+        assertThat(jdbc.queryForObject("select count(*) from identity_verifications where id = ? and qa_sampled_at is not null",
+                Integer.class, id)).isZero();
         revoke(approver, id)
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value(ErrorCodes.IDENTITY_QA_OPEN));
-        qa(approver, id, "{\"outcome\":\"confirmed\"}")
-                .andExpect(status().isForbidden());
-        qa(checker, id, "{\"outcome\":\"confirmed\"}")
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.qaOutcome").value("confirmed"))
-                .andExpect(jsonPath("$.qaReviewedByName").value("Ops Admin B"))
-                .andExpect(jsonPath("$.awaitingQa").value(false));
-
-        mvc.perform(get(Routes.Moderation.IDENTITY_REVIEWS).param("status", "qa")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.totalElements").value(0));
-    }
-
-    @Test
-    void resubmittedPassedLivenessCaseIsSampledForQaAtZeroRate() throws Exception {
-        User subject = user("9830011031", "buyer", "Resubmit Subject");
-        User reviewer = user("9830011032", Roles.Wire.ADMIN, "Ops Admin A");
-        User checker = user("9830011033", Roles.Wire.ADMIN, "Ops Admin B");
-        submitPan(subject, "passed").andExpect(status().isAccepted());
-        UUID id = caseOf(subject);
-        reject(reviewer, id).andExpect(status().isOk());
-        submitPan(subject, "passed").andExpect(status().isAccepted());
-
-        approve(reviewer, id, "Asha Patil").andExpect(status().isOk());
-
-        mvc.perform(get(Routes.Moderation.IDENTITY_REVIEWS).param("status", "qa")
-                        .header(HttpHeaders.AUTHORIZATION, bearer(checker)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].id").value(id.toString()));
-    }
-
-    @Test
-    void qaRevokeRunsTheRevokePathAndRecordsQaOutcome() throws Exception {
-        User subject = user("9830011012", "buyer", "QA Revoke Subject");
-        User approver = user("9830011013", Roles.Wire.ADMIN, "Ops Admin A");
-        User checker = user("9830011014", Roles.Wire.ADMIN, "Ops Admin B");
-        submitPan(subject, "bypassed").andExpect(status().isAccepted());
-        UUID id = caseOf(subject);
-        approve(approver, id, "Asha Patil").andExpect(status().isOk());
-
-        qa(checker, id, "{\"outcome\":\"revoked\",\"reason\":\"" + REVOKE_REASON + "\"}")
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value(VerificationStatuses.REVOKED))
-                .andExpect(jsonPath("$.qaOutcome").value("revoked"))
-                .andExpect(jsonPath("$.revocationReason").value(REVOKE_REASON));
-
-        assertThat(users.findById(subject.getId()).orElseThrow().isVerified()).isFalse();
-        assertThat(verifications.findById(id).orElseThrow().getRevokedBy()).isEqualTo(checker.getId());
-        assertThat(auditCount("identity.review.qa_revoked", id)).isEqualTo(1);
-        assertThat(auditCount("identity.verification.revoked", id)).isEqualTo(1);
-    }
-
-    @Test
-    void qaOnAnUnsampledCaseIsAConflict() throws Exception {
-        User subject = user("9830011015", "buyer", "Unsampled Subject");
-        User approver = user("9830011016", Roles.Wire.ADMIN, "Ops Admin A");
-        User checker = user("9830011017", Roles.Wire.ADMIN, "Ops Admin B");
-        submitPan(subject, "passed").andExpect(status().isAccepted());
-        UUID id = caseOf(subject);
-        approve(approver, id, "Asha Patil").andExpect(status().isOk());
-
-        qa(checker, id, "{\"outcome\":\"confirmed\"}")
-                .andExpect(status().isConflict());
+                .andExpect(jsonPath("$.status").value(VerificationStatuses.REVOKED));
+        assertThat(verifications.findById(id).orElseThrow().getRevokedBy()).isEqualTo(approver.getId());
     }
 
     private User user(String mobile, String role, String name) {
@@ -472,13 +386,6 @@ class IdentityReviewClaimQaTest extends AbstractApiTest {
         return mvc.perform(delete(reviewPath(Routes.Moderation.IDENTITY_REVIEW_BY_ID + "/claim", id))
                 .param("force", "true")
                 .header(HttpHeaders.AUTHORIZATION, bearer(reviewer)));
-    }
-
-    private ResultActions qa(User reviewer, UUID id, String body) throws Exception {
-        return mvc.perform(post(reviewPath(Routes.Moderation.IDENTITY_REVIEW_BY_ID + "/qa", id))
-                .header(HttpHeaders.AUTHORIZATION, bearer(reviewer))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(body));
     }
 
     private int auditCount(String action, UUID id) {

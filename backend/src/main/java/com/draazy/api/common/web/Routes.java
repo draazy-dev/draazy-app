@@ -816,8 +816,6 @@ public final class Routes {
 
         public static final String DRAFT_OTP = DRAFT + "/otp";
 
-        public static final String DRAFT_CHECK = DRAFT + "/check";
-
         public static final String DRAFT_OPENED = DRAFT + "/opened";
 
         public static final String FINAL_DOC = BY_ID + "/final-doc";

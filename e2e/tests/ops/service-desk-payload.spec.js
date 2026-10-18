@@ -2,8 +2,8 @@ import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, apiLogin, authHeaders, signIn, uniqueMobile } from '../../helpers/liveAuth.js';
 
 const STAFFER = { mobile: '9383334640' };
-const ROW_KEYS = ['id', 'type', 'status', 'details', 'assignee', 'assignedToMe', 'createdAt', 'amount', 'sla',
-  'draftCheckStatus', 'policeConfirmed', 'approvedAt'];
+const ROW_KEYS = ['id', 'type', 'status', 'details', 'requesterName', 'requesterMobile', 'assignee', 'assignedToMe', 'createdAt', 'amount', 'sla',
+  'policeConfirmed', 'approvedAt'];
 const OWNER_PAN = 'ZZZQA1234Z';
 const OWNER_AADHAAR = '999988887779';
 
