@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { focusFlatmateMap } from '../../../helpers/locality.js';
 
-/* Map view gates on a "Focus your map" picker; a ?near=lat,lng&nearr=km deep link self-focuses it and
+/* Map view gates on a "Focus your map" locality search; a ?near=lat,lng&nearr=km deep link self-focuses it and
    narrows posts to the radius deterministically, with no live Places call. */
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
@@ -14,9 +15,10 @@ test('map view opens on the focus gate, picking an area unlocks the bubbles, and
     await expect(page.locator('.map-pin')).toHaveCount(0);
   });
 
-  await test.step('picking a focus area unlocks the bubble map', async () => {
-    await page.locator('[data-sf-area]').first().waitFor({ timeout: 20000 });
-    await page.locator('[data-sf-area]').first().click();
+  await test.step('searching a focus area and showing the map unlocks the bubbles', async () => {
+    const show = page.getByRole('button', { name: 'Show Map view' });
+    await expect(show, 'nothing picked yet').toBeDisabled();
+    await focusFlatmateMap(page, ['Baner']);
     await expect(page.locator('.map-pin').first()).toBeVisible({ timeout: 20000 });
   });
 

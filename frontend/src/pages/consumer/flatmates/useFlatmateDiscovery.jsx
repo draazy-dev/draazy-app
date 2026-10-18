@@ -231,11 +231,6 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     return Object.fromEntries(Object.entries(byLocality).filter(([name]) => mapAreas.has(name)));
   }, [byLocality, mapAreas, filters.near]);
   const mapGated = viewMode === 'map' && mapAreas.size === 0 && !filters.near;
-  const toggleMapArea = (name) => setMapAreas((prev) => {
-    const next = new Set(prev);
-    if (next.has(name)) next.delete(name); else next.add(name);
-    return next;
-  });
   // Carries a single active locality filter into the map focus on entry, so a user who already
   // narrowed to one area is not asked to re-pick it.
   useEffect(() => {
@@ -341,7 +336,7 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
 
   return {
     filters, setFilters, setF, sortMode, onSort,
-    mapAreas, setMapAreas, toggleMapArea, mapGated, mapItems,
+    mapAreas, setMapAreas, mapGated, mapItems,
     filtersActive, clearFilters, activeFilterCount,
     activeList,
     // `total` is the whole match, not `activeList.length` — reading a count off a page is the bug

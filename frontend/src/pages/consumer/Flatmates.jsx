@@ -18,7 +18,7 @@ export default function Flatmates() {
     rootRef, t, user, isVerified, openVerify,
     filters, setF, viewMode, setViewMode, seg, budgetLbl,
     smartSearchFlat, setFilters, tab, sortMode, onSort, clearFilters,
-    flatmateTabs, mapGated, gateAreas, mapAreas, toggleMapArea, kindWord,
+    flatmateTabs, mapGated, gateAreas, kindWord,
     filtersActive, mapItems, setMapAreas, onInterest, onRoomInterest, onJoin,
     onSave, saved, interestedFor, goToPosting, myPost, myRooms, myGroups,
     activeList, otherCount, switchTab,
@@ -41,10 +41,10 @@ export default function Flatmates() {
           {viewMode === 'map' ? (
             mapGated ? (
               <FlatmateMapGate
+                key={tab}
                 areas={gateAreas}
-                selected={mapAreas}
-                onToggle={toggleMapArea}
                 maxAreas={MAP_MAX_AREAS}
+                onShow={setMapAreas}
                 onSwitchList={() => setViewMode('list')}
                 kindWord={kindWord}
                 filters={filters}
@@ -65,8 +65,8 @@ export default function Flatmates() {
               <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                 <p className="text-xs text-gray-500 flex items-center gap-1.5"><Icon name="info" className="w-3.5 h-3.5" /> {t('flatmates.mapInfo', { kind: t('flatmates.kind_' + kindWord) })}</p>
                 {filters.near ? (
-                  <button type="button" onClick={() => setF({ near: '', nearLabel: '', nearRadius: 5, nearMode: 'km' })} className="dz-chip bg-teal-500/12 border border-teal-400/30 text-teal-200 hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200 t-all">
-                    <Icon name="map-pinned" className="w-3 h-3" /> {t('flatmates.nearChip', { label: filters.nearLabel || t('flatmates.placeWord'), radius: filters.nearRadius, unit: filters.nearMode === 'km' ? t('flatmates.unitKm') : t('flatmates.unitMin') })} <Icon name="x" className="w-3 h-3" />
+                  <button type="button" onClick={() => setF({ near: '', nearLabel: '', nearRadius: 5, nearMode: 'km' })}                   className="dz-chip dz-chip--accent dz-chip--sm hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200">
+                                      <Icon name="map-pinned" /> {t('flatmates.nearChip', { label: filters.nearLabel || t('flatmates.placeWord'), radius: filters.nearRadius, unit: filters.nearMode === 'km' ? t('flatmates.unitKm') : t('flatmates.unitMin') })} <Icon name="x" />
                   </button>
                 ) : (
                   <button type="button" onClick={() => setMapAreas(new Set())} className="text-[11px] font-medium text-teal-400 hover:text-teal-300 inline-flex items-center gap-1"><Icon name="rotate-ccw" className="w-3 h-3" /> {t('flatmates.changeAreas')}</button>

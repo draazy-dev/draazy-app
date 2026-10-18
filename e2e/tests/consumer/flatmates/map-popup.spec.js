@@ -1,11 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { focusFlatmateMap } from '../../../helpers/locality.js';
 
 const openMap = async (page, url) => {
   await page.goto(url);
   await page.getByRole('button', { name: 'Map' }).click();
-  await page.locator('[data-sf-area]').first().waitFor({ timeout: 20000 });
-  await page.locator('[data-sf-area]').first().click();
+  await focusFlatmateMap(page, ['Baner']);
   await page.locator('.map-pin').first().waitFor({ timeout: 20000 });
   await page.locator('.map-pin').first().click();
   await page.locator('.dz-sp-row').first().waitFor({ timeout: 10000 });
