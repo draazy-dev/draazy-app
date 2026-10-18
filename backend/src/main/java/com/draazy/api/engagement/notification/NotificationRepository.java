@@ -11,14 +11,16 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-/** Notification access. Every query is user-scoped (invariant 1). The composite index
- * {@code idx_notifications_user_created} backs the paged read (newest first). */
+/** Notification access. Every query is user-scoped (invariant 1). The paged read (newest first) is backed by
+ * {@code idx_notifications_user_created}, or by {@code idx_notifications_user} when filtered on {@code read}. */
 public interface NotificationRepository extends JpaRepository<Notification, UUID> {
 
+    /** A null {@code read} lists both read and unread rows. */
     @Query("select n from Notification n where n.userId = :userId "
             + "and (n.deliverAfter is null or n.deliverAfter <= :now) "
-            + "and (n.read = false or n.createdAt >= :readCutoff)")
-    Page<Notification> findDeliverable(@Param("userId") UUID userId,
+            + "and (n.read = false or n.createdAt >= :readCutoff) "
+            + "and (:read is null or n.read = :read)")
+    Page<Notification> findDeliverable(@Param("userId") UUID userId, @Param("read") Boolean read,
             @Param("now") Instant now, @Param("readCutoff") Instant readCutoff, Pageable pageable);
 
     /** Non-null {@code deliverAfter} hides rows until the user's quiet window closes. */
@@ -57,6 +59,10 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     @Modifying
     @Query("delete from Notification n where n.createdAt < :cutoff")
     int deleteCreatedBefore(@Param("cutoff") Instant cutoff);
+
+    @Modifying
+    @Query("delete from Notification n where n.read = true and n.createdAt < :cutoff")
+    int deleteReadCreatedBefore(@Param("cutoff") Instant cutoff);
 
     @Modifying
     @Query("delete from Notification n where n.userId = :userId and n.id in :ids")

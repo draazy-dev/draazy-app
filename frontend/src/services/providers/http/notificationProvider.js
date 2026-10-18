@@ -14,8 +14,9 @@ function pageMeta(payload, requested) {
   };
 }
 
-export async function listNotifications({ page = 0, size = DEFAULT_PAGE_SIZE } = {}) {
-  const requested = { page, size };
+/** `read` true/false narrows to read or unread rows; omitted lists both. */
+export async function listNotifications({ page = 0, size = DEFAULT_PAGE_SIZE, read } = {}) {
+  const requested = { page, size, read };
   return pageMeta(await get('/notifications', requested), requested);
 }
 

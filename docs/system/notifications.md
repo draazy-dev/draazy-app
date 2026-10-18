@@ -26,7 +26,8 @@ Configuration for the paid channels is in [DEPLOY.md](../DEPLOY.md) (WhatsApp id
 - **Quiet hours.** When the user has quiet hours on (default off, 22:00–07:00), a row written inside the window gets
   `deliverAfter` and stays hidden until the window closes. Turning quiet hours off releases held rows.
 - **Match-alert switch.** `matchAlerts=false` drops only the `match.*` and `price.*` families (`NotificationTypes`).
-- **Retention.** Rows older than 90 days are swept daily (`NotificationRetention`).
+- **Retention.** The nightly `NotificationRetention` sweep deletes read rows after 30 days (they already left the
+  list then) and every row after 90.
 - **Channel toggles.** The `whatsapp` toggle (`Notifier.allowsWhatsapp`) gates the paid identity and digest sends;
   codes are never gated. The `email` and `sms` toggles are stored but read by nothing.
 - **Chat bursts.** `message.received` writes one bell row per unread run (only when the recipient's unread count in

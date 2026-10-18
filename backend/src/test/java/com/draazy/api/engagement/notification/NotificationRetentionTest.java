@@ -24,22 +24,37 @@ class NotificationRetentionTest extends AbstractApiTest {
         User u = user("9800000451");
         Instant now = Instant.now();
         Instant cutoff = now.minus(NotificationRetention.RETENTION);
+        Instant readCutoff = now.minus(NotificationRetention.READ_RETENTION);
 
-        note(u, "old", cutoff.minus(Duration.ofDays(1)));
-        note(u, "edge", cutoff.plusSeconds(60));
-        note(u, "new", now.minus(Duration.ofDays(1)));
+        note(u, "old", cutoff.minus(Duration.ofDays(1)), false);
+        note(u, "edge", cutoff.plusSeconds(60), false);
+        note(u, "new", now.minus(Duration.ofDays(1)), false);
 
-        assertThat(retention.purgeOlderThan(cutoff)).isEqualTo(1);
+        assertThat(retention.purgeOlderThan(cutoff, readCutoff)).isEqualTo(1);
+        assertThat(titles(u)).containsExactlyInAnyOrder("edge", "new");
+    }
+
+    @Test
+    void readRowsGoAtTheShorterWindow() {
+        User u = user("9800000453");
+        Instant now = Instant.now();
+        Instant readCutoff = now.minus(NotificationRetention.READ_RETENTION);
+
+        note(u, "old", readCutoff.minus(Duration.ofDays(1)), true);
+        note(u, "edge", readCutoff.minus(Duration.ofDays(1)), false);
+        note(u, "new", readCutoff.plusSeconds(60), true);
+
+        assertThat(retention.purgeOlderThan(now.minus(NotificationRetention.RETENTION), readCutoff)).isPositive();
         assertThat(titles(u)).containsExactlyInAnyOrder("edge", "new");
     }
 
     @Test
     void emptyPurgeIsANoop() {
         User u = user("9800000452");
-        note(u, "new", Instant.now());
+        note(u, "new", Instant.now(), true);
+        Instant cutoff = Instant.now().minus(NotificationRetention.RETENTION);
 
-        assertThat(retention.purgeOlderThan(Instant.now().minus(NotificationRetention.RETENTION)))
-                .isZero();
+        assertThat(retention.purgeOlderThan(cutoff, cutoff)).isZero();
         assertThat(titles(u)).containsExactly("new");
     }
 
@@ -50,11 +65,11 @@ class NotificationRetentionTest extends AbstractApiTest {
         return users.saveAndFlush(u);
     }
 
-    private void note(User user, String title, Instant at) {
+    private void note(User user, String title, Instant at, boolean read) {
         jdbc.update("""
-                insert into notifications (user_id, type, title, created_at)
-                values (?, 'info', ?, ?)
-                """, user.getId(), title, Timestamp.from(at));
+                insert into notifications (user_id, type, title, read, created_at)
+                values (?, 'info', ?, ?, ?)
+                """, user.getId(), title, read, Timestamp.from(at));
     }
 
     private List<String> titles(User user) {
