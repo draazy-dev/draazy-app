@@ -43,7 +43,7 @@ Nothing.
 | 321 | Visit no-show | Owner-only "Didn't come" on a confirmed visit after its day; no penalty, visitor disputes go to Support |
 | 322 | Limit visit hours to daytime? | No; the owner confirms or reschedules every slot |
 | 323 | Payment disputes | No in-app dispute form: refund request on Plan & Billing or a Support ticket; a Cashfree chargeback freezes only that order |
-| 324 | One checkout TTL for every payment kind | Yes, 15 minutes for passes, packs, rent, services and co-fill |
+| 324 | One checkout TTL for every payment kind | Yes, 20 minutes for passes, packs, rent, services and co-fill (15 is Cashfree's floor and fails every order) |
 | 325 | Backfill pre-deploy 45-min Cashfree orders and old `9xxxxxxxxx` erasure pseudonyms? | No: no production data exists before launch |
 | 326 | Pause on flatmate rooms | Not offered; rooms expire, and can be edited or deleted |
 | 327 | Send the ID number at identity submit | No; appeals go through `POST /me/verification/identity/appeal` |
