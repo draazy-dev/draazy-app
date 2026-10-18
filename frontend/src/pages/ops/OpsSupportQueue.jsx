@@ -13,7 +13,7 @@ import {
 import { fmtAgo } from './service-queue/helpers.js';
 
 /** The platform-wide support queue (`GET /admin/support-tickets`); under `/ops` because `/admin/*` locks out staff.
- * Paging and counts are server-side, and the list carries no mobile by contract. */
+ * Paging and counts are server-side. */
 
 const TABS = [
   { key: 'awaiting', label: 'Awaiting reply', awaitingReply: true },
@@ -85,7 +85,7 @@ export default function OpsSupportQueue() {
   const reload = () => { wantCounts.current = true; setNonce((n) => n + 1); };
 
   const open = async (row) => {
-    setDetail({ id: row.id, subject: row.subject, status: row.status, category: row.category, raiser: row.raiser, messages: [] });
+    setDetail({ id: row.id, subject: row.subject, status: row.status, category: row.category, raiser: row.raiser, raiserMobile: row.raiserMobile, messages: [] });
     setReply('');
     setDetailStatus('loading');
     try {
@@ -193,6 +193,7 @@ export default function OpsSupportQueue() {
                 meta={(
                   <>
                     <span>{t.raiser || 'Account removed'}</span>
+                    {t.raiserMobile ? <><Dot /><span className="tabular-nums" data-testid="raiser-mobile">{t.raiserMobile}</span></> : null}
                     <Dot />
                     <span>{catLabel(t.category)}</span>
                     <Dot />
@@ -222,6 +223,7 @@ export default function OpsSupportQueue() {
               <Badge status={detail.status} />
               <span className="text-gray-400">{catLabel(detail.category)}</span>
               {detail.raiser ? (<><span className="text-gray-600">·</span><span className="text-gray-400">{detail.raiser}</span></>) : null}
+              {detail.raiserMobile ? (<><span className="text-gray-600">·</span><span className="tabular-nums text-gray-400">{detail.raiserMobile}</span></>) : null}
               {detail.status !== 'closed' ? <button type="button" onClick={close} className={classNames(BTN.ghost, 'ml-auto')}>Close ticket</button> : null}
             </div>
 

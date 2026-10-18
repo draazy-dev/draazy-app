@@ -59,7 +59,7 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
     class Enquiries {
 
         @Test
-        @DisplayName("an admin sees the row with the requester's masked number")
+        @DisplayName("an admin sees the row with the requester's full number")
         void adminReadsFullMobile() throws Exception {
             User owner = user("9855100001", Roles.Wire.OWNER, "Owner One");
             User buyer = user(RAW, Roles.Wire.BUYER, "Curious Buyer");
@@ -71,7 +71,7 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                             .param("status", ContactRequestStatuses.PENDING))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].requesterName").value("Curious Buyer"))
-                    .andExpect(jsonPath("$.content[0].requesterMobile").value(MASKED))
+                    .andExpect(jsonPath("$.content[0].requesterMobile").value(RAW))
                     .andExpect(jsonPath("$.content[0].propertyTitle")
                             .value("Enquiry board fixture"));
         }
@@ -97,7 +97,7 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
     class Visits {
 
         @Test
-        @DisplayName("the visitor's masked number, and the slot survives the projection")
+        @DisplayName("the visitor's full number, and the slot survives the projection")
         void visitorMobileInFull() throws Exception {
             User owner = user("9855100007", Roles.Wire.OWNER, "Owner Four");
             User visitor = user(RAW, Roles.Wire.BUYER, "Site Visitor");
@@ -109,7 +109,7 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(admin("9855100008"))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].visitorName").value("Site Visitor"))
-                    .andExpect(jsonPath("$.content[0].visitorMobile").value(MASKED))
+                    .andExpect(jsonPath("$.content[0].visitorMobile").value(RAW))
                     .andExpect(jsonPath("$.content[0].mode").value(VisitModes.IN_PERSON))
                     .andExpect(jsonPath("$.content[0].slot").exists());
         }
@@ -135,7 +135,7 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(admin("9855100010"))))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].counterpartyName").value("Registered Party"))
-                    .andExpect(jsonPath("$.content[0].counterpartyMobile").value(MASKED))
+                    .andExpect(jsonPath("$.content[0].counterpartyMobile").value(RAW))
                     .andExpect(jsonPath("$.content[0].agreedPrice").value(24000));
         }
 
@@ -155,7 +155,7 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                             .param("status", DealStatuses.CLOSED))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].counterpartyName").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].counterpartyMobile").value(MASKED));
+                    .andExpect(jsonPath("$.content[0].counterpartyMobile").value(RAW));
         }
     }
 

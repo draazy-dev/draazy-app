@@ -149,6 +149,7 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalElements").value(2))
                 .andExpect(jsonPath("$.content[0].author").value("Reviewer 9840000020"))
+                .andExpect(jsonPath("$.content[0].authorMobile").value("9840000020"))
                 .andExpect(jsonPath("$.content[0].body").exists())
                 .andExpect(jsonPath("$.content[0].title").doesNotExist())
                 .andExpect(jsonPath("$.content[0].categories").doesNotExist())

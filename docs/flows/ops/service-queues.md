@@ -188,6 +188,8 @@ visibly (D184).
 - **Triage:** *Unassigned only* sends `unassigned=true` (a boolean, never an assignee id). The search
   box sends `q` after a 300 ms debounce: an anchored prefix of the requester's name or mobile, or a
   whole request id. `%` and `_` are escaped server-side so a caller cannot unanchor the scan.
+- **Requester:** each row and the drawer header show the requester's name and full mobile
+  (`requesterName`, `requesterMobile` on `ServiceRequestQueueRow`).
 - **Ageing (`AgeTone`):** the *Opened* cell is amber at 24 h and rose at 72 h, like the property
   re-check queue; closed matters are muted. An approved rental instead shows *Register by <date>*:
   four months from draft approval (Registration Act s.23), amber in the last 30 days.
@@ -230,7 +232,7 @@ visibly (D184).
   API. Only a `registered` row feeds the
   flatmate trust badge (`FlatmateTrustReconciler`), and only then does the tenant see the row and
   its copy under `/me/rent-agreements` (an unlinked legacy row likewise, minus its owner-typed URL).
-  Mobiles are masked here (`GET /{id}/rent-agreements`).
+  Mobiles are in full here (`GET /{id}/rent-agreements`).
 - **Desk files are the desk's:** `POST /{id}/docs` refuses the `draft` and `final-document`
   categories (422) and any upload once the matter is closed (409), so a customer cannot plant a
   "Registered copy" for the checker.
@@ -265,7 +267,7 @@ through the listing's own docs and never appear.
   **one review per flat**, not per room).
 - **Buckets / tabs:** `pending`, `flagged` (`flagForReview && status === 'pending'`), `approved`
   ("Ops-verified"), `rejected`, `all`. The four KPI tiles are the same buckets and are clickable.
-- **Row content:** host + masked mobile (last 4) + created date; flat/address with a Room/Group chip;
+- **Row content:** host + full mobile + created date; flat/address with a Room/Group chip;
   the claimed `tier`; signals (View agreement / Agreement on file / **No document** for a tenant-tier
   row with nothing attached); status; actions.
 - **Decisions:** approve -> `decideFlatmateReview(id, 'approved')` and the host shows **Ops-verified**.
@@ -286,7 +288,7 @@ The platform-wide view of customer support conversations, and a **different oper
 customer's own list rather than the same one with a wider scope (D51). `GET /support/tickets` is an
 unpaged bare array carrying every message inline; "every support conversation on the platform" in
 that shape is a PII export by another name, so `GET /admin/support-tickets` is paged, staff/admin
-only, and returns summaries with **no thread and no mobile number**.
+only, and returns summaries with **no thread**; the raiser's mobile is in full.
 
 - **Tabs:** Awaiting reply (`awaitingReply=true`), Answered (`false`), All (parameter omitted). The
   tri-state matters — `undefined` is not `false`, and collapsing them would make "All" mean

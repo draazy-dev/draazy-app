@@ -181,8 +181,7 @@ export const test = base.extend({
       });
       if (!res.ok) throw new Error(`listing staff failed (${res.status})`);
       const page1 = await res.json();
-      const masked = `${want.slice(0, 2)}XXXXX${want.slice(-3)}`;
-      const row = (page1.content || page1.items || []).find((u) => u.mobile === masked);
+      const row = (page1.content || page1.items || []).find((u) => u.mobile === want);
       if (!row) throw new Error(`no back-office account shown as ${want} — see fixtures/live.js`);
       if (!scoped.has(row.id)) {
         const stored = await fetch(`${API}/users/${row.id}/permissions`, { headers: await authHeaders(ACTORS.admin) });

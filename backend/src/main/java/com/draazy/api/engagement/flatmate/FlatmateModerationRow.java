@@ -10,6 +10,7 @@ public record FlatmateModerationRow(
         String kind,
         String modStatus,
         String authorName,
+        String authorMobile,
         String headline,
         String locality,
         String freeText,
@@ -20,6 +21,7 @@ public record FlatmateModerationRow(
 
     static FlatmateModerationRow of(FlatmateModerationQueueDto item) {
         return new FlatmateModerationRow(item.id(), item.kind(), item.modStatus(), item.authorName(),
+                item.authorMobile(),
                 item.headline(), item.locality(), item.freeText(), item.photos().size(),
                 item.recheckReason(), item.recheckRequestedAt(), item.createdAt());
     }

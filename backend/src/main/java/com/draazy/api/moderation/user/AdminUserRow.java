@@ -3,7 +3,7 @@ package com.draazy.api.moderation.user;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 
-/** One row of the admin people directory; {@code mobile} is masked, the audited single-user read reveals it. */
+/** One row of the admin people directory; {@code mobile} is in full, as on every back-office surface. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record AdminUserRow(
         String id,

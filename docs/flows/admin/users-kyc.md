@@ -213,11 +213,9 @@ differs from the applicant's entry is a soft stop (409 `identity_number_mismatch
 
 Rationale relocated from `UserAdminService` Javadoc.
 
-- **Masked list, audited reveal.** `GET /users` masks mobiles and writes no audit row; `GET
-  /users/{id}` reveals the number and records who looked. Ops genuinely need a phone number to act
-  on a case, but a paged list hands over thousands per request - one deliberate, individually
-  logged read per person keeps the cost of exfiltration linear and leaves a trail naming whose data
-  was read.
+- **Full numbers, no reveal step.** `GET /users` and `GET /users/{id}` both carry the full mobile;
+  every back-office surface does, because staff need the number to act on a case. Listing the
+  directory writes no audit row.
 - **Moderation lives next door.** Suspension, the identity badge and the internal review flag are
   in `UserModerationService`: decisions about a person, as opposed to administration of the
   directory row.
@@ -279,10 +277,8 @@ It owns one decision - *what a back-office caller is allowed to see of another p
 shared by two services that otherwise have nothing to do with each other (`UserAdminService`,
 which administers the directory, and `UserModerationService`, which acts on a person). It is not a
 `XService` + `XServiceHelper` split of the kind `package-structure.md` section 4.1 warns
-against; duplicating the masking rule in both callers would be the real hazard, because the two
-copies would drift and the drift would be one of them quietly serving an unmasked mobile.
+against; duplicating the projection in both callers would be the real hazard, because the two
+copies would drift.
 
-**The masking asymmetry it holds.** A list masks; a single-user read does not, and writes an audit
-row for the reveal. Ops genuinely need a phone number to act on a case, so refusing it would push
-the work off-platform - but a paged list hands over thousands of numbers per request for the cost of
-one click, which is a bulk-export surface wearing the clothes of a search screen.
+**What it holds.** The list row and the single-user read both carry the full mobile, as every
+back-office surface does: ops need the number to act on a case.

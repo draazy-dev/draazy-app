@@ -5,7 +5,7 @@ category: ops-playbook
 audience: staff
 access: staff
 order: 1
-updated: 2026-10-10
+updated: 2026-10-18
 summary: Internal queue rules for listing verification, live re-checks, duplicates and owner follow-up.
 tags: [ops, sla, verification, internal]
 modules: [properties]
@@ -18,15 +18,16 @@ modules: [properties]
 
 **Monitor**
 
-- **To verify** tab, oldest first ? amber at 24 h ("due soon"), rose at 48 h ("overdue").
-- **Re-checks** and **Badge requests** tabs ? amber at 24 h, rose at 72 h.
-- **Flagged** tab count ? every flagged listing is out of search until you clear or archive it.
-- **Duplicates** tab count ? clusters still waiting for a decision.
-- **Follow-up** tab count ? live listings the owner has not confirmed for over two weeks. It has no amber or rose.
+- **To verify** tab, newest first — amber at 24 h ("due soon"), rose at 48 h ("overdue").
+- **Re-checks** and **Badge requests** tabs — amber at 24 h, rose at 72 h.
+- **Flagged** tab count — every flagged listing is out of search until you clear or archive it.
+- **Duplicates** tab count — clusters still waiting for a decision.
+- **Follow-up** tab count — live listings the owner has not confirmed for over two weeks. It has no amber or rose.
+- Every queue shows newest first, and each tile shows when the listing was created or last updated.
 
 **Work on**
 
-- Clear **To verify** from the oldest rose row down. Use the **Awaiting owner** chip to separate staff-posted listings that only need an owner nudge.
+- Clear the rose rows in **To verify** first; they sit at the end of the list. Use the **Awaiting owner** chip to separate staff-posted listings that only need an owner nudge.
 - Decide every row in **Re-checks**: **Looks fine**, or take the listing down.
 - Grant or decline every request in **Badge requests**.
 - Decide each cluster in **Duplicates** before approving any member.

@@ -1234,11 +1234,8 @@ role can do and may never be the thing that decides whether the caller is ops.
   "close" buttons wrote the owner's decision field with the operator's opinion. A write atom would
   have to name a route that does that, so there is neither; the console offers an internal note under
   `notes:write` instead - the operator's opinion recorded as the operator's opinion, beside the row
-  rather than inside it. Nor is there an `enquiries:reveal`: the detail routes that unmask one
-  contact number are guarded by this same atom with the *role* term raised to `admin`, the way
-  `users:read` guards both the masked directory and the audited user detail. Unmasking is a
-  narrower audience for one capability rather than a separate one, and a grid that grows a row per
-  shade of the same permission stops being read.
+  rather than inside it. Nor is there an `enquiries:reveal`: lists and details carry the full
+  number under this same atom, as every back-office surface does.
 - **`postOnBehalf:write`** is a write with no matching read, uniquely. The module is a single form
   with nothing to list, and a `postOnBehalf:read` would guard no route. It is its own module rather
   than `properties:write` because the route names another user as the owner of what it creates - an

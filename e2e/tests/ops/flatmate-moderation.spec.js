@@ -207,6 +207,7 @@ test.describe('Ops → flatmate desk (live)', () => {
       await expect(cards).toHaveCount(2);
       await expect(page.getByRole('status').filter({ hasText: 'items' })).toHaveText('2 items');
       await expect(cards.first()).toContainText(`${tag} second`);
+      await expect(cards.first().getByTestId('activity-stamp')).toHaveText(/^Created \d{1,2} [A-Z][a-z]{2,3} \d{4}, \d{1,2}:\d{2}\s(AM|PM)$/);
       await expect(page.getByRole('group', { name: 'Sort' })).toHaveCount(0);
 
       await page.getByRole('group', { name: 'Posted' }).getByRole('button', { name: 'Today', exact: true }).click();

@@ -40,6 +40,7 @@ const fromPost = (row) => ({
   headline: row.headline,
   locality: row.locality,
   author: row.authorName,
+  authorMobile: row.authorMobile,
   createdAt: row.createdAt,
   modStatus: row.modStatus,
   photoCount: row.photoCount,
@@ -78,6 +79,7 @@ const keyOf = (type, row) => {
 };
 
 const earliest = (a, b) => (a == null ? b : b == null ? a : Math.min(a, b));
+const latest = (a, b) => (a == null ? b : b == null ? a : Math.max(a, b));
 
 /* A room can be awaiting publish and claiming a badge at once. It gets one card with both
    reasons, not two cards that each hide half of what the reviewer must decide. */
@@ -92,6 +94,7 @@ export function mergeQueue(results) {
       ...patch,
       reasons: [...new Set([...prev.reasons, ...patch.reasons])],
       since: earliest(prev.since, patch.since),
+      latestAt: latest(prev.latestAt, patch.since),
     });
   }));
   const items = [...byKey.values()].sort((a, b) => (b.since || 0) - (a.since || 0));

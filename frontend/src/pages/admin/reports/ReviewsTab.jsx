@@ -110,7 +110,7 @@ export default function ReviewsTab() {
                 <span className={classNames(CHIP, CHIP_TONE.amber, 'gap-0.5')}><Star className="h-2.5 w-2.5" aria-hidden="true" />{r.rating || '—'}</span>
               </>
             )}
-            meta={<><span>{r.target || '—'}</span>{r.at ? <><span className="text-gray-600" aria-hidden="true">·</span><span>{r.at}</span></> : null}</>}
+            meta={<>{r.authorMobile ? <><span className="tabular-nums" data-testid="author-mobile">{r.authorMobile}</span><span className="text-gray-600" aria-hidden="true">·</span></> : null}<span>{r.target || '—'}</span>{r.at ? <><span className="text-gray-600" aria-hidden="true">·</span><span>{r.at}</span></> : null}</>}
             chips={r.text ? <p className="text-sm text-gray-300">{r.text}</p> : null}
             primary={(
               <>

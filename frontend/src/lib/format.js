@@ -10,6 +10,24 @@ export function fmtDate(iso) {
   return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
 }
 
+export function fmtDateTime(value) {
+  const d = value == null || value === '' ? null : new Date(value);
+  if (!d || Number.isNaN(d.getTime())) return '';
+  const text = d.toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true });
+  return text.replace(/\b(am|pm)\b/, (m) => m.toUpperCase());
+}
+
+const toMs = (v) => (v == null || v === '' ? NaN : typeof v === 'number' ? v : Date.parse(v));
+
+/** The newest of a record's timestamps, worded "Created" until anything after creation happens. */
+export function lastActivity(createdAt, ...later) {
+  const created = toMs(createdAt);
+  const times = [created, ...later.map(toMs)].filter(Number.isFinite);
+  if (!times.length) return null;
+  const at = Math.max(...times);
+  return { verb: Number.isFinite(created) && at > created ? 'Updated' : 'Created', at, text: fmtDateTime(at) };
+}
+
 export function fmtINR(n) {
   const num = Number(n) || 0;
   if (num >= 10000000) return '₹' + (num / 10000000).toFixed(2).replace(/\.00$/, '') + ' Cr';

@@ -42,7 +42,7 @@ class FlatmateModerationDetails {
     private FlatmateModerationDetailDto ofPost(FlatmateSeekerPost post) {
         User author = user(post.getUserId());
         return new FlatmateModerationDetailDto(
-                FlatmateModerationQueueDto.of(post, nameOf(author)), null, null,
+                FlatmateModerationQueueDto.of(post, author), null, null,
                 mapper.toDto(post, new FlatmateMapper.SeekerView(mobileOf(author))), null);
     }
 
@@ -52,7 +52,7 @@ class FlatmateModerationDetails {
         FlatmateMapper.RoomView view = roomCards
                 .ownerViews(List.of(room), nameOf(host), mobileOf(host)).get(room.getId());
         return new FlatmateModerationDetailDto(
-                FlatmateModerationQueueDto.of(room, nameOf(host)), mapper.toDto(room, view), null,
+                FlatmateModerationQueueDto.of(room, host), mapper.toDto(room, view), null,
                 null, reviewOf(review, host));
     }
 
@@ -62,7 +62,7 @@ class FlatmateModerationDetails {
         FlatmateMapper.PartyView view = new FlatmateMapper.PartyView(nameOf(host),
                 mobileOf(host), review == null ? null : review.getStatus());
         return new FlatmateModerationDetailDto(
-                FlatmateModerationQueueDto.of(group, nameOf(host)), null, mapper.toDto(group, view),
+                FlatmateModerationQueueDto.of(group, host), null, mapper.toDto(group, view),
                 null, reviewOf(review, host));
     }
 

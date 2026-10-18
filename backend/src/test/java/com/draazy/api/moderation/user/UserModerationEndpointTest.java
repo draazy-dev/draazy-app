@@ -7,7 +7,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -206,7 +205,7 @@ class UserModerationEndpointTest extends AbstractApiTest {
         mvc.perform(get(Routes.Users.BASE).param("q", "9877000032").param("counts", "true")
                         .header(HttpHeaders.AUTHORIZATION, bearer(actor)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].mobile").value("98XXXXX032"))
+                .andExpect(jsonPath("$.content[0].mobile").value("9877000032"))
                 .andExpect(jsonPath("$.content[0].badgePending").doesNotExist())
                 .andExpect(jsonPath("$.content[0].email").doesNotExist())
                 .andExpect(jsonPath("$.content[0].lastActive").doesNotExist())
@@ -517,7 +516,7 @@ class UserModerationEndpointTest extends AbstractApiTest {
                         .content("{\"name\":\"Renamed Owner\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name").value("Renamed Owner"))
-                .andExpect(jsonPath("$.mobile").value(MobileMask.mask(target.getMobile())))
+                .andExpect(jsonPath("$.mobile").value(target.getMobile()))
                 .andExpect(jsonPath("$.email").doesNotExist());
 
         String metadata = jdbc.queryForObject("""

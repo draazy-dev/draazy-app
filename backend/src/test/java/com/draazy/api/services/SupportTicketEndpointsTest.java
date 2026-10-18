@@ -372,12 +372,13 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
             String body = queue(desk)
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].raiser").value("Asha Patil"))
+                    .andExpect(jsonPath("$.content[0].raiserMobile").value("9840000149"))
                     .andReturn().getResponse().getContentAsString();
 
             // Absent, not empty: the thread is read one ticket at a time at GET /support/tickets/{id}, and a page of
             // twenty threads is the unbounded response the page envelope was meant to prevent.
             assertThat(body).doesNotContain(SECRET).doesNotContain("\"messages\"")
-                    .doesNotContain("\"notes\"").doesNotContain("9840000149");
+                    .doesNotContain("\"notes\"");
             assertThat(AdminSupportTicketDto.class.getRecordComponents())
                     .noneMatch(c -> "messages".equals(c.getName()) || "notes".equals(c.getName()));
         }

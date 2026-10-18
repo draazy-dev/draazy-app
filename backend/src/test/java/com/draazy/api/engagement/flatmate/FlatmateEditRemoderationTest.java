@@ -637,11 +637,11 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     }
 
     @Nested
-    @DisplayName("the verification desk shows the host's number in the popup, not on every card")
+    @DisplayName("the verification desk shows the host's number on the card and in the popup")
     class HostMobile {
 
         @Test
-        @DisplayName("a tenant-tier host's number leaves the server in full, from the detail only")
+        @DisplayName("a tenant-tier host's number leaves the server in full")
         void theDetailShowsTheMobile() throws Exception {
             String id = createRoom(host("9812000050", "Documented"),
                     roomBody("EditTownH", "Theta Place", "Private room", 15000,
@@ -651,7 +651,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
             mvc.perform(get(Routes.Moderation.FLATMATE_REVIEWS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.content[*].hostMobile").doesNotExist());
+                    .andExpect(jsonPath("$.content[*].hostMobile", Matchers.hasItem("9812000050")));
 
             mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk)))

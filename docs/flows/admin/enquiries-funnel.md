@@ -47,7 +47,7 @@ are enabled — all three through `services/enquiryBoardService.js` since D25, s
 active tab picks the base list; `rows` applies status filter, type filter (`deal`, deals only), free-
 text search (`JSON.stringify(r).includes(q)`), and a date-range cutoff over `at`/`when`.
 
-**Contact numbers arrive masked** (`98XXXXX210`). See 5.4a.
+**Contact numbers arrive in full**, as on every back-office surface. See 5.4a.
 
 The enquiry **type** filter is gone. It labelled every enquiry `contact`, `chat` or `call`;
 only `contact` is a row in a table, chats are private to their participants, and the platform
@@ -86,21 +86,15 @@ record that they acted — but the mechanism changed: `addNote('listing', proper
 `note` domain, rather than a status field on a conversation the platform is not party to and the two
 participants cannot see.
 
-### 5.4a The audited reveal (D25)
-A per-row Unlock button calls `GET /admin/{enquiries,visits,deals}/{id}`, which returns the same row
-with the one contact number readable and writes an `audit_log` entry **before** answering.
+### 5.4a The audited detail (D25)
+**View** calls `GET /admin/{enquiries,visits,deals}/{id}`, which returns the same row and writes an
+`audit_log` entry **before** answering. The list already carries the full number; browsing it
+writes no audit row.
 
-- **A detail read, never `?reveal=true` on the list.** A parameter makes bulk disclosure a single
-  request and reduces the audit trail to "somebody looked at forty numbers".
-- **Admin-only on the existing `enquiries:read` atom** — the role term is raised, the atom is not
-  duplicated, matching `UserAdminController.TIMELINE_READ`. A staffer therefore reads the board and
-  cannot open a row. (They never see the button: the whole admin console is admin-only at the
-  router, so the split is asserted at the API in `EnquiryBoardEndpointsTest`.)
+- **Same `enquiries:read` atom** as the list, so any staffer who reads the board can open a row.
 - **The audit row stores the masked number**, so the log is not a second copy of the secret. On the
   deals route it also records `source: off-platform | account`, because a counterparty mobile may
   have been typed by an owner closing privately and belong to nobody with an account here.
-- The reply replaces the row in place, so the CSV export — which writes whatever is in memory — can
-  only ever carry numbers an operator deliberately opened, one audited click at a time.
 
 ### 5.5 Assignment (current state)
 - The admin enquiries desk has **no assignee field today** - enquiries/visits are triaged by status,

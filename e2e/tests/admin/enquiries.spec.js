@@ -1,10 +1,9 @@
-/* Demand board against the live API: lists carry masked contacts, and opening a row's detail returns the full number
- * and is recorded against whoever opened it. */
+/* Demand board against the live API: lists and details carry the full number, and opening a row's detail is recorded
+ * against whoever opened it. */
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
 
 const RAW = /^[6-9]\d{9}$/;
-const MASKED = /^[6-9]\dX{5}\d{3}$/;
 
 async function openBoard(page, tab) {
   await page.goto(tab ? `/admin/enquiries?tab=${tab}` : '/admin/enquiries');
@@ -13,7 +12,7 @@ async function openBoard(page, tab) {
   await expect(page.getByTestId('queue-row').first()).toBeVisible();
 }
 
-test('every tab lists masked contacts, and the detail modal opens the full number', async ({ page, login, consoleErrors }) => {
+test('every tab lists full contacts, and the detail modal opens the full number', async ({ page, login, consoleErrors }) => {
   await login.asAdmin();
   await openBoard(page);
 
@@ -26,9 +25,8 @@ test('every tab lists masked contacts, and the detail modal opens the full numbe
     const rows = Number(await page.getByTestId(`tab-count-${tab}`).innerText());
     if (rows === 0) continue;
 
-    await expect(page.getByText(RAW), `the ${tab} list must not carry a full mobile`).toHaveCount(0);
     if (tab !== 'deals') {
-      await expect(page.getByTestId('queue-row').first().getByText(MASKED), `the ${tab} list shows a masked mobile`).toBeVisible();
+      await expect(page.getByTestId('queue-row').first().getByText(RAW), `the ${tab} list shows the full mobile`).toBeVisible();
     }
 
     await page.getByTestId('queue-row').first().locator('[title="View"]').click();

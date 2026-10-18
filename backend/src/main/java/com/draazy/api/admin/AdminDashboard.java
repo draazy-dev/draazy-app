@@ -40,7 +40,7 @@ public record AdminDashboard(
     public record Tickets(long open, String openTeam, List<TicketRow> latest) {
     }
 
-    public record TicketRow(String id, String team, String service, String customer, String detail,
-            String status) {
+    public record TicketRow(String id, String team, String service, String customer, String mobile,
+            String detail, String status) {
     }
 }

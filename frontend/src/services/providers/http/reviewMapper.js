@@ -77,6 +77,7 @@ export function toModerationViewModel(r) {
     ...base,
     // `pending` is the intake state; defaulted so the Badge never renders an empty chip that reads as "approved".
     status: r.status || 'pending',
+    authorMobile: r.authorMobile || '',
     target: label && r.targetId ? `${label}: ${r.targetId}` : label || null,
   };
 }

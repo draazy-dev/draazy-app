@@ -65,7 +65,7 @@ export async function searchForModeration(filters = {}, sort = 'newest', { page 
 export async function lookupForModeration(q, { size = 6 } = {}) {
   const res = await get('/admin/properties/lookup', { q, page: 0, size });
   return {
-    items: (res?.content ?? []).map((l) => ({ id: l.slug || l.id, title: l.title, locality: l.locality, owner: l.owner, status: l.status })),
+    items: (res?.content ?? []).map((l) => ({ id: l.slug || l.id, title: l.title, locality: l.locality, owner: l.owner, ownerMobile: l.ownerMobile, status: l.status })),
     total: res?.totalElements ?? 0,
   };
 }

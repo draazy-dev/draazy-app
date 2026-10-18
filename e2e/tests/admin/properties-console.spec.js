@@ -112,6 +112,7 @@ const tab = (page, name) => page.getByRole('tab', { name });
 const rows = (page) => page.getByTestId('queue-row');
 const rowFor = (page, title) => rows(page).filter({ has: page.getByRole('heading', { name: title }) });
 const searchBox = (page) => page.getByPlaceholder('Title, owner, mobile or ID');
+const STAMP_12H = /^\d{1,2} [A-Z][a-z]{2,3} \d{4}, \d{1,2}:\d{2}\s(AM|PM)$/;
 
 function queueFetch(match = {}) {
   return (res) => {
@@ -186,10 +187,32 @@ test.describe('LIVE: the properties console', () => {
     const labels = await page.getByRole('tab').allInnerTexts();
     TAB_ORDER.forEach((pattern, i) => expect(labels[i].trim()).toMatch(pattern));
     await expect(tab(page, /^To verify/)).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId('verify-note')).toContainText('Oldest first');
+    await expect(page.getByTestId('verify-note')).toContainText('Newest first');
     await expect(page.getByRole('group', { name: 'Sort' })).toHaveCount(0);
     await expect(rows(page).first()).toBeVisible({ timeout: 20000 });
     expect(consoleErrors).toEqual([]);
+  });
+
+  test('To verify lists the newest listing first and stamps when it was created', async ({ page, login }) => {
+    const listing = await pendingListing('newest');
+    await login.asAdmin();
+    await openConsole(page, '', { status: 'pending', archived: 'false', sort: 'createdAt,desc', page: '0', size: String(PAGE_LIMIT) });
+
+    const first = rows(page).first();
+    await expect(first.getByRole('heading', { name: listing.title })).toBeVisible({ timeout: 20000 });
+    await expect(first.getByText('Created', { exact: true })).toBeVisible();
+    await expect(first.getByTestId('activity-stamp')).toHaveText(STAMP_12H);
+  });
+
+  test('a re-check tile is stamped with the owner\'s edit, not the creation time', async ({ page, login, request }) => {
+    const listing = await recheckListing(request, 'stamp');
+    await login.asAdmin();
+    await openConsole(page, '?tab=recheck', { recheck: 'true', archived: 'false', sort: 'recheckRequestedAt,desc', page: '0', size: String(PAGE_LIMIT) });
+
+    const row = rowFor(page, listing.title);
+    await expect(row).toBeVisible({ timeout: 20000 });
+    await expect(row.getByText('Updated', { exact: true })).toBeVisible();
+    await expect(row.getByTestId('activity-stamp')).toHaveText(STAMP_12H);
   });
 
   test('tab selection, deep links and removed tab names resolve through the URL', async ({ page, login }) => {

@@ -105,7 +105,7 @@ public class AdminDashboardService {
     }
 
     private static AdminDashboard.TicketRow row(TicketRow t) {
-        return new AdminDashboard.TicketRow(t.id(), t.team(), t.service(), t.customer(), t.detail(),
-                t.status());
+        return new AdminDashboard.TicketRow(t.id(), t.team(), t.service(), t.customer(), t.mobile(),
+                t.detail(), t.status());
     }
 }

@@ -40,9 +40,10 @@ test.describe('LIVE: the staff Refunds desk', () => {
       await expect(page.getByRole('tab', { name: /^Pending/ })).toHaveAttribute('aria-selected', 'true');
     });
 
-    await test.step('a pending row names the customer, the plan and the order, and carries the risk chips and both buttons', async () => {
+    await test.step('a pending row names the customer with their full mobile, the plan and the order, and carries the risk chips and both buttons', async () => {
       const row = rowFor(page, 'Desk Anita');
       await expect(row).toHaveCount(1);
+      await expect(row.getByTestId('customer-mobile')).toHaveText(anita.mobile);
       await expect(row).toContainText('₹199');
       await expect(row).toContainText('Contact Pack');
       await expect(row).toContainText('Pending');
@@ -79,7 +80,7 @@ test.describe('LIVE: the staff Refunds desk', () => {
 
     await row.getByTestId('refund-approve').click();
     const modal = page.getByRole('dialog', { name: 'Approve refund' });
-    await expect(modal).toContainText('Desk Chitra · Contact Pack · ₹199');
+    await expect(modal).toContainText(`Desk Chitra · ${buyer.mobile} · Contact Pack · ₹199`);
     await expect(modal).toContainText('This pays ₹199 back to the original payment method.');
     await page.keyboard.press('Escape');
     await expect(modal).toHaveCount(0);

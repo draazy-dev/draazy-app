@@ -3,17 +3,8 @@ package com.draazy.api.engagement.flatmate;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * Contract schema {@code GroupApplication}.
- *
- * <p>Most of this is derived by joining the listing and the group: an application row itself holds
- * only the two keys, the two statuses and the timestamps. Denormalising the titles and the rent onto
- * the row would mean an admin screen rendering a price that stopped being true the moment the owner
- * edited their listing.
- *
- * @param status    the OWNER's decision — admin may never write it
- * @param modStatus the ADMIN's moderation axis, independent of the above
- */
+/** Titles and rent are joined from the listing, not stored on the row, so no screen shows a stale price.
+ * {@code status} is the owner's call (admin never writes it); {@code applicantMobile} is null in the owner's inbox. */
 public record GroupApplicationDto(
         UUID id,
         UUID listingId,
@@ -23,6 +14,7 @@ public record GroupApplicationDto(
         Long perHead,
         String groupTitle,
         String applicantName,
+        String applicantMobile,
         int members,
         int seatsTotal,
         String status,
@@ -30,7 +22,7 @@ public record GroupApplicationDto(
         Instant at) {
 
     static GroupApplicationDto of(FlatmateGroupApplication application, String listingTitle,
-            String locality, Long rent, String groupTitle, String applicantName,
+            String locality, Long rent, String groupTitle, String applicantName, String applicantMobile,
             int members, int seatsTotal) {
         return new GroupApplicationDto(
                 application.getId(),
@@ -43,6 +35,7 @@ public record GroupApplicationDto(
                 rent == null || seatsTotal <= 0 ? rent : rent / seatsTotal,
                 groupTitle,
                 applicantName,
+                applicantMobile,
                 members,
                 seatsTotal,
                 application.getStatus(),

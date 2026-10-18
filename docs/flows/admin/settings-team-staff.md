@@ -116,9 +116,8 @@ the module map; `rbac.spec.js` asserts it never reappears in the catalogue.
 see" (a per-row summary would cost one request per member to answer a question nobody has asked yet).
 
 `saveMember()` validation and payload shaping:
-- Name required. **Mobile only on create**: it is the sign-in credential, there is no route that
-  changes it, and the directory publishes it masked (`97XXXXX115`), so the edit form renders it
-  read-only and omits it from the `PATCH`.
+- Name required. **Mobile only on create**: it is the sign-in credential and there is no route that
+  changes it, so the edit form renders it read-only and omits it from the `PATCH`.
 - **Last-admin guardrail:** editing cannot demote or suspend the final active admin. This is a
   console-only path precisely because the contract has no role-change route at all - `teamProvider`
   refuses a role or team change outright rather than PATCHing the subset the server accepts and

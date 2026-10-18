@@ -58,21 +58,21 @@ public class EnquiryBoardService {
     public Page<AdminEnquiryDto> enquiries(String status, String q, Integer days, Pageable pageable) {
         return queries.enquiries(filter(status, null, q, days), Pageables.unsorted(pageable)).map(r -> new AdminEnquiryDto(
                 r[0].toString(), r[1].toString(), (String) r[2], (String) r[3], (String) r[4],
-                MobileMask.mask((String) r[5]), (String) r[6], (Instant) r[7]));
+                (String) r[5], (String) r[6], (Instant) r[7]));
     }
 
     @Transactional(readOnly = true)
     public Page<AdminVisitDto> visits(String status, String q, Integer days, Pageable pageable) {
         return queries.visits(filter(status, null, q, days), Pageables.unsorted(pageable)).map(r -> new AdminVisitDto(
                 r[0].toString(), r[1].toString(), (String) r[2], (String) r[3], (String) r[4],
-                MobileMask.mask((String) r[5]), (Instant) r[6], (String) r[7], (String) r[8], (Instant) r[9]));
+                (String) r[5], (Instant) r[6], (String) r[7], (String) r[8], (Instant) r[9]));
     }
 
     @Transactional(readOnly = true)
     public Page<AdminDealDto> deals(String status, String deal, String q, Integer days, Pageable pageable) {
         return queries.deals(filter(status, deal, q, days), Pageables.unsorted(pageable)).map(r -> new AdminDealDto(
                 r[0].toString(), r[1].toString(), (String) r[2], (String) r[3], (String) r[4], (String) r[5],
-                MobileMask.mask(r[6] != null ? (String) r[6] : (String) r[7]), (Long) r[8], (String) r[9],
+                r[6] != null ? (String) r[6] : (String) r[7], (Long) r[8], (String) r[9],
                 (Instant) r[10], (Instant) r[11]));
     }
 
@@ -136,7 +136,6 @@ public class EnquiryBoardService {
 
     private static EnquiryBoardQueries.Filter filter(String status, String deal, String q, Integer days) {
         String term = q == null ? "" : q.trim().toLowerCase();
-        // Whole number only: rows mask the mobile, so a prefix match would let a caller unmask it digit by digit.
         String mobile = MobileMask.normalise(term);
         return new EnquiryBoardQueries.Filter(
                 status == null ? "" : status.trim(),

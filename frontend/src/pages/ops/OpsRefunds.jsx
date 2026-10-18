@@ -42,7 +42,7 @@ function ApproveModal({ row, busy, onClose, onConfirm }) {
         </button>
       )}
     >
-      <p className="text-sm text-gray-300">{row.customerName || 'Customer'} · {row.label} · {fmtINR(row.amount)}</p>
+      <p className="text-sm text-gray-300">{row.customerName || 'Customer'}{row.customerMobile ? ` · ${row.customerMobile}` : ''} · {row.label} · {fmtINR(row.amount)}</p>
       <p className="mt-1 font-mono text-xs text-gray-400">{row.orderRef}</p>
       <p className="mt-3 text-xs text-gray-400">This pays {fmtINR(row.amount)} back to the original payment method.</p>
     </Modal>
@@ -64,7 +64,7 @@ function RejectModal({ row, busy, onClose, onConfirm }) {
         </button>
       )}
     >
-      <p className="mb-3 text-sm text-gray-300">{row.customerName} · {row.label} · {fmtINR(row.amount)}</p>
+      <p className="mb-3 text-sm text-gray-300">{row.customerName}{row.customerMobile ? ` · ${row.customerMobile}` : ''} · {row.label} · {fmtINR(row.amount)}</p>
       <label className="block text-xs text-gray-400">
         Reason (required)
         <textarea value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} rows={3} className="dz-input mt-1 w-full text-sm" data-testid="refund-reject-reason" />
@@ -232,7 +232,7 @@ export default function OpsRefunds() {
               id={r.id}
               title={<>{r.customerName || 'Customer'} <span className="font-normal text-gray-500">·</span> {fmtINR(r.amount)}</>}
               badges={<span className={classNames(CHIP, STATUS_TONE[r.status] || CHIP_TONE.neutral)}>{STATUS_LABEL[r.status] || r.status}</span>}
-              meta={<><span>{r.label}</span><Dot /><span className="font-mono">{r.orderRef}</span><Dot /><span>Requested {fmtDate(r.at)}</span></>}
+              meta={<><span>{r.label}</span>{r.customerMobile ? <><Dot /><span className="tabular-nums" data-testid="customer-mobile">{r.customerMobile}</span></> : null}<Dot /><span className="font-mono">{r.orderRef}</span><Dot /><span>Requested {fmtDate(r.at)}</span></>}
               facts={(
                 <>
                   {r.basis ? <FactRow label="Basis"><span className="col-span-full">{r.basis}</span></FactRow> : null}

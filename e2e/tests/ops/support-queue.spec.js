@@ -1,8 +1,8 @@
-import { expect, MOBILE, test } from '../../fixtures/live.js';
+import { expect, test } from '../../fixtures/live.js';
 import { API, apiLogin } from '../../helpers/liveAuth.js';
 
 /* Ops Support queue against the live API. Covers what the mock could not falsify: the two-sided read model
-   (`unread` is the raiser's, `staff_unread` the desk's), the withheld mobile, staff answering others' tickets. */
+   (`unread` is the raiser's, `staff_unread` the desk's), the raiser's mobile, staff answering others' tickets. */
 
 /** Rahul Mehta — an ordinary buyer, and in this file the customer who writes in. */
 const CUSTOMER = '9700000001';
@@ -55,7 +55,7 @@ async function asCustomer(id, who = CUSTOMER) {
 }
 
 test.describe('Ops → Support queue (live)', () => {
-  test('the working queue is what the server says is waiting, and carries no mobile number', async ({ page, login, consoleErrors }) => {
+  test('the working queue is what the server says is waiting, with the raiser’s full mobile', async ({ page, login, consoleErrors }) => {
     await seedConsent(page);
     await login.asStaff('rental');
     await page.goto('/ops/support');
@@ -77,11 +77,7 @@ test.describe('Ops → Support queue (live)', () => {
     // The raiser is a display name, and "Us" is the desk's own side of the read model.
     await expect(row.getByText(SEEDED.raiser)).toBeVisible();
     await expect(row.getByText('Waiting on us', { exact: true })).toBeVisible();
-
-    /* The mobile is withheld by the schema: Priya has one that GET /support/tickets/{id} shows this caller.
-       MOBILE is anchored (see fixtures/live.js) because Date.now() stamps look like mobiles. */
-    const queue = await page.getByRole('tabpanel').innerText();
-    expect(queue).not.toMatch(MOBILE);
+    await expect(row.getByTestId('raiser-mobile')).toHaveText(SEEDED_RAISER);
 
     expect(consoleErrors).toEqual([]);
   });

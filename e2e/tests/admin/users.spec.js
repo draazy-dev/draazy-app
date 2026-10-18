@@ -20,9 +20,9 @@ async function findUser(page, name) {
   return row;
 }
 
-test('the directory lists accounts with role, status and a masked mobile, filters by status on the server, and narrows by search', async ({ page, login, consoleErrors }) => {
+test('the directory lists accounts with role, status and a full mobile, filters by status on the server, and narrows by search', async ({ page, login, consoleErrors }) => {
   await login.asAdmin();
-  await test.step('the directory lists accounts with role, status and a masked mobile', async () => {
+  await test.step('the directory lists accounts with role, status and a full mobile', async () => {
     await openUsers(page);
 
     // Directory copy depends on shared population size, not this test.
@@ -32,7 +32,7 @@ test('the directory lists accounts with role, status and a masked mobile, filter
 
     // Use Nikhil Sharma because Nikhil Nair is not unique in the seed.
     const row = await findUser(page, 'Nikhil Sharma');
-    await expect(row.getByText(/^\d{2}X{5}\d{3}$/)).toBeVisible();
+    await expect(row.getByText(/^[6-9]\d{9}$/)).toBeVisible();
     await expect(row.getByText('owner', { exact: true })).toBeVisible();
 
     expect(consoleErrors).toHaveLength(0);

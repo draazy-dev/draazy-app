@@ -7,9 +7,11 @@ import Loading from '../../components/ui/Loading.jsx';
 import Select from '../../components/ui/Select.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { hasPermission } from '../../lib/adminModules.js';
+import { classNames, fmtNum, lastActivity } from '../../lib/format.js';
 import { useTabParam } from '../../lib/useTabParam.js';
 import { Chips, ClearFilters, PageNav, QueueTabs, SearchBox } from '../../components/admin/WorkQueue.jsx';
 import KycReviewModal from './kyc/KycReviewModal.jsx';
+import { CLAIM_HOLD_LIMIT, DOC_OPTIONS, STATUS_LABELS, docLabel, elapsed } from './kyc/vocabulary.js';
 
 const PAGE_SIZE = 10;
 const TABS = [
@@ -191,7 +193,8 @@ export default function OpsIdentityReview() {
 
 function QueueRow({ row, tab, onOpen }) {
   const lockedByOther = row.claimedByName && !row.claimedByMe;
-  const age = tab === 'needs' ? elapsed(row.submittedAt) : tab === 'qa' ? elapsed(row.qaSampledAt) : null;
+  const age = tab === 'needs' ? elapsed(row.submittedAt) : null;
+  const stamp = lastActivity(row.submittedAt, row.decidedAt, row.revokedAt);
   return (
     <li className="border-b border-white/[0.06] last:border-b-0">
       <button type="button" onClick={onOpen} data-testid="kyc-row" className={classNames(GRID, 'w-full cursor-pointer px-4 py-3 text-left transition-colors hover:bg-white/[0.03]', lockedByOther && 'opacity-60')}>
@@ -203,16 +206,21 @@ function QueueRow({ row, tab, onOpen }) {
           <div className="truncate text-xs tabular-nums text-gray-500">{row.userMobile || '—'}</div>
         </div>
         <div className="truncate text-sm text-gray-300">{docLabel(row.docType)}</div>
-        <div className={classNames('flex items-center gap-1.5 text-xs tabular-nums', age ? AGE_TONE[age.tone] : 'text-gray-400')}>
-          {age ? <><Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />{age.text}{age.tone === 'breach' ? ' · overdue' : age.tone === 'warn' ? ' · due soon' : ''}</> : dateLabel(row.revokedAt || row.decidedAt)}
+        <div className="min-w-0 text-xs tabular-nums">
+          {age ? (
+            <div className={classNames('flex items-center gap-1.5', AGE_TONE[age.tone])}>
+              <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />{age.text}{age.tone === 'breach' ? ' · overdue' : age.tone === 'warn' ? ' · due soon' : ''}
+            </div>
+          ) : null}
+          <div data-testid="activity-stamp" title={stamp ? `${stamp.verb} ${stamp.text}` : undefined} className={classNames('truncate', age ? 'text-[11px] text-gray-500' : 'text-gray-400')}>
+            {stamp ? `${stamp.verb} ${stamp.text}` : '—'}
+          </div>
         </div>
         <div className="min-w-0 truncate text-xs">
           {tab === 'needs' ? (
             row.claimedByMe ? <span className="text-teal-200">Claimed by you</span>
               : lockedByOther ? <span className="dz-tag border border-amber-400/30 bg-amber-500/15 text-amber-200">In review · {row.claimedByName}</span>
                 : <span className="text-gray-500">Unclaimed</span>
-          ) : tab === 'qa' ? (
-            <span className="text-gray-300">{row.approvedByName || '—'}</span>
           ) : (
             <Badge status={row.status}>{STATUS_LABELS[row.status] || row.status}</Badge>
           )}

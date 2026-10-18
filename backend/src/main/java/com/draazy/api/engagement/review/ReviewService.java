@@ -75,8 +75,8 @@ public class ReviewService {
     public Page<ReviewModerationRow> listForModeration(String status, String q, Pageable pageable) {
         Page<Review> page = reviews.findForModeration(
                 status == null || status.isBlank() ? null : status.strip(), LikePatterns.contains(q), pageable);
-        Map<UUID, String> names = authorNames(page.getContent());
-        return page.map(r -> ReviewModerationRow.of(r, nameOf(names, r)));
+        Map<UUID, User> authors = authors(page.getContent());
+        return page.map(r -> ReviewModerationRow.of(r, authorOf(authors, r)));
     }
 
     /** Whole-queue totals for the status chips: {@code all} plus one key per status, zero when none. */
@@ -102,9 +102,9 @@ public class ReviewService {
     public ReviewListResponse listForEntity(String entityType, String entityId, Pageable pageable, UUID viewerId) {
         String key = targetKey.resolve(entityType, entityId);
         Page<Review> page = reviews.findPublished(entityType, key, pageable);
-        Map<UUID, String> names = authorNames(page.getContent());
+        Map<UUID, User> authors = authors(page.getContent());
         return ReviewListResponse.of(
-                page.map(r -> mapper.toResponse(r, nameOf(names, r), mineFor(r, viewerId))),
+                page.map(r -> mapper.toResponse(r, nameOf(authors, r), mineFor(r, viewerId))),
                 summaryOf(entityType, key));
     }
 
@@ -221,16 +221,21 @@ public class ReviewService {
         }
     }
 
-    /** Guarded because {@link #authorNames} returns {@code Map.of()} when no row has an author,
+    /** Guarded because {@link #authors} returns {@code Map.of()} when no row has an author,
      * and an immutable map NPEs on a null key. */
-    private String nameOf(Map<UUID, String> names, Review row) {
-        return row.getAuthorId() == null ? null : names.get(row.getAuthorId());
+    private static User authorOf(Map<UUID, User> authors, Review row) {
+        return row.getAuthorId() == null ? null : authors.get(row.getAuthorId());
+    }
+
+    private static String nameOf(Map<UUID, User> authors, Review row) {
+        User author = authorOf(authors, row);
+        return author == null ? null : author.getName();
     }
 
     private List<ReviewResponse> withAuthors(List<Review> rows, UUID viewerId) {
-        Map<UUID, String> names = authorNames(rows);
+        Map<UUID, User> authors = authors(rows);
         return rows.stream()
-                .map(r -> mapper.toResponse(r, nameOf(names, r), mineFor(r, viewerId)))
+                .map(r -> mapper.toResponse(r, nameOf(authors, r), mineFor(r, viewerId)))
                 .toList();
     }
 
@@ -240,7 +245,7 @@ public class ReviewService {
     }
 
     /** One query per page: resolving authors in the row mapping is an N+1 on a public anonymous endpoint. */
-    private Map<UUID, String> authorNames(List<Review> rows) {
+    private Map<UUID, User> authors(List<Review> rows) {
         Set<UUID> ids = rows.stream()
                 .map(Review::getAuthorId)
                 .filter(java.util.Objects::nonNull)
@@ -248,11 +253,11 @@ public class ReviewService {
         if (ids.isEmpty()) {
             return Map.of();
         }
-        Map<UUID, String> names = new HashMap<>();
+        Map<UUID, User> out = new HashMap<>();
         for (User u : users.findAllById(ids)) {
-            names.put(u.getId(), u.getName());
+            out.put(u.getId(), u);
         }
-        return names;
+        return out;
     }
 
     private String displayName(UUID userId) {

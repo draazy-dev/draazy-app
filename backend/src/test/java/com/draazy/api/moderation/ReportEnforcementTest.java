@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
-import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.moderation.report.Report;
@@ -281,7 +280,7 @@ class ReportEnforcementTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].targetName").value("Offender Name"))
-                .andExpect(jsonPath("$.content[0].targetMobile").value(MobileMask.mask("9800000242")));
+                .andExpect(jsonPath("$.content[0].targetMobile").value("9800000242"));
     }
 
     @Test

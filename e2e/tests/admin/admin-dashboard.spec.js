@@ -210,5 +210,10 @@ test.describe('/admin dashboard — the scorecard is the server\'s', () => {
 
     // In order, not as a set.
     await expect(card.locator('.text-sm.font-semibold')).toHaveText(titles(oldest));
+
+    const dash = await api('GET', '/admin/dashboard', admin);
+    const first = dash.body.listings.oldestPending[0];
+    expect(first.ownerMobile).toMatch(/^\d{10}$/);
+    await expect(card.locator('.truncate.text-xs').first()).toContainText(first.ownerMobile);
   });
 });

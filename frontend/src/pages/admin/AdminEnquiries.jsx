@@ -37,7 +37,7 @@ const NOTES = {
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 
 /** The board is read-only: `contact_requests.status` is the owner's decision, so "Responded" writes a note.
- * Lists carry masked mobiles; opening a row's detail returns the full number and is audited. */
+ * Opening a row's detail is audited. */
 export default function AdminEnquiries() {
   const { toast } = useToast();
   const [tab, setTab] = useTabParam(['enquiries', 'visits', 'deals', 'funnel'], 'enquiries');
@@ -124,7 +124,7 @@ export default function AdminEnquiries() {
 
   const note = tab === 'deals' ? `Deals agreed through the platform \u2014 ${fmtINR(summary.gmv)} across all deals.` : NOTES[tab];
 
-  // The export is the first 100 matching rows; the list's masked mobile is what it carries.
+  // The export is the first 100 matching rows.
   const doExport = async () => {
     try {
       const all = (await LISTERS[tab]({ status: statusF, deal: tab === 'deals' ? typeF : '', q: qLive, days: dateRange, page: 0, size: MAX_PAGE_SIZE })).items;

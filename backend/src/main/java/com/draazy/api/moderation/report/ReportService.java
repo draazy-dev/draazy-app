@@ -9,7 +9,6 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.RateLimitedException;
 import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.persistence.LikePatterns;
-import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.engagement.flatmate.FlatmateModerationService;
 import com.draazy.api.identity.user.User;
@@ -138,7 +137,7 @@ public class ReportService {
                     .withTargetReportCount(perTarget.getOrDefault(r.getTargetId(), 1L))
                     .withTargetTitle(titles.get(r.getTargetId()));
             User person = people.get(r.getTargetId());
-            return person == null ? row : row.withTargetPerson(person.getName(), MobileMask.mask(person.getMobile()));
+            return person == null ? row : row.withTargetPerson(person.getName(), person.getMobile());
         });
     }
 

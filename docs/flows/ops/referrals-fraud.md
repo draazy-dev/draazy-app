@@ -39,8 +39,8 @@
   (`owner` | `seeker`, whichever qualifying event came first), `risk`, the signals
   (`identityVerified`, `identityUnique`, `activated`, `sameDevice`, `sameIp`, `velocityHigh`),
   `holdUntil`, `autoReason` and `at`.
-  Both mobiles are masked and stay masked: a privileged list is masked platform-wide, and checkers
-  decide on server-computed signals.
+  Both mobiles are in full, as on every back-office surface; checkers still decide on
+  server-computed signals.
 - **The referrer's rewards** are derived on every read by `billing.entitlement` from the granting
   referrals (owner-track: free agreements; seeker-track: owner contacts). There is no balance column,
   which is what makes clawback whole.
@@ -185,7 +185,6 @@ contact announcing against the same referral, mints nothing. A rejected row is n
 a later event. `uq_referrals_referred_mobile` admits one row per referred mobile, so "one reward per
 referee, ever" needs no further constraint.
 
-### Queue paging and masking
-`ReferralService.queue` resolves the page's referrer names in one query (`toDtos`). `ReferralMapper.masked`
-is hand-written and private per api-standards §8.1; both mobiles go through it and nothing returns a
-raw one.
+### Queue paging
+`ReferralService.queue` resolves the page's referrer names in one query (`toDtos`). Both mobiles are
+returned in full.

@@ -101,11 +101,11 @@ The desk refuses a blank one ("Add a clear reason before rejecting") and
 always told why."* Two guards for one rule, because the client one is a courtesy and the server one
 is the rule. A host told "no" without being told why cannot fix anything, and will simply post again.
 
-### 5.4 The host's mobile number is masked
-`FlatmateReviewDto` carries the number in full; `flatmateModerationMapper.js` renders it as
-`••••• 1234`. A **deliberate divergence from the DTO's own javadoc**, on the ruling that this desk
-decides on the declaration and the agreement document and should never need to ring anyone - a desk
-that can phone a host can be socially engineered into doing it on somebody else's behalf.
+### 5.4 The author's mobile number is shown in full
+`FlatmateReviewDto` and the queue cards carry the number in full (`hostMobile` on
+`FlatmateReviewRow`, `authorMobile` on `FlatmateModerationRow`, `applicantMobile` on the staff
+group-application list), as on every back-office surface. The owner's inbox gets no
+`applicantMobile`.
 
 ### 5.5 The moderation vocabulary, and the two words that are missing
 Kinds: `post` / `room` / `group`, one board at a time - three tables, and a merged board would have

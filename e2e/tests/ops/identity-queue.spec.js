@@ -151,3 +151,23 @@ test('a case opens with evidence beside the fields, a checklist gating approve, 
   await expect.poll(() => desk.released).toEqual(['case-1', 'case-2']);
   expect(consoleErrors).toEqual([]);
 });
+
+test.describe('row timestamps', () => {
+  test.use({ timezoneId: 'Asia/Kolkata' });
+
+  test('a row shows when the case was submitted, or last decided, in 12-hour time', async ({ page, login }) => {
+    await mockDesk(page, login);
+    await page.route((url) => url.pathname === '/api/moderation/identity-reviews', (route) => {
+      const decided = new URL(route.request().url()).searchParams.get('status') === 'decided';
+      const row = decided
+        ? kycCase(1, { status: 'verified', submittedAt: '2026-10-18T04:54:00Z', decidedAt: '2026-10-18T09:05:00Z' })
+        : kycCase(1, { submittedAt: '2026-10-18T04:54:00Z' });
+      return route.fulfill({ json: { content: [row], totalElements: 1, totalPages: 1, number: 0, size: 10 } });
+    });
+    await page.goto('/ops/kyc-review');
+
+    await expect(page.getByTestId('kyc-row').getByTestId('activity-stamp')).toHaveText(/^Created 18 Oct 2026, 10:24\sAM$/);
+    await page.getByRole('tab', { name: /^Decided/ }).click();
+    await expect(page.getByTestId('kyc-row').getByTestId('activity-stamp')).toHaveText(/^Updated 18 Oct 2026, 2:35\sPM$/);
+  });
+});

@@ -165,7 +165,7 @@ function PlatformDashboard({ user }) {
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-semibold">{l.title}</div>
                     <div className="truncate text-xs text-gray-500">
-                      {l.locality} · {fmtINR(l.price)} · {l.owner}
+                      {l.locality} · {fmtINR(l.price)} · {l.owner}{l.ownerMobile ? ` · ${l.ownerMobile}` : null}
                     </div>
                   </div>
                   <Link to="/admin/properties" className="dz-btn dz-btn-primary text-xs">
@@ -202,7 +202,7 @@ function PlatformDashboard({ user }) {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold">{t.service}</div>
                   <div className="truncate text-xs text-gray-500">
-                    {t.customer} · {t.detail}
+                    {t.customer}{t.mobile ? ` · ${t.mobile}` : null} · {t.detail}
                   </div>
                 </div>
                 <Badge status={t.status} />

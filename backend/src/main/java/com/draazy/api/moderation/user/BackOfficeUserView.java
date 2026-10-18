@@ -1,7 +1,6 @@
 package com.draazy.api.moderation.user;
 
 import com.draazy.api.common.error.NotFoundException;
-import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserMapper;
@@ -63,7 +62,7 @@ class BackOfficeUserView {
             UserResponse base = mapper.toResponse(user);
             String source = !user.isVerified() ? null
                     : identityBacked.contains(user.getId()) ? BADGE_FROM_IDENTITY : BADGE_BY_HAND;
-            return new AdminUserRow(base.id(), base.name(), MobileMask.mask(base.mobile()), base.role(),
+            return new AdminUserRow(base.id(), base.name(), base.mobile(), base.role(),
                     base.status(), base.verified(), base.city(), base.listingsCount(),
                     base.joinedAt() != null ? base.joinedAt() : base.createdAt(),
                     user.isFlagged(), user.getFlagReason(), source, user.isArchived());

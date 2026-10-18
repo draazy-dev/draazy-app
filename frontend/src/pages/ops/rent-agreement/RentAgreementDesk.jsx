@@ -153,6 +153,7 @@ function CaseRow({ row, onOpen }) {
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-white">{s.owner || 'Owner not given'}</div>
           <div className="truncate text-xs text-gray-400">→ {s.tenants || 'Tenant not given'}</div>
+          {row.requesterMobile ? <div className="truncate text-xs tabular-nums text-gray-500" data-testid="requester-mobile">{row.requesterName ? `By ${row.requesterName} · ` : 'By '}{row.requesterMobile}</div> : null}
         </div>
         <div className="min-w-0 truncate text-xs text-gray-300">
           {[s.flat, s.locality].filter(Boolean).join(' · ') || '—'}

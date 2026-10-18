@@ -113,6 +113,7 @@ export function toViewModel(p) {
     resubmittedAt: p.resubmittedAt ?? null,
     // Missing confirmation must leave the freshness reader's createdAt fallback intact.
     freshenedAt: p.lastConfirmedAt ? String(p.lastConfirmedAt).slice(0, 10) : undefined,
+    confirmedAt: p.lastConfirmedAt ?? null,
     flagReason: p.flagReason ?? '',
     recheckPending: p.recheckPending ?? false,
     recheckReason: p.recheckReason ?? '',
@@ -243,11 +244,8 @@ const SORTS = {
   'price-asc': 'price,asc',
   'price-desc': 'price,desc',
   'area-desc': 'area,desc',
-  'recheck-oldest': 'recheckRequestedAt,asc',
   'recheck-newest': 'recheckRequestedAt,desc',
-  'badge-oldest': 'ownershipRequestedAt,asc',
   'badge-newest': 'ownershipRequestedAt,desc',
-  'confirmed-oldest': 'lastConfirmedAt,asc',
   'confirmed-newest': 'lastConfirmedAt,desc',
 };
 

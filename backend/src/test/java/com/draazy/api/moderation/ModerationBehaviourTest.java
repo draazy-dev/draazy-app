@@ -596,15 +596,15 @@ class ModerationBehaviourTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("the user list shows masked mobiles and no contact or privacy fields")
-    void userListMasksMobileAndDropsPrivateFields() throws Exception {
+    @DisplayName("the user list shows full mobiles and no contact or privacy fields")
+    void userListShowsMobileAndDropsPrivateFields() throws Exception {
         User staff = user("9800000107", "staff", "Ops");
         user("9800000108", "buyer", "Subject");
 
         mvc.perform(get("/users").param("q", "Subject")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].mobile").value("98XXXXX108"))
+                .andExpect(jsonPath("$.content[0].mobile").value("9800000108"))
                 .andExpect(jsonPath("$.content[0].email").doesNotExist())
                 .andExpect(jsonPath("$.content[0].hideNumber").doesNotExist())
                 .andExpect(jsonPath("$.content[0].permissions").doesNotExist())

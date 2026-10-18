@@ -1,6 +1,6 @@
 import { Clock, Eye, Image as ImageIcon, MapPin, User } from 'lucide-react';
 import Badge from '../../../components/ui/Badge.jsx';
-import { classNames, fmtAgo } from '../../../lib/format.js';
+import { classNames, fmtAgo, lastActivity } from '../../../lib/format.js';
 
 const KIND_LABEL = { post: 'Seeker post', room: 'Room', group: 'Group', application: 'Group application' };
 
@@ -15,6 +15,7 @@ export function entrySummary(e) {
       title: a.groupTitle ? `${a.groupTitle} → ${a.listingTitle || 'a listing'}` : a.listingTitle,
       locality: a.locality,
       author: a.applicantName,
+      mobile: a.applicantMobile,
       modStatus: a.modStatus,
     };
   }
@@ -22,6 +23,7 @@ export function entrySummary(e) {
     title: e.post?.headline || e.review?.address,
     locality: e.post?.locality || null,
     author: e.post?.author || e.review?.host,
+    mobile: e.post?.authorMobile || e.review?.hostMobile,
     modStatus: e.post?.modStatus || null,
   };
 }
@@ -31,6 +33,7 @@ export const MOD_LABEL = { flagged: 'Hidden for review', live: 'Published', appr
 export default function FlatmateQueueCard({ entry, onReview }) {
   const kind = entryKind(entry);
   const s = entrySummary(entry);
+  const stamp = lastActivity(entry.post?.createdAt ?? entry.review?.createdAt ?? entry.application?.at, entry.latestAt);
   return (
     <li className="flatmate-queue-card dz-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center" data-testid="flatmate-queue-card" data-key={entry.key}>
       <div className="min-w-0 flex-1">
@@ -58,8 +61,9 @@ export default function FlatmateQueueCard({ entry, onReview }) {
         {entry.post?.snippet ? <p className="mt-0.5 line-clamp-2 break-words text-sm text-gray-400">{entry.post.snippet}</p> : null}
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400">
           {s.locality ? <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3" />{s.locality}</span> : null}
-          <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{s.author || '—'}</span>
+          <span className="inline-flex items-center gap-1"><User className="h-3 w-3" />{s.author || '—'}{s.mobile ? <span data-testid="author-mobile" className="tabular-nums">· {s.mobile}</span> : null}</span>
           {entry.since ? <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />{fmtAgo(entry.since)}</span> : null}
+          {stamp ? <span data-testid="activity-stamp" className="tabular-nums">{stamp.verb} {stamp.text}</span> : null}
           {entry.post?.photoCount ? (
             <span className="inline-flex items-center gap-1"><ImageIcon className="h-3 w-3" />{entry.post.photoCount} photos</span>
           ) : null}

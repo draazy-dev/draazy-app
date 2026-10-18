@@ -4,7 +4,7 @@ import { API, authHeaders } from '../../helpers/liveAuth.js';
 const CANDIDATE_KEYS = new Set(['slug', 'name', 'localitySlug', 'mintOrigin', 'createdAt']);
 const DIRECTORY_KEYS = new Set(['slug', 'name', 'builder', 'localitySlug', 'year', 'maintenancePerSqft']);
 const LOCALITY_KEYS = new Set(['slug', 'name', 'lat', 'lng', 'archived', 'liveListings']);
-const REVIEW_ROW_KEYS = new Set(['id', 'targetType', 'targetId', 'author', 'rating', 'body', 'createdAt', 'status']);
+const REVIEW_ROW_KEYS = new Set(['id', 'targetType', 'targetId', 'author', 'authorMobile', 'rating', 'body', 'createdAt', 'status']);
 
 function recordGets(page) {
   const seen = [];

@@ -196,16 +196,20 @@ class AdminOverviewEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a ticket's mobile reaches the bell masked")
-    void bellMasksTicketMobile() throws Exception {
+    @DisplayName("a ticket's mobile reaches the bell and the dashboard in full, as does a pending listing's owner")
+    void bellShowsTicketMobile() throws Exception {
         jdbc.update("""
                 insert into tickets (id, subject, team, priority, status, mobile, created_at, updated_at)
-                values (?, 'Masked probe', 'legal', 'medium', 'open', '9877710099', now(), now())
+                values (?, 'Mobile probe', 'legal', 'medium', 'open', '9877710099', now() + interval '1 minute', now())
                 """, UUID.randomUUID());
         read(Routes.Admin.BELL, admin)
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.openTickets.items[?(@.mobile == '9877710099')]").isEmpty())
-                .andExpect(jsonPath("$.openTickets.items[?(@.mobile == '98XXXXX099')]").isNotEmpty());
+                .andExpect(jsonPath("$.openTickets.items[?(@.mobile == '9877710099')]").isNotEmpty())
+                .andExpect(jsonPath("$.pendingListings.items[0].ownerMobile").value("9877710001"));
+        read(Routes.Admin.DASHBOARD, admin)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.tickets.latest[?(@.mobile == '9877710099')]").isNotEmpty())
+                .andExpect(jsonPath("$.listings.oldestPending[0].ownerMobile").value("9877710001"));
     }
     @Test
     @DisplayName("the bell leaves out what the caller holds no atom for")
