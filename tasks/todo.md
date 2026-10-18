@@ -7,6 +7,7 @@
 
 ## Open
 
+- [ ] **PAY-TTL** sandbox checkout 500 (TTL 15 = Cashfree floor) fixed: TTL 20, floor 16; `plans-checkout` e2e green. PENDING VERIFICATION: redeploy sandbox, buy Contact Pack.
 - [ ] **QA-E2E-2** e2e reds left: seed ageing (community:178/246, QA-SEED-1) and flatmate-moderation:330. Maps reds closed: shard 1 serves on `:3322` (the key's only allowed origin) and `e2e/maps-specs.js` pins Maps specs to it; all 43 Maps files are green there. Watch for: my-rental:42 is data-dependent (owner nav reads "Requests 2"); land-minimum:102 and edit-prefill:312/352 hit a one-off wizard "This page stopped working" that passed on rerun.
 - [ ] **UI-STD** App-wide standardisation: one size scale (`--control-h` 44 · `--dz-icon-btn` 36 · `--dz-chip-h` 32 · `--dz-tag-h` 24 · `--dz-count-h` 20, `components/chips.css`, `<Button>`) and one mobile overlay shape (floating glass card, as `.filter-panel`). Done: `/listings` scale, filter card + `ScrollRail`. One group per slice, in order; each = edits → 412px screenshots → related e2e → spec + COVERAGE row:
   - [x] **G0 Guard** `scripts/check-ui-std.mjs`: counts hand-rolled chips/tags, raw `className="btn`, ad-hoc `fixed inset-0` overlays per file against a baseline that may only shrink; the plan is done when it reads 0.

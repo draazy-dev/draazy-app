@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.draazy.api.common.payments.CheckoutTtl;
 import com.draazy.api.provider.cashfree.CashfreeProperties;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
@@ -59,6 +60,19 @@ class CashfreeOrderExpiryTest {
                 Instant.parse("2026-03-14T10:15:00.123456789Z"), null));
 
         assertThat(body.get("order_expiry_time")).isEqualTo("2026-03-14T10:15:00Z");
+    }
+
+    /** Cashfree refuses an expiry under 15 minutes from when it receives the order; truncation and the
+     * network both eat into the window, so the shortest allowed TTL must still clear it with room. */
+    @Test
+    @DisplayName("the shortest allowed TTL still sends an expiry Cashfree accepts")
+    void theClampedFloorClearsTheVendorMinimum() {
+        Instant now = Instant.parse("2026-03-14T09:30:00.999Z");
+        Instant arrivesAtVendor = now.plusSeconds(10);
+        Map<String, Object> body = CashfreePaymentGateway.orderRequest(order(new CheckoutTtl(0).expiryFrom(now), null));
+        Instant sent = Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse((String) body.get("order_expiry_time")));
+
+        assertThat(sent).isAfter(arrivesAtVendor.plus(Duration.ofMinutes(15)));
     }
 
     /** Adding a field must not have dropped or renamed one — nothing else covers this payload. */
