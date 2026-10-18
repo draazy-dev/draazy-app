@@ -4,6 +4,7 @@ import com.draazy.api.catalog.property.ListingClosed;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.ContactVisibility;
@@ -13,6 +14,8 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.leads.contact.ContactService;
 import com.draazy.api.security.AuthPrincipal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class VisitService {
 
     private static final Logger LOG = LoggerFactory.getLogger(VisitService.class);
+    private static final Duration REBOOK_WAIT = Duration.ofHours(24);
 
     private final VisitRepository visits;
     private final PropertyRepository properties;
@@ -68,6 +72,11 @@ public class VisitService {
         }
         UUID ownerId = property.getOwner().getId();
         if (!ownerId.equals(callerId)) {
+            Instant cancelled = visits.lastCancelledByVisitor(callerId, propertyId);
+            if (cancelled != null && cancelled.plus(REBOOK_WAIT).isAfter(Instant.now())) {
+                throw new ConflictException(ErrorCodes.RECENTLY_WITHDRAWN,
+                        "You cancelled a visit here in the last day. You can book again after 24 hours.");
+            }
             contacts.requireRoomForVisit(callerId, propertyId);
         }
 
@@ -124,7 +133,11 @@ public class VisitService {
                     "Cannot transition from '" + visit.getStatus() + "' to '" + body.status() + "'");
         }
 
-        visit.setStatus(body.status());
+        if (VisitStatuses.CANCELLED.equals(body.status()) && isVisitor) {
+            visit.cancelByVisitor();
+        } else {
+            visit.setStatus(body.status());
+        }
         visits.saveAndFlush(visit);
 
         if (VisitStatuses.CONFIRMED.equals(body.status())

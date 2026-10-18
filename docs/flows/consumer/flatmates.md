@@ -675,7 +675,9 @@ cap is spent, scoped to `PURPOSE_OWNER_CONSENT` so neither flow can be used agai
   an undo into a lockout. Only while pending: once the host has accepted they have acted on it (on a
   group, given up a seat for it), so 409 rather than 403 — the row is theirs, it is its state that
   refuses. No refund, because the notification already went out and a refund would make withdrawal
-  the cheapest way to buy another send. The `kind` vocabulary spells the seeker door `flatmate`
+  the cheapest way to buy another send: `flatmate_interest_withdrawals` (`FlatmateInterestLedger`)
+  keeps each withdrawn ask in the hourly budget, and the same target waits 7 days like every other
+  withdrawn request (`recently_withdrawn`). The `kind` vocabulary spells the seeker door `flatmate`
   rather than `post`: that is the literal in the column, and renaming it needs a data migration.
 - **`GET /me/flatmate-posts` is not the feed narrowed by author.** The feed is hard-floored to
   approved rows, so an author still in moderation cannot find their post there, and every row it

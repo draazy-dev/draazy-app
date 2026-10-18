@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router';
 import '../../styles/routes/messages.css';
 import SharedReportModal from '../../components/ReportModal.jsx';
 import { OWNER_REPORT_REASONS } from '../../lib/reportReasons.js';
@@ -40,7 +41,10 @@ export default function Messages() {
   const { user } = useAuth();
   const { refresh: refreshChatBadge, streamConnected, subscribe } = useConversationUnread();
   const [convs, setConvs] = useState([]);
-  const [tab, setTab] = useState('chats');
+  const [params] = useSearchParams();
+  const paramTab = params.get('tab') === 'requests' ? 'requests' : null;
+  const paramBox = ['received', 'sent'].includes(params.get('box')) ? params.get('box') : null;
+  const [tab, setTab] = useState(paramTab || 'chats');
   const [activeId, setActiveId] = useState(null);
   const [search, setSearch] = useState('');
   const [narrow, setNarrow] = useState(false);
@@ -126,6 +130,9 @@ export default function Messages() {
 
   /* Load the inbox, having first tried to send anything staged. */
   useEffect(() => { reload().catch(() => {}); }, [reload]);
+
+  // A notification link lands on this page already mounted, so the query string has to move the tab too.
+  useEffect(() => { if (paramTab) setTab(paramTab); }, [paramTab]);
 
   useEffect(() => {
     const resize = () => setNarrow((wrapRef.current?.clientWidth || 9999) < 720);
@@ -417,6 +424,8 @@ export default function Messages() {
             onRetry={() => reload().catch(() => {})}
             onState={changeState}
             onBlock={block}
+            onStagedChanged={() => reload({ quiet: true }).catch(() => {})}
+            initialBox={paramBox}
             loading={loading}
             error={error}
           />

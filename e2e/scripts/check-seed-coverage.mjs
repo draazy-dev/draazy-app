@@ -64,6 +64,9 @@ const WAIVED = new Map([
   ['invoice_sequences', 'counter row created by the first invoice issued'],
   ['credit_notes', 'issued from the signed gateway refund webhook; refund specs insert their own'],
   ['credit_note_sequences', 'counter row created by the first credit note issued'],
+  ['request_reminders', 'written by `POST /me/requests/{kind}/{id}/reminders`; `consumer/account/requests-inbox.spec.js` sends its own'],
+  ['request_hidden', 'written when a requester clears a finished request; `consumer/account/requests-inbox.spec.js` clears its own'],
+  ['flatmate_interest_withdrawals', 'written when a seeker withdraws a pending flatmate interest; backend `RequestInboxEndpointsTest` covers it'],
   ['property_live_gaps', 'written when a listing leaves live and comes back; the pass-guarantee specs pause and resume their own'],
 ]);
 

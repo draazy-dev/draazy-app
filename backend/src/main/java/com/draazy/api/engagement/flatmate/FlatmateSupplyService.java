@@ -76,6 +76,7 @@ public class FlatmateSupplyService {
     private final LocalityBinding localities;
     private final ListingPhotoSources photoSources;
     private final FlatmateGenderGate genderGate;
+    private final FlatmateInterestLedger ledger;
 
     public FlatmateSupplyService(FlatmateRoomRepository rooms, FlatmateGroupRepository groups,
             FlatmateRequestRepository requests,
@@ -87,8 +88,10 @@ public class FlatmateSupplyService {
             RateLimitLock locks, FlatmateRoomCards cards, SocietyReference societyReference,
             FlatmateReviewStatuses reviewStatuses, FlatmateEditRules editRules,
             OwnedDocumentLookup ownedDocuments, FlatmateMembershipService membership,
-            LocalityBinding localities, ListingPhotoSources photoSources, FlatmateGenderGate genderGate) {
+            LocalityBinding localities, ListingPhotoSources photoSources, FlatmateGenderGate genderGate,
+            FlatmateInterestLedger ledger) {
         this.genderGate = genderGate;
+        this.ledger = ledger;
         this.rooms = rooms;
         this.groups = groups;
         this.requests = requests;
@@ -611,9 +614,9 @@ public class FlatmateSupplyService {
         if ("group".equals(kind)) {
             membership.requireRoomToAsk(caller.userId());
         }
+        ledger.requireNotRecentlyWithdrawn(kind, targetId, caller.userId());
 
-        if (requests.countByRequesterIdAndCreatedAtAfter(
-                caller.userId(), Instant.now().minus(RATE_WINDOW)) >= MAX_INTERESTS) {
+        if (ledger.sentSince(caller.userId(), Instant.now().minus(RATE_WINDOW)) >= MAX_INTERESTS) {
             throw new RateLimitedException(
                     "You have contacted a lot of hosts in the last hour. Try again shortly.",
                     (int) RATE_WINDOW.toSeconds());

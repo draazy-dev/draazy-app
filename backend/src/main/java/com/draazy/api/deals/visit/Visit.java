@@ -38,6 +38,9 @@ public class Visit extends VersionedEntity {
     @Column(name = "note")
     private String note;
 
+    @Column(name = "cancelled_by_visitor", nullable = false)
+    private boolean cancelledByVisitor;
+
     protected Visit() {
         // JPA
     }
@@ -55,6 +58,11 @@ public class Visit extends VersionedEntity {
             confirmedAt = Instant.now();
         }
         this.status = status;
+    }
+
+    public void cancelByVisitor() {
+        this.status = VisitStatuses.CANCELLED;
+        this.cancelledByVisitor = true;
     }
 
     // A moved slot is one the other party has not agreed to yet, so it goes back to scheduled.

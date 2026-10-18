@@ -1,0 +1,143 @@
+import { test, expect, ACTORS } from '../../../fixtures/live.js';
+import { API, authHeaders, uniqueMobile, signedInAs, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { sql } from '../../../helpers/monetisation.js';
+
+const created = new Set();
+
+async function api(method, path, headers, body) {
+  const res = await fetch(`${API}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const text = await res.text();
+  return { status: res.status, body: text ? JSON.parse(text) : null };
+}
+
+async function actor(name) {
+  const mobile = uniqueMobile();
+  const headers = await authHeaders(mobile);
+  const res = await api('PATCH', '/auth/me', headers, { name });
+  expect(res.status, `naming ${name}`).toBe(200);
+  return { mobile, headers, name };
+}
+
+async function listing(owner, label) {
+  const title = `Zztest requests ${label} ${Date.now()}`;
+  const res = await api('POST', '/me/listings', owner.headers, {
+    title, deal: 'rent', propertyType: 'Flat', bhk: 2, price: 26000, area: 900, areaUnit: 'sqft',
+    furnishing: 'semi-furnished', city: 'Pune', locality: 'Baner', address: 'D120 Requests Residency, B-201',
+    images: await uploadedListingPhotos(owner.headers),
+  });
+  expect(res.status, `creating the fixture listing (${JSON.stringify(res.body)})`).toBe(201);
+  created.add(res.body.id);
+  expect((await approveListingWithFetch(res.body.id, await authHeaders(ACTORS.admin))).status).toBe(200);
+  return { id: res.body.id, title };
+}
+
+async function ask(buyer, propertyId, message) {
+  const res = await api('POST', '/contacts/request', buyer.headers, { propertyId, ...(message ? { message } : {}) });
+  expect(res.status, `requesting contact (${JSON.stringify(res.body)})`).toBe(200);
+  const row = sql(`select id from contact_requests where property_id = '${propertyId}' and requester_id = `
+    + `(select id from users where mobile = '${buyer.mobile}')`);
+  expect(row, 'the request row exists').toBeTruthy();
+  return row;
+}
+
+const card = (page, text) => page.getByTestId('request-card').filter({ hasText: text });
+
+async function openRequests(page, box) {
+  await page.goto(`/messages?tab=requests&box=${box}`);
+  await expect(page.getByTestId('requests-panel')).toBeVisible({ timeout: 20000 });
+}
+
+test.afterEach(async () => {
+  const admin = await authHeaders(ACTORS.admin);
+  for (const id of created) await rejectListingWithFetch(id, admin, { reason: 'Zztest cleanup \u2014 requests inbox fixture' });
+  created.clear();
+});
+
+test.describe('Messages → Requests', () => {
+  test('the owner sees each number request with the buyer\'s message or a default line, and Approve & chat opens the thread', async ({ page }) => {
+    const owner = await actor('Zztest Requests Owner');
+    const flat = await listing(owner, 'received');
+    const writer = await actor('Zztest Writing Buyer');
+    const quiet = await actor('Zztest Quiet Buyer');
+    await ask(writer, flat.id, 'Zztest - is the flat pet friendly?');
+    await ask(quiet, flat.id);
+
+    const inbox = await api('GET', '/me/contact-requests', owner.headers);
+    expect(inbox.body.content.find((r) => r.requester.name === writer.name).message).toBe('Zztest - is the flat pet friendly?');
+
+    await signedInAs(page, owner.mobile);
+    await openRequests(page, 'received');
+    await expect(page.locator('.pc-reqbadge')).toHaveText('2');
+    await expect(card(page, writer.name)).toContainText('is the flat pet friendly?');
+    await expect(card(page, quiet.name)).toContainText(`Hi, I'm interested in ${flat.title}. Could you share your contact details?`);
+    await expect(card(page, writer.name).getByTestId('request-kind')).toHaveText('Number request');
+
+    await card(page, writer.name).getByRole('button', { name: 'Approve & chat' }).click();
+    await expect(page).toHaveURL(/\/messages\?c=/, { timeout: 20000 });
+    await expect(page.getByText(`thanks for your interest in ${flat.title}`).first()).toBeVisible({ timeout: 20000 });
+    const gate = await api('GET', `/contacts/status?propertyId=${flat.id}`, writer.headers);
+    expect(gate.body.status, 'approving from Messages opens the gate').toBe('approved');
+  });
+
+  test('a reminder unlocks a day after sending, reaches the owner, then waits another day', async ({ page }) => {
+    const owner = await actor('Zztest Remind Owner');
+    const flat = await listing(owner, 'remind');
+    const buyer = await actor('Zztest Reminding Buyer');
+    const id = await ask(buyer, flat.id);
+
+    await signedInAs(page, buyer.mobile);
+    await openRequests(page, 'sent');
+    const sent = card(page, flat.title);
+    await expect(sent.getByTestId('request-state')).toHaveText('Pending');
+    await expect(sent.getByRole('button', { name: /^Remind (in|tomorrow)/ })).toBeDisabled();
+
+    sql(`update contact_requests set created_at = created_at - interval '25 hours' where id = '${id}'`);
+    await page.reload();
+    await card(page, flat.title).getByRole('button', { name: 'Remind', exact: true }).click();
+    await expect(page.getByText('Reminder sent')).toBeVisible();
+    await expect(card(page, flat.title).getByRole('button', { name: /^Remind (in|tomorrow)/ })).toBeDisabled();
+
+    const again = await api('POST', `/me/requests/contact/${id}/reminders`, buyer.headers);
+    expect(again.status, 'a second reminder the same day is refused').toBe(409);
+    expect(again.body.error).toBe('reminder_too_soon');
+    expect(again.body.nextReminderAt).toBeTruthy();
+
+    const bell = await api('GET', '/notifications?size=50', owner.headers);
+    expect(bell.body.content.filter((n) => n.type === 'request.reminder'), 'one reminder notification').toHaveLength(1);
+    const received = await api('GET', '/me/requests?box=received', owner.headers);
+    expect(received.body.content[0].reminders.count).toBe(1);
+  });
+
+  test('withdrawing a number request takes it off the owner\'s inbox and blocks asking again for a week; a declined one can be cleared', async ({ page }) => {
+    const owner = await actor('Zztest Withdraw Owner');
+    const flat = await listing(owner, 'withdraw');
+    const otherOwner = await actor('Zztest Declining Owner');
+    const other = await listing(otherOwner, 'declined');
+    const buyer = await actor('Zztest Withdrawing Buyer');
+    await ask(buyer, flat.id);
+    const declinedId = await ask(buyer, other.id);
+    expect((await api('PATCH', `/me/contact-requests/${declinedId}`, otherOwner.headers, { status: 'declined' })).status).toBe(200);
+
+    await signedInAs(page, buyer.mobile);
+    await openRequests(page, 'sent');
+    await card(page, flat.title).getByRole('button', { name: 'Withdraw' }).click();
+    await expect(page.getByTestId('confirm-modal')).toContainText('Your contact credit comes back');
+    await page.getByTestId('confirm-modal-ok').click();
+    await expect(card(page, flat.title).getByTestId('request-state')).toHaveText('Withdrawn');
+
+    const inbox = await api('GET', '/me/contact-requests', owner.headers);
+    expect(inbox.body.content.filter((r) => r.propertyId === flat.id), 'the owner no longer sees it').toHaveLength(0);
+    expect((await api('GET', `/contacts/status?propertyId=${flat.id}`, buyer.headers)).body.status).toBe('none');
+    const reask = await api('POST', '/contacts/request', buyer.headers, { propertyId: flat.id });
+    expect(reask.status).toBe(409);
+    expect(reask.body.error).toBe('recently_withdrawn');
+
+    const declined = card(page, other.title);
+    await expect(declined.getByTestId('request-state')).toHaveText('Declined');
+    await declined.getByRole('button', { name: 'Clear' }).click();
+    await expect(declined).toHaveCount(0);
+    const sentBox = await api('GET', '/me/requests?box=sent', buyer.headers);
+    expect(sentBox.body.content.map((r) => r.id)).not.toContain(declinedId);
+  });
+});

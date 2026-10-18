@@ -165,8 +165,8 @@ test('a visitor sees the listing rail and About section, is routed to a listing 
   await test.step('a visitor is routed to a listing and is never offered the number', async () => {
     /* In-app chat is L1 and needs no number, so Message stays available to anyone. */
     await expect(page.getByRole('button', { name: 'Message' })).toBeVisible();
-    /* Asked by role `link`, which is the role `Owner.jsx` actually uses — Call and WhatsApp are `tel:`
-       and `wa.me` anchors, so a `button` assertion is green against the very markup it forbids. */
+    /* Asked by role `link`, which is the role `Owner.jsx` actually uses — Call is a `tel:` anchor, so a
+       `button` assertion is green against the very markup it forbids. No WhatsApp handoff exists anywhere. */
     await expect(page.getByRole('link', { name: 'Call' })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'WhatsApp' })).toHaveCount(0);
     await expect(page.getByText('Request number', { exact: true })).toHaveCount(0);

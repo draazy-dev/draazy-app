@@ -457,7 +457,7 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
     class Withdrawal {
 
         @Test
-        @DisplayName("removes the row, and lets the same person ask again afterwards")
+        @DisplayName("removes the row, and lets the same person ask again after the 7-day wait")
         void withdrawalIsAnUndoRatherThanALockout() throws Exception {
             User host = user("9811000116", "Host Four");
             User seeker = user("9811000117", "Asker Four");
@@ -476,6 +476,15 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content").isEmpty());
 
+            mvc.perform(post(Routes.Flatmates.ROOM_INTEREST, roomId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error").value("recently_withdrawn"));
+
+            entityManager.flush();
+            jdbc.update("update flatmate_interest_withdrawals set withdrawn_at = now() - interval '8 days' "
+                    + "where requester_id = ?", seeker.getId());
+            entityManager.clear();
             mvc.perform(post(Routes.Flatmates.ROOM_INTEREST, roomId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(seeker)))
                     .andExpect(status().isCreated());

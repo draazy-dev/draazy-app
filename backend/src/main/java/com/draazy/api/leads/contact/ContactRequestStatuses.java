@@ -15,6 +15,8 @@ public final class ContactRequestStatuses {
 
     public static final String EXPIRED = "expired";
 
+    public static final String WITHDRAWN = "withdrawn";
+
     public static final String RESPONSE_PATTERN = "^(" + APPROVED + "|" + DECLINED + ")$";
 
     // Only pending can transition; terminal states reject a second PATCH.

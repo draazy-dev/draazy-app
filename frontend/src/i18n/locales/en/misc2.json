@@ -114,7 +114,6 @@
     "msgLastSeenDate": "last seen {{date}}",
     "msgCallTitle": "Call {{phone}}",
     "msgCallAria": "Call",
-    "msgWhatsApp": "WhatsApp",
     "msgNumberLockedTitle": "The owner prefers chat",
     "msgNumberLockedAria": "Number locked",
     "msgReportUser": "Report this user",

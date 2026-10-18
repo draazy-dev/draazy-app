@@ -4,7 +4,7 @@ import Icon from '../../../components/Icon.jsx';
 import Modal from '../../../components/ui/Modal.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
 import { avatarFor, timeAgo } from '../../../lib/format.js';
-import { CallBtn, WhatsAppBtn } from './components.jsx';
+import { CallBtn, ChatBtn } from './components.jsx';
 /* Lead detail sheet — progressive disclosure for a single request. */
 
 const toDateInput = (ts) => {
@@ -156,9 +156,9 @@ export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation,
             </Link>
           ) : null}
           {lead.contactMobile ? (
-            <div className="grid grid-cols-2 gap-2">
+            <div className={lead.chat ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1 gap-2'}>
               <CallBtn mobile={lead.contactMobile} name={lead.name} label="Call" />
-              <WhatsAppBtn mobile={lead.contactMobile} name={lead.name} label="WhatsApp" />
+              {lead.chat ? <ChatBtn onClick={() => { void close().then(lead.chat); }} name={lead.name} label="Chat" /> : null}
             </div>
           ) : null}
         </div>

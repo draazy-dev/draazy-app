@@ -130,35 +130,40 @@ test.describe('Messages inbox — live API', () => {
     await expect(page.getByRole('dialog', { name: /Report/i })).toBeVisible();
   });
 
-  test('staged chats stay in Requests and are scoped to the signed-in user', async ({ page, request }) => {
+  test('a staged chat is reached from its Sent request and is scoped to the signed-in user', async ({ page, request }) => {
     const first = await actor(request, `Staged Buyer A ${letterTag()}`);
     const second = await actor(request, `Staged Buyer B ${letterTag()}`);
-    const title = `Private staged chat ${Date.now()}`;
+    for (const who of [first, second]) {
+      const asked = await request.post(`${API}/contacts/request`, { headers: who.headers, data: { propertyId: BANER_FLAT_ID } });
+      expect(asked.status()).toBe(200);
+    }
+    const stagedMessage = `Private staged message ${Date.now()}`;
 
     await signedInAs(page, first.mobile);
     await page.goto('/');
     const firstUserId = await page.evaluate(() => JSON.parse(localStorage.getItem('draazyUser')).id);
-    await page.evaluate(({ userId, title: stagedTitle }) => {
+    await page.evaluate(({ userId, propertyId, body }) => {
       localStorage.setItem('dzPendingRequests', JSON.stringify([{
         kind: 'chat',
         userId,
-        propertyId: 'local-staged-property',
+        propertyId,
         at: Date.now(),
-        property: { title: stagedTitle, price: '₹28,000/mo', loc: 'Baner', img: '' },
+        property: { title: 'Staged flat', price: '₹28,000/mo', loc: 'Baner', img: '' },
         party: { name: 'Private Owner', role: 'Owner' },
-        firstMessage: 'Private staged message',
+        firstMessage: body,
       }]));
-    }, { userId: firstUserId, title });
+    }, { userId: firstUserId, propertyId: BANER_FLAT_ID, body: stagedMessage });
 
-    await page.goto('/messages');
+    await page.goto('/messages?tab=requests&box=sent');
     await expect(page.locator('.pc-conv[data-staged="true"]')).toHaveCount(0);
-    await page.getByRole('tab', { name: /Requests/ }).click();
-    await expect(page.locator('.pc-conv[data-staged="true"]', { hasText: title })).toBeVisible();
+    await page.getByTestId('request-card').filter({ has: page.getByRole('button', { name: /Open your chat draft about/ }) })
+      .getByRole('button', { name: /Open your chat draft about/ }).click();
+    await expect(page.getByText(stagedMessage).first()).toBeVisible();
 
     await signedInAs(page, second.mobile);
-    await page.goto('/messages');
-    await page.getByRole('tab', { name: /Requests/ }).click();
-    await expect(page.locator('.pc-conv', { hasText: title })).toHaveCount(0);
+    await page.goto('/messages?tab=requests&box=sent');
+    await expect(page.getByTestId('request-card').first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('button', { name: /Open your chat draft about/ })).toHaveCount(0);
   });
 
   test('thread actions reach the server: delete for me, mute, archive and block', async ({ page }) => {

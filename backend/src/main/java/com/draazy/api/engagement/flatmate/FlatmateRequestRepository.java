@@ -27,6 +27,15 @@ public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest
     Page<FlatmateRequest> findByHostIdAndStatusOrderByRequestedAtDesc(
             UUID hostId, String status, Pageable pageable);
 
+    @Query("""
+            select r from FlatmateRequest r
+            where r.requesterId = :requesterId and (r.status = 'pending' or r.updatedAt >= :since)""")
+    List<FlatmateRequest> findSentSince(@Param("requesterId") UUID requesterId, @Param("since") Instant since);
+
+    List<FlatmateRequest> findByHostIdAndStatus(UUID hostId, String status);
+
+    Optional<FlatmateRequest> findByIdAndRequesterId(UUID id, UUID requesterId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     /** Host-scoped by id, so deciding somebody else's request is a 404 rather than a 403. */
     Optional<FlatmateRequest> findByIdAndHostId(UUID id, UUID hostId);

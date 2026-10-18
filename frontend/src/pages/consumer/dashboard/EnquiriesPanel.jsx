@@ -5,9 +5,10 @@ import { Link, useNavigate } from 'react-router';
 import { timeAgo, avatarFor } from '../../../lib/format.js';
 import { myLeadNotes, saveLeadNote } from '../../../services/leadNoteService.js';
 import { openFlatmateRequestConversation } from '../../../services/conversationService.js';
+import { useOpenChat } from '../../../lib/useOpenChat.js';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useAppFlags } from '../../../context/AppFlagsContext.jsx';
-import { Card, SectionHead, SubNav, RequestList, RequestRow, RequestEmpty, CallBtn, WhatsAppBtn, FollowUpChip } from './components.jsx';
+import { Card, SectionHead, SubNav, RequestList, RequestRow, RequestEmpty, CallBtn, ChatBtn, FollowUpChip } from './components.jsx';
 import LoadError from '../../../components/LoadError.jsx';
 import LeadSheet from './LeadSheet.jsx';
 import { buildDocGroups, listingTitleFor } from './dashboardData.js';
@@ -49,6 +50,7 @@ export default function EnquiriesPanel({ contactReqs, decideContact, photoReqs =
   /* Leads inbox split into sub-tabs — number, photo, document and flatmate requests — each one a real request a real
      person made. */
   const navigate = useNavigate();
+  const openChat = useOpenChat(toast);
   const { flagEnabled } = useAppFlags();
 
   // Resolve a listing id to its human title for request meta lines.
@@ -97,6 +99,12 @@ export default function EnquiriesPanel({ contactReqs, decideContact, photoReqs =
       toast(e?.message || 'Could not open the chat. Please try again.', 'error');
     }
   };
+  const chatEnabled = flagEnabled('inAppMessaging');
+  const chatWithBuyer = (r) => () => openChat({
+    mobile: r.buyerMobile,
+    propertyId: r.propId,
+    greeting: `Hi ${r.buyerName || 'there'}, thanks for your interest in ${listingTitleFor(listings, r.propId, '') || 'my property'} on Draazy.`,
+  });
 
   const orderedContacts = attentionFirst(contactReqs, (r) => r.status === 'pending');
   const orderedFlatmateReqs = attentionFirst(flatmateReqs, (r) => r.status === 'pending');
@@ -133,6 +141,7 @@ export default function EnquiriesPanel({ contactReqs, decideContact, photoReqs =
     approve: () => decideContact(r.id, 'approved'), decline: () => decideContact(r.id, 'declined'),
     approveLabel: 'Accept', declineLabel: 'Decline',
     busyKey: 'contact:' + r.id,
+    chat: r.status === 'approved' && chatEnabled ? chatWithBuyer(r) : undefined,
   /* Two exits, not one: leaving a photo request pending reads as "not yet" to both sides, so the owner's inbox
      accumulates rows they can never clear and the buyer waits on photos that are not coming. */
   });
@@ -315,7 +324,7 @@ export default function EnquiriesPanel({ contactReqs, decideContact, photoReqs =
                     {item.contactMobile ? (
                       <>
                         <CallBtn mobile={item.contactMobile} name={item.name} />
-                        <WhatsAppBtn mobile={item.contactMobile} name={item.name} />
+                        {item.chat ? <ChatBtn onClick={item.chat} name={item.name} /> : null}
                       </>
                     ) : null}
                   </>
@@ -358,7 +367,7 @@ export default function EnquiriesPanel({ contactReqs, decideContact, photoReqs =
                   <>
                     <span className="inline-flex items-center gap-1 text-xs text-emerald-300 font-medium"><Icon name="badge-check" className="w-3.5 h-3.5" /> {statusLabel(r.status)}</span>
                     <CallBtn mobile={r.buyerMobile} name={r.buyerName} />
-                    <WhatsAppBtn mobile={r.buyerMobile} name={r.buyerName} />
+                    {chatEnabled ? <ChatBtn onClick={chatWithBuyer(r)} name={r.buyerName} /> : null}
                   </>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-xs text-gray-400 font-medium"><Icon name="x-circle" className="w-3.5 h-3.5" /> {statusLabel(r.status)}</span>

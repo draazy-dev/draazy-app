@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.flatmate;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -33,8 +34,7 @@ public interface FlatmateGroupApplicationRepository
     Page<FlatmateGroupApplication> findByListingIdInAndModStatusInOrderByCreatedAtDesc(
             Collection<UUID> listingIds, Collection<String> modStatuses, Pageable pageable);
 
-    /** Check first so duplicate applications return the contract's 409 sentence. */
-    boolean existsByListingIdAndGroupId(UUID listingId, UUID groupId);
+    Optional<FlatmateGroupApplication> findByListingIdAndGroupId(UUID listingId, UUID groupId);
 
     /** Callers pass the public moderation states: a removed application does not hold the flat. */
     boolean existsByListingIdAndStatusAndModStatusIn(UUID listingId, String status,
@@ -44,6 +44,18 @@ public interface FlatmateGroupApplicationRepository
             Collection<String> modStatuses, UUID id);
 
     List<FlatmateGroupApplication> findByListingIdAndStatus(UUID listingId, String status);
+
+    @Query("""
+            select a from FlatmateGroupApplication a
+            where a.applicantId = :applicantId and a.modStatus in :modStatuses
+              and (a.status = 'pending' or a.updatedAt >= :since)""")
+    List<FlatmateGroupApplication> findSentSince(@Param("applicantId") UUID applicantId,
+            @Param("modStatuses") Collection<String> modStatuses, @Param("since") Instant since);
+
+    List<FlatmateGroupApplication> findByListingIdInAndStatusAndModStatusIn(Collection<UUID> listingIds,
+            String status, Collection<String> modStatuses);
+
+    Optional<FlatmateGroupApplication> findByIdAndApplicantId(UUID id, UUID applicantId);
 
     @Modifying
     @Query("delete from FlatmateGroupApplication a where a.applicantId = :userId and a.status = 'pending'")
@@ -61,4 +73,9 @@ public interface FlatmateGroupApplicationRepository
                                 @Param("pending") String pending,
                                 @Param("status") String status,
                                 @Param("decidedAt") java.time.Instant decidedAt);
+
+    // created_at restarts so the reminder clock counts from the new application.
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update flatmate_group_applications set created_at = now() where id = :id", nativeQuery = true)
+    void restartClock(@Param("id") UUID id);
 }
