@@ -493,8 +493,9 @@ In-app notifications are read from the server through `src/services/notification
 frontend no longer derives inbox rows or stores notification state in `localStorage`.
 `GET /notifications/unread-count` returns `{ "count": n }`, using the same unread + deliverable
 filter as the list. Each row carries a stable `id`, `read` flag, timestamp and link; those server
-rows drive both `/notifications` and the header bell. Read rows leave the list after 30 days; all
-notification rows are purged after 90 days by the nightly `notification-retention` job.
+rows drive both `/notifications` and the header bell. `GET /notifications?read=false|true` narrows the
+list; the page opens on unread rows and loads read ones behind "Show read notifications". The nightly
+`notification-retention` job deletes read rows after 30 days and every row after 90.
 
 The bell's count is pushed, not polled: when a row becomes deliverable, or `markRead` changes one,
 `NotificationPublisher` sends an id-free `notification` event on the caller's `/messages/stream`

@@ -14,6 +14,9 @@ public class NotificationRetention {
 
     public static final Duration RETENTION = Duration.ofDays(90);
 
+    /** Read rows are already hidden from the inbox after this window, so nothing visible is lost. */
+    public static final Duration READ_RETENTION = NotificationService.READ_VISIBILITY;
+
     private final NotificationRepository repository;
 
     public NotificationRetention(NotificationRepository repository) {
@@ -21,16 +24,17 @@ public class NotificationRetention {
     }
 
     @Transactional
-    public int purgeOlderThan(Instant cutoff) {
-        int removed = repository.deleteCreatedBefore(cutoff);
+    public int purgeOlderThan(Instant cutoff, Instant readCutoff) {
+        int removed = repository.deleteCreatedBefore(cutoff) + repository.deleteReadCreatedBefore(readCutoff);
         if (removed > 0) {
-            log.info("Purged {} notifications created before {}", removed, cutoff);
+            log.info("Purged {} notifications (all before {}, read before {})", removed, cutoff, readCutoff);
         }
         return removed;
     }
 
     @Transactional
     public int purgeNow() {
-        return purgeOlderThan(Instant.now().minus(RETENTION));
+        Instant now = Instant.now();
+        return purgeOlderThan(now.minus(RETENTION), now.minus(READ_RETENTION));
     }
 }

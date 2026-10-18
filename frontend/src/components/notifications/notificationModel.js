@@ -1,9 +1,9 @@
 export const SAFE_LINK_RE = /^\/(?!\/)[a-zA-Z0-9\-_/?=&#%.]*$/;
 
 export const FILTERS = [
-  { key: 'all', labelKey: 'notifications.filters.all' },
-  { key: 'leads', labelKey: 'notifications.filters.leads' },
-  { key: 'updates', labelKey: 'notifications.filters.updates' },
+  { key: 'all', labelKey: 'notifications.filters.all', icon: 'inbox' },
+  { key: 'leads', labelKey: 'notifications.filters.leads', icon: 'user-plus' },
+  { key: 'updates', labelKey: 'notifications.filters.updates', icon: 'info' },
 ];
 
 const LEAD_TYPES = new Set(['enquiry', 'price', 'visit', 'share']);

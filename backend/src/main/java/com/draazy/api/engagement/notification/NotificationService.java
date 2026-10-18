@@ -29,11 +29,11 @@ public class NotificationService {
 
     /** Deferred quiet-hours rows stay hidden only until their delivery instant. */
     @Transactional(readOnly = true)
-    public Page<NotificationResponse> list(UUID userId, Pageable pageable) {
+    public Page<NotificationResponse> list(UUID userId, Boolean read, Pageable pageable) {
         Pageable sorted = PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
                 Sort.by(Sort.Direction.DESC, "createdAt"));
         Instant now = Instant.now();
-        return repo.findDeliverable(userId, now, now.minus(READ_VISIBILITY), sorted)
+        return repo.findDeliverable(userId, read, now, now.minus(READ_VISIBILITY), sorted)
                 .map(mapper::toResponse);
     }
 

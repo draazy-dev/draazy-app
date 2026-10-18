@@ -1,6 +1,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { sql } from '../../../helpers/monetisation.js';
 
 const SEED_TITLES = [
   '3 new properties match your search',
@@ -46,6 +47,16 @@ async function openInbox(page, mobile) {
   await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible();
 }
 
+async function showRead(page) {
+  const loaded = page.waitForResponse((response) =>
+    new URL(response.url()).pathname.endsWith('/api/notifications') &&
+    new URL(response.url()).searchParams.get('read') === 'true' &&
+    response.status() === 200,
+  );
+  await page.getByRole('button', { name: 'Show read notifications' }).click();
+  await loaded;
+}
+
 test.describe('Notifications — live API', () => {
   test('guards /notifications: an unauthenticated visitor is redirected to /signin', async ({ page }) => {
     await page.goto('/notifications');
@@ -69,6 +80,7 @@ test.describe('Notifications — live API', () => {
 
     const unreadCard = page.locator('.notif.unread', { hasText: unread.title });
     await expect(unreadCard).toBeVisible();
+    await showRead(page);
     await expect(page.getByText(match.title)).toBeVisible();
 
     const ids = new Set(before.map((row) => row.id));
@@ -79,7 +91,8 @@ test.describe('Notifications — live API', () => {
     await expect(page.getByLabel(`Notifications, ${unreadCount} unread`).locator('visible=true')).toBeVisible();
     await expect(page.getByText(`${unreadCount} unread updates`)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Updates' }).click();
+    await page.getByRole('tab', { name: 'Updates' }).click();
+    await expect(page.getByRole('tab', { name: 'Updates' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.locator('.notif')).not.toHaveCount(0);
     await expect(page.getByText(match.title)).toBeVisible();
     await expect(page.getByText(enquiry.title)).toHaveCount(0);
@@ -94,13 +107,68 @@ test.describe('Notifications — live API', () => {
     await openInbox(page, mobile);
 
     expect(await inbox(mobile), 'a new account starts with an empty server inbox').toHaveLength(0);
-    await expect(page.getByText("You're all caught up — no notifications yet.")).toBeVisible();
+    await expect(page.getByText("You're all caught up.")).toBeVisible();
     await expect(page.locator('.notif')).toHaveCount(0);
+    await showRead(page);
+    await expect(page.getByText('No read notifications from the last 30 days.')).toBeVisible();
     for (const title of SEED_TITLES) {
       await expect(page.getByText(title), `"${title}" is demo content and must not render`).toHaveCount(0);
     }
 
     expect(await legacyNotificationKeys(page), 'legacy notification storage keys leaked into a live inbox').toEqual([]);
+  });
+
+  test('opens on unread only, with read notifications one tap below', async ({ page, consoleErrors }) => {
+    const mobile = uniqueMobile();
+    await authHeaders(mobile);
+    const userId = sql(`SELECT id FROM users WHERE mobile = '${mobile}'`);
+    sql(`INSERT INTO notifications (user_id, type, title, body, read, link) VALUES
+      ('${userId}', 'contact.received', 'Zz fresh lead', 'Someone wants to contact you.', false, '/dashboard#leads'),
+      ('${userId}', 'listing.approved', 'Zz old news', 'Your listing is live.', true, '/dashboard')`);
+
+    await openInbox(page, mobile);
+    const fresh = page.locator('.notif', { hasText: 'Zz fresh lead' });
+    await expect(fresh).toBeVisible();
+    await expect(page.getByText('Zz old news'), 'read rows wait behind the toggle').toHaveCount(0);
+
+    await showRead(page);
+    await expect(page.locator('#notif-read .notif', { hasText: 'Zz old news' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Hide read notifications' })).toHaveAttribute('aria-expanded', 'true');
+
+    await page.getByRole('button', { name: 'Mark all read' }).click();
+    await expect(page.locator('.notif.unread')).toHaveCount(0);
+    await expect(fresh, 'a row read on this visit stays where it was, once').toHaveCount(1);
+    await expect(page.locator('#notif-read').getByText('Zz fresh lead')).toHaveCount(0);
+
+    await page.reload();
+    await expect(page.getByText("You're all caught up.")).toBeVisible();
+    await expect(fresh).toHaveCount(0);
+    await showRead(page);
+    await expect(page.locator('#notif-read .notif')).toHaveCount(2);
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('"Show older" still reaches every unread row after some were dismissed', async ({ page }) => {
+    const mobile = uniqueMobile();
+    await authHeaders(mobile);
+    const userId = sql(`SELECT id FROM users WHERE mobile = '${mobile}'`);
+    sql(`INSERT INTO notifications (user_id, type, title, body, read, link, created_at)
+      SELECT '${userId}', 'message.received', 'Zz row ' || g, 'Hi', false, '/messages?c=' || g, now() - g * interval '1 minute'
+      FROM generate_series(1, 55) g`);
+
+    await openInbox(page, mobile);
+    await expect(page.locator('.notif')).toHaveCount(50);
+    for (const n of [1, 2, 3]) {
+      const card = page.locator('.notif', { hasText: new RegExp(`Zz row ${n}(?!\\d)`) });
+      const deleted = page.waitForResponse((r) => r.request().method() === 'DELETE' && r.status() === 204);
+      await card.getByRole('button', { name: 'Dismiss' }).click();
+      await deleted;
+      await expect(card).toHaveCount(0);
+    }
+
+    await page.getByRole('button', { name: 'Show older' }).click();
+    await expect(page.locator('.notif'), 'paging must not skip the rows that slid up after a dismiss').toHaveCount(52);
+    await expect(page.getByRole('button', { name: 'Show older' })).toHaveCount(0);
   });
 
   test('the top-bar badge appears only for real unread notifications and clears once they are read', async ({ page }) => {
@@ -174,6 +242,7 @@ test.describe('Notifications — live API', () => {
     expect(target, 'the fixture must include a notification to dismiss').toBeTruthy();
 
     await openInbox(page, ACTORS.buyer);
+    if (target.read) await showRead(page);
     const card = page.locator('.notif', { hasText: target.title });
     await expect(card).toBeVisible();
 

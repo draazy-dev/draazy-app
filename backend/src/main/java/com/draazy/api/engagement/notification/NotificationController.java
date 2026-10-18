@@ -17,10 +17,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Paged because notifications accrue for years. */
 @RestController
 public class NotificationController {
 
@@ -33,9 +33,10 @@ public class NotificationController {
     /** Strip client sort so unknown properties cannot reach the query as a 500. */
     @GetMapping(Routes.Engagement.NOTIFICATIONS)
     public PageResponse<NotificationResponse> list(@CurrentUser AuthPrincipal principal,
+            @RequestParam(required = false) Boolean read,
             @PageableDefault(size = 20) Pageable pageable) {
         return PageResponse.of(
-                notificationService.list(principal.userId(), Pageables.unsorted(pageable)),
+                notificationService.list(principal.userId(), read, Pageables.unsorted(pageable)),
                 dto -> dto);
     }
 

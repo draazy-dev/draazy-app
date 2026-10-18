@@ -514,6 +514,26 @@ class EngagementEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void listNotifications_readFilterSplitsTheInbox() throws Exception {
+        User u = user("9820100049");
+        jdbc.update("insert into notifications (user_id, type, title, read) values (?, 'info', 'Fresh', false)",
+                u.getId());
+        jdbc.update("insert into notifications (user_id, type, title, read) values (?, 'info', 'Seen', true)",
+                u.getId());
+
+        mvc.perform(get("/notifications?read=false").header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Fresh"));
+        mvc.perform(get("/notifications?read=true").header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].title").value("Seen"));
+        mvc.perform(get("/notifications?read=maybe").header(HttpHeaders.AUTHORIZATION, bearer(u)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void notifications_absurdSize_clamped() throws Exception {
         User u = user("9820100031");
         mvc.perform(get("/notifications?size=100000")
