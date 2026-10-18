@@ -70,11 +70,11 @@ test.describe('Landscape phone', () => {
       for (const h of heights) expect(h).toBeGreaterThanOrEqual(44);
     });
 
-    await test.step('the raised centre button stops overhanging the shorter bar', async () => {
+    await test.step('the active bubble stops overhanging the shorter bar', async () => {
+      await page.goto('/listings');
       const barBox = await bar.boundingBox();
-      const fabBox = await bar.locator('.dz-bottom-nav__fab').boundingBox();
-      // At 56px the circle overhung by 8px; on a 44px bar that would collide with content.
-      expect(fabBox.y).toBeGreaterThanOrEqual(barBox.y - 1);
+      const bubble = bar.locator('.dz-bottom-nav__bubble');
+      await expect.poll(async () => (await bubble.boundingBox()).y).toBeGreaterThanOrEqual(barBox.y - 1);
     });
   });
 });
@@ -119,10 +119,7 @@ test.describe('Dynamic type', () => {
     const r = await page.evaluate(() => {
       const nav = document.querySelector('.dz-bottom-nav');
       const nb = nav.getBoundingClientRect();
-      const labels = [...document.querySelectorAll('.dz-bottom-nav__label')];
-      // The raised centre slot is exempt: its 56px circle plus label needs ~74px inside a 56px bar,
-      // so the label squeezes at 200% type. The four standard tabs must be clean.
-      const standard = labels.filter((l) => !l.parentElement.querySelector('.dz-bottom-nav__fab'));
+      const standard = [...document.querySelectorAll('.dz-bottom-nav__label')];
       return {
         standardCount: standard.length,
         spill: standard.filter((l) => l.getBoundingClientRect().bottom > nb.bottom + 1).length,

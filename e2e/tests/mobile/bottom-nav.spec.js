@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-/* The four link slots, in DOM order; Post is the raised centre slot, asserted separately by its
+/* The four link slots, in DOM order; Post is the centre slot, a button asserted separately by its
    aria-label. Home is deliberately not a slot — the wordmark already goes home. */
 const TABS = [
   { name: /^Reels$/, href: '/reels' },
@@ -49,38 +49,46 @@ test.describe('Mobile bottom nav', () => {
     });
   });
 
-  test('the active tab is marked, the indicator follows it, and no route mounts a search sheet', async ({ page }) => {
+  test('the active tab is marked and carries the raised bubble, and no route mounts a search sheet', async ({ page }) => {
     test.slow(); // four cold navigations while the dev server compiles routes for the other workers.
-    const pill = page.locator('.dz-bottom-nav__indicator');
+    const current = bar(page).locator('.dz-bottom-nav__tab.is-active');
+    const bubble = bar(page).locator('.dz-bottom-nav__bubble');
+    // The bubble is the non-colour cue (WCAG 1.4.1), so it must actually sit on the current tab.
+    const bubbleOn = async (tabLocator) => {
+      const tab = await tabLocator.boundingBox();
+      await expect.poll(async () => {
+        const b = await bubble.boundingBox();
+        return b ? Math.abs(b.x + b.width / 2 - (tab.x + tab.width / 2)) : Infinity;
+      }, { message: `bubble sits on ${tabLocator}` }).toBeLessThan(2);
+    };
+    const link = (name) => bar(page).getByRole('link', { name });
     const noSheet = async (route) => {
       await expect(page.locator('.dz-search-sheet'), `${route} should mount no search sheet`).toHaveCount(0);
     };
 
-    await test.step('Home owns no slot, so nothing is current and the indicator stays hidden', async () => {
+    await test.step('Home owns no slot, so nothing is current and no bubble shows', async () => {
       await page.goto('/');
       for (const t of TABS) {
         await expect(bar(page).getByRole('link', { name: t.name })).not.toHaveAttribute('aria-current', 'page');
       }
-      await expect(pill).toHaveCSS('opacity', '0');
+      await expect(current).toHaveCount(0);
+      await expect(bubble).toBeHidden();
       await noSheet('/');
     });
 
-    await test.step('Search is current and the single indicator sits on it', async () => {
+    await test.step('Search is current and carries the bubble', async () => {
       await page.goto('/listings');
       await expect(bar(page).getByRole('link', { name: /^Search$/ })).toHaveAttribute('aria-current', 'page');
       await expect(bar(page).getByRole('link', { name: /^Flatmates$/ })).not.toHaveAttribute('aria-current', 'page');
-      await expect(pill).toHaveCount(1);
-      const search = await bar(page).getByRole('link', { name: /^Search$/ }).boundingBox();
-      const box = await pill.boundingBox();
-      expect(Math.abs(box.x - search.x), 'indicator sits on Search').toBeLessThan(4);
+      await expect(current).toHaveCount(1);
+      await bubbleOn(link(/^Search$/));
       await noSheet('/listings');
     });
 
-    await test.step('the indicator travels to Services', async () => {
+    await test.step('the bubble moves to Services', async () => {
       await page.goto('/services');
-      const services = await bar(page).getByRole('link', { name: /^Services$/ }).boundingBox();
-      const box = await pill.boundingBox();
-      expect(Math.abs(box.x - services.x), 'indicator sits on Services').toBeLessThan(4);
+      await expect(current).toHaveAttribute('href', '/services');
+      await bubbleOn(link(/^Services$/));
     });
 
     await test.step('Flatmates becomes current and Search is released', async () => {
@@ -88,6 +96,21 @@ test.describe('Mobile bottom nav', () => {
       await expect(bar(page).getByRole('link', { name: /^Flatmates$/ })).toHaveAttribute('aria-current', 'page');
       await expect(bar(page).getByRole('link', { name: /^Search$/ })).not.toHaveAttribute('aria-current', 'page');
       await noSheet('/flatmates');
+    });
+
+    await test.step('Post takes the bubble before its sheet covers the bar, then hands it back on close', async () => {
+      const post = bar(page).getByRole('button', { name: /post property/i });
+      const sheet = page.getByRole('dialog', { name: /What do you want to post/ });
+      await post.click();
+      await expect(post).toHaveClass(/is-active/);
+      expect(await sheet.count(), 'sheet waits for the slide').toBe(0);
+      await bubbleOn(post);
+      await expect(sheet).toBeVisible();
+      await expect(link(/^Flatmates$/)).toHaveAttribute('aria-current', 'page');
+      await page.keyboard.press('Escape');
+      await expect(sheet).toBeHidden();
+      await expect(post).not.toHaveClass(/is-active/);
+      await bubbleOn(link(/^Flatmates$/));
     });
   });
 

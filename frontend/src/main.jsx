@@ -35,6 +35,7 @@ import './styles/components/chips.css';
 import './styles/components/date-time-fields.css';
 // The shared <Select>/<MultiSelect>/<Menu> dropdown skin (.dz-dropdown), used on every route.
 import './styles/components/dropdown.css';
+import './styles/components/bottom-nav.css';
 // Last: its island `color` rule must follow preflight's `button, a { color: inherit }`.
 import './styles/theme.css';
 
