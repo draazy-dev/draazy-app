@@ -200,14 +200,12 @@ export function CallBtn({ mobile, name, label }) {
     </a>
   );
 }
-export function WhatsAppBtn({ mobile, name, label }) {
-  const digits = dialDigits(mobile);
-  if (!digits) return null;
-  const base = 'inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-500/10 font-semibold text-emerald-400 transition hover:bg-emerald-500/20';
+export function ChatBtn({ onClick, name, label }) {
+  const base = 'inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-teal/15 font-semibold text-brand-teal transition hover:bg-brand-teal/25';
   return (
-    <a href={'https://wa.me/91' + digits} target="_blank" rel="noopener noreferrer" aria-label={('WhatsApp ' + (name || '')).trim()} className={base + (label ? ' min-h-[44px] px-3 text-xs' : ' h-11 w-11')}>
+    <button type="button" onClick={onClick} aria-label={('Chat with ' + (name || '')).trim()} className={base + (label ? ' min-h-[44px] px-3 text-xs' : ' h-11 w-11')}>
       <Icon name="message-circle" className="h-4 w-4" />{label ? <span>{label}</span> : null}
-    </a>
+    </button>
   );
 }
 

@@ -19,7 +19,7 @@ const REFRESH_LOCK = 'draazy:auth-refresh';
 // Branch on `code`, the backend's stable machine-readable string — never on `message`, which is
 // human-facing and may be reworded at any time.
 export class ApiError extends Error {
-  constructor({ code, message, status, traceId, fields, attemptsRemaining, retryAfterSeconds, reason, existingId }) {
+  constructor({ code, message, status, traceId, fields, attemptsRemaining,   retryAfterSeconds, reason, existingId, nextReminderAt }) {
     super(message || code || `HTTP ${status}`);
     this.name = 'ApiError';
     this.code = code || null;
@@ -37,6 +37,8 @@ export class ApiError extends Error {
     this.reason = typeof reason === 'string' ? reason : null;
     /** The listing a 409 `duplicate_submission` points at; `null` on every other error. */
     this.existingId = typeof existingId === 'string' ? existingId : null;
+    /** When a 409 `reminder_too_soon` says the next reminder may go out; `null` on every other error. */
+    this.nextReminderAt = typeof nextReminderAt === 'string' ? nextReminderAt : null;
   }
 
   /** True when the failure was a validation rejection, so a form can map `fields` onto inputs. */
@@ -419,6 +421,7 @@ async function toResult(res, withStatus = false) {
     retryAfterSeconds: payload?.retryAfterSeconds,
     reason: payload?.reason,
     existingId: payload?.existingId,
+    nextReminderAt: payload?.nextReminderAt,
   });
 }
 

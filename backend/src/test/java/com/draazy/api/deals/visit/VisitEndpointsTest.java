@@ -361,11 +361,12 @@ class VisitEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void cancelledVisit_doesNotBlockRebooking() throws Exception {
+    void cancelledVisit_blocksRebookingForADayOnlyWhenTheVisitorCancelled() throws Exception {
         User owner = user("9820200027", "owner");
         User visitor = user("9820200028", "buyer");
         Property p = listing(owner, "Rebook test");
         String visitId = scheduleVisit(visitor, p);
+        String rebook = "{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot() + "\"}";
 
         mvc.perform(patch(Routes.Visits.STATUS.replace("{id}", visitId))
                         .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
@@ -376,7 +377,21 @@ class VisitEndpointsTest extends AbstractApiTest {
         mvc.perform(post(Routes.Visits.BASE)
                         .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"propertyId\":\"" + p.getId() + "\",\"slot\":\"" + futureSlot() + "\"}"))
+                        .content(rebook))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("recently_withdrawn"));
+
+        Property other = listing(owner, "Owner cancels");
+        String ownerCancelled = scheduleVisit(visitor, other);
+        mvc.perform(patch(Routes.Visits.STATUS.replace("{id}", ownerCancelled))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"cancelled\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(post(Routes.Visits.BASE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(visitor))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"propertyId\":\"" + other.getId() + "\",\"slot\":\"" + futureSlot() + "\"}"))
                 .andExpect(status().isCreated());
     }
 

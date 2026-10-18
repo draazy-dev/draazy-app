@@ -184,4 +184,24 @@ test.describe('Chat with the owner from a listing', () => {
     await expect(ownerPage.locator('.pc-quick-chip')).toHaveCount(0);
     await ownerPage.context().close();
   });
+
+  test('the owner\'s Chat on an approved lead opens the existing in-app thread, and nothing links to WhatsApp', async ({ page }) => {
+    const { owner, id } = await fixture();
+    const buyer = await actor('Zztest Lead Chat Buyer');
+    await openTheGate(buyer, owner, id);
+    const conv = await api('POST', '/messages', buyer.headers, { propertyId: id, body: 'Zztest — still available?' });
+    expect(conv.status).toBe(201);
+
+    await signedInAs(page, owner.mobile);
+    await page.goto('/dashboard#leads');
+    await page.getByRole('tab', { name: /^Number requests/i }).click();
+    await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Chat with Zztest Lead Chat Buyer' }).first().click();
+
+    await expect(page).toHaveURL(new RegExp(`/messages\\?c=${conv.body.id}`));
+    await expect(page.getByText(/still available\?/i).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('.pc-head a[href*="wa.me"]')).toHaveCount(0);
+    const detail = await api('GET', `/messages/${conv.body.id}`, owner.headers);
+    expect(detail.body.messages, 'reusing a thread posts nothing on the owner\'s behalf').toHaveLength(1);
+  });
 });

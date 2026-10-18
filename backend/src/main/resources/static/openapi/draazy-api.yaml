@@ -2126,7 +2126,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Visit' }
         '409':
-          description: The listing is closed (`listing_not_live`), or the caller already has a live visit on it.
+          description: >
+            The listing is closed (`listing_not_live`), the caller already has a live visit on it, or the
+            caller cancelled a visit on it in the last 24 hours (`recently_withdrawn`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -5057,7 +5059,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: The listing is closed (paused, rented or sold) - `listing_not_live` - or it is the caller's own (`own_listing`).
+          description: The listing is closed (paused, rented or sold) - `listing_not_live` - it is the caller's own (`own_listing`), or the caller withdrew a request for it less than 7 days ago (`recently_withdrawn`).
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -5135,8 +5137,8 @@ paths:
       summary: Ask the owner for more photos of a listing
       operationId: requestPhotos
       description: >
-        Always `200`, never `201`/`409` - a repeat tap is a no-op rather than an error, and the client
-        tells the two apart from `created`. Nested under the listing rather than sitting at
+        Always `200` for a repeat tap - it is a no-op rather than an error, and the client
+        tells the two apart from `created`. Asking again within 7 days of withdrawing is `409 recently_withdrawn`. Nested under the listing rather than sitting at
         `/photo-requests` because the listing is the only thing being asked about.
       responses:
         '200':
@@ -5145,6 +5147,11 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PhotoRequestCreateResult' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Withdrawn by the caller less than 7 days ago (`recently_withdrawn`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /me/photo-requests:
     get:
       tags: [Leads & Contact]
@@ -5194,6 +5201,104 @@ paths:
               schema: { $ref: '#/components/schemas/PhotoRequest' }
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationError' }
+  /me/requests:
+    get:
+      tags: [Leads & Contact]
+      summary: Requests inbox (received or sent)
+      operationId: myRequests
+      description: >
+        Every kind of request - contact, visit, photo, flatmate interest, group application - merged into
+        one list. `received` is what is waiting on the caller as the recipient (pending only, most recently
+        reminded first); `sent` is what the caller asked, pending first, plus anything decided in the last
+        30 days that the caller has not cleared. `party` is always the other side and never carries a mobile.
+      parameters:
+        - name: box
+          in: query
+          schema: { type: string, enum: [received, sent], default: received }
+        - { $ref: '#/components/parameters/Page' }
+        - { $ref: '#/components/parameters/Size' }
+      responses:
+        '200':
+          description: Paged requests
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageEnvelope'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items: { $ref: '#/components/schemas/RequestItem' }
+        '400':
+          description: Unknown `box` (`invalid_box`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: invalid_box, message: "box must be 'received' or 'sent'", status: 400 }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/requests/{kind}/{id}:
+    parameters:
+      - name: kind
+        in: path
+        required: true
+        schema: { type: string, enum: [contact, visit, photo, flatmate, group] }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [Leads & Contact]
+      summary: Withdraw a pending request, or clear a decided one
+      operationId: removeMyRequest
+      description: >
+        Requester only. A pending request is withdrawn the way its own kind withdraws (a contact request
+        returns its credit; a visit is cancelled; a flatmate interest is deleted). A decided one is only
+        hidden from the caller's sent box. Repeating the call is a no-op. Someone else's request, or one that
+        does not exist, is `404`.
+      responses:
+        '204': { description: Withdrawn or cleared }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >
+            The recipient answered the request before the withdrawal landed, so it can no longer be withdrawn
+            (`conflict`, or `already_decided` for a flatmate interest).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+  /me/requests/{kind}/{id}/reminders:
+    parameters:
+      - name: kind
+        in: path
+        required: true
+        schema: { type: string, enum: [contact, visit, photo, flatmate, group] }
+      - name: id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Leads & Contact]
+      summary: Remind the recipient of a pending request
+      operationId: remindMyRequest
+      description: >
+        Requester only, pending requests only (anything else is `404`). Allowed a day after sending and then
+        at most once a day per request; it never extends the request's expiry. The recipient is notified at
+        most once a day across all reminders - the rest are recorded without a notification.
+      responses:
+        '201':
+          description: Reminder recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RequestReminderResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Too soon (`reminder_too_soon`); `nextReminderAt` says when the next one is allowed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: reminder_too_soon, message: You can send another reminder after 5 Jun, 9:30 AM., status: 409, nextReminderAt: '2026-06-05T04:00:00Z' }
   /me/lead-notes:
     get:
       tags: [Leads & Contact]
@@ -5271,7 +5376,8 @@ paths:
       description: >-
         Requires an existing relationship: the caller holds an approved contact request against a
         listing the counterparty owns, or the counterparty holds one against a listing the caller
-        owns. Staff and admin may always open a thread.
+        owns; an owner-confirmed visit on that listing counts the same way. Staff and admin may
+        always open a thread.
 
 
         Without that rule this operation is a mobile-enumeration oracle -- a distinguishable answer
@@ -9328,7 +9434,7 @@ paths:
               schema: { $ref: '#/components/schemas/GroupApplication' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: This group has already applied to this listing (`already_applied`), or the listing already has an accepted group and takes no new applications }
+        '409': { description: This group has already applied to this listing (`already_applied`), the group withdrew an application here less than 7 days ago (`recently_withdrawn`; after that it is reopened as pending), or the listing already has an accepted group and takes no new applications }
         '422': { $ref: '#/components/responses/ValidationError' }
   /me/flatmate-groups:
     get:
@@ -11373,6 +11479,7 @@ components:
         traceId: { type: string, description: Correlation id for observability. }
         reason: { type: string, description: 'Present only on 422 refund_not_eligible: the policy reason code.' }
         existingId: { type: string, format: uuid, description: 'Present only on 409 duplicate_submission: the listing the owner already posted.' }
+        nextReminderAt: { type: string, format: date-time, description: 'Present only on 409 reminder_too_soon: the earliest moment another reminder is allowed.' }
         attemptsRemaining:
           type: integer
           minimum: 0
@@ -11918,8 +12025,8 @@ components:
       description: >
         Address the thread by `counterpartyMobile`, or by `propertyId` alone — supply at least one.
         The buyer side may name the listing and let the server derive the owner. Whether the two may
-        message is decided by the approved contact request either way; naming a listing buys nothing
-        on its own.
+        message is decided by the approved contact request (or an owner-confirmed visit) either way;
+        naming a listing buys nothing on its own.
       properties:
         counterpartyMobile: { $ref: '#/components/schemas/Mobile' }
         propertyId: { type: string, description: 'Listing the chat is about; required when counterpartyMobile is omitted' }
@@ -14735,7 +14842,7 @@ components:
         requester: { $ref: '#/components/schemas/Party' }
         status:
           type: string
-          enum: [pending, approved, declined, expired]
+          enum: [pending, approved, declined, expired, withdrawn]
           description: expired is set once a request is left pending longer than `contactReplyDays`; it cannot be answered and the contact is returned.
         contact:
           type: [object, 'null']
@@ -14743,6 +14850,7 @@ components:
           properties:
             name: { type: string }
             mobile: { $ref: '#/components/schemas/Mobile' }
+        message: { type: [string, 'null'], description: The requester's note, if they left one. }
         createdAt: { type: string, format: date-time }
     PhotoRequest:
       type: object
@@ -14759,8 +14867,40 @@ components:
           properties:
             name: { type: string }
             mobile: { $ref: '#/components/schemas/Mobile' }
-        status: { type: string, enum: [pending, resolved, declined] }
+        status: { type: string, enum: [pending, resolved, declined, withdrawn] }
         createdAt: { type: string, format: date-time }
+    RequestItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid, description: The underlying request row. }
+        kind: { type: string, enum: [contact, visit, photo, flatmate, group] }
+        state: { type: string, enum: [pending, accepted, declined, expired, withdrawn] }
+        status: { type: string, description: 'The kind''s own status, e.g. scheduled, confirmed, resolved, approved.' }
+        party:
+          type: object
+          description: The other side - the requester in the received box, the recipient in the sent box. No mobile.
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            verified: { type: boolean }
+        target:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            type: { type: string, enum: [property, flatmate-post, room, group] }
+            title: { type: [string, 'null'] }
+            link: { type: [string, 'null'] }
+        message: { type: [string, 'null'] }
+        slot: { type: [string, 'null'], format: date-time, description: Visits only. }
+        createdAt: { type: string, format: date-time }
+        decidedAt: { type: [string, 'null'], format: date-time }
+        reminders: { $ref: '#/components/schemas/RequestReminderResponse' }
+    RequestReminderResponse:
+      type: object
+      properties:
+        count: { type: integer, minimum: 0 }
+        lastAt: { type: [string, 'null'], format: date-time }
+        nextAt: { type: [string, 'null'], format: date-time, description: Sent box only; null once the request would have lapsed by then. }
     PhotoRequestCreateResult:
       type: object
       description: >
@@ -17130,9 +17270,10 @@ components:
         perHead: { $ref: '#/components/schemas/Money' }
         groupTitle: { type: string }
         applicantName: { type: string }
+        applicantMobile: { type: [string, 'null'], description: In full on the staff moderation desk; null on the owner's inbox. }
         members: { type: integer }
         seatsTotal: { type: integer }
-        status: { type: string, enum: [pending, accepted, declined], description: The OWNER's decision. Admin may never write this. }
+        status: { type: string, enum: [pending, accepted, declined, withdrawn], description: The OWNER's decision, or withdrawn by the applicant. Admin may never write this. }
         modStatus: { $ref: '#/components/schemas/FlatmateModStatus' }
         at: { type: string, format: date-time }
     HostEligibility:

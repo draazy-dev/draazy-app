@@ -65,13 +65,14 @@ public class FlatmateSeekerService {
     private final FlatmateAcceptance acceptance;
     private final LocalityBinding localities;
     private final FlatmateGenderGate genderGate;
+    private final FlatmateInterestLedger ledger;
 
     public FlatmateSeekerService(FlatmateSeekerPostRepository posts,
             FlatmateRequestRepository requests, FlatmateRequestHydrator hydrator,
             FlatmateMapper mapper, UserRepository users,
             Notifier notifier, RateLimitLock locks,
             FlatmateEditRules editRules, FlatmateAcceptance acceptance, LocalityBinding localities,
-            FlatmateGenderGate genderGate) {
+            FlatmateGenderGate genderGate, FlatmateInterestLedger ledger) {
         this.posts = posts;
         this.requests = requests;
         this.hydrator = hydrator;
@@ -83,6 +84,7 @@ public class FlatmateSeekerService {
         this.acceptance = acceptance;
         this.localities = localities;
         this.genderGate = genderGate;
+        this.ledger = ledger;
     }
 
     /** One live post per identity; the partial unique index enforces it, the pre-check only turns
@@ -178,9 +180,9 @@ public class FlatmateSeekerService {
                 "flatmate", post.getId(), caller.userId()).isPresent()) {
             throw alreadyInterested();
         }
+        ledger.requireNotRecentlyWithdrawn("flatmate", post.getId(), caller.userId());
 
-        if (requests.countByRequesterIdAndCreatedAtAfter(
-                caller.userId(), Instant.now().minus(RATE_WINDOW)) >= MAX_INTERESTS) {
+        if (ledger.sentSince(caller.userId(), Instant.now().minus(RATE_WINDOW)) >= MAX_INTERESTS) {
             throw new RateLimitedException(
                     "You have contacted a lot of people in the last hour. Try again shortly.",
                     (int) RATE_WINDOW.toSeconds());
@@ -306,6 +308,7 @@ public class FlatmateSeekerService {
                     "The host has already answered this one, so it cannot be withdrawn.",
                     FlatmateConflicts.ALREADY_DECIDED));
         }
+        ledger.recordWithdrawal(request);
     }
 
     private void apply(FlatmateSeekerPost post, FlatmateSeekerPostCreateRequest body, User author) {

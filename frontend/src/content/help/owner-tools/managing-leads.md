@@ -24,7 +24,7 @@ A request for your number, a request for more photos, a request to see documents
 
 The list sorts itself: anything awaiting a decision from you comes first, then whoever has waited longest. You do not have to hunt for the urgent one.
 
-Tap any row to open it. The detail sheet has the request, the person, and the actions — accept or decline, mark photos done or add photos, grant or decline documents. Once you accept a number request, **Call** and **WhatsApp** buttons appear. Plain messages are not in this inbox; they live under **Dashboard → Messages**. Buttons stay disabled while a decision is being saved so a double tap cannot send two answers.
+Tap any row to open it. The detail sheet has the request, the person, and the actions — accept or decline, mark photos done or add photos, grant or decline documents. Once you accept a number request, **Call** and **Chat** buttons appear. Plain messages are not in this inbox; they live under **Dashboard → Messages**. Buttons stay disabled while a decision is being saved so a double tap cannot send two answers.
 
 ## Triaging
 

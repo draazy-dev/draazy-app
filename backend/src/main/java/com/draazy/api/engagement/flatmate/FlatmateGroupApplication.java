@@ -8,20 +8,8 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Getter;
 
-/**
- * A formed flatmate group applying to an owner's whole-flat rent listing (V29
- * {@code flatmate_group_applications}).
- *
- * <p>Distinct from {@link FlatmateRequest}, which is one person asking one host for one seat: here
- * the applicant is a <em>group</em> and the target is a <em>listing</em>, so both ends and the
- * direction differ.
- *
- * <p><strong>Two independent statuses.</strong> {@link #status} is the owner's decision and theirs
- * alone; {@link #modStatus} is the admin moderation axis. An admin removing a spam application must
- * not thereby decline it on the owner's behalf, and an owner declining must not hide it from
- * moderation — which is why {@link #moderate} and {@link #decide} touch different fields and are
- * called from different services.
- */
+// status is the owner's decision and modStatus the admin's; an admin removing spam must not decline on the
+// owner's behalf, so moderate() and decide() touch different fields.
 @Entity
 @Table(name = "flatmate_group_applications")
 @Getter
@@ -34,7 +22,7 @@ public class FlatmateGroupApplication extends AuditedEntity {
     private UUID groupId;
 
     /** The group's host, denormalised so the admin list need not resolve it per row. */
-    @Column(name = "applicant_id", nullable = false, updatable = false)
+    @Column(name = "applicant_id", nullable = false)
     private UUID applicantId;
 
     @Column(name = "status", nullable = false)
@@ -63,6 +51,12 @@ public class FlatmateGroupApplication extends AuditedEntity {
     void decide(String decision) {
         this.status = decision;
         this.decidedAt = Instant.now();
+    }
+
+    void reopen(UUID reapplicantId) {
+        this.status = FlatmateVocabulary.STATUS_PENDING;
+        this.decidedAt = null;
+        this.applicantId = reapplicantId;
     }
 
     /** The admin's axis. Deliberately cannot touch {@link #status}. */

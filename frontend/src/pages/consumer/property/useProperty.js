@@ -304,6 +304,7 @@ export default function useProperty() {
       toast(created ? tr('property.photosSent') : tr('property.photosDuplicate'), created ? 'success' : 'info');
     } catch (err) {
       if (err?.status === 401) { sendToSignIn('photos', back); return; }
+      if (err?.code === 'recently_withdrawn') { toast(err.message || tr('property.recentlyWithdrawn'), 'info'); return; }
       if (err?.status === 400) { toast(tr('property.ownListingPhotos'), 'info'); return; }
       toast(tr('property.photosFailed'), 'error');
     } finally {

@@ -139,7 +139,7 @@ export default function Owner() {
   const revealed = isOwnerViewer(owner.mobile);
 
   const latestListing = listings[0] || null;
-  const waText = t('owner.waIntro', { name: (owner.name || '').split(' ')[0] || t('owner.waFallbackName') });
+  const introText = t('owner.chatIntro', { name: (owner.name || '').split(' ')[0] || t('owner.chatFallbackName') });
   /* Figures come from the summary read, never `reviews`; `revAvg` stays null so an unrated owner isn't shown as
      rated badly; `dist` arrives ascending but the bars read downwards. */
   const revLoading = !summary && !summaryFailed;
@@ -205,7 +205,7 @@ export default function Owner() {
   const messageOwner = () => {
     if (!isIn) { sendToSignIn('contact'); return; }
     if (latestListing) {
-        queuePendingChat(latestListing, { firstMessage: waText });
+        queuePendingChat(latestListing, { firstMessage: introText });
       navigate(messagesLinkForProp(latestListing));
     } else {
       navigate('/contact');
@@ -247,12 +247,9 @@ export default function Owner() {
               </div>
               <div className="hidden sm:flex gap-2.5 flex-wrap">
                 {revealed ? (
-                  <>
                     <a href={`tel:+91${digits(owner.mobile)}`} className="h-btn px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="phone" className="w-4 h-4 text-teal-400" /> {t('owner.call')}</a>
-                    <a href={`https://wa.me/91${digits(owner.mobile)}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer" className="h-btn px-4 rounded-xl border border-emerald-500/20 text-emerald-400 text-sm font-medium hover:bg-emerald-500/10 flex items-center gap-2"><Icon name="message-circle" className="w-4 h-4" /> {t('owner.whatsapp')}</a>
-                  </>
                 ) : (
-                  /* No Call/WhatsApp for visitors: the number is granted per
+                  /* No Call for visitors: the number is granted per
                      listing, so send them to one; in-app Message needs no number. */
                   <a href="#owner-listings" className="h-btn px-4 rounded-xl border border-white/10 text-gray-200 text-sm font-medium hover:bg-white/5 flex items-center gap-2"><Icon name="lock-keyhole" className="w-4 h-4 text-teal-400" /> {t('owner.contactViaListing')}</a>
                 )}
@@ -390,10 +387,7 @@ export default function Owner() {
                 <h3 className="text-white font-bold mb-4">{t('owner.contactTitle')}</h3>
                 <div className="space-y-2.5">
                   {revealed ? (
-                    <>
-                      <a href={`tel:+91${digits(owner.mobile)}`} className="flex items-center gap-3 py-3 px-4 rounded-xl border border-white/10 text-gray-200 text-sm hover:bg-white/5 transition-all"><Icon name="phone" className="w-4 h-4 text-teal-400" /> {fmtPhone(owner.mobile)}</a>
-                      <a href={`https://wa.me/91${digits(owner.mobile)}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer" className="hidden lg:flex items-center gap-3 py-3 px-4 mt-2.5 rounded-xl border border-emerald-500/20 text-emerald-400 text-sm hover:bg-emerald-500/10 transition-all"><Icon name="message-circle" className="w-4 h-4" /> {t('owner.chatWhatsapp')}</a>
-                    </>
+                    <a href={`tel:+91${digits(owner.mobile)}`} className="flex items-center gap-3 py-3 px-4 rounded-xl border border-white/10 text-gray-200 text-sm hover:bg-white/5 transition-all"><Icon name="phone" className="w-4 h-4 text-teal-400" /> {fmtPhone(owner.mobile)}</a>
                   ) : (
                     <>
                       <div className="flex items-center gap-3 py-3 px-4 rounded-xl border border-white/10 text-gray-300 text-sm"><Icon name="phone-off" className="w-4 h-4 text-gray-500" /> <span className="tracking-wider">{masked}</span></div>
@@ -414,10 +408,7 @@ export default function Owner() {
 
       <div className="dz-sticky-cta lg:hidden">
         {revealed ? (
-          <>
-            <a href={`tel:+91${digits(owner.mobile)}`} className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4"><Icon name="phone" className="w-4 h-4" /> {t('owner.call')}</a>
-            <a href={`https://wa.me/91${digits(owner.mobile)}?text=${encodeURIComponent(waText)}`} target="_blank" rel="noopener noreferrer" className="h-btn flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold px-4"><Icon name="message-circle" className="w-4 h-4" /> {t('owner.whatsapp')}</a>
-          </>
+          <a href={`tel:+91${digits(owner.mobile)}`} className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4"><Icon name="phone" className="w-4 h-4" /> {t('owner.call')}</a>
         ) : (
           <>
             <button onClick={messageOwner} type="button" className="btn-teal flex-1 min-h-[44px] flex items-center justify-center gap-1.5 text-sm font-semibold py-3 px-4"><Icon name="send" className="w-4 h-4" /> {t('owner.message')}</button>

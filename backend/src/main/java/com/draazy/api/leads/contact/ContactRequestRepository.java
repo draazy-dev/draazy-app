@@ -87,6 +87,22 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
     Page<ContactRequest> findByPropertyIdInOrderByCreatedAtDesc(Collection<UUID> propertyIds,
             Pageable pageable);
 
+    Page<ContactRequest> findByPropertyIdInAndStatusNotOrderByCreatedAtDesc(Collection<UUID> propertyIds,
+            String status, Pageable pageable);
+
+    @Query("""
+            select cr from ContactRequest cr
+            where cr.requesterId = :requesterId and (cr.status = 'pending' or cr.updatedAt >= :since)""")
+    List<ContactRequest> findSentSince(@Param("requesterId") UUID requesterId, @Param("since") Instant since);
+
+    @Query("""
+            select cr from ContactRequest cr
+            where cr.propertyId in :propertyIds and cr.status = 'pending' and cr.createdAt >= :replyCutoff""")
+    List<ContactRequest> findOpenForProperties(@Param("propertyIds") Collection<UUID> propertyIds,
+            @Param("replyCutoff") Instant replyCutoff);
+
+    Optional<ContactRequest> findByIdAndRequesterId(UUID id, UUID requesterId);
+
     Page<ContactRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     Page<ContactRequest> findByStatusOrderByCreatedAtDesc(String status, Pageable pageable);
@@ -111,7 +127,7 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
             update contact_requests
                set status = 'pending', created_at = :now, first_requested_at = :now, message = :message
              where id = :id
-               and (status = 'expired' or (status = 'pending' and created_at < :replyCutoff))
+               and (status in ('expired', 'withdrawn') or (status = 'pending' and created_at < :replyCutoff))
             """, nativeQuery = true)
     int renewIfLapsed(@Param("id") UUID id, @Param("message") String message, @Param("now") Instant now,
                       @Param("replyCutoff") Instant replyCutoff);

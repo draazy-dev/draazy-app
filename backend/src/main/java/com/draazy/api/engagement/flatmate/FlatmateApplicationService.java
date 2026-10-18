@@ -8,6 +8,8 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.RequestSource;
+import com.draazy.api.common.trust.WithdrawnCooldown;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
 import java.util.List;
@@ -82,17 +84,27 @@ public class FlatmateApplicationService {
             throw new BadRequestException("This is your own listing.");
         }
         locks.holdUntilCommit(RateLimitLock.Limit.FLATMATE_LISTING_DECISION, listingId.toString());
-        if (applications.existsByListingIdAndGroupId(listingId, groupId)) {
+        FlatmateGroupApplication earlier = applications.findByListingIdAndGroupId(listingId, groupId).orElse(null);
+        if (earlier != null && !RequestSource.WITHDRAWN.equals(earlier.getStatus())) {
             throw new ConflictException(
                     "Your group has already applied to this flat — the owner has it.");
+        }
+        if (earlier != null && WithdrawnCooldown.active(earlier.getDecidedAt(), Instant.now())) {
+            throw WithdrawnCooldown.refusal(earlier.getDecidedAt());
         }
         if (applications.existsByListingIdAndStatusAndModStatusIn(listingId,
                 FlatmateVocabulary.STATUS_ACCEPTED, FlatmateVocabulary.MOD_PUBLIC)) {
             throw new ConflictException(CLOSED_TO_GROUPS);
         }
 
-        FlatmateGroupApplication saved = applications.saveAndFlush(
-                new FlatmateGroupApplication(listingId, groupId, caller.userId()));
+        FlatmateGroupApplication saved;
+        if (earlier == null) {
+            saved = applications.saveAndFlush(new FlatmateGroupApplication(listingId, groupId, caller.userId()));
+        } else {
+            earlier.reopen(caller.userId());
+            saved = applications.saveAndFlush(earlier);
+            applications.restartClock(saved.getId());
+        }
 
         if (listing.getOwner() != null) {
             notifier.notify(listing.getOwner().getId(), "flatmate.groupApplication.received",

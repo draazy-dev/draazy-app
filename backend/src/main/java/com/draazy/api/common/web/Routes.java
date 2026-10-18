@@ -308,6 +308,18 @@ public final class Routes {
         public static final String REQUEST = BASE + "/request";
     }
 
+    public static final class MeRequests {
+
+        private MeRequests() {
+        }
+
+        public static final String BASE = "/me/requests";
+
+        public static final String BY_ID = BASE + "/{kind}/{id}";
+
+        public static final String REMINDERS = BY_ID + "/reminders";
+    }
+
     public static final class MeContactRequests {
 
         private MeContactRequests() {

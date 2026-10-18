@@ -249,7 +249,7 @@ export const KB = [
     id: 'owner-requests',
     keywords: ['requests', 'leads', 'enquiries', 'enquiry', 'tenants', 'buyers', 'accept', 'decline', 'interested', 'approve', 'hide', 'privacy', 'serious'],
     q: 'I am an owner — how do I handle contact requests?',
-    a: "Number, photo, document and flatmate requests all wait in your Dashboard under Requests, and anything urgent also shows in the Action Center on Home. Open one to accept or decline it; a verified tick tells you the team has checked that person's ID. Once you accept a number request, Call and WhatsApp buttons appear — or keep your number private in Settings and talk only in Messages. Offers and finalize requests show on your listing.",
+    a: "Number, photo, document and flatmate requests all wait in your Dashboard under Requests, and anything urgent also shows in the Action Center on Home. Open one to accept or decline it; a verified tick tells you the team has checked that person's ID. Once you accept a number request, Call and Chat buttons appear — or keep your number private in Settings and talk only in Messages. Offers and finalize requests show on your listing.",
     actions: [
       { label: 'My requests', to: '/dashboard#leads', icon: 'inbox' },
       { label: 'My messages', to: '/messages', icon: 'message-circle' },

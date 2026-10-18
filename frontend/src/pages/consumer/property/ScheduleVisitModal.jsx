@@ -80,11 +80,10 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
         setQuotaOpen(true);
         return;
       }
-      const expected = e?.code === 'contact_pending_limit' || e?.status === 409;
       const message = e?.code === 'contact_pending_limit' ? t('property.contactPendingLimit')
+        : e?.code === 'recently_withdrawn' ? (e.message || t('property.recentlyWithdrawn'))
         : e?.status === 409 ? t('property.visitAlreadyBooked') : t('property.visitRequestFailed');
       setError(message);
-      toast(message, expected ? 'info' : 'error');
     } finally {
       if (keepMounted) setBusy(false);
     }
@@ -127,7 +126,7 @@ export function ScheduleVisitModal({ p, isIn, onClose, toast }) {
                 <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={3} placeholder={t('property.anyRequirements')} className="field w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500 resize-none" />
               </div>
             </div>
-            {error ? <p className="mb-3 rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p> : null}
+            {error ? <p role="alert" className="mb-3 rounded-xl border border-rose-400/25 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">{error}</p> : null}
             <button type="button" onClick={submit} disabled={busy || past} aria-describedby={past ? 'visit-past-hint' : undefined} className="btn-teal w-full min-h-[44px] flex items-center justify-center gap-2 px-4 disabled:opacity-60"><Icon name="calendar-check" className="w-4 h-4" /> {t('property.confirmVisit')}</button>
           </>
         )}

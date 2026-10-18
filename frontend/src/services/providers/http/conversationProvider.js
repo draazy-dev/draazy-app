@@ -43,8 +43,8 @@ export async function getConversation(id) {
 
 /* Find-or-create: 201 new, 200 existing, both returning the thread. Throws without an approved contact
    request — the guard stopping this endpoint being a way to test mobiles against the user base. */
-export async function startConversation({ counterpartyMobile, propertyId, firstMessage } = {}) {
-  const body = toConversationCreate({ counterpartyMobile, propertyId, body: firstMessage });
+export async function startConversation({ counterpartyMobile, propertyId, firstMessage, clientId } = {}) {
+  const body = toConversationCreate({ counterpartyMobile, propertyId, body: firstMessage, clientId });
   return toViewModel(await post('/messages', body));
 }
 
@@ -142,6 +142,20 @@ export async function queuePendingChat(property, { firstMessage, active = false 
     firstMessage: firstMessage || greeting(property),
   });
   writeQueue(queue);
+}
+
+/* The drain would otherwise send the staged greeting once the gate reopens, after the request was withdrawn. */
+export function dropPendingChat(...keys) {
+  const wanted = new Set(keys.filter(Boolean).map(String));
+  if (!wanted.size) return;
+  const mine = viewerId();
+  try {
+    const arr = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    if (!Array.isArray(arr)) return;
+    writeQueue(arr.filter((q) => q?.userId !== mine || !(wanted.has(q.propertyId) || wanted.has(q.propertySlug))));
+  } catch {
+    /* a corrupt queue has nothing to drop */
+  }
 }
 
 const greeting = (property) =>

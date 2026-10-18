@@ -1,10 +1,15 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
+import HScroll from '../../../components/ui/HScroll.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
 import { lastAt, relTime } from '../../../lib/chatFormat.js';
 import { fmtINR } from '../../../lib/format.js';
 import ActionSheet from './ActionSheet.jsx';
+import RequestsPanel from './RequestsPanel.jsx';
+import { useRequestsInbox } from './useRequestsInbox.js';
+
+const REQUESTS_REFRESH_MS = 60000;
 
 const displayPrice = (p) => {
   if (!p?.price) return '';
@@ -29,6 +34,8 @@ export default function Inbox({
   onRetry,
   onState,
   onBlock,
+  onStagedChanged,
+  initialBox,
   loading,
   error,
 }) {
@@ -37,19 +44,39 @@ export default function Inbox({
   const [swiped, setSwiped] = useState(null);
   const startX = useRef(0);
   const timer = useRef(null);
-  const requests = items.filter((c) => c.staged).length;
+  const firstRun = useRef(true);
+  const inbox = useRequestsInbox();
+  const { load: loadRequests } = inbox;
+  const { received } = inbox.boxes;
+  const stagedCount = items.filter((c) => c.staged).length;
+  const requests = received.status === 'ready' ? received.items.length : received.status === 'error' ? stagedCount : 0;
   const archivedCount = items.filter((c) => c.archived).length;
   const q = search.trim().toLowerCase();
+  const onRequests = tab === 'requests';
+
+  useEffect(() => {
+    const skip = firstRun.current;
+    firstRun.current = false;
+    if (tab !== 'requests') return undefined;
+    const refresh = () => {
+      if (document.hidden) return;
+      loadRequests('received', { quiet: true });
+      loadRequests('sent', { quiet: true });
+    };
+    if (!skip) refresh();
+    const poll = setInterval(refresh, REQUESTS_REFRESH_MS);
+    return () => clearInterval(poll);
+  }, [loadRequests, tab]);
 
   const visible = useMemo(() => {
     const base = items.filter((c) => archived ? c.archived : !c.archived)
-      .filter((c) => tab === 'requests' ? c.staged : !c.staged)
+      .filter((c) => !c.staged)
       .filter((c) => !q || c.party.name.toLowerCase().includes(q) || c.property.title.toLowerCase().includes(q));
-    if (archived || tab === 'requests') return base;
+    if (archived) return base;
     const pinned = base.filter((c) => c.awaitingReply && (c.unread || c.messages.at(-1)?.from === 'them')).slice(0, 3);
     const pinnedIds = new Set(pinned.map((c) => c.id));
     return [...pinned, ...base.filter((c) => !pinnedIds.has(c.id))];
-  }, [archived, items, q, tab]);
+  }, [archived, items, q]);
 
   const rowActions = (c) => [
     { label: c.archived ? 'Unarchive' : 'Archive', icon: 'archive', onClick: () => onState(c.id, { archived: !c.archived }) },
@@ -71,17 +98,20 @@ export default function Inbox({
   return (
     <aside className="pc-list relative">
       <div className="pc-list-head">
-        <h1>{archived ? 'Archived' : t('misc.msgMessages')}</h1>
-        <div className="pc-tabs" role="tablist" aria-label={t('misc.msgFilters')}>
-          <button role="tab" aria-selected={tab === 'chats'} className={'pc-tab' + (tab === 'chats' ? ' active' : '')} onClick={() => setTab('chats')}>Chats</button>
-          <button role="tab" aria-selected={tab === 'requests'} className={'pc-tab' + (tab === 'requests' ? ' active' : '')} onClick={() => setTab('requests')}>Requests {requests > 0 && <span className="pc-reqbadge">{requests}</span>}</button>
-        </div>
-        <div className="pc-search"><Icon name="search" className="w-4 h-4" /><input value={search} onChange={(e) => setSearch(e.target.value)} type="text" enterKeyHint="search" placeholder={t('misc.msgSearchPlaceholder')} aria-label={t('misc.msgSearchAria')} /></div>
+        <h1>{archived && !onRequests ? 'Archived' : t('misc.msgMessages')}</h1>
+        <HScroll role="tablist" aria-label={t('misc.msgFilters')} fadeColor="var(--brand-dark)" className="flex gap-1 sm:gap-2 border-b border-white/10">
+          <button type="button" role="tab" aria-selected={tab === 'chats'} className={'dz-detail-tab' + (tab === 'chats' ? ' is-active' : '')} onClick={() => setTab('chats')}><Icon name="message-square" className="w-4 h-4" /> <span>Chats</span></button>
+          <button type="button" role="tab" aria-selected={tab === 'requests'} className={'dz-detail-tab' + (tab === 'requests' ? ' is-active' : '')} onClick={() => setTab('requests')}><Icon name="inbox" className="w-4 h-4" /> <span>Requests</span> {requests > 0 && <span className="pc-reqbadge">{requests}</span>}</button>
+        </HScroll>
+        {!onRequests ? <div className="pc-search"><Icon name="search" className="w-4 h-4" /><input value={search} onChange={(e) => setSearch(e.target.value)} type="text" enterKeyHint="search" placeholder={t('misc.msgSearchPlaceholder')} aria-label={t('misc.msgSearchAria')} /></div> : null}
       </div>
       <div className="pc-convs">
-        {loading && Array.from({ length: 6 }, (_, i) => <div key={i} className="pc-conv pc-skel" />)}
-        {!loading && error ? <div className="pc-empty-list"><p>Couldn't load chats</p><button type="button" onClick={onRetry}>Retry</button></div> : null}
-        {!loading && !error && visible.length ? visible.map((c, index) => {
+        {onRequests ? (
+          <RequestsPanel key={initialBox || 'auto'} inbox={inbox} convs={items} initialBox={initialBox} onOpenStaged={onOpen} onStagedChanged={onStagedChanged} />
+        ) : null}
+        {!onRequests && loading && Array.from({ length: 6 }, (_, i) => <div key={i} className="pc-conv pc-skel" />)}
+        {!onRequests && !loading && error ? <div className="pc-empty-list"><p>Couldn't load chats</p><button type="button" onClick={onRetry}>Retry</button></div> : null}
+        {!onRequests && !loading && !error && visible.length ? visible.map((c, index) => {
           const last = c.messages.at(-1);
           const fromMe = last?.from === 'me';
           const previewText = last?.attachments?.length && !last.text ? 'Photo' : last?.text;
@@ -103,10 +133,10 @@ export default function Inbox({
             </div>
           );
         }) : null}
-        {!loading && !error && !visible.length ? <div className="pc-empty-list"><p>{tab === 'requests' ? t('misc.msgNoRequests') : 'No chats yet'}</p>{tab === 'chats' ? <><span>When an owner accepts your request, your chat opens here.</span><Link to="/listings">Browse listings</Link></> : null}</div> : null}
+        {!onRequests && !loading && !error && !visible.length ? <div className="pc-empty-list"><p>No chats yet</p><span>When an owner accepts your request, your chat opens here.</span><Link to="/listings">Browse listings</Link></div> : null}
       </div>
-      {!archived && archivedCount > 0 ? <button type="button" className="pc-archived-link" onClick={() => setArchived(true)}>Archived ({archivedCount})</button> : null}
-      {archived ? <button type="button" className="pc-archived-link" onClick={() => setArchived(false)}>Back to inbox</button> : null}
+      {!onRequests && !archived && archivedCount > 0 ? <button type="button" className="pc-archived-link" onClick={() => setArchived(true)}>Archived ({archivedCount})</button> : null}
+      {!onRequests && archived ? <button type="button" className="pc-archived-link" onClick={() => setArchived(false)}>Back to inbox</button> : null}
       {sheet ? <ActionSheet title={sheet.party.name} actions={rowActions(sheet)} onClose={() => setSheet(null)} /> : null}
     </aside>
   );

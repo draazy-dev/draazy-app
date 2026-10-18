@@ -110,8 +110,8 @@ const rememberedAsk = (page, key) => expect.poll(
 ).toBe(true);
 
 const openInboxRequests = async (page) => {
-  await page.goto(`${BASE}/messages`);
-  await page.getByRole('tab', { name: /Requests/i }).click();
+  await page.goto(`${BASE}/messages?tab=requests&box=sent`);
+  await expect(page.getByTestId('requests-panel')).toBeVisible({ timeout: 20_000 });
 };
 /** The rooms board. A room created a moment ago is on the public feed only once `approve` has run,
  *  and the board fetches on mount, so this is always a fresh navigation rather than a tab click. */
@@ -159,7 +159,9 @@ test.describe('Flatmate interest doors (live)', () => {
       expect(await queuedFor(page, `room-${room.id}`), 'the ask should be queued for Messages').toHaveLength(1);
 
       await openInboxRequests(page);
-      await expect(page.getByText(`Room in ${society}`).first()).toBeVisible({ timeout: 15_000 });
+      const sent = page.getByTestId('request-card').filter({ hasText: society });
+      await expect(sent).toHaveAttribute('data-kind', 'flatmate', { timeout: 15_000 });
+      await expect(sent.getByTestId('request-state')).toHaveText('Pending');
     });
 
     await test.step('the sent state follows the seeker to a second device, so the duplicate is never offered', async () => {

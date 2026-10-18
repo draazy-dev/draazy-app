@@ -8,6 +8,7 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.ConstraintViolations;
 import com.draazy.api.common.trust.FlatmateRequestParties;
 import com.draazy.api.common.trust.MobileMask;
+import com.draazy.api.common.trust.VisitUsageLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -47,6 +48,7 @@ public class ConversationOpeningService {
     private final PropertyRepository properties;
     private final ContactRequestRepository contactRequests;
     private final FlatmateRequestParties flatmateRequests;
+    private final VisitUsageLookup visits;
     private final AuditService audit;
 
     // The thread itself, for the one thing opening cannot do alone: put the caller's first message in it.
@@ -57,7 +59,7 @@ public class ConversationOpeningService {
     public ConversationOpeningService(ConversationRepository conversations,
             ConversationMapper mapper, UserRepository users, PropertyRepository properties,
             ContactRequestRepository contactRequests, FlatmateRequestParties flatmateRequests,
-            AuditService audit,
+            VisitUsageLookup visits, AuditService audit,
             ConversationService thread, PlatformTransactionManager transactionManager) {
         this.conversations = conversations;
         this.mapper = mapper;
@@ -65,6 +67,7 @@ public class ConversationOpeningService {
         this.properties = properties;
         this.contactRequests = contactRequests;
         this.flatmateRequests = flatmateRequests;
+        this.visits = visits;
         this.audit = audit;
         this.thread = thread;
         this.transactions = new TransactionTemplate(transactionManager);
@@ -175,8 +178,8 @@ public class ConversationOpeningService {
         return new Started(mapper.toDetail(conversation, me), existing.isEmpty());
     }
 
-    // Consent is per listing. A thread without a listing is only for staff or an owner writing to
-    // someone who has an approved request on one of their listings.
+    // Consent is per listing: an approved contact request, or a visit the owner confirmed. A thread without a
+    // listing is only for staff or an owner writing to someone who has an approved request on one of their listings.
     private boolean related(AuthPrincipal caller, UUID counterpartyId, Property listing) {
         if (Roles.isBackOffice(caller.role())) {
             return true;
@@ -187,7 +190,8 @@ public class ConversationOpeningService {
         }
         UUID requester = listing.getOwner().getId().equals(caller.userId()) ? counterpartyId : caller.userId();
         return contactRequests.existsByRequesterIdAndPropertyIdAndStatus(
-                requester, listing.getId(), ContactRequestStatuses.APPROVED);
+                requester, listing.getId(), ContactRequestStatuses.APPROVED)
+                || visits.ownerConfirmed(requester, listing.getId());
     }
 
     // The relationship guard still runs later; this lookup proves nothing alone.

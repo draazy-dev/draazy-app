@@ -36,7 +36,9 @@ public class RateLimitLock {
 
         REFERRER_QUALIFY(10),
 
-        REPORT_CREATE(11);
+        REPORT_CREATE(11),
+
+        REQUEST_REMINDER(12);
 
         private final int namespace;
 

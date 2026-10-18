@@ -77,6 +77,12 @@ public final class ErrorCodes {
 
     public static final String CONTACT_PENDING_LIMIT = "contact_pending_limit";
 
+    public static final String INVALID_BOX = "invalid_box";
+
+    public static final String REMINDER_TOO_SOON = "reminder_too_soon";
+
+    public static final String RECENTLY_WITHDRAWN = "recently_withdrawn";
+
     public static final String LISTING_NOT_LIVE = "listing_not_live";
 
     public static final String LISTING_NOT_EDITABLE = "listing_not_editable";

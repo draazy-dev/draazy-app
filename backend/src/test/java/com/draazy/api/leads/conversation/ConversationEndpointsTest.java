@@ -13,6 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.deals.visit.Visit;
+import com.draazy.api.deals.visit.VisitRepository;
+import com.draazy.api.deals.visit.VisitStatuses;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.identity.user.UserStatuses;
@@ -22,6 +25,8 @@ import com.draazy.api.leads.contact.ContactRequestStatuses;
 import com.draazy.api.security.Roles;
 import com.draazy.api.security.Teams;
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -41,6 +46,8 @@ class ConversationEndpointsTest extends AbstractApiTest {
     ContactRequestRepository contactRequests;
     @Autowired
     ConversationRepository conversations;
+    @Autowired
+    VisitRepository visits;
 
     @Nested
     @DisplayName("the relationship guard")
@@ -155,6 +162,26 @@ class ConversationEndpointsTest extends AbstractApiTest {
             approve(buyer, listing(owner));
 
             start(owner, buyer, listing(owner), 403);
+        }
+
+        @Test
+        @DisplayName("a visit the owner confirmed opens the listing thread both ways; a merely booked one does not")
+        void confirmedVisitMayMessage() throws Exception {
+            User owner = user("9830000901", Roles.Wire.OWNER, "Owner Visit");
+            User visitor = user("9830000902", Roles.Wire.BUYER, "Visitor");
+            Property p = listing(owner);
+            Property other = listing(owner);
+            Visit booked = visits.saveAndFlush(new Visit(p.getId(), visitor.getId(),
+                    Instant.now().plus(2, ChronoUnit.DAYS), null, null));
+
+            start(owner, visitor, p, 403);
+
+            booked.setStatus(VisitStatuses.CONFIRMED);
+            visits.saveAndFlush(booked);
+            start(owner, visitor, p, 201);
+            start(visitor, owner, p, 200);
+            start(owner, visitor, other, 403);
+            start(owner, visitor, null, 403);
         }
     }
 

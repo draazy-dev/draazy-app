@@ -23,4 +23,10 @@ class VisitUsageService implements VisitUsageLookup {
                         VisitStatuses.SCHEDULED.equals(v.getStatus())))
                 .toList();
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean ownerConfirmed(UUID visitorId, UUID propertyId) {
+        return visits.existsByVisitorIdAndPropertyIdAndConfirmedAtIsNotNull(visitorId, propertyId);
+    }
 }

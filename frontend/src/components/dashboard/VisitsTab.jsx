@@ -7,6 +7,8 @@ import DateField from '../ui/DateField.jsx';
 import TimeField from '../ui/TimeField.jsx';
 import { parseWhen, formatWhen, slotFromParts, todayIso } from '../../lib/visitWhen.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useAppFlags } from '../../context/AppFlagsContext.jsx';
+import { useOpenChat } from '../../lib/useOpenChat.js';
 import { isVisitHost } from '../../pages/consumer/dashboard/dashboardData.js';
 
 const isPastSlot = (date, time) => new Date(slotFromParts(date, time)) <= new Date();
@@ -68,26 +70,26 @@ const LegendDot = ({ cls, label }) => (
   <span className="inline-flex items-center gap-1.5 text-gray-400"><span className={'w-2 h-2 rounded-full ' + cls} />{label}</span>
 );
 
-const waDigits = (m) => (m || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
-const isFullMobile = (m) => waDigits(m).length === 10;
-const btnWhatsapp = 'px-2.5 py-1.5 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/25 flex items-center gap-1';
+const isFullMobile = (m) => (m || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').length === 10;
+const btnChat = 'px-2.5 py-1.5 rounded-lg bg-teal-500/15 text-teal-300 text-xs font-semibold hover:bg-teal-500/25 flex items-center gap-1';
 
-function visitWaMessage(v, dateStr, timeLabel, t) {
+function visitChatMessage(v, dateStr, timeLabel, t) {
   const listing = (v.listing || t('visits.propertyFallback')).split(' in ')[0];
   // Built as whole sentences per status: word order differs across languages, so
   // stitching fragments would read as broken Hindi/Marathi.
   const when = [dateStr && t('visits.whenOn', { date: dateStr }), timeLabel && t('visits.whenAt', { time: timeLabel })].filter(Boolean).join(' ');
   const name = v.visitorName || t('visits.thereFallback');
-  if (v.status === 'confirmed') return t('visits.waConfirmed', { name, listing, when });
-  if (v.status === 'cancelled' || v.status === 'no-show') return t('visits.waCancelled', { name, listing, when });
-  return t('visits.waPending', { name, listing, when });
+  if (v.status === 'confirmed') return t('visits.chatConfirmed', { name, listing, when });
+  if (v.status === 'cancelled' || v.status === 'no-show') return t('visits.chatCancelled', { name, listing, when });
+  return t('visits.chatPending', { name, listing, when });
 }
-
-const waHref = (mobile, text) => `https://wa.me/91${waDigits(mobile)}?text=${encodeURIComponent(text)}`;
 
 export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const { flagEnabled } = useAppFlags();
+  const chatEnabled = flagEnabled('inAppMessaging');
+  const openChat = useOpenChat(toast);
   const locale = i18n.language;
   const CAL_MONTHS = useMemo(() => calMonths(locale), [locale]);
   const CAL_DAYS = useMemo(() => calDays(locale), [locale]);
@@ -205,14 +207,14 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
         </div>
         <div className="flex items-center gap-1.5 flex-wrap [&>*]:min-h-[44px] sm:[&>*]:min-h-0">
           {(() => {
-            if (!hostedByMe) return null;
+            if (!hostedByMe || !chatEnabled) return null;
             const target = v.visitorMobile;
             if (!isFullMobile(target)) return null;
-            const text = visitWaMessage(v, tag || dateStr, p.timeLabel, t);
+            const greeting = visitChatMessage(v, tag || dateStr, p.timeLabel, t);
             return (
-              <a href={waHref(target, text)} target="_blank" rel="noopener noreferrer" className={btnWhatsapp} aria-label={t('visits.waVisitor', { name: v.visitorName || t('visits.visitorFallback') })}>
-                <Icon name="message-circle" className="w-3.5 h-3.5" /> {t('visits.whatsapp')}
-              </a>
+              <button type="button" onClick={() => openChat({ mobile: target, propertyId: v.listingId, greeting })} className={btnChat} aria-label={t('visits.chatVisitor', { name: v.visitorName || t('visits.visitorFallback') })}>
+                <Icon name="message-circle" className="w-3.5 h-3.5" /> {t('visits.chat')}
+              </button>
             );
           })()}
           {v.status === 'scheduled' && hostedByMe && <button onClick={() => updateVisit(v.id, 'confirmed')} className={btnConfirm}><Icon name="check" className="w-3.5 h-3.5" /> {t('visits.confirm')}</button>}
@@ -308,19 +310,6 @@ export default function VisitsTab({ visits, toast, isOwner = false, onUpdate }) 
           />
           {rePast ? <p id="re-past-hint" role="alert" className="text-xs text-rose-300">{t('visits.pastSlot')}</p> : null}
           <p className="text-xs text-gray-500">{isVisitHost(reschedule, user?.id) ? t('visits.reconfirmVisitor') : t('visits.reconfirmOwner')}</p>
-          {(() => {
-            if (!isVisitHost(reschedule, user?.id)) return null;
-            const target = reschedule.visitorMobile;
-            if (!isFullMobile(target) || !reDate || !reTime) return null;
-            const label = new Date(reDate + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
-            const listing = (reschedule.listing || t('visits.propertyFallback')).split(' in ')[0];
-            const text = t('visits.waReschedOwner', { name: reschedule.visitorName || t('visits.thereFallback'), listing, date: label, time: reTime });
-            return (
-              <a href={waHref(target, text)} target="_blank" rel="noopener noreferrer" className={btnWhatsapp + ' w-full justify-center'}>
-                <Icon name="message-circle" className="w-3.5 h-3.5" /> {t('visits.notifyWa')}
-              </a>
-            );
-          })()}
         </div>
       ) : null}
     </Modal>

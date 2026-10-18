@@ -25,6 +25,7 @@
     "requestSentAwaiting": "Request sent — awaiting listing contact",
     "contactReturned": "Contact returned",
     "contactPendingLimit": "Too many requests are awaiting a reply. Try again once an owner responds.",
+    "recentlyWithdrawn": "You withdrew this request recently. You can ask again after 7 days.",
     "listingNotLive": "This listing isn’t taking enquiries right now.",
     "requestNumber": "Request number",
     "contactsLeft_one": "{{count}} owner contact left",

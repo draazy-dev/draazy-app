@@ -37,6 +37,9 @@ export const unreadCount = async () => (await provider()).unreadCount();
 /** Queue messages typed before the contact gate opens. */
 export const queuePendingChat = async (property, options) => (await provider()).queuePendingChat(property, options);
 
+/** Forget the staged chat for a listing, by id and/or slug. */
+export const dropPendingChat = async (...keys) => (await provider()).dropPendingChat(...keys);
+
 /** `blocked` entries stay queued — the gate may open later — which is why this is not a fire-and-forget drain. */
 export const drainPendingChats = async () => (await provider()).drainPendingChats();
 export const clearConversationDeviceState = async () => (await provider()).clearConversationDeviceState?.();

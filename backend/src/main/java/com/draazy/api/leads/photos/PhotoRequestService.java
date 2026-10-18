@@ -8,6 +8,7 @@ import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.common.trust.WithdrawnCooldown;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
 import java.util.List;
@@ -51,18 +52,36 @@ public class PhotoRequestService {
         }
 
         return photoRequests.findByRequesterIdAndPropertyId(requesterId, property.getId())
-                .map(existing -> new PhotoRequestCreateResponse(false, project(existing, property)))
+                .map(existing -> reAsk(existing, property))
                 .orElseGet(() -> {
                     PhotoRequest saved =
                             photoRequests.save(new PhotoRequest(property.getId(), requesterId));
-                    if (owner != null) {
-                        notifier.notify(owner.getId(), "photo.requested",
-                                "Someone wants more photos",
-                                "A buyer asked for more photos of " + property.getTitle() + ".",
-                                "/dashboard#leads");
-                    }
+                    announceToOwner(owner, property);
                     return new PhotoRequestCreateResponse(true, project(saved, property));
                 });
+    }
+
+    private PhotoRequestCreateResponse reAsk(PhotoRequest existing, Property property) {
+        if (!PhotoRequestStatuses.WITHDRAWN.equals(existing.getStatus())) {
+            return new PhotoRequestCreateResponse(false, project(existing, property));
+        }
+        if (WithdrawnCooldown.active(existing.getUpdatedAt(), Instant.now())) {
+            throw WithdrawnCooldown.refusal(existing.getUpdatedAt());
+        }
+        existing.reopen();
+        PhotoRequest reopened = photoRequests.saveAndFlush(existing);
+        photoRequests.restartClock(reopened.getId());
+        announceToOwner(property.getOwner(), property);
+        return new PhotoRequestCreateResponse(true, project(reopened, property));
+    }
+
+    private void announceToOwner(User owner, Property property) {
+        if (owner != null) {
+            notifier.notify(owner.getId(), "photo.requested",
+                    "Someone wants more photos",
+                    "A buyer asked for more photos of " + property.getTitle() + ".",
+                    "/messages?tab=requests");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -72,7 +91,8 @@ public class PhotoRequestService {
             return Page.empty(pageable);
         }
         Page<PhotoRequest> rows =
-                photoRequests.findByPropertyIdInOrderByCreatedAtDesc(ownedPropertyIds, pageable);
+                photoRequests.findByPropertyIdInAndStatusNotOrderByCreatedAtDesc(
+                        ownedPropertyIds, PhotoRequestStatuses.WITHDRAWN, pageable);
         return rows.map(projector(rows.getContent()));
     }
 
@@ -82,7 +102,7 @@ public class PhotoRequestService {
             throw new BadRequestException("decision must be one of: %s, %s."
                     .formatted(PhotoRequestStatuses.RESOLVED, PhotoRequestStatuses.DECLINED));
         }
-        PhotoRequest row = photoRequests.findById(requestId)
+        PhotoRequest row = photoRequests.lockById(requestId)
                 .orElseThrow(() -> NotFoundException.of("Photo request"));
         Property property = properties.findById(row.getPropertyId())
                 .orElseThrow(() -> NotFoundException.of("Photo request"));
@@ -94,7 +114,7 @@ public class PhotoRequestService {
         if (decision.equals(before)) {
             return project(row, property);
         }
-        if (PhotoRequestStatuses.isTerminal(before)) {
+        if (!PhotoRequestStatuses.PENDING.equals(before)) {
             return project(row, property);
         }
         row.decide(decision, Instant.now());

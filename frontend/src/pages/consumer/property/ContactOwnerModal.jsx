@@ -80,6 +80,10 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
         toast(t('property.contactPendingLimit'), 'info');
         return;
       }
+      if (err?.code === 'recently_withdrawn') {
+        toast(err.message || t('property.recentlyWithdrawn'), 'info');
+        return;
+      }
       if (err?.code === 'own_listing') {
         toast(t('property.ownListing'), 'info');
         onClose();
@@ -115,6 +119,10 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
     }
     if (err?.code === 'contact_pending_limit') {
       toast(t('property.contactPendingLimit'), 'info');
+      return true;
+    }
+    if (err?.code === 'recently_withdrawn') {
+      toast(err.message || t('property.recentlyWithdrawn'), 'info');
       return true;
     }
     if (err?.code === 'listing_not_live') {

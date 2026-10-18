@@ -19,6 +19,10 @@ class ContactReplyWindow {
         return now.minus(Duration.ofDays(settings.contactReplyDays()));
     }
 
+    Instant expiresAt(Instant createdAt) {
+        return createdAt.plus(Duration.ofDays(settings.contactReplyDays()));
+    }
+
     /** True for a request whose window ran out, whether or not the sweep has stored the expiry yet. */
     boolean lapsed(String status, Instant createdAt, Instant now) {
         return ContactRequestStatuses.EXPIRED.equals(status)

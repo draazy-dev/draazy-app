@@ -16,6 +16,7 @@ import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.ReferralTriggers;
 import com.draazy.api.common.trust.VerifiedTenantLookup;
+import com.draazy.api.common.trust.WithdrawnCooldown;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -103,7 +104,10 @@ public class ContactService {
             requireRoomForAnotherRequest(viewerId, property.getId(), now);
             contactRequests.saveAndFlush(new ContactRequest(property.getId(), viewerId, body.message()));
             announceToOwner(owner, viewerId, property);
-        } else if (window.lapsed(existing.get().getStatus(), existing.get().getCreatedAt(), now)) {
+        } else if (isWithdrawn(existing.get()) || window.lapsed(existing.get().getStatus(), existing.get().getCreatedAt(), now)) {
+            if (isWithdrawn(existing.get()) && WithdrawnCooldown.active(existing.get().getUpdatedAt(), now)) {
+                throw WithdrawnCooldown.refusal(existing.get().getUpdatedAt());
+            }
 
             // A lapsed request does not count, so asking again is a new spend and is checked as one.
             requireRoomForAnotherRequest(viewerId, property.getId(), now);
@@ -126,7 +130,7 @@ public class ContactService {
         notifier.notify(owner.getId(), "contact.received",
                 "New contact request",
                 name + " wants to contact you about " + property.getTitle() + ". Approve or decline it.",
-                "/dashboard#leads");
+                "/messages?tab=requests");
     }
 
     // A visit reaches the owner just as a contact request does, so it spends from the same allowance.
@@ -161,8 +165,8 @@ public class ContactService {
         if (ownedPropertyIds.isEmpty()) {
             return Page.empty(pageable);
         }
-        Page<ContactRequest> rows =
-                contactRequests.findByPropertyIdInOrderByCreatedAtDesc(ownedPropertyIds, pageable);
+        Page<ContactRequest> rows = contactRequests.findByPropertyIdInAndStatusNotOrderByCreatedAtDesc(
+                ownedPropertyIds, ContactRequestStatuses.WITHDRAWN, pageable);
         Map<UUID, User> requesters = users.findAllById(
                         rows.getContent().stream()
                                 .map(ContactRequest::getRequesterId).distinct().toList())
@@ -237,12 +241,17 @@ public class ContactService {
             return new ContactStatusResponse(ContactStatuses.OWNER, verifiedContactOnly, false, false);
         }
         String status = contactRequests.findByRequesterIdAndPropertyId(viewerId, property.getId())
-                .map(row -> window.lapsed(row.getStatus(), row.getCreatedAt(), Instant.now())
-                        ? ContactStatuses.EXPIRED : row.getStatus())
+                .map(row -> isWithdrawn(row) ? ContactStatuses.NONE
+                        : window.lapsed(row.getStatus(), row.getCreatedAt(), Instant.now())
+                                ? ContactStatuses.EXPIRED : row.getStatus())
                 .orElse(ContactStatuses.NONE);
         return new ContactStatusResponse(
                 status, verifiedContactOnly, verifiedContactOnly && !hasBadge(viewerId),
                 owner != null && owner.isHideNumber());
+    }
+
+    private static boolean isWithdrawn(ContactRequest row) {
+        return ContactRequestStatuses.WITHDRAWN.equals(row.getStatus());
     }
 
     // Read verification live so old tokens do not block newly verified users.
@@ -261,7 +270,7 @@ public class ContactService {
             return response;
         }
         return new ContactRequestResponse(response.id(), response.propertyId(), response.requester(),
-                ContactRequestStatuses.EXPIRED, response.contact(), response.createdAt());
+                ContactRequestStatuses.EXPIRED, response.contact(), response.message(), response.createdAt());
     }
 
     // Accept UUID or slug here because the property-detail contract accepts both.

@@ -94,8 +94,8 @@ test.describe('Scheduled visits (live)', () => {
       await expect(upcoming).toBeVisible();
       await expect(badges(page, 'Awaiting confirmation')).toHaveCount(2);
       await expect(page.getByText('Asha Kulkarni')).toBeVisible();
-      // `isFullMobile` suppresses the button for the five-digit fragment a masked value strips to.
-      await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+      // `isFullMobile` suppresses the in-app Message button for the five-digit fragment a masked value strips to.
+      await expect(page.getByRole('button', { name: /^Message / })).toHaveCount(0);
       expect((await rowOf(asha)).visitor.mobile, 'masked to the owner while merely scheduled')
         .toBe(`${asha.mobile.slice(0, 2)}XXXXX${asha.mobile.slice(-3)}`);
     });
@@ -106,9 +106,8 @@ test.describe('Scheduled visits (live)', () => {
       await expect(badges(page, 'Confirmed')).toHaveCount(1);
       await expect(badges(page, 'Awaiting confirmation')).toHaveCount(1);
 
-      const wa = page.locator(`a[href*="wa.me/91${asha.mobile}"]`);
-      await expect(wa).toHaveCount(1);
-      await expect(wa).toHaveAttribute('aria-label', /Asha Kulkarni/);
+      await expect(page.getByRole('button', { name: 'Message Asha Kulkarni' })).toHaveCount(1);
+      await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
       expect((await rowOf(asha)).visitor.mobile, 'revealed to the owner once confirmed').toBe(asha.mobile);
     });
 
@@ -195,6 +194,27 @@ test.describe('Scheduled visits (live)', () => {
     // The row is on screen and fully rendered — and carries no route to the owner's number.
     await expect(page.getByRole('link', { name: /WhatsApp/i })).toHaveCount(0);
     await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+  });
+
+  test('Message on a confirmed visit opens the in-app thread with the visitor, once', async ({ page }) => {
+    const { owner, visitors } = await scene(['Chat Visitor']);
+    const [visitor] = visitors;
+    const confirmed = await api('PATCH', `/visit-requests/${visitor.visitId}/status`, owner.headers, { status: 'confirmed' });
+    expect(confirmed.status).toBe(200);
+
+    await signedInAs(page, owner.mobile);
+    for (const attempt of [1, 2]) {
+      await page.goto('/dashboard#visits');
+      await page.getByRole('button', { name: 'Message Chat Visitor' }).click();
+      await expect(page, `attempt ${attempt} lands in Messages`).toHaveURL(/\/messages\?c=/);
+      await expect(page.getByText(/your visit to .* is confirmed/).first()).toBeVisible();
+    }
+
+    const threads = await api('GET', '/messages?size=100', visitor.headers);
+    expect(threads.status).toBe(200);
+    expect(threads.body.content, 'one thread, not one per tap').toHaveLength(1);
+    const thread = await api('GET', `/messages/${threads.body.content[0].id}`, visitor.headers);
+    expect(thread.body.messages, 'a second tap reuses the thread without re-sending the greeting').toHaveLength(1);
   });
 
   test('the owner marks a past confirmed visit as a no-show', async ({ page }) => {
