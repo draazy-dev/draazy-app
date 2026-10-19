@@ -69,6 +69,22 @@
   - [ ] PENDING VERIFICATION, no e2e spec yet: W2 notification/audit texts (MOD-20/21/22, MC-09, PC-05, XC-03/04) are covered only by `ModerationRecordTest`/`ReviewReasonParityTest`. Untestable locally: PC-08 (Maps key), PC-16 (no OffscreenCanvas-less browser), MOD-17 4G timing. `liveSociety.js:81` cleanup rejects with a bare `other` (no note), so it silently fails.
   - [ ] Notes: public `qualityScore` reveals the ownership-doc band on sale listings; the list-property draft key isn't per-user (shared device); a rejected listing's tracker step reads `submitted`.
 
+## QA: Property search
+
+- [x] P1 Visibility via API (maker-checker): 0 leaks / 0 5xx over 267 probe reads + `consumer/search/visibility-matrix` (3 green on the search lane)
+  - V-01 · Minor · live re-check shows the owner's unreviewed price/description at once · Asked → by design (Q14)
+  - V-02 · Minor · `/properties/{id}` opens paused/sold/rented (badge, no contact, never listed) · Asked → by design
+  - V-03 · Minor · reversed/negative ranges answer 200 with 0 rows, not 400/ignored · Asked → by design; verify the UI drops them in P3/P5
+  - `run-fast.ps1` could not boot shard 1: another session's Vite (pid 49684) holds :3322 — spec verified on the search lane instead
+- [x] P2 Lifecycle in the UI — rent flat (1280px) + buy plot (390px) through submit → approve → owner edit → re-check → flag → archive: list, hero counts, locality, saved, alerts consistent at every step
+  - P2-01 · Major · flagged listing stayed in search/detail/cards/locality for the full 30s cache TTL (moderation writes never evicted) · Asked → Fixed-Verified (evict on moderation/lifecycle writes only — status, flag, takedown, archive, restore; 30s → 0s measured)
+  - P2-02 · Minor · `/me/saved` kept a suspended owner's listing (title, price, photo) · Asked → Fixed-Verified (hidden like search)
+  - P2-03 · Minor · Saved hides paused but keeps sold/rented as unavailable · Asked → by design
+  - Untested: map markers (Maps key admits only :3322; left to P6), wizard submit (done via API). `run-fast -Full` (PublicReadCacheFilter is shared infra) deferred to P8; `check-comments` flags another session's `city-propagation.spec.js`
+- [x] P8 Close-out: GO for search — 0 Blocker/Critical, 0 visibility leaks, P1–P7 ticked. `run-fast -Full` 87 failed → `-Failed` rerun 53/55 green; the 33 maps-pinned shard-1 tests could not boot (another session's `npm run dev` took :3322 mid-run) and were run on the search lane instead: all green except Maps-referer (lane-only) and `contact_quota_exhausted` in the review seeds
+  - Review fixes: maps refusal hook moved into the eager loader; `queryKey` carries `size`; map fallback names the failure; `view=map` ignores `page`; cache eviction narrowed to moderation/lifecycle routes (Asked; members can no longer flush it); visibility-matrix cleans up its clones and bypasses the cache
+  - Not ours, still red: `flatmates/detail-page` lightbox "2 / 3", `flatmates/interactions` re-ask 409, `property-integration-community` reviews → `contact_quota_exhausted` (contact allowance, other session's billing work)
+
 ## Waiting by design
 
 - SSE hub is single-instance; multi-node needs LISTEN/NOTIFY.

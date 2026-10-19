@@ -141,6 +141,28 @@ class EngagementEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void listSaved_hidesASuspendedOwnersListingLikeSearchDoes() throws Exception {
+        User buyer = user("9820100191");
+        User owner = user("9820100192");
+        Property kept = listing(buyer, PropertyStatus.APPROVED);
+        Property suspendedOwners = listing(owner, PropertyStatus.APPROVED);
+        String auth = bearer(buyer);
+        for (Property p : List.of(kept, suspendedOwners)) {
+            mvc.perform(put("/me/saved/" + p.getId()).header(HttpHeaders.AUTHORIZATION, auth))
+                    .andExpect(status().isNoContent());
+        }
+        jdbc.update("update users set status = 'suspended' where id = ?", owner.getId());
+
+        mvc.perform(get("/me/saved").header(HttpHeaders.AUTHORIZATION, auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(kept.getId().toString()));
+        mvc.perform(get("/me/saved/keys").header(HttpHeaders.AUTHORIZATION, auth))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+    }
+
+    @Test
     void saveTwice_idempotent() throws Exception {
         User u = user("9820100003");
         Property p = listing(u);

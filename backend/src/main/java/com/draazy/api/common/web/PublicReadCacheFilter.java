@@ -51,6 +51,11 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
 
     private static final String ADMIN_PREFIX = "/admin/";
 
+    private static final List<PathPattern> MODERATION_WRITES = Stream.of(
+                    Routes.Moderation.PROPERTY_STATUS, Routes.Moderation.PROPERTY_FLAG,
+                    Routes.Moderation.PROPERTY_PHOTO_TAKEDOWN, Routes.Properties.ARCHIVE, Routes.Properties.RESTORE)
+            .map(PathPatternParser.defaultInstance::parse).toList();
+
     private static final Set<String> READ_METHODS = Set.of("GET", "HEAD", "OPTIONS");
 
     /** Bounds memory against arbitrary query strings, e.g. {@code /properties/featured?x=<random>}. */
@@ -89,11 +94,15 @@ public class PublicReadCacheFilter extends OncePerRequestFilter {
         return ANONYMOUS.stream().anyMatch(p -> p.matches(container));
     }
 
-    // Every back-office write can change a cached answer (settings, cities, plans, FAQs, moderation),
-    // so a successful one drops them all. Only on this instance: the others serve out their TTL.
+    // Back-office and listing moderation/lifecycle writes can change a cached answer, so a successful one
+    // drops them all. Only on this instance: the others serve out their TTL.
     private boolean evicts(HttpServletRequest request) {
-        return ttlMillis > 0 && !READ_METHODS.contains(request.getMethod())
-                && pathOf(request).startsWith(ADMIN_PREFIX);
+        if (ttlMillis <= 0 || READ_METHODS.contains(request.getMethod())) {
+            return false;
+        }
+        String path = pathOf(request);
+        PathContainer container = PathContainer.parsePath(path);
+        return path.startsWith(ADMIN_PREFIX) || MODERATION_WRITES.stream().anyMatch(p -> p.matches(container));
     }
 
     private static String pathOf(HttpServletRequest request) {

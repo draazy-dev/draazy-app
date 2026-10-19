@@ -17,7 +17,9 @@ public interface SavedPropertyRepository extends Repository<Property, UUID> {
             select sp.property_id
               from saved_properties sp
               join properties p on p.id = sp.property_id
+              join users u on u.id = p.owner_id
              where sp.user_id = :userId
+               and u.status <> 'suspended'
                and p.archived = false
                and p.status in ('approved', 'sold', 'rented')
              order by sp.created_at desc
@@ -26,7 +28,9 @@ public interface SavedPropertyRepository extends Repository<Property, UUID> {
             select count(*)
               from saved_properties sp
               join properties p on p.id = sp.property_id
+              join users u on u.id = p.owner_id
              where sp.user_id = :userId
+               and u.status <> 'suspended'
                and p.archived = false
                and p.status in ('approved', 'sold', 'rented')
             """,
@@ -38,7 +42,9 @@ public interface SavedPropertyRepository extends Repository<Property, UUID> {
             select p.id, p.slug
               from saved_properties sp
               join properties p on p.id = sp.property_id
+              join users u on u.id = p.owner_id
              where sp.user_id = :userId
+               and u.status <> 'suspended'
                and p.archived = false
                and p.status in ('approved', 'sold', 'rented')
              order by sp.created_at desc
