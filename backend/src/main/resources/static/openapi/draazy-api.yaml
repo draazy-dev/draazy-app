@@ -13389,6 +13389,10 @@ components:
         avgRent: { type: [integer, 'null'], description: Average monthly rent of live rent flats (INR); null below 3 samples }
         ratePerSqft: { type: [integer, 'null'], description: Average asking rate of live sale flats (INR/sqft); null below 3 samples }
         fromPrice: { type: [integer, 'null'], description: Lowest live asking price, rent or sale (INR) }
+        forSale: { type: integer, description: Live sale listings; with forRent, sums to liveListings }
+        forRent: { type: integer, description: Live rent listings }
+        fromSale: { type: [integer, 'null'], description: Lowest live sale price (INR) }
+        fromRent: { type: [integer, 'null'], description: Lowest live monthly rent (INR) }
     LocalitySummary:
       type: object
       required: [slug, name, city]

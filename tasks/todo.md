@@ -80,7 +80,10 @@
   - P2-01 · Major · flagged listing stayed in search/detail/cards/locality for the full 30s cache TTL (moderation writes never evicted) · Asked → Fixed-Verified (evict on moderation/lifecycle writes only — status, flag, takedown, archive, restore; 30s → 0s measured)
   - P2-02 · Minor · `/me/saved` kept a suspended owner's listing (title, price, photo) · Asked → Fixed-Verified (hidden like search)
   - P2-03 · Minor · Saved hides paused but keeps sold/rented as unavailable · Asked → by design
+  - P2-04 · Minor · locality strip called every approved home "verified" (listings page: 13 · 2 verified) · Asked → Fixed-Verified ("live homes")
+  - P2-05 · Trivial · locality strip from-price split "₹92 / L" at 355px · Fixed-Verified (nowrap)
   - Untested: map markers (Maps key admits only :3322; left to P6), wizard submit (done via API). `run-fast -Full` (PublicReadCacheFilter is shared infra) deferred to P8; `check-comments` flags another session's `city-propagation.spec.js`
+  - P5-02 · Minor · locality strip "11 live homes · from ₹14,000" opened Buy with 9 results · Asked → Fixed-Verified (additive `forSale/forRent/fromSale/fromRent`; two links)
 - [x] P8 Close-out: GO for search — 0 Blocker/Critical, 0 visibility leaks, P1–P7 ticked. `run-fast -Full` 87 failed → `-Failed` rerun 53/55 green; the 33 maps-pinned shard-1 tests could not boot (another session's `npm run dev` took :3322 mid-run) and were run on the search lane instead: all green except Maps-referer (lane-only) and `contact_quota_exhausted` in the review seeds
   - Review fixes: maps refusal hook moved into the eager loader; `queryKey` carries `size`; map fallback names the failure; `view=map` ignores `page`; cache eviction narrowed to moderation/lifecycle routes (Asked; members can no longer flush it); visibility-matrix cleans up its clones and bypasses the cache
   - Not ours, still red: `flatmates/detail-page` lightbox "2 / 3", `flatmates/interactions` re-ask 409, `property-integration-community` reviews → `contact_quota_exhausted` (contact allowance, other session's billing work)

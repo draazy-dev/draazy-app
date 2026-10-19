@@ -58,11 +58,37 @@ test('the owner page reads a seller card without an id and one rail of listings'
   expect(consoleErrors).toEqual([]);
 });
 
-test('the locality page takes its inventory line from the locality read', async ({ page, consoleErrors }) => {
-  const localities = await (await fetch(`${API}/localities`)).json();
-  const busy = localities.find((l) => l.liveListings > 0 && l.fromPrice != null);
-  expect(busy, 'a locality with live listings').toBeTruthy();
+test('the locality page splits its inventory line into a sale and a rent link that each land on matching results', async ({ page, consoleErrors }) => {
+  const localities = await (await fetch(`${API}/localities`, { headers: { 'Cache-Control': 'no-cache' } })).json();
+  const busy = localities.find((l) => l.forSale > 0 && l.forRent > 0);
+  expect(busy, 'a locality with sale and rent stock').toBeTruthy();
+  expect(busy.forSale + busy.forRent).toBe(busy.liveListings);
   await page.goto(`/locality/${busy.slug}`);
-  await expect(page.locator(`a[href="/listings?loc=${busy.slug}"]`).filter({ hasText: String(busy.liveListings) })).toBeVisible();
+  const want = [['buy', busy.forSale, busy.fromSale, 'for sale'], ['rent', busy.forRent, busy.fromRent, 'for rent']];
+  for (const [deal, n, from, word] of want) {
+    const strip = page.locator(`a[href="/listings?deal=${deal}&loc=${busy.slug}"]`).filter({ hasText: word });
+    await expect(strip).toContainText(String(n));
+    if (from != null) await expect(strip).toContainText('₹');
+    // Only the v-badge count may be called verified.
+    await expect(strip).not.toContainText(/verified/i);
+  }
   expect(consoleErrors).toEqual([]);
+  for (const [deal, n] of want) {
+    await page.goto(`/listings?deal=${deal}&loc=${busy.slug}`);
+    await expect(page.locator('main p:visible', { hasText: /Showing \d+/ }).first()).toContainText(`Showing ${n} `);
+  }
+});
+
+test('the locality strip keeps its from-price on one line on a phone', async ({ page }) => {
+  const localities = await (await fetch(`${API}/localities`)).json();
+  const busy = localities.find((l) => l.forSale > 0 && l.fromSale != null);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/locality/${busy.slug}`);
+  const price = page.locator(`a[href="/listings?deal=buy&loc=${busy.slug}"] span.font-semibold`).first();
+  await expect(price).toContainText('₹');
+  // Sweeping phone widths is what lands the line break inside "₹38 L" for some name length.
+  for (let width = 320; width <= 430; width += 5) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(await price.evaluate((el) => el.getClientRects().length), `"${await price.innerText()}" at ${width}px`).toBe(1);
+  }
 });
