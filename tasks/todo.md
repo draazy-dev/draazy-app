@@ -102,12 +102,17 @@
 - [x] P6 Sort, paging, scroll and map: 6 sorts send the right `rank`/`sort` and order monotonically; out-of-order responses (first request slowest) settle on the last click's IDs and total; drawer/sheet scroll, back-to-close, superseded search green; 390/1280 retested
   - P6-01 · Major · Back from a page-2 property landed on page 1 at page 2's scroll offset · Asked → Fixed-Verified (`page=N` in the URL, clamped, dropped on filter/sort change)
   - P6-02 · Minor · property Buy/Rent breadcrumb dropped sort and every filter but loc/soc/q · Fixed-Verified (return URL carries the full search)
+  - P6-03 · Minor · gated map ("Focus your map") showed a "Searching Pune…" spinner forever · Fixed-Verified
+  - P6-04 · Major · refused Maps key left Google's grey box with no cards and no way back · Asked → Fixed-Verified (MapUnavailable + "Show as list")
+  - Untested: marker↔card link (Maps key admits only :3322, lane is :5192)
 - [x] P7 Cards, actions and mobile: 12 cards (6 buy, 6 rent) checked against detail; compare stops at 4; share copies the link; report opens its sheet signed-out; zero results offer "Create alert"; at 360/390 with touch: no overflow, inputs ≥16px, Back closes the filter drawer first, tap-targets/safe-area/keyboard-chrome specs green (78/78 existing action+mobile specs)
   - P7-01 · Minor · detail headline showed carpet area beside a ₹/sq.ft computed on `area` (card: 2,200; detail: 1,810) · Asked → Fixed-Verified (headline, key details, map quick-view lead with `area`)
   - Observation, not changed: a signed-out heart returns to the same results after sign-in but the home is not saved until tapped again (same one-more-tap rule as alerts); share copies `/property/pNNNN`, not the descriptive URL
+  - Lane-only: `map-panel-contact` now fails on :5192 because a refused key shows the fallback instead of hidden markers; run-fast pins it to :3322 (P8)
 - [x] P8 Close-out: GO for search — 0 Blocker/Critical, 0 visibility leaks, P1–P7 ticked. `run-fast -Full` 87 failed → `-Failed` rerun 53/55 green; the 33 maps-pinned shard-1 tests could not boot (another session's `npm run dev` took :3322 mid-run) and were run on the search lane instead: all green except Maps-referer (lane-only) and `contact_quota_exhausted` in the review seeds
   - Review fixes: maps refusal hook moved into the eager loader; `queryKey` carries `size`; map fallback names the failure; `view=map` ignores `page`; cache eviction narrowed to moderation/lifecycle routes (Asked; members can no longer flush it); visibility-matrix cleans up its clones and bypasses the cache
   - Not ours, still red: `flatmates/detail-page` lightbox "2 / 3", `flatmates/interactions` re-ask 409, `property-integration-community` reviews → `contact_quota_exhausted` (contact allowance, other session's billing work)
+  - PENDING VERIFICATION on :3322: `map-panel-contact`, marker↔card link, `property-integration` wizard (lane shows Google's referer error + an IntersectionObserver rejection from the refused key)
 
 ## Waiting by design
 

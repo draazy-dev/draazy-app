@@ -109,6 +109,7 @@
     "relaxedNearSuf": "instead.",
     "relaxedNearKeep": "Keep just the area near {{label}}",
     "mapUnavailable": "Map search is currently unavailable — showing results as a grid instead.",
+    "mapShowList": "Show as list",
     "mapCappedPre": "Showing the first",
     "mapCappedMid": "of",
     "mapCappedSuf": "matches on the map. Zoom in or narrow your filters to see the rest.",
