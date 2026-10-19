@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ImagePlus } from 'lucide-react';
 import { classNames, parseAmount } from '../../../lib/format.js';
 import Select from '../../../components/ui/Select.jsx';
 import LocalitySelect from '../../../components/ui/LocalitySelect.jsx';
 import SocietySelect from '../../consumer/list-property/SocietySelect.jsx';
+import { activeLocality, societyLocalityName } from '../../consumer/list-property/useListingLocation.js';
 import FieldError from '../../../components/ui/FieldError.jsx';
 import IdInput from '../../../components/IdInput.jsx';
 import AvailabilityField from '../../../components/ui/AvailabilityField.jsx';
@@ -115,19 +116,32 @@ export function PropertyStep({ form, set, errors }) {
 }
 
 export function LocationStep({ form, set, errors, onLocalityBusy }) {
-  // A pick binds the listing to the society record and its Google pin; typing unbinds both.
-  const onSocietyChange = (s) => {
+  const pickSeq = useRef(0);
+  const handPickedAt = useRef(-1);
+  const pickLocality = (name, slug) => { handPickedAt.current = pickSeq.current; set('locality', name); set('localitySlug', slug); };
+  // A pick binds the society record, its Google pin and its locality; typing unbinds them.
+  const onSocietyChange = async (s) => {
     set('society', s?.name || '');
     set('societyId', s?.id || '');
     set('lat', s?.lat ?? null);
     set('lng', s?.lng ?? null);
     set('pincode', s?.pincode || '');
+    const seq = ++pickSeq.current;
+    if (!s?.id) return;
+    onLocalityBusy(true);
+    try {
+      const { name, slug } = await societyLocalityName(s, Number(s.lat ?? NaN), Number(s.lng ?? NaN));
+      const hit = await activeLocality(name, slug);
+      if (hit && seq === pickSeq.current && handPickedAt.current !== seq) { set('locality', hit.name); set('localitySlug', hit.slug); }
+    } finally {
+      if (seq === pickSeq.current) onLocalityBusy(false);
+    }
   };
   return (
     <div className="space-y-5">
-      <div><label className={label}>Locality *</label><LocalitySelect value={form.locality} onChange={(v) => { set('locality', v); set('localitySlug', ''); }} onSelect={(sel) => { set('locality', sel.name); set('localitySlug', sel.slug || ''); }} onBusyChange={onLocalityBusy} placeholder="Select locality" ariaLabel="Locality" invalid={!!errors.locality} /><FieldError show={!!errors.locality}>Select a locality.</FieldError></div>
       <div><label htmlFor="pob-society" className={label}>Society / Building Name</label>
         <SocietySelect id="pob-society" value={form.societyId} name={form.society} allowNotOnMaps={false} localityLabel={form.locality} lat={form.lat} lng={form.lng} placeholder="Search society or building on Google Maps" inputClassName={fld} onChange={onSocietyChange} /></div>
+      <div><label className={label}>Locality *</label><LocalitySelect value={form.locality} onChange={(v) => pickLocality(v, '')} onSelect={(sel) => pickLocality(sel.name, sel.slug || '')} onBusyChange={onLocalityBusy} placeholder="Select locality" ariaLabel="Locality" invalid={!!errors.locality} /><FieldError show={!!errors.locality}>Select a locality.</FieldError></div>
       <div><label htmlFor="pob-address" className={label}>Full Address</label><textarea id="pob-address" value={form.address} maxLength={300} onChange={(e) => set('address', e.target.value)} placeholder="Flat no, wing, street..." rows={2} className={fld} /></div>
     </div>
   );

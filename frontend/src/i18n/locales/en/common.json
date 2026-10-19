@@ -7,8 +7,7 @@
     "inDays_one": "in {{count}} day",
     "inDays_other": "in {{count}} days",
     "chip_now": "Available now",
-    "chip_in15": "In 15 days",
-    "chip_in30": "In 30 days"
+    "chip_nextMonth": "1st of next month"
   },
   "common": {
     "myPostsAria": "Your posts",

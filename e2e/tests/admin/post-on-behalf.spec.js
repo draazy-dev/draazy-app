@@ -270,7 +270,7 @@ test('the desk asks only the critical facts, and each one reaches the server', a
 });
 
 const PIN = { lat: 18.5975, lng: 73.7701 };
-test('locality and society take Google suggestions, and a picked society binds the listing to it and its pin', async ({ page, login }) => {
+test('the society leads the location step and decides the locality, which a later locality pick can still correct', async ({ page, login }) => {
   const ownerMobile = uniqueMobile();
   const society = `Zztest Google Towers ${ownerMobile.slice(-6)}`;
   await login.asAdmin();
@@ -279,9 +279,14 @@ test('locality and society take Google suggestions, and a picked society binds t
   await ownerAndProperty(page, { name: 'Google Owner', mobile: ownerMobile, carpetArea: '900' });
   await page.getByRole('button', { name: /Next/i }).click();
 
-  await pickGoogleLocality(page, 'Pashan', { field: page.getByLabel('Locality'), lat: 18.538, lng: 73.789 });
+  const locality = page.getByLabel('Locality');
+  const [societyBox, localityBox] = await Promise.all([page.locator('#pob-society').boundingBox(), locality.boundingBox()]);
+  expect(societyBox.y).toBeLessThan(localityBox.y);
 
-  await pickGoogleSociety(page, society, { input: page.locator('#pob-society'), ...PIN });
+  await pickGoogleSociety(page, society, { input: page.locator('#pob-society'), ...PIN, locality: 'Wakad' });
+  await expect(locality.locator('.dz-dropdown__value')).toContainText('Wakad');
+
+  await pickGoogleLocality(page, 'Pashan', { field: locality, lat: 18.538, lng: 73.789 });
   await page.getByRole('button', { name: /Next/i }).click();
 
   await page.locator('#pob-price').fill('26000');

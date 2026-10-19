@@ -19,7 +19,7 @@ async function openWizard(page) {
 }
 
 test.describe('Mobile listing wizard', () => {
-  test('the step 1 form spends its width on fields, keeps its actions pinned and tappable, and flags every invalid field', async ({ page, login }) => {
+  test('the step 1 form spends its width on fields, keeps its actions in flow and tappable, and flags every invalid field', async ({ page, login }) => {
     test.slow();
     const errors = trackErrors(page);
     await withConsent(page);
@@ -57,14 +57,16 @@ test.describe('Mobile listing wizard', () => {
       expect(chrome.reserved).toBeLessThan(64);
     });
 
-    await test.step('the sticky step actions stay in reach and tappable', async () => {
+    await test.step('the step actions sit in flow at the end of the form, compact and tappable', async () => {
       const actions = page.locator('.lp-step-actions').first();
 
-      await expect(actions).toHaveCSS('position', 'sticky');
-      await page.evaluate(() => window.scrollTo(0, 300));
-      await page.waitForTimeout(200);
-      const actionsBox = await actions.boundingBox();
-      expect(actionsBox.y + actionsBox.height, 'the row stays inside the viewport').toBeLessThanOrEqual(page.viewportSize().height);
+      // Sticky/fixed rows drift mid-screen when the iOS keyboard shrinks the visual viewport.
+      await expect(actions).toHaveCSS('position', 'static');
+      const form = await actions.evaluate((el) => {
+        const prev = el.previousElementSibling.getBoundingClientRect();
+        return { below: el.getBoundingClientRect().top >= prev.bottom, last: el === el.parentElement.lastElementChild };
+      });
+      expect(form, 'the row closes the form instead of floating over it').toEqual({ below: true, last: true });
 
       const vw = page.viewportSize().width;
       const primary = actions.getByRole('button', { name: /next/i });
@@ -72,17 +74,11 @@ test.describe('Mobile listing wizard', () => {
       expect(box.width, 'compact, not a full-width bar').toBeLessThan(vw * 0.6);
       expect(box.height).toBeGreaterThanOrEqual(44);
 
-      // A solid rounded bar no taller than the bottom nav, so the fields behind it never leak through.
-      const bar = await actions.evaluate((el) => {
-        const s = getComputedStyle(el);
-        const nav = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dz-bottom-nav-h'));
-        return { radius: s.borderBottomLeftRadius, fill: s.backgroundColor.startsWith('rgba') ? 'translucent' : 'solid', fits: el.getBoundingClientRect().height <= nav + 0.5 };
-      });
-      expect(bar).toEqual({ radius: '16px', fill: 'solid', fits: true });
-
-      // The Ask Draaz launcher must clear the bar rather than sit on its Next button.
-      const launcher = await page.locator('.dz-assistant-layer').boundingBox();
-      if (launcher) expect(launcher.y + launcher.height, 'the launcher sits above the bar').toBeLessThanOrEqual(actionsBox.y);
+      await primary.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      await expect.poll(() => primary.evaluate((el) => {
+        const r = el.getBoundingClientRect();
+        return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+      }), { message: 'nothing, not even Ask Draaz, sits on top of Next' }).toBe(true);
     });
 
     expect(errors, 'the wizard logs no console errors on a phone').toEqual([]);

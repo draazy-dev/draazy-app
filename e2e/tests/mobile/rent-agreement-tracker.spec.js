@@ -58,21 +58,19 @@ test.describe('Rent agreement tracker on a phone', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the Ask Draaz launcher clears the sticky wizard actions instead of covering Next', async ({ page }) => {
+  test('the wizard actions sit in flow at the end of the form, and Ask Draaz does not cover Next', async ({ page }) => {
     await seedConsent(page);
     await signedInAsNew(page);
     await page.goto('/services/rent-agreement');
 
-    // Park the form's top under the header so its action row is pinned to the bottom of the screen.
-    await page.getByRole('heading', { name: 'Property & Agreement' }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
-    await page.waitForTimeout(300);
-
     const next = page.getByRole('button', { name: /^Next/ });
-    const bar = await next.locator('xpath=..').boundingBox();
-    const launcher = await page.locator('.dz-assistant-layer').boundingBox();
-    expect(bar, 'the step actions are on screen').not.toBeNull();
-    expect(bar.y + bar.height, 'the step actions are pinned on screen').toBeLessThanOrEqual(page.viewportSize().height);
-    expect(launcher, 'the launcher is on screen').not.toBeNull();
-    expect(launcher.y + launcher.height, 'the launcher sits above the bar').toBeLessThanOrEqual(bar.y);
+    const bar = next.locator('xpath=..');
+    await expect(bar, 'a sticky row drifts mid-screen when the iOS keyboard opens').toHaveCSS('position', 'static');
+
+    await next.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await expect.poll(() => next.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return el.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+    }), { message: 'nothing sits on top of Next' }).toBe(true);
   });
 });

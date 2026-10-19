@@ -378,11 +378,13 @@ broken.
 
 ### Sticky action rows (`position: sticky`, not `fixed`)
 In-flow action rows use `sticky`: the row keeps its place in the flow, so it reserves its own space
-and can never cover the last field — no per-step `padding-bottom` bookkeeping. Three consumers:
-`.lp-step-actions` (listing wizard, below `lg`, primary flexed 1.6x so the target is unambiguous
-under a thumb), `.dz-auth-submit` (sign-in/sign-up, where the keyboard would otherwise push the
-primary action below the fold), and `.dz-sticky-cta`, which is genuinely `fixed` and docks at
-`--dz-bottom-inset`.
+and can never cover the last field — no per-step `padding-bottom` bookkeeping. Two consumers:
+`.dz-auth-submit` (sign-in/sign-up, where the keyboard would otherwise push the primary action below
+the fold) and `.dz-sticky-cta`, which is genuinely `fixed` and docks at `--dz-bottom-inset`.
+
+`.lp-step-actions` (listing wizard) and the rent-agreement wizard's Back/Next row are deliberately
+**static** at the end of each step on every breakpoint: iOS shrinks only the visual viewport for the
+keyboard, so a sticky row there floated mid-screen over the fields being typed into.
 
 ### Mobile bottom nav + the floating-glass material
 The primary wayfinding surface on phones is a floating capsule, not an edge-to-edge bar: an

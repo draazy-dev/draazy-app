@@ -5,9 +5,10 @@ import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.j
 import { approveListing, rejectListing } from '../../../helpers/moderation.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
-import { displayDate, istInDays, istToday, shortLabel } from '../../../helpers/availability.js';
+import { bucketOf, displayDate, istFirstOfNextMonth, istInDays, istToday, shortLabel } from '../../../helpers/availability.js';
 
 const created = new Set();
+const CHIPS = ['Available now', '1st of next month'];
 
 test.afterEach(async ({ request }) => {
   if (!created.size) return;
@@ -31,7 +32,7 @@ const RENT = (images, extra = {}) => ({
   city: 'Pune', locality: 'Baner', bhk: 2, area: 900, images, ...extra,
 });
 
-test('the rent wizard offers three chips plus a date; a chip and a picked date are one answer, sent as availableOn', async ({ page, request }) => {
+test('the rent wizard offers two chips plus a date; a chip and a picked date are one answer, sent as availableOn', async ({ page, request }) => {
   test.slow();
   const mobile = await signedInAsNew(page);
   const headers = await authHeaders(mobile);
@@ -56,25 +57,28 @@ test('the rent wizard offers three chips plus a date; a chip and a picked date a
   await page.locator('input[data-err="monthlyRent"]').fill('31000');
   await page.locator('input[data-err="deposit"]').fill('90000');
 
-  await test.step('three quick chips and a date, none chosen yet', async () => {
+  const nextMonth = istFirstOfNextMonth();
+  await test.step('two quick chips and a date, none chosen yet', async () => {
     await expect(field(page)).toBeVisible();
-    for (const name of ['Available now', 'In 15 days', 'In 30 days']) {
+    for (const name of CHIPS) {
       await expect(chip(page, name)).toHaveAttribute('aria-pressed', 'false');
     }
+    await expect(field(page).getByRole('button', { name: /In \d+ days/ })).toHaveCount(0);
     await expect(shown(page)).toHaveText('DD/MM/YYYY');
   });
 
   await test.step('a chip fills the date and lights up; a picked date takes the light away', async () => {
-    await chip(page, 'In 15 days').click();
-    await expect(chip(page, 'In 15 days')).toHaveAttribute('aria-pressed', 'true');
-    await expect(shown(page)).toHaveText(displayDate(istInDays(15)));
+    await chip(page, '1st of next month').click();
+    await expect(chip(page, '1st of next month')).toHaveAttribute('aria-pressed', 'true');
+    await expect(shown(page)).toHaveText(displayDate(nextMonth));
+    expect(nextMonth.endsWith('-01')).toBe(true);
     await pickDate(page, '[data-testid="availability-field"] .dz-datefield', istInDays(50));
     await expect(shown(page)).toHaveText(displayDate(istInDays(50)));
-    for (const name of ['Available now', 'In 15 days', 'In 30 days']) {
+    for (const name of CHIPS) {
       await expect(chip(page, name)).toHaveAttribute('aria-pressed', 'false');
     }
-    await chip(page, 'In 30 days').click();
-    await expect(shown(page)).toHaveText(displayDate(istInDays(30)));
+    await chip(page, '1st of next month').click();
+    await expect(shown(page)).toHaveText(displayDate(nextMonth));
   });
 
   await test.step('the date outside the next year cannot be picked', async () => {
@@ -89,7 +93,7 @@ test('the rent wizard offers three chips plus a date; a chip and a picked date a
     await expect(cal.locator(`.dz-cal__day[aria-label="${far}"]:not(.is-muted)`)).toBeDisabled();
     await page.keyboard.press('Escape');
     await expect(cal).toBeHidden();
-    await expect(shown(page)).toHaveText(displayDate(istInDays(30)));
+    await expect(shown(page)).toHaveText(displayDate(nextMonth));
   });
 
   await next.click();
@@ -100,13 +104,13 @@ test('the rent wizard offers three chips plus a date; a chip and a picked date a
   const response = await posted;
   expect(response.status()).toBe(201);
   const body = response.request().postDataJSON();
-  expect(body.availableOn).toBe(istInDays(30));
+  expect(body.availableOn).toBe(nextMonth);
   const id = (await response.json()).id;
   created.add(id);
 
   const row = await rowOf(request, headers, id);
-  expect(row.availableOn).toBe(istInDays(30));
-  expect(row.availableFrom).toBe('30');
+  expect(row.availableOn).toBe(nextMonth);
+  expect(row.availableFrom ?? null).toBe(bucketOf(nextMonth));
 });
 
 test('an exact date round-trips from the edit page to the card and the detail page, and its bucket is derived live', async ({ page, request }) => {
@@ -121,7 +125,7 @@ test('an exact date round-trips from the edit page to the card and the detail pa
       deposit: 0, maintenance: 2500, area: 1000, carpetArea: 875.5, builtUpArea: 1000.25, areaUnit: 'sqft',
       furnishing: 'semi-furnished', locality: 'Baner', city: 'Pune', lat: 18.559, lng: 73.786, floor: 0, totalFloors: 15,
       ageYears: 7, address: 'C-901, North, Edit Prefill Homes, Baner Road', pincode: '411045',
-      images: await uploadedListingPhotos(headers), availableOn: istInDays(15),
+      images: await uploadedListingPhotos(headers), availableOn: istFirstOfNextMonth(),
       formDetails: {
         flatNumber: 'C-901', tower: 'North', society: 'Edit Prefill Homes', street: 'Baner Road',
         landmark: 'Near the public library', agreementDuration: '24', lockIn: '0', noticePeriod: '2',
@@ -134,7 +138,7 @@ test('an exact date round-trips from the edit page to the card and the detail pa
   created.add(id);
   const approved = await approveListing(request, id, await authHeaders(ACTORS.admin));
   expect(approved.status()).toBeLessThan(300);
-  expect((await rowOf(request, headers, id)).availableFrom).toBe('15');
+  expect((await rowOf(request, headers, id)).availableFrom ?? null).toBe(bucketOf(istFirstOfNextMonth()));
 
   const editAvailability = async (act) => {
     await page.goto(`/list-property?edit=${id}`);
@@ -161,16 +165,16 @@ test('an exact date round-trips from the edit page to the card and the detail pa
       await page.getByRole('button', { name: 'Next Step', exact: true }).click();
       await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
     }
-    await expect(chip(page, 'In 15 days')).toHaveAttribute('aria-pressed', 'true');
-    await expect(shown(page)).toHaveText(displayDate(istInDays(15)));
+    await expect(chip(page, '1st of next month')).toHaveAttribute('aria-pressed', 'true');
+    await expect(shown(page)).toHaveText(displayDate(istFirstOfNextMonth()));
   });
 
   await test.step('a chip saved from the edit page is the new date and bucket', async () => {
-    const patch = await editAvailability(() => chip(page, 'In 30 days').click());
-    expect(patch.availableOn).toBe(istInDays(30));
+    const patch = await editAvailability(() => chip(page, 'Available now').click());
+    expect(patch.availableOn).toBe(istToday());
     const row = await rowOf(request, headers, id);
-    expect(row.availableOn).toBe(istInDays(30));
-    expect(row.availableFrom).toBe('30');
+    expect(row.availableOn).toBe(istToday());
+    expect(row.availableFrom).toBe('now');
   });
 
   const far = istInDays(200);

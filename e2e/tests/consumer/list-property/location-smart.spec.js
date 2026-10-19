@@ -1,6 +1,6 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { signedInAsNew } from '../../../helpers/liveAuth.js';
-import { pickFloors } from '../../../helpers/listingForm.helper.js';
+import { pickFloors, readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
 
@@ -61,15 +61,33 @@ test('a society pick takes the society\'s own locality over a hand pick, but nev
   await expect(page.locator('input[data-err="pincode"]')).toHaveValue('411099');
 });
 
-test('picking society A and then society B in another locality moves the locality to B\'s', async ({ page }) => {
+test('picking society A and then society B in another locality moves the locality and pincode to B\'s', async ({ page }) => {
   await gotoLocation(page);
   await fillSociety(page, uniqueName('Zz Skyline Alpha'), BANER_PIN);
   await expect(page.locator('[data-err="locality"]')).toContainText('Baner');
+  await expect(page.locator('input[data-err="pincode"]')).toHaveValue('411045');
 
   const wakad = { lat: 18.595 + Math.random() * 0.01, lng: 73.755 + Math.random() * 0.01, locality: 'Wakad', pincode: '411057' };
   await fillSociety(page, uniqueName('Zz Skyline Beta'), wakad);
   await expect(page.locator('[data-err="locality"]')).toContainText('Wakad');
   await expect(page.locator('[data-err="locality"]')).not.toContainText('Baner');
+  await expect(page.locator('input[data-err="pincode"]')).toHaveValue('411057');
+});
+
+test('a society changed after the draft was saved and reopened brings its own pincode, not the old society\'s', async ({ page }) => {
+  await gotoLocation(page);
+  await fillSociety(page, uniqueName('Zz Skyline Gamma'), BANER_PIN);
+  await expect(page.locator('input[data-err="pincode"]')).toHaveValue('411045');
+  await expect.poll(() => readListPropertyDraft(page)).toContain('"pincode":"411045"');
+
+  await page.reload();
+  await page.waitForSelector('.gm-style', { timeout: 30000 });
+  await expect(page.locator('input[data-err="pincode"]')).toHaveValue('411045');
+
+  const wakad = { lat: 18.595 + Math.random() * 0.01, lng: 73.755 + Math.random() * 0.01, locality: 'Wakad', pincode: '411057' };
+  await fillSociety(page, uniqueName('Zz Skyline Delta'), wakad);
+  await expect(page.locator('[data-err="locality"]')).toContainText('Wakad');
+  await expect(page.locator('input[data-err="pincode"]')).toHaveValue('411057');
 });
 
 test('on a phone the locality dropdown is an anchored menu under the field, not the full-screen picker or a bottom sheet', async ({ page }) => {

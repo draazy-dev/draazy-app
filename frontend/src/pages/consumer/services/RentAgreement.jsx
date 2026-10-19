@@ -260,8 +260,7 @@ export default function RentAgreement() {
 
                   <StepReview step={step} prop={prop} owner={owner} coOwners={coOwners} wit={wit} ownerMode={ownerMode} tenantMode={tenantMode} invite={invite} tenants={tenants} terms={terms} cost={cost} maint={maint} furnitureText={furnitureText} regArea={regArea} declare={declare} setDeclare={setDeclare} generate={generate} submitting={submitting} retrying={!!pendingRequestId} paysNow={mode === 'owner' && !inviting} identityReminders={identityReminders.review} />
 
-                  {/* Nav buttons — sticky at viewport bottom on mobile so step actions stay reachable */}
-                  <div className="flex justify-between items-center gap-3 mt-8 sticky bottom-[var(--dz-bottom-inset)] z-20 -mx-6 sm:-mx-8 px-6 sm:px-8 py-4 bg-[var(--section-alt)] backdrop-blur border-t border-white/10 lg:static lg:mx-0 lg:px-0 lg:py-0 lg:bg-transparent lg:backdrop-blur-none lg:border-0">
+                  <div className="flex justify-between items-center gap-3 mt-8">
                     {step !== 0 ? <button type="button" onClick={prev} className="btn-outline px-6 py-3 rounded-xl text-gray-300 text-sm font-semibold flex items-center gap-2"><Icon name="arrow-left" className="w-4 h-4" /> {tr('services.ra.back')}</button> : <div />}
                     {step !== 5 ? <button type="button" onClick={next} disabled={localityBusy} className="btn-teal px-7 py-3 rounded-xl text-white text-sm font-semibold flex items-center gap-2 disabled:opacity-70">{gated ? <><Icon name="lock" className="w-4 h-4" /> {tr('services.ra.gate.nextCta')}</> : <>{tr('services.ra.next')} <Icon name="arrow-right" className="w-4 h-4" /></>}</button> : <div />}
                   </div>

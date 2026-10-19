@@ -12,6 +12,11 @@ export function addDaysIso(iso, days) {
 
 export const daysUntil = (iso) => Math.round((Date.parse(`${iso}T00:00:00Z`) - Date.parse(`${istToday()}T00:00:00Z`)) / DAY_MS);
 
+export const firstOfNextMonthIso = (iso) => {
+  const [year, month] = iso.split('-').map(Number);
+  return new Date(Date.UTC(year, month, 1)).toISOString().slice(0, 10);
+};
+
 /** Epoch ms where a "last N days" filter starts: IST midnight N-1 days back, so 1 is today, not the last 24h. */
 export const istWindowStart = (days) => Date.parse(`${addDaysIso(istToday(), 1 - Number(days))}T00:00:00+05:30`);
 

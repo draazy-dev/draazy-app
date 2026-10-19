@@ -208,14 +208,11 @@ export default function AssistantWidget() {
     || /^\/flatmates\/(room|group|post)\//.test(pathname)
     || pathname === '/society'
     || pathname.startsWith('/society/')
-    || pathname === '/contact'
-    || pathname === '/services/rent-agreement';
+    || pathname === '/contact';
   const cityBar = !isLive(city);
-  const wizardBar = pathname.startsWith('/list-property');
   let anchorClass = 'bottom-[calc(var(--dz-bottom-inset)+1.5rem)]';
   if (detailBar) anchorClass = 'bottom-[calc(var(--dz-bottom-inset)+5.75rem)] lg:bottom-[calc(var(--dz-bottom-inset)+1.5rem)]';
   else if (cityBar) anchorClass = 'bottom-[calc(var(--dz-bottom-inset)+9rem)] sm:bottom-[calc(var(--dz-bottom-inset)+1.5rem)]';
-  else if (wizardBar) anchorClass = 'bottom-[calc(var(--dz-bottom-inset)+5.75rem)] sm:bottom-[calc(var(--dz-bottom-inset)+1.5rem)]';
   // On phones the collapsed FAB and the full-width consent bar collide, so hide
   // the FAB there while the consent UI is up (desktop keeps it — no overlap).
   const hideClass = cookieBar && !open ? 'max-sm:hidden' : '';
