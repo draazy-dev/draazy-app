@@ -49,12 +49,16 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).doesNotContain("secret");
     }
 
-    /**
-     * D48. The 409 is shared with the constraint-violation handler, so the thing worth pinning is
-     * the message: a lost race and a rejected write are different situations and the advice that
-     * resolves them differs. Hibernate's own text names the entity class and row id, which is
-     * internal detail a caller has no use for, so it must not survive into the body.
-     */
+    @Test
+    void illegalArgumentFromOurOwnCodeStaysA500() {
+        var response = handler.handleIllegalArgument(new IllegalArgumentException("internal invariant"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+        assertThat(response.getBody().message()).doesNotContain("invariant");
+    }
+
+    /** The 409 is shared with constraint violations, so the message is what tells a lost race apart;
+     * Hibernate's text names the entity and row id and must not reach the body. */
     @Test
     void lostConcurrentUpdateIs409AdvisingReloadAndLeaksNoEntityDetail() {
         var response = handler.handleOptimisticLock(new OptimisticLockingFailureException(
@@ -68,13 +72,8 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).doesNotContain("a1b2");
     }
 
-    /**
-     * The 400 path used to return {@code ex.getMessage()} verbatim. Jackson writes that message,
-     * and it names the target Java class, the JSON pointer and a fragment of the payload — so the
-     * one handler that echoed an exception was also the one whose exception message was not ours.
-     * A realistic Jackson string is used rather than a toy one, because the assertion that matters
-     * is that none of those three things survives.
-     */
+    /** Jackson's message names the target class, the JSON pointer and a payload fragment; a realistic
+     * one is used because the assertion is that none of the three survives. */
     @Test
     void unreadableBodyIs400AndLeaksNoJacksonDetail() {
         var response = handler.handleUnreadableBody(new HttpMessageNotReadableException(
@@ -90,11 +89,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().message()).doesNotContain("line: 1");
     }
 
-    /**
-     * The parameter name is the caller's own and is in the published contract, so returning it is
-     * the actionable half of the answer. The Java type it failed to bind to is not — that is our
-     * controller signature, and the default exception message renders it.
-     */
+    /** The parameter name is published contract; the Java type it failed to bind to is our signature. */
     @Test
     void badParameterIs400NamingTheParamButNotItsJavaType() {
         var missing = handler.handleBadParameter(
@@ -124,11 +119,7 @@ class GlobalExceptionHandlerTest {
                 .containsExactlyInAnyOrder(HttpMethod.GET, HttpMethod.POST);
     }
 
-    /**
-     * Spring's pre-controller refusal must render the same code as the vault's own byte-sniffing
-     * refusal, or a client learns two names for one outcome — the invariant {@code ErrorCodes
-     * .PAYLOAD_TOO_LARGE} spells out for the analogous 413 pair.
-     */
+    /** Must render the same code as the vault's own byte-sniffing refusal, or one outcome has two names. */
     @Test
     void unsupportedContentTypeIs415WithTheSameCodeAsTheVaultsOwnRefusal() {
         var response = handler.handleMediaTypeNotSupported(

@@ -185,6 +185,10 @@ vault's byte-sniffing check *and* Spring refusing a `Content-Type` the endpoint 
   the parameter name is safe to return (the caller chose it, and it is in the published contract),
   but `MethodArgumentTypeMismatchException` renders the target Java type. Naming the field is the
   actionable half; the type is the leak. Detail is logged at `debug`.
+- **A `%` in `sort` is a 400.** Spring Data's sort resolver URI-decodes the already-decoded value
+  again, so `sort=50%` throws `IllegalArgumentException` from inside argument resolution, on every
+  `Pageable` endpoint. Only an exception thrown from that resolver maps to 400; any other
+  `IllegalArgumentException` is a server bug and stays on the 500 catch-all.
 - **Nested field names win over parameter names in `HandlerMethodValidationException`.** Spring
   routes a method here as soon as *any* of its parameters carries a constraint — and once it does, a
   cascaded `@Valid @RequestBody` arrives as a `ParameterErrors` rather than as the
