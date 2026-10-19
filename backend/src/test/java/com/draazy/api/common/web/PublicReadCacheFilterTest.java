@@ -120,6 +120,30 @@ class PublicReadCacheFilterTest {
     }
 
     @Test
+    void aSuccessfulModerationWriteEvictsTheListingEverywhere() throws Exception {
+        int n = 1;
+        for (String[] write : new String[][] {{"PATCH", "/properties/p1/status"},
+                {"POST", "/properties/p1/flag"}, {"DELETE", "/properties/p1/flag"},
+                {"POST", "/properties/p1/photos/takedown"}, {"PATCH", "/properties/p1/archive"},
+                {"PATCH", "/properties/p1/restore"}}) {
+            send(get("/properties/p1"));
+            send(new MockHttpServletRequest(write[0], write[1]));
+            n += 2;
+            assertThat(send(get("/properties/p1")).getContentAsString()).as(write[1]).isEqualTo("{\"n\":" + n + "}");
+        }
+    }
+
+    @Test
+    void aMemberWriteUnderAListingEvictsNothing() throws Exception {
+        send(get("/properties/p1"));
+        for (String[] write : new String[][] {{"POST", "/properties/p1/reviews"},
+                {"POST", "/properties/p1/photo-requests"}, {"POST", "/properties/p1/split"}}) {
+            send(new MockHttpServletRequest(write[0], write[1]));
+            assertThat(send(get("/properties/p1")).getContentAsString()).as(write[1]).isEqualTo("{\"n\":1}");
+        }
+    }
+
+    @Test
     void aRejectedAdminWriteEvictsNothing() throws Exception {
         send(get("/bootstrap"));
         status = 422;

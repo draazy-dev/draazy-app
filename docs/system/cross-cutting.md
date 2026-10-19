@@ -1007,9 +1007,12 @@ sends every read by a staff or admin user as `cache: 'no-cache'`, which makes th
 recomputes and refreshes its entry, so the next anonymous read on that instance is fresh too. A
 `Cache-Control` the browser adds does not trigger a CORS preflight.
 
-A successful `/admin/**` write clears the filter's entries on the instance that took it; the other
-instances serve out their TTL. Property writers are too many, and bulk or native queries skip
-entity listeners, so for everything else the TTL is the contract. Add a path to `PATHS` only if its
+A successful `/admin/**` write, or a listing moderation or lifecycle write (`/properties/{id}/status`,
+`/flag`, `/photos/takedown`, `/archive`, `/restore`), clears the filter's entries on the instance that
+took it, so a flagged listing leaves search at once; the other instances serve out their TTL. Member
+writes under a listing (reviews, photo requests, split) do not, so no signed-in user can keep flushing
+it. Owner edits under `/me/listings` are too
+many, and bulk or native queries skip entity listeners, so for everything else the TTL is the contract. Add a path to `PATHS` only if its
 answer is identical for every caller: anything personalised would leak between users.
 `ANONYMOUS` holds the public catalogue reads (search, listing detail, cards, reviews, owner, locality,
 society and flatmate pages) whose answer varies only for a signed-in viewer; they are cached only
