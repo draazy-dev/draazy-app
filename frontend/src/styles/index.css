@@ -2929,6 +2929,12 @@ html.dz-reduce-motion .dz-connectivity-card { animation: none; }
 
 .notif.unread { border-left: 3px solid var(--teal-2); }
 
+/* `both` would pin transform after the entrance and freeze the swipe drag and press scale. */
+.notif.list-reveal {
+  opacity: 1;
+  animation-fill-mode: backwards;
+}
+
 .seg {
   height: var(--control-h);
   display: inline-flex;

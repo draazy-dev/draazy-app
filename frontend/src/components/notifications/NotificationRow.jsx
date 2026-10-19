@@ -11,6 +11,8 @@ import {
 } from './notificationModel.js';
 
 const LONG_PRESS_MS = 520;
+// `.list-reveal` holds a row hidden until its delay ends, so a long inbox must not leave its tail blank for seconds.
+const MAX_STAGGER_S = 0.3;
 
 export default function NotificationRow({
   item,
@@ -79,8 +81,8 @@ export default function NotificationRow({
       <div
         {...pressHandlers}
         data-id={item.id}
-        className={`notif rounded-2xl flex items-stretch reveal${item.read ? '' : ' unread'}`}
-        style={{ animationDelay: `${delay}s`, touchAction: swipeable ? 'pan-y' : undefined }}
+        className={`notif rounded-2xl flex items-stretch list-reveal${item.read ? '' : ' unread'}`}
+        style={{ animationDelay: `${Math.min(delay, MAX_STAGGER_S)}s`, touchAction: swipeable ? 'pan-y' : undefined }}
       >
         <Link to={href} onClick={open} className={`min-w-0 flex-1 flex items-center gap-3 ${compact ? 'px-3 py-2.5' : 'px-3.5 py-3'}`}>
           <span className={`grid h-10 w-10 flex-shrink-0 place-items-center rounded-xl ${meta.bgCls}`}>
