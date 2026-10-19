@@ -37,7 +37,7 @@ const PhotosDocumentsStep = ({
   photos, handlePhotoUpload, removePhoto, setPhotoCategory,
   isMediaBusy, mediaStatus,
   prevStep, submitProperty, onReset, posting, onJump,
-  needsAuthForMedia = false, onRequireAuth,
+  needsAuthForMedia = false, onRequireAuth, claimMode = false,
 }) => {
   const { t } = useTranslation();
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -66,7 +66,8 @@ const PhotosDocumentsStep = ({
     if (String(form.description || '').trim() && !window.confirm(t('listProperty.content.describe.replaceConfirm'))) return;
     set('description', next);
   };
-  const submitLabel = t(needsAuthForMedia ? 'listProperty.deferredLogin.submitCta' : 'listProperty.photosDocs.submitProperty');
+  const submitLabel = t(needsAuthForMedia ? 'listProperty.deferredLogin.submitCta'
+    : claimMode ? 'listProperty.claim.submit' : 'listProperty.photosDocs.submitProperty');
   return (
     <div className="lp-step">
       <StepHeader title={t('listProperty.steps.photosTitle')} subtitle={t('listProperty.steps.photosSubtitle')} onReset={onReset} />

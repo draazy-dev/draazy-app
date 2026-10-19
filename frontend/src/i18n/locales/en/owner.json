@@ -84,7 +84,7 @@
       },
       "line": {
         "pending": "Our team usually reviews listings within 24 hours.",
-        "confirm": "Draazy posted this for you. Check the details — it goes live only after you confirm.",
+        "confirm": "Draazy posted this for you. Complete the details and photos, then confirm to send it for review.",
         "underReview": "This listing is off search while Draazy reviews it.",
         "live": "Buyers can now find and contact you.",
         "paused": "This listing is paused.",
@@ -101,7 +101,7 @@
         "share": "Share listing",
         "contactSupport": "Contact support",
         "supportMessages": "Messages from Draazy Support",
-        "confirm": "Yes, this is my property",
+        "confirm": "Review & confirm",
         "reportWrong": "Something's wrong"
       },
       "reasons": {

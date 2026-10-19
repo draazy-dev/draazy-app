@@ -449,7 +449,7 @@ export const keyPhotoCategoriesFor = (propertyType, commercialType) => {
   return ['Living Room', 'Kitchen', 'Bedroom', 'Bathroom'];
 };
 
-export const MIN_PUBLISH_PHOTOS = 1;
+export const MIN_PUBLISH_PHOTOS = 3;
 export const MIN_PUBLISH_KEY_CATEGORIES = 2;
 export const STRONG_PHOTO_COUNT = 5;
 

@@ -121,7 +121,7 @@ test('possession is an unanswered required choice, and the answer drives the sea
   expect(ids).toContain(row.id);
 });
 
-test('a sale\'s pricing step: no past handover date, MahaRERA optional but format-checked, and one photo clears the publish floor', async ({ page }) => {
+test('a sale\'s pricing step: no past handover date, MahaRERA optional but format-checked, and three labelled photos are the publish floor', async ({ page }) => {
   test.slow();
   await gotoPricing(page);
   await page.locator('input[data-err="price"]').fill('9500000');
@@ -157,13 +157,15 @@ test('a sale\'s pricing step: no past handover date, MahaRERA optional but forma
     await expect(page.getByText('MahaRERA Registration No.')).toHaveCount(0);
   });
 
-  await test.step('one photo clears the publish floor, while the three-photo guidance stays soft', async () => {
+  await test.step('three photos are the publish floor, and two of them must show key rooms', async () => {
     await uploadPublishablePhotos(page, { count: 1, categories: [] });
-    await expect(page.getByText(/Add at least 3 photos/)).toBeVisible();
+    await expect(page.getByText('Add at least 3 photos and label what 2 of them show.')).toBeVisible();
+    await page.getByRole('button', { name: /Submit Property/i }).click();
+    await expect(page.getByText('Add at least 3 photos.', { exact: true })).toBeVisible();
 
     // Three photos clear the count but not the coverage: a seeker who cannot see the kitchen has
     // been shown three pictures of nothing in particular.
-    await uploadPublishablePhotos(page, { count: 1, categories: [] });
+    await uploadPublishablePhotos(page, { count: 2, categories: [] });
     await page.getByRole('button', { name: /Submit Property/i }).click();
     await expect(page.getByText(/Label at least 2 photos/)).toBeVisible();
   });

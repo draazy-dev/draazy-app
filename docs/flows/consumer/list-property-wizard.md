@@ -174,8 +174,10 @@ advance on any error (scrolling to the first error via `scrollToError`).
   date for search, so it never goes stale.
 
 **Step 4 - Photos & description (`validateStep3`):**
-- **Photos:** one is the floor; under three, a hint says "Add at least 3 photos — listings with 3+
-  photos are approved faster."
+- **Photos:** a new listing (and a staff-posted listing its owner confirms) needs at least three, two of
+  them labelled with key categories (`keyPhotoCategoriesFor`: living room, kitchen, bedroom, bathroom for
+  a home). An edit never needs more photos than the listing already has, capped at three, and skips the
+  label rule, since labels are not stored. The server holds a staff-posted confirm to three photos too.
 - **Up to the configured photo limit**: default 10, set by an admin in Settings → General (3–20), stored
   as `settings.listings.maxPhotos` and published on the public `GET /bootstrap` (`listingPolicy`)
   (`usePhotoLimit` in `lib/uploads`). The server enforces the same number on listing create, owner

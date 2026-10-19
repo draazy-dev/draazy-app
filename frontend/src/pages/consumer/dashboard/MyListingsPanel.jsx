@@ -5,7 +5,7 @@ import { usePricing } from '../../../context/PricingContext';
 import Select from '../../../components/ui/Select.jsx';
 import Icon from '../../../components/Icon.jsx';
 import RefundGuarantee from '../../../components/billing/RefundGuarantee.jsx';
-import { confirmListingFresh, confirmOwnerListing, takeListingDown, pauseListing, resumeListing, myListingCard } from '../../../services/propertyService.js';
+import { confirmListingFresh, takeListingDown, pauseListing, resumeListing, myListingCard } from '../../../services/propertyService.js';
 import { deleteGroup, deletePost, deleteRoom, renewFlatmate, splitProperty, unsplitProperty } from '../../../services/flatmateService.js';
 import { closeDeal, reopenDeal, reserveDeal } from '../../../services/dealService.js';
 import { composeOwnerProperties } from '../../../lib/data/ownerProperties.js';
@@ -262,16 +262,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     toast(`"${l.title}" confirmed as available`, 'success');
   };
 
-  const handleConfirmListing = async (l) => {
-    try {
-      await confirmOwnerListing(l.uuid || l.id);
-      toast(`Thanks — "${l.title}" is now with our review team`, 'success');
-      await reloadRow(l);
-    } catch (err) {
-      toast(err?.body?.message || err?.message || 'Could not confirm this listing', 'error');
-    }
-  };
-
   const handlePause = async (l) => {
     const ok = await confirmAction({
       title: t('listingLifecycle.pauseTitle'),
@@ -470,7 +460,6 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
                   navigate={navigate}
                   openReview={openReview}
                   onConfirmFresh={handleConfirmFresh}
-                  onConfirmListing={handleConfirmListing}
                   onReopen={(row) => (row.deal === 'rent' ? setRelist({ listing: row, date: istToday() }) : handleReopen(row))}
                   onMarkUnderOffer={handleMarkUnderOffer}
                   onFinalize={setShowDealModal}

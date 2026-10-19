@@ -3497,7 +3497,8 @@ paths:
       summary: Owner confirms a listing staff posted on their behalf
       operationId: confirmOwnerListing
       description: >
-        The owner's explicit "Yes, this is my property". Moves a staff-posted listing from
+        The owner's explicit "Yes, this is my property", sent once they have completed the listing
+        in the wizard. Moves a staff-posted listing from
         `link_sent`/`created` to `owner_confirmed`; publication of a staff-posted listing is refused
         with `409 owner_not_confirmed` until this has happened. Idempotent: a repeat call keeps the
         first confirmation. Notifies the staff member who posted the listing.
@@ -3506,8 +3507,11 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: >
-            `not_staff_posted` when the owner posted the listing themselves, or `conflict` when it
-            is archived or no longer waiting for review.
+            `not_staff_posted` when the owner posted the listing themselves, `conflict` when it
+            is archived or no longer waiting for review, or `listing_incomplete` when it still lacks
+            what a new listing must carry (area, BHK and bathrooms for a home, floors for a flat,
+            locality, pincode, price, deposit and move-in date for a rental, possession for a sale,
+            three photos); the message names what is missing.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

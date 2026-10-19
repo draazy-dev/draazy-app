@@ -92,7 +92,7 @@ const statusLine = (state, t, review) => {
   if (state === 'rejected') return reasonText(t, review);
   const lines = {
     pending: [statusKey('line.pending'), 'Our team usually reviews listings within 24 hours.'],
-    confirm: [statusKey('line.confirm'), 'Draazy posted this for you. Check the details — it goes live only after you confirm.'],
+    confirm: [statusKey('line.confirm'), 'Draazy posted this for you. Complete the details and photos, then confirm to send it for review.'],
     flagged: [statusKey('line.underReview'), 'This listing is off search while Draazy reviews it.'],
     live: [statusKey('line.live'), 'Buyers can now find and contact you.'],
     paused: [statusKey('line.paused'), 'This listing is paused.'],
@@ -106,11 +106,11 @@ const statusLine = (state, t, review) => {
   return tr(t, key, fallback);
 };
 
-const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, onConfirm, t }) => {
+const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, claimHref, t }) => {
   const badgeRequested = hasBadgeRequest(listing);
   const verified = Boolean(listing?.ownershipVerified);
-  if (state === 'confirm' && onConfirm) {
-    return { kind: 'button', onClick: onConfirm, icon: 'check-circle', label: tr(t, statusKey('actions.confirm'), 'Yes, this is my property'), testId: 'confirm-listing' };
+  if (state === 'confirm' && claimHref) {
+    return { kind: 'link', href: claimHref, icon: 'check-circle', label: tr(t, statusKey('actions.confirm'), 'Review & confirm'), testId: 'confirm-listing' };
   }
   if (state === 'pending') {
     return badgeRequested
@@ -161,7 +161,7 @@ export default function ListingStatusCard({
   supportHref = '/support',
   onOpenReview,
   onShare,
-  onConfirm,
+  claimHref,
   omitView = false,
   t,
   className = '',
@@ -169,12 +169,12 @@ export default function ListingStatusCard({
   const meta = getOwnerListingStatusMeta(listing, review, t);
   const unread = Number(review?.unread) || 0;
   const compact = variant === 'slim';
-  const resolved = actionFor({ state: meta.state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, onConfirm, t });
+  const resolved = actionFor({ state: meta.state, listing, review, editHref, viewHref, supportHref, onOpenReview, onShare, claimHref, t });
   const action = omitView && resolved.icon === 'eye' ? null : resolved;
   const getBadge = meta.state === 'live' && onShare && !listing?.ownershipVerified && !hasBadgeRequest(listing)
     ? { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') }
     : null;
-  const reportWrong = meta.state === 'confirm' && onConfirm
+  const reportWrong = meta.state === 'confirm' && claimHref
     ? { kind: onOpenReview ? 'button' : 'link', onClick: onOpenReview, href: supportHref, icon: 'alert-circle', label: tr(t, statusKey('actions.reportWrong'), "Something's wrong"), testId: 'report-listing-wrong' }
     : null;
   const line = statusLine(meta.state, t, review);

@@ -57,7 +57,7 @@ Choose **For Rent** or **For Sale** before entering details. The choice controls
 | Price | Required |
 | Floor | Cannot be greater than total floors |
 | Land listings | Require NA status and other rights; farmland sale also requires buyer eligibility |
-| Photos | Optional URL entries; owner can add uploads after claiming |
+| Photos | Optional URL entries; the owner must have at least three photos, two labelled by room, before they can confirm |
 
 The browser autosaves a draft under `dz_pob_draft_v2`. Use **Resume** to continue or **Discard** to clear it.
 
@@ -76,6 +76,8 @@ Do not ignore a pending-listing warning. Open **Admin → Properties** and confi
 5. Wait for owner confirmation before the listing goes live.
 
 The owner confirmation endpoint records claim-link opened time and owner confirmation time. Publication is blocked while a staff-posted listing still waits for owner confirmation.
+
+The owner confirms from the listing wizard, which holds the listing to the same bar as a new post: every required detail and at least three photos. The more you capture on the call, the less the owner has to fill in.
 
 Use internal notes for call details that matter to reviewers. The listing creation route has no notes field, so the desk saves notes to the listing timeline after creation.
 

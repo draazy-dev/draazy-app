@@ -18,7 +18,7 @@ import {
 export default function ListingCard({
   l, review = null, split = null,
   navigate, openReview,
-  onConfirmFresh, onConfirmListing, onReopen, onMarkUnderOffer, onFinalize, onDelete,
+  onConfirmFresh, onReopen, onMarkUnderOffer, onFinalize, onDelete,
   onSplit, onUnsplit, onPause, onResume, onShare, onOpenTools, onEditGroup, onEditPost, onRenew, quota = null, passPrice = '', t,
 }) {
   const unread = review?.unread || 0;
@@ -193,7 +193,7 @@ export default function ListingCard({
             omitView
             onOpenReview={hasReview ? () => openReview(l.id) : undefined}
             onShare={onShare ? () => onShare(l, viewHref) : undefined}
-            onConfirm={onConfirmListing ? () => onConfirmListing(l) : undefined}
+            claimHref={editHref}
             t={t}
           />
         </div>

@@ -39,9 +39,9 @@ If it is a rental of a residential property, you also choose here whether you ar
 
 **Step 3 — Pricing.** For a rental: monthly rent, deposit and the available-from date. For a sale: price, possession and ownership type. Pet policy can be left unstated if you have not decided.
 
-**Step 4 — Photos and description.** Add at least one photo, and label photos in at least two of the key categories (for a home: living room, kitchen, bedroom, bathroom). The first photo is the cover. The photo limit is set by the platform, defaults to **10**, and can be between **3 and 20**. One picker accepts JPEG, PNG and HEIC; large photos are compressed for you, so upload straight off the phone. Add a short headline and a factual description. Phone numbers and other contact details are not allowed in the headline, description or address — enquiries come through Draazy.
+**Step 4 — Photos and description.** Add at least three photos, and label two of them with key categories (for a home: living room, kitchen, bedroom, bathroom). The first photo is the cover. The photo limit is set by the platform, defaults to **10**, and can be between **3 and 20**. One picker accepts JPEG, PNG and HEIC; large photos are compressed for you, so upload straight off the phone. Add a short headline and a factual description. Phone numbers and other contact details are not allowed in the headline, description or address — enquiries come through Draazy.
 
-Then review and publish. Your listing goes into review and the status card shows **Under review** (usually reviewed within 24 hours), **Needs info**, **Live** or **Not approved**. If our concierge desk posted the listing on your behalf, it shows **Confirm your listing** until you tap **Yes, this is my property**.
+Then review and publish. Your listing goes into review and the status card shows **Under review** (usually reviewed within 24 hours), **Needs info**, **Live** or **Not approved**. If our concierge desk posted the listing on your behalf, it shows **Confirm your listing** until you tap **Review & confirm**, fill in anything still missing (including at least three photos) and tap **Confirm & send for review**.
 
 > [!NOTE]
 > The wizard saves your progress as you go, so closing the tab does not lose the form.
