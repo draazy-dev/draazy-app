@@ -84,7 +84,8 @@ export function areaRangeToUrl(range, profile) {
 
 export function formatAreaRange(range, profile) {
   const [lo, hi] = displayAreaRange(range, profile);
-  return `${clean(lo)} - ${clean(hi)} ${profile.label}`;
+  const top = Number(range?.[1]) === defaultAreaRangeSqft(profile)[1] ? '+' : '';
+  return `${clean(lo)} - ${clean(hi)}${top} ${profile.label}`;
 }
 
 export function formatAreaValue(value, unit) {

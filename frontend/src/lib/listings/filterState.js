@@ -1,10 +1,12 @@
 /* Single source of truth for the filter shape, the Set<->array serialisation used by return-to-search
    snapshots, and the two-way URL mapping that makes a search shareable and back-button-safe. */
-import { canonicalTypeKey, BUY_TYPES, RENT_TYPES } from '../../data/propertyTypes.js';
+import { canonicalTypeKey, BUY_TYPES, RENT_TYPES, COMMERCIAL_TYPES, LAND_USE } from '../../data/propertyTypes.js';
+import { AMEN_BUY, AMEN_RENT, AVAIL_FROM, FURN, ROOM_TYPES, TENANTS } from '../../pages/consumer/listings/constants.js';
+import { FACING, NA_STATUS, SHELL } from '../../pages/consumer/listings/filtersPanel/facetOptions.js';
 import { BHK_KEYS, expandBhkToken, normBhk } from './bhkOptions.js';
 import { clampNearRadius, nearMaxFor, nearToParams } from '../nearParams.js';
 import { BUILT_AREA_RANGE, areaProfileForTypes, areaRangeToUrl, defaultAreaRangeSqft, isDefaultAreaRange, parseAreaRange } from './areaUnits.js';
-import { sectionVisible } from './filterRelevance.js';
+import { sectionVisible, VERIF_SECTIONS } from './filterRelevance.js';
 
 /* Default range values — a filter at its default is omitted from the URL so the
    address bar only ever carries what the user actually narrowed. */
@@ -102,6 +104,11 @@ export { normBhk };
 
 const joinSet = (s) => [...s].join(',');
 const splitCsv = (v) => (v ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
+// A value no control offers would paint a chip nobody can recreate and match nothing server-side.
+const offered = (options, v) => {
+  const keys = new Set(options.map(([k]) => k));
+  return new Set(splitCsv(v).filter((k) => keys.has(k)));
+};
 export const rangeChanged = (v, def) => v[0] !== def[0] || v[1] !== def[1];
 const validConstruction = (tokens) => tokens.filter((token) => CONSTRUCTION_KEYS.has(token));
 const legacyAvailToConstruction = (token) => LEGACY_AVAIL_TO_CONSTRUCTION[token] || [];
@@ -134,33 +141,33 @@ export function filtersToParams(f) {
   if (f.societies.size) p.soc = joinSet(f.societies);
   if (f.types.size) p.ptype = joinSet(f.types);
   if (f.types.has('commercial') && f.commercialTypes.size) p.ctype = joinSet(f.commercialTypes);
-  if (f.bhk.size) p.bhks = joinSet(f.bhk);
-  if (f.furnishing.size) p.furn = joinSet(f.furnishing);
+  if (rel('bhk') && f.bhk.size) p.bhks = joinSet(f.bhk);
+  if (rel('furnishing') && f.furnishing.size) p.furn = joinSet(f.furnishing);
   if (rel('facing') && f.facing.size) p.facing = joinSet(f.facing);
   if (rel('baths') && MIN_BATH_KEYS.has(f.minBaths)) p.minBaths = f.minBaths;
-  if (f.amenities.size) p.amen = joinSet(f.amenities);
+  if (rel('amenities') && f.amenities.size) p.amen = joinSet(f.amenities);
   if (rel('landUse') && f.landUse.size) p.landuse = joinSet(f.landUse);
   if (rel('shell') && f.shell.size) p.shell = joinSet(f.shell);
   if (rel('na') && f.na.size) p.na = joinSet(f.na);
-  const vkeys = VERIF_KEYS.filter((k) => f.verified[k]);
+  const vkeys = VERIF_KEYS.filter((k) => f.verified[k] && (!VERIF_SECTIONS[k] || rel(VERIF_SECTIONS[k])));
   if (vkeys.length) p.v = vkeys.join(',');
-  if (rangeChanged(f.age, RANGE.age)) p.age = `${f.age[0]}-${f.age[1]}`;
-  if (rangeChanged(f.floor, RANGE.floor)) p.floor = `${f.floor[0]}-${f.floor[1]}`;
+  if (rel('age') && rangeChanged(f.age, RANGE.age)) p.age = `${f.age[0]}-${f.age[1]}`;
+  if (rel('floor') && rangeChanged(f.floor, RANGE.floor)) p.floor = `${f.floor[0]}-${f.floor[1]}`;
   const areaProfile = areaProfileForTypes(f.types, f.areaUnit);
   if (rel('area') && !isDefaultAreaRange(f.area, areaProfile)) {
     p.area = areaRangeToUrl(f.area, areaProfile);
     if (areaProfile.kind !== 'built') p.areaUnit = areaProfile.unit;
   }
   if (isRent) {
-    if (f.room.size) p.room = joinSet(f.room);
-    if (f.tenants.size) p.tenants = joinSet(f.tenants);
-    if (f.availFrom) p.availfrom = f.availFrom;
-    if (f.pets) p.pets = '1';
+    if (rel('room') && f.room.size) p.room = joinSet(f.room);
+    if (rel('tenants') && f.tenants.size) p.tenants = joinSet(f.tenants);
+    if (rel('availFrom') && f.availFrom) p.availfrom = f.availFrom;
+    if (rel('amenities') && f.pets) p.pets = '1';
     if (f.food && rel('food')) p.food = f.food;
     if (rangeChanged(f.rent, RANGE.rent)) p.rent = `${f.rent[0]}-${f.rent[1]}`;
     if (rangeChanged(f.deposit, RANGE.deposit)) p.deposit = `${f.deposit[0]}-${f.deposit[1]}`;
   } else {
-    if (f.constr.size) p.constr = joinSet(f.constr);
+    if (rel('construction') && f.constr.size) p.constr = joinSet(f.constr);
     if (f.preLeased && rel('preLeased')) p.preLeased = 'true';
     if (rangeChanged(f.budget, RANGE.budget)) p.budget = `${f.budget[0]}-${f.budget[1]}`;
   }
@@ -182,7 +189,7 @@ export function paramsToFilters(params, deal) {
   const pickedTypes = typeTokens.filter((k) => allowedTypes.has(k));
   if (pickedTypes.length) f.types = new Set(pickedTypes);
 
-  if (f.types.has('commercial')) f.commercialTypes = new Set(splitCsv(get('ctype')));
+  if (f.types.has('commercial')) f.commercialTypes = offered(COMMERCIAL_TYPES, get('ctype'));
 
   // Localities carried as slugs (or home-search names) -> slugify to match data.
   const locTokens = splitCsv(get('loc') || get('locality')).map((s) => s.toLowerCase().replace(/\s+/g, '-'));
@@ -198,13 +205,13 @@ export function paramsToFilters(params, deal) {
     .filter((key) => BHK_KEYS[deal].includes(key));
   if (bhkKeys.length) f.bhk = new Set(bhkKeys);
 
-  if (get('furn')) f.furnishing = new Set(splitCsv(get('furn')));
-  if (get('facing')) f.facing = new Set(splitCsv(get('facing')));
+  f.furnishing = offered(FURN, get('furn'));
+  f.facing = offered(FACING, get('facing'));
   if (MIN_BATH_KEYS.has(get('minBaths'))) f.minBaths = get('minBaths');
-  if (get('amen')) f.amenities = new Set(splitCsv(get('amen')));
-  if (get('landuse')) f.landUse = new Set(splitCsv(get('landuse')));
-  if (get('na')) f.na = new Set(splitCsv(get('na')));
-  if (get('shell')) f.shell = new Set(splitCsv(get('shell')));
+  f.amenities = offered([...AMEN_BUY, ...AMEN_RENT], get('amen'));
+  f.landUse = offered(LAND_USE, get('landuse'));
+  f.na = offered(NA_STATUS, get('na'));
+  f.shell = offered(SHELL, get('shell'));
 
   const vkeys = splitCsv(get('v')).filter((k) => VERIF_KEYS.includes(k));
   if (vkeys.length) f.verified = Object.fromEntries(vkeys.map((k) => [k, true]));
@@ -218,9 +225,9 @@ export function paramsToFilters(params, deal) {
   f.area = areaUnit && areaProfile.unit !== areaUnit ? areaDefault : areaUnit ? parseAreaRange(get('area'), areaDefault, areaProfile.unit) : parseRange(get('area'), areaDefault);
 
   if (isRent) {
-    if (get('room')) f.room = new Set(splitCsv(get('room')));
-    if (get('tenants')) f.tenants = new Set(splitCsv(get('tenants')));
-    if (get('availfrom')) f.availFrom = get('availfrom');
+    f.room = offered(ROOM_TYPES, get('room'));
+    f.tenants = offered(TENANTS, get('tenants'));
+    f.availFrom = [...offered(AVAIL_FROM, get('availfrom'))][0] || '';
     if (get('pets') === '1') f.pets = true;
     f.food = normalizeFood(get('food'));
     f.rent = parseRange(get('rent'), RANGE.rent);
@@ -234,7 +241,7 @@ export function paramsToFilters(params, deal) {
   }
 
   const near = get('near');
-  if (near) {
+  if (nearToParams({ near }).near) {
     f.near = near;
     const nl = get('nearlabel');
     if (nl) f.nearLabel = nl;

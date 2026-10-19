@@ -1,5 +1,6 @@
 import { fmtINR } from '../../../lib/format.js';
 import { deserializeF, filtersToParams } from '../../../lib/listings/filterState.js';
+import { sectionVisible } from '../../../lib/listings/filterRelevance.js';
 import { fmtRent } from './format.js';
 import { BUY_TYPES, RENT_TYPES, COMMERCIAL_TYPES } from '../../../data/propertyTypes.js';
 import { BHK_BUY, BHK_RENT, FURN_LBL, AMEN_LBL } from './constants.js';
@@ -45,8 +46,18 @@ export function alertLabel(rec, locNameBySlug = {}) {
   return parts.filter(Boolean).join(' · ') || `All ${rec.deal === 'rent' ? 'rentals' : 'homes'}`;
 }
 
+// The server matches every facet it is sent, so one the chosen types hide (a plot's BHK)
+// would stop the alert from ever firing.
+export function dropHiddenFacets(rec) {
+  const types = new Set(asArr(rec.types));
+  const out = { ...rec };
+  for (const key of ['bhk', 'furnishing', 'amenities']) if (out[key] && !sectionVisible(key, types)) out[key] = [];
+  if (out.pets && !sectionVisible('amenities', types)) out.pets = false;
+  return out;
+}
+
 export function buildAlertRecord(f, locNameBySlug = {}) {
-  const rec = {
+  const rec = dropHiddenFacets({
     deal: f.deal,
     types: asArr(f.types),
     commercialTypes: asArr(f.commercialTypes),
@@ -57,7 +68,7 @@ export function buildAlertRecord(f, locNameBySlug = {}) {
     budget: Array.isArray(f.budget) ? f.budget : undefined,
     rent: Array.isArray(f.rent) ? f.rent : undefined,
     pets: !!f.pets,
-  };
+  });
   rec.label = alertLabel(rec, locNameBySlug);
   return rec;
 }

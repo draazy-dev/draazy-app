@@ -61,7 +61,7 @@ export default function RentExtraSections({ f, set }) {
   const foodOptions = FOOD.map(([v, key]) => [v, t(key)]);
   return (
     <>
-      <FilterGroup icon="wallet" title={t('listings.securityDeposit')} summary={f.deposit[0] === DEP_MIN && f.deposit[1] === DEP_MAX ? '' : `${fmtRent(f.deposit[0])} - ${fmtRent(f.deposit[1])}`}>
+      <FilterGroup icon="wallet" title={t('listings.securityDeposit')} summary={f.deposit[0] === DEP_MIN && f.deposit[1] === DEP_MAX ? '' : `${fmtRent(f.deposit[0])} - ${fmtRent(f.deposit[1])}${f.deposit[1] === DEP_MAX ? '+' : ''}`}>
         <DualRange min={DEP_MIN} max={DEP_MAX} step={10000} value={f.deposit} onChange={(v) => set({ deposit: v })} label={t('listings.securityDeposit')} format={(v) => (v === DEP_MAX ? `${fmtRent(v)}+` : fmtRent(v))} />
       </FilterGroup>
       <Divider />
