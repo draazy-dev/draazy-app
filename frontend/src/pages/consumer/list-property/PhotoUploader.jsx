@@ -192,7 +192,7 @@ const PhotoUploader = ({
           </div>
           </SortableContext>
           </DndContext>
-          {uploadedCount < 3 && <p className="text-teal-300 text-xs mt-2">{t('listProperty.photoUploader.threePhotoHint')}</p>}
+          {uploadedCount < MIN_PUBLISH_PHOTOS && <p className="text-teal-300 text-xs mt-2">{t('listProperty.photoUploader.minPhotoHint', { count: MIN_PUBLISH_PHOTOS })}</p>}
         </>
       )}
     </div>

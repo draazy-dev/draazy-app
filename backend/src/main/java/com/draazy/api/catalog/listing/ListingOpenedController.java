@@ -1,15 +1,18 @@
 package com.draazy.api.catalog.listing;
 
+import com.draazy.api.catalog.property.ListingCompleteness;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.CurrentUser;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,6 +56,11 @@ public class ListingOpenedController {
         }
         if (property.isArchived() || !PropertyStatus.PENDING.equals(property.getStatus())) {
             throw new ConflictException("Only a listing waiting for review can be confirmed");
+        }
+        List<String> missing = ListingCompleteness.missing(property);
+        if (!missing.isEmpty()) {
+            throw new ConflictException(ErrorCodes.LISTING_INCOMPLETE,
+                    "Add the missing details before confirming: " + String.join(", ", missing) + ".");
         }
         property.recordClaimLinkOpened();
         property.confirmByOwner();

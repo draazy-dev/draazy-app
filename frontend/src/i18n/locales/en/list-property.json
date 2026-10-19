@@ -16,6 +16,12 @@
       "legacyLandAddress": "The separate address details were never saved. Leave them blank to keep this address, or fill in the details below to replace it."
     },
     "editLoadFailed": "We could not load that listing. Reload the page and try again.",
+    "claim": {
+      "banner": "Draazy started this listing for you. Fill in anything missing and add photos, then confirm to send it for review.",
+      "submit": "Confirm & send for review",
+      "confirmed": "Thanks — your listing is now with our review team.",
+      "confirmFailed": "Your details are saved, but we could not confirm the listing. Please try again."
+    },
     "next": "Next Step",
     "back": "Back",
     "checking": "Checking…",
@@ -410,7 +416,7 @@
       "reraFormat": "MahaRERA ID looks like P52100012345 — P followed by 11 digits.",
       "descriptionLength": "Keep the description within 4000 characters.",
       "contactDetails": "Do not include a phone number, email, WhatsApp/social link or handle. Buyers can contact you through Draazy.",
-      "photosMin": "Add at least one photo.",
+      "photosMin": "Add at least {{count}} photos.",
       "deal": "Choose Sale or Rent.",
       "agreementRequired": "Upload your registered rent agreement.",
       "ownerConsent": "Confirm that the owner knows and agrees to sharing.",
@@ -449,11 +455,11 @@
       "defaultLabel": "Property Photos *",
       "dropTitle": "Drag & drop or click to upload",
       "dropSub": "PNG, JPG up to 10MB each. Max 20 photos.",
-      "errorAddPhoto": "Add at least one photo — listings with photos get far more enquiries.",
+      "errorAddPhoto": "Add photos — listings with photos get far more enquiries.",
       "cover": "COVER",
       "photoCategoryAria": "Photo category",
       "addPhoto": "Add photo",
-      "threePhotoHint": "Add at least 3 photos — listings with 3+ photos are approved faster.",
+      "minPhotoHint": "Add at least {{count}} photos and label what 2 of them show.",
       "photoCount_one": "{{count}} photo",
       "photoCount_other": "{{count}} photos"
     },

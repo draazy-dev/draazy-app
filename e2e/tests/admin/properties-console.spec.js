@@ -1,5 +1,5 @@
 import { expect, test, ACTORS, STAFF } from '../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signIn, uniqueMobile } from '../../helpers/liveAuth.js';
+import { API, authHeaders, uploadedListingPhotos, signIn, uniqueMobile, completeStaffPostedListing } from '../../helpers/liveAuth.js';
 import { appReady } from '../../helpers/app.js';
 import { approveListing, rejectListing } from '../../helpers/moderation.js';
 
@@ -512,6 +512,10 @@ test.describe('LIVE: the properties console', () => {
     expect(await refused.text()).toContain('owner_not_confirmed');
 
     const ownerHeaders = await authHeaders(desk.ownerMobile);
+    const incomplete = await api('POST', `/me/listings/${desk.id}/confirm`, ownerHeaders);
+    expect(incomplete.status).toBe(409);
+    expect(incomplete.body.error).toBe('listing_incomplete');
+    await completeStaffPostedListing(desk.id, ownerHeaders);
     expect((await api('POST', `/me/listings/${desk.id}/confirm`, ownerHeaders)).status).toBe(204);
 
     await login.asAdmin();

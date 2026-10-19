@@ -403,7 +403,7 @@ stage, so no two writers can disagree (V81 dropped `lifecycle_*`, `pipeline_stag
 | Track | Steps | Moves on |
 |---|---|---|
 | Owner-posted | Submitted -> In review -> Live | checker opens the review (`review_started_at`); approve |
-| Staff-posted | Created -> Link sent -> Owner confirmed -> In review -> Live | claim link marked sent (`claim_link_sent_at`); owner taps "Yes, this is my property" (`POST /me/listings/{id}/confirm`, `owner_confirmed_at`); review opened; approve |
+| Staff-posted | Created -> Link sent -> Owner confirmed -> In review -> Live | claim link marked sent (`claim_link_sent_at`); owner taps "Review & confirm", completes the listing in the wizard to the new-listing bar (photos included), and its final button confirms (`POST /me/listings/{id}/confirm`, `owner_confirmed_at`; `409 listing_incomplete` while anything required is missing); review opened; approve |
 
 - **Detours are flags, not steps:** `needs_info` (`info_requested_at`), `rejected`, `flagged`,
   `no_photos`, `opened` (claim link opened, not yet confirmed), `recheck`. The owner sees only

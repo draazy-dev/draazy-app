@@ -201,6 +201,7 @@ class ReviewLifecycleTest extends AbstractApiTest {
         User owner = user("9800011932", "owner");
         Property p = listing(owner);
         p.markPostedOnBehalf(maker.getId().toString());
+        complete(p);
         fileLocality(p);
         mvc.perform(post("/properties/" + p.getId() + "/verification")
                 .header("Authorization", bearer(owner))).andExpect(status().isCreated());
@@ -231,6 +232,45 @@ class ReviewLifecycleTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.progress.track").value("staff"))
                 .andExpect(jsonPath("$.progress.step").value("live"));
+    }
+
+    @Test void anIncompleteStaffPostedListingCannotBeConfirmed() throws Exception {
+        User owner = user("9800011935", "owner");
+        Property p = listing(owner);
+        p.markPostedOnBehalf("some-other-staff");
+        fileLocality(p);
+        mvc.perform(post("/me/listings/" + p.getId() + "/confirm")
+                .header("Authorization", bearer(owner)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("listing_incomplete"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("photos")));
+        assertThat(jdbc.queryForObject("select owner_confirmed_at from properties where id= ?",
+                java.sql.Timestamp.class, p.getId())).isNull();
+
+        complete(p);
+        p.setImages(List.of("https://img.test/living.jpg", "https://img.test/kitchen.jpg"));
+        properties.saveAndFlush(p);
+        mvc.perform(post("/me/listings/" + p.getId() + "/confirm")
+                .header("Authorization", bearer(owner)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message").value("Add the missing details before confirming: 3 photos."));
+
+        complete(p);
+        mvc.perform(post("/me/listings/" + p.getId() + "/confirm")
+                .header("Authorization", bearer(owner))).andExpect(status().isNoContent());
+    }
+
+    private void complete(Property p) {
+        p.setCarpetArea(java.math.BigDecimal.valueOf(650));
+        p.setBhk(java.math.BigDecimal.valueOf(2));
+        p.setBathrooms(2);
+        p.setFloor(3);
+        p.setTotalFloors(12);
+        p.setPincode("411045");
+        p.setDeposit(100000L);
+        p.setAvailableOn(java.time.LocalDate.now());
+        p.setImages(List.of("https://img.test/living.jpg", "https://img.test/kitchen.jpg", "https://img.test/bed.jpg"));
+        properties.saveAndFlush(p);
     }
 
     @Test void onlyTheOwnerOfAStaffPostedListingCanConfirmIt() throws Exception {

@@ -1,6 +1,6 @@
 // @ts-check
 import { test, expect, ACTORS, STAFF } from '../../../fixtures/live.js';
-import { authHeaders, API } from '../../../helpers/liveAuth.js';
+import { authHeaders, API, completeStaffPostedListing } from '../../../helpers/liveAuth.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { pickPlaceholderLocality } from '../../../helpers/locality.js';
 import * as consumerC from '../../../../frontend/src/pages/consumer/list-property/constants.js';
@@ -42,12 +42,12 @@ test.describe('Post-property ↔ Post-on-behalf option sync', () => {
     await page.getByRole('group', { name: 'BHK', exact: true }).getByRole('button', { name: '2 BHK' }).click();
     await page.getByPlaceholder('e.g. 850').fill('900');
     await page.getByRole('group', { name: 'Furnishing' }).getByRole('button', { name: 'Semi-Furnished' }).click();
-    await page.getByRole('button', { name: /Next/i }).click();
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
 
     await pickPlaceholderLocality(page, 'Baner');
-    await page.getByRole('button', { name: /Next/i }).click();
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
     await page.locator('input[inputmode="numeric"]').first().fill('24000');
-    await page.getByRole('button', { name: /Next/i }).click();
+    await page.getByRole('button', { name: 'Next', exact: true }).click();
 
     const [created] = await Promise.all([
       page.waitForResponse(
@@ -60,8 +60,10 @@ test.describe('Post-property ↔ Post-on-behalf option sync', () => {
     postedIds.add(id);
     await expect(page.getByRole('heading', { name: 'Listing created' })).toBeVisible({ timeout: 15000 });
 
+    const ownerHeaders = await authHeaders('9600000123');
+    await completeStaffPostedListing(id, ownerHeaders);
     const confirmed = await fetch(`${API}/me/listings/${id}/confirm`, {
-      method: 'POST', headers: await authHeaders('9600000123'),
+      method: 'POST', headers: ownerHeaders,
     });
     expect(confirmed.status).toBe(204);
     const approved = await approveListingWithFetch(id, await authHeaders(STAFF.rental));

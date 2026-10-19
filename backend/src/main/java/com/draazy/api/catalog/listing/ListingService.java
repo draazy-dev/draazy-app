@@ -271,10 +271,13 @@ public class ListingService {
             if (!PropertyStatus.PENDING.equals(statusBefore)) {
                 p.recordResubmission();
             }
-            caseNotes.post(p.getId(), p.getDeal(),
-                    "You changed something fundamental about this listing, so it has gone back "
-                    + "for review and is off search until a moderator approves it. We usually get to "
-                    + "these within a day.");
+            // An owner completing a staff-posted draft is filling it in, not changing it.
+            if (!p.awaitsOwnerConfirmation()) {
+                caseNotes.post(p.getId(), p.getDeal(),
+                        "You changed something fundamental about this listing, so it has gone back "
+                        + "for review and is off search until a moderator approves it. We usually get to "
+                        + "these within a day.");
+            }
         } else if (impact.remoderationRequired() && PropertyStatus.FLAGGED.equals(p.getStatus())) {
             // A flag is a moderator's hold, so an owner edit raises a re-check and never lifts it.
             List<String> held = impact.rechecked().isEmpty() ? List.of("listing basics") : impact.rechecked();

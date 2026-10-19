@@ -22,7 +22,7 @@ const ListPropertyForm = () => {
   const vm = useListProperty();
   const { fee } = usePricing();
   const {
-    t, navigate, showSuccess, isFlatmateMode, editId, editRoomId, editApproved, editChanges,
+    t, navigate, showSuccess, isFlatmateMode, editId, editRoomId, editApproved, editChanges, claimMode,
     postedListing, savedListingStatus, editReady, editLoading, editLoadError, retryEditLoad, legacyAddress,
     authPromptOpen, closeAuthPrompt,
     progressState, passListingId,
@@ -159,7 +159,11 @@ const ListPropertyForm = () => {
           </div>
         )}
 
-        {editId && <EditPolicyBanner approved={editApproved} changes={editChanges} />}
+        {claimMode ? (
+          <p data-testid="claim-banner" className="mb-4 rounded-xl border border-amber-400/30 bg-amber-400/5 px-4 py-3 text-sm text-amber-100">
+            {t('listProperty.claim.banner')}
+          </p>
+        ) : editId && <EditPolicyBanner approved={editApproved} changes={editChanges} />}
 
             <StepNav current={currentStep} steps={LISTING_STEPS} onJump={jumpTo} />
             {/* Narrow mobile gutters leave room for paired fields. */}
@@ -255,6 +259,7 @@ const ListPropertyForm = () => {
                   onJump={jumpTo}
                   needsAuthForMedia={needsAuthForMedia}
                   onRequireAuth={requestAuthPrompt}
+                  claimMode={claimMode}
                 />
               )}
 

@@ -5,7 +5,8 @@ import { useAuth } from '../../../context/AuthContext';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useFormDraft } from '../../../lib/hooks';
 import { parseAmount } from '../../../lib/format';
-import { myListing, checkOwnDuplicate } from '../../../services/propertyService.js';
+import { myListing, checkOwnDuplicate, confirmOwnerListing } from '../../../services/propertyService.js';
+import { getOwnerListingState } from '../../../components/listing/ListingStatusCard.jsx';
 import { ADDRESS_PARTS, hasStoredAddress } from '../../../lib/listingFormDetails.js';
 import { createRoom, updateRoom } from '../../../services/flatmateService.js';
 import { canSplitIntoRooms } from '../../../lib/data/flatSplit.js';
@@ -459,6 +460,9 @@ export default function useListProperty() {
     return classifyChanges(editListing.form, form,
       (editListing.images || editListing.gallery || []).filter(Boolean), photos.map((p) => p.url).filter(Boolean));
   }, [editId, editReady, editListing, form, photos]);
+  // A staff-posted draft is held to the new-listing bar: the desk asks far less than the owner wizard.
+  const claimMode = !!editListing && getOwnerListingState(editListing) === 'confirm';
+  const baseline = claimMode ? null : editListing;
 
   useEffect(() => {
     if (showSuccess) window.scrollTo({ top: 0, behavior: 'auto' });
@@ -566,7 +570,7 @@ export default function useListProperty() {
 
   const lastStep = LISTING_STEPS.length;
   const maxReachableStep = useCallback(() => {
-    const original = editListing?.form;
+    const original = baseline?.form;
     const first = isFlatmateMode ? validateFlatmateStep1(form) : validateStep1(form, original);
     if (Object.keys(first).length) return 1;
     const locationErrors = isFlatmateMode ? validateFlatmateLocation(form, roomBaseline) : validateLocationStep(form, original);
@@ -574,7 +578,7 @@ export default function useListProperty() {
     if (Object.keys(locationErrors).length) return 2;
     const priceErrors = isFlatmateMode ? validateFlatmatePrice(form) : validatePricingStep(form, original);
     return Object.keys(priceErrors).length ? 3 : lastStep;
-  }, [editId, editListing, form, isFlatmateMode, lastStep, locationSet, roomBaseline]);
+  }, [baseline, editId, editListing, form, isFlatmateMode, lastStep, locationSet, roomBaseline]);
   const goToStep = useCallback((step, { replace = false } = {}) => {
     if (!editReady) return;
     dupSeq.current += 1;
@@ -607,9 +611,9 @@ export default function useListProperty() {
       ? (currentStep === 1 ? validateFlatmateStep1(form)
         : currentStep === 2 ? validateFlatmateLocation(form, roomBaseline)
           : currentStep === 3 ? validateFlatmatePrice(form) : {})
-      : (currentStep === 1 ? validateStep1(form, editListing?.form)
-        : currentStep === 2 ? validateLocationStep(form, editListing?.form)
-          : currentStep === 3 ? validatePricingStep(form, editListing?.form) : {});
+      : (currentStep === 1 ? validateStep1(form, baseline?.form)
+        : currentStep === 2 ? validateLocationStep(form, baseline?.form)
+          : currentStep === 3 ? validatePricingStep(form, baseline?.form) : {});
     /* An edit is exempt: a listing published before the pin existed would otherwise be barred
      * from its own price correction. */
     if (currentStep === 2 && !locationSet && !editListing) err.location = true;
@@ -702,6 +706,18 @@ export default function useListProperty() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
+    if (claimMode) {
+      try {
+        await confirmOwnerListing(editId);
+      } catch (error) {
+        toast(error?.body?.message || error?.message || t('listProperty.claim.confirmFailed'), 'error');
+        return;
+      }
+      skipLeaveGuard.current = true;
+      toast(t('listProperty.claim.confirmed'), 'success');
+      navigate('/dashboard#listings');
+      return;
+    }
     if (!editId) clearFormDraft();
     if (!editId) track('listing_submitted', { deal: res?.listing?.deal, type: res?.listing?.type });
     // Refresh owner eligibility and quota after consuming a new-post allowance.
@@ -718,14 +734,14 @@ export default function useListProperty() {
   const submitProperty = () => {
     if (!editReady || posting || media.isMediaProcessing()) return;
     if (!signedIn) { requestAuthPrompt(); return; }
-    const step1Errors = editId ? validateStep1(form, editListing.form) : {};
-    const locationErrors = editId ? validateLocationStep(form, editListing.form) : {};
-    const pricingErrors = editId ? validatePricingStep(form, editListing.form) : {};
+    const step1Errors = editId ? validateStep1(form, baseline?.form) : {};
+    const locationErrors = editId ? validateLocationStep(form, baseline?.form) : {};
+    const pricingErrors = editId ? validatePricingStep(form, baseline?.form) : {};
     const err = {
       ...step1Errors,
       ...locationErrors,
       ...pricingErrors,
-      ...validateStep3(form, photos, editId ? editListing : null, media.maxPhotos),
+      ...validateStep3(form, photos, baseline, media.maxPhotos),
     };
     if (Object.keys(err).length) {
       const failStep = Object.keys(step1Errors).length ? 1
@@ -867,7 +883,7 @@ export default function useListProperty() {
     requestAuthPrompt,
     needsAuthForMedia: !signedIn,
     savedListingStatus,
-    editApproved, editChanges, showIdentityGuard, setShowIdentityGuard,
+    editApproved, editChanges, claimMode, showIdentityGuard, setShowIdentityGuard,
     showDupGuard, setShowDupGuard, dupExistingId, dupPending, passListingId,
     form, progressState,
     toggleInArray, toggleTenant, changePropertyType, changeCommercialType,

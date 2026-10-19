@@ -193,7 +193,6 @@ export const validateStep3 = (form, photos, original, maxPhotos) => {
   if (list.length < floor) return { ...nextErr, photos: 'min' };
   if (original || nextErr.photos === 'max') return nextErr;
   const keyCats = keyPhotoCategoriesFor(form.propertyType, form.commercialType);
-  if (list.length < Math.min(MIN_PUBLISH_KEY_CATEGORIES, keyCats.length)) return nextErr;
   const covered = new Set(list.map((p) => p.category).filter((c) => keyCats.includes(c)));
   return covered.size < Math.min(MIN_PUBLISH_KEY_CATEGORIES, keyCats.length) ? { ...nextErr, photos: 'categories' } : nextErr;
 };

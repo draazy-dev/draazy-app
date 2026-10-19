@@ -56,6 +56,20 @@ export async function uploadedListingPhotos(auth, count = 1, { api = API } = {})
   return urls;
 }
 
+/** Fills in what the desk leaves out of a rent Flat, so its owner may confirm it (`listing_incomplete` otherwise). */
+export async function completeStaffPostedListing(id, ownerHeaders, { api = API } = {}) {
+  const res = await fetch(`${api}/me/listings/${id}`, {
+    method: 'PATCH',
+    headers: ownerHeaders,
+    body: JSON.stringify({
+      carpetArea: 850, bathrooms: 2, floor: 3, totalFloors: 12, pincode: '411045', deposit: 100000,
+      availableOn: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10),
+      images: await uploadedListingPhotos(ownerHeaders, 3, { api }),
+    }),
+  });
+  if (!res.ok) throw new Error(`PATCH /me/listings/${id} failed: ${res.status} ${await res.text()}`);
+}
+
 export const seedConsent = (page) => page.addInitScript(() => {
   localStorage.setItem('dz_cookie_consent_v1', JSON.stringify({
     necessary: true, functional: true, analytics: true, marketing: false, version: 1, ts: Date.now(),

@@ -87,6 +87,8 @@ public final class ErrorCodes {
 
     public static final String LISTING_NOT_EDITABLE = "listing_not_editable";
 
+    public static final String LISTING_INCOMPLETE = "listing_incomplete";
+
     public static final String DUPLICATE_SUBMISSION = "duplicate_submission";
 
     public static final String OWN_LISTING = "own_listing";

@@ -207,3 +207,4 @@ hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 - **One staff decision is final** (#330): never add a second-reviewer, QA-sample or override-request step to an approval; only refunds are two-person. Self-action guards (own listing/case/upload) stay.
 - **A submitted case is "in review", not "unverified"**: consumer cards must show what the user already sent (identity, listing) instead of re-asking.
 - "Horizontal scroll UI standard" for filters/tabs = the underline `dz-detail-tab` strip in `HScroll` (Property/Society tabs, icon + label), not the dashboard pill chips.
+- **A new listing (and a staff-posted claim) needs 3 photos, 2 labelled with key rooms** (`MIN_PUBLISH_PHOTOS`, mirrored by `ListingCompleteness.MIN_PHOTOS`); never treat the one-photo floor as the listing standard.
