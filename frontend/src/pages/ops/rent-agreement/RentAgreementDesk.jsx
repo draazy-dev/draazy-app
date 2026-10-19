@@ -5,7 +5,7 @@ import PageHeader from '../../../components/ui/PageHeader.jsx';
 import Loading from '../../../components/ui/Loading.jsx';
 import { classNames, fmtINR } from '../../../lib/format.js';
 import { useTabParam } from '../../../lib/useTabParam.js';
-import { PageNav, QueueTabs, SearchBox } from '../../../components/admin/WorkQueue.jsx';
+import { Chips, DATE_CHIPS, PageNav, QueueTabs, SearchBox } from '../../../components/admin/WorkQueue.jsx';
 import AdminServices from '../../admin/AdminServices.jsx';
 import useDeskTickets from '../../admin/useDeskTickets.js';
 import AgeTone from '../service-queue/AgeTone.jsx';
@@ -23,6 +23,7 @@ export default function RentAgreementDesk() {
   const [tab, setTab] = useTabParam(TAB_KEYS, 'pickup');
   const [q, setQ] = useState('');
   const [overdue, setOverdue] = useState(false);
+  const [days, setDays] = useState('');
   const [page, setPage] = useState(1);
   const [pageTab, setPageTab] = useState(tab);
   if (pageTab !== tab) {
@@ -57,7 +58,8 @@ export default function RentAgreementDesk() {
 
   const active = TABS.find((t) => t.key === tab);
   const queue = useQueue({
-    type: 'rental', ...active.query, overdue: overdue || undefined, q: q.trim() || undefined, page: page - 1, size: PAGE_SIZE,
+    type: 'rental', ...active.query, overdue: overdue || undefined, q: q.trim() || undefined, days: days || undefined,
+    page: page - 1, size: PAGE_SIZE,
   }, reloadToken);
   const rows = queue.page?.items || [];
   const total = queue.page?.total ?? 0;
@@ -103,6 +105,7 @@ export default function RentAgreementDesk() {
         <div className="flex flex-wrap items-center gap-2 border-b border-white/10 p-3">
           <SearchBox value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder="Name, mobile or request id" label="Search name, mobile or request id" className="w-full sm:w-72" />
           <OverdueToggle on={overdue} count={summary?.overdue} onToggle={() => { setOverdue((v) => !v); setPage(1); }} />
+          <Chips label="Date" options={DATE_CHIPS} value={days} onChange={(v) => { setDays(v); setPage(1); }} />
           <div className="ml-auto"><PageNav {...paging} /></div>
         </div>
 
@@ -113,7 +116,7 @@ export default function RentAgreementDesk() {
               <button type="button" onClick={reload} className="dz-btn dz-btn-primary"><RefreshCw className="h-4 w-4" /> Try again</button>
             </div>
           ) : queue.page == null ? <Loading /> : rows.length === 0 ? (
-            <p className="p-10 text-center text-sm text-gray-400">{q.trim() || overdue ? 'No cases match these filters.' : active.empty}</p>
+            <p className="p-10 text-center text-sm text-gray-400">{q.trim() || overdue || days ? 'No cases match these filters.' : active.empty}</p>
           ) : (
             <div>
               <div aria-hidden="true" className={classNames(GRID, 'hidden border-b border-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500')}>

@@ -14,7 +14,7 @@ export async function listServiceRequests(typeFilter) {
   return toViewModelList(res?.content ?? (Array.isArray(res) ? res : []));
 }
 
-export async function listServiceRequestQueue({ type, status, mine, unassigned, overdue, q, page = 0, size = 20 } = {}) {
+export async function listServiceRequestQueue({ type, status, mine, unassigned, overdue, q, days, page = 0, size = 20 } = {}) {
   const query = { page, size };
   if (type) query.type = toWireType(type);
   if (status) query.status = Array.isArray(status) ? status.join(',') : status;
@@ -22,6 +22,7 @@ export async function listServiceRequestQueue({ type, status, mine, unassigned, 
   if (unassigned) query.unassigned = true;
   if (overdue) query.overdue = true;
   if (q) query.q = q;
+  if (days) query.days = days;
   return toQueueRowPage(await get('/service-requests/queue', query), { page, size });
 }
 

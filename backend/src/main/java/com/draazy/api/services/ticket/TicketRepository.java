@@ -31,6 +31,7 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
             where (:allTeams = true or t.team in :teams or (:unassigned = true and t.team is null))
               and (:status is null or t.status = :status)
               and (:priority is null or t.priority = :priority)
+              and t.createdAt >= :since
               and (:q is null
                    or lower(cast(t.id as string)) like :q escape '\\'
                    or lower(t.subject) like :q escape '\\'
@@ -46,6 +47,7 @@ public interface TicketRepository extends JpaRepository<Ticket, UUID> {
             @Param("status") String status,
             @Param("priority") String priority,
             @Param("q") String q,
+            @Param("since") Instant since,
             Pageable pageable);
 
     @Query("""

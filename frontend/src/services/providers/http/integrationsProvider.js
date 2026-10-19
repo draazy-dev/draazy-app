@@ -20,10 +20,11 @@ export async function getProviderHealth() {
 }
 
 // Blank filters are omitted: the server answers 400 to a value outside its enum, and '' is one.
-export async function listProviderCalls({ provider, outcome, q, page = 0, size = 20 } = {}) {
+export async function listProviderCalls({ provider, outcome, days, q, page = 0, size = 20 } = {}) {
   const query = { page, size };
   if (provider) query.provider = provider;
   if (outcome) query.outcome = outcome;
+  if (days) query.days = days;
   if (q && q.trim()) query.q = q.trim();
   return unwrapPage(await get('/admin/integrations/calls', query), { page, size });
 }

@@ -2511,6 +2511,7 @@ paths:
       operationId: listUsers
       x-roles: [staff, manager, admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { name: role, in: query, schema: { $ref: '#/components/schemas/Role' } }
         # Owners and buyers only; back-office accounts are listed under Team & Access.
         - { name: customers, in: query, schema: { type: boolean, default: false } }
@@ -3121,6 +3122,7 @@ paths:
         first. Every filter is applied in the database before paging. Rows
         carry only what a queue line shows; claims, images and warnings are the detail read.
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { name: status, in: query, schema: { type: string, enum: [pending, verified, rejected, revoked, decided, appeal] } }
         - { name: q, in: query, description: Applicant name contains, or mobile contains the typed digits (3+), schema: { type: string } }
         - { name: docType, in: query, schema: { type: string, enum: [aadhaar, pan, driving_licence, passport, voter_id] } }
@@ -4017,6 +4019,7 @@ paths:
         here is `properties:read`, granted per account and revocable per account.
       x-roles: [staff, admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { name: deal, in: query, schema: { $ref: '#/components/schemas/DealIntent' } }
         - { name: type, in: query, schema: { type: string } }
         - { name: locality, in: query, schema: { type: string }, description: 'Locality *slug*, as on searchProperties' }
@@ -4228,7 +4231,7 @@ paths:
         a truncated window of rows. `days` and `deal` narrow the funnel only.
       x-roles: [staff, admin]
       parameters:
-        - { name: days, in: query, schema: { type: integer, minimum: 1 } }
+        - { $ref: '#/components/parameters/BoardDays' }
         - { name: deal, in: query, schema: { $ref: '#/components/schemas/DealIntent' } }
       responses:
         '200':
@@ -4364,6 +4367,7 @@ paths:
         useful filters are `rejected` (what has been taken down) and no filter at all.
       x-roles: [staff, manager, admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - name: status
           in: query
           description: Narrow to one moderation status. Omit for the whole queue.
@@ -4498,7 +4502,7 @@ paths:
           schema: { type: string }
         - name: sinceDays
           in: query
-          description: Only reports filed within this many days.
+          description: Only reports filed in the last N IST calendar days, today included (1 = since IST midnight).
           schema: { type: integer, minimum: 1 }
         - name: counts
           in: query
@@ -4601,6 +4605,7 @@ paths:
       # user suspensions are reversible; an executed erasure is not, by anybody.
       x-roles: [admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
         - name: status
@@ -6488,6 +6493,7 @@ paths:
       operationId: listTickets
       x-roles: [staff, admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { name: team, in: query, schema: { $ref: '#/components/schemas/Team' } }
         - name: status
           in: query
@@ -6696,6 +6702,7 @@ paths:
       operationId: adminSupportTickets
       x-roles: [staff, admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - name: awaitingReply
           in: query
           schema: { type: boolean }
@@ -6896,6 +6903,7 @@ paths:
         terms). Open a row with `getServiceRequest`. Same scope and filters as `listServiceRequests`
         for back-office callers, which still reaches the full shape.
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { name: type, in: query, schema: { type: string }, description: Service type, e.g. rent-agreement }
         - { name: status, in: query, schema: { type: string } }
         - { name: team, in: query, schema: { $ref: '#/components/schemas/Team' } }
@@ -8165,6 +8173,7 @@ paths:
         listing) and `disputed` the open gateway disputes. An unknown status is a 400.
       x-roles: [staff, admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { name: status, in: query, schema: { type: string, enum: [pending_review, approved, rejected, auto, disputed], default: pending_review } }
         - name: counts
           in: query
@@ -8292,6 +8301,7 @@ paths:
       # signals saying which of them we suspect. The decision endpoints below are guarded alike.
       x-roles: [staff, admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { name: status, in: query, schema: { type: string }, description: 'One status or a comma-separated set of pending, qualified, held, rewarded, rejected, clawed-back.' }  # Slice-13 spec fix S52
         - { name: risk, in: query, schema: { type: string, enum: [low, medium, high] } }
         - { name: q, in: query, schema: { type: string }, description: 'Matches the referrer or referred name, either mobile, or the referral id.' }
@@ -10549,6 +10559,7 @@ paths:
         disclosure two panels away.
       x-roles: [admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - name: kind
           in: query
           description: Narrow to one source. Omit for all.
@@ -10607,6 +10618,7 @@ paths:
         for 30 days. Never carries a message body, OTP, link or key; recipients are masked.
       x-roles: [admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - name: provider
           in: query
           schema: { type: string, enum: [zeptomail, whatsapp, cashfree] }
@@ -10646,6 +10658,7 @@ paths:
         apart from the verdicts: most readers who vote give none.
       x-roles: [admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
       responses:
@@ -10672,6 +10685,7 @@ paths:
         no address hash.
       x-roles: [admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - name: slug
           in: query
           schema: { type: string, pattern: '^[a-z0-9-]{1,120}$' }
@@ -10996,6 +11010,7 @@ paths:
       # Admin-only, like the audit log: stacks and request paths are operational detail.
       x-roles: [admin]
       parameters:
+        - $ref: '#/components/parameters/BoardDays'
         - { name: source, in: query, schema: { type: string, enum: [api, job, web] } }
         - { name: status, in: query, schema: { type: string, enum: [open, resolved, all], default: open } }
         # Matches message, error type, path, last trace id and fingerprint anywhere, and the client crash
@@ -11347,8 +11362,10 @@ components:
     BoardDays:
       name: days
       in: query
-      description: Only rows from the last N days. Omit for all time.
-      schema: { type: integer, minimum: 1 }
+      description: >
+        Only rows from the last N IST calendar days, today included (1 = since IST midnight); omit for all time.
+        Filters the row's own timestamp (the one the list sorts on); counts and summaries stay all-time.
+      schema: { type: integer, minimum: 1, maximum: 3660 }
     GenericId:
       name: id
       in: path

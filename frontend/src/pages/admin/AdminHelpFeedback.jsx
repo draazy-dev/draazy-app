@@ -4,7 +4,7 @@ import { classNames, fmtAgo, fmtNum } from '../../lib/format.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, ClearFilters, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
+  BTN, CHIP, CHIP_TONE, Chips, ClearFilters, DATE_CHIPS, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
 } from '../../components/admin/WorkQueue.jsx';
 
 const PAGE_SIZE = 20;
@@ -59,6 +59,7 @@ function CommentRow({ c }) {
 export default function AdminHelpFeedback() {
   const [tab, setTab] = useState('articles');
   const [slug, setSlug] = useState('');
+  const [days, setDays] = useState('');
   const [page, setPage] = useState(1);
   const [data, setData] = useState(null);
   const [failed, setFailed] = useState('');
@@ -66,15 +67,17 @@ export default function AdminHelpFeedback() {
   useEffect(() => {
     let alive = true;
     setData((prev) => (prev ? { ...prev, stale: true } : prev));
-    const query = { page: page - 1, size: PAGE_SIZE };
+    const query = { page: page - 1, size: PAGE_SIZE, days };
     const read = tab === 'articles' ? listHelpFeedbackArticles(query) : listHelpFeedbackComments({ ...query, slug });
     read
       .then((res) => { if (alive) { setFailed(''); setData({ ...res, tab }); } })
       .catch((err) => { if (alive) { setFailed(err?.message || 'Could not load help feedback'); setData({ ...EMPTY, tab }); } });
     return () => { alive = false; };
-  }, [tab, slug, page]);
+  }, [tab, slug, days, page]);
 
   const show = (next, nextSlug = '') => { setTab(next); setSlug(nextSlug); setPage(1); };
+  const pickDays = (value) => { setDays(value); setPage(1); };
+  const clear = () => { setSlug(''); setDays(''); setPage(1); };
 
   if (!data) return <Loading />;
 
@@ -89,7 +92,8 @@ export default function AdminHelpFeedback() {
         note={tab === 'comments' && slug ? `Comments on ${slug}` : null}
         toolbar={(
           <>
-            {tab === 'comments' && slug ? <ClearFilters onClick={() => show('comments')} /> : null}
+            <Chips label="Date" options={DATE_CHIPS} value={days} onChange={pickDays} />
+            {(tab === 'comments' && slug) || days ? <ClearFilters onClick={clear} /> : null}
             <div className="ml-auto">
               <PageNav
                 page={page}

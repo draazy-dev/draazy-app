@@ -257,7 +257,7 @@ export const unsupportedFilters = (filters = {}) =>
 export function toModerationQuery(filters = {}, sort = 'newest') {
   return {
     ...toQuery(filters, sort),
-    ...Object.fromEntries(['archived', 'recheck', 'featured', 'postedByAdmin', 'unconfirmed', 'progress', 'badge']
+    ...Object.fromEntries(['archived', 'recheck', 'featured', 'postedByAdmin', 'unconfirmed', 'progress', 'badge', 'days']
       .filter((key) => filters[key] !== undefined).map((key) => [key, filters[key]])),
   };
 }

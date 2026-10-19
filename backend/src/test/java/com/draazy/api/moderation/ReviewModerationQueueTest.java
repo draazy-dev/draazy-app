@@ -209,4 +209,23 @@ class ReviewModerationQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[?(@.id=='" + r.getId() + "')].status")
                         .value(Matchers.empty()));
     }
-}
+
+    @Test
+    @DisplayName("days limits the queue to reviews written in the last N IST days")
+    void daysFiltersByCreatedAt() throws Exception {
+        User author = user("9871503001", "buyer");
+        User staff = user("9871503002", "staff");
+        Review fresh = review(author.getId(), ReviewStatuses.PUBLISHED);
+        Review old = review(author.getId(), ReviewStatuses.PUBLISHED);
+        java.time.Instant yesterdayLate = java.time.LocalDate.now(com.draazy.api.common.PlatformTime.IST)
+                .atStartOfDay(com.draazy.api.common.PlatformTime.IST).toInstant()
+                .minus(1, java.time.temporal.ChronoUnit.MINUTES);
+        jdbc.update("update reviews set created_at = ? where id = ?", java.sql.Timestamp.from(yesterdayLate), old.getId());
+
+        mvc.perform(get("/admin/reviews").param("days", "1").header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(fresh.getId().toString()));
+        mvc.perform(get("/admin/reviews").param("days", "7").header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(jsonPath("$.totalElements").value(2));
+    }}

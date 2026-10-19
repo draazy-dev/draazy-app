@@ -1,5 +1,6 @@
 package com.draazy.api.moderation.user;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.access.BackOfficeGrant;
 import com.draazy.api.common.access.BackOfficeGrantRepository;
 import com.draazy.api.common.audit.AuditService;
@@ -24,6 +25,7 @@ import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.BackOfficeFunctions;
 import com.draazy.api.security.Roles;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -84,11 +86,12 @@ public class UserAdminService {
 
     @Transactional(readOnly = true)
     public Page<AdminUserRow> list(String role, boolean customers, String q, String status, Boolean flagged,
-            boolean archived, Pageable pageable) {
+            boolean archived, Integer days, Pageable pageable) {
+        Instant since = PlatformTime.sinceOrNull(days);
         String prefix = (q == null || q.isBlank()) ? null : likePrefix(q.trim().toLowerCase());
         String state = (status == null || status.isBlank()) ? null : status.trim();
         Page<User> page = users.searchForAdmin(role, customers, prefix, MobileMask.normalise(q), state, flagged,
-                archived, pageable);
+                archived, since == null ? Instant.EPOCH : since, pageable);
         return new PageImpl<>(view.rows(page.getContent()), pageable, page.getTotalElements());
     }
 

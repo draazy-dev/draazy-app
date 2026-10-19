@@ -4,18 +4,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.draazy.api.billing.plan.Subscription;
 import com.draazy.api.billing.plan.SubscriptionSweeper;
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.jayway.jsonpath.JsonPath;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -227,6 +233,31 @@ class RefundCreditNoteAndDisputeTest extends RefundTestBase {
                 .isNotEqualTo("suspended");
         assertThat((java.util.List<String>) paymentField(buyer, disputed.getId(), "status")).containsExactly("disputed");
         assertThat((java.util.List<String>) paymentField(buyer, untouched.getId(), "status")).containsExactly("paid");
+    }
+
+    @Test
+    void daysNarrowsDisputesByWhenTheyWereOpened() throws Exception {
+        User desk = refundStaff();
+        Subscription oldOrder = pack(user("buyer"), 20);
+        Subscription freshOrder = pack(user("buyer"), 20);
+        dispute("DISPUTE_CREATED", "D-DAYS-OLD", "DISPUTE_CREATED", ref(oldOrder));
+        dispute("DISPUTE_CREATED", "D-DAYS-NEW", "DISPUTE_CREATED", ref(freshOrder));
+        Instant midnight = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant();
+        jdbc.update("update payment_disputes set opened_at = ? where dispute_ref = 'D-DAYS-OLD'",
+                Timestamp.from(midnight.minus(1, ChronoUnit.MINUTES)));
+
+        assertThat(deskJson(desk, "1")).contains(ref(freshOrder)).doesNotContain(ref(oldOrder));
+        assertThat(deskJson(desk, "7")).contains(ref(freshOrder), ref(oldOrder));
+        assertThat(deskJson(desk, null)).contains(ref(freshOrder), ref(oldOrder));
+    }
+
+    private String deskJson(User desk, String days) throws Exception {
+        var request = get(Routes.Refunds.DESK)
+                .param("status", "disputed").param("size", "100").header(HttpHeaders.AUTHORIZATION, bearer(desk));
+        if (days != null) {
+            request.param("days", days);
+        }
+        return mvc.perform(request).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     }
 
     @Test

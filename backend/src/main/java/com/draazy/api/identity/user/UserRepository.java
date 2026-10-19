@@ -1,6 +1,7 @@
 package com.draazy.api.identity.user;
 
 import com.draazy.api.security.RoleSource;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -91,6 +92,7 @@ public interface UserRepository extends JpaRepository<User, UUID>, RoleSource {
               and (:customers = false or u.role in ('owner', 'buyer'))
               and (:status is null or u.status = :status)
               and (:flagged is null or u.flagged = :flagged)
+              and u.createdAt >= :since
               and (:prefix is null
                    or lower(u.name) like :prefix escape '\\'
                    or u.mobile = :mobile)
@@ -103,6 +105,7 @@ public interface UserRepository extends JpaRepository<User, UUID>, RoleSource {
             @Param("status") String status,
             @Param("flagged") Boolean flagged,
             @Param("archived") boolean archived,
+            @Param("since") Instant since,
             Pageable pageable);
 
     // Same predicates as searchForAdmin minus archived/status/flagged, so the tab counts group over one scan.

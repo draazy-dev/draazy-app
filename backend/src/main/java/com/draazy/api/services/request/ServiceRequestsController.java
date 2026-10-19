@@ -137,9 +137,10 @@ public class ServiceRequestsController {
             @RequestParam(defaultValue = "false") boolean overdue,
             @RequestParam(defaultValue = "false") boolean mine,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer days,
             @PageableDefault(size = 20) Pageable pageable) {
         return PageResponse.of(
-                queries.queue(principal, type, status, team, ticketId, unassigned, overdue, mine, q,
+                queries.queue(principal, type, status, team, ticketId, unassigned, overdue, mine, q, days,
                         Pageables.unsorted(pageable)),
                 row -> row);
     }

@@ -46,7 +46,7 @@ const SORT_COLUMN = { recheck: 'recheck', badge: 'badge', followup: 'confirmed' 
 const sortFor = (tab) => (SORT_COLUMN[tab] ? `${SORT_COLUMN[tab]}-newest` : 'newest');
 
 function queueFilters(tab, f) {
-  const common = { q: f.q.trim() || undefined, deal: f.deal || undefined };
+  const common = { q: f.q.trim() || undefined, deal: f.deal || undefined, days: f.days || undefined };
   switch (tab) {
     case 'verify': return { ...common, status: 'pending', archived: false, progress: f.progress || undefined };
     case 'recheck': return { ...common, recheck: true, archived: false };

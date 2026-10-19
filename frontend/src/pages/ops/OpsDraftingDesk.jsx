@@ -15,7 +15,7 @@ import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import InternalNote, { saveNoteIfAny } from '../../components/ui/InternalNote.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, Cell, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
+  BTN, CHIP, CHIP_TONE, Cell, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
 import AdminServices from '../admin/AdminServices.jsx';
 import useDeskTickets from '../admin/useDeskTickets.js';
@@ -78,6 +78,7 @@ export default function OpsDraftingDesk({ desk }) {
   const [tab, setTab] = useTabParam(TAB_KEYS, 'pickup');
   const [q, setQ] = useState('');
   const [overdue, setOverdue] = useState(false);
+  const [days, setDays] = useState('');
   const [page, setPage] = useState(1);
   const [pageTab, setPageTab] = useState(tab);
   if (pageTab !== tab) {
@@ -100,7 +101,8 @@ export default function OpsDraftingDesk({ desk }) {
 
   const active = TABS.find((t) => t.key === tab);
   const queue = useQueue({
-    type: desk, ...active.query, overdue: overdue || undefined, q: q.trim() || undefined, page: page - 1, size: PAGE_SIZE,
+    type: desk, ...active.query, overdue: overdue || undefined, q: q.trim() || undefined, days: days || undefined,
+    page: page - 1, size: PAGE_SIZE,
   }, reloadToken);
   const rows = queue.page?.items || [];
   const total = queue.page?.total ?? 0;
@@ -260,6 +262,7 @@ export default function OpsDraftingDesk({ desk }) {
             <>
               <SearchBox value={q} onChange={(v) => { setQ(v); setPage(1); }} placeholder="Name, mobile or request id" label="Search name, mobile or request id" className="w-full sm:w-72" />
               <OverdueToggle on={overdue} count={summary?.overdue} onToggle={() => { setOverdue((v) => !v); setPage(1); }} />
+              <Chips label="Date" options={DATE_CHIPS} value={days} onChange={(v) => { setDays(v); setPage(1); }} />
               <div className="ml-auto"><PageNav {...paging} /></div>
             </>
           )}
@@ -276,7 +279,7 @@ export default function OpsDraftingDesk({ desk }) {
                 </button>
               </div>
             ) : queue.page == null ? <Loading label="Loading the request queue…" /> : (
-              <RowList isEmpty={!rows.length} empty={q.trim() || overdue ? 'No requests match these filters.' : active.empty}>
+              <RowList isEmpty={!rows.length} empty={q.trim() || overdue || days ? 'No requests match these filters.' : active.empty}>
                 {rows.map((r) => (
                   <RowCard
                     key={r.id}

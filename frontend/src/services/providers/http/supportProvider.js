@@ -9,9 +9,10 @@ export async function listTickets() {
 
 /** Not a role-widened `listTickets`: this is a paged envelope of thread-less summaries.
  * `awaitingReply` is tri-state: omitted means everything, and `false` for "no filter" hides unanswered tickets. */
-export async function listSupportQueue({ awaitingReply, page = 0, size = 20, counts = false } = {}) {
+export async function listSupportQueue({ awaitingReply, days, page = 0, size = 20, counts = false } = {}) {
   const query = { page, size };
   if (awaitingReply === true || awaitingReply === false) query.awaitingReply = awaitingReply;
+  if (days) query.days = days;
   if (counts) query.counts = true;
   return toQueuePage(await get('/admin/support-tickets', query), { page, size });
 }

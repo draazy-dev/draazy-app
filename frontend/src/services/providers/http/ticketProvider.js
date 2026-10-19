@@ -5,13 +5,14 @@ import { toClaim, toCreate, toNote, toViewModel, toViewModelPage, toWireStatus }
 
 /** Errors propagate: a queue that renders an unread failure as an empty list sends a desk home early,
  * and a 403 is information the caller turns into a sentence rather than a blank table. */
-export async function listTicketQueue({ status, team, priority, q, page = 0, size = 20 } = {}) {
+export async function listTicketQueue({ status, team, priority, q, days, page = 0, size = 20 } = {}) {
   const query = { page, size };
   const wire = toWireStatus(status);
   if (wire) query.status = wire;
   if (team) query.team = team;
   if (priority) query.priority = priority;
   if (q) query.q = q;
+  if (days) query.days = days;
   return toViewModelPage(await get('/tickets', query), { page, size });
 }
 

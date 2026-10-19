@@ -11,6 +11,7 @@ import Table from '../../components/ui/Table.jsx';
 import Select from '../../components/ui/Select.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import DateRangePills from '../../components/ui/DateRangePills.jsx';
+import { istWindowStart } from '../../lib/availability.js';
 import { Chips, QueueTabs } from '../../components/admin/WorkQueue.jsx';
 import PerformanceTab from './staff-activity/PerformanceTab.jsx';
 import AuditTrail, { describe } from './staff-activity/AuditTrail.jsx';
@@ -66,7 +67,7 @@ export default function AdminStaffActivity() {
   }, []);
 
   const from = useMemo(
-    () => (days ? new Date(Date.now() - Number(days) * 86400000).toISOString() : undefined),
+    () => (days ? new Date(istWindowStart(days)).toISOString() : undefined),
     [days],
   );
 

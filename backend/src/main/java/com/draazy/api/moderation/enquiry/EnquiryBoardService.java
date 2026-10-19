@@ -2,6 +2,7 @@ package com.draazy.api.moderation.enquiry;
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.LikePatterns;
@@ -18,7 +19,6 @@ import com.draazy.api.leads.contact.ContactRequest;
 import com.draazy.api.leads.contact.ContactRequestRepository;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -131,7 +131,8 @@ public class EnquiryBoardService {
     }
 
     private static Instant since(Integer days) {
-        return days == null || days < 1 ? Instant.EPOCH : Instant.now().minus(days, ChronoUnit.DAYS);
+        Instant since = PlatformTime.sinceOrNull(days);
+        return since == null ? Instant.EPOCH : since;
     }
 
     private static EnquiryBoardQueries.Filter filter(String status, String deal, String q, Integer days) {

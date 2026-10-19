@@ -10,7 +10,7 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
+  BTN, CHIP, CHIP_TONE, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
 } from '../../components/admin/WorkQueue.jsx';
 
 const PAGE_SIZE = 20;
@@ -79,6 +79,7 @@ export default function OpsRefunds() {
   const [counts, setCounts] = useState({});
   const [tab, setTab] = useTabParam(TAB_KEYS, 'pending');
   const [page, setPage] = useState(0);
+  const [days, setDays] = useState('');
   const [reloading, setReloading] = useState(false);
   const [nonce, setNonce] = useState(0);
   const { user } = useAuth();
@@ -92,7 +93,7 @@ export default function OpsRefunds() {
     const { status } = TABS.find((t) => t.key === tab);
     let live = true;
     setReloading(true);
-    listRefunds({ status, page, size: PAGE_SIZE, counts: true })
+    listRefunds({ status, days, page, size: PAGE_SIZE, counts: true })
       .then((res) => {
         if (!live) return;
         if (res.counts) setCounts(res.counts);
@@ -109,12 +110,13 @@ export default function OpsRefunds() {
         setReloading(false);
       });
     return () => { live = false; };
-  }, [tab, page]);
+  }, [tab, page, days]);
 
   useEffect(load, [load, nonce]);
 
   const reload = () => setNonce((n) => n + 1);
   const switchTab = (key) => { setTab(key); setPage(0); };
+  const changeDays = (value) => { setDays(value); setPage(0); };
 
   const decide = async (r, act, reason) => {
     if (!canWrite || busy.current) return;
@@ -218,10 +220,13 @@ export default function OpsRefunds() {
         active={tab}
         note={NOTE}
         toolbar={(
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button type="button" onClick={reload} className={BTN.ghost}><RefreshCw className="h-3.5 w-3.5" />Refresh</button>
-            <PageNav {...paging} />
-          </div>
+          <>
+            <Chips label="Date" options={DATE_CHIPS} value={days} onChange={changeDays} />
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <button type="button" onClick={reload} className={BTN.ghost}><RefreshCw className="h-3.5 w-3.5" />Refresh</button>
+              <PageNav {...paging} />
+            </div>
+          </>
         )}
         footer={paging.pageCount > 1 ? <PageNav {...paging} /> : null}
       >

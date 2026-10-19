@@ -8,7 +8,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
+  BTN, CHIP, CHIP_TONE, Chips, DATE_CHIPS, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
 } from '../../components/admin/WorkQueue.jsx';
 import { fmtAgo } from './service-queue/helpers.js';
 
@@ -47,6 +47,7 @@ const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 export default function OpsSupportQueue() {
   const { toast } = useToast();
   const [tab, setTab] = useState('awaiting');
+  const [days, setDays] = useState('');
   const [page, setPage] = useState(0);
   const [state, setState] = useState({ status: 'loading', items: [], total: 0, error: null });
   const [counts, setCounts] = useState({});
@@ -63,7 +64,7 @@ export default function OpsSupportQueue() {
     let live = true;
     const counts = wantCounts.current;
     setState((s) => ({ ...s, status: 'loading', error: null }));
-    listSupportQueue({ awaitingReply, page, size: PAGE_SIZE, counts })
+    listSupportQueue({ awaitingReply, days: days || undefined, page, size: PAGE_SIZE, counts })
       .then((res) => {
         if (!live) return;
         setState({ status: 'ready', items: res.items, total: res.total, error: null });
@@ -77,11 +78,12 @@ export default function OpsSupportQueue() {
         if (live) setState({ status: 'error', items: [], total: 0, error: err });
       });
     return () => { live = false; };
-  }, [tab, page]);
+  }, [tab, days, page]);
 
   useEffect(load, [load, nonce]);
 
   const switchTab = (key) => { setTab(key); setPage(0); };
+  const changeDays = (v) => { setDays(v); setPage(0); };
   const reload = () => { wantCounts.current = true; setNonce((n) => n + 1); };
 
   const open = async (row) => {
@@ -164,6 +166,7 @@ export default function OpsSupportQueue() {
             <button type="button" onClick={reload} className={BTN.ghost}>
               <RefreshCw className="h-3.5 w-3.5" />Refresh
             </button>
+            <Chips label="Date" options={DATE_CHIPS} value={days} onChange={changeDays} />
             {state.status === 'ready' ? <div className="ml-auto"><PageNav {...paging} /></div> : null}
           </>
         )}
@@ -183,7 +186,7 @@ export default function OpsSupportQueue() {
         ) : null}
 
         {state.status === 'ready' ? (
-          <RowList isEmpty={!state.items.length} empty={tab === 'awaiting' ? 'Nothing is waiting on us. Every customer message has been read.' : 'No tickets in this view.'}>
+          <RowList isEmpty={!state.items.length} empty={days ? 'No tickets in this date range.' : tab === 'awaiting' ? 'Nothing is waiting on us. Every customer message has been read.' : 'No tickets in this view.'}>
             {state.items.map((t) => (
               <RowCard
                 key={t.id}

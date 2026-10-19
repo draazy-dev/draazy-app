@@ -74,13 +74,14 @@ public class UserAdminController {
             @RequestParam(required = false) Boolean flagged,
             @RequestParam(defaultValue = "false") boolean archived,
             @RequestParam(defaultValue = "false") boolean counts,
+            @RequestParam(required = false) Integer days,
             @PageableDefault(size = 20) Pageable pageable) {
         if (status != null && !status.isBlank() && !UserStatuses.ALL.contains(status)) {
             throw new ValidationException("Unknown status '" + status + "'. Expected one of "
                     + "active, suspended, archived.");
         }
         PageResponse<AdminUserRow> page = PageResponse.of(
-                service.list(role, customers, q, status, flagged, archived,
+                service.list(role, customers, q, status, flagged, archived, days,
                         Pageables.unsorted(pageable)),
                 dto -> dto);
         return counts ? page.withCounts(service.statusCounts(role, customers, q)) : page;

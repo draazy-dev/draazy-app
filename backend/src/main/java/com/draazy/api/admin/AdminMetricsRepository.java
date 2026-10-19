@@ -105,11 +105,12 @@ public class AdminMetricsRepository {
             """.formatted(IST);
 
     // The filter applied to `#LEDGER_ROWS`, written once and used by both the page and its count.
-    // Every bound parameter is `cast(… as text)` before the null test.
+    // Every bound parameter is cast to its type before the null test.
     private static final String LEDGER_FILTER = """
              where (cast(:kind       as text) is null or kind       = cast(:kind       as text))
                and (cast(:settlement as text) is null or settlement = cast(:settlement as text))
                and (cast(:q          as text) is null or party ilike cast(:q as text) escape '\\')
+               and (cast(:since as date) is null or occurred_on >= cast(:since as date))
             """;
 
     private static final String LEDGER_PROJECTION =
@@ -216,24 +217,26 @@ public class AdminMetricsRepository {
     }
 
     @SuppressWarnings("unchecked")
-    public List<Object[]> ledger(String kind, String settlement, String q, int limit, long offset) {
+    public List<Object[]> ledger(String kind, String settlement, String q, LocalDate since, int limit, long offset) {
         return em.createNativeQuery(LEDGER_PROJECTION + "(" + LEDGER_ROWS + ") ledger"
                 + LEDGER_FILTER
                 + " order by occurred_on desc nulls last, id limit :limit offset :offset")
                 .setParameter("kind", kind)
                 .setParameter("settlement", settlement)
                 .setParameter("q", q)
+                .setParameter("since", since)
                 .setParameter("limit", limit)
                 .setParameter("offset", offset)
                 .getResultList();
     }
 
-    public long ledgerCount(String kind, String settlement, String q) {
+    public long ledgerCount(String kind, String settlement, String q, LocalDate since) {
         return ((Number) em.createNativeQuery(
                 "select count(*) from (" + LEDGER_ROWS + ") ledger" + LEDGER_FILTER)
                 .setParameter("kind", kind)
                 .setParameter("settlement", settlement)
                 .setParameter("q", q)
+                .setParameter("since", since)
                 .getSingleResult()).longValue();
     }
     }

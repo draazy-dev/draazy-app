@@ -12,7 +12,9 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import java.sql.Timestamp;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -286,6 +288,27 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].amount").value((int) OWNER_PRO_PRICE))
                     .andExpect(jsonPath("$.content[0].status").value("paid"))
                     .andExpect(jsonPath("$.content[0].party").value(name));
+        }
+
+        @Test
+        void daysKeepsOnlyPaymentsOccurringWithinTheIstWindow() throws Exception {
+            String token = admin();
+            String fresh = subscribe("9877730033", "Window Fresh Member", "Owner Pro", "active");
+            String stale = subscribe("9877730034", "Window Stale Member", "Owner Pro", "active");
+            jdbc.update("update subscriptions set started_at = ? where payment_ref = ?", Timestamp.from(
+                    LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                            .minus(1, ChronoUnit.MINUTES)), "pay_9877730034");
+
+            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", "Window ").param("days", "1")
+                            .header(HttpHeaders.AUTHORIZATION, token))
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].party").value(fresh));
+            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", stale).param("days", "7")
+                            .header(HttpHeaders.AUTHORIZATION, token))
+                    .andExpect(jsonPath("$.totalElements").value(1));
+            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", "Window ")
+                            .header(HttpHeaders.AUTHORIZATION, token))
+                    .andExpect(jsonPath("$.totalElements").value(2));
         }
 
         @Test

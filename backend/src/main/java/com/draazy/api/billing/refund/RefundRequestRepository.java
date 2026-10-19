@@ -22,7 +22,9 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, UU
 
     List<RefundRequest> findBySubscriptionIdIn(Collection<UUID> subscriptionIds);
 
-    Page<RefundRequest> findByStatus(String status, Pageable pageable);
+    @Query("select r from RefundRequest r where r.status = :status and r.createdAt >= :since")
+    Page<RefundRequest> findByStatusSince(@Param("status") String status, @Param("since") Instant since,
+            Pageable pageable);
 
     long countByStatus(String status);
 
@@ -53,7 +55,8 @@ public interface RefundRequestRepository extends JpaRepository<RefundRequest, UU
     @Query("""
             select s from Subscription s
             where s.refundDueAt is not null
+              and s.refundDueAt >= :since
               and not exists (select 1 from RefundRequest r where r.subscriptionId = s.id)
             order by s.refundDueAt desc""")
-    Page<Subscription> findAutoRefunds(Pageable pageable);
+    Page<Subscription> findAutoRefunds(@Param("since") Instant since, Pageable pageable);
 }

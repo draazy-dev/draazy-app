@@ -1,5 +1,6 @@
 package com.draazy.api.billing.referral;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
@@ -175,12 +176,17 @@ public class ReferralService {
 
     /** The paged queue ({@code x-roles: [staff, admin]}); {@code status} is a comma-separated set. */
     @Transactional(readOnly = true)
-    public Page<ReferralDto> queue(String status, String risk, String q, Pageable pageable) {
+    public Page<ReferralDto> queue(String status, String risk, String q, Integer days, Pageable pageable) {
         List<String> statuses = blankToNull(status) == null ? List.of()
                 : Arrays.stream(status.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
         Page<Referral> page = referrals.queue(statuses.isEmpty(), statuses.isEmpty() ? List.of("") : statuses,
-                blankToNull(risk), LikePatterns.contains(q), pageable);
+                blankToNull(risk), LikePatterns.contains(q), since(days), pageable);
         return new PageImpl<>(mapper.toDtos(page.getContent()), pageable, page.getTotalElements());
+    }
+
+    private static Instant since(Integer days) {
+        Instant since = PlatformTime.sinceOrNull(days);
+        return since == null ? Instant.EPOCH : since;
     }
 
     @Transactional(readOnly = true)

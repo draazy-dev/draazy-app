@@ -16,8 +16,9 @@ export async function requestRefund(id, { reason, attemptId } = {}) {
 }
 
 /** `counts` asks for the whole-table tab totals, keyed by wire status. */
-export async function listRefunds({ status, page = 0, size = 20, counts = false } = {}) {
+export async function listRefunds({ status, days, page = 0, size = 20, counts = false } = {}) {
   const query = { status, page, size };
+  if (days) query.days = days;
   if (counts) query.counts = true;
   return toRefundPage(await get('/admin/refunds', query));
 }

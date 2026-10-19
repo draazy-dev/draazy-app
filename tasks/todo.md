@@ -7,6 +7,11 @@
 
 ## Open
 
+- [ ] **TODAY-IST** Back-office "Today/7d/30d" chips now count IST calendar days (`PlatformTime.windowStart`, `istWindowStart`): enquiries board + funnel, reports, staff activity, flatmate desk. Backend tests + 29 e2e (enquiries, reports, staff-activity, flatmate-moderation) green on a private lane. PENDING `run-fast.ps1 -Full` + reviewers before commit
+- [ ] **DATE-CHIPS** All/Today/7d/30d chips + server `days` on 15 staff list endpoints (`PlatformTime.sinceOrNull`); counts stay all-time. 289 backend tests + 152 e2e green (45 on a private lane: another session held port 3322). Support awaiting-reply list no longer uses the partial index `idx_support_tickets_awaiting_reply`. PENDING `run-fast.ps1 -Full` + reviewers before commit
+
+
+
 - [ ] **ALERT-SETUP** Listings bell opens `AlertSetupModal` (pre-filled from current filters; deal, localities, BHK, budget/rent, type, furnishing, cadence); dashboard `AlertsPanel` redesigned with themed cadence `Select`, Edit in place (`PATCH /me/saved-searches/{id}` now takes `filters`+`query`+`name`; restarts the new-match count, 409 on a duplicate, 400 for flatmates), View matches carrying the filters:
   - [x] Backend: `SavedSearchUpdateRequest`/`SavedSearchService.update`, OpenAPI; `SavedSearchUpdateTest` +4 (saved-search, spec parity, size guard green)
   - [x] Frontend: modal, Listings/ResultsArea wiring, AlertsPanel, `searchHref` carries facets

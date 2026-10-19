@@ -5,7 +5,7 @@ import { classNames, fmtAgo, fmtNum } from '../../lib/format.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  CHIP, CHIP_TONE, Chips, PageNav, QueuePanel, RowCard, RowList, SearchBox,
+  CHIP, CHIP_TONE, Chips, DATE_CHIPS, PageNav, QueuePanel, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
 
 const PAGE_SIZE = 20;
@@ -113,6 +113,7 @@ export default function AdminIntegrations() {
   const [calls, setCalls] = useState(null);
   const [provider, setProvider] = useState('');
   const [outcome, setOutcome] = useState('');
+  const [days, setDays] = useState('');
   const [q, setQ] = useState('');
   const [term, setTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -137,11 +138,11 @@ export default function AdminIntegrations() {
   useEffect(() => {
     let alive = true;
     setCalls((prev) => (prev ? { ...prev, stale: true } : prev));
-    listProviderCalls({ provider, outcome, q: term, page: page - 1, size: PAGE_SIZE })
+    listProviderCalls({ provider, outcome, days, q: term, page: page - 1, size: PAGE_SIZE })
       .then((res) => { if (alive) setCalls(res); })
       .catch(() => { if (alive) setCalls({ items: [], total: 0, totalPages: 0, failed: true }); });
     return () => { alive = false; };
-  }, [provider, outcome, term, page, attempt]);
+  }, [provider, outcome, days, term, page, attempt]);
 
   if (!health) return <Loading />;
 
@@ -168,6 +169,7 @@ export default function AdminIntegrations() {
             <SearchBox value={q} onChange={setQ} placeholder="Full email, mobile or order id" label="Search calls" />
             <Chips label="Provider" options={PROVIDER_CHIPS} value={provider} onChange={filterBy(setProvider)} />
             <Chips label="Outcome" options={OUTCOME_CHIPS} value={outcome} onChange={filterBy(setOutcome)} />
+            <Chips label="Date" options={DATE_CHIPS} value={days} onChange={filterBy(setDays)} />
             <div className="ml-auto">
               <PageNav
                 page={page}

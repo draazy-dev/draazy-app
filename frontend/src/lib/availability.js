@@ -12,6 +12,9 @@ export function addDaysIso(iso, days) {
 
 export const daysUntil = (iso) => Math.round((Date.parse(`${iso}T00:00:00Z`) - Date.parse(`${istToday()}T00:00:00Z`)) / DAY_MS);
 
+/** Epoch ms where a "last N days" filter starts: IST midnight N-1 days back, so 1 is today, not the last 24h. */
+export const istWindowStart = (days) => Date.parse(`${addDaysIso(istToday(), 1 - Number(days))}T00:00:00+05:30`);
+
 export const MAX_AVAILABLE_DAYS = 365;
 export const MAX_POSSESSION_DAYS = 5 * 365;
 

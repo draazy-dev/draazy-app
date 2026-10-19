@@ -55,10 +55,11 @@ public class ReferralsController {
     public PageResponse<ReferralDto> queue(@RequestParam(required = false) String status,
             @RequestParam(required = false) String risk,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer days,
             @RequestParam(defaultValue = "false") boolean counts,
             @PageableDefault(size = 20) Pageable pageable) {
         PageResponse<ReferralDto> page = PageResponse.of(
-                service.queue(status, risk, q, Pageables.unsorted(pageable)), dto -> dto);
+                service.queue(status, risk, q, days, Pageables.unsorted(pageable)), dto -> dto);
         return counts ? page.withCounts(service.queueCounts()) : page;
     }
 

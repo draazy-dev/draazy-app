@@ -265,4 +265,31 @@ class ErasureBoundaryTest extends AbstractApiTest {
                 .isNotEqualTo(ErasureService.pseudonymMobile(b))
                 .matches("^[0-5][0-9]{9}$");
     }
-}
+
+    @Test
+    @DisplayName("days limits the erasure queue to requests filed in the last N IST days")
+    void daysFiltersByRequestedAt() throws Exception {
+        User admin = user("9871504001", "admin", "Admin");
+        String fresh = fileRequest(user("9871504002", "owner", "Fresh"));
+        String old = fileRequest(user("9871504003", "owner", "Old"));
+        java.time.Instant yesterdayLate = java.time.LocalDate.now(com.draazy.api.common.PlatformTime.IST)
+                .atStartOfDay(com.draazy.api.common.PlatformTime.IST).toInstant()
+                .minus(1, java.time.temporal.ChronoUnit.MINUTES);
+        jdbc.update("update erasure_requests set requested_at = ? where id = ?",
+                java.sql.Timestamp.from(yesterdayLate), UUID.fromString(old));
+
+        assertThat(queueIds(admin, null, null)).contains(fresh, old);
+        assertThat(queueIds(admin, null, "1")).contains(fresh).doesNotContain(old);
+        assertThat(queueIds(admin, null, "7")).contains(fresh, old);
+        assertThat(queueIds(admin, "pending", "1")).contains(fresh).doesNotContain(old);
+        assertThat(queueIds(admin, "rejected", "7")).doesNotContain(fresh, old);
+    }
+
+    private List<String> queueIds(User admin, String status, String days) throws Exception {
+        var req = org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/admin/erasure-requests")
+                .header(HttpHeaders.AUTHORIZATION, bearer(admin));
+        if (status != null) req = req.param("status", status);
+        if (days != null) req = req.param("days", days);
+        String body = mvc.perform(req).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return com.jayway.jsonpath.JsonPath.read(body, "$.content[*].id");
+    }}

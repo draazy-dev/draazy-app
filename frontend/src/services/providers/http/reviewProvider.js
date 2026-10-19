@@ -79,8 +79,8 @@ export async function getEntityReviewSummary(entityType, entityId, { size = PAGE
 
 /** The one review read that does not filter on `status`, so it needs its own route
  * and a moderator can see taken-down reviews (`status: 'rejected'`). */
-export async function listReviewsForModeration({ status, q, page = 0, size = 20, counts = false } = {}) {
-  const res = await get('/admin/reviews', { status: status || undefined, q: q || undefined, page, size, counts: counts || undefined });
+export async function listReviewsForModeration({ status, q, days, page = 0, size = 20, counts = false } = {}) {
+  const res = await get('/admin/reviews', { status: status || undefined, q: q || undefined, days: days || undefined, page, size, counts: counts || undefined });
   return toModerationViewModelPage(res, { page, size });
 }
 

@@ -25,6 +25,7 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             select r from Referral r
             where (:anyStatus = true or r.status in :statuses)
               and (:risk is null or r.risk = :risk)
+              and r.at >= :since
               and (:q is null
                    or lower(r.referred) like :q escape '\\'
                    or r.referrerMobile like :q escape '\\'
@@ -34,7 +35,7 @@ public interface ReferralRepository extends JpaRepository<Referral, UUID> {
             order by r.at desc
             """)
     Page<Referral> queue(@Param("anyStatus") boolean anyStatus, @Param("statuses") List<String> statuses,
-            @Param("risk") String risk, @Param("q") String q, Pageable pageable);
+            @Param("risk") String risk, @Param("q") String q, @Param("since") Instant since, Pageable pageable);
 
     // Tab totals over the whole table: all, pending, held, high risk, rewarded, refused.
     @Query("""

@@ -96,6 +96,7 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
                               where u.id = r.requesterId
                                 and (lower(u.name) like :prefix escape '\\'
                                      or u.mobile like :prefix escape '\\')))
+              and r.createdAt >= :since
             order by r.createdAt desc
             """)
     Page<ServiceRequest> findForQueue(@Param("allTeams") boolean allTeams,
@@ -114,6 +115,7 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
             @Param("registrationBy") Instant registrationBy,
             @Param("prefix") String prefix,
             @Param("requestId") UUID requestId,
+            @Param("since") Instant since,
             Pageable pageable);
 
     @Query("""

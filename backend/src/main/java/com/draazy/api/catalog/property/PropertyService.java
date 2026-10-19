@@ -93,7 +93,14 @@ public class PropertyService {
     @Transactional(readOnly = true)
     public Page<Property> searchForModeration(PropertySearchQuery filters, ModerationFacets mod,
             Pageable pageable) {
-        return properties.findAll(PropertySpecs.adminSearch(filters, mod),
+        return searchForModeration(filters, mod, null, pageable);
+    }
+
+    /** {@code since} bounds the tab's own clock: the re-check or badge request time, else creation. */
+    @Transactional(readOnly = true)
+    public Page<Property> searchForModeration(PropertySearchQuery filters, ModerationFacets mod, Instant since,
+            Pageable pageable) {
+        return properties.findAll(PropertySpecs.adminSearch(filters, mod, since),
                 PropertySort.sanitizeModeration(pageable));
     }
 

@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.moderation.report.Report;
@@ -17,6 +18,8 @@ import com.draazy.api.security.Roles;
 import com.draazy.api.security.Teams;
 import com.draazy.api.support.AbstractApiTest;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -316,6 +319,15 @@ class ReportEnforcementTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.counts").doesNotExist())
                 .andExpect(jsonPath("$.totalElements").value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
+
+        Report lateYesterday = report("property", target, user("9800000236", "buyer", "Reporter 4"), "fake");
+        jdbc.update("update reports set created_at = ? where id = ?",
+                java.sql.Timestamp.from(LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                        .minus(1, ChronoUnit.MINUTES)),
+                lateYesterday.getId());
+        mvc.perform(get("/reports").param("sinceDays", "1").param("q", target.substring(0, 8))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(jsonPath("$.totalElements").value(3));
         mvc.perform(get("/reports").param("q", "zzz-no-such-report")
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(jsonPath("$.totalElements").value(0));
