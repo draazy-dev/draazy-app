@@ -55,9 +55,11 @@ export default function CityChrome() {
               <button onClick={() => openWaitlist(city)} className="btn btn-primary btn-sm flex-1 sm:flex-none">
                 Join the waitlist
               </button>
-              <button onClick={() => setCity('Pune')} className="btn btn-secondary btn-sm flex-1 sm:flex-none">
-                Switch to Pune
-              </button>
+              {city !== 'Pune' ? (
+                <button onClick={() => setCity('Pune')} className="btn btn-secondary btn-sm flex-1 sm:flex-none">
+                  Switch to Pune
+                </button>
+              ) : null}
             </div>
             <button
               onClick={dismiss}
