@@ -62,8 +62,8 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
     />
   );
 
-  /* `aria-busy` tells a screen reader the number is being updated. */
-  const countLine = loaded ? (
+  /* `aria-busy` tells a screen reader the number is being updated. A gated map sends no search, so it has no count. */
+  const countLine = mapGated ? null : loaded ? (
     <p className="text-gray-400 text-sm" aria-busy={searching ? 'true' : undefined}>{t('listings.showing')} <span className="text-teal-400 font-semibold">{count}</span> {t('listings.propertyNoun', { count })}
       {verifiedCount > 0 ? <span className="text-emerald-300/90"> · <Icon name="shield-check" className="w-3.5 h-3.5 inline-block -mt-0.5" /> {t('listings.verifiedCount', { count: verifiedCount })}</span> : null}
       {unstatedCount > 0 ? <span className="text-amber-300/90"> · <Icon name="info" className="w-3.5 h-3.5 inline-block -mt-0.5" /> {t('listings.unstatedCount', { count: unstatedCount })}</span> : null}
@@ -184,7 +184,7 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                        downward pan would otherwise arm the pull and refetch. */}
                     <div data-no-ptr>
                       <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-8 h-8 border-2 border-teal-400/30 border-t-teal-400 rounded-full animate-spin" /></div>}>
-                        <PropertyMap properties={results} locName={locNameBySlug} focus={mapFocus} activeId={activeId} onSelect={onSelectProperty} wrapStyle={resultsMapStyle} gestureHandling="greedy" />
+                        <PropertyMap properties={results} locName={locNameBySlug} focus={mapFocus} activeId={activeId} onSelect={onSelectProperty} wrapStyle={resultsMapStyle} gestureHandling="greedy" unavailableAction={{ label: t('listings.mapShowList'), onClick: () => setView('list') }} />
                       </Suspense>
                     </div>
                     {activeProperty ? (

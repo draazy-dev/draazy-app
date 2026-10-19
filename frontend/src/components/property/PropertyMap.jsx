@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { APIProvider, Map, AdvancedMarker, InfoWindow, useMap } from '@vis.gl/react-google-maps';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
@@ -8,7 +8,7 @@ import { fmtArea, fmtINR } from '../../lib/format.js';
 import { FURN_LBL } from '../../pages/consumer/listings/constants.js';
 import { propLatLng } from '../../pages/consumer/listings/geo.js';
 import { POSSESSION, AMEN_ICON, amenLabel } from './tileMeta.js';
-import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme } from '../../lib/mapsConfig.js';
+import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme, subscribeMapsRefusal, isMapsRefused } from '../../lib/mapsConfig.js';
 import { getActiveCityGeo, cityLabelFor } from '../../lib/geoConfig.js';
 import MapUnavailable from './MapUnavailable.jsx';
 import ErrorBoundary from '../ErrorBoundary.jsx';
@@ -143,8 +143,11 @@ function PropertyPopup({ p, locName }) {
   );
 }
 
-export default function PropertyMap({ properties, locName, focus = [], activeId, onSelect, wrapStyle: wrapStyleProp, gestureHandling = 'cooperative' }) {
+export default function PropertyMap({ properties, locName, focus = [], activeId, onSelect, wrapStyle: wrapStyleProp, gestureHandling = 'cooperative', unavailableAction }) {
   const [openId, setOpenId] = useState(null); // single-property InfoWindow (no onSelect)
+  const { t } = useTranslation();
+  const refused = useSyncExternalStore(subscribeMapsRefusal, isMapsRefused);
+  const [loadFailed, setLoadFailed] = useState(false);
   // Single-property mode (Property details page): one pin, no listings drawer.
   const single = !onSelect && properties.length === 1;
   const activeIdx = properties.findIndex((p) => p.id === activeId);
@@ -160,10 +163,11 @@ export default function PropertyMap({ properties, locName, focus = [], activeId,
   // Callers can hand an explicit footprint (e.g. an embedded locality map card);
   // otherwise fall back to the mode's default height.
   const wrapStyle = wrapStyleProp || (single ? { height: '100%' } : { height: '72dvh', minHeight: 'min(520px, 70dvh)' });
-  if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={wrapStyle} />;
+  if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={wrapStyle} action={unavailableAction} />;
+  if (refused || loadFailed) return <MapUnavailable style={wrapStyle} detail={t('pmap.mapLoadFailed')} action={unavailableAction} />;
   return (
-    <ErrorBoundary scope="property-map" fallback={<MapUnavailable style={wrapStyle} />}>
-    <APIProvider apiKey={GOOGLE_MAPS_API_KEY}>
+    <ErrorBoundary scope="property-map" fallback={<MapUnavailable style={wrapStyle} action={unavailableAction} />}>
+    <APIProvider apiKey={GOOGLE_MAPS_API_KEY} onError={() => setLoadFailed(true)}>
       <div className="w-full rounded-2xl overflow-hidden border border-white/10 isolate relative" style={wrapStyle}>
         <Map
           mapId={GOOGLE_MAPS_MAP_ID}

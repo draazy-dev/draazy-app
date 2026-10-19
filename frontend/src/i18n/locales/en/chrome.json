@@ -67,7 +67,8 @@
     "amenities": "Amenities",
     "verified": "Verified",
     "mapUnavailable": "Map unavailable",
-    "mapNotConfigured": "The interactive map isn’t configured right now."
+    "mapNotConfigured": "The interactive map isn’t configured right now.",
+    "mapLoadFailed": "The interactive map couldn’t load right now."
   },
   "draaz": {
     "typing": "Typing"

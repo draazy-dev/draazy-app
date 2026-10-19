@@ -16,10 +16,22 @@ export const PUNE_CENTER = { lat: 18.553, lng: 73.86 };
 // A map takes its scheme when constructed; the switch lives in Settings, which renders no map.
 export const mapColorScheme = () => (document.documentElement.classList.contains('light') ? 'LIGHT' : 'DARK');
 
+let mapsRefused = false;
+const refusalListeners = new Set();
+export const subscribeMapsRefusal = (fn) => { refusalListeners.add(fn); return () => refusalListeners.delete(fn); };
+export const isMapsRefused = () => mapsRefused;
+
 /* Google's dynamic-import bootstrap: the ~800 KB SDK loads on the first importLibrary call, not on every page.
    Each map's APIProvider finds importLibrary defined and reuses it. */
 export function installMapsLoader() {
   if (!GOOGLE_MAPS_API_KEY) return;
+  // Google calls this once per page when it refuses the key (referrer, billing, quota), then paints its own error box.
+  const prevAuthFailure = window.gm_authFailure;
+  window.gm_authFailure = () => {
+    mapsRefused = true;
+    refusalListeners.forEach((fn) => fn());
+    if (typeof prevAuthFailure === 'function') prevAuthFailure();
+  };
   const maps = ((window.google ||= {}).maps ||= {});
   if (maps.importLibrary) return;
   let sdk;
