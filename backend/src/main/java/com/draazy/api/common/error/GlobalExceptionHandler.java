@@ -3,6 +3,7 @@ package com.draazy.api.common.error;
 import com.draazy.api.common.web.RequestCorrelation;
 import jakarta.validation.ConstraintViolationException;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,6 +11,7 @@ import org.slf4j.MDC;
 import org.springframework.core.NestedExceptionUtils;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.data.web.SortHandlerMethodArgumentResolver;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -136,6 +138,19 @@ public class GlobalExceptionHandler {
                 : ex instanceof MissingServletRequestPartException missing
                         ? missing.getRequestPartName()
                 : ((MethodArgumentTypeMismatchException) ex).getName();
+        return badParameter(name);
+    }
+
+    /** Spring Data URI-decodes {@code sort} a second time, so a literal {@code %} throws from its resolver.
+     * Only that origin is the caller's fault; any other IllegalArgumentException is still our bug. */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiError> handleIllegalArgument(IllegalArgumentException ex) {
+        boolean fromSortResolver = Arrays.stream(ex.getStackTrace())
+                .anyMatch(frame -> frame.getClassName().equals(SortHandlerMethodArgumentResolver.class.getName()));
+        return fromSortResolver ? badParameter("sort") : handleUncaught(ex);
+    }
+
+    private static ResponseEntity<ApiError> badParameter(String name) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ApiError(ErrorCodes.BAD_REQUEST,
                         "Invalid or missing request parameter: " + name, 400, traceId()));

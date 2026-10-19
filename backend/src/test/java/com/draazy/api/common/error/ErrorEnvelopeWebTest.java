@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -66,6 +67,16 @@ class ErrorEnvelopeWebTest extends AbstractApiTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.error").value(ErrorCodes.NOT_FOUND))
                 .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @ParameterizedTest(name = "sort={0}")
+    @ValueSource(strings = {"%s", "50%", "ZAP%n%s%n%s"})
+    @DisplayName("a stray % in sort is 400, not 500")
+    void undecodableSortIs400(String sort) throws Exception {
+        mvc.perform(get("/flatmates/feed").param("tab", "move-in").param("sort", sort))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value(ErrorCodes.BAD_REQUEST))
+                .andExpect(jsonPath("$.message").value("Invalid or missing request parameter: sort"));
     }
 
     @ParameterizedTest(name = "{0}")
