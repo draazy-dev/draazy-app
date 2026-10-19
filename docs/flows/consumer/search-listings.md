@@ -21,7 +21,8 @@
   subtypes), `loc`/`locality` (locality slugs), `soc` (society slugs), `bhk`, `furn`, `amen`,
   `v` (verification flags), `room`, `tenants`, `landuse`, `constr`, `avail`, `availfrom`,
   `pets`, `budget`, `rent`, `area`, `age`, `floor`, `near`/`nearlabel`/`nearr`/`nearmode`,
-  `q` (text), `sort`, `view` (`grid`|`list`|`map`), `property` (open card).
+  `q` (text), `sort`, `page` (omitted on page 1; any filter or sort change drops it; past the end it
+  settles on the last page), `view` (`grid`|`list`|`map`), `property` (open card).
 - **Triggers:** hero search, home category tiles, locality/society pages, `alerts`-reason sign-in
   returns, and deep links from anywhere. Flatmates is reached from its own permanent slot in the
   mobile bottom nav - the old "Looking to share? Browse flatmates & rooms" pill on the Rent tab was

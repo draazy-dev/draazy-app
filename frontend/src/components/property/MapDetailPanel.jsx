@@ -47,10 +47,10 @@ const factsOf = (p, t) => {
   const isPlot = isLandListing(p);
   const baths = Number(p.bath) || 0;
   const areaRow = [
+    [isPlot ? t('property.plotArea') : t('property.totalArea'), p.area, p.areaUnit],
     [t('property.carpetArea'), p.carpetArea, 'sqft'],
     [t('property.builtupArea'), p.builtUpArea, 'sqft'],
     [t('property.superBuiltup'), p.superBuiltUpArea, 'sqft'],
-    [isPlot ? t('property.plotArea') : t('property.totalArea'), p.area, p.areaUnit],
   ].find(([, value]) => Number(value) > 0);
   const area = areaRow ? fmtArea(areaRow[1], areaRow[2]) : '';
   const furn = FURN_LBL[p.furnishing];

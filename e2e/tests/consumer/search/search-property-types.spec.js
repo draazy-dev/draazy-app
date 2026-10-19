@@ -118,19 +118,20 @@ async function addHomeLoc(page, name) {
 test('home locality + BHK selection carries into the listings filters', async ({ page }) => {
   const errors = trackErrors(page);
   await page.goto(`${BASE}/`);
+  // Places is not stubbed here, so a typed locality is only offered when it holds Buy stock.
   await addHomeLoc(page, 'Baner');
-  await addHomeLoc(page, 'Wakad');
+  await addHomeLoc(page, 'Kharadi');
   await page.getByRole('button', { name: 'BHK', exact: true }).click();
   await page.getByRole('button', { name: '2 BHK', exact: true }).click();
   await page.getByRole('button', { name: 'Search' }).click();
 
   await page.waitForURL(/\/listings\?/);
   const url = decodeURIComponent(page.url());
-  expect(url).toContain('loc=baner,wakad');
+  expect(url).toContain('loc=baner,kharadi');
   expect(url).toContain('bhks=2');
 
   await expect(page.getByRole('button', { name: /Remove filter Baner/i })).toBeVisible();
-  await expect(page.getByRole('button', { name: /Remove filter Wakad/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Remove filter Kharadi/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /Remove filter 2 BHK/i })).toBeVisible();
   expect(errors).toHaveLength(0);
 });

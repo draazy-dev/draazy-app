@@ -64,6 +64,16 @@ const MAX_PREFIX_RE = new RegExp(`^(?:${MAX_WORDS})$`);
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const word = (w) => new RegExp('\\b' + escapeRe(w) + '\\b');
 
+const withinOneEdit = (a, b) => {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && a[i] === b[i]) i += 1;
+  let j = a.length;
+  let k = b.length;
+  while (j > i && k > i && a[j - 1] === b[k - 1]) { j -= 1; k -= 1; }
+  return Math.max(j - i, k - i) <= 1;
+};
+
 const toRupees = (amt, unit) => {
   if (!unit) return amt;
   if (/^cr/.test(unit)) return amt * 1e7;
@@ -105,6 +115,9 @@ export function parseSmartQuery(raw, { current, localities, locNameBySlug }) {
   /* Localities are read early so an area name keeps its whole self: "Pimple Saudagar" must not leave "saudagar"
      stranded in the free text. */
   const locSlugs = [];
+  // Six letters is where a one-letter slip stops colliding with ordinary words ("under" vs Undri).
+  const nearMiss = (w) => (w.length < 6 ? undefined
+    : rest.split(' ').find((t) => t.length >= 6 && withinOneEdit(w, t)));
   localities
     .map((l) => {
       const words = [...new Set([...l.slug.split('-'), ...l.name.toLowerCase().split(/[\s,]+/)])].filter(Boolean);
@@ -112,9 +125,12 @@ export function parseSmartQuery(raw, { current, localities, locNameBySlug }) {
     })
     .sort((a, b) => b.score - a.score || a.words.length - b.words.length)
     .forEach(({ slug, words }) => {
-      if (!words.some((w) => w.length >= 4 && !GENERIC_LOC_WORDS.has(w) && word(w).test(rest))) return;
+      const strong = words.filter((w) => w.length >= 4 && !GENERIC_LOC_WORDS.has(w));
+      const typo = strong.some((w) => word(w).test(rest)) ? null : strong.map(nearMiss).find(Boolean);
+      if (typo === undefined) return;
       locSlugs.push(slug);
       words.forEach((w) => eat(word(w)));
+      if (typo) eat(word(typo));
     });
 
   // "near Baner" resolves to the same locality filter; the connector is noted only so the summary
