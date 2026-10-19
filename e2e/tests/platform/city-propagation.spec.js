@@ -1,15 +1,15 @@
 import { test, expect } from '../../fixtures/live.js';
 
-/** Once a second city is live, Pune's inventory must not leak into it (Mumbai has no seeded stock, so the empty states fail honestly if that changes).
- * `cities.set` writes via `PATCH /admin/cities/{slug}` and the page reads the same server roster through `GET /bootstrap`. */
+/** Once a second city is live, Pune's inventory must not leak into it (Mumbai has no seeded stock, so the empty
+ * states fail honestly if that changes). The page reads the roster `PATCH /admin/cities/{slug}` writes. */
 
 /** Pick a city through the picker, as a shopper does, and wait for the page to agree. */
 async function selectCity(page, city) {
   const pill = page.getByRole('button', { name: /^City: / }).first();
   const list = page.getByRole('listbox', { name: 'Select city' });
 
-  /* Open the picker inside `toPass`: the roster arrives after first paint, so one click can list the city under "Coming soon"
-       and resolve the option to the waitlist entry. */
+  /* Open the picker inside `toPass`: the roster arrives after first paint, so one click can list the city
+     under "Coming soon" and resolve the option to the waitlist entry. */
   await expect(async () => {
     if (!(await list.isVisible())) await pill.click();
     await expect(list.getByRole('button', { name: city, exact: true })).toBeVisible({
@@ -103,5 +103,30 @@ test.describe('a second live city', () => {
     await expect(page.getByText(/isn't live in/i)).toHaveCount(0);
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Pune');
     expect(await page.evaluate(() => localStorage.getItem('draazyCity'))).not.toBe('Mumbai');
+  });
+});
+
+test.describe('the not-live bar', () => {
+  test('offers "Switch to Pune" only when the shopper is not already in Pune', async ({ page }) => {
+    const bar = page.getByText(/isn't live in/i);
+    const switchToPune = page.getByRole('button', { name: 'Switch to Pune' });
+
+    await page.addInitScript(() => localStorage.setItem('draazyCity', 'Mumbai'));
+    await page.goto('/');
+    await expect(bar).toContainText('Mumbai');
+    await expect(switchToPune).toBeVisible();
+
+    // Stubbed, not `cities.set('pune', false)`: un-launching Pune in the shard DB breaks every parallel spec.
+    await page.route('**/api/bootstrap', async (route) => {
+      const res = await route.fetch();
+      const doc = await res.json();
+      const cities = doc.cities.map((c) => ({ ...c, live: false }));
+      await route.fulfill({ response: res, json: { ...doc, cities } });
+    });
+    await page.addInitScript(() => localStorage.setItem('draazyCity', 'Pune'));
+    await page.goto('/');
+    await expect(bar).toContainText('Pune');
+    await expect(page.getByRole('button', { name: 'Join the waitlist' })).toBeVisible();
+    await expect(switchToPune).toHaveCount(0);
   });
 });
