@@ -12,5 +12,9 @@ public record LocalityResponse(
         boolean indexable,
         Long avgRent,
         Long ratePerSqft,
-        Long fromPrice) {
+        Long fromPrice,
+        long forSale,
+        long forRent,
+        Long fromSale,
+        Long fromRent) {
 }

@@ -211,8 +211,8 @@ public interface PropertyRepository
             group by p.localitySlug""")
     List<Object[]> countLiveByLocalitySlug(@Param("status") String status);
 
-    /** One grouped pass over live listings: counts, then the flat samples behind the rent and rate
-     * averages. Rows are [slug, live, rentFlats, avgRent, saleFlatsWithArea, avgRate, fromPrice]. */
+    /** Rows are [slug, live, rentFlats, avgRent, saleFlatsWithArea, avgRate, fromPrice, forSale, forRent,
+     * fromSale, fromRent]: one grouped pass, with the flat samples behind the rent and rate averages. */
     @Query(nativeQuery = true, value = """
             select p.locality_slug,
                    count(*),
@@ -222,7 +222,11 @@ public interface PropertyRepository
                                       and p.area > 0 and coalesce(lower(p.area_unit), 'sqft') = 'sqft'),
                    avg(p.price / p.area) filter (where p.deal = 'buy' and p.property_type_key = 'flat'
                                       and p.area > 0 and coalesce(lower(p.area_unit), 'sqft') = 'sqft'),
-                   min(p.price)
+                   min(p.price),
+                   count(*) filter (where p.deal = 'buy'),
+                   count(*) filter (where p.deal = 'rent'),
+                   min(p.price) filter (where p.deal = 'buy'),
+                   min(p.price) filter (where p.deal = 'rent')
             from properties p
             where p.status = :status and p.archived = false and p.locality_slug is not null
               and (cast(:slug as text) is null or p.locality_slug = cast(:slug as text))

@@ -150,7 +150,11 @@ class LocalityReadEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.archived").value(false))
                 .andExpect(jsonPath("$.avgRent").value(30000))
                 .andExpect(jsonPath("$.ratePerSqft").value(7000))
-                .andExpect(jsonPath("$.fromPrice").value(20000));
+                .andExpect(jsonPath("$.fromPrice").value(20000))
+                .andExpect(jsonPath("$.forSale").value(3))
+                .andExpect(jsonPath("$.forRent").value(3))
+                .andExpect(jsonPath("$.fromSale").value(6_000_000))
+                .andExpect(jsonPath("$.fromRent").value(20000));
     }
 
     @Test

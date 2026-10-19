@@ -17,7 +17,10 @@ const toLocality = (row) => {
     // Null below three live listings (each also needs 3 flats of its kind): a gap, never a zero.
     avgRent: maybeNumber(row?.avgRent),
     ratePerSqft: maybeNumber(row?.ratePerSqft),
-    fromPrice: maybeNumber(row?.fromPrice),
+    forSale: Number(row?.forSale) || 0,
+    forRent: Number(row?.forRent) || 0,
+    fromSale: maybeNumber(row?.fromSale),
+    fromRent: maybeNumber(row?.fromRent),
     lat: maybeNumber(row?.lat),
     lng: maybeNumber(row?.lng),
   };

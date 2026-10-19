@@ -195,7 +195,7 @@ export default function Locality() {
 
           {loc ? (
             <>
-              <div className="reveal"><InventoryBar inv={{ count: loc.liveListings, from: loc.fromPrice }} activeName={name} slug={loc.slug} /></div>
+              <div className="reveal"><InventoryBar loc={loc} activeName={name} /></div>
               {stats.length ? (
                 <div className="grid grid-cols-2 gap-3 sm:gap-4" data-testid="locality-stats">
                   {stats.map((s) => (
