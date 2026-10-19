@@ -518,11 +518,12 @@ passes it an explicit variable list.
 
 Settings that encode consequences invisible from the console:
 
-- **1 GB, not 512 MB.** The Dockerfile sets `-XX:MaxRAMPercentage=70.0` and `-XX:+ExitOnOutOfMemoryError`,
-  so 1 GB is a ~717 MB heap with ~300 MB for metaspace, code cache and thread stacks. Measured: 40
-  concurrent requests peak at ~650 MB resident and steady state sits near 800 MB RSS. At 512 MB the
-  non-heap no longer fits and the container is OOM-killed during startup. The migration job uses the same
-  size.
+- **1 GB, not 512 MB.** The Dockerfile sets `-XX:MaxRAMPercentage=50.0` with metaspace capped at 192 MB
+  and code cache at 128 MB, so 1 GB is a 512 MB heap plus ~290 MB of non-heap, a ceiling near 800 MB.
+  Measured under load with 1 CPU and a 1 GB limit: ~160 MB live heap, ~680 MB committed in total, and the
+  same throughput and GC time as the old 70% heap. That 70% heap allowed ~1,010 MB in the worst case, over
+  the limit, so the container could be killed without warning. At 512 MB the non-heap no longer fits and
+  the container is OOM-killed during startup. The migration job uses the same size.
 - **Single container, always on.** `instance_count: 1` and no autoscaling: the $10 fixed size includes
   100 GB of outbound bandwidth. There is no scale-to-zero, so the JVM boot cost is paid on deploys only.
 - **The probe path carries `/api`** because `server.servlet.context-path` moves the actuator too, and it

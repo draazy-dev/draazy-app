@@ -65,9 +65,9 @@ USER app
 # insecure configuration has to be asked for by name. Override it (e.g. `sandbox`) deliberately.
 ENV SPRING_PROFILES_ACTIVE=prod
 
-# Heap at 70% of the container limit (the 25% default wastes a small instance); the rest
-# covers metaspace, thread stacks, malloc arenas and the S3 client's direct buffers.
-ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError"
+# Non-heap runs ~290 MB (metaspace ~120, code cache ~95, symbols, stacks), so heap + caps must stay
+# under the container limit or the kernel kills the JVM silently. 1 GB: 512 MB heap vs ~160 MB live.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=50.0 -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=128m -XX:+ExitOnOutOfMemoryError"
 
 # Documentation only — the platform injects PORT and the app reads it (see the header note).
 EXPOSE 8080
