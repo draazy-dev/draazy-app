@@ -8,16 +8,12 @@ export default function QualityScoreBadge({ listing, variant = 'compact' }) {
   if (!Number.isFinite(score)) return null;
   const c = qualityColor(score);
 
-  if (variant === 'tile') {
+  if (variant === 'inline') {
     return (
-      <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-3" title={t('ui.listingQuality', { score })}>
-        <div className="flex items-center gap-1.5 text-slate-400 text-[11px] mb-1">
-          <ScoreRing score={score} color={c.ring} size={14} /> {t('ui.qualityScore')}
-        </div>
-        <p className="text-white font-bold text-base tabular-nums">
-          {score}/100 <span className={classNames('text-[11px] font-semibold', c.text)}>· {t(c.labelKey)}</span>
-        </p>
-      </div>
+      <span className="inline-flex items-center gap-1.5 tabular-nums" title={t('ui.listingQuality', { score })}>
+        <ScoreRing score={score} color={c.ring} size={14} /> {t('ui.qualityScore')} {score}/100
+        <span className={classNames('font-semibold', c.text)}>· {t(c.labelKey)}</span>
+      </span>
     );
   }
 

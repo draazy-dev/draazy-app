@@ -367,10 +367,11 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
       );
     }
     return (
-      <div className={cardCls}>
+      <div className="glass-strong rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-1"><Icon name="gavel" className="w-5 h-5 text-amber-400" /><h3 className="text-white font-bold text-sm">{t('property.negotiatePrice')}</h3></div>
         <p className="text-slate-400 text-xs mb-3">{t('property.negotiateBody')}</p>
-        <button onClick={openOffer} className="btn-teal w-full py-2.5 rounded-lg text-sm font-semibold inline-flex items-center justify-center gap-1.5"><Icon name="gavel" className="w-4 h-4" /> {t('property.makeOffer')}</button>
+        {/* Outlined, not teal: Contact is the page's one primary action and an offer is the step after it. */}
+        <button onClick={openOffer} className="h-btn w-full rounded-xl border border-brand-teal-2/30 bg-brand-teal-1/10 text-brand-teal-3 text-sm font-semibold inline-flex items-center justify-center gap-1.5 hover:bg-brand-teal-1/20 transition-smooth"><Icon name="gavel" className="w-4 h-4" /> {t('property.makeOffer')}</button>
       </div>
     );
   };

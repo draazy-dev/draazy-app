@@ -11,7 +11,8 @@ Things code can't close: secrets, deploy steps, real-device checks, human fact-c
 - [ ] Cloudflare Cache Rule for extensionless photo originals; check the R2 cache header on a real upload
 - [ ] Anonymous `/api/flags` on the Pages host should not reach the origin
 - [ ] `SANDBOX_GOOGLE_PLACES_SERVER_KEY`; read Google's lat/lng caching terms
-- [ ] Google Cloud: the **production** browser key (`VITE_GOOGLE_MAPS_API_KEY`) must allow **Maps Embed API** (the dev key already does), or the property Street View tile shows Google's error frame; check a FC Road listing's Location tab after deploy
+- [ ] Google Cloud: the **production** browser key (`VITE_GOOGLE_MAPS_API_KEY`) must allow **Maps Embed API** (the dev key already does), or the property Street View sheet shows Google's error frame; check a FC Road listing's Location tab after deploy
+- [ ] Google Cloud: enable **Street View Static API** on the browser key (dev and prod). The dev key returns 403 today, so the Street View tile falls back to a plain row instead of a photo preview. Billable past the free monthly quota
 - [ ] Google Maps / Routes / Places key with quota on sandbox, then run the SB-09 checklist rows (7, 157, 186, 187, 259) there (local e2e already loads Maps on `localhost:3322`)
 - [ ] Rotate `backend/.env.local` secrets if in doubt (surfaced 2026-08-09)
 - [ ] DigitalOcean: add the alert policies and the one free Uptime check from `docs/DEPLOY.md` §8; leave log forwarding off

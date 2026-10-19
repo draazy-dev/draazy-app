@@ -33,28 +33,46 @@ async function openLocationTab(page, found) {
   await expect(page.getByTestId('location-locality-stats')).toBeVisible({ timeout: 15000 });
 }
 
+const PNG_1PX = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
+
 test.describe('Property Street View tile', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/maps/embed/v1/streetview**', (route) => route.fulfill({ status: 200, contentType: 'text/html', body: '<html></html>' }));
   });
 
-  test('a pin with Google imagery nearby embeds the panorama facing the pin, plus an Open in Google Maps link', async ({ page }) => {
+  test('a pin with Google imagery shows a still preview, and the panorama opens in a sheet facing the pin', async ({ page }) => {
     const errors = trackErrors(page);
+    await page.route('**/maps/api/streetview?**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PNG_1PX }));
     await openLocationTab(page, true);
 
     const tile = page.getByTestId('property-street-view');
     await expect(tile).toBeVisible();
     await expect(tile).toContainText('2024-05');
-    const src = await tile.locator('iframe').getAttribute('src');
+    await expect(tile.locator('img')).toHaveAttribute('src', /maps\/api\/streetview\?.*pano=stub-pano&heading=123/);
+    // The Embed's own controls are the clutter: nothing interactive from Google loads until the buyer asks.
+    await expect(tile.locator('iframe')).toHaveCount(0);
+
+    await tile.getByRole('button', { name: /Explore 360/ }).click();
+    const sheet = page.getByRole('dialog', { name: 'Street view' });
+    const src = await sheet.locator('iframe').getAttribute('src');
     expect(src).toContain('https://www.google.com/maps/embed/v1/streetview?');
     expect(src).toContain('pano=stub-pano&heading=123');
-    await expect(tile.locator('iframe')).toHaveAttribute('referrerpolicy', 'strict-origin');
+    await expect(sheet.locator('iframe')).toHaveAttribute('referrerpolicy', 'strict-origin');
 
-    const link = tile.getByRole('link', { name: /Open in Google Maps/ });
+    const link = sheet.getByRole('link', { name: /Open in Google Maps/ });
     await expect(link).toHaveAttribute('href', /map_action=pano&viewpoint=[\d.]+,[\d.]+&pano=stub-pano&heading=123/);
     await expect(link).toHaveAttribute('target', '_blank');
     // A CSP frame-src refusal surfaces here as a console error.
     expect(errors).toEqual([]);
+  });
+
+  test('a key without the Static API still offers the panorama, as a plain row', async ({ page }) => {
+    await page.route('**/maps/api/streetview?**', (route) => route.fulfill({ status: 403, body: '' }));
+    await openLocationTab(page, true);
+
+    const tile = page.getByTestId('property-street-view');
+    await expect(tile.getByRole('button', { name: /Explore 360/ })).toBeVisible();
+    await expect(tile.locator('img')).toHaveCount(0);
   });
 
   test('no imagery within reach of the pin shows no tile', async ({ page }) => {
