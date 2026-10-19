@@ -19,4 +19,6 @@ public interface ServiceRequestRefundRepository extends JpaRepository<ServiceReq
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from ServiceRequestRefund r where r.serviceRequestId = :requestId and r.status = 'requested'")
     Optional<ServiceRequestRefund> findOpenForUpdate(@Param("requestId") UUID requestId);
+
+    boolean existsByGatewayRefundId(String gatewayRefundId);
 }

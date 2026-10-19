@@ -164,6 +164,13 @@ abstract class ServiceFixtures extends AbstractApiTest {
                 + merchantRefundId + "\",\"order_id\":\"order_x\",\"refund_status\":\"" + refundStatus + "\"}}}");
     }
 
+    /** A refund someone made on the Cashfree dashboard: Cashfree picks the refund id, not us. */
+    void deliverDashboardRefund(String orderId, String cfRefundId, long amount, String refundStatus) throws Exception {
+        deliverBody("{\"type\":\"REFUND_STATUS_WEBHOOK\",\"data\":{\"refund\":{\"refund_id\":\"refund_" + cfRefundId
+                + "\",\"cf_refund_id\":\"" + cfRefundId + "\",\"order_id\":\"" + orderId + "\",\"refund_amount\":"
+                + amount + ".00,\"refund_status\":\"" + refundStatus + "\"}}}");
+    }
+
     private void deliverBody(String body) throws Exception {
         String ts = String.valueOf(System.currentTimeMillis());
         String signature = webhookSignature.sign(ts, body);

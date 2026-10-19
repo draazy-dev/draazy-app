@@ -100,6 +100,11 @@ they lapse but never sold.
 - `POST /me/subscription {planId, propertyId?, paymentMethod}` with an Idempotency-Key unique to the
   checkout screen: a double tap returns the same order, a second pack is a new purchase. A pending
   order opens Cashfree; only the signed webhook activates it. One open unpaid order per user (409).
+- **A declined or abandoned attempt leaves the order open.** Cashfree keeps the order payable until it
+  expires, so a failure webhook only logs. After the payment window closes, the page polls
+  `GET /me/subscription/orders/{orderId}` (`paid | pending | failed | closed`, owner-only, 404 otherwise;
+  `failed` comes from the newest attempt in Cashfree's `/pg/orders/{id}/payments`). On `failed` it shows
+  the decline and keeps the Idempotency-Key, so Pay reopens the same order instead of meeting the 409.
 - The page shows the flat price and, once paid, the expiry date. Nothing auto-renews.
 
 ### The Cashfree webhook signature (`WebhookSignature`)
@@ -191,6 +196,9 @@ and reading that file; the constructor check is what states the rule.
   and are audited `refund.*`. The request row is locked, so concurrent decisions leave one (the other gets 409).
 - **Automatic system refunds stay automatic** (failed, late or mismatched payment; a pass for a closed listing).
   They also notify `refunds` holders with `refund.auto` and show on the desk as `auto`.
+- **A refund made on the Cashfree dashboard** is matched by order from the refund webhook: the whole price ends the
+  pack or pass (a partial one does not), and either way the refund is recorded, credited and notified
+  (`refund.completed`). See finance.md 5.12.
 - **Credit note** `CN-FY2627-000001` (FY April-March, IST, one sequence per FY) is issued when a refund is
   confirmed successful by the gateway for an invoiced order (an automatic refund of a payment that never activated gets none): subscription refunds, rent-agreement refunds, automatic refunds. A
   rent-agreement note records only the platform fee as Draazy's (`taxable_amount`), not the pass-through part.

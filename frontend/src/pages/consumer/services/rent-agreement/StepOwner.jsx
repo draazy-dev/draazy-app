@@ -111,7 +111,7 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {ownerDocSlots(owner).map((k) => {
             const d = ownerDocs[k];
-            const vaultState = !vaultEnabled || !d ? null : d.fromVault ? 'reused' : (d.dataUrl ? 'saved' : null);
+            const vaultState = !vaultEnabled || !d ? null : d.fromVault ? 'reused' : (d.dataUrl && d.vaultDocId ? 'saved' : null);
             return (
               <UploadBox
                 key={k}

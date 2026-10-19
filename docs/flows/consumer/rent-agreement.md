@@ -115,7 +115,10 @@
   to the timeline and the customer is notified. A refund that returns everything paid cancels the request
   (`refund.cancelled-request`); a partial one does not. The gateway's refund webhook (Cashfree
   `REFUND_STATUS_WEBHOOK`) is applied too: a `CANCELLED` or `FAILED` refund is marked `failed`,
-  written to the timeline and audit, and the customer is told, so the desk can ask again.
+  written to the timeline and audit, and the customer is told, so the desk can ask again. A refund
+  made by hand on the Cashfree dashboard carries Cashfree's own refund id; once it succeeds it is
+  entered as an approved refund on the order's request, with its credit note, and counts toward the
+  full-refund cancellation.
   **Draft approvals** (MC-4/MC-8). Every executing party approves the current draft version:
   in-app for account holders, by OTP for inline parties (witnesses are not asked). Any rejection
   sends it back to changes-requested, and a new version resets every approval. A draft the holder shares goes to the customer at once; no second operator checks it first.

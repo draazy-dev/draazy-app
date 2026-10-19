@@ -1,6 +1,6 @@
 /** `listPlans` does not short-circuit without a session, because the pricing page
  * must render for the signed-out visitors it exists to convert. */
-import { post } from '../../http.js';
+import { get, post } from '../../http.js';
 import { bootstrapSection } from './bootstrap.js';
 import { toPlanCatalogueEntry } from './planMapper.js';
 
@@ -34,3 +34,7 @@ export async function cancelPending() {
   await post('/me/subscription/cancel', {});
 }
 
+/** `paid | pending | failed | closed`. `failed` is the newest attempt only: the order can still be paid. */
+export async function orderStatus(orderId) {
+  return (await get(`/me/subscription/orders/${encodeURIComponent(orderId)}`))?.status ?? 'pending';
+}

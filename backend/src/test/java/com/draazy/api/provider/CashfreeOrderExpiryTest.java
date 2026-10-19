@@ -105,6 +105,18 @@ class CashfreeOrderExpiryTest {
                 Map.of("notify_url", "https://tunnel.example/webhooks/cashfree/payment"));
     }
 
+    /** A payer the bank page bounces out of the modal otherwise lands on Cashfree's own page with no way back. */
+    @Test
+    @DisplayName("return_url rides in order_meta beside notify_url")
+    void theReturnUrlIsSentWhenGiven() {
+        Map<String, Object> body = CashfreePaymentGateway.orderRequest(order(TTL.expiryFrom(NOW),
+                "https://tunnel.example/hook", "https://draazy.com/checkout?order_id={order_id}"));
+
+        assertThat(body.get("order_meta")).isEqualTo(Map.of(
+                "notify_url", "https://tunnel.example/hook",
+                "return_url", "https://draazy.com/checkout?order_id={order_id}"));
+    }
+
     /** The test above bypasses the guard with a raw string, so without this one it is unexecuted code;
      * direct construction is sound since the constructor dereferences no collaborator. */
     @Test
@@ -138,7 +150,7 @@ class CashfreeOrderExpiryTest {
 
     private static CashfreePaymentGateway gatewayWithNotifyUrl(String notifyUrl) {
         return new CashfreePaymentGateway(null, TTL,
-                new CashfreeProperties(true, null, null, null, notifyUrl), null);
+                new CashfreeProperties(true, null, null, null, notifyUrl), null, "https://draazy.com");
     }
 
     private static Map<String, Object> body() {
@@ -146,7 +158,11 @@ class CashfreeOrderExpiryTest {
     }
 
     private static CashfreePaymentGateway.OrderSpec order(Instant expiresAt, String notifyUrl) {
+        return order(expiresAt, notifyUrl, null);
+    }
+
+    private static CashfreePaymentGateway.OrderSpec order(Instant expiresAt, String notifyUrl, String returnUrl) {
         return new CashfreePaymentGateway.OrderSpec("dz_1", 2499L, "sub_1",
-                new PaymentGateway.Customer("cust_1", "9800000000"), expiresAt, notifyUrl);
+                new PaymentGateway.Customer("cust_1", "9800000000"), expiresAt, notifyUrl, returnUrl);
     }
 }

@@ -148,6 +148,20 @@ test.describe('Notifications — live API', () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test('an automatic refund for a late checkout payment renders as a refund update, not an unknown type', async ({ page }) => {
+    const mobile = uniqueMobile();
+    await authHeaders(mobile);
+    const userId = sql(`SELECT id FROM users WHERE mobile = '${mobile}'`);
+    sql(`INSERT INTO notifications (user_id, type, title, body, read, link) VALUES
+      ('${userId}', 'subscription.refund', 'Zz refund on its way', 'Your order was already closed.', false, '/dashboard#billing')`);
+    const warnings = [];
+    page.on('console', (message) => { if (/Unknown server type/.test(message.text())) warnings.push(message.text()); });
+
+    await openInbox(page, mobile);
+    await expect(page.locator('.notif', { hasText: 'Zz refund on its way' })).toBeVisible();
+    expect(warnings).toEqual([]);
+  });
+
   test('"Show older" still reaches every unread row after some were dismissed', async ({ page }) => {
     const mobile = uniqueMobile();
     await authHeaders(mobile);

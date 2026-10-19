@@ -3048,24 +3048,6 @@ label.lbl {
   margin-bottom: .3rem;
 }
 
-.method {
-  border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
-  background: rgb(var(--dz-c-white) / .04);
-  border-radius: .85rem;
-  padding: .85rem 1rem;
-  cursor: pointer;
-  transition: all .2s;
-}
-
-@media (hover: hover) {
-  .method:hover { border-color: rgb(var(--dz-c-white) / .2); }
-}
-
-.method.active {
-  border-color: rgb(var(--dz-c-teal-500) / .6);
-  background: rgb(var(--dz-c-teal-500) / .12);
-}
-
 .pick {
   border: 1px solid rgb(var(--dz-c-white) / calc(.1 * var(--dz-line-boost)));
   background: rgb(var(--dz-c-white) / .03);

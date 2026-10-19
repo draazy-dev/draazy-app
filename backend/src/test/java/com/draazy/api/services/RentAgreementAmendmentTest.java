@@ -168,11 +168,12 @@ class RentAgreementAmendmentTest extends ServiceFixtures {
         assertThat(orderOf(amendment)).isEqualTo(firstOrder);
 
         deliverSigned(firstOrder, false);
-        read(owner, id).andExpect(jsonPath("$.amendment.checkoutOpen").value(false))
+        read(owner, id).andExpect(jsonPath("$.amendment.checkoutOpen").value(true))
                 .andExpect(jsonPath("$.details.rent").value(20000));
 
         accept(owner, id, amendment).andExpect(status().isOk());
         String secondOrder = orderOf(amendment);
+        assertThat(secondOrder).isEqualTo(firstOrder);
         deliverSigned(secondOrder, true);
         long after = amendmentRepo.findById(UUID.fromString(amendment)).orElseThrow().getAmountAfter();
         read(owner, id)

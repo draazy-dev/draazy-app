@@ -18,7 +18,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -85,19 +87,44 @@ public class SubscriptionService {
         return currentFor(caller.userId()).map(mapper::toDto).orElseGet(SubscriptionDto::none);
     }
 
-    @Transactional
     public boolean cancelPending(AuthPrincipal caller) {
-        List<Subscription> pending = subscriptions.findByUserIdOrderByStartedAtDesc(caller.userId()).stream()
-                .filter(s -> SubscriptionStatuses.PENDING.equals(s.getStatus()))
-                .toList();
-        boolean cancelled = false;
-        for (Subscription s : pending) {
-            if (s.abandonCheckout()) {
-                subscriptions.saveAndFlush(s);
-                cancelled = true;
+        List<String> abandonedOrders = transactions.execute(tx -> {
+            List<String> refs = new ArrayList<>();
+            for (Subscription s : subscriptions.findByUserIdOrderByStartedAtDesc(caller.userId())) {
+                if (SubscriptionStatuses.PENDING.equals(s.getStatus()) && s.abandonCheckout()) {
+                    subscriptions.saveAndFlush(s);
+                    refs.add(s.getPaymentRef());
+                }
             }
+            return refs;
+        });
+        // Outside the transaction: a payer still holding the modal is stopped at the gateway; a payment
+        // that beats the termination is refunded by the webhook as it is today.
+        abandonedOrders.stream().filter(Objects::nonNull).forEach(this::terminateQuietly);
+        return !abandonedOrders.isEmpty();
+    }
+
+    private void terminateQuietly(String orderId) {
+        try {
+            gateway.terminate(orderId);
+        } catch (RuntimeException failed) {
+            log.warn("Could not terminate abandoned gateway order {}; it stays payable until expiry", orderId,
+                    failed);
         }
-        return cancelled;
+    }
+
+    /** Checkout's poll after the gateway modal closes. The gateway is asked outside any transaction. */
+    public String orderStatus(AuthPrincipal caller, String orderId) {
+        Subscription s = subscriptions.findByPaymentRef(orderId)
+                .filter(found -> found.getUserId().equals(caller.userId()))
+                .orElseThrow(() -> NotFoundException.of("Order"));
+        if (SubscriptionStatuses.isEntitling(s.getStatus())) {
+            return "paid";
+        }
+        if (!SubscriptionStatuses.PENDING.equals(s.getStatus())) {
+            return "closed";
+        }
+        return gateway.lastAttemptFailed(orderId) ? "failed" : "pending";
     }
 
     public SubscriptionDto subscribe(AuthPrincipal caller, SubscribeRequest body,
@@ -204,7 +231,9 @@ public class SubscriptionService {
         return new Opened(null, saved.getId(), saved.getAmount(),
                 "subscription:" + caller.userId() + ":" + plan.getId()
                         + (propertyId == null ? "" : ":" + propertyId),
-                new PaymentGateway.Customer(caller.userId().toString(), phone));
+                new PaymentGateway.Customer(caller.userId().toString(), phone),
+                "/checkout?plan=" + plan.getKind() + (propertyId == null ? "" : "&property=" + propertyId)
+                        + "&order_id={order_id}");
     }
 
     private SubscriptionDto attach(UUID subscriptionId, PaymentGateway.PaymentOrder order) {
@@ -238,10 +267,10 @@ public class SubscriptionService {
     }
 
     private record Opened(SubscriptionDto settled, UUID subscriptionId, long price,
-            String reference, PaymentGateway.Customer customer) {
+            String reference, PaymentGateway.Customer customer, String returnPath) {
 
         static Opened settled(SubscriptionDto dto) {
-            return new Opened(dto, null, 0, null, null);
+            return new Opened(dto, null, 0, null, null, null);
         }
     }
 
@@ -276,9 +305,8 @@ public class SubscriptionService {
             return true;
         }
         if (!paid) {
-            if (subscription.fail()) {
-                log.info("Subscription {} cancelled: payment failed", subscription.getId());
-            }
+            log.info("Payment attempt on subscription {} was not completed; the order stays open for a retry",
+                    subscription.getId());
             return true;
         }
         Optional<Plan> plan = plans.findById(subscription.getPlanId());
@@ -373,7 +401,7 @@ public class SubscriptionService {
 
     private PaymentGateway.PaymentOrder createOrder(Opened opened) {
         PaymentGateway.PaymentOrder order =
-                gateway.createOrder(opened.price(), opened.reference(), opened.customer());
+                gateway.createOrder(opened.price(), opened.reference(), opened.customer(), opened.returnPath());
         if (order.orderId() == null || order.orderId().isBlank()) {
             throw new IllegalStateException("Payment gateway returned no order id");
         }

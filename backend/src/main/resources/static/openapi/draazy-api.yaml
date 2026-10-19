@@ -8093,6 +8093,28 @@ paths:
       responses:
         '204': { description: Cancelled, or nothing was pending }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/subscription/orders/{orderId}:
+    get:
+      tags: [Billing & Growth]
+      summary: Where my checkout order stands
+      operationId: getSubscriptionOrderStatus
+      description: >
+        Polled by checkout after the payment window closes. `failed` means the newest attempt was declined
+        or abandoned; the order stays payable until it expires, so the same checkout can retry it.
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Order status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [paid, pending, failed, closed] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /me/entitlements:
     get:
       tags: [Billing & Growth]

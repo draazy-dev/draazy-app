@@ -6,6 +6,7 @@ import com.draazy.api.security.CurrentUser;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -40,5 +41,14 @@ public class PlansController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void cancelPending(@CurrentUser AuthPrincipal principal) {
         service.cancelPending(principal);
+    }
+
+    /** {@code GET /me/subscription/orders/{orderId}}: {@code paid | pending | failed | closed}. */
+    @GetMapping(Routes.Plans.ORDER_STATUS)
+    public OrderStatus orderStatus(@CurrentUser AuthPrincipal principal, @PathVariable String orderId) {
+        return new OrderStatus(service.orderStatus(principal, orderId));
+    }
+
+    public record OrderStatus(String status) {
     }
 }

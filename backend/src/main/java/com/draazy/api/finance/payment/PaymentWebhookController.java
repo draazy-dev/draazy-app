@@ -10,6 +10,7 @@ import com.draazy.api.services.request.ServiceRequestAmendments;
 import com.draazy.api.services.request.ServiceRequestRefunds;
 import com.draazy.api.services.request.ServiceRequestService;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
@@ -39,6 +40,8 @@ public class PaymentWebhookController {
     private static final String REFUND_EVENT = "REFUND_STATUS_WEBHOOK";
 
     private static final String PASS_REFUND_PREFIX = "lp_";
+
+    private static final String REQUEST_REFUND_PREFIX = "rf_";
 
     private static final String DISPUTE_EVENT_PREFIX = "DISPUTE_";
 
@@ -143,16 +146,32 @@ public class PaymentWebhookController {
         String refundId = refund.path("refund_id").asString(null);
         String status = refund.path("refund_status").asString(null);
         String gatewayRef = refund.path("cf_refund_id").asString(null);
-        Settlement outcome = settle("refund", () -> refundId != null && refundId.startsWith(PASS_REFUND_PREFIX)
-                ? billingPayments.settleRefund(refundId, status, gatewayRef)
-                : refunds.applyWebhookOutcome(refundId, status));
+        String orderId = refund.path("order_id").asString(null);
+        BigDecimal amount = exactAmount(refund.path("refund_amount").asString(null));
+        Settlement outcome = settle("refund", () -> routeRefund(refundId, status, gatewayRef, orderId, amount));
         boolean ok = outcome == Settlement.CLAIMED;
         if (outcome == Settlement.NOT_MINE) {
-            log.warn("Refund webhook {} matched no refund of ours", refundId);
+            log.warn("Refund webhook {} ({}) on order {} changed nothing here", refundId, status, orderId);
         }
         calls.record(ProviderCalls.CASHFREE, PaymentGateway.WEBHOOK,
                 ok ? ProviderCalls.Outcome.OK : ProviderCalls.Outcome.FAILED,
-                null, refund.path("order_id").asString(null), "refund " + status, null);
+                null, orderId, "refund " + status, null);
+    }
+
+    // Any other refund id was made on the Cashfree dashboard, and only a completed one changes anything.
+    private boolean routeRefund(String refundId, String status, String gatewayRef, String orderId, BigDecimal amount) {
+        if (refundId != null && refundId.startsWith(PASS_REFUND_PREFIX)) {
+            return billingPayments.settleRefund(refundId, status, gatewayRef);
+        }
+        if (refundId != null && refundId.startsWith(REQUEST_REFUND_PREFIX)) {
+            return refunds.applyWebhookOutcome(refundId, status);
+        }
+        if (!PROVIDER_SUCCESS.equals(status) || amount == null || amount.signum() <= 0) {
+            return false;
+        }
+        long rupees = amount.setScale(0, RoundingMode.DOWN).longValue();
+        return billingPayments.settleOutsideRefund(orderId, gatewayRef, rupees)
+                || refunds.applyOutsideRefund(orderId, gatewayRef, rupees);
     }
 
     // Disputes freeze one order and tell the refunds desk; an unknown DISPUTE_* type still freezes on first sight.
