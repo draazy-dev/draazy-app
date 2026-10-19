@@ -3,6 +3,7 @@ package com.draazy.api.engagement.review;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.AlreadyReviewedException;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.NotFoundException;
@@ -15,6 +16,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -72,9 +74,11 @@ public class ReviewService {
 
     /** Paged, unlike {@link #listForProperty}, because no unique index bounds the moderation queue's count. */
     @Transactional(readOnly = true)
-    public Page<ReviewModerationRow> listForModeration(String status, String q, Pageable pageable) {
+    public Page<ReviewModerationRow> listForModeration(String status, String q, Integer days, Pageable pageable) {
+        Instant since = PlatformTime.sinceOrNull(days);
         Page<Review> page = reviews.findForModeration(
-                status == null || status.isBlank() ? null : status.strip(), LikePatterns.contains(q), pageable);
+                status == null || status.isBlank() ? null : status.strip(), LikePatterns.contains(q),
+                since == null ? Instant.EPOCH : since, pageable);
         Map<UUID, User> authors = authors(page.getContent());
         return page.map(r -> ReviewModerationRow.of(r, authorOf(authors, r)));
     }

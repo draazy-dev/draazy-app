@@ -9,11 +9,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,6 +94,37 @@ class AdminHelpFeedbackTest extends AbstractApiTest {
 
         assertThat(body.indexOf(bad)).isPositive().isLessThan(body.indexOf(busy));
         assertThat(body.indexOf(busy)).isLessThan(body.indexOf(thin));
+    }
+
+    @Test
+    @DisplayName("days narrows both the article tallies and the comments to votes cast within the IST window")
+    void daysWindowFiltersVotes() throws Exception {
+        vote("en", true, "fresh comment");
+        vote("en", false, "stale comment");
+        jdbc.update("UPDATE help_article_feedback SET created_at = ? WHERE comment = 'stale comment'",
+                Timestamp.from(LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                        .minus(1, ChronoUnit.MINUTES)));
+        String admin = bearer("9877730006", Roles.Wire.ADMIN);
+        String article = "$.content[?(@.slug=='" + slug + "' && @.lang=='en')]";
+
+        mvc.perform(get(Routes.Admin.HELP_FEEDBACK).param("size", "100").param("days", "1")
+                        .header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath(article + ".helpful").value(1))
+                .andExpect(jsonPath(article + ".notHelpful").value(0))
+                .andExpect(jsonPath(article + ".comments").value(1));
+        mvc.perform(get(Routes.Admin.HELP_FEEDBACK).param("size", "100").param("days", "7")
+                        .header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath(article + ".notHelpful").value(1));
+        mvc.perform(get(Routes.Admin.HELP_FEEDBACK_COMMENTS).param("slug", slug).param("days", "1")
+                        .header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].comment").value("fresh comment"));
+        mvc.perform(get(Routes.Admin.HELP_FEEDBACK_COMMENTS).param("slug", slug).param("days", "7")
+                        .header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath("$.totalElements").value(2));
+        mvc.perform(get(Routes.Admin.HELP_FEEDBACK_COMMENTS).param("slug", slug)
+                        .header(HttpHeaders.AUTHORIZATION, admin))
+                .andExpect(jsonPath("$.totalElements").value(2));
     }
 
     @Test

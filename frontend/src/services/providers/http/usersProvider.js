@@ -21,7 +21,7 @@ const toRow = (u) => ({
 
 /** One page of the directory. `archived` and `status` are separate query parameters because they are separate
  * columns: sending a status without pinning `archived=false` returns archived rows too. */
-export async function listUsers({ role, customers, status, q, page = 0, size = 20, counts } = {}) {
+export async function listUsers({ role, customers, status, q, days, page = 0, size = 20, counts } = {}) {
   const archived = status === 'archived';
   const res = await get('/users', {
     page,
@@ -30,6 +30,7 @@ export async function listUsers({ role, customers, status, q, page = 0, size = 2
     role: role || undefined,
     customers: customers || undefined,
     q: q || undefined,
+    days: days || undefined,
     status: !archived && WIRE_STATUSES.has(status) ? status : undefined,
     counts: counts || undefined,
   });

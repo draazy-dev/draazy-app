@@ -1,5 +1,6 @@
 package com.draazy.api.engagement.review;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -21,12 +22,13 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     /** The only finder not filtered to {@code published}: the staff queue must see rejected and pending ones. */
     @Query("select r from Review r where (:status is null or r.status = :status) "
+            + "and r.createdAt >= :since "
             + "and (:like is null or lower(coalesce(r.body, '')) like :like escape '\\' "
             + "or lower(r.targetId) like :like escape '\\' "
             + "or r.authorId in (select u.id from User u where lower(coalesce(u.name, '')) like :like escape '\\')) "
             + "order by r.createdAt desc")
     Page<Review> findForModeration(@Param("status") String status, @Param("like") String like,
-            Pageable pageable);
+            @Param("since") Instant since, Pageable pageable);
 
     @Query("select r.status, count(r) from Review r group by r.status")
     List<Object[]> countByStatus();

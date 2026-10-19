@@ -1,5 +1,6 @@
 package com.draazy.api.services.support;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.trust.Notifier;
@@ -11,6 +12,7 @@ import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.BackOfficePermissions;
 import com.draazy.api.security.Roles;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.springframework.data.domain.Page;
@@ -47,14 +49,10 @@ public class SupportTicketService {
     }
 
     @Transactional(readOnly = true)
-    public Page<AdminSupportTicketDto> queue(Boolean awaitingReply, Pageable pageable) {
-        Pageable page = Pageables.unsorted(pageable);
-        if (awaitingReply == null) {
-            return mapper.toAdminPage(tickets.findAllByOrderByCreatedAtDesc(page));
-        }
-        return awaitingReply
-                ? mapper.toAdminPage(tickets.findByStaffUnreadTrueOrderByCreatedAtDesc(page))
-                : mapper.toAdminPage(tickets.findByStaffUnreadFalseOrderByCreatedAtDesc(page));
+    public Page<AdminSupportTicketDto> queue(Boolean awaitingReply, Integer days, Pageable pageable) {
+        Instant since = PlatformTime.sinceOrNull(days);
+        return mapper.toAdminPage(tickets.findQueue(awaitingReply == null, Boolean.TRUE.equals(awaitingReply),
+                since == null ? Instant.EPOCH : since, Pageables.unsorted(pageable)));
     }
 
     @Transactional(readOnly = true)

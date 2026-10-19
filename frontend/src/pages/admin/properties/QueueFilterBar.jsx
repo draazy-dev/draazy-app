@@ -1,6 +1,6 @@
 import { classNames } from '../../../lib/format.js';
 import Select from '../../../components/ui/Select.jsx';
-import { Chips, ClearFilters, PageNav, SearchBox } from '../../../components/admin/WorkQueue.jsx';
+import { Chips, ClearFilters, DATE_CHIPS, PageNav, SearchBox } from '../../../components/admin/WorkQueue.jsx';
 import { STATUS_OPTS } from './constants.js';
 
 const PROGRESS_CHIPS = [
@@ -12,7 +12,7 @@ const PROGRESS_CHIPS = [
 ];
 const DEAL_CHIPS = [{ value: '', label: 'All' }, { value: 'buy', label: 'Buy' }, { value: 'rent', label: 'Rent' }];
 const SOURCE_CHIPS = [{ value: '', label: 'Any source' }, { value: 'owner', label: 'Owner' }, { value: 'staff', label: 'Staff posted' }];
-export const EMPTY_FILTERS = { q: '', deal: '', progress: '', status: '', source: '', featured: false };
+export const EMPTY_FILTERS = { q: '', deal: '', progress: '', status: '', source: '', featured: false, days: '' };
 
 /** The one filter bar every queue tab shares: what to look at on the left, where you are on the right. */
 export default function QueueFilterBar({ tab, filters, onChange, onClear, paging }) {
@@ -38,6 +38,7 @@ export default function QueueFilterBar({ tab, filters, onChange, onClear, paging
           </button>
         </>
       ) : null}
+      <Chips label="Date" options={DATE_CHIPS} value={filters.days} onChange={(days) => onChange({ days })} />
       {dirty ? <ClearFilters onClick={onClear} /> : null}
       <div className="ml-auto">
         <PageNav {...paging} />

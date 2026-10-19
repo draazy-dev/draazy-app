@@ -42,13 +42,16 @@ export async function submitHelpFeedback({ slug, helpful, comment }) {
   });
 }
 
-export async function listHelpFeedbackArticles({ page = 0, size = 20 } = {}) {
-  return unwrapPage(await get('/admin/help-feedback', { page, size }), { page, size });
+export async function listHelpFeedbackArticles({ days, page = 0, size = 20 } = {}) {
+  const query = { page, size };
+  if (days) query.days = days;
+  return unwrapPage(await get('/admin/help-feedback', query), { page, size });
 }
 
-export async function listHelpFeedbackComments({ slug, page = 0, size = 20 } = {}) {
+export async function listHelpFeedbackComments({ slug, days, page = 0, size = 20 } = {}) {
   const query = { page, size };
   if (slug) query.slug = slug;
+  if (days) query.days = days;
   return unwrapPage(await get('/admin/help-feedback/comments', query), { page, size });
 }
 

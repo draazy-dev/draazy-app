@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.Roles;
@@ -16,6 +17,8 @@ import com.draazy.api.services.request.ServiceRequestStatus;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -172,6 +175,46 @@ class ServiceRequestQueueTest extends ServiceFixtures {
                         .param("team", Teams.RENTAL))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.openTickets").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("queue days keeps the last N IST calendar days and the summary ignores it")
+    void queueDaysWindow() throws Exception {
+        User buyer = customer("9820000691");
+        User desk = staff("9820000692", Teams.RENTAL);
+        String today = raise(buyer, "rent-agreement", listing(buyer));
+        String yesterday = raise(buyer, "rent-agreement", listing(buyer));
+        Instant lateYesterday = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                .minus(1, ChronoUnit.MINUTES);
+        jdbc.update("update service_requests set created_at = ? where id = cast(? as uuid)",
+                Timestamp.from(lateYesterday), yesterday);
+        em.clear();
+
+        mvc.perform(get(Routes.ServiceRequests.QUEUE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .param("q", "9820000691").param("days", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].id").value(today));
+        mvc.perform(get(Routes.ServiceRequests.QUEUE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .param("q", "9820000691").param("days", "7"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)));
+        mvc.perform(get(Routes.ServiceRequests.QUEUE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .param("q", "9820000691"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)));
+        mvc.perform(get(Routes.ServiceRequests.QUEUE)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .param("days", "9999"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get(Routes.ServiceRequests.QUEUE_SUMMARY)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                        .param("days", "1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.toPickUp").value(2));
     }
 
     private void force(String id, ServiceRequestStatus status, User assignee) {

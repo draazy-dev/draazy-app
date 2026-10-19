@@ -55,11 +55,12 @@ export async function getFinanceSeries(months = 12) {
 /** Empty filter values are omitted rather than sent blank. `?kind=` would reach the server as an empty string, which
  * is not one of the three values it accepts, so an unfiltered view would answer 400. */
 export async function listFinanceTransactions({
-  kind, status, q, page = 0, size = 20,
+  kind, status, days, q, page = 0, size = 20,
 } = {}) {
   const query = { page, size };
   if (kind) query.kind = kind;
   if (status) query.status = status;
+  if (days) query.days = days;
   if (q && q.trim()) query.q = q.trim();
 
   const res = await get('/admin/finance/transactions', query);

@@ -5,6 +5,7 @@ import com.draazy.api.common.persistence.LikePatterns;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -42,7 +43,7 @@ public class ErrorLogRepository {
         this.jdbc = jdbc;
     }
 
-    public Page<ErrorEventSummary> search(String source, Status status, String q, Pageable pageable) {
+    public Page<ErrorEventSummary> search(String source, Status status, String q, Instant since, Pageable pageable) {
         StringBuilder where = new StringBuilder(" WHERE 1 = 1");
         List<Object> args = new ArrayList<>();
         if (source != null) {
@@ -53,6 +54,10 @@ public class ErrorLogRepository {
             where.append(" AND resolved_at IS NULL");
         } else if (status == Status.RESOLVED) {
             where.append(" AND resolved_at IS NOT NULL");
+        }
+        if (since != null) {
+            where.append(" AND last_seen >= ?");
+            args.add(Timestamp.from(since));
         }
         String pattern = LikePatterns.contains(q);
         if (pattern != null) {

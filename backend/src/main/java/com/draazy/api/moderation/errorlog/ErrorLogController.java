@@ -1,5 +1,6 @@
 package com.draazy.api.moderation.errorlog;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.NotFoundException;
@@ -47,13 +48,14 @@ public class ErrorLogController {
             @RequestParam(required = false) String source,
             @RequestParam(defaultValue = "open") String status,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer days,
             @PageableDefault(size = 20) Pageable pageable) {
         String sourceFilter = source == null || source.isBlank() ? null : source.toLowerCase(Locale.ROOT);
         if (sourceFilter != null && !SOURCES.contains(sourceFilter)) {
             throw new BadRequestException("source must be api, job or web");
         }
         return PageResponse.of(
-                repository.search(sourceFilter, parseStatus(status), q, Pageables.unsorted(pageable)),
+                repository.search(sourceFilter, parseStatus(status), q, PlatformTime.sinceOrNull(days), Pageables.unsorted(pageable)),
                 row -> row);
     }
 

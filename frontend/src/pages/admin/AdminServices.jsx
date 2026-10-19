@@ -15,7 +15,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, Cell, Chips, ClearFilters, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
+  BTN, CHIP, CHIP_TONE, Cell, Chips, ClearFilters, DATE_CHIPS, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
 
 /* The server's `TicketStatuses` vocabulary (incl. `waiting`, `closed`); `PATCH /tickets/{id}` 400s on `done`. */
@@ -92,8 +92,9 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
   const [q, setQ] = useState('');
   const [fStat, setFStat] = useState('open');
   const [fPrio, setFPrio] = useState('');
+  const [days, setDays] = useState('');
   const [page, setPage] = useState(1);
-  const filterKey = `${fStat}|${fPrio}|${q}`;
+  const filterKey = `${fStat}|${fPrio}|${days}|${q}`;
   const [pageKey, setPageKey] = useState(filterKey);
   if (pageKey !== filterKey) {
     setPageKey(filterKey);
@@ -107,7 +108,8 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
 
   const filters = useCallback(() => ({
     team: desk, status: fStat === 'all' ? undefined : fStat, priority: fPrio || undefined, q: q.trim() || undefined,
-  }), [desk, fStat, fPrio, q]);
+    days: days || undefined,
+  }), [desk, fStat, fPrio, days, q]);
 
   useEffect(() => {
     let alive = true;
@@ -343,7 +345,8 @@ export default function AdminServices({ desk, embedded = false, idPrefix = 'queu
           ) : null}
           <SearchBox value={q} onChange={setQ} placeholder="Search id, customer, detail…" label="Search tickets" />
           <Chips label="Priority" options={PRIORITY_CHIPS} value={fPrio} onChange={setFPrio} />
-          {q || fPrio ? <ClearFilters onClick={() => { setQ(''); setFPrio(''); }} /> : null}
+          <Chips label="Date" options={DATE_CHIPS} value={days} onChange={setDays} />
+          {q || fPrio || days ? <ClearFilters onClick={() => { setQ(''); setFPrio(''); setDays(''); }} /> : null}
           <div className="ml-auto flex items-center gap-2">
             <button type="button" onClick={doExport} className={BTN.ghost}>
               <Download className="h-3.5 w-3.5" /> Export CSV

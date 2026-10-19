@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.deals.deal.Deal;
 import com.draazy.api.deals.deal.DealRepository;
@@ -23,6 +24,7 @@ import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
@@ -211,6 +213,27 @@ class EnquiryBoardEndpointsTest extends AbstractApiTest {
                             .param("deal", "rent").param("q", "Days fixture"))
                     .andExpect(jsonPath("$.totalElements").value(1))
                     .andExpect(jsonPath("$.content[0].deal").value("rent"));
+        }
+
+        @Test
+        @DisplayName("days=1 is the IST calendar day: a deal closed just before midnight IST is not today's")
+        void todayStartsAtIstMidnight() throws Exception {
+            User owner = user("9855100041", Roles.Wire.OWNER, "Owner Today");
+            Instant midnight = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant();
+            Deal yesterday = new Deal(listing(owner, "Today fixture late").getId(), "rent");
+            yesterday.setStatus(DealStatuses.CLOSED);
+            yesterday.setClosedAt(midnight.minus(1, ChronoUnit.MINUTES));
+            deals.saveAndFlush(yesterday);
+            Deal today = new Deal(listing(owner, "Today fixture now").getId(), "rent");
+            today.setStatus(DealStatuses.CLOSED);
+            today.setClosedAt(Instant.now());
+            deals.saveAndFlush(today);
+            String token = bearer(admin("9855100040"));
+
+            mvc.perform(get(Routes.Moderation.ADMIN_DEALS).header(HttpHeaders.AUTHORIZATION, token)
+                            .param("days", "1").param("q", "Today fixture"))
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].propertyTitle").value("Today fixture now"));
         }
 
         @Test

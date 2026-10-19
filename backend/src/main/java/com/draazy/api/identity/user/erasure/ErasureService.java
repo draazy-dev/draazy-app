@@ -1,5 +1,6 @@
 package com.draazy.api.identity.user.erasure;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
@@ -17,6 +18,7 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -89,15 +91,13 @@ public class ErasureService {
     }
 
     @Transactional(readOnly = true)
-    public Page<ErasureRequestResponse> queue(String status, Pageable pageable) {
-        if (status == null || status.isBlank()) {
-            return requests.findAllByOrderByRequestedAtDesc(pageable)
-                    .map(ErasureRequestResponse::of);
-        }
-        if (!ErasureStatuses.isValid(status)) {
+    public Page<ErasureRequestResponse> queue(String status, Integer days, Pageable pageable) {
+        boolean unfiltered = status == null || status.isBlank();
+        if (!unfiltered && !ErasureStatuses.isValid(status)) {
             throw new BadRequestException("Unknown erasure request status: " + status);
         }
-        return requests.findByStatusOrderByRequestedAtDesc(status, pageable)
+        Instant since = PlatformTime.sinceOrNull(days);
+        return requests.queue(unfiltered ? null : status, since == null ? Instant.EPOCH : since, pageable)
                 .map(ErasureRequestResponse::of);
     }
 

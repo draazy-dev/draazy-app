@@ -3,11 +3,12 @@ import { get, post } from '../../http.js';
 import { toDecision, toViewModelPage } from './referralMapper.js';
 
 /** Errors propagate: "no referrals here" would be worse than "could not look". `counts` asks for the tab totals. */
-export async function listReferralQueue({ status, risk, q, page = 0, size = 20, counts = false } = {}) {
+export async function listReferralQueue({ status, risk, q, days, page = 0, size = 20, counts = false } = {}) {
   const query = { page, size };
   if (status) query.status = status;
   if (risk) query.risk = risk;
   if (q) query.q = q;
+  if (days) query.days = days;
   if (counts) query.counts = true;
   return toViewModelPage(await get('/referrals', query), { page, size });
 }

@@ -55,8 +55,9 @@ public class IdentityReviewController {
             @RequestParam(defaultValue = "false") boolean overdue,
             @RequestParam(required = false) String outcome,
             @RequestParam(required = false) String sort,
+            @RequestParam(required = false) Integer days,
             @PageableDefault(size = 20) Pageable pageable) {
-        var filters = new IdentityReviewQueueService.Filters(status, q, docType, claim, overdue, outcome, sort);
+        var filters = new IdentityReviewQueueService.Filters(status, q, docType, claim, overdue, outcome, sort, days);
         return PageResponse.of(queue.queue(principal, filters, pageable), dto -> dto);
     }
 

@@ -1,5 +1,6 @@
 package com.draazy.api.identity.verification;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.identity.user.User;
@@ -36,7 +37,7 @@ public class IdentityReviewQueueService {
     private static final char ESCAPE = '\\';
 
     public record Filters(String status, String q, String docType, String claim, boolean overdue,
-            String outcome, String sort) {
+            String outcome, String sort, Integer days) {
     }
 
     public record Summary(long pending, long overdue, long mine, long decided, long appeals) {
@@ -87,12 +88,17 @@ public class IdentityReviewQueueService {
     }
 
     private Specification<IdentityVerification> spec(AuthPrincipal actor, Filters f) {
+        Instant since = PlatformTime.sinceOrNull(f.days());
         Specification<IdentityVerification> base = switch (f.status() == null ? "" : f.status()) {
             case "" -> Specification.not(statusIs(VerificationStatuses.WITHDRAWN));
-            case APPEAL -> appealOpen();
+            case APPEAL -> appealOpen(since);
             case DECIDED -> decided(f.outcome());
             default -> statusIs(f.status());
         };
+        if (since != null && !APPEAL.equals(f.status())) {
+            String column = submittedColumn(f.status()) ? "submittedAt" : "decidedAt";
+            base = base.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get(column), since));
+        }
         if (f.docType() != null) {
             base = base.and((root, query, cb) -> cb.equal(root.get("docType"), f.docType()));
         }
@@ -108,14 +114,15 @@ public class IdentityReviewQueueService {
 
     private static Sort order(Filters f) {
         String status = f.status() == null ? "" : f.status();
-        String column = switch (status) {
-            case VerificationStatuses.PENDING, "" -> "submittedAt";
-            default -> "decidedAt";
-        };
+        String column = submittedColumn(status) ? "submittedAt" : "decidedAt";
         boolean oldestByDefault = VerificationStatuses.PENDING.equals(status) || APPEAL.equals(status);
         boolean oldest = f.sort() == null ? oldestByDefault : "oldest".equals(f.sort());
         Sort.Direction dir = oldest ? Sort.Direction.ASC : Sort.Direction.DESC;
         return Sort.by(new Sort.Order(dir, column).nullsLast(), new Sort.Order(dir, "id"));
+    }
+
+    private static boolean submittedColumn(String status) {
+        return status == null || status.isEmpty() || VerificationStatuses.PENDING.equals(status);
     }
 
     private static Specification<IdentityVerification> statusIs(String status) {
@@ -128,11 +135,13 @@ public class IdentityReviewQueueService {
                 : statusIs(outcome);
     }
 
-    private static Specification<IdentityVerification> appealOpen() {
+    private static Specification<IdentityVerification> appealOpen(Instant since) {
         return (root, query, cb) -> {
             Subquery<UUID> open = query.subquery(UUID.class);
             Root<IdentityAppeal> a = open.from(IdentityAppeal.class);
-            open.select(a.get("verificationId")).where(cb.equal(a.get("status"), IdentityAppeal.OPEN));
+            var raised = cb.equal(a.get("status"), IdentityAppeal.OPEN);
+            open.select(a.get("verificationId")).where(since == null ? raised
+                    : cb.and(raised, cb.greaterThanOrEqualTo(a.get("createdAt"), since)));
             return cb.and(cb.equal(root.get("status"), VerificationStatuses.REJECTED), root.get("id").in(open));
         };
     }

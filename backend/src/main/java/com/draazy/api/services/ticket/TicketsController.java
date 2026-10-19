@@ -52,9 +52,10 @@ public class TicketsController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer days,
             @PageableDefault(size = 20) Pageable pageable) {
         return PageResponse.of(
-                service.rows(principal, team, status, priority, q, Pageables.unsorted(pageable)), row -> row);
+                service.rows(principal, team, status, priority, q, days, Pageables.unsorted(pageable)), row -> row);
     }
 
     /** Counts per status for the same scope as {@code GET /tickets}, so the tabs never depend on a page. */

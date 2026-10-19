@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -17,6 +18,10 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -673,4 +678,25 @@ class UserModerationEndpointTest extends AbstractApiTest {
         }
         return hex.toString();
     }
-}
+
+    @Test
+    @DisplayName("days limits the directory to people who joined in the last N IST days")
+    void daysFiltersByJoinedAt() throws Exception {
+        User actor = person("9871502001", Roles.Wire.ADMIN);
+        person("9871502002", Roles.Wire.BUYER);
+        User yesterday = person("9871502003", Roles.Wire.BUYER);
+        Instant yesterdayLate = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                .minus(1, ChronoUnit.MINUTES);
+        jdbc.update("update users set created_at = ? where id = ?", Timestamp.from(yesterdayLate), yesterday.getId());
+
+        assertThat(directoryNames(actor, null)).hasSize(3);
+        assertThat(directoryNames(actor, "1")).containsExactlyInAnyOrder("V77 probe 9871502001", "V77 probe 9871502002");
+        assertThat(directoryNames(actor, "7")).hasSize(3);
+    }
+
+    private List<String> directoryNames(User actor, String days) throws Exception {
+        var req = get(Routes.Users.BASE).header(HttpHeaders.AUTHORIZATION, bearer(actor)).param("q", "v77 probe 98715020");
+        if (days != null) req = req.param("days", days);
+        String body = mvc.perform(req).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return com.jayway.jsonpath.JsonPath.read(body, "$.content[*].name");
+    }}

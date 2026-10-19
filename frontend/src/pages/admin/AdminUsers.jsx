@@ -21,7 +21,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, Cell, Chips, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
+  BTN, CHIP, CHIP_TONE, Cell, Chips, DATE_CHIPS, FactRow, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
 
 const ROLE_CHIPS = [
@@ -76,7 +76,8 @@ export default function AdminUsers() {
   const [counts, setCounts] = useState({});
   const [role, setRole] = useState('');
   const [q, setQ] = useState('');
-  const resetKey = `${tab}|${role}|${q}`;
+  const [days, setDays] = useState('');
+  const resetKey = `${tab}|${role}|${q}|${days}`;
   const [pageState, setPageState] = useState({ page: 1, key: resetKey });
   const lastPage = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(pageState.key === resetKey ? pageState.page : 1, lastPage);
@@ -105,7 +106,7 @@ export default function AdminUsers() {
   const load = useCallback(async (recount = false) => {
     const key = `${role}|${q.trim()}`;
     const counts = recount === true || countsKey.current !== key;
-    const res = await listUsers({ role, customers: true, status, q: q.trim(), page: page - 1, size: PAGE_SIZE, counts });
+    const res = await listUsers({ role, customers: true, status, q: q.trim(), days, page: page - 1, size: PAGE_SIZE, counts });
     if (!alive.current) return;
     setRows(res.items);
     setTotal(res.total);
@@ -113,7 +114,7 @@ export default function AdminUsers() {
       countsKey.current = key;
       setCounts(res.counts || {});
     }
-  }, [role, status, q, page]);
+  }, [role, status, q, days, page]);
 
   // Debounced, because `q` changes on every keystroke and each change is a request.
   useEffect(() => {
@@ -216,7 +217,7 @@ export default function AdminUsers() {
 
   const doExport = async () => {
     try {
-      const all = await listUsers({ role, customers: true, status, q: q.trim(), page: 0, size: MAX_PAGE_SIZE });
+      const all = await listUsers({ role, customers: true, status, q: q.trim(), days, page: 0, size: MAX_PAGE_SIZE });
       exportCsv(
         'draazy-users.csv',
         ['ID', 'Name', 'Mobile', 'Role', 'City', 'Listings', 'Joined', 'Verified', 'Status'],
@@ -312,6 +313,7 @@ export default function AdminUsers() {
           <>
             <SearchBox value={q} onChange={setQ} placeholder="Search name or mobile…" label="Search users" />
             <Chips label="Role" options={ROLE_CHIPS} value={role} onChange={setRole} />
+            <Chips label="Joined" options={DATE_CHIPS} value={days} onChange={setDays} />
             <div className="ml-auto flex items-center gap-2">
               {optionEnabled('users.csvExport') ? (
                 <button type="button" onClick={doExport} className={BTN.ghost}>

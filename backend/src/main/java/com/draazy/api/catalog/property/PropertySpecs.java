@@ -193,7 +193,7 @@ final class PropertySpecs {
     }
 
     /** No visibility floor, so {@code status} widens rather than narrows: staff/admin routes only. */
-    static Specification<Property> adminSearch(PropertySearchQuery filters, ModerationFacets mod) {
+    static Specification<Property> adminSearch(PropertySearchQuery filters, ModerationFacets mod, Instant since) {
         return (root, query, cb) -> {
 
             // Only this search maps rows to the full PropertyResponse, which embeds the LAZY owner;
@@ -205,6 +205,11 @@ final class PropertySpecs {
             adminTextSearch(filters, root, cb, where);
             if (filters.status() != null) {
                 where.add(cb.equal(root.get("status"), filters.status()));
+            }
+            if (since != null) {
+                String column = Boolean.TRUE.equals(mod.recheck()) ? "recheckRequestedAt"
+                        : Boolean.TRUE.equals(mod.badge()) ? "ownershipRequestedAt" : "createdAt";
+                where.add(cb.greaterThanOrEqualTo(root.<Instant>get(column), since));
             }
             if (mod.archived() != null) {
                 where.add(mod.archived()
@@ -236,12 +241,12 @@ final class PropertySpecs {
 
                 // COALESCE to createdAt because posting is itself an assertion of availability; a
                 // bare null would drop those rows out of *both* sides of this tri-state.
-                Expression<Instant> since =
+                Expression<Instant> lastSeen =
                         cb.coalesce(root.get("lastConfirmedAt"), root.get("createdAt"));
                 Instant cutoff = Freshness.unconfirmedBefore(Instant.now());
                 where.add(mod.unconfirmed()
-                        ? cb.lessThanOrEqualTo(since, cutoff)
-                        : cb.greaterThan(since, cutoff));
+                        ? cb.lessThanOrEqualTo(lastSeen, cutoff)
+                        : cb.greaterThan(lastSeen, cutoff));
             }
             if (mod.progress() != null) {
                 where.add(progress(mod.progress(), root, cb));

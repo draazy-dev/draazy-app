@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import { Chips, ClearFilters, DATE_CHIPS, QueuePanel, QueueTabs, SearchBox } from '../../components/admin/WorkQueue.jsx';
+import { istWindowStart } from '../../lib/availability.js';
 import { QueueState } from './flatmate/board.jsx';
 import useFlatmateQueue, { QUEUE_TABS } from './flatmate/useFlatmateQueue.js';
 import FlatmateQueueCard, { entryKind, entrySummary } from './flatmate/FlatmateQueueCard.jsx';
@@ -35,7 +36,7 @@ const haystack = (entry) => {
 
 function filterQueue(items, { type, q, days }) {
   const needle = q.trim().toLowerCase();
-  const cutoff = days ? Date.now() - Number(days) * 86400000 : 0;
+  const cutoff = days ? istWindowStart(days) : 0;
   return items
     .filter((e) => (type === 'all' || typeOf(e) === type)
       && (!needle || haystack(e).includes(needle))

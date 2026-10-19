@@ -1,7 +1,8 @@
 /* Demand board against the live API: lists and details carry the full number, and opening a row's detail is recorded
  * against whoever opened it. */
 import { test, expect, ACTORS } from '../../fixtures/live.js';
-import { API, authHeaders } from '../../helpers/liveAuth.js';
+import { API, authHeaders, uniqueMobile } from '../../helpers/liveAuth.js';
+import { approve, call, newListing, sql } from '../../helpers/monetisation.js';
 
 const RAW = /^[6-9]\d{9}$/;
 
@@ -127,3 +128,32 @@ test('a lead marked responded is on the case file the moderator opens', async ({
 
 /* No test here for "a staffer sees the board but not the reveal button": the admin shell excludes
  * staff, so a staffer never reaches this page. That split is asserted in `EnquiryBoardEndpointsTest`. */
+
+test('Today is the IST calendar day: an enquiry raised just before midnight is under 7d, not Today', async ({ page, login }) => {
+  const owner = uniqueMobile();
+  const flat = await newListing(owner, { title: 'Zztest today filter' });
+  await approve(flat.id);
+  const ask = async (name) => {
+    const buyer = uniqueMobile();
+    expect((await call('PATCH', '/auth/me', buyer, { name })).status).toBe(200);
+    expect((await call('POST', '/contacts/request', buyer, { propertyId: flat.id })).status).toBe(200);
+    return buyer;
+  };
+  await ask('Zztest Today Buyer');
+  const late = await ask('Zztest Late Buyer');
+  sql(`update contact_requests set created_at = (date_trunc('day', now() at time zone 'Asia/Kolkata') at time zone 'Asia/Kolkata') - interval '1 minute' `
+    + `where property_id = '${flat.id}' and requester_id = (select id from users where mobile = '${late}')`);
+
+  await login.asAdmin();
+  await openBoard(page);
+  await page.getByRole('textbox', { name: 'Search the board' }).fill(flat.title);
+  const rows = page.getByTestId('queue-row');
+  await expect(rows).toHaveCount(2);
+
+  const date = page.getByRole('group', { name: 'Date' });
+  await date.getByRole('button', { name: 'Today', exact: true }).click();
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('Zztest Today Buyer');
+  await date.getByRole('button', { name: '7d', exact: true }).click();
+  await expect(rows).toHaveCount(2);
+});

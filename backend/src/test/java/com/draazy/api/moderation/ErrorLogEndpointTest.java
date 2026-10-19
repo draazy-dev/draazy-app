@@ -6,11 +6,15 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import java.sql.Timestamp;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -131,6 +135,31 @@ class ErrorLogEndpointTest extends AbstractApiTest {
                         .param("q", reference.toString().substring(9, 17)))
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
+
+    @Test
+    @DisplayName("days keeps only errors last seen within the last N IST calendar days")
+    void daysWindowFiltersByLastSeen() throws Exception {
+        String token = adminToken();
+        event("fp-days-new", "api", "days fresh failure", "/api/d1", "1 minute", false);
+        UUID stale = event("fp-days-old", "api", "days stale failure", "/api/d2", "1 minute", false);
+        jdbc.update("update error_event set last_seen = ? where id = ?", Timestamp.from(LocalDate.now(PlatformTime.IST)
+                .atStartOfDay(PlatformTime.IST).toInstant().minus(1, ChronoUnit.MINUTES)), stale);
+
+        mvc.perform(get(url(Routes.Admin.ERROR_LOG)).header(HttpHeaders.AUTHORIZATION, token)
+                        .param("q", "days ").param("days", "1"))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].message").value("days fresh failure"));
+        mvc.perform(get(url(Routes.Admin.ERROR_LOG)).header(HttpHeaders.AUTHORIZATION, token)
+                        .param("q", "days ").param("days", "7"))
+                .andExpect(jsonPath("$.totalElements").value(2));
+        mvc.perform(get(url(Routes.Admin.ERROR_LOG)).header(HttpHeaders.AUTHORIZATION, token)
+                        .param("q", "days "))
+                .andExpect(jsonPath("$.totalElements").value(2));
+        mvc.perform(get(url(Routes.Admin.ERROR_LOG)).header(HttpHeaders.AUTHORIZATION, token)
+                        .param("days", "99999"))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     @DisplayName("the detail adds stack, request, user and context")
     void detail() throws Exception {

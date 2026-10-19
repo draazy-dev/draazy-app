@@ -8,6 +8,7 @@ import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyResponse;
 import com.draazy.api.catalog.property.PropertySearchQuery;
 import com.draazy.api.catalog.property.PropertyService;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.trust.BackOfficeVisibility;
 import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.MessageSender;
@@ -125,6 +126,7 @@ public class PropertyModerationController {
             @RequestParam(required = false) Boolean unconfirmed,
             @RequestParam(required = false) String progress,
             @RequestParam(required = false) Boolean badge,
+            @RequestParam(required = false) Integer days,
             @PageableDefault(size = 20) Pageable pageable) {
 
         // The owner facet is the public profile page's, deliberately not offered here: the desk
@@ -134,7 +136,8 @@ public class PropertyModerationController {
                 null);
         ModerationFacets mod = new ModerationFacets(
                 archived, recheck, featured, postedByAdmin, unconfirmed, progress, badge);
-        Page<Property> page = propertyService.searchForModeration(filters, mod, pageable);
+        Page<Property> page = propertyService.searchForModeration(
+                filters, mod, PlatformTime.sinceOrNull(days), pageable);
         OutreachCounts counts = outreach.countsFor(page.getContent());
         Map<UUID, ListingSignals> pageSignals = signals.forProperties(page.getContent());
         Set<UUID> replied = reviewQueue.awaitingStaff(

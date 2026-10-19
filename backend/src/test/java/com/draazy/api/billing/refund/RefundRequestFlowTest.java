@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.draazy.api.billing.plan.Subscription;
 import com.draazy.api.catalog.property.Property;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import java.time.Instant;
@@ -316,6 +317,52 @@ class RefundRequestFlowTest extends RefundTestBase {
                 .andExpect(jsonPath("$.content[0].status").value("auto"));
         mvc.perform(get(Routes.Refunds.DESK).param("status", "bogus").header(HttpHeaders.AUTHORIZATION, bearer(desk)))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void daysNarrowsTheDeskByRequestedAtForCustomerRequestsAndAutomaticRefunds() throws Exception {
+        User desk = refundStaff();
+        User oldBuyer = user("buyer");
+        User freshBuyer = user("buyer");
+        Subscription oldPack = pack(oldBuyer, 1);
+        Subscription freshPack = pack(freshBuyer, 1);
+        askRefund(oldBuyer, oldPack.getId(), "k-old", null).andExpect(status().isOk());
+        askRefund(freshBuyer, freshPack.getId(), "k-fresh", null).andExpect(status().isOk());
+        UUID oldRequest = refundRequestOf(oldPack.getId());
+        UUID freshRequest = refundRequestOf(freshPack.getId());
+        jdbc.update("update refund_requests set created_at = ? where id = ?", yesterdayLateIst(), oldRequest);
+
+        assertNarrowed(desk, "pending_review", oldRequest, freshRequest);
+
+        User owner = user("owner");
+        Subscription oldAuto = pass(owner, listing(owner), 1);
+        Subscription freshAuto = pass(owner, listing(owner), 1);
+        jdbc.update("update subscriptions set refund_due_at = ?, status = 'cancelled' where id = ?",
+                yesterdayLateIst(), oldAuto.getId());
+        jdbc.update("update subscriptions set refund_due_at = now(), status = 'cancelled' where id = ?",
+                freshAuto.getId());
+
+        assertNarrowed(desk, "auto", oldAuto.getId(), freshAuto.getId());
+    }
+
+    private void assertNarrowed(User desk, String status, UUID old, UUID fresh) throws Exception {
+        assertThat(deskJson(desk, status, "1")).contains(fresh.toString()).doesNotContain(old.toString());
+        assertThat(deskJson(desk, status, "7")).contains(fresh.toString(), old.toString());
+        assertThat(deskJson(desk, status, null)).contains(fresh.toString(), old.toString());
+    }
+
+    private String deskJson(User desk, String status, String days) throws Exception {
+        var request = get(Routes.Refunds.DESK).param("status", status).param("size", "100")
+                .header(HttpHeaders.AUTHORIZATION, bearer(desk));
+        if (days != null) {
+            request.param("days", days);
+        }
+        return mvc.perform(request).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+    }
+
+    private static java.sql.Timestamp yesterdayLateIst() {
+        Instant midnight = java.time.LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant();
+        return java.sql.Timestamp.from(midnight.minus(1, ChronoUnit.MINUTES));
     }
 
     @Test

@@ -9,12 +9,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.Roles;
 import com.draazy.api.security.Teams;
 import com.draazy.api.services.support.AdminSupportTicketDto;
 import jakarta.persistence.EntityManager;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -354,6 +359,42 @@ class SupportTicketEndpointsTest extends ServiceFixtures {
                             .header(HttpHeaders.AUTHORIZATION, bearer(desk)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.counts").doesNotExist());
+        }
+
+        @Test
+        @DisplayName("days keeps the last N IST calendar days and composes with awaitingReply; counts ignore it")
+        void daysNarrowsRowsNotCounts() throws Exception {
+            User asha = customer("9840000171");
+            User desk = staff("9840000172", Teams.RENTAL);
+            raiseTicket(asha, "Datewin today");
+            String old = raiseTicket(asha, "Datewin yesterday");
+            Instant lateYesterday = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                    .minus(1, ChronoUnit.MINUTES);
+            jdbc.update("update support_tickets set created_at = ? where id = ?::uuid",
+                    Timestamp.from(lateYesterday), old);
+            long all = countOf(desk, "all");
+
+            mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                            .param("days", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.subject=='Datewin today')]", hasSize(1)))
+                    .andExpect(jsonPath("$.content[?(@.subject=='Datewin yesterday')]", hasSize(0)));
+            mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                            .param("days", "7").param("awaitingReply", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.subject=='Datewin today')]", hasSize(1)))
+                    .andExpect(jsonPath("$.content[?(@.subject=='Datewin yesterday')]", hasSize(1)));
+            mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                            .param("days", "1").param("counts", "true"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.counts.all").value(all));
+            mvc.perform(get(Routes.Admin.SUPPORT_TICKETS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(desk))
+                            .param("days", "9999"))
+                    .andExpect(status().isBadRequest());
         }
 
         private long countOf(User desk, String key) throws Exception {

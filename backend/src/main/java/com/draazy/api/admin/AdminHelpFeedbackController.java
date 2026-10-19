@@ -24,17 +24,19 @@ public class AdminHelpFeedbackController {
     @GetMapping(Routes.Admin.HELP_FEEDBACK)
     @PreAuthorize(SETTINGS_READ)
     public PageResponse<AdminHelpFeedbackArticle> articles(
+            @RequestParam(required = false) Integer days,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return feedback.articles(page, size);
+        return feedback.articles(days, page, size);
     }
 
     @GetMapping(Routes.Admin.HELP_FEEDBACK_COMMENTS)
     @PreAuthorize(SETTINGS_READ)
     public PageResponse<AdminHelpFeedbackComment> comments(
             @RequestParam(required = false) String slug,
+            @RequestParam(required = false) Integer days,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return feedback.comments(slug, page, size);
+        return feedback.comments(slug, days, page, size);
     }
 }

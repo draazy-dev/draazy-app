@@ -1,5 +1,6 @@
 package com.draazy.api.services.ticket;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ForbiddenException;
@@ -77,10 +78,17 @@ public class TicketService {
                 page.getTotalElements());
     }
 
-    // The board's rows: the same scope as `list`, narrowed by priority and a contains-search, with no notes read.
     @Transactional(readOnly = true)
     public Page<TicketRow> rows(AuthPrincipal caller, String team, String status, String priority, String q,
             Pageable pageable) {
+        return rows(caller, team, status, priority, q, null, pageable);
+    }
+
+    // The board's rows: the same scope as `list`, narrowed by priority, a contains-search and the last N IST days;
+    // no notes are read.
+    @Transactional(readOnly = true)
+    public Page<TicketRow> rows(AuthPrincipal caller, String team, String status, String priority, String q,
+            Integer days, Pageable pageable) {
         String statusFilter = blankToNull(status);
         if (statusFilter != null && !TicketStatuses.isKnown(statusFilter)) {
             throw new BadRequestException("Unknown ticket status: " + statusFilter);
@@ -91,8 +99,9 @@ public class TicketService {
         }
         String term = blankToNull(q);
         BoardScope scope = boardScope(caller, team);
+        Instant since = PlatformTime.sinceOrNull(days);
         Page<Ticket> page = tickets.findRowsForBoard(scope.allTeams(), scope.teams(), scope.unassigned(), statusFilter, priorityFilter,
-                term == null ? null : containsPattern(term), pageable);
+                term == null ? null : containsPattern(term), since == null ? Instant.EPOCH : since, pageable);
         return new PageImpl<>(mapper.toRows(page.getContent()), page.getPageable(), page.getTotalElements());
     }
 

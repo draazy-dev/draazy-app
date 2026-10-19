@@ -58,9 +58,10 @@ public class ReviewModerationController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String q,
             @RequestParam(defaultValue = "false") boolean counts,
+            @RequestParam(required = false) Integer days,
             @PageableDefault(size = 20) Pageable pageable) {
         PageResponse<ReviewModerationRow> page = PageResponse.of(
-                reviewService.listForModeration(status, q, Pageables.unsorted(pageable)), r -> r);
+                reviewService.listForModeration(status, q, days, Pageables.unsorted(pageable)), r -> r);
         return counts ? page.withCounts(reviewService.moderationCounts()) : page;
     }
 

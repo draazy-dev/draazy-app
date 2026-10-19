@@ -4,6 +4,7 @@ import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.persistence.LikePatterns;
 import com.draazy.api.common.web.PageResponse;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -120,7 +121,7 @@ public class AdminFinanceService {
 
     @Transactional(readOnly = true)
     public PageResponse<AdminFinanceTransaction> financeTransactions(
-            String kind, String status, String q, int page, int size) {
+            String kind, String status, String q, Integer days, int page, int size) {
         if (kind != null && !LEDGER_KINDS.contains(kind)) {
             throw new BadRequestException("kind must be one of " + LEDGER_KINDS);
         }
@@ -142,9 +143,12 @@ public class AdminFinanceService {
         // percent in the name would otherwise be running a wildcard they did not type.
         String term = (q == null || q.isBlank()) ? null : "%" + LikePatterns.escape(q.trim()) + "%";
 
-        long total = metrics.ledgerCount(kind, status, term);
+        Instant since = PlatformTime.sinceOrNull(days);
+        LocalDate sinceDay = since == null ? null : LocalDate.ofInstant(since, PlatformTime.IST);
+
+        long total = metrics.ledgerCount(kind, status, term, sinceDay);
         List<AdminFinanceTransaction> rows = metrics
-                .ledger(kind, status, term, safeSize, offset).stream()
+                .ledger(kind, status, term, sinceDay, safeSize, offset).stream()
                 .map(row -> new AdminFinanceTransaction(
                         (UUID) row[0],
                         row[1] == null ? null : BucketDate.of(row[1]),

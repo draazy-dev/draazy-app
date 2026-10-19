@@ -6,11 +6,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -135,6 +140,75 @@ class IdentityReviewQueueTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.totalElements").value(0));
     }
 
+    @Test
+    void daysNarrowsPendingBySubmittedAt() throws Exception {
+        User reviewer = user("9830017708", Roles.Wire.ADMIN, "Queue Admin");
+        UUID stale = submit(user("9830017761", "buyer", NAME + " Stale"), IdentityDocTypes.PAN);
+        UUID fresh = submit(user("9830017762", "buyer", NAME + " Fresh"), IdentityDocTypes.PAN);
+        jdbc.update("update identity_verifications set submitted_at = ? where id = ?", yesterdayLateIst(), stale);
+
+        list(reviewer, "q", NAME, "days", "1")
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(fresh.toString()));
+        list(reviewer, "q", NAME, "days", "7").andExpect(jsonPath("$.totalElements").value(2));
+        list(reviewer, "q", NAME).andExpect(jsonPath("$.totalElements").value(2));
+        list(reviewer, "q", NAME, "days", "9999").andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void daysNarrowsDecidedByDecidedAt() throws Exception {
+        User reviewer = user("9830017709", Roles.Wire.ADMIN, "Queue Admin");
+        UUID stale = submit(user("9830017763", "buyer", NAME + " Old Decision"), IdentityDocTypes.PAN);
+        UUID fresh = submit(user("9830017764", "buyer", NAME + " New Decision"), IdentityDocTypes.PAN);
+        reject(reviewer, stale);
+        reject(reviewer, fresh);
+        jdbc.update("update identity_verifications set decided_at = ? where id = ?", yesterdayLateIst(), stale);
+
+        list(reviewer, "status", "decided", "q", NAME, "days", "1")
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(fresh.toString()));
+        list(reviewer, "status", "decided", "q", NAME, "days", "7").andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    @Test
+    void daysNarrowsAppealsByWhenAppealWasRaised() throws Exception {
+        User reviewer = user("9830017710", Roles.Wire.ADMIN, "Queue Admin");
+        User oldApplicant = user("9830017765", "buyer", NAME + " Old Appeal");
+        User newApplicant = user("9830017766", "buyer", NAME + " New Appeal");
+        UUID oldCase = submit(oldApplicant, IdentityDocTypes.PAN);
+        UUID newCase = submit(newApplicant, IdentityDocTypes.PAN);
+        reject(reviewer, oldCase);
+        reject(reviewer, newCase);
+        appeal(oldApplicant);
+        appeal(newApplicant);
+        jdbc.update("update identity_appeals set created_at = ? where verification_id = ?", yesterdayLateIst(), oldCase);
+
+        list(reviewer, "status", "appeal", "q", NAME, "days", "1")
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(newCase.toString()));
+        list(reviewer, "status", "appeal", "q", NAME, "days", "7").andExpect(jsonPath("$.totalElements").value(2));
+    }
+
+    private static Timestamp yesterdayLateIst() {
+        Instant midnight = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant();
+        return Timestamp.from(midnight.minus(1, ChronoUnit.MINUTES));
+    }
+
+    private void reject(User reviewer, UUID id) throws Exception {
+        mvc.perform(post(Routes.Moderation.IDENTITY_REVIEW_REJECT.replace("{id}", id.toString()))
+                        .header(HttpHeaders.AUTHORIZATION, bearer(reviewer))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"blurry\",\"note\":\"The image is too blurry to verify\"}"))
+                .andExpect(status().isOk());
+    }
+
+    private void appeal(User applicant) throws Exception {
+        mvc.perform(post(Routes.Verification.IDENTITY_APPEAL)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(applicant))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"note\":\"Please recheck this decision.\"}"))
+                .andExpect(status().isCreated());
+    }
     @Test
     void unknownFilterValuesAreBadRequests() throws Exception {
         User reviewer = user("9830017706", Roles.Wire.ADMIN, "Queue Admin");

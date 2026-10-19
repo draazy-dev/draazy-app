@@ -1,11 +1,12 @@
 import { get, post, unwrapPage } from '../../http.js';
 
 // Only set filters are sent: an empty `q` or `source` would be a filter on the server, not "any".
-const query = ({ source, status, q } = {}) => {
+const query = ({ source, status, q, days } = {}) => {
   const params = {};
   if (source) params.source = source;
   if (status) params.status = status;
   if (q) params.q = q;
+  if (days) params.days = days;
   return params;
 };
 

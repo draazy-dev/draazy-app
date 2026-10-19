@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.Teams;
@@ -17,6 +18,10 @@ import com.draazy.api.services.ticket.Ticket;
 import com.draazy.api.services.ticket.TicketMapper;
 import com.draazy.api.services.ticket.TicketNoteRepository;
 import com.draazy.api.services.ticket.TicketRepository;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -363,6 +368,50 @@ class TicketQueueTest extends ServiceFixtures {
         void theTypeItselfCarriesNoNotes() {
             assertThat(CustomerTicketDto.class.getRecordComponents())
                     .noneMatch(c -> "notes".equals(c.getName()));
+        }
+    }
+
+    @Nested
+    @DisplayName("the date window")
+    class DateWindow {
+
+        @Test
+        @DisplayName("days=1 keeps today's tickets and drops yesterday's; days=7 keeps both; the summary ignores days")
+        void daysNarrowsRowsNotCounts() throws Exception {
+            User buyer = customer("9820000391");
+            String today = create(buyer, "{\"subject\":\"Datewin today\",\"team\":\"legal\"}", 201);
+            String yesterday = create(buyer, "{\"subject\":\"Datewin yesterday\",\"team\":\"legal\"}", 201);
+            Instant lateYesterday = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                    .minus(1, ChronoUnit.MINUTES);
+            jdbc.update("update tickets set created_at = ? where id = ?::uuid", Timestamp.from(lateYesterday),
+                    yesterday);
+            User boss = admin("9820000392");
+
+            mvc.perform(get(Routes.Tickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("q", "Datewin").param("days", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(1)))
+                    .andExpect(jsonPath("$.content[0].id").value(today));
+            mvc.perform(get(Routes.Tickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("q", "Datewin").param("days", "7"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(2)));
+            mvc.perform(get(Routes.Tickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("q", "Datewin"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content", hasSize(2)));
+            mvc.perform(get(Routes.Tickets.BASE)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("days", "9999"))
+                    .andExpect(status().isBadRequest());
+            mvc.perform(get(Routes.Tickets.SUMMARY)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(boss))
+                            .param("days", "1"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.all").value(2));
         }
     }
 

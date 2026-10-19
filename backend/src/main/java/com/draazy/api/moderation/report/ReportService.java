@@ -2,6 +2,7 @@ package com.draazy.api.moderation.report;
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
@@ -18,7 +19,6 @@ import com.draazy.api.moderation.user.UserAdminService;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -108,7 +108,7 @@ public class ReportService {
         String wantedReason = blankToNull(reason);
         String wantedTargetType = blankToNull(targetType);
         String like = LikePatterns.contains(q);
-        Instant since = sinceDays == null || sinceDays <= 0 ? null : Instant.now().minus(sinceDays, ChronoUnit.DAYS);
+        Instant since = PlatformTime.sinceOrNull(sinceDays);
 
         if (wantedStatus != null && !ReportStatuses.isValid(wantedStatus)) {
             throw new BadRequestException("Unknown report status: " + wantedStatus);

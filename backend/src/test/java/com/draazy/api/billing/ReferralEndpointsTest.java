@@ -9,11 +9,17 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.draazy.api.billing.referral.ReferralRepository;
 import com.draazy.api.billing.referral.ReferralStatuses;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.JwtService;
 import com.draazy.api.security.Roles;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -251,6 +257,35 @@ class ReferralEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content", org.hamcrest.Matchers.hasSize(0)));
     }
 
+    @Test
+    void daysNarrowsTheQueueByWhenTheReferralWasMade() throws Exception {
+        User staff = user("9866600092", "staff");
+        User oldReferrer = user("9866600093", "owner");
+        User oldReferred = user("9866600094", "buyer");
+        User newReferrer = user("9866600095", "owner");
+        User newReferred = user("9866600096", "buyer");
+        String old = referralFrom(oldReferrer, oldReferred);
+        String fresh = referralFrom(newReferrer, newReferred);
+        Instant midnight = LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant();
+        jdbc.update("update referrals set at = ? where id = ?",
+                Timestamp.from(midnight.minus(1, ChronoUnit.MINUTES)), UUID.fromString(old));
+
+        queueIds(staff, newReferrer, "1").contains(fresh);
+        queueIds(staff, oldReferrer, "1").doesNotContain(old);
+        queueIds(staff, oldReferrer, "7").contains(old);
+        queueIds(staff, oldReferrer, null).contains(old);
+    }
+
+    private org.assertj.core.api.AbstractStringAssert<?> queueIds(User staff, User referrer, String days) throws Exception {
+        var request = get(Routes.Referrals.BASE)
+                .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                .param("q", referrer.getMobile());
+        if (days != null) {
+            request.param("days", days);
+        }
+        return assertThat(mvc.perform(request).andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+    }
     @Test
     void approvingReleasesTheRewardAndCannotBeDoneTwice() throws Exception {
         User referrer = user("9866600050", "owner");

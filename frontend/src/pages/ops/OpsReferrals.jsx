@@ -9,7 +9,7 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
+  BTN, CHIP, CHIP_TONE, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox,
 } from '../../components/admin/WorkQueue.jsx';
 
 const RISK_TONE = { high: CHIP_TONE.red, medium: CHIP_TONE.amber, low: CHIP_TONE.green };
@@ -74,6 +74,7 @@ export default function OpsReferrals() {
   const [page, setPage] = useState(0);
   const [q, setQ] = useState('');
   const [query, setQuery] = useState('');
+  const [days, setDays] = useState('');
   const [reloading, setReloading] = useState(false);
   const [nonce, setNonce] = useState(0);
   const wantCounts = useRef(true);
@@ -90,7 +91,7 @@ export default function OpsReferrals() {
     const withCounts = wantCounts.current;
     let live = true;
     setReloading(true);
-    listReferralQueue({ ...filter, q: query, page, size: PAGE_SIZE, counts: withCounts })
+    listReferralQueue({ ...filter, q: query, days, page, size: PAGE_SIZE, counts: withCounts })
       .then((res) => {
         if (!live) return;
         if (!res.items.length && page > 0 && res.total > 0) {
@@ -110,12 +111,13 @@ export default function OpsReferrals() {
         setReloading(false);
       });
     return () => { live = false; };
-  }, [tab, page, query]);
+  }, [tab, page, query, days]);
 
   useEffect(load, [load, nonce]);
 
   const reload = () => { wantCounts.current = true; setNonce((n) => n + 1); };
   const switchTab = (key) => { setTab(key); setPage(0); };
+  const changeDays = (value) => { setDays(value); setPage(0); };
 
   const doAction = async (r, act) => {
     if (busy.current) return;
@@ -225,6 +227,7 @@ export default function OpsReferrals() {
         toolbar={(
           <>
             <SearchBox value={q} onChange={setQ} placeholder="Referrer, referred or ID" label="Search referrals" />
+            <Chips label="Date" options={DATE_CHIPS} value={days} onChange={changeDays} />
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <button type="button" onClick={reload} className={BTN.ghost}><RefreshCw className="h-3.5 w-3.5" />Refresh</button>
               <button type="button" onClick={doExport} className={BTN.ghost}><Download className="h-3.5 w-3.5" />Export CSV</button>
@@ -234,7 +237,7 @@ export default function OpsReferrals() {
         )}
         footer={paging.pageCount > 1 ? <PageNav {...paging} /> : null}
       >
-        <RowList isEmpty={!rows.length} empty={query ? 'No referrals match this search.' : 'No referrals here.'}>
+        <RowList isEmpty={!rows.length} empty={query || days ? 'No referrals match this search.' : 'No referrals here.'}>
           {rows.map((r) => (
             <RowCard
               key={r.id}

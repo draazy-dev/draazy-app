@@ -1,5 +1,6 @@
 package com.draazy.api.identity.user.erasure;
 
+import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import jakarta.persistence.LockModeType;
@@ -19,11 +20,11 @@ public interface ErasureRequestRepository extends JpaRepository<ErasureRequest, 
     /** Every request the subject has ever filed that still names them — pending, or rejected. */
     Page<ErasureRequest> findBySubjectIdOrderByRequestedAtDesc(UUID subjectId, Pageable pageable);
 
-    /** The admin queue, newest first. */
-    Page<ErasureRequest> findAllByOrderByRequestedAtDesc(Pageable pageable);
-
-    /** The admin queue narrowed to one state, newest first. */
-    Page<ErasureRequest> findByStatusOrderByRequestedAtDesc(String status, Pageable pageable);
+    /** The admin queue, newest first; a null {@code status} means every state. */
+    @Query("select r from ErasureRequest r where (:status is null or r.status = :status) "
+            + "and r.requestedAt >= :since order by r.requestedAt desc")
+    Page<ErasureRequest> queue(@Param("status") String status, @Param("since") Instant since,
+            Pageable pageable);
 
     /** Row-locked so a second concurrent decision waits, then sees the first's outcome and gets the 409. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)

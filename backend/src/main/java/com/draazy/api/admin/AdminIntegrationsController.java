@@ -34,8 +34,9 @@ public class AdminIntegrationsController {
             @RequestParam(required = false) String provider,
             @RequestParam(required = false) String outcome,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Integer days,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return integrations.calls(provider, outcome, q, page, size);
+        return integrations.calls(provider, outcome, q, days, page, size);
     }
 }

@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { hasPermission } from '../../lib/adminModules.js';
 import { classNames, fmtNum, lastActivity } from '../../lib/format.js';
 import { useTabParam } from '../../lib/useTabParam.js';
-import { Chips, ClearFilters, PageNav, QueueTabs, SearchBox } from '../../components/admin/WorkQueue.jsx';
+import { Chips, ClearFilters, DATE_CHIPS, PageNav, QueueTabs, SearchBox } from '../../components/admin/WorkQueue.jsx';
 import KycReviewModal from './kyc/KycReviewModal.jsx';
 import { CLAIM_HOLD_LIMIT, DOC_OPTIONS, STATUS_LABELS, docLabel, elapsed } from './kyc/vocabulary.js';
 
@@ -20,14 +20,14 @@ const TABS = [
   { key: 'appeal', label: 'Appeals', status: 'appeal', count: (s) => s.appeals, empty: 'No identity appeals waiting.', note: 'Rejected cases the applicant asked to have checked again. Uphold the rejection or reopen it for a fresh review.' },
 ];
 const TAB_KEYS = TABS.map((t) => t.key);
-const EMPTY_FILTERS = { q: '', docType: '', claim: '', overdue: false, outcome: '' };
+const EMPTY_FILTERS = { q: '', docType: '', claim: '', overdue: false, outcome: '', days: '' };
 const OUTCOME_CHIPS = [{ value: '', label: 'Any outcome' }, { value: 'verified', label: 'Verified' }, { value: 'rejected', label: 'Rejected' }, { value: 'revoked', label: 'Revoked' }];
 const GRID = 'grid grid-cols-[minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,1fr)_minmax(0,1.2fr)_4.5rem] items-center gap-3';
 const AGE_TONE = { ok: 'text-gray-400', warn: 'font-semibold text-amber-300', breach: 'font-semibold text-rose-300' };
 
 /* Only the filters the tab's server query understands go on the wire. */
 function queryFor(tab, f, page) {
-  const base = { status: TABS.find((t) => t.key === tab).status, q: f.q.trim() || undefined, docType: f.docType || undefined, sort: 'newest', page: page - 1, size: PAGE_SIZE };
+  const base = { status: TABS.find((t) => t.key === tab).status, q: f.q.trim() || undefined, docType: f.docType || undefined, days: f.days || undefined, sort: 'newest', page: page - 1, size: PAGE_SIZE };
   if (tab === 'needs') return { ...base, claim: f.claim || undefined, overdue: f.overdue || undefined };
   if (tab === 'decided') return { ...base, outcome: f.outcome || undefined };
   return base;
@@ -149,6 +149,7 @@ export default function OpsIdentityReview() {
             </>
           ) : null}
           {tab === 'decided' ? <Chips label="Outcome" options={OUTCOME_CHIPS} value={filters.outcome} onChange={(outcome) => changeFilters({ outcome })} /> : null}
+          <Chips label="Date" options={DATE_CHIPS} value={filters.days} onChange={(days) => changeFilters({ days })} />
           {filtered ? <ClearFilters onClick={() => changeFilters(EMPTY_FILTERS)} /> : null}
           <div className="ml-auto"><PageNav {...paging} /></div>
         </div>

@@ -13,7 +13,7 @@ import Select from '../../components/ui/Select.jsx';
 import { BarChart, LineChart, DoughnutChart, PALETTE } from '../../components/charts/index.jsx';
 import { cssColour, useIsLightTheme } from '../../lib/themeColour';
 import {
-  BTN, Chips, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox, useClientPaging,
+  BTN, Chips, DATE_CHIPS, IconAction, PageNav, QueuePanel, QueueTabs, RowCard, RowList, SearchBox, useClientPaging,
 } from '../../components/admin/WorkQueue.jsx';
 
 /** The widest window the console offers, and therefore what it fetches once and slices locally. */
@@ -97,6 +97,7 @@ export default function AdminFinance() {
   const [txQ, setTxQ] = useState('');
   const [txTerm, setTxTerm] = useState('');
   const [txStatus, setTxStatus] = useState('');
+  const [txDays, setTxDays] = useState('');
   const [detail, setDetail] = useState(null);
   const [tab, setTab] = useTabParam(['overview', 'transactions'], 'overview');
   const [overviewFailed, setOverviewFailed] = useState(false);
@@ -123,8 +124,8 @@ export default function AdminFinance() {
   }, [txQ]);
 
   const txFilters = useMemo(
-    () => ({ status: txStatus, q: txTerm }),
-    [txStatus, txTerm],
+    () => ({ status: txStatus, days: txDays, q: txTerm }),
+    [txStatus, txDays, txTerm],
   );
 
   useEffect(() => {
@@ -139,7 +140,7 @@ export default function AdminFinance() {
 
   const txRows = ledger?.items || [];
   const txTotal = ledger?.total || 0;
-  const { items: pageTx, paging } = useClientPaging(txRows, TX_PER_PAGE, `${txStatus}|${txTerm}`);
+  const { items: pageTx, paging } = useClientPaging(txRows, TX_PER_PAGE, `${txStatus}|${txDays}|${txTerm}`);
 
   if (overviewFailed) {
     return (
@@ -375,6 +376,7 @@ export default function AdminFinance() {
               <SearchBox value={txQ} onChange={setTxQ} placeholder="Search party…" label="Search party" />
               {/* The ledger only ever derives `paid` and `pending`; the server answers 400 for `refunded`. */}
               <Chips label="Status" options={TX_STATUSES} value={txStatus} onChange={setTxStatus} />
+              <Chips label="Date" options={DATE_CHIPS} value={txDays} onChange={setTxDays} />
               <div className="ml-auto flex items-center gap-2">
                 <button type="button" onClick={doTxExport} className={BTN.ghost}><Download className="h-3.5 w-3.5" />Export CSV</button>
                 <PageNav {...paging} />

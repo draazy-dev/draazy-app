@@ -7,6 +7,7 @@ import com.draazy.api.billing.plan.Plan;
 import com.draazy.api.billing.plan.PlanRepository;
 import com.draazy.api.billing.plan.Subscription;
 import com.draazy.api.billing.plan.SubscriptionRepository;
+import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -78,20 +79,21 @@ public class RefundDesk {
     }
 
     @Transactional(readOnly = true)
-    public Page<Row> list(String status, Pageable pageable) {
+    public Page<Row> list(String status, Integer days, Pageable pageable) {
         String filter = status == null || status.isBlank() ? RefundStatuses.PENDING_REVIEW : status;
         if (!RefundStatuses.DESK_FILTERS.contains(filter)) {
             throw new BadRequestException("status must be one of " + RefundStatuses.DESK_FILTERS.stream().sorted().toList());
         }
+        Instant since = since(days);
         return switch (filter) {
             case RefundStatuses.AUTO -> {
-                Page<Subscription> page = requests.findAutoRefunds(pageable);
+                Page<Subscription> page = requests.findAutoRefunds(since, pageable);
                 Lookup lookup = lookup(page.getContent().stream().map(Subscription::getId).toList(),
                         page.getContent().stream().map(Subscription::getUserId).toList());
                 yield page.map(order -> autoRow(order, lookup));
             }
             case RefundStatuses.DISPUTED -> {
-                Page<PaymentDispute> page = disputes.findByStatus(PaymentDispute.OPEN,
+                Page<PaymentDispute> page = disputes.findByStatusSince(PaymentDispute.OPEN, since,
                         PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
                                 Sort.by(Sort.Direction.DESC, "openedAt")));
                 Lookup lookup = lookup(page.getContent().stream().map(PaymentDispute::getSubscriptionId).toList(),
@@ -99,13 +101,19 @@ public class RefundDesk {
                 yield page.map(dispute -> disputeRow(dispute, lookup));
             }
             default -> {
-                Page<RefundRequest> page = requests.findByStatus(filter, PageRequest.of(pageable.getPageNumber(),
-                        pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "createdAt")));
+                Page<RefundRequest> page = requests.findByStatusSince(filter, since,
+                        PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+                                Sort.by(Sort.Direction.DESC, "createdAt")));
                 Lookup lookup = lookup(page.getContent().stream().map(RefundRequest::getSubscriptionId).toList(),
                         page.getContent().stream().map(RefundRequest::getUserId).toList());
                 yield page.map(request -> requestRow(request, lookup));
             }
         };
+    }
+
+    private static Instant since(Integer days) {
+        Instant since = PlatformTime.sinceOrNull(days);
+        return since == null ? Instant.EPOCH : since;
     }
 
     @Transactional(readOnly = true)
@@ -114,7 +122,7 @@ public class RefundDesk {
         for (String status : List.of(RefundStatuses.PENDING_REVIEW, RefundStatuses.APPROVED, RefundStatuses.REJECTED)) {
             totals.put(status, requests.countByStatus(status));
         }
-        totals.put(RefundStatuses.AUTO, requests.findAutoRefunds(PageRequest.of(0, 1)).getTotalElements());
+        totals.put(RefundStatuses.AUTO, requests.findAutoRefunds(Instant.EPOCH, PageRequest.of(0, 1)).getTotalElements());
         totals.put(RefundStatuses.DISPUTED, disputes.countByStatus(PaymentDispute.OPEN));
         return totals;
     }

@@ -357,4 +357,60 @@ class PropertyModerationQueueTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
                 .andExpect(jsonPath("$.flagReason").value("duplicate photos"));
     }
-}
+
+    private static final java.time.Instant YESTERDAY_LATE = java.time.LocalDate.now(com.draazy.api.common.PlatformTime.IST)
+            .atStartOfDay(com.draazy.api.common.PlatformTime.IST).toInstant().minus(1, java.time.temporal.ChronoUnit.MINUTES);
+
+    private void stamp(Property p, String column, java.time.Instant at) {
+        jdbc.update("update properties set " + column + " = ? where id = ?", java.sql.Timestamp.from(at), p.getId());
+    }
+
+    private java.util.List<String> titles(User staff, String... params) throws Exception {
+        var req = get("/admin/properties").header(HttpHeaders.AUTHORIZATION, bearer(staff)).param("q", "Datechip");
+        for (int i = 0; i < params.length; i += 2) req = req.param(params[i], params[i + 1]);
+        String body = mvc.perform(req).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        return com.jayway.jsonpath.JsonPath.read(body, "$.content[*].title");
+    }
+
+    @Test
+    @DisplayName("days filters the queue by creation time in IST calendar days")
+    void daysFiltersByCreatedAt() throws Exception {
+        User owner = user("9871501001", "owner");
+        User staff = user("9871501002", "staff");
+        listing(owner, "Datechip today", PropertyStatus.PENDING);
+        stamp(listing(owner, "Datechip yesterday", PropertyStatus.PENDING), "created_at", YESTERDAY_LATE);
+
+        org.assertj.core.api.Assertions.assertThat(titles(staff)).hasSize(2);
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "days", "1")).containsExactly("Datechip today");
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "days", "7")).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("days filters the re-check tab by when the re-check was requested, not by creation")
+    void daysFiltersRecheckByRequestTime() throws Exception {
+        User owner = user("9871501003", "owner");
+        User staff = user("9871501004", "staff");
+        Property fresh = listing(owner, "Datechip fresh recheck", PropertyStatus.APPROVED);
+        Property old = listing(owner, "Datechip old recheck", PropertyStatus.APPROVED);
+        stamp(fresh, "recheck_requested_at", java.time.Instant.now());
+        stamp(old, "recheck_requested_at", YESTERDAY_LATE);
+
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "recheck", "true", "days", "1"))
+                .containsExactly("Datechip fresh recheck");
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "recheck", "true", "days", "7")).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("days filters the badge tab by when the badge was requested, not by creation")
+    void daysFiltersBadgeByRequestTime() throws Exception {
+        User owner = user("9871501005", "owner");
+        User staff = user("9871501006", "staff");
+        Property fresh = listing(owner, "Datechip fresh badge", PropertyStatus.APPROVED);
+        Property old = listing(owner, "Datechip old badge", PropertyStatus.APPROVED);
+        stamp(fresh, "ownership_requested_at", java.time.Instant.now());
+        stamp(old, "ownership_requested_at", YESTERDAY_LATE);
+
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "badge", "true", "days", "1"))
+                .containsExactly("Datechip fresh badge");
+        org.assertj.core.api.Assertions.assertThat(titles(staff, "badge", "true", "days", "7")).hasSize(2);
+    }}

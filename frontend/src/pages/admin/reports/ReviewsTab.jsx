@@ -6,7 +6,7 @@ import { classNames, fmtNum } from '../../../lib/format.js';
 import Badge from '../../../components/ui/Badge.jsx';
 import Loading from '../../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, Chips, ClearFilters, PageNav, QueuePanel, RowCard, RowList, SearchBox,
+  BTN, CHIP, CHIP_TONE, Chips, ClearFilters, DATE_CHIPS, PageNav, QueuePanel, RowCard, RowList, SearchBox,
 } from '../../../components/admin/WorkQueue.jsx';
 
 const PAGE_SIZE = 10;
@@ -21,6 +21,7 @@ export default function ReviewsTab() {
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
+  const [days, setDays] = useState('');
   const [pageState, setPageState] = useState({ page: 1, key: '' });
   const [bump, setBump] = useState(0);
   const countsFor = useRef(-1);
@@ -30,13 +31,13 @@ export default function ReviewsTab() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const filterKey = `${status}|${search}`;
+  const filterKey = `${status}|${search}|${days}`;
   const pageNo = pageState.key === filterKey ? pageState.page : 1;
 
   // One page per read; the status totals ride along on first load and after a decision.
   useEffect(() => {
     let alive = true;
-    listReviewsForModeration({ status, q: search, page: pageNo - 1, size: PAGE_SIZE, counts: countsFor.current !== bump })
+    listReviewsForModeration({ status, q: search, days, page: pageNo - 1, size: PAGE_SIZE, counts: countsFor.current !== bump })
       .then((r) => {
         if (!alive) return;
         if (r.counts) { countsFor.current = bump; setCounts(r.counts); }
@@ -49,7 +50,7 @@ export default function ReviewsTab() {
         setError('Reviews could not be loaded. This is not an empty queue — reload to try again.');
       });
     return () => { alive = false; };
-  }, [status, search, pageNo, bump]);
+  }, [status, search, days, pageNo, bump]);
 
   // Not optimistic: a row claiming a verdict the server refused would leave a review up that the
   // moderator believes is down.
@@ -91,14 +92,15 @@ export default function ReviewsTab() {
         <>
           <SearchBox value={q} onChange={setQ} placeholder="Author, item or text" label="Search reviews" />
           <Chips label="Status" options={statusChips} value={status} onChange={setStatus} />
-          {status || q ? <ClearFilters onClick={() => { setStatus(''); setQ(''); }} /> : null}
+          <Chips label="Date" options={DATE_CHIPS} value={days} onChange={setDays} />
+          {status || q || days ? <ClearFilters onClick={() => { setStatus(''); setQ(''); setDays(''); }} /> : null}
           <div className="ml-auto"><PageNav {...paging} /></div>
         </>
       )}
       footer={paging.pageCount > 1 ? <PageNav {...paging} /> : null}
     >
       {error ? <div role="alert" className="border-b border-rose-500/20 bg-rose-500/5 px-4 py-2.5 text-sm text-rose-200">{error}</div> : null}
-      <RowList isEmpty={!rows.length} empty={status || q ? 'No reviews match these filters.' : 'No reviews yet.'}>
+      <RowList isEmpty={!rows.length} empty={status || q || days ? 'No reviews match these filters.' : 'No reviews yet.'}>
         {rows.map((r) => (
           <RowCard
             key={r.id}
