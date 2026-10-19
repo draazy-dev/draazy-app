@@ -229,8 +229,8 @@ is a trial; pricing a platform against an expiring credit is how the surprise ar
 **Budget.** Sandbox ≈ **$17/mo + 18% GST** ($10 `api` + $7 dev database). Production swaps the dev
 database for Managed Postgres: ≈ $25/mo + GST before storage overage.
 
-**Why the $5 tier is a trap, specifically here.** `-XX:MaxRAMPercentage=70.0` (`backend/Dockerfile`)
-on 512 MiB leaves a ~358 MB heap and ~154 MB for everything else, and Spring Boot 4 plus Hibernate
+**Why the $5 tier is a trap, specifically here.** `-XX:MaxRAMPercentage=50.0` (`backend/Dockerfile`)
+on 512 MiB leaves a ~256 MB heap and ~256 MB for everything else, and Spring Boot 4 plus Hibernate
 across ~99 repositories spends ~250 MB outside the heap (metaspace ~100 MB, code cache, symbols,
 threads). It does not OOM under load — it OOMs *during startup*, after the health check has begun
 waiting, which reads as a failed deploy rather than an undersized plan.
