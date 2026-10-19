@@ -23,6 +23,8 @@ import { areaProfileForTypes, defaultAreaRangeSqft, formatAreaRange, isDefaultAr
 export function buildActiveChips(f, { tr, locNameBySlug, socNameBySlug, setF, set, freeText, clearFreeText }) {
   const rent = f.deal === 'rent';
   const relc = (s) => sectionVisible(s, f.types);
+  // A range's ceiling is sent open-ended (facetQuery `bounds`), so its label must read "and above".
+  const upTo = (label, v, max) => label + (v === max ? '+' : '');
   const TYPE_LBL = Object.fromEntries(rent ? RENT_TYPES : BUY_TYPES);
   const BHK_LBL = Object.fromEntries(rent ? BHK_RENT : BHK_BUY);
   const TENANT_LBL = Object.fromEntries(TENANTS);
@@ -64,26 +66,26 @@ export function buildActiveChips(f, { tr, locNameBySlug, socNameBySlug, setF, se
     chips.push({ id: 'near', label: tr('listings.chipNear', { label: f.nearLabel || tr('listings.place'), radius: f.nearRadius, unit: f.nearMode === 'km' ? tr('listings.unitKm') : tr('listings.unitMin') }), remove: () => set({ near: '', nearLabel: '', nearRadius: 5 }) });
   }
   const areaProfile = areaProfileForTypes(f.types, f.areaUnit);
-  if (!isDefaultAreaRange(f.area, areaProfile) && relc('area')) chips.push({ id: 'area', label: areaProfile.kind === 'built' ? fmtAreaSqft(f.area[0]) + ' – ' + fmtAreaSqft(f.area[1]) : formatAreaRange(f.area, areaProfile), remove: () => set({ area: defaultAreaRangeSqft(areaProfile), areaUnit: areaProfile.unit }) });
+  if (!isDefaultAreaRange(f.area, areaProfile) && relc('area')) chips.push({ id: 'area', label: areaProfile.kind === 'built' ? fmtAreaSqft(f.area[0]) + ' – ' + upTo(fmtAreaSqft(f.area[1]), f.area[1], defaultAreaRangeSqft(areaProfile)[1]) : formatAreaRange(f.area, areaProfile), remove: () => set({ area: defaultAreaRangeSqft(areaProfile), areaUnit: areaProfile.unit }) });
   if (rent) {
     if (relc('tenants')) [...f.tenants].forEach((v) => chips.push({ id: 'ten-' + v, label: TENANT_LBL[v] || v, remove: () => delFrom('tenants', v) }));
     if (relc('room')) [...f.room].forEach((v) => chips.push({ id: 'room-' + v, label: ROOM_LBL[v] || v, remove: () => delFrom('room', v) }));
     if (f.availFrom && relc('availFrom')) chips.push({ id: 'availf-' + f.availFrom, label: AVAILF_LBL[f.availFrom] || f.availFrom, remove: () => set({ availFrom: '' }) });
     if (f.pets && relc('amenities')) chips.push({ id: 'pets', label: tr('listings.petFriendly'), remove: () => set({ pets: false }) });
     if (f.food && relc('food')) chips.push({ id: 'food', label: tr((FOOD.find(([v]) => v === f.food) || [])[1] || 'listings.nonVegOk'), remove: () => set({ food: '' }) });
-    if (f.rent[0] !== 0 || f.rent[1] !== 100000) chips.push({ id: 'rent', label: fmtRent(f.rent[0]) + ' – ' + fmtRent(f.rent[1]), remove: () => set({ rent: [0, 100000] }) });
-    if (f.deposit[0] !== 0 || f.deposit[1] !== 1000000) chips.push({ id: 'deposit', label: tr('listings.chipDeposit', { from: fmtRent(f.deposit[0]), to: fmtRent(f.deposit[1]) }), remove: () => set({ deposit: [0, 1000000] }) });
-    if ((f.age[0] !== 0 || f.age[1] !== 25) && relc('age')) chips.push({ id: 'age', label: tr('listings.chipAge', { from: f.age[0], to: f.age[1] }), remove: () => set({ age: [0, 25] }) });
-    if ((f.floor[0] !== 0 || f.floor[1] !== 40) && relc('floor')) chips.push({ id: 'floor', label: tr('listings.chipFloor', { from: f.floor[0], to: f.floor[1] }), remove: () => set({ floor: [0, 40] }) });
+    if (f.rent[0] !== 0 || f.rent[1] !== 100000) chips.push({ id: 'rent', label: fmtRent(f.rent[0]) + ' – ' + upTo(fmtRent(f.rent[1]), f.rent[1], 100000), remove: () => set({ rent: [0, 100000] }) });
+    if (f.deposit[0] !== 0 || f.deposit[1] !== 1000000) chips.push({ id: 'deposit', label: tr('listings.chipDeposit', { from: fmtRent(f.deposit[0]), to: upTo(fmtRent(f.deposit[1]), f.deposit[1], 1000000) }), remove: () => set({ deposit: [0, 1000000] }) });
+    if ((f.age[0] !== 0 || f.age[1] !== 25) && relc('age')) chips.push({ id: 'age', label: tr('listings.chipAge', { from: f.age[0], to: upTo('' + f.age[1], f.age[1], 25) }), remove: () => set({ age: [0, 25] }) });
+    if ((f.floor[0] !== 0 || f.floor[1] !== 40) && relc('floor')) chips.push({ id: 'floor', label: tr('listings.chipFloor', { from: f.floor[0], to: upTo('' + f.floor[1], f.floor[1], 40) }), remove: () => set({ floor: [0, 40] }) });
   } else {
     if (relc('construction')) [...f.constr].forEach((v) => {
       const lbl = CONSTR_STATUS.find(([k]) => k === v);
       if (lbl) chips.push({ id: 'constr-' + v, label: lbl[1], remove: () => delFrom('constr', v) });
     });
     if (f.preLeased && relc('preLeased')) chips.push({ id: 'preLeased', label: tr('listings.preLeased'), remove: () => set({ preLeased: false }) });
-    if (f.budget[0] !== 0 || f.budget[1] !== 50000000) chips.push({ id: 'budget', label: fmtINR(f.budget[0]) + ' – ' + fmtINR(f.budget[1]), remove: () => set({ budget: [0, 50000000] }) });
-    if ((f.age[0] !== 0 || f.age[1] !== 25) && relc('age')) chips.push({ id: 'age', label: tr('listings.chipAge', { from: f.age[0], to: f.age[1] }), remove: () => set({ age: [0, 25] }) });
-    if ((f.floor[0] !== 0 || f.floor[1] !== 40) && relc('floor')) chips.push({ id: 'floor', label: tr('listings.chipFloor', { from: f.floor[0], to: f.floor[1] }), remove: () => set({ floor: [0, 40] }) });
+    if (f.budget[0] !== 0 || f.budget[1] !== 50000000) chips.push({ id: 'budget', label: fmtINR(f.budget[0]) + ' – ' + upTo(fmtINR(f.budget[1]), f.budget[1], 50000000), remove: () => set({ budget: [0, 50000000] }) });
+    if ((f.age[0] !== 0 || f.age[1] !== 25) && relc('age')) chips.push({ id: 'age', label: tr('listings.chipAge', { from: f.age[0], to: upTo('' + f.age[1], f.age[1], 25) }), remove: () => set({ age: [0, 25] }) });
+    if ((f.floor[0] !== 0 || f.floor[1] !== 40) && relc('floor')) chips.push({ id: 'floor', label: tr('listings.chipFloor', { from: f.floor[0], to: upTo('' + f.floor[1], f.floor[1], 40) }), remove: () => set({ floor: [0, 40] }) });
   }
   return chips;
 }

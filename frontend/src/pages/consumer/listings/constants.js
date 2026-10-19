@@ -9,7 +9,7 @@ export const AMEN_RENT = [['lift', 'Lift'], ['parking', 'Parking'], ['security',
 export const BHK_BUY = BHK_OPTIONS.buy;
 export const BHK_RENT = BHK_OPTIONS.rent;
 export const TENANTS = [['family', 'Family'], ['bachelors', 'Bachelors'], ['bachelor-male', 'Bachelors (Male)'], ['bachelor-female', 'Bachelors (Female)'], ['company', 'Company'], ['anyone', 'No preference']];
-export const ROOM_TYPES = [['single', 'Single Room (Private)'], ['shared', 'Shared Room']];
+export const ROOM_TYPES = [['single', 'Private room'], ['shared', 'Shared (twin-sharing)']];
 export const AVAIL_FROM = [['', 'Anytime'], ['now', 'Immediately'], ['15', 'Within 15 days'], ['30', 'Within 30 days']];
 export const CONSTR_STATUS = [['ready', 'Ready to Move'], ['under', 'Under Construction'], ['new', 'New Launch']];
 

@@ -211,6 +211,27 @@ test.describe('Property alerts (live)', () => {
     expect([...saved.filters.bhk].sort()).toEqual(['2', '3']);
   });
 
+  test('a facet the chosen type has no use for is neither shown nor saved', async ({ page }) => {
+    const mobile = await signedInAsNew(page);
+    const headers = await authHeaders(mobile);
+
+    await page.goto('/listings?deal=buy&ptype=plot&bhks=2&furn=semi&amen=lift');
+    await page.getByRole('button', { name: 'Alert me', exact: true }).filter({ visible: true }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Create an alert' });
+    await expect(dialog.getByTestId('alert-setup-label')).not.toContainText('BHK');
+    await expect(dialog.getByRole('button', { name: '2 BHK' })).toHaveCount(0);
+    await dialog.getByRole('button', { name: 'Create alert', exact: true }).click();
+    await expect(dialog).toBeHidden();
+
+    await expect.poll(async () => (await savedSearchesOf(headers)).length).toBe(1);
+    const [{ filters }] = await savedSearchesOf(headers);
+    expect(filters.types).toEqual(['plot']);
+    expect(filters.bhk ?? []).toEqual([]);
+    expect(filters.furnishing ?? []).toEqual([]);
+    expect(filters.amenities ?? []).toEqual([]);
+  });
+
   test('editing an alert from the dashboard updates it in place', async ({ page }) => {
     const mobile = uniqueMobile();
     const headers = await authHeaders(mobile);

@@ -126,7 +126,9 @@ Axes, and the column each resolves to:
     out instead of 404ing a card.
 - **Relevance-gated filters:** each optional filter is wrapped in `rel(section)`
   (`sectionVisible`), so a filter hidden as irrelevant for the current property types never narrows
-  results.
+  results. The same gate keeps it out of the URL (`filtersToParams`) and out of a saved alert
+  (`dropHiddenFacets`), since the alert matcher applies every facet it is given; the value stays in
+  state and returns when the type no longer hides it.
 
 **Where the browser and the server disagreed, the server wins** - these are behaviour changes, not
 implementation details:

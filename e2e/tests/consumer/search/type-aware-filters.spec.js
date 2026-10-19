@@ -109,3 +109,14 @@ test('Land use and Property type are multi-select checkbox grids that toggle chi
     await expect(typeInput(page, 'flat')).toBeChecked();
   });
 });
+
+test('a facet the type hides leaves the URL, and returns when the type is cleared', async ({ page }) => {
+  await page.goto(`${BASE}/listings?deal=buy&ptype=plot&bhks=2&furn=semi&amen=lift&v=rera&age=0-5&floor=2-10&constr=ready`);
+  await expect(page.getByRole('button', { name: 'Remove filter Open Plot', exact: true })).toBeVisible();
+  await expect.poll(() => [...new URL(page.url()).searchParams.keys()].sort()).toEqual(['deal', 'ptype']);
+  await expect(page.getByRole('button', { name: 'Remove filter 2 BHK', exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Remove filter Open Plot', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove filter 2 BHK', exact: true })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get('bhks')).toBe('2');
+});

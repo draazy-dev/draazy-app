@@ -8,8 +8,9 @@ import LocalitySearchInput from '../../../components/search/LocalitySearchInput.
 import { useToast } from '../../../context/ToastContext.jsx';
 import { fmtINR } from '../../../lib/format.js';
 import { RANGE } from '../../../lib/listings/filterState.js';
+import { sectionVisible } from '../../../lib/listings/filterRelevance.js';
 import { DEFAULT_ALERT_FREQUENCY } from '../../../services/savedSearchService.js';
-import { alertLabel } from './alertCriteria.js';
+import { alertLabel, dropHiddenFacets } from './alertCriteria.js';
 import { BHK_BUY, BHK_RENT, BUY_TYPES, FURN, RENT_TYPES } from './constants.js';
 import DealToggle from './DealToggle.jsx';
 import { fmtRent } from './format.js';
@@ -84,7 +85,7 @@ export default function AlertSetupModal({ initial, locNameBySlug = {}, editing =
   const set = (patch) => setD((prev) => ({ ...prev, ...patch }));
   const nameOf = (slug) => names[slug] || slug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-  const record = {
+  const record = dropHiddenFacets({
     kind: 'listings',
     deal: d.deal,
     localities: d.localities,
@@ -96,8 +97,9 @@ export default function AlertSetupModal({ initial, locNameBySlug = {}, editing =
     alertFrequency: d.alertFrequency,
     channel: 'push',
     query: '',
-  };
+  });
   record.label = alertLabel(record, names);
+  const shows = (section) => sectionVisible(section, new Set(d.types));
 
   const switchDeal = (deal) => {
     const next = deal === 'rent' ? { bhk: BHK_RENT, types: RENT_TYPES } : { bhk: BHK_BUY, types: BUY_TYPES };
@@ -165,7 +167,7 @@ export default function AlertSetupModal({ initial, locNameBySlug = {}, editing =
           {d.localities.length ? null : <p className="mt-1.5 text-xs text-gray-500">{t('listings.alertAnyArea')}</p>}
         </fieldset>
 
-        <ChipGroup icon="bed-double" label={t('listings.bhkType')} options={bhkOpts} selected={d.bhk} onToggle={(k) => set({ bhk: toggle(d.bhk, k) })} />
+        {shows('bhk') && <ChipGroup icon="bed-double" label={t('listings.bhkType')} options={bhkOpts} selected={d.bhk} onToggle={(k) => set({ bhk: toggle(d.bhk, k) })} />}
 
         <fieldset>
           <legend className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-white">
@@ -179,7 +181,7 @@ export default function AlertSetupModal({ initial, locNameBySlug = {}, editing =
         </fieldset>
 
         <ChipGroup icon="building-2" label={t('listings.propertyType')} options={typeOpts} selected={d.types} onToggle={(k) => set({ types: toggle(d.types, k) })} />
-        <ChipGroup icon="sofa" label={t('listings.furnishing')} options={FURN} selected={d.furnishing} onToggle={(k) => set({ furnishing: toggle(d.furnishing, k) })} />
+        {shows('furnishing') && <ChipGroup icon="sofa" label={t('listings.furnishing')} options={FURN} selected={d.furnishing} onToggle={(k) => set({ furnishing: toggle(d.furnishing, k) })} />}
 
         <fieldset>
           <legend className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-white">
