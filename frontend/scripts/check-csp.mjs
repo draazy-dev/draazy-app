@@ -103,7 +103,7 @@ if (problems.length) {
 const { SECURITY_HEADERS } = await import(pathToFileURL(join(root, 'edge/seo-pages.mjs')).href);
 const block = readFileSync(join(root, 'public/_headers'), 'utf8').split(/\r?\n\/\*\r?\n/)[1].split(/\r?\n(?=\S)/)[0];
 const fileHeaders = Object.fromEntries(block.split(/\r?\n/).map((l) => l.trim())
-  .filter((l) => l && !l.startsWith('#')).map((l) => [l.slice(0, l.indexOf(':')), l.slice(l.indexOf(':') + 1).trim()]));
+  .filter((l) => l && !l.startsWith('#') && !l.startsWith('!')).map((l) => [l.slice(0, l.indexOf(':')), l.slice(l.indexOf(':') + 1).trim()]));
 const edgeDrift = [...new Set([...Object.keys(fileHeaders), ...Object.keys(SECURITY_HEADERS)])]
   .filter((name) => fileHeaders[name] !== SECURITY_HEADERS[name]);
 if (edgeDrift.length) {
