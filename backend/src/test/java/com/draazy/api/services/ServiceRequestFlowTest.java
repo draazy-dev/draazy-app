@@ -738,13 +738,17 @@ class ServiceRequestFlowTest extends ServiceFixtures {
         }
 
         @Test
-        @DisplayName("a failed payment cancels the request")
-        void failedPaymentCancels() throws Exception {
+        @DisplayName("a declined attempt leaves the request payable, and a retry on the same order settles it")
+        void aDeclineKeepsTheOrderOpen() throws Exception {
             User buyer = customer("9820000143");
             String id = raiseUnpaid(buyer, listing(buyer));
+            String ref = paymentRef(id);
 
-            deliverSigned(paymentRef(id), false);
-            expectStatus(buyer, id, "cancelled");
+            deliverSigned(ref, false);
+            expectStatus(buyer, id, "awaiting-payment");
+
+            deliverSigned(ref, true);
+            expectStatus(buyer, id, "new");
         }
 
         @Test

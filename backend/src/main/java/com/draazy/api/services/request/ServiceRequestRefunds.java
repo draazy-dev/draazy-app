@@ -38,6 +38,8 @@ public class ServiceRequestRefunds {
 
     private static final String GATEWAY_SETTLED = "SUCCESS";
 
+    private static final String OUTSIDE_ACTOR = "Payment gateway";
+
     private static final Pattern GATEWAY_REFUND_ID = Pattern.compile("rf_([0-9a-f]{8})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{4})([0-9a-f]{12})");
 
     private final ServiceRequestService requests;
@@ -133,7 +135,7 @@ public class ServiceRequestRefunds {
             throw unrecorded;
         }
         requests.record(request, "refund.approved", requests.displayName(caller.userId()));
-        cancelWhenFullyRefunded(request, caller);
+        cancelWhenFullyRefunded(request, caller.userId(), requests.displayName(caller.userId()));
         audit.record(caller, "service-request.refund-approved", "service_request", id,
                 "refund", refundId, "amount", refund.getAmount(), "gatewayRefund", gatewayRef);
         notifier.notify(request.getRequesterId(), "service.refund-approved",
@@ -179,6 +181,37 @@ public class ServiceRequestRefunds {
         return true;
     }
 
+    /** A refund made on the gateway dashboard, entered in the ledger as approved so the refundable balance, the
+     * credit note and a full-refund cancellation follow. False when the order is not one of ours. */
+    @Transactional
+    public boolean applyOutsideRefund(String orderId, String gatewayRefund, long amount) {
+        UUID requestId = orderId == null ? null : requestRows.findByPaymentRef(orderId).map(ServiceRequest::getId)
+                .or(() -> amendments.findByPaymentRefForUpdate(orderId).map(ServiceRequestAmendment::getServiceRequestId))
+                .orElse(null);
+        if (requestId == null) {
+            return false;
+        }
+        ServiceRequest request = locked(requestId);
+        if (gatewayRefund == null || refunds.existsByGatewayRefundId(gatewayRefund)) {
+            return true;
+        }
+        ServiceRequestRefund refund = new ServiceRequestRefund(request.getId(), orderId, amount, false, null,
+                "Refunded on the payment gateway dashboard", null);
+        refund.approve(gatewayRefund, null, null);
+        refunds.saveAndFlush(refund);
+        creditNotes.issue(request.getRequesterId(), CreditNotes.SERVICE_REQUEST_REFUND, refund.getId(), orderId,
+                amount, Instant.now());
+        requests.record(request, "refund.approved", OUTSIDE_ACTOR);
+        cancelWhenFullyRefunded(request, null, OUTSIDE_ACTOR);
+        audit.record("system", "admin", "service-request.refund-outside", "service_request",
+                request.getId().toString(), Map.of("order", orderId, "amount", amount, "gatewayRefund", gatewayRefund));
+        notifier.notify(request.getRequesterId(), "service.refund-approved",
+                Notifier.rupees(amount) + " refund on its way",
+                "It goes back to the card or account you paid with. Banks usually take 5\u20137 working days.",
+                ServiceRequestTypes.pageFor(request.getType()));
+        return true;
+    }
+
     @Transactional
     public RefundSummaryDto reject(AuthPrincipal caller, String id, String refundId, String note) {
         ServiceRequest request = locked(rentAgreement(caller, id).getId());
@@ -191,15 +224,15 @@ public class ServiceRequestRefunds {
     }
 
     // The refund that took everything back leaves nothing to deliver, so the request ends with it.
-    private void cancelWhenFullyRefunded(ServiceRequest request, AuthPrincipal caller) {
+    private void cancelWhenFullyRefunded(ServiceRequest request, UUID actor, String actorName) {
         if (refunds.approvedTotal(request.getId()) < paid(request)
                 || !request.getStatus().canTransitionTo(ServiceRequestStatus.CANCELLED)) {
             return;
         }
         requests.transition(request, ServiceRequestStatus.CANCELLED);
         amendments.findOpenForUpdate(request.getId())
-                .ifPresent(open -> open.close(ServiceRequestAmendment.WITHDRAWN, caller.userId(), Instant.now()));
-        requests.record(request, "refund.cancelled-request", requests.displayName(caller.userId()));
+                .ifPresent(open -> open.close(ServiceRequestAmendment.WITHDRAWN, actor, Instant.now()));
+        requests.record(request, "refund.cancelled-request", actorName);
         notifier.notify(request.getRequesterId(), "service.refund-cancelled",
                 "Request cancelled", "Everything you paid is being refunded, so this request is closed.",
                 ServiceRequestTypes.pageFor(request.getType()));

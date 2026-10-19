@@ -41,6 +41,8 @@ const TYPE_PREFIXES = [
   ['tenancy', 'service'],
   ['referral', 'referral'],
   ['refund', 'refund'],
+  // A checkout paid too late (cancelled or expired order) is refunded automatically.
+  ['subscription.refund', 'refund'],
   ['support', 'system'],
 ];
 

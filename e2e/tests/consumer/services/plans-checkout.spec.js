@@ -239,6 +239,97 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     await expect(page.getByText(/15 contacts added, valid till/)).toBeVisible();
   });
 
+  test('a second pack bought on top of a live one reaches the success screen, though the earliest pack expiry does not move', async ({ page }) => {
+    /* Entitlements report the earliest live pack's expiry, so a stacked pack never changes it:
+       the paid order is the proof. */
+    const mobile = await signedInAsNew(page);
+    await seedConsent(page);
+    settleOrder((await openOrder(mobile, CONTACT_PACK_PLAN)).id, 10);
+
+    await page.goto('/checkout?plan=contact-pack');
+    await page.getByRole('button', { name: /^Pay ₹/ }).first().click();
+    await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
+
+    settleOrder(await pendingOrderId(mobile), 30);
+    await expect(page.getByRole('heading', { name: 'Payment successful!' })).toBeVisible({ timeout: 40000 });
+    await expect(page.getByText(/15 contacts added, valid till/)).toBeVisible();
+  });
+
+  test('a declined payment brings Pay back with a decline message, and the retry reopens the same order', async ({ page }) => {
+    /* Cashfree keeps a declined order payable; the mock gateway never declines, so the order-status read is stubbed. */
+    await signedInAsNew(page);
+    await seedConsent(page);
+    let declined = true;
+    await page.route('**/api/me/subscription/orders/*', (route) =>
+      (declined ? route.fulfill({ json: { status: 'failed' } }) : route.fallback()));
+    const orders = [];
+    page.on('response', async (res) => {
+      if (res.request().method() === 'POST' && /\/api\/me\/subscription$/.test(res.url())) orders.push(res);
+    });
+
+    await page.goto('/checkout?plan=contact-pack');
+    const pay = page.getByRole('button', { name: /^Pay ₹/ }).first();
+    await pay.click();
+    await expect(page.getByRole('alert')).toContainText("Your payment didn't go through", { timeout: 20000 });
+    await expect(page.getByRole('heading', { name: 'Payment pending' })).toHaveCount(0);
+
+    declined = false;
+    await pay.click();
+    await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(orders.map((r) => r.status())).toEqual([201, 201]);
+    const [first, retry] = await Promise.all(orders.map((r) => r.json()));
+    expect(retry.paymentRef).toBe(first.paymentRef);
+  });
+
+  test('closing the payment window reads as not completed rather than a failure to start, and an order paid before the close still succeeds', async ({ page }) => {
+    /* The SDK resolves a closed modal as `{ error }`. The mock gateway's session never reaches the SDK, so the
+       session is swapped for a real-looking one and the SDK global is faked. */
+    await signedInAsNew(page);
+    await seedConsent(page);
+    await page.addInitScript(() => { window.Cashfree = () => ({ checkout: async () => ({ error: { message: 'closed' } }) }); });
+    await page.route('**/api/me/subscription', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback();
+      const response = await route.fetch();
+      return route.fulfill({ response, json: { ...(await response.json()), paymentSessionId: 'session_e2e' } });
+    });
+    let status = 'pending';
+    await page.route('**/api/me/subscription/orders/*', (route) => route.fulfill({ json: { status } }));
+
+    await page.goto('/checkout?plan=contact-pack');
+    const pay = page.getByRole('button', { name: /^Pay ₹/ }).first();
+    await pay.click();
+    const alert = page.getByRole('alert');
+    await expect(alert).toContainText('Payment not completed', { timeout: 20000 });
+    await expect(alert).not.toContainText("couldn't start");
+
+    status = 'paid';
+    await pay.click();
+    await expect(page.getByRole('heading', { name: 'Payment successful!' })).toBeVisible({ timeout: 20000 });
+  });
+
+  test('coming back from a bank page with the order id resumes on the pending screen, and an older live pack does not pass for this order', async ({ page }) => {
+    const mobile = await signedInAsNew(page);
+    await seedConsent(page);
+    settleOrder((await openOrder(mobile, CONTACT_PACK_PLAN)).id, 10);
+    const order = await openOrder(mobile, CONTACT_PACK_PLAN);
+
+    await page.goto(`/checkout?plan=contact-pack&order_id=${order.paymentRef}`);
+    await expect(page.getByRole('heading', { name: 'Payment pending' })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(order.paymentRef)).toBeVisible();
+
+    settleOrder(order.id, 30);
+    await expect(page.getByRole('heading', { name: 'Payment successful!' })).toBeVisible({ timeout: 40000 });
+  });
+
+  test('checkout leaves the payment method to the gateway screen instead of a picker that was never sent', async ({ page }) => {
+    await signedInAsNew(page);
+    await seedConsent(page);
+    await page.goto('/checkout?plan=contact-pack');
+    await expect(page.getByText('you pick on the secure Cashfree screen')).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('div.max-w-4xl').getByRole('radio')).toHaveCount(0);
+  });
+
   test('the plan cards state what each product grants, with the counts read from the catalogue', async ({ page }) => {
     await page.context().clearCookies();
     await seedConsent(page);
@@ -271,8 +362,28 @@ test.describe('LIVE: plans, pricing and the checkout hand-off', () => {
     await signedInAs(page, mobile);
     await seedConsent(page);
     await page.goto('/dashboard#billing');
-    await expect(page.getByText(/^Contact pack · till /)).toBeVisible({ timeout: 20000 });
+    await page.getByText('See details').click({ timeout: 20000 });
+    await expect(page.getByText(/^Contact pack · till /)).toBeVisible();
     await expect(page.getByText(/^Listing pass · Billing pass \d+ · till /)).toBeVisible();
     await expect(page.getByText(/subscription|auto-renew|renews/i)).toHaveCount(0);
+  });
+
+  test('billing shows the contact and listing balances the account holds', async ({ page }) => {
+    const mobile = `${uniqueMobile().slice(0, -1)}7`;
+    const listing = await newListing(mobile, { title: 'Balance pass' });
+    await approve(listing.id);
+    settleOrder((await openOrder(mobile, CONTACT_PACK_PLAN)).id, 30);
+    settleOrder((await openOrder(mobile, LISTING_PASS_PLAN, listing.id)).id, 60);
+    const { contacts, listings } = await (await fetch(`${API}/me/entitlements`, { headers: await authHeaders(mobile) })).json();
+
+    await signedInAs(page, mobile);
+    await seedConsent(page);
+    await page.goto('/dashboard#billing');
+    const balance = (key) => page.locator(`[data-balance="${key}"]`);
+    await expect(balance('contacts')).toContainText(`${contacts.remaining}Owner contacts left`, { timeout: 20000 });
+    await expect(balance('contacts')).toContainText(`${contacts.used} of ${contacts.allowance} used`);
+    await expect(balance('slots')).toContainText(`${Math.max(0, listings.allowance - listings.used)}Free listing slots left`);
+    await expect(balance('slots')).toContainText(`${listings.used} of ${listings.allowance} used`);
+    await expect(balance('passes')).toContainText(`${listings.passes.length}Listing passes active`);
   });
 });

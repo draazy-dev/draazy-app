@@ -198,6 +198,12 @@ at which point the server property becomes the single source of truth for both h
   disputes the order, is 409. Both notify the customer (`refund.decided`) and are audited `refund.approved` / `refund.rejected`.
 - New requests, automatic refunds and disputes notify holders of `refunds` (`refund.requested`, `refund.auto`,
   `refund.dispute`), linking to `/admin/refunds`.
+- A refund made by hand on the Cashfree dashboard reaches us through the same refund webhook under Cashfree's own
+  refund id, and is matched by order. Once it succeeds it is recorded on the order (so no queued refund is sent
+  again), earns its credit note, closes a waiting request as approved, tells the customer (`refund.completed`) and
+  `refunds` holders (`refund.auto`), and is audited `subscription.refundedOutside`. Only the whole price ends the
+  pack or pass; a partial one leaves it live. A second dashboard refund on an order already refunded changes
+  nothing and alerts the desk. Without a customer request it shows on the `auto` tab.
 - A credit note (`CN-FY2627-000001`) is issued when a refund is confirmed paid; it cites the original invoice (`INV-FY2627-000001`, issued when the payment succeeded),
   and `/me/payments` shows both numbers. An order that was never invoiced (a failed, late or mismatched payment refunded automatically) gets no credit note.
 

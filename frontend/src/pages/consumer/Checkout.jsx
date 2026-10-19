@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import { openCashfreeCheckout } from '../../lib/cashfree.js';
-import { cancelPending, listPlans, subscribe as subscribeToPlan } from '../../services/planService.js';
+import { cancelPending, listPlans, orderStatus, subscribe as subscribeToPlan } from '../../services/planService.js';
 import { getEntitlements } from '../../services/entitlementService.js';
 import { myListingCard } from '../../services/propertyService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -30,11 +30,6 @@ const checkoutPlans = (t) => ({
   'contact-pack': { nameLabel: t('misc.coContactPackName'), priceKey: 'contactPack', sub: t('misc.coContactPackSub'), termDays: 30, icon: 'user-plus', tagline: t('misc.coContactPackTagline'), feats: [t('misc.coContactPackFeat1'), t('misc.coContactPackFeat2'), t('misc.coContactPackFeat3')], done: { cta: t('misc.coContactPackDoneCta'), href: '/listings' } },
   'listing-pass': { nameLabel: t('misc.coListingPassName'), priceKey: 'listingPass', sub: t('misc.coListingPassSub'), termDays: 60, icon: 'building-2', tagline: t('misc.coListingPassTagline'), feats: [t('misc.coListingPassFeat1'), t('misc.coListingPassFeat2'), t('misc.coListingPassFeat3')], done: { cta: t('misc.coListingPassDoneCta'), href: '/dashboard#properties' } },
 });
-const checkoutMethods = (t) => [
-  { id: 'UPI', label: t('misc.coMethodUpiLabel'), desc: t('misc.coMethodUpiDesc'), icon: 'smartphone' },
-  { id: 'Card', label: t('misc.coMethodCardLabel'), desc: t('misc.coMethodCardDesc'), icon: 'credit-card' },
-  { id: 'Netbanking', label: t('misc.coMethodNetbankingLabel'), desc: t('misc.coMethodNetbankingDesc'), icon: 'landmark' },
-];
 const inr = (n) => '₹' + Number(n).toLocaleString('en-IN');
 
 export default function Checkout() {
@@ -48,15 +43,16 @@ export default function Checkout() {
   // plan catalogue's own row and wins when it resolves.
   const { prices } = usePricing();
   const CO = checkoutPlans(t);
-  const METHODS = checkoutMethods(t);
   const base = CO[planId];
   const needsProperty = planId === 'listing-pass';
-  const [method, setMethod] = useState('UPI');
   const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
+  // Cashfree's return_url lands here with the order, for a payer a bank page bounced out of the modal.
+  const returnedOrder = useRef(params.get('order_id'));
   /** `null` until Pay: then `verifying` (polling entitlements), `timeout` (still unconfirmed) or `paid`. */
-  const [phase, setPhase] = useState(null);
-  const [orderRef, setOrderRef] = useState('');
+  const [phase, setPhase] = useState(returnedOrder.current ? 'verifying' : null);
+  const [orderRef, setOrderRef] = useState(returnedOrder.current ?? '');
+  const gatewayOrder = useRef(returnedOrder.current);
   /** The open gateway order, kept so a retry after the SDK failed reopens it instead of POSTing again. */
   const [session, setSession] = useState(null);
   /** Server catalogue row for this plan, once it resolves. See the note in `Plans.jsx`. */
@@ -115,14 +111,27 @@ export default function Checkout() {
     let timer;
     const started = Date.now();
     const tick = async () => {
-      const at = await purchaseExpiry({ needsProperty, propertyId, before: packExpiryBefore.current });
+      // Without the pre-purchase expiry an older live pack would read as this order's success.
+      const at = returnedOrder.current ? null : await purchaseExpiry({ needsProperty, propertyId, before: packExpiryBefore.current });
       if (!alive) return;
       if (at) {
         setExpiresAt(at);
         setPhase('paid');
         try { sessionStorage.removeItem(attemptKey); } catch { /* ignore */ }
-      } else if (Date.now() - started >= POLL_MAX_MS) {
+        return;
+      }
+      const status = gatewayOrder.current ? await orderStatus(gatewayOrder.current).catch(() => null) : null;
+      if (!alive) return;
+      // A stacked pack leaves packExpiresAt (the earliest live pack) unchanged, so the order is the only proof.
+      if (status === 'paid') {
+        setPhase('paid');
         try { sessionStorage.removeItem(attemptKey); } catch { /* ignore */ }
+      } else if (status === 'failed') {
+        // The kept attempt key lets Pay replay and reopen this same order instead of hitting the one-open-order 409.
+        setSession(null);
+        setError(t('misc.coPaymentDeclined'));
+        setPhase(null);
+      } else if (Date.now() - started >= POLL_MAX_MS) {
         setPhase('timeout');
       } else {
         timer = setTimeout(tick, POLL_MS);
@@ -130,7 +139,7 @@ export default function Checkout() {
     };
     tick();
     return () => { alive = false; clearTimeout(timer); };
-  }, [phase, needsProperty, propertyId, attemptKey]);
+  }, [phase, needsProperty, propertyId, attemptKey, t]);
 
   const [cancelling, setCancelling] = useState(false);
   const [orderOpen, setOrderOpen] = useState(false);
@@ -159,20 +168,26 @@ export default function Checkout() {
     setPaying(true);
     setError('');
     setOrderOpen(false);
+    returnedOrder.current = null;
     try {
       let order = session;
       if (!order) {
         if (!needsProperty) packExpiryBefore.current = (await getEntitlements().catch(() => null))?.contacts?.packExpiresAt ?? null;
-        const sub = await subscribeToPlan(planId, method.toLowerCase(), { propertyId: needsProperty ? propertyId : undefined, attemptId });
+        const sub = await subscribeToPlan(planId, undefined, { propertyId: needsProperty ? propertyId : undefined, attemptId });
         // No session means the key replayed a settled order, so the next Pay must be a new purchase.
         if (!sub?.paymentSessionId) rotateAttempt();
         setOrderRef(sub?.paymentRef || sub?.subscriptionId || '');
+        gatewayOrder.current = sub?.paymentRef ?? null;
         order = { sessionId: sub?.paymentSessionId ?? null };
         setSession(order);
       }
       const outcome = order.sessionId ? await openCashfreeCheckout(order.sessionId) : null;
       if (outcome?.error) {
-        setError(t('misc.coPaymentFailed'));
+        // The SDK reports a closed modal as an error too, so the order says whether money moved.
+        setSession(null);
+        const status = gatewayOrder.current ? await orderStatus(gatewayOrder.current).catch(() => null) : null;
+        if (status === 'paid') setPhase('verifying');
+        else setError(t(status === 'failed' ? 'misc.coPaymentDeclined' : 'misc.coPaymentNotCompleted'));
         return;
       }
       setPhase('verifying');
@@ -219,7 +234,7 @@ export default function Checkout() {
         <div className="glass rounded-2xl p-8 sm:p-10 max-w-lg mx-auto text-center">
           <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-5" style={{ background: 'rgb(var(--dz-c-amber-500) / .15)' }}><Icon name="clock" className="w-9 h-9 text-amber-400" /></div>
           <h2 className="text-xl font-extrabold mb-1">{t('misc.coPaymentPending')}</h2>
-          <p className="text-gray-400 text-sm mb-1">{P.nameLabel} · {inr(P.price)} {t('misc.coPaidVia')} {method}</p>
+          <p className="text-gray-400 text-sm mb-1">{P.nameLabel} · {inr(P.price)}</p>
           <p className="text-gray-400 text-sm mb-2">{t('misc.coPaymentPendingBody')}</p>
           {orderRef && <p className="text-gray-500 text-xs mb-6">{t('misc.coOrderReference')} · <span className="text-gray-400 font-mono">{orderRef}</span></p>}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -233,7 +248,7 @@ export default function Checkout() {
         <div className="glass rounded-2xl p-8 sm:p-10 max-w-lg mx-auto text-center">
           <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center mb-5" style={{ background: 'rgb(var(--dz-c-emerald-500) / .15)' }}><Icon name="check-circle-2" className="w-9 h-9 text-emerald-400" /></div>
           <h2 className="text-xl font-extrabold mb-1">{t('misc.coPaymentSuccess')}</h2>
-          <p className="text-gray-400 text-sm mb-1">{P.nameLabel} · {inr(P.price)} {t('misc.coPaidVia')} {method}</p>
+          <p className="text-gray-400 text-sm mb-1">{P.nameLabel} · {inr(P.price)}</p>
           <p className="text-gray-400 text-sm mb-2">{doneBody}</p>
           {orderRef && <p className="text-gray-500 text-xs mb-6">{t('misc.coOrderReference')} · <span className="text-gray-400 font-mono">{orderRef}</span></p>}
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -262,16 +277,8 @@ export default function Checkout() {
           </div>
 
           <div className="glass rounded-2xl p-5 sm:p-6">
-            <h2 id="co-method-label" className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-4">{t('misc.coPaymentMethod')}</h2>
-            <div role="radiogroup" aria-labelledby="co-method-label" className="space-y-2.5 mb-5">
-              {METHODS.map((m) => (
-                <button key={m.id} type="button" role="radio" aria-checked={m.id === method} onClick={() => setMethod(m.id)} className={'method w-full flex items-center gap-3 text-left' + (m.id === method ? ' active' : '')}>
-                  <Icon name={m.icon} className="w-5 h-5 text-teal-400 flex-shrink-0" />
-                  <span className="flex-1"><span className="block text-sm font-semibold">{m.label}</span><span className="block text-xs text-gray-500">{m.desc}</span></span>
-                  <Icon name={m.id === method ? 'check-circle-2' : 'circle'} className={'w-4 h-4 ' + (m.id === method ? 'text-teal-400' : 'text-gray-600')} />
-                </button>
-              ))}
-            </div>
+            <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">{t('misc.coPaymentMethod')}</h2>
+            <p className="flex items-center gap-2 text-sm text-gray-300 mb-5"><Icon name="shield-check" className="w-4 h-4 text-teal-400 flex-shrink-0" /> {t('misc.coMethodsNote')}</p>
             <button onClick={pay} disabled={paying} className="btn-teal w-full py-3 rounded-xl font-semibold hidden md:inline-flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">{paying ? <><Icon name="loader-2" className="w-4 h-4 animate-spin" /> {t('misc.coProcessing')}</> : <><Icon name="lock" className="w-4 h-4" /> {t('misc.coPay')} {inr(P.price)}</>}</button>
             {error && (
               <div className="mt-3 text-center space-y-2">

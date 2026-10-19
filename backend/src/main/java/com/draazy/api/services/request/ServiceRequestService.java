@@ -57,6 +57,9 @@ public class ServiceRequestService implements AbandonedCheckouts {
     // Not payment.failed: this means no money was attempted, not a declined card.
     private static final String ABANDONED_EVENT = "payment.abandoned";
 
+    // Only the rent-agreement flow opens a checkout for a request or its revised terms.
+    static final String RETURN_PATH = "/services/rent-agreement";
+
     static final Duration INCOMPLETE_TTL = Duration.ofDays(30);
 
     private final ServiceRequestRepository requests;
@@ -278,7 +281,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
     // Blank gateway order ids are refusals; otherwise webhooks cannot find the row.
     private PaymentGateway.PaymentOrder openOrder(Opened opened) {
         PaymentGateway.PaymentOrder order = gateway.createOrder(opened.price(),
-                "service-request:" + opened.requestId(), opened.customer());
+                "service-request:" + opened.requestId(), opened.customer(), RETURN_PATH);
         if (order.orderId() == null || order.orderId().isBlank()) {
             throw new IllegalStateException("Payment gateway returned no order id");
         }
@@ -308,7 +311,7 @@ public class ServiceRequestService implements AbandonedCheckouts {
             record(request, "payment.received", null);
             invoicing.checkoutPaid(request);
         } else {
-            transition(request, ServiceRequestStatus.CANCELLED);
+            // Cashfree keeps the order payable after a declined attempt; cancelling here would refund a retry.
             record(request, "payment.failed", null);
         }
         return true;

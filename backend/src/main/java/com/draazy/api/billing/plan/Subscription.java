@@ -163,11 +163,6 @@ public class Subscription extends VersionedEntity {
         this.refundAttempts++;
     }
 
-    /** A declined card is retried at once, so the key is released with the status. */
-    boolean fail() {
-        return abandonCheckout();
-    }
-
     /** A null {@code renewsAt} never lapses: a pending order has no term yet. The boundary is inclusive. */
     boolean hasLapsed(Instant now) {
         return SubscriptionStatuses.ACTIVE.equals(status)
@@ -216,6 +211,26 @@ public class Subscription extends VersionedEntity {
 
     public boolean restoreAfterDisputeWon(String frozenFrom, Instant now) {
         return frozenFrom != null && moveStatus(SubscriptionStatuses.DISPUTED, frozenFrom) && thaw(now);
+    }
+
+    /** A refund made on the gateway dashboard. Recorded so no sweep resends it; only a refund of the whole price
+     * ends the benefit. False when a refund is already on record. */
+    public boolean recordOutsideRefund(String gatewayRefund, long refunded, Instant now) {
+        if (refundRef != null) {
+            return false;
+        }
+        if (refundDueAt == null) {
+            this.refundDueAt = now;
+        }
+        this.refundAmount = refunded;
+        this.refundRef = gatewayRefund;
+        boolean held = SubscriptionStatuses.isEntitling(status) || SubscriptionStatuses.DISPUTED.equals(status)
+                || SubscriptionStatuses.REFUND_REVIEW.equals(status);
+        if (refunded >= amount && held) {
+            this.status = SubscriptionStatuses.REFUNDED;
+            this.frozenAt = null;
+        }
+        return true;
     }
 
     /** A lost or accepted dispute ends the benefit from any status that still held it. */

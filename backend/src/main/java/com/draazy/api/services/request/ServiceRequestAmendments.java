@@ -202,7 +202,7 @@ public class ServiceRequestAmendments {
         String phone = users.findById(caller.userId()).map(User::getMobile).orElse(null);
         PaymentGateway.PaymentOrder order = gateway.createOrder(delta,
                 "service-request-amendment:" + amendmentId,
-                new PaymentGateway.Customer(caller.userId().toString(), phone));
+                new PaymentGateway.Customer(caller.userId().toString(), phone), ServiceRequestService.RETURN_PATH);
         if (order.orderId() == null || order.orderId().isBlank()) {
             throw new IllegalStateException("Payment gateway returned no order id");
         }
@@ -254,7 +254,7 @@ public class ServiceRequestAmendments {
         if (paid) {
             apply(request, amendment, null);
         } else {
-            amendment.releaseOrder();
+            // The order stays attached: Cashfree keeps it payable, and a retry's success must still find it.
             requests.record(request, "amendment.payment-failed", null);
         }
         return true;

@@ -1,5 +1,5 @@
-/* The wizard's own "Saved to your Documents" badge is derived from local state, so the vault is
-   read back over HTTP from outside the browser as the evidence the paper actually left it. */
+/* The vault is read back over HTTP from outside the browser as the evidence the paper actually left it;
+   the wizard's "Saved to your Documents" badge only follows the server's answer. */
 import { expect, test } from '../../../fixtures/live.js';
 import { API, authHeaders, signedInAsNew } from '../../../helpers/liveAuth.js';
 import { fillBuilding, pickLocality } from '../../../helpers/rentAgreementWizard.js';
@@ -54,7 +54,6 @@ test.describe('rent-agreement document vault, live', () => {
     await page.goto(PAGE);
     await toOwnerStep(page);
     await uploadOwnerDoc(page, 0, 'live-pan.png');
-    // The optimistic badge — proof the handler ran, not proof the paper was filed. See the header.
     await expect(page.getByText('Saved to your Documents')).toBeVisible({ timeout: 15000 });
     /* An id-set delta survives a vault that already had rows. `fileName` because this reads the
        wire (`DocumentDto.fileName`); `name` is the client's word for it and would be undefined. */
@@ -83,5 +82,18 @@ test.describe('rent-agreement document vault, live', () => {
     const after = await personalVault(mobile);
     expect(after, 'the re-pick did not file a second copy').toHaveLength(withPan.size + 1);
     expect(after.filter((d) => !withPan.has(d.id)).map((d) => d.category)).toEqual(['Aadhaar Card']);
+  });
+
+  test('a paper the vault refused carries no "Saved to your Documents" badge', async ({ page }) => {
+    await signedInAsNew(page);
+    await page.route('**/api/me/documents/personal', (route) =>
+      (route.request().method() === 'POST' ? route.fulfill({ status: 503, body: 'blocked' }) : route.fallback()));
+
+    await page.goto(PAGE);
+    await toOwnerStep(page);
+    const refused = page.waitForResponse((res) => res.request().method() === 'POST' && /\/me\/documents\/personal$/.test(res.url()));
+    await uploadOwnerDoc(page, 0, 'refused-pan.png');
+    await refused;
+    await expect(page.getByText('Saved to your Documents')).toHaveCount(0);
   });
 });

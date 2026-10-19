@@ -873,6 +873,7 @@ public final class Routes {
 
         public static final String SUBSCRIPTION = "/me/subscription";
         public static final String CANCEL_SUBSCRIPTION = SUBSCRIPTION + "/cancel";
+        public static final String ORDER_STATUS = SUBSCRIPTION + "/orders/{orderId}";
 
         /** Authenticated — what the caller is entitled to do: owner contacts and listing slots. */
         public static final String ENTITLEMENTS = "/me/entitlements";

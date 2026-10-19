@@ -236,6 +236,36 @@ class RentAgreementRefundTest extends ServiceFixtures {
     }
 
     @Test
+    @DisplayName("a refund made on the Cashfree dashboard enters the ledger once, and the whole sum closes the request")
+    void aDashboardRefundEntersTheLedger() throws Exception {
+        User owner = customer("9820009201");
+        User maker = staff("9820009202", Teams.RENTAL);
+        String id = raiseWithTerms(owner);
+        setStatus(maker, id, "assigned", 200);
+        long paid = paid(id);
+        String order = requestRepo.findById(UUID.fromString(id)).orElseThrow().getPaymentRef();
+
+        deliverDashboardRefund(order, "cf_dash_pending", 500, "PENDING");
+        summary(maker, id).andExpect(jsonPath("$.refunded").value(0));
+
+        deliverDashboardRefund(order, "cf_dash_1", 500, "SUCCESS");
+        deliverDashboardRefund(order, "cf_dash_1", 500, "SUCCESS");
+        summary(maker, id).andExpect(jsonPath("$.refunded").value(500))
+                .andExpect(jsonPath("$.refunds.length()").value(1))
+                .andExpect(jsonPath("$.refunds[0].status").value("approved"))
+                .andExpect(jsonPath("$.refunds[0].gatewayRefundId").value("cf_dash_1"))
+                .andExpect(jsonPath("$.refundableBeforeDuty").value(paid - 500));
+        expectStatus(owner, id, "assigned");
+        assertThat(jdbc.queryForList("select amount from credit_notes where source_type = 'service_request_refund'"
+                + " and user_id = ?", Long.class, owner.getId())).containsExactly(500L);
+
+        deliverDashboardRefund(order, "cf_dash_2", paid - 500, "SUCCESS");
+        expectStatus(owner, id, "cancelled");
+        assertThat(jdbc.queryForList("select 1 from notifications where user_id = ? and type = ?",
+                owner.getId(), "service.refund-approved")).hasSize(2);
+    }
+
+    @Test
     @DisplayName("a paid checkout is invoiced once, only the platform fee counted as taxable, and the credit note cites it")
     void aPaidCheckoutIsInvoicedAndItsCreditNoteCitesTheInvoice() throws Exception {
         User owner = customer("9820009071");

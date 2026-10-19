@@ -364,6 +364,11 @@ class FrequentAndHourlyJobsQaTest extends AbstractJobQaTest {
         }
 
         @Override
+        public boolean lastAttemptFailed(String orderId) {
+            return false;
+        }
+
+        @Override
         public String refund(String orderId, long amountInr, String refundId, String note) {
             if (orderId.startsWith("qa-poison-")) {
                 throw new IllegalStateException("gateway refuses " + orderId);
