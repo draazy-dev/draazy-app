@@ -285,8 +285,6 @@ export default function useProperty() {
   };
 
   const tags = [];
-  if (!isRent) tags.push([possessionLabel, '', p.construction === 'new' ? 'hard-hat' : 'key', p.construction === 'new' ? 'tag.underConstruction' : 'tag.readyToMove']);
-  else if (!isLand && furnishLabel !== '—') tags.push([furnishLabel, '', 'sofa', 'tag.furnishing']);
   if (p.ownerVerified) tags.push([tr('property.verifiedOwner'), 'tag-emerald', 'user-check', 'tag.verifiedOwner']);
   if (p.ownershipVerified) tags.push([tr('property.ownershipVerified'), 'tag-emerald', 'file-check', 'tag.ownershipVerified']);
   if (p.reraId) tags.push([tr('property.reraApproved'), 'tag-emerald', 'badge-check', 'tag.rera']);
@@ -353,7 +351,7 @@ export default function useProperty() {
     ownerPreview: (isOwner || isAdmin) && (p.status === 'pending' || p.status === 'flagged'),
     staffPreview: !isOwner && isAdmin && (p.status === 'pending' || p.status === 'flagged'),
     isRent, kind, isLand, baths, furnishLabel, parkingLabel, possessionLabel, title, priceStr,
-    perUnitLabel, perUnitVal, showPerUnit, details, highlights,
+    areaLabel, perUnitVal, showPerUnit, details, highlights,
     topHighlights, amenPhrase, overviewMore, waShare, tags, requestPhotos, returnTo,
     hasAmenities, reviewsOn, tabs, current, selectTab,
   };
