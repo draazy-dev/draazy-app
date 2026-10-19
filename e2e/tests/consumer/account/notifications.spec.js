@@ -218,6 +218,12 @@ test.describe('Notifications — live API', () => {
     await expect(bell).toHaveText(String(unread.length));
 
     await bell.click();
+    // toBeVisible passes at opacity 0, which is exactly how the desktop popup rendered blank.
+    const popupRow = page.getByRole('dialog').locator('.notif').first();
+    await expect(popupRow).toBeVisible();
+    await expect.poll(() => popupRow.evaluate((el) => Number(getComputedStyle(el).opacity)), {
+      message: 'the popup rows must actually show, not sit at opacity 0',
+    }).toBe(1);
     const marked = page.waitForResponse((response) =>
       new URL(response.url()).pathname.endsWith('/api/notifications/read') && response.status() === 204);
     await page.getByRole('dialog').getByRole('button', { name: 'Mark all read' }).click();
