@@ -112,7 +112,10 @@ export default function Listings() {
   const [f, setF] = useState(buildInitial);
   const latestFilterStateRef = useRef(f);
   const [sort, setSort] = useState(() => backRestoreInitial?.sort || (SORTS.includes(params.get('sort')) ? params.get('sort') : (SORTS.includes(initialListingsSearch?.sort) && !initialHadUrlParams.current ? initialListingsSearch.sort : 'relevance')));
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => {
+    const n = Number(params.get('page'));
+    return Number.isInteger(n) && n > 1 && params.get('view') !== 'map' ? n : 1;
+  });
   const [view, setView] = useState(backRestoreInitial?.view || (params.get('view') === 'map' ? 'map' : params.get('view') === 'list' ? 'list' : (!initialHadUrlParams.current && ['map', 'list', 'grid'].includes(initialListingsSearch?.view) ? initialListingsSearch.view : 'grid')));
   const [activeId, setActiveId] = useState(backRestoreInitial?.activeId || params.get('property') || null);
   // Only Pune has inventory today, so a data-less live city gets an honest empty state here
@@ -189,16 +192,13 @@ export default function Listings() {
     if (snap.scrollY != null) requestAnimationFrame(() => requestAnimationFrame(() => window.scrollTo(0, snap.scrollY)));
   }, [location.state]);
 
-  // The canonical return URL (deal + view + areas + open property) that we mirror to
-  // the address bar and hand to the property page so its "Back to map" is one click.
+  // The return URL handed to the property page, so its breadcrumb lands on the same results, sort and page.
   const buildReturnSearch = () => {
-    const sp = new URLSearchParams();
+    const sp = applyFiltersToSearchParams(new URLSearchParams(), f);
     sp.set('deal', f.deal);
     sp.set('view', view);
-    const locs = [...f.localities];
-    if (locs.length) sp.set('loc', locs.join(','));
-    const socs = [...f.societies];
-    if (socs.length) sp.set('soc', socs.join(','));
+    if (sort !== 'relevance') sp.set('sort', sort);
+    if (page > 1) sp.set('page', String(page));
     if (freeText) sp.set('q', freeText);
     if (activeId) sp.set('property', activeId);
     return '/listings?' + sp.toString();
@@ -238,6 +238,7 @@ export default function Listings() {
       if (restoreSnapshot.sort === 'relevance') next.delete('sort'); else next.set('sort', restoreSnapshot.sort);
       if (restoreSnapshot.activeId) next.set('property', restoreSnapshot.activeId); else next.delete('property');
       if (restoreSnapshot.freeText) next.set('q', restoreSnapshot.freeText); else next.delete('q');
+      if (page > 1) next.set('page', String(page)); else next.delete('page');
       const nextSearch = next.toString();
       if (nextSearch !== params.toString()) setParams(next, { replace: true });
       if (
@@ -268,11 +269,12 @@ export default function Listings() {
     if (sort === 'relevance') next.delete('sort'); else next.set('sort', sort);
     if (activeId) next.set('property', activeId); else next.delete('property');
     if (freeText) next.set('q', freeText); else next.delete('q');
+    if (page > 1) next.set('page', String(page)); else next.delete('page');
     const nextSearch = next.toString();
     if (nextSearch !== params.toString()) setParams(next, { replace: true });
     if (stateDrivenDealRef.current === f.deal) stateDrivenDealRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- URL writes.
-  }, [effView, sort, f, activeId, freeText, params, drawer]);
+  }, [effView, sort, page, f, activeId, freeText, params, drawer]);
 
   useEffect(() => {
     if (!lastSearchWriteReady.current) {
@@ -349,7 +351,7 @@ export default function Listings() {
     [query, deferredF, sort, freeText],
   );
 
-  const queryKey = useMemo(() => JSON.stringify(query), [query]);
+  const queryKey = useMemo(() => JSON.stringify([query, size]), [query, size]);
   const [pagedQueryKey, setPagedQueryKey] = useState(queryKey);
   if (pagedQueryKey !== queryKey) {
     setPagedQueryKey(queryKey);
@@ -374,6 +376,9 @@ export default function Listings() {
   const loaded = search.status === 'ready' || results.length > 0;
   const pageCount = Math.max(1, search.data.pageCount || 1);
   const safePage = Math.min(requestPage, pageCount);
+  useEffect(() => {
+    if (search.status === 'ready' && page > pageCount) setPage(pageCount);
+  }, [search.status, page, pageCount]);
 
   const ptr = usePullToRefresh(search.refresh);
 

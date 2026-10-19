@@ -165,11 +165,12 @@ export default function useProperty() {
   const title = `${bhkLabel ? `${bhkLabel} ` : ''}${typeLabel} for ${isRent ? 'Rent' : 'Sale'} in ${p.locality}`;
   const priceStr = isRent ? `₹${(p.price || 0).toLocaleString('en-IN')}/month` : fmtINR(p.price);
 
+  // `area` first: it is what the card shows and what ₹/sq.ft divides by; the breakdown keeps carpet/built-up/super.
   const areaCandidate = [
+    [isLand ? tr('property.plotArea') : tr('property.totalArea'), p.area, p.areaUnit],
     [tr('property.carpetArea'), p.carpetArea, 'sqft'],
     [tr('property.builtupArea'), p.builtUpArea, 'sqft'],
     [tr('property.superBuiltup'), p.superBuiltUpArea, 'sqft'],
-    [isLand ? tr('property.plotArea') : tr('property.totalArea'), p.area, p.areaUnit],
   ].find(([, value]) => Number(value) > 0);
   const areaTitle = areaCandidate?.[0] || (isLand ? tr('property.plotArea') : tr('property.area'));
   const areaLabel = areaCandidate ? fmtArea(areaCandidate[1], areaCandidate[2]) : '—';
