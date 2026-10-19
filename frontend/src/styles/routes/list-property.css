@@ -286,32 +286,6 @@ input.form-input {
   background: rgb(var(--dz-c-ink-card));
 }
 
-@media (max-width: 639.98px) {
-  .lp-page {
-    padding-bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h, 0px) + 7.5rem + env(safe-area-inset-bottom, 0px)) !important;
-  }
-
-  /* No taller than the bottom nav it floats over, so the two bars read as one family. */
-  .lp-step-actions {
-    position: sticky;
-    z-index: 55;
-    bottom: calc(var(--dz-bottom-inset) + var(--dz-cookie-banner-h, 0px) + 0.5rem);
-    align-items: center;
-    height: var(--dz-bottom-nav-h);
-    margin-top: 1.5rem;
-    padding: 0 6px;
-    border: 1px solid rgb(var(--dz-c-white) / calc(0.1 * var(--dz-line-boost)));
-    border-radius: 1rem;
-    background: rgb(var(--dz-c-ink-card));
-    box-shadow: var(--bottom-nav-shadow);
-  }
-
-  .lp-step-actions button {
-    min-height: 0;
-    height: var(--btn-h);
-  }
-}
-
 .radio-pill {
   background: rgb(var(--dz-c-white) / 0.04);
   border: 1px solid rgb(var(--dz-c-white) / calc(0.1 * var(--dz-line-boost)));

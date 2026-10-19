@@ -1,18 +1,16 @@
 import { useTranslation } from 'react-i18next';
 import DateField from './DateField.jsx';
-import { addDaysIso, istToday, MAX_AVAILABLE_DAYS } from '../../lib/availability.js';
+import { addDaysIso, firstOfNextMonthIso, istToday, MAX_AVAILABLE_DAYS } from '../../lib/availability.js';
 
-const CHIPS = [['now', 0], ['in15', 15], ['in30', 30]];
-
-/** Availability entry: three quick chips plus a date; the value is always an ISO date. */
+/** Availability entry: two quick chips plus a date; the value is always an ISO date. */
 export default function AvailabilityField({ value, onChange, dataErr, invalid, ariaLabel, className = '' }) {
   const { t } = useTranslation();
   const today = istToday();
+  const chips = [['now', today], ['nextMonth', firstOfNextMonthIso(today)]];
   return (
     <div className="space-y-2.5" role="group" aria-label={ariaLabel} data-testid="availability-field">
       <div className="flex flex-wrap gap-2">
-        {CHIPS.map(([key, days]) => {
-          const date = addDaysIso(today, days);
+        {chips.map(([key, date]) => {
           const on = value === date;
           return (
             <button key={key} type="button" onClick={() => onChange(date)} aria-pressed={on}

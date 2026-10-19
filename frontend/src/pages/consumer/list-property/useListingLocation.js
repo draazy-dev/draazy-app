@@ -35,6 +35,13 @@ const titleCase = (slug) => String(slug || '').replace(/-/g, ' ').replace(/\b\w/
 const societyLocality = (society) =>
   society.locality || society.localityLabel || titleCase(society.localitySlug);
 
+export const societyLocalityName = async (society, lat, lng) => {
+  const known = societyLocality(society);
+  if (known) return { name: known, slug: society.localitySlug || '' };
+  if (society.localityRaw || !Number.isFinite(lat) || !Number.isFinite(lng)) return { name: society.localityRaw || '', slug: '' };
+  return { name: (await reverseGeocode(lat, lng)).localityRaw || '', slug: '' };
+};
+
 const sameName = (a, b) => String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
 
 /* No saved row yet: mint it from the Google locality of exactly this name, as a manual pick would. */
@@ -45,7 +52,7 @@ const googleLocality = async (name) => {
   return resolveLocality({ placeId: details.placeId || hit.placeId, name: details.name || hit.mainText, lat: details.lat, lng: details.lng, types: details.types });
 };
 
-const activeLocality = async (name, slug) => {
+export const activeLocality = async (name, slug) => {
   if (!String(name || '').trim()) return null;
   try {
     const rows = await searchLocalities(name);
@@ -248,12 +255,10 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
   /* The society is where the home is, so its locality replaces whatever was there, even a hand pick. */
   const followSocietyLocality = async (society, lat, lng, seq) => {
     const stale = () => societyPickSeqRef.current !== seq;
-    const known = societyLocality(society);
-    let name = known || society.localityRaw || '';
-    if (!name && Number.isFinite(lat) && Number.isFinite(lng)) name = (await reverseGeocode(lat, lng)).localityRaw || '';
+    const { name, slug } = await societyLocalityName(society, lat, lng);
     if (!name || stale()) return;
     delete userEditedRef.current.locality;
-    if (!await bindLocality(name, known ? society.localitySlug : '', true, stale)) return;
+    if (!await bindLocality(name, slug, true, stale)) return;
     setSocietyFillNotice((n) => n && { ...n, fields: [...new Set([...n.fields, SOCIETY_FILL_LABELS.locality])] });
   };
 
@@ -309,6 +314,9 @@ export default function useListingLocation({ setForm, formRef, errors, setErrors
     const seq = societyPickSeqRef.current + 1;
     societyPickSeqRef.current = seq;
     if (!picked || picked.notOnMaps) {
+      /* The pincode beside the society being dropped is that society's, even when a reload or an edit
+         prefill has lost the record of who filled it; the next pick may replace it. */
+      if (formRef.current.societyId && !userEditedRef.current.pincode) societyFillRef.current.pincode = true;
       set('societyId', '', { explicit: true });
       set('society', '', { explicit: true });
       set('societyNotOnMaps', !!picked, { explicit: true });
