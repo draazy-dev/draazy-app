@@ -10641,7 +10641,7 @@ paths:
       operationId: adminIntegrationCalls
       description: >
         Every outbound call to a third party and every inbound payment webhook, newest first, kept
-        for 30 days. Never carries a message body, OTP, link or key; recipients are masked.
+        for 30 days. Never carries a message body, OTP, link or key; mobiles are shown in full, emails masked.
       x-roles: [admin]
       parameters:
         - $ref: '#/components/parameters/BoardDays'
@@ -10655,7 +10655,7 @@ paths:
           in: query
           description: >
             Exact match on `reference` (e.g. a payment order id), or a full email or mobile matched
-            against the recipient. A partial recipient matches nothing: only the masked form is stored.
+            against the recipient. A partial recipient matches nothing.
           schema: { type: string }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
@@ -18787,7 +18787,7 @@ components:
         provider: { type: string, enum: [zeptomail, whatsapp, cashfree] }
         operation: { type: string, description: 'email, otp, identity-decision, create-order, refund or webhook' }
         outcome: { type: string, enum: [ok, failed, skipped] }
-        recipient: { type: string, nullable: true, description: 'masked: 98XXXXX210 or ***@domain' }
+        recipient: { type: string, nullable: true, description: 'A ten-digit mobile in full, or ***@domain.' }
         reference: { type: string, nullable: true, description: payment order id, or the email subject }
         detail: { type: string, nullable: true, description: vendor error code or webhook payment status }
         durationMs: { type: integer, nullable: true }

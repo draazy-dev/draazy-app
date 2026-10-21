@@ -19,10 +19,10 @@ import org.springframework.web.client.ResourceAccessException;
 class ProviderCallsTest {
 
     @Test
-    @DisplayName("recipients are stored masked; the search key ignores formatting and case")
-    void masksAndHashes() {
-        assertThat(ProviderCalls.mask("98111 22233")).isEqualTo("98XXXXX233");
-        assertThat(ProviderCalls.mask("Hire@Example.com")).isEqualTo("***@Example.com");
+    @DisplayName("mobiles are stored in full, emails masked; the search key ignores formatting and case")
+    void storesAndHashes() {
+        assertThat(ProviderCalls.shown("+91 98111 22233")).isEqualTo("9811122233");
+        assertThat(ProviderCalls.shown("Hire@Example.com")).isEqualTo("***@Example.com");
         assertThat(ProviderCalls.hashRecipient("+91 98111-22233"))
                 .isEqualTo(ProviderCalls.hashRecipient("9811122233"));
         assertThat(ProviderCalls.hashRecipient(" HIRE@example.com "))

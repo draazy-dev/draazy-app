@@ -126,7 +126,7 @@ class AdminIntegrationsTest extends AbstractApiTest {
                         .param("provider", "whatsapp").param("outcome", "ok")
                         .header(HttpHeaders.AUTHORIZATION, admin))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.content[0].recipient").value("98XXXXX233"))
+                .andExpect(jsonPath("$.content[0].recipient").value("9811122233"))
                 .andExpect(jsonPath("$.content[0].durationMs").value(120));
 
         mvc.perform(get(Routes.Admin.INTEGRATION_CALLS).param("q", tag + "-order")
