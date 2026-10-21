@@ -89,6 +89,8 @@ test.describe('Compare properties — /compare', () => {
     await expect(addBtn).toBeVisible({ timeout: 10_000 });
     await addBtn.click();
     await expect(page.getByTitle('Remove from Compare', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Compare properties' }).first()).toContainText('1');
+    await expect(page.getByRole('link', { name: /View Compare|^View \d+$/ })).toHaveCount(0);
 
     await page.goto('/compare');
     await expect(page.getByRole('heading', { name: 'Compare properties' })).toBeVisible();

@@ -215,7 +215,7 @@ export default function Compare() {
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
             <div>
               <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-sm font-medium mb-4">
-                <Icon name="git-compare" className="w-4 h-4" /> {t('compare.badge')}
+                <Icon name="scale" className="w-4 h-4" /> {t('compare.badge')}
               </div>
               <h1 className="text-3xl sm:text-4xl font-bold text-white">{t('compare.title')}</h1>
               <p className="text-gray-400 text-sm mt-2">{t('compare.subtitle', { max: MAX })} <span className="text-teal-400">{t('compare.subtitleHighlight')}</span></p>
@@ -236,7 +236,7 @@ export default function Compare() {
 
           {ids.length === 0 ? (
             <div className="glass-card rounded-2xl p-16 text-center">
-              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-5"><Icon name="git-compare" className="w-8 h-8 text-gray-500" /></div>
+              <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mx-auto mb-5"><Icon name="scale" className="w-8 h-8 text-gray-500" /></div>
               <h3 className="text-xl font-bold text-white mb-2">{t('compare.emptyTitle')}</h3>
               <p className="text-gray-400 text-sm mb-6">{t('compare.emptyBody')}</p>
               <Link to="/listings" className="btn-teal inline-flex items-center gap-2 px-6 py-3 rounded-xl text-white text-sm font-semibold"><Icon name="search" className="w-4 h-4" /> {t('compare.browseListings')}</Link>

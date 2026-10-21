@@ -119,7 +119,7 @@ export default function Navbar() {
     <>
       {mobile ? (
         <Link to="/compare" onClick={close} className={rowCls}>
-          <Icon name="git-compare" className="w-4 h-4 text-gray-400" />
+          <Icon name="scale" className="w-4 h-4 text-gray-400" />
           <span className="flex-1">Compare properties</span>
           {compareCount > 0 ? (
             <span className="min-w-5 h-5 px-1 grid place-items-center rounded-full bg-gradient-to-br from-teal-500 to-teal-400 text-[10px] font-bold text-white">{compareCount}</span>
@@ -316,7 +316,7 @@ export default function Navbar() {
             {/* Signed in, this target leaves the phone bar for the drawer; signed out has no drawer. */}
             {showCompare || compareCount > 0 ? (
               <Link to="/compare" className={'dz-topbar__action tap-target tap-extend relative items-center justify-center p-2 rounded-xl hover:bg-white/5 transition-all duration-300 group ' + (isIn ? 'hidden lg:inline-flex' : 'inline-flex')} title="Compare Properties" aria-label="Compare properties">
-                <Icon name="git-compare" className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
+                <Icon name="scale" className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
                 {compareCount > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 bg-gradient-to-br from-teal-500 to-teal-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-teal-500/30">{compareCount}</span>}
               </Link>
             ) : null}

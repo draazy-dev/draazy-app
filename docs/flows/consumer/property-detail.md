@@ -26,7 +26,7 @@
   `SimilarProperties.jsx`, `PriceInsights.jsx`, `RentDetails.jsx`, `LocationInsights.jsx`,
   `locationIntel.js`, `VerificationSection.jsx`, `DocumentsSection.jsx`, `FloorPlan.jsx`,
   `SocietySection.jsx`, `ReviewsSection.jsx` (+ `ReviewModal.jsx`, `StarInput.jsx`, `Stars.jsx`,
-  `reviews.js`), `CompareToggleBar.jsx`, `ScheduleVisitModal.jsx`,
+  `reviews.js`), `ListingActions.jsx`, `ScheduleVisitModal.jsx`,
   `ReportModal.jsx` (a thin property adapter over the shared `src/components/ReportModal.jsx`),
   `DealPanel.jsx`, `derivations.js`.
 - **Mobile chrome:** below `lg` the page carries a fixed bottom action bar (`dz-sticky-cta`) holding
@@ -119,6 +119,13 @@
   is on it queues an owner chat request and opens Messages (no badge needed); when off it opens
   `ContactOwnerModal` (enquiry). `contactApproved` (approved/owner) swaps the sticky mobile CTA to a
   chat/WhatsApp action. Full rules: [contact-gate-leads.md](./contact-gate-leads.md).
+
+### Save, share and compare (`ListingActions.jsx`)
+Save, Compare and Share are bare icons on the hero photo, styled like the heart on listing cards
+(`heart-on-photo`): Save top-left; Compare then Share top-right. Compare fills teal once added
+(the navbar badge carries the count), and a fifth add is refused with a toast (the tray holds four).
+There is no Fullscreen button: tapping the photo opens the lightbox, and the photo counter is the
+keyboard way in.
 
 ### Flat-share teaser (`PropertyHeader.jsx`)
 Any **residential rent** listing with `bhkNum >= 2` and a positive price shows a "sharing this flat"

@@ -9,7 +9,6 @@ import { cityLabelFor } from '../../../lib/geoConfig.js';
 import { OwnerCard } from './OwnerCard.jsx';
 import { DealPanel } from './DealPanel.jsx';
 import { GroupApplyCard } from './GroupApplyCard.jsx';
-import { CompareToggleBar } from './CompareToggleBar.jsx';
 import { VisitCta } from './ActionCtas.jsx';
 
 const FRESH_TONE = { emerald: 'text-emerald-300', gray: 'text-slate-400', amber: 'text-amber-300' };
@@ -178,7 +177,6 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
               <GroupApplyCard p={p} isIn={isIn} toast={toast} />
 
               {!isLand && !isRent && <Link to="/emi-calculator" className="flex min-h-[44px] items-center justify-center gap-1.5 text-sm font-semibold text-brand-teal-3 hover:text-brand-teal-2 transition-smooth"><Icon name="calculator" className="w-4 h-4" /> {tr('property.calculateEmi')}</Link>}
-              <CompareToggleBar p={p} />
             </div>
           </section>
   );

@@ -7,6 +7,7 @@ import { messagesLinkForProp } from '../../lib/chatFormat.js';
 import { queuePendingChat } from '../../services/conversationService.js';
 import useSheetViewport from '../../lib/useSheetViewport.js';
 import { Gallery } from './property/Gallery.jsx';
+import { PhotoActions } from './property/ListingActions.jsx';
 import PropertySkeleton from './property/PropertySkeleton.jsx';
 import useProperty from './property/useProperty.js';
 import PropertyHeader from './property/PropertyHeader.jsx';
@@ -112,7 +113,7 @@ export default function Property() {
 
           {/* Keyed on the listing: `active` is reset here on an id change but the gallery's own `ask` slide is not,
              so an in-place navigation would otherwise park the next listing's hero on its request-photos card. */}
-          <Gallery key={p.id} gallery={gallery} active={active} setActive={setActive} title={title} p={p} setLightbox={setLightbox} requestPhotos={requestPhotos} priceStr={priceOnHero ? ctx.priceStr : null} />
+          <Gallery key={p.id} gallery={gallery} active={active} setActive={setActive} title={title} p={p} setLightbox={setLightbox} requestPhotos={requestPhotos} priceStr={priceOnHero ? ctx.priceStr : null} actions={<PhotoActions p={p} />} />
 
           <PropertyHeader ctx={ctx} priceOnHero={priceOnHero} />
 
