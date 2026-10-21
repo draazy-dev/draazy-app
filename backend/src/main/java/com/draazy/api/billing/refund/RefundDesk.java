@@ -3,10 +3,14 @@ package com.draazy.api.billing.refund;
 import com.draazy.api.billing.credit.CreditNote;
 import com.draazy.api.billing.credit.CreditNoteRepository;
 import com.draazy.api.billing.credit.CreditNotes;
+import com.draazy.api.billing.credit.Invoice;
+import com.draazy.api.billing.credit.InvoiceRepository;
+import com.draazy.api.billing.credit.Invoices;
 import com.draazy.api.billing.plan.Plan;
 import com.draazy.api.billing.plan.PlanRepository;
 import com.draazy.api.billing.plan.Subscription;
 import com.draazy.api.billing.plan.SubscriptionRepository;
+import com.draazy.api.billing.plan.SubscriptionStatuses;
 import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.identity.user.User;
@@ -37,15 +41,21 @@ public class RefundDesk {
             boolean pausedDuringWindow) {
     }
 
+    /** The payment behind a row; the refund fields stay null until money is due back. */
+    public record Transaction(long paid, Instant paidAt, String orderStatus, String invoiceNo, String refundReason,
+            Long refundAmount, Instant refundDueAt, String refundState, Instant refundSettledAt, String gatewayRefund,
+            int refundAttempts, Instant refundTriedAt) {
+    }
+
     public record Row(String id, String status, String kind, String label, String customerId, String customerName,
             String customerMobile, String orderRef, long amount, String basis, String customerReason,
             Instant requestedAt, Instant decidedAt, String decisionReason, String propertyId, String creditNoteNo,
-            Signals signals) {
+            Signals signals, Transaction transaction) {
     }
 
     // What one page of rows needs, loaded once for the whole page.
     private record Lookup(Map<UUID, Subscription> orders, Map<UUID, Plan> plans, Map<UUID, User> people,
-            Map<UUID, String> notes) {
+            Map<UUID, String> notes, Map<UUID, Invoice> invoices) {
 
         String name(UUID userId) {
             User u = userId == null ? null : people.get(userId);
@@ -64,17 +74,19 @@ public class RefundDesk {
     private final PlanRepository plans;
     private final UserRepository users;
     private final CreditNoteRepository creditNotes;
+    private final InvoiceRepository invoices;
     private final RefundAssessor assessor;
 
     public RefundDesk(RefundRequestRepository requests, PaymentDisputeRepository disputes,
             SubscriptionRepository subscriptions, PlanRepository plans, UserRepository users,
-            CreditNoteRepository creditNotes, RefundAssessor assessor) {
+            CreditNoteRepository creditNotes, InvoiceRepository invoices, RefundAssessor assessor) {
         this.requests = requests;
         this.disputes = disputes;
         this.subscriptions = subscriptions;
         this.plans = plans;
         this.users = users;
         this.creditNotes = creditNotes;
+        this.invoices = invoices;
         this.assessor = assessor;
     }
 
@@ -142,7 +154,7 @@ public class RefundDesk {
                 order.getPaymentRef(),
                 request.getAmount(), request.getBasis(), request.getCustomerReason(), request.getCreatedAt(),
                 request.getDecidedAt(), request.getDecisionReason(), idOf(order.getPropertyId()),
-                lookup.notes().get(order.getId()), signals);
+                lookup.notes().get(order.getId()), signals, transaction(order, lookup));
     }
 
     private Row autoRow(Subscription order, Lookup lookup) {
@@ -152,7 +164,36 @@ public class RefundDesk {
                 order.getPaymentRef(),
                 order.getRefundAmount() != null ? order.getRefundAmount() : order.getAmount(), null, null,
                 order.getRefundDueAt(), null, null, idOf(order.getPropertyId()), lookup.notes().get(order.getId()),
-                null);
+                null, transaction(order, lookup));
+    }
+
+    private static Transaction transaction(Subscription order, Lookup lookup) {
+        if (order == null) {
+            return null;
+        }
+        Invoice invoice = lookup.invoices().get(order.getId());
+        // An order that died before paying is never invoiced; its payment landed when the refund fell due.
+        Instant paidAt = invoice != null ? invoice.getIssuedAt()
+                : SubscriptionStatuses.CANCELLED.equals(order.getStatus()) ? order.getRefundDueAt() : null;
+        boolean due = order.getRefundDueAt() != null;
+        return new Transaction(order.getAmount(), paidAt, order.getStatus(),
+                invoice == null ? null : invoice.getNumber(), order.getRefundReason(),
+                !due ? null : order.getRefundAmount() != null ? order.getRefundAmount() : order.getAmount(),
+                order.getRefundDueAt(), refundState(order), order.getRefundSettledAt(), order.getRefundRef(),
+                order.getRefundAttempts(), order.getRefundTriedAt());
+    }
+
+    private static String refundState(Subscription order) {
+        if (order.getRefundDueAt() == null) {
+            return null;
+        }
+        if (order.getRefundSettledAt() != null) {
+            return "confirmed";
+        }
+        if (order.getRefundRef() != null) {
+            return "sent";
+        }
+        return order.getRefundTriedAt() != null || order.getRefundAttempts() > 0 ? "retrying" : "queued";
     }
 
     private Row disputeRow(PaymentDispute dispute, Lookup lookup) {
@@ -165,7 +206,7 @@ public class RefundDesk {
                 lookup.name(customer), lookup.mobile(customer), dispute.getOrderRef(),
                 dispute.getAmount() != null ? dispute.getAmount() : order == null ? 0L : order.getAmount(), null,
                 dispute.getReason(), dispute.getOpenedAt(), dispute.getClosedAt(), null,
-                order == null ? null : idOf(order.getPropertyId()), null, null);
+                order == null ? null : idOf(order.getPropertyId()), null, null, transaction(order, lookup));
     }
 
     private Signals signals(Subscription order, Plan plan, String device, Instant asOf) {
@@ -190,7 +231,9 @@ public class RefundDesk {
                 .forEach(u -> people.put(u.getId(), u));
         Map<UUID, String> notes = creditNotes.findBySourceTypeAndSourceIdIn(CreditNotes.SUBSCRIPTION, ids).stream()
                 .collect(Collectors.toMap(CreditNote::getSourceId, CreditNote::getNumber, (a, b) -> a));
-        return new Lookup(orders, planById, people, notes);
+        Map<UUID, Invoice> invoiceById = invoices.findBySourceTypeAndSourceIdIn(Invoices.SUBSCRIPTION, ids).stream()
+                .collect(Collectors.toMap(Invoice::getSourceId, Function.identity(), (a, b) -> a));
+        return new Lookup(orders, planById, people, notes, invoiceById);
     }
 
     private static String idOf(UUID id) {

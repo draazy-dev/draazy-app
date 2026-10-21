@@ -210,7 +210,15 @@ class RefundCreditNoteAndDisputeTest extends RefundTestBase {
                         .param("status", "auto").header(HttpHeaders.AUTHORIZATION, bearer(desk)))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
-                        .jsonPath("$.content[0].id").value(id.toString()));
+                        .jsonPath("$.content[0].id").value(id.toString()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.content[0].transaction.refundReason").value("listing_gone"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.content[0].transaction.refundState").value("confirmed"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.content[0].transaction.gatewayRefund").value("cf_refund_3"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.content[0].transaction.orderStatus").value("cancelled"));
     }
 
     @Test

@@ -192,7 +192,17 @@ at which point the server property becomes the single source of truth for both h
   always). `GET /admin/refunds?status=pending_review|approved|rejected|auto|disputed&counts=true` is paged in the
   house envelope. Rows: `{id, status, kind, label, customerId, customerName, orderRef, amount, basis, customerReason,
   requestedAt, decidedAt, decisionReason, propertyId, creditNoteNo, signals{refunds12m, linkedAccounts, contactsUsed,
-  enquiries, pausedDuringWindow}}`. `signals` is computed only for `pending_review` rows and is null on every other tab. `auto` rows are the system's own refunds (id = order id) and `disputed` rows the gateway disputes.
+  enquiries, pausedDuringWindow}, transaction}`. `signals` is computed only for `pending_review` rows and is null on every other tab. `auto` rows are the system's own refunds (id = order id) and `disputed` rows the gateway disputes.
+- `transaction` is the order behind every row: price, paid-at (the invoice time, or for an order that died unpaid
+  the moment its refund fell due), order status, invoice number, and once money is due back the refund amount,
+  `refundReason` (`paid_after_cancel`, `listing_gone`, `amount_mismatch`, `customer_request`, `gateway_dashboard`,
+  stored on `subscriptions.refund_reason`), `refundState` (`queued` → `sent` once Cashfree accepts it →
+  `confirmed` once its SUCCESS webhook lands, `subscriptions.refund_settled_at`; `retrying` after a refusal), the
+  gateway refund id and attempts. The desk shows the reason in place of the customer's on the Automatic tab.
+- The system refunds with no staff decision in three cases: a payment lands on an order already cancelled
+  (the customer backed out, or the sweep expired the checkout); a listing pass is paid after its listing was
+  archived, rented or sold; or the amount or currency paid is not the order's. Nothing is granted and the sum paid
+  goes back.
 - `POST /admin/refunds/{id}/approve` re-checks the facts, then queues the refund; `POST .../reject {reason}`
   (required, else 422) restores the entitlement. A second decision, or approving or rejecting while the gateway
   disputes the order, is 409. Both notify the customer (`refund.decided`) and are audited `refund.approved` / `refund.rejected`.

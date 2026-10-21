@@ -10,7 +10,7 @@ import PageHeader from '../../components/ui/PageHeader.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import Loading from '../../components/ui/Loading.jsx';
 import {
-  BTN, CHIP, CHIP_TONE, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
+  BTN, CHIP, CHIP_TONE, Cell, Chips, DATE_CHIPS, FactRow, PageNav, QueuePanel, QueueTabs, RowCard, RowList,
 } from '../../components/admin/WorkQueue.jsx';
 
 const PAGE_SIZE = 20;
@@ -25,9 +25,50 @@ const TAB_KEYS = TABS.map((t) => t.key);
 const STATUS_LABEL = { pending_review: 'Pending', approved: 'Approved', rejected: 'Rejected', auto: 'Automatic', disputed: 'Dispute' };
 const STATUS_TONE = { pending_review: CHIP_TONE.amber, approved: CHIP_TONE.green, rejected: CHIP_TONE.red, auto: CHIP_TONE.teal, disputed: CHIP_TONE.red };
 const NOTE = 'Decide within 2 business days. Approving pays back to the original method; rejecting needs a reason the customer will see.';
+const REASON_LABEL = {
+  paid_after_cancel: 'Paid after the order was cancelled or expired',
+  listing_gone: 'Listing was no longer live when the payment arrived',
+  amount_mismatch: 'Paid amount did not match the order',
+  customer_request: 'Customer asked for it',
+  gateway_dashboard: 'Refunded on the Cashfree dashboard',
+};
+const REFUND_STATE = {
+  queued: 'Queued to send',
+  retrying: 'Cashfree refused it, retrying',
+  sent: 'Sent to Cashfree',
+  confirmed: 'Confirmed by Cashfree',
+};
+const AT_LABEL = { auto: 'Due', disputed: 'Opened' };
 
 const fmtDate = (ms) => (ms ? new Date(ms).toLocaleDateString('en-IN') : '—');
+const fmtDateTime = (ms) => (ms ? new Date(ms).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
 const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
+
+function TransactionFacts({ tx }) {
+  if (!tx) return null;
+  return (
+    <>
+      <FactRow label="Payment">
+        <Cell>Paid {fmtINR(tx.paid)}</Cell>
+        <Cell>{tx.paidAt ? fmtDateTime(tx.paidAt) : ''}</Cell>
+        <Cell>Order {tx.orderStatus}</Cell>
+        <Cell className="font-mono">{tx.invoiceNo ? `Invoice ${tx.invoiceNo}` : 'No invoice'}</Cell>
+      </FactRow>
+      {tx.refundState ? (
+        <FactRow label="Refund">
+          <Cell>{tx.refundAmount != null ? fmtINR(tx.refundAmount) : ''}</Cell>
+          <span className={tx.refundState === 'retrying' ? 'text-amber-300' : undefined} data-testid="refund-state">{REFUND_STATE[tx.refundState] || tx.refundState}</span>
+          <Cell className="font-mono">{tx.gatewayRefund}</Cell>
+          <Cell>
+            {tx.refundState === 'retrying'
+              ? `${tx.refundAttempts} failed${tx.refundTriedAt ? `, last ${fmtDateTime(tx.refundTriedAt)}` : ''}`
+              : tx.refundSettledAt ? `Refunded ${fmtDateTime(tx.refundSettledAt)}` : `Due ${fmtDateTime(tx.refundDueAt)}`}
+          </Cell>
+        </FactRow>
+      ) : null}
+    </>
+  );
+}
 
 function ApproveModal({ row, busy, onClose, onConfirm }) {
   return (
@@ -237,11 +278,12 @@ export default function OpsRefunds() {
               id={r.id}
               title={<>{r.customerName || 'Customer'} <span className="font-normal text-gray-500">·</span> {fmtINR(r.amount)}</>}
               badges={<span className={classNames(CHIP, STATUS_TONE[r.status] || CHIP_TONE.neutral)}>{STATUS_LABEL[r.status] || r.status}</span>}
-              meta={<><span>{r.label}</span>{r.customerMobile ? <><Dot /><span className="tabular-nums" data-testid="customer-mobile">{r.customerMobile}</span></> : null}<Dot /><span className="font-mono">{r.orderRef}</span><Dot /><span>Requested {fmtDate(r.at)}</span></>}
+              meta={<><span>{r.label}</span>{r.customerMobile ? <><Dot /><span className="tabular-nums" data-testid="customer-mobile">{r.customerMobile}</span></> : null}<Dot /><span className="font-mono">{r.orderRef}</span>              <Dot /><span>{AT_LABEL[r.status] || 'Requested'} {fmtDate(r.at)}</span></>}
               facts={(
                 <>
                   {r.basis ? <FactRow label="Basis"><span className="col-span-full">{r.basis}</span></FactRow> : null}
-                  <FactRow label="Reason"><span className="col-span-full">{r.customerReason || '—'}</span></FactRow>
+                                <FactRow label="Reason"><span className="col-span-full" data-testid="refund-reason">{(r.status === 'auto' ? REASON_LABEL[r.transaction?.refundReason] : r.customerReason) || '—'}</span></FactRow>
+                                <TransactionFacts tx={r.transaction} />
                   {r.decidedAt ? <FactRow label="Decided"><span className="col-span-full">{fmtDate(r.decidedAt)}</span></FactRow> : null}
                   {r.creditNoteNo ? <FactRow label="Credit note"><span className="col-span-full font-mono">{r.creditNoteNo}</span></FactRow> : null}
                   {r.decisionReason ? <FactRow label="Decision"><span className="col-span-full">{r.decisionReason}</span></FactRow> : null}

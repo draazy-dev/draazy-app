@@ -1,6 +1,6 @@
 import { test, expect } from '../../fixtures/live.js';
 import { uniqueMobile } from '../../helpers/liveAuth.js';
-import { call, entitlementsOf } from '../../helpers/monetisation.js';
+import { call, entitlementsOf, openOrder, sql, CONTACT_PACK_PLAN } from '../../helpers/monetisation.js';
 import { member } from '../../helpers/referral.js';
 import { decide, paidPack, paymentOf, refundIdOf, requestRefund, staffCall } from '../../helpers/refunds.js';
 
@@ -48,6 +48,9 @@ test.describe('LIVE: the staff Refunds desk', () => {
       await expect(row).toContainText('Contact Pack');
       await expect(row).toContainText('Pending');
       await expect(row).toContainText('Desk Anita changed their mind');
+      await expect(row).toContainText('Paid ₹199');
+      await expect(row).toContainText('Order refund-review');
+      await expect(row.getByTestId('refund-state'), 'nothing is due back before a decision').toHaveCount(0);
       await expect(row).toContainText(/\d+ refunds? in 12 mo/);
       await expect(row).toContainText('0 linked accounts');
       await expect(row).toContainText('0 contacts used');
@@ -68,6 +71,33 @@ test.describe('LIVE: the staff Refunds desk', () => {
       await expect(row.getByTestId('refund-approve')).toHaveCount(0);
       await expect(row.getByTestId('refund-reject')).toHaveCount(0);
     });
+
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('an automatic refund says why it happened and where the money is', async ({ page, login, consoleErrors }) => {
+    test.slow();
+    const mobile = await member('Desk Kavya');
+    const order = await openOrder(mobile, CONTACT_PACK_PLAN);
+    // The paid-after-cancel webhook's outcome; its secret is machine-local.
+    sql(`update subscriptions set status = 'cancelled', refund_due_at = now(), refund_reason = 'paid_after_cancel',`
+      + ` refund_ref = 'cf_rf_desk_kavya' where id = '${order.id}'`);
+    await openDesk(page, login);
+    await openTab(page, 'Automatic');
+
+    const row = rowFor(page, 'Desk Kavya');
+    await expect(row).toHaveCount(1, { timeout: 20000 });
+    await expect(row.getByTestId('refund-reason')).toHaveText('Paid after the order was cancelled or expired');
+    await expect(row).toContainText('Paid ₹199');
+    await expect(row).toContainText('Order cancelled');
+    await expect(row).toContainText('No invoice');
+    await expect(row.getByTestId('refund-state')).toHaveText('Sent to Cashfree');
+    await expect(row).toContainText('cf_rf_desk_kavya');
+
+    sql(`update subscriptions set refund_settled_at = now() where id = '${order.id}'`);
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await expect(row.getByTestId('refund-state')).toHaveText('Confirmed by Cashfree');
+    await expect(row).toContainText('Refunded');
 
     expect(consoleErrors).toEqual([]);
   });
