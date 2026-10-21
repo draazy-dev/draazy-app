@@ -149,26 +149,7 @@
   background: rgb(var(--dz-c-white) / .08);
 }
 
-/* .otp-* box styles live in index.css (global, shared via OtpBoxes.jsx). */
-
-.auth-page .send-otp-btn {
-  background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .15), rgb(var(--dz-c-indigo-600) / .15));
-  border: 1px solid rgb(var(--dz-c-teal-500) / .3);
-  transition: all .3s cubic-bezier(.4, 0, .2, 1);
-}
-
-@media (hover: hover) {
-  .auth-page .send-otp-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .25), rgb(var(--dz-c-indigo-600) / .25));
-    border-color: rgb(var(--dz-c-teal-500) / .5);
-    transform: translateY(-1px);
-  }
-}
-
-.auth-page .send-otp-btn:disabled {
-  opacity: .5;
-  cursor: not-allowed;
-}
+/* .otp-* boxes are global in index.css; .send-otp-btn is Tier 0 in components/buttons.css. */
 
 .auth-page .role-chip {
   cursor: pointer;
