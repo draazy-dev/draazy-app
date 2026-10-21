@@ -51,7 +51,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
 
   const request = async () => {
     if (!isIn) {
-      /* Close only if the gate actually navigated. */
+      /* Close only if the gate actually opened. */
       if (sendToSignIn('contact')) onClose();
       return;
     }
@@ -90,8 +90,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
         return;
       }
       if (err?.status === 401) {
-        /* `back` is the listing as it was when the request left: `signInPath` otherwise reads `window.location` at
-           call time and would return them to wherever they navigated meanwhile. */
+        // `back` is the listing as it was when the request left, not wherever they navigated meanwhile.
         if (sendToSignIn('contact', back)) onClose();
         return;
       }

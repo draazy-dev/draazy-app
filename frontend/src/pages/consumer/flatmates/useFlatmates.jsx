@@ -7,7 +7,7 @@ import { useToast } from '../../../context/ToastContext.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { usePostChooser } from '../../../context/PostChooserContext.jsx';
 import { digits } from '../../../lib/contact.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../../lib/useSignInGate.js';
 import { recordAskLocally, rememberAsk } from '../../../lib/data/flatmates.js';
 import * as flatmateService from '../../../services/flatmateService.js';
 import { FLATMATE_IMG, detailPath, roomTitle } from './helpers.js';
@@ -155,11 +155,12 @@ export function useFlatmates() {
 
   /* Signed out, the tap goes to sign-in — an anonymous list could never be merged into the real
    * one. */
-  const onSave = async (k) => {
+  const onSave = async (k, want) => {
     const key = parseSavedKey(k);
     if (!key) return;
-    if (!user) { sendToSignIn('save'); return; }
-    const next = !saved[k];
+    // The resume asks for "saved": toggling a row the account had already saved would unsave it.
+    if (!user) { sendToSignIn('save', undefined, () => latest.current.onSave(k, true)); return; }
+    const next = want ?? !saved[k];
     const apply = (on) => setSaved((m) => {
       const n = { ...m };
       if (on) n[k] = true; else delete n[k];
@@ -169,6 +170,8 @@ export function useFlatmates() {
     try {
       if (next) await flatmateService.saveFlatmatePost(key.kind, key.id);
       else await flatmateService.unsaveFlatmatePost(key.kind, key.id);
+      // Re-assert: the saved-list read that sign-in starts can land mid-write without this row.
+      apply(next);
     } catch (e) {
       // Put it back. A bookmark that stays filled over a save the server never recorded is the one
       // failure mode the user cannot see until the shortlist is empty.
@@ -179,7 +182,7 @@ export function useFlatmates() {
   };
   /* The server owns interest records; this hook owns optimistic button state. */
   const onInterest = async (r) => {
-    if (!user) { sendToSignIn('contact'); return; }
+    if (!user) { sendToSignIn('contact', undefined, () => latest.current.onInterest(r)); return; }
     if (r.verifiedContactOnly && !isVerified) { toast(t('flatmates.acceptsVerifiedOnlyToast', { name: r.name }), 'error'); setVerifyOpen(true); return; }
     const ask = {
       request: { propertyId: r.id, property: { title: 'Flatmate: ' + r.name, price: r.budget ? '₹' + r.budget + '/mo' : '', loc: (r.localities || [])[0] || 'Pune', img: FLATMATE_IMG }, party: { name: r.name, avatar: (r.name || 'U').slice(0, 2).toUpperCase() }, firstMessage: SEEKER_OPENER },
@@ -207,7 +210,7 @@ export function useFlatmates() {
   // Rooms use a distinct interest key and payload, so they get their own handler. `share` carries
   // how the seeker intends to take the room — the owner needs to know whether one person or two.
   const onRoomInterest = async (room, share = 'solo') => {
-    if (!user) { sendToSignIn('contact'); return; }
+    if (!user) { sendToSignIn('contact', undefined, () => latest.current.onRoomInterest(room, share)); return; }
     const key = 'room-' + room.id;
     const opener = SHARE_OPENER[share] || SHARE_OPENER.solo;
     const name = room.society || roomTitle(room);
@@ -236,6 +239,7 @@ export function useFlatmates() {
 
     toast(t('flatmates.messageSentOwner', { society: name }));
   };
+  const latest = useLatest({ onSave, onInterest, onRoomInterest });
 
   // Interest state is device-scoped; repeat requests remain a server-resolved conflict. Returns the
   // server row (carrying `status`) once loaded, `true` for a tap not yet confirmed, `false` otherwise.

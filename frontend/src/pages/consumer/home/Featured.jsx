@@ -32,7 +32,7 @@ function FeaturedCard({ p, priority = false }) {
   const handleSave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!isIn) { sendToSignIn('save'); return; }
+    if (!isIn) { sendToSignIn('save', undefined, () => savedList.save(p.id, p.uuid)); return; }
     savedList.toggle(p.id, p.uuid);
   };
 

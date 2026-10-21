@@ -15,7 +15,7 @@ import { useContactGate } from './useContactGate.js';
 import { useMyVisits } from './useMyVisits.js';
 import { requestPhotos as askForPhotos } from '../../../services/photoRequestService.js';
 import { pushRecentProp, getLastSearch } from '../../../lib/localPrefs.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../../lib/useSignInGate.js';
 import { isInternal } from '../../../lib/auth.js';
 import { AMEN_LABEL, availableLabel, deriveFloor, deriveFacing, deriveOverlooking, deriveAge, possessionDateLabel, propertyKind } from './derivations.js';
 import { commercialSpecsFor } from '../list-property/constants.js';
@@ -292,19 +292,19 @@ export default function useProperty() {
 
   /* Re-stated here only to spend a toast instead of a round trip; the server enforces both
    * independently. */
-  const requestPhotos = async () => {
-    if (!isIn) { sendToSignIn('photos'); return; }
+  const requestPhotos = async (e) => {
+    const again = replay(e);
+    if (!isIn) { sendToSignIn('photos', undefined, again); return; }
     if (isOwner) { toast(tr('property.ownListingPhotos'), 'info'); return; }
     if (photoAskBusy.current) return;
-    /* Captured before the await, because `signInPath` reads `window.location` at call time and
-     * a 401 can land after the buyer has already moved to another page. */
-    const back = window.location.pathname + window.location.search;
+    // Captured before the await, so a 401 after the buyer moved on still returns them to this listing.
+    const back = window.location.pathname + window.location.search + window.location.hash;
     photoAskBusy.current = true;
     try {
       const { created } = await askForPhotos(p.id);
       toast(created ? tr('property.photosSent') : tr('property.photosDuplicate'), created ? 'success' : 'info');
     } catch (err) {
-      if (err?.status === 401) { sendToSignIn('photos', back); return; }
+      if (err?.status === 401) { sendToSignIn('photos', back, again); return; }
       if (err?.code === 'recently_withdrawn') { toast(err.message || tr('property.recentlyWithdrawn'), 'info'); return; }
       if (err?.status === 400) { toast(tr('property.ownListingPhotos'), 'info'); return; }
       toast(tr('property.photosFailed'), 'error');

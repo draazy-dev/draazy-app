@@ -44,8 +44,8 @@
 
 ## 3. Actors & roles
 - **All consumers** can open every calculator and see instant figures **without signing in** (the
-  math is public). Submitting a *certified/lead* request requires sign-in:
-  `navigate('/signin?reason=service&next=<path>')` (draft restored on return). The Move-in Pack
+  math is public). Submitting a *certified/lead* request requires sign-in: the in-page sign-in sheet
+  opens over the form and re-submits it after OTP. The Move-in Pack
   `bookPack` and rent-agreement generate also require sign-in.
 - **Ops/staff** (team-scoped) consume the resulting tickets/requests in the back-office (out of scope
   here). No consumer route here is a `ProtectedRoute`; the sign-in gate is in-handler.
@@ -188,9 +188,9 @@ conf   = clamp(72..95) of 92, minus 12 if area<400 or >3000, minus 3 if ageM<0.9
   valuation returns `null` (no estimate) when area is 0; packers rounds to Rs 500 and clamps unknown
   keys to factor 1.
 - **Unknown locality (valuation):** falls back to city-average rate/YoY and drops confidence by 8.
-- **Sign-in gate on submit:** valuation `submit` and rent-agreement `generate` bounce to
-  `/signin?reason=service&next=...`; the autosaved draft (`dzDraft:*`, `useFormDraft`) is restored on
-  return. `bookPack`/`waitlist` also gate/limit appropriately.
+- **Sign-in gate on submit:** valuation `submit` and rent-agreement `generate` open the in-page sign-in
+  sheet and resume after OTP; the autosaved draft (`dzDraft:*`, `useFormDraft`) still covers a reload.
+  `bookPack`/`waitlist` also gate/limit appropriately.
 - **Field validation:** valuation lead requires name, valid mobile `^[6-9]\d{9}$`, and a purpose;
   Move-in waitlist requires a valid mobile (`isValidMobile`).
 - **Admin config unavailable:** Move-in Pack uses `DEFAULT_PACK_PRICES` until `settings.movePack`

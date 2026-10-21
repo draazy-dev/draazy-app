@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router';
 import { useFormDraft, useFieldErrors } from '../../../lib/hooks.js';
 import { useVerification } from '../../../context/VerificationContext.jsx';
 import { digits } from '../../../lib/contact.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../../lib/useSignInGate.js';
 import { evaluateHostEligibility, recordAskLocally, rememberAsk } from '../../../lib/data/flatmates.js';
 import * as flatmateService from '../../../services/flatmateService.js';
 import { getLocality } from '../../../services/localityService.js';
@@ -70,15 +70,20 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
   const { verified: identityVerified } = useVerification();
   const isVerified = user ? identityVerified : false;
 
-  // Posting only needs an L1 mobile-verified sign-in, the same floor as List Property.
-  // Identity verification is an opt-in badge, never a wall.
-  const requireSignedIn = (action) => {
-    if (!user) { sendToSignIn('listproperty'); return; }
+  // Posting needs only an L1 sign-in, never identity verification. Signed out, the tap resumes through
+  // the `?post=` intent below, which waits for `myPost` (the one-live-request check needs it).
+  const requireSignedIn = (action, intent) => {
+    if (!user) {
+      const next = new URLSearchParams(params);
+      next.set('post', intent);
+      sendToSignIn('listproperty', `/flatmates?${next}`);
+      return;
+    }
     action();
   };
   /* No `listRoom` twin of these: the app-wide sheet navigates to `/list-property?flatmate=1` from wherever it was
      opened, so a board-only copy would be a second door to the same room. */
-  const createGroup = () => requireSignedIn(() => setGroupOpen(true));
+  const createGroup = () => requireSignedIn(() => setGroupOpen(true), 'group');
   const openPostModal = (id = null) => {
     requireSignedIn(() => {
       // One live request per person: a fresh post while one already exists edits the existing
@@ -109,7 +114,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
         setPost({ name: user.name || '', gender: user.gender || 'any', age: '', occupation: '', budget: '', budgetMax: '', moveIn: 'now', flatPref: 'any', roomPref: 'any', localities: [], tags: [], note: '', title: '', verifiedContactOnly: false });
       }
       setPostOpen(true);
-    });
+    }, 'solo');
   };
   const postIntent = params.get('post');
   /* A Symbol marks the signed-out redirect — it can never equal a `?post=` value. */
@@ -120,7 +125,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     if (!user) {
       if (handledIntent.current !== SIGNIN_LATCH) {
         handledIntent.current = SIGNIN_LATCH;
-        sendToSignIn('listproperty', `/flatmates?post=${encodeURIComponent(postIntent)}`);
+        sendToSignIn('listproperty', `/flatmates?${params}`);
       }
       return;
     }
@@ -384,7 +389,7 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
     setConsentOpen(true);
   };
   const onJoin = async (g) => {
-    if (!user) { sendToSignIn('community'); return; }
+    if (!user) { sendToSignIn('community', undefined, () => latestJoin.current(g)); return; }
     if (ownsGroup(g)) { toast(t('flatmates.alreadyMember')); return; }
     const key = 'group-' + g.id;
     const open = g.policy === 'any';
@@ -428,9 +433,10 @@ export function useFlatmateSupply({ refresh, user, authLoading, toast, t, nav: n
 
     toast(open ? t('flatmates.joinedToast', { title: g.title }) : t('flatmates.requestJoinToast', { title: g.title }));
   };
+  const latestJoin = useLatest(onJoin);
 
   const openVerify = () => {
-    if (!user) { sendToSignIn('verify'); return; }
+    if (!user) { sendToSignIn('verify', undefined, () => setVerifyOpen(true)); return; }
     setVerifyOpen(true);
   };
 

@@ -46,8 +46,8 @@
 
 ## 3. Actors & roles
 - **Public:** anyone can browse, filter, sort and page. No `ProtectedRoute`.
-- **Auth-gated sub-actions:** saving a search / alert requires sign-in (bounces to
-  `/signin?reason=alerts`), because alerts are keyed by mobile and live in the login-only dashboard.
+- **Auth-gated sub-actions:** saving a search / alert requires sign-in (the in-page sign-in sheet,
+  then the save runs), because alerts are keyed by mobile and live in the login-only dashboard.
   Opening a property and requesting contact have their own gates (see
   [property-detail.md](./property-detail.md) and [contact-gate-leads.md](./contact-gate-leads.md)).
 - **Map view** is behind the `mapSearch` app flag (`AppFlagRoute`-style `flagEnabled('mapSearch')`).
@@ -190,7 +190,7 @@ implementation details:
   search is therefore shareable, refresh-safe and back-button-safe.
 
 ### Save search / smart search
-- **Save search:** requires sign-in (else `/signin?reason=alerts`). Builds an alert record
+- **Save search:** requires sign-in (else the in-page sign-in sheet). Builds an alert record
   (`buildAlertRecord`) and `addSavedSearch(...)`; a typed query is parsed first so the label and
   criteria agree.
 - **Smart search (`parseSmartQuery`):** parses a free-text box into a filter set + deal, applies it,

@@ -6,7 +6,7 @@ import Icon from '../../../components/Icon.jsx';
 import { ServiceBreadcrumbs } from '../../../components/Breadcrumbs.jsx';
 import MobileField from '../../../components/MobileField.jsx';
 import { useScrollReveal } from '../../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import ServiceTracker from '../../../components/ServiceTracker.jsx';
@@ -87,11 +87,15 @@ export default function PropertyValuation() {
 
   const submit = (e) => {
     e.preventDefault();
-    // Instant estimate is public; the certified report requires sign-in (draft is restored on return).
-    if (!isIn) { sendToSignIn('services'); return; }
+    // Instant estimate is public; the certified report requires sign-in.
+    if (!isIn) { sendToSignIn('services', undefined, replay(e)); return; }
+    // A submit resumed after the sign-in sheet sees fields that were blank at mount; the account fills them.
+    const name = form.name.trim() || user?.name || '';
+    const mobile = form.mobile || user?.mobile || '';
+    if (name !== form.name || mobile !== form.mobile) setForm((p) => ({ ...p, name, mobile }));
     const ok = err.check([
-      { name: 'name', ok: !!form.name.trim(), msg: tr('services.valuation.errName') },
-      { name: 'mobile', ok: /^[6-9]\d{9}$/.test((form.mobile || '').replace(/\D/g, '')), msg: tr('services.valuation.errMobile') },
+      { name: 'name', ok: !!name, msg: tr('services.valuation.errName') },
+      { name: 'mobile', ok: /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '')), msg: tr('services.valuation.errMobile') },
       { name: 'purpose', ok: !!form.purpose, msg: tr('services.valuation.errPurpose') },
     ], toast);
     if (!ok) return;
@@ -100,14 +104,14 @@ export default function PropertyValuation() {
     createFlowRequest({
       type: 'valuation',
       service: 'Property Valuation',
-      customer: { name: form.name },
+      customer: { name },
       details: {
         property: form.location || '',
         ptype: form.ptype,
         area: form.area ? form.area + ' sq.ft' : '',
         purpose: form.purpose,
-        contactName: form.name,
-        contactMobile: form.mobile,
+        contactName: name,
+        contactMobile: mobile,
       },
     }).catch(() => {});
     draft.clear();

@@ -1,5 +1,6 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs } from '../../../helpers/liveAuth.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 
 const api = (path, headers, init = {}) => fetch(`${API}${path}`, { headers, ...init });
 
@@ -59,12 +60,22 @@ async function openSaved(page, mobile) {
   await page.goto('/saved');
 }
 
-test('a signed-out visitor gets the on-device shortlist and a sign-in prompt', async ({ page }) => {
+test('a signed-out visitor gets the on-device shortlist and a sign-in prompt that opens the sheet in place', async ({ page }) => {
   await page.goto('/saved');
   await expect(page).not.toHaveURL(/\/signin/);
   await expect(page.getByRole('heading', { name: 'Saved properties', exact: true })).toBeVisible();
   await expect(page.getByText('Sign in to keep your shortlist on every device.')).toBeVisible();
-  await expect(page.locator('a[href="/signin?reason=saved&next=%2Fsaved"]')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+
+  await expect(signInSheet(page)).toBeVisible();
+  await expect(page.getByRole('dialog', { name: /sign in to see your saved homes/i })).toBeVisible();
+  await expect(page).toHaveURL(/\/saved$/);
+
+  await verifyInSheet(page, uniqueMobile());
+
+  await expect(page).toHaveURL(/\/saved$/);
+  await expect(page.getByText('Sign in to keep your shortlist on every device.')).toHaveCount(0);
 });
 
 test('the shortlist the page renders is the one the server holds, with no console errors', async ({ page, consoleErrors }) => {

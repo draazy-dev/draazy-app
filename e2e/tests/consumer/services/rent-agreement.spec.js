@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { AADHAAR, MOBILE, active, BUILDING_PLACEHOLDER, SOCIETY_PLACEHOLDER, clickNext, fillBuilding, fillOwner, fillProperty, fillTenant, fillTenantPolice, fillTerms, fillWitnesses, inviteOwner, pickLocality, uploadAll } from '../../../helpers/rentAgreementWizard.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { shownMobile } from '../../../helpers/liveAuth.js';
+import { signInSheet } from '../../../helpers/signInSheet.js';
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const BUYER = { name: 'Anita Verma', mobile: '9811223344', email: '', role: 'buyer', joinedAt: Date.now() };
 async function login(page, user) {
@@ -214,22 +215,17 @@ test.describe('Rent Agreement — revenue flow', () => {
     await p.getByPlaceholder('411045').fill('411045');
 
     await page.getByRole('button', { name: 'Sign in to continue' }).click();
+    // The draft flush ran on the click; the clock resumes so the sheet's own timers can run.
+    await page.clock.resume();
 
-    await expect(page).toHaveURL(/\/signin/);
-    const url = new URL(page.url());
-    expect(url.searchParams.get('reason')).toBe('services'); // plural — AUTH_REASONS drops 'service'
-    expect(url.searchParams.get('next')).toBe('/services/rent-agreement');
-    /* The sign-up leg must carry `next` too, or `postAuthDest` sends a brand-new account to the
-       dashboard. Asserted on the href, because completing a signup needs a server this lane lacks. */
-
-    await expect(page.getByRole('link', { name: /sign up/i }))
-      .toHaveAttribute('href', /next=%2Fservices%2Frent-agreement/);
+    await expect(signInSheet(page)).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /sign in to book services/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/services\/rent-agreement$/);
 
     const written = await page.evaluate(() => localStorage.getItem('dzDraft:rentAgreement') || '');
     expect(written).toContain('Skyline Heights');
     expect(written).toContain('411045');
 
-    await page.clock.resume();
     await login(page, BUYER);
     await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
     const back = active(page);

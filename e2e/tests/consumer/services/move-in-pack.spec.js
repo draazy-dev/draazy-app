@@ -1,6 +1,7 @@
 import { test, expect, ACTORS, STAFF } from '../../../fixtures/live.js';
 import { API, authHeaders } from '../../../helpers/liveAuth.js';
 import { appReady } from '../../../helpers/app.js';
+import { signInSheet } from '../../../helpers/signInSheet.js';
 
 /* Reads the packers board back via GET /tickets with a staff token (the buyer is refused it), since a toast
    alone passes on a lead that never left the browser. The waitlist rate limit is in ServiceWaitlistTest. */
@@ -134,15 +135,17 @@ test.describe('Move-in Pack booking (live)', () => {
     await expect(pack.getByRole('button', { name: new RegExp(CHOSEN[0]) })).toHaveClass(/bg-teal-400\/10/);
   });
 
-  test('a signed-out visitor is sent to sign in before anything is written', async ({ page }) => {
+  test('a signed-out visitor gets the sign-in sheet before anything is written', async ({ page }) => {
     const before = (await packersBoard()).length;
     await openHub(page);
     const pack = await packSection(page);
     await chooseItems(pack);
+    const hubUrl = page.url();
     await pack.getByRole('button', { name: 'Book Move-in Pack' }).click();
 
-    await expect(page).toHaveURL(/\/signin/);
-    // The redirect is the positive anchor: the gate runs before the write,
+    await expect(signInSheet(page)).toBeVisible();
+    await expect(page).toHaveURL(hubUrl);
+    // The sheet is the positive anchor: the gate runs before the write,
     // so no half-identified ticket reaches the desk.
     expect((await packersBoard()).length).toBe(before);
   });

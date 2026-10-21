@@ -182,7 +182,7 @@ export default function MapDetailPanel({ property: p, list, locName, activeIndex
     setVisitOpen(true);
   };
   const toggleSave = () => {
-    if (!signedIn) { sendToSignIn('save'); return; }
+    if (!signedIn) { sendToSignIn('save', undefined, () => savedList.save(p.id, p.uuid)); return; }
     savedList.toggle(p.id, p.uuid);
   };
   const isOwner = signedIn && digits(p.ownerMobile) && digits(p.ownerMobile) === digits(user?.mobile);

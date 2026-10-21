@@ -42,7 +42,7 @@ const Card = memo(function Card({ p, locName, index = 0, list = false, linkState
   const saved = savedList.has(p.id);
   const handleHeart = (e) => {
     e.preventDefault();
-    if (!isIn) { sendToSignIn('save'); return; }
+    if (!isIn) { sendToSignIn('save', undefined, () => savedList.save(p.id, p.uuid)); return; }
     savedList.toggle(p.id, p.uuid);
     haptic('tick');
   };

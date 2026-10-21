@@ -26,7 +26,7 @@ export default function RentAgreement() {
   const {
     rootRef, formRef, tr, navigate,
     step, errors, done, openFaq, setOpenFaq,
-    mode, inviteError, inviteResult, copied,
+    mode, inviteError, inviteResult, copied, signInToInvite,
     withdrawInvite, withdrawing,
     prop, setP, setProp, setSelectedPropertyId, pickListing, myProperties,
     owner, setO, coOwners, setCoOwner, addCoOwner, removeCoOwner, ownerDocs, setOwnerDocs, vaultEnabled, saveOwnerDocToVault,
@@ -62,7 +62,9 @@ export default function RentAgreement() {
                   <Icon name="alert-triangle" className="w-10 h-10 text-amber-300 mx-auto mb-3" />
                   <p className="text-white font-semibold">{tr(`services.ra.inviteErr.${inviteError.kind}.title`)}</p>
                   <p className="text-gray-400 text-sm mt-1.5 leading-relaxed max-w-md mx-auto">{tr(`services.ra.inviteErr.${inviteError.kind}.desc`, { mobile: inviteError.toMobile ? '••••' + String(inviteError.toMobile).slice(-4) : '' })}</p>
-                  <button type="button" onClick={() => navigate('/services/rent-agreement')} className="btn-teal mt-5 px-6 py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center gap-2"><Icon name="file-signature" className="w-4 h-4" /> {tr('services.ra.inviteErr.startOwn')}</button>
+                  {inviteError.kind === 'signin'
+                    ? <button type="button" onClick={signInToInvite} className="btn-teal mt-5 px-6 py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center gap-2"><Icon name="log-in" className="w-4 h-4" /> {tr('services.ra.inviteErr.signIn')}</button>
+                    : <button type="button" onClick={() => navigate('/services/rent-agreement')} className="btn-teal mt-5 px-6 py-3 rounded-xl text-white text-sm font-semibold inline-flex items-center gap-2"><Icon name="file-signature" className="w-4 h-4" /> {tr('services.ra.inviteErr.startOwn')}</button>}
                 </div>
               ) : (
               <>

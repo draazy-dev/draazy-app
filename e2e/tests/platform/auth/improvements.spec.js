@@ -86,8 +86,7 @@ test('the auth pages have no dead links, resolve their legal links and focus the
 });
 
 test('a gated visitor is told why they are being asked to sign in', async ({ page }) => {
-  // Review gates need consequence copy because reviews publish under the user's name; non-contact
-  // actions need distinct reasons because gate toasts survive navigation.
+  // Review gates need consequence copy because reviews publish under the user's name.
   const reasons = [
     ['an explicit save reason', '/signin?reason=save&next=%2Flistings', /save this home/i],
     ['an explicit contact reason', '/signin?reason=contact&next=%2Fowner%2F1', /contact the owner/i],

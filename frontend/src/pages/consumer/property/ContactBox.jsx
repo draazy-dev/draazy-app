@@ -6,7 +6,7 @@ import Button from '../../../components/ui/Button.jsx';
 import VerifyIdentityRedirect from '../../../components/auth/VerifyIdentityRedirect.jsx';
 import ContactsExhaustedModal from '../../../components/property/ContactsExhaustedModal.jsx';
 import { maskPhone, fmtPhone } from '../../../lib/contact.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../../lib/useSignInGate.js';
 import { requestContact } from '../../../services/contactService.js';
 import { useContactGate } from './useContactGate.js';
 import { useEntitlements, contactsLeft, freeContactsTill } from './useEntitlements.js';
@@ -41,15 +41,14 @@ export function ContactBox({ p, isIn, toast }) {
 
   const request = async () => {
     if (!isIn) {
-      sendToSignIn('contact');
+      sendToSignIn('contact', undefined, () => latestRequest.current());
       return;
     }
     track('contact_click', { action: 'request_number', id: propId });
     captureLead({ context: 'request_number', property: String(propId) });
 
-    /* Captured before the await: `signInPath` reads `window.location` at call time, so a 401 that lands after the
-       visitor has navigated away would otherwise return them to the wrong page. */
-    const back = window.location.pathname + window.location.search;
+    // Captured before the await, so a 401 after the visitor navigated away still resumes on this listing.
+    const back = window.location.pathname + window.location.search + window.location.hash;
     setBusy(true);
     try {
       const next = await requestContact(propId);
@@ -70,12 +69,13 @@ export function ContactBox({ p, isIn, toast }) {
       else if (err?.code === 'recently_withdrawn') toast(err.message || t('property.recentlyWithdrawn'), 'info');
       else if (err?.code === 'listing_not_live') toast(t('property.listingNotLive'), 'info');
       else if (err?.code === 'own_listing') toast(t('property.ownListing'), 'info');
-      else if (err?.status === 401) sendToSignIn('contact', back);
+      else if (err?.status === 401) sendToSignIn('contact', back, () => latestRequest.current());
       else toast(t('property.contactUnavailable'), 'error');
     } finally {
       setBusy(false);
     }
   };
+  const latestRequest = useLatest(request);
 
   return (
     <div className="mb-3 rounded-xl bg-white/5 border border-white/10 px-3 py-2.5">

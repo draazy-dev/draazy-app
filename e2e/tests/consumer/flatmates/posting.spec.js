@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { signedInAsNew } from '../../../helpers/liveAuth.js';
+import { signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 // Real sessions exercise posting guards; each test mints its own actor because posting changes account state.
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const POST_BUTTON = /^Post(?: Property| property — Free)?$/;
@@ -46,14 +47,21 @@ test.describe('Flatmates posting (live)', () => {
     await expect(sheet(page).getByRole('button', { name: /A property to rent out or sell/ })).toBeVisible();
   });
 
-  test('a guest is sent to sign-in, and told where to come back to', async ({ page }) => {
+  test('a guest gets the sign-in sheet, and the chosen branch opens after sign-in', async ({ page }) => {
     await openBoard(page);
     await openSheet(page);
     await sheet(page).getByRole('button', { name: /I'm looking for a place/ }).click();
     await whoSheet(page).getByRole('button', { name: /Just me/ }).click();
-    // Preserve `next` so authentication returns the poster to the selected branch.
-    await expect(page).toHaveURL(/\/signin/);
-    await expect(page).toHaveURL(/next=.*post%3Dsolo/);
+
+    await expect(signInSheet(page)).toBeVisible();
+    await expect(page).not.toHaveURL(/\/signin/);
+    await expect(page.getByText('Post your flatmate request')).toHaveCount(0);
+
+    await verifyInSheet(page, uniqueMobile());
+
+    // The sheet returns the poster to the selected branch; the one-shot intent is then cleared.
+    await expect(page.getByText('Post your flatmate request')).toBeVisible({ timeout: 15000 });
+    await expect(page).not.toHaveURL(/post=/);
   });
 
   test('a signed-in user is routed to the branch each posting choice names', async ({ page }) => {
@@ -106,13 +114,17 @@ test.describe('Flatmates posting (live)', () => {
     });
   });
 
-  test('the ?post=1 deep link does not carry a guest past the sign-in guard', async ({ page }) => {
-    // Skip `openBoard`: the guard can redirect before the lazy board mounts.
+  test('the ?post=1 deep link opens the sign-in sheet for a guest, not the form', async ({ page }) => {
+    // Skip `openBoard`: the sheet can open before the lazy board mounts.
     await page.goto(`${BASE}/flatmates?post=1`);
 
-    await expect(page).toHaveURL(/\/signin/);
+    await expect(signInSheet(page)).toBeVisible();
+    await expect(page).toHaveURL(/\/flatmates\?post=1/);
     await expect(page.getByText('Post your flatmate request')).toHaveCount(0);
-    // Assert `next` because this deep-link guard builds its redirect independently of the sheet.
-    await expect(page).toHaveURL(/next=%2Fflatmates%3Fpost%3D1/);
+
+    await verifyInSheet(page, uniqueMobile());
+
+    await expect(page.getByText('Post your flatmate request')).toBeVisible({ timeout: 15000 });
+    await expect(page).not.toHaveURL(/post=/);
   });
 });

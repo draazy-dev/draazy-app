@@ -16,7 +16,7 @@ import { cityHasData } from '../../lib/geoConfig.js';
 import NewCityEmptyState from '../../components/city/NewCityEmptyState.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import usePullToRefresh from '../../lib/usePullToRefresh.js';
-import { useSignInGate } from '../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../lib/useSignInGate.js';
 import { getSocietyBrief } from '../../services/societyService.js';
 import { toFacetQuery } from '../../lib/listings/facetQuery.js';
 import { INITIAL, serializeF, deserializeF, paramsToFilters, applyFiltersToSearchParams, switchDealFilters, hasFilterParams } from '../../lib/listings/filterState.js';
@@ -447,11 +447,11 @@ export default function Listings() {
     toast(tr('listings.smartSearchToast', { detail }), 'success');
   };
 
-  const saveSearch = async () => {
+  const saveSearch = async (e) => {
     // Alerts are keyed by mobile and live in the login-only dashboard, so a search saved while
     // signed out would be orphaned under 'anon' and never surface there.
     if (!isIn) {
-      sendToSignIn('alerts');
+      sendToSignIn('alerts', undefined, replay(e));
       return;
     }
     if (savingSearch) return;

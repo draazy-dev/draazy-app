@@ -177,11 +177,14 @@ export default function Societies() {
   const sortOptions = useMemo(() => SORTS.map((o) => ({ value: o.value, label: t(o.labelKey) })), [t]);
 
   const onFollow = async (slug) => {
-    if (!isIn) { sendToSignIn('society'); return; }
-    /* The context returns the state it settled on after any rollback, so
-       a refused write toasts 'unfollowed', not a false confirmation. */
-    const now = await follows.toggle(slug);
-    toast(now ? t('societies.followToast') : t('societies.unfollowToast'), now ? 'success' : 'info');
+    const follow = async () => {
+      /* The context returns the state it settled on after any rollback, so
+         a refused write toasts 'unfollowed', not a false confirmation. */
+      const now = await follows.toggle(slug);
+      toast(now ? t('societies.followToast') : t('societies.unfollowToast'), now ? 'success' : 'info');
+    };
+    if (!isIn) { sendToSignIn('society', undefined, follow); return; }
+    follow();
   };
 
   /* The picker resolves or mints by Google Place ID; `source` is 'create' only when the row is new,

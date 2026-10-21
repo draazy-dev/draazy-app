@@ -10,7 +10,7 @@ import { formatIndian } from '../list-property/format.js';
 import { istToday } from '../../../lib/availability.js';
 import { digits } from '../../../lib/contact.js';
 import { isoToDisplay } from '../../../lib/format.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useSingleFlight } from '../../../hooks/useSingleFlight.js';
 import {
@@ -200,11 +200,12 @@ export function DealPanel({ p, isIn, toast, contactApproved = false }) {
     t('property.agreedAwaitingOwner'),
   );
   const openOffer = () => {
-    if (!isIn) { sendToSignIn('offer'); return; }
+    if (!isIn) { sendToSignIn('offer', undefined, () => { if (!latest.current.isOwner) latest.current.openOffer(); }); return; }
     setOfferAmt(state.myOffer ? String(state.myOffer.amount || '') : '');
     setOfferErr('');
     setOfferOpen(true);
   };
+  const latest = useLatest({ openOffer, isOwner });
 
   const cardCls = 'glass-strong rounded-2xl p-5';
 

@@ -1,11 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { seedConsent, signedInAs, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
-/* The gate's toast text is the sign-in screen's own heading, so the two cannot disagree; the
-   `?reason=` and `?next=` pair is as much under test as the redirect itself. */
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
+/* A gated click opens the sign-in sheet in place, headed by the gated reason, and resumes the action after sign-in. */
 
 const LISTING = 'p5145';
-
-const toasts = (page) => page.getByTestId('toasts').getByRole('alert');
 
 async function openListing(page) {
   // The consent bar sits above the modal band and swallows clicks near the bottom of a mobile
@@ -19,18 +17,23 @@ async function openListing(page) {
 }
 
 test.describe('a visitor clicking a gated control gets the matching auth gate', () => {
-  test('Save property redirects to sign-in with the save reason', async ({ page }) => {
-    /* The other direction of the drift: `Card.jsx`'s save heart takes a guest to sign-in correctly
-       but must say so on the way, or the listing simply vanishes and an OTP form appears. */
+  test('Save property opens the save sheet in place and saves after sign-in', async ({ page }) => {
+    /* `Card.jsx`'s save heart must say why the sheet opened, or an OTP form appears with no context. */
     await seedConsent(page);
     await page.goto('/listings', { waitUntil: 'domcontentloaded' });
     await page.evaluate(() => document.querySelectorAll('.reveal,.fade-up,.fade-in').forEach((el) => el.classList.add('visible')));
 
     await page.getByRole('button', { name: 'Save property' }).first().click();
 
-    await expect(toasts(page)).toContainText(/sign in to save/i);
-    await page.waitForURL(/\/signin\?/);
-    expect(new URL(page.url()).searchParams.get('reason')).toBe('save');
+    await expect(signInSheet(page)).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /sign in to save/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/listings/);
+    const before = page.url();
+
+    await verifyInSheet(page, uniqueMobile());
+
+    await expect(page.locator('.heart-btn[aria-pressed="true"]').first()).toBeVisible({ timeout: 15000 });
+    await expect(page).toHaveURL(before);
   });
 
   test('the same click signed in opens the contact modal without leaving the listing', async ({ page }) => {

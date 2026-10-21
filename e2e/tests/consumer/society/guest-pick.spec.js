@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { seedConsent, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { signInSheet } from '../../../helpers/signInSheet.js';
 import { mintPickableSociety } from '../../../helpers/liveSociety.js';
 import { pickGoogleSociety } from '../../../helpers/places.js';
 
@@ -33,13 +34,14 @@ test('a guest picking a place that is already a society lands on its hub without
   expect(mints, 'finding an existing society must not mint another').toEqual([]);
 });
 
-test('a guest picking a place nobody has added is sent to sign in, and nothing is minted', async ({ page }) => {
+test('a guest picking a place nobody has added gets the sign-in sheet in place, and nothing is minted', async ({ page }) => {
   const mints = watchMints(page);
 
   await page.goto('/societies');
   await pickGoogleSociety(page, `Zz Guest New ${uniq()}`, { keepsValue: false });
 
-  await expect(page).toHaveURL(/\/signin/);
-  await expect(page.getByText('Sign in to join the community').first()).toBeVisible();
+  await expect(signInSheet(page)).toBeVisible();
+  await expect(page.getByRole('dialog', { name: /sign in to join the community/i })).toBeVisible();
+  await expect(page).toHaveURL(/\/societies/);
   expect(mints, 'a signed-out pick must not reach POST /societies').toEqual([]);
 });
