@@ -64,6 +64,12 @@ public class Subscription extends VersionedEntity {
     @Column(name = "refund_tried_at", insertable = false, updatable = false)
     private Instant refundTriedAt;
 
+    @Column(name = "refund_reason")
+    private String refundReason;
+
+    @Column(name = "refund_settled_at")
+    private Instant refundSettledAt;
+
     @Column(name = "frozen_at")
     private Instant frozenAt;
 
@@ -128,18 +134,15 @@ public class Subscription extends VersionedEntity {
         return true;
     }
 
-    /** True the first time only, so the owner is told once however often the gateway repeats itself. */
-    boolean markRefundDue(Instant now) {
-        return markRefundDue(now, null);
-    }
-
-    /** {@code amount} is what to send back when the provider took a different sum than the order was for. */
-    boolean markRefundDue(Instant now, Long amount) {
+    /** True the first time only, so the owner is told once however often the gateway repeats itself.
+     * {@code amount} is what to send back when the provider took a different sum than the order was for. */
+    boolean markRefundDue(Instant now, Long amount, String reason) {
         if (refundDueAt != null) {
             return false;
         }
         this.refundDueAt = now;
         this.refundAmount = amount;
+        this.refundReason = reason;
         return true;
     }
 
@@ -149,6 +152,12 @@ public class Subscription extends VersionedEntity {
 
     void markRefunded(String gatewayRefund) {
         this.refundRef = gatewayRefund;
+    }
+
+    void refundSettled(Instant now) {
+        if (refundSettledAt == null) {
+            this.refundSettledAt = now;
+        }
     }
 
     /** Derived from the id so a resend is the same refund; a failed one needs the next attempt's id. */
@@ -195,7 +204,7 @@ public class Subscription extends VersionedEntity {
         if (!moveStatus(SubscriptionStatuses.REFUND_REVIEW, SubscriptionStatuses.REFUNDED)) {
             return false;
         }
-        markRefundDue(now, refundAmount);
+        markRefundDue(now, refundAmount, RefundReasons.CUSTOMER_REQUEST);
         return true;
     }
 
@@ -221,9 +230,11 @@ public class Subscription extends VersionedEntity {
         }
         if (refundDueAt == null) {
             this.refundDueAt = now;
+            this.refundReason = RefundReasons.GATEWAY_DASHBOARD;
         }
         this.refundAmount = refunded;
         this.refundRef = gatewayRefund;
+        this.refundSettledAt = now;
         boolean held = SubscriptionStatuses.isEntitling(status) || SubscriptionStatuses.DISPUTED.equals(status)
                 || SubscriptionStatuses.REFUND_REVIEW.equals(status);
         if (refunded >= amount && held) {

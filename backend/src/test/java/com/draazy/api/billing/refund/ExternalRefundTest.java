@@ -47,6 +47,8 @@ class ExternalRefundTest extends RefundTestBase {
         Subscription after = subscriptionRow(pack.getId());
         assertThat(after.getStatus()).isEqualTo("refunded");
         assertThat(after.getRefundRef()).isEqualTo("cf_full");
+        assertThat(after.getRefundReason()).isEqualTo("gateway_dashboard");
+        assertThat(after.getRefundSettledAt()).isNotNull();
         assertThat(creditNotes(pack)).containsExactly(pack.getAmount());
         assertThat(notes(buyer, "refund.completed")).isEqualTo(1);
         assertThat((List<String>) paymentField(buyer, pack.getId(), "status")).containsExactly("refunded");
@@ -97,6 +99,7 @@ class ExternalRefundTest extends RefundTestBase {
 
         verify(gateway, never()).refund(anyString(), anyLong(), anyString(), anyString());
         assertThat(subscriptionRow(pack.getId()).getRefundRef()).isEqualTo("cf_instead");
+        assertThat(subscriptionRow(pack.getId()).getRefundReason()).isEqualTo("customer_request");
         assertThat(creditNotes(pack)).containsExactly(pack.getAmount());
     }
 

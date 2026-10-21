@@ -131,7 +131,8 @@ class ListingPasses {
         boolean listingGone = pass.getPropertyId() != null
                 && !SubscriptionStatuses.CANCELLED.equals(pass.getStatus());
         pass.abandonCheckout();
-        if (pass.markRefundDue(now)) {
+        if (pass.markRefundDue(now, null,
+                listingGone ? RefundReasons.LISTING_GONE : RefundReasons.PAID_AFTER_CANCEL)) {
             audit.record("system", "admin", "subscription.passRefundDue", "subscription",
                     pass.getId().toString(), null,
                     "{\"amount\":" + pass.getAmount() + ",\"order\":\"" + pass.getPaymentRef() + "\"}");
@@ -155,7 +156,7 @@ class ListingPasses {
         }
         order.abandonCheckout();
         long back = paid == null ? order.getAmount() : paid.setScale(0, RoundingMode.DOWN).longValue();
-        if (order.markRefundDue(now, back)) {
+        if (order.markRefundDue(now, back, RefundReasons.AMOUNT_MISMATCH)) {
             audit.record("system", "admin", "subscription.amountMismatch", "subscription",
                     order.getId().toString(), Map.of("expected", order.getAmount(), "paid", String.valueOf(paid),
                             "currency", String.valueOf(currency), "order", order.getPaymentRef()));
@@ -259,6 +260,7 @@ class ListingPasses {
             if (pass.getRefundRef() == null) {
                 recordRefunded(pass, gatewayRef == null || gatewayRef.isBlank() ? refundId : gatewayRef);
             }
+            pass.refundSettled(Instant.now());
             creditNotes.issue(pass.getUserId(), CreditNotes.SUBSCRIPTION, pass.getId(), pass.getPaymentRef(),
                     pass.refundable(), Instant.now());
         } else if (REFUND_REFUSED.contains(status) && pass.getRefundDueAt() != null) {

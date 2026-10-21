@@ -164,6 +164,7 @@ class BillingEndpointsTest extends AbstractApiTest {
         assertThat(order.getRenewsAt()).isNull();
         assertThat(order.getRefundDueAt()).isNotNull();
         assertThat(order.getRefundAmount()).isEqualTo(1L);
+        assertThat(order.getRefundReason()).isEqualTo("amount_mismatch");
         assertThat(jdbc.queryForObject("select count(*) from audit_log where action = ? and entity_id = ?",
                 Integer.class, "subscription.amountMismatch", order.getId().toString())).isEqualTo(1);
 
@@ -212,6 +213,7 @@ class BillingEndpointsTest extends AbstractApiTest {
         Subscription order = subscriptions.findByPaymentRef(orderId).orElseThrow();
         assertThat(order.getStatus()).isEqualTo(SubscriptionStatuses.CANCELLED);
         assertThat(order.getRefundDueAt()).isNotNull();
+        assertThat(order.getRefundReason()).isEqualTo("paid_after_cancel");
         assertThat(jdbc.queryForObject("select count(*) from audit_log where action = ? and entity_id = ?",
                 Integer.class, "subscription.passRefundDue", order.getId().toString())).isEqualTo(1);
         jdbc.update("delete from audit_log where entity_id = ?", order.getId().toString());
