@@ -168,6 +168,11 @@ public interface PropertyRepository
     @Query(value = "update properties set featured_days = :days where id = :id", nativeQuery = true)
     int setFeaturedDays(@Param("id") UUID id, @Param("days") Integer days);
 
+    /** One more view, unless the viewer owns the listing; {@code viewerId} is null for a signed-out visitor. */
+    @Modifying
+    @Query("update Property p set p.views = p.views + 1 where p.id = :id and (:viewerId is null or p.owner.id <> :viewerId)")
+    int countView(@Param("id") UUID id, @Param("viewerId") UUID viewerId);
+
     /** Featured-first live listings for the homepage strip; the {@link Pageable} caps the result
      * because the contract endpoint takes no limit. Summary projection, so no owner graph. */
     @Query("""
