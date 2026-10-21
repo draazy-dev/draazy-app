@@ -102,7 +102,7 @@ public class ProviderCalls {
 
     public void record(String provider, String operation, Outcome outcome, String recipient,
             String reference, String detail, Integer durationMs) {
-        Object[] row = {provider, operation, outcome.wire(), mask(recipient), hashRecipient(recipient),
+        Object[] row = {provider, operation, outcome.wire(), shown(recipient), hashRecipient(recipient),
                 reference, truncate(detail), durationMs, MDC.get(RequestCorrelation.TRACE_ID_MDC)};
         try {
             writer.execute(() -> write(provider, operation, row));
@@ -139,11 +139,12 @@ public class ProviderCalls {
         }
     }
 
-    static String mask(String recipient) {
+    /** Mobiles in full so ops can trace a delivery to the number; emails stay masked. */
+    static String shown(String recipient) {
         if (recipient == null || recipient.isBlank()) {
             return null;
         }
-        return recipient.contains("@") ? EmailSender.maskAddress(recipient.strip()) : MobileMask.mask(recipient);
+        return recipient.contains("@") ? EmailSender.maskAddress(recipient.strip()) : MobileMask.normalise(recipient);
     }
 
     public static String diagnosis(Throwable failure) {

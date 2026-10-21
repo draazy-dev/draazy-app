@@ -388,7 +388,7 @@ The boot fails if the flag is on and the key or from-address is blank. Send fail
 
 **Provider call log (`/admin/integrations`, admin only).** Every ZeptoMail, WhatsApp and Cashfree
 call, and every Cashfree webhook, writes one `provider_call` row (`provider/ProviderCalls.java`):
-outcome, masked recipient, order id or subject, an error code and the latency. Message bodies, OTPs,
+outcome, recipient (mobile in full, email masked), order id or subject, an error code and the latency. Message bodies, OTPs,
 links and keys are never stored. The page shows 24h/7d health per provider and a log searchable by
 full email, mobile or order id. Rows are written off the request thread and purged after 30 days;
 nothing to configure. Delivery and bounce receipts still live in each vendor's console.
