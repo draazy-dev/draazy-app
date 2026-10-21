@@ -209,3 +209,4 @@ hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 - "Horizontal scroll UI standard" for filters/tabs = the underline `dz-detail-tab` strip in `HScroll` (Property/Society tabs, icon + label), not the dashboard pill chips.
 - **Form action rows on phones sit in flow at the end of the form, never sticky/floating**: the iOS keyboard shrinks only the visual viewport, so a sticky Back/Next bar drifts mid-screen over the fields (listing wizard `.lp-step-actions`).
 - **A new listing (and a staff-posted claim) needs 3 photos, 2 labelled with key rooms** (`MIN_PUBLISH_PHOTOS`, mirrored by `ListingCompleteness.MIN_PHOTOS`); never treat the one-photo floor as the listing standard.
+- Don't replace a familiar layout while moving features: the user wanted dashboard request-type tabs and the chat property photo panel kept; add new cues (Received/Sent chip) on top instead.
