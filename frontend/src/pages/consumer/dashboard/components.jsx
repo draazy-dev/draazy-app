@@ -53,14 +53,14 @@ export function Stat({ icon, bg, fg, value, label, trend, onClick, ariaLabel }) 
 /* Horizontal sub-navigation used inside consolidated tabs (Activity, My Properties) to switch between grouped
    sub-sections without adding more top-level tabs. */
 
-export function SubNav({ items, active, onChange, variant = 'pill' }) {
+export function SubNav({ items, active, onChange, variant = 'pill', wrapClassName = 'mb-5' }) {
   if (!items || items.length < 2) return null;
   // Underline variant reuses the app-wide `.dz-detail-tab` style so every tab strip reads as one
   // standard.
 
   if (variant === 'underline') {
     return (
-      <HScroll role="tablist" fadeColor="var(--brand-dark)" wrapClassName="mb-5" className="flex gap-1 sm:gap-2 border-b border-white/10">
+      <HScroll role="tablist" fadeColor="var(--brand-dark)" wrapClassName={wrapClassName} className="flex gap-1 sm:gap-2 border-b border-white/10">
         {items.map((it) => (
           <button
             key={it.key}
@@ -188,37 +188,6 @@ export function RequestRow({ icon, tint = 'teal', avatar, title, badge, meta, ti
     </div>
   );
 }
-
-const dialDigits = (m) => String(m == null ? '' : m).replace(/\D/g, '');
-export function CallBtn({ mobile, name, label }) {
-  const digits = dialDigits(mobile);
-  if (!digits) return null;
-  const base = 'inline-flex items-center justify-center gap-1.5 rounded-lg bg-white/5 font-semibold text-brand-teal transition hover:bg-white/10';
-  return (
-    <a href={'tel:' + digits} aria-label={('Call ' + (name || '')).trim()} className={base + (label ? ' min-h-[44px] px-3 text-xs' : ' h-11 w-11')}>
-      <Icon name="phone" className="h-4 w-4" />{label ? <span>{label}</span> : null}
-    </a>
-  );
-}
-export function ChatBtn({ onClick, name, label }) {
-  const base = 'inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-teal/15 font-semibold text-brand-teal transition hover:bg-brand-teal/25';
-  return (
-    <button type="button" onClick={onClick} aria-label={('Chat with ' + (name || '')).trim()} className={base + (label ? ' min-h-[44px] px-3 text-xs' : ' h-11 w-11')}>
-      <Icon name="message-circle" className="h-4 w-4" />{label ? <span>{label}</span> : null}
-    </button>
-  );
-}
-
-export function FollowUpChip({ ts }) {
-  if (!ts) return null;
-  const label = new Date(ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-  return (
-    <span className="dz-tag bg-amber-400/15 font-semibold text-amber-300">
-      <Icon name="calendar-clock" className="h-3 w-3" /> {label}
-    </span>
-  );
-}
-/* Consistent empty state for a Requests sub-tab — an invitation, not a dead end. */
 
 export const RequestEmpty = ({ icon = 'inbox', text, cta }) => (
   <div className="flex flex-col items-center gap-3 py-10 text-center">

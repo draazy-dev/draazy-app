@@ -43,8 +43,11 @@ async function ask(buyer, propertyId, message) {
 
 const card = (page, text) => page.getByTestId('request-card').filter({ hasText: text });
 
-async function openRequests(page, box) {
-  await page.goto(`/messages?tab=requests&box=${box}`);
+const typeTab = (page, name) => page.getByRole('tab', { name: new RegExp(`^${name}`) });
+const tabCount = (page, name) => typeTab(page, name).locator('.dz-count');
+
+async function openRequests(page) {
+  await page.goto('/dashboard?tab=leads');
   await expect(page.getByTestId('requests-panel')).toBeVisible({ timeout: 20000 });
 }
 
@@ -54,7 +57,7 @@ test.afterEach(async () => {
   created.clear();
 });
 
-test.describe('Messages → Requests', () => {
+test.describe('Dashboard → Requests', () => {
   test('the owner sees each number request with the buyer\'s message or a default line, and Approve & chat opens the thread', async ({ page }) => {
     const owner = await actor('Zztest Requests Owner');
     const flat = await listing(owner, 'received');
@@ -67,17 +70,28 @@ test.describe('Messages → Requests', () => {
     expect(inbox.body.content.find((r) => r.requester.name === writer.name).message).toBe('Zztest - is the flat pet friendly?');
 
     await signedInAs(page, owner.mobile);
-    await openRequests(page, 'received');
-    await expect(page.locator('.pc-reqbadge')).toHaveText('2');
+    await openRequests(page);
+    await expect(typeTab(page, 'All')).toHaveAttribute('aria-selected', 'true');
+    await expect(tabCount(page, 'All')).toHaveText('2');
+    await expect(tabCount(page, 'Number requests')).toHaveText('2');
+    await expect(tabCount(page, 'Photo requests')).toHaveCount(0);
+    await expect(card(page, writer.name).getByTestId('request-direction')).toHaveText('Received');
+    await expect(card(page, writer.name)).toHaveAttribute('data-box', 'received');
     await expect(card(page, writer.name)).toContainText('is the flat pet friendly?');
     await expect(card(page, quiet.name)).toContainText(`Hi, I'm interested in ${flat.title}. Could you share your contact details?`);
     await expect(card(page, writer.name).getByTestId('request-kind')).toHaveText('Number request');
+
+    await typeTab(page, 'Photo requests').click();
+    await expect(page.getByTestId('requests-empty')).toContainText('No photo requests yet.');
+    await expect(page.getByTestId('request-card')).toHaveCount(0);
+    await typeTab(page, 'Number requests').click();
+    await expect(page.getByTestId('request-card')).toHaveCount(2);
 
     await card(page, writer.name).getByRole('button', { name: 'Approve & chat' }).click();
     await expect(page).toHaveURL(/\/messages\?c=/, { timeout: 20000 });
     await expect(page.getByText(`thanks for your interest in ${flat.title}`).first()).toBeVisible({ timeout: 20000 });
     const gate = await api('GET', `/contacts/status?propertyId=${flat.id}`, writer.headers);
-    expect(gate.body.status, 'approving from Messages opens the gate').toBe('approved');
+    expect(gate.body.status, 'approving from the dashboard opens the gate').toBe('approved');
   });
 
   test('a reminder unlocks a day after sending, reaches the owner, then waits another day', async ({ page }) => {
@@ -87,8 +101,11 @@ test.describe('Messages → Requests', () => {
     const id = await ask(buyer, flat.id);
 
     await signedInAs(page, buyer.mobile);
-    await openRequests(page, 'sent');
+    await openRequests(page);
     const sent = card(page, flat.title);
+    await expect(sent.getByTestId('request-direction')).toHaveText('Sent');
+    await expect(sent).toHaveAttribute('data-box', 'sent');
+    await expect(page.locator('.dz-count')).toHaveCount(0);
     await expect(sent.getByTestId('request-state')).toHaveText('Pending');
     await expect(sent.getByRole('button', { name: /^Remind (in|tomorrow)/ })).toBeDisabled();
 
@@ -109,7 +126,7 @@ test.describe('Messages → Requests', () => {
     expect(received.body.content[0].reminders.count).toBe(1);
   });
 
-  test('withdrawing a number request takes it off the owner\'s inbox and blocks asking again for a week; a declined one can be cleared', async ({ page }) => {
+  test('withdrawing a number request leaves a withdrawn card, takes it off the owner\'s inbox and blocks asking again for a week; a declined one can be cleared', async ({ page }) => {
     const owner = await actor('Zztest Withdraw Owner');
     const flat = await listing(owner, 'withdraw');
     const otherOwner = await actor('Zztest Declining Owner');
@@ -120,11 +137,17 @@ test.describe('Messages → Requests', () => {
     expect((await api('PATCH', `/me/contact-requests/${declinedId}`, otherOwner.headers, { status: 'declined' })).status).toBe(200);
 
     await signedInAs(page, buyer.mobile);
-    await openRequests(page, 'sent');
+    await openRequests(page);
     await card(page, flat.title).getByRole('button', { name: 'Withdraw' }).click();
     await expect(page.getByTestId('confirm-modal')).toContainText('Your contact credit comes back');
+    await page.getByRole('button', { name: 'Keep request' }).click();
+    await expect(card(page, flat.title).getByTestId('request-state')).toHaveText('Pending');
+
+    await card(page, flat.title).getByRole('button', { name: 'Withdraw' }).click();
     await page.getByTestId('confirm-modal-ok').click();
+    await expect(card(page, flat.title)).toHaveAttribute('data-state', 'withdrawn');
     await expect(card(page, flat.title).getByTestId('request-state')).toHaveText('Withdrawn');
+    await expect(card(page, flat.title).getByRole('button', { name: 'Clear' })).toBeVisible();
 
     const inbox = await api('GET', '/me/contact-requests', owner.headers);
     expect(inbox.body.content.filter((r) => r.propertyId === flat.id), 'the owner no longer sees it').toHaveLength(0);
@@ -139,5 +162,83 @@ test.describe('Messages → Requests', () => {
     await expect(declined).toHaveCount(0);
     const sentBox = await api('GET', '/me/requests?box=sent', buyer.headers);
     expect(sentBox.body.content.map((r) => r.id)).not.toContain(declinedId);
+  });
+
+  test('a seeker with no listings gets the Requests panel, opening on what they sent', async ({ page }) => {
+    const owner = await actor('Zztest Seeker Panel Owner');
+    const flat = await listing(owner, 'seeker-panel');
+    const buyer = await actor('Zztest Seeker Panel Buyer');
+    await ask(buyer, flat.id);
+
+    await signedInAs(page, buyer.mobile);
+    await page.goto('/dashboard#leads');
+    await expect(page.getByTestId('requests-panel')).toBeVisible({ timeout: 20000 });
+    await expect(typeTab(page, 'All')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('requests-box-received')).toHaveCount(0);
+    await expect(page.getByTestId('requests-box-sent')).toHaveCount(0);
+    await expect(card(page, flat.title)).toHaveAttribute('data-kind', 'contact');
+    await expect(card(page, flat.title).getByTestId('request-direction')).toHaveText('Sent');
+    await expect(card(page, flat.title).getByTestId('request-state')).toHaveText('Pending');
+    await expect(card(page, flat.title).getByTestId('request-note')).toHaveCount(0);
+    await expect(page.locator('.dz-count')).toHaveCount(0);
+
+    await typeTab(page, 'Documents').click();
+    await expect(page.getByTestId('requests-empty')).toContainText('No document requests yet.');
+    await expect(page.getByRole('link', { name: 'Browse listings' })).toBeVisible();
+    await typeTab(page, 'Number requests').click();
+    await expect(card(page, flat.title)).toBeVisible();
+  });
+
+  test('received requests list first, sent ones follow, and a type tab counts only what awaits you', async ({ page }) => {
+    const owner = await actor('Zztest Mixed Owner');
+    const mine = await listing(owner, 'mixed-mine');
+    const otherOwner = await actor('Zztest Mixed Other Owner');
+    const theirs = await listing(otherOwner, 'mixed-theirs');
+    const buyer = await actor('Zztest Mixed Buyer');
+    await ask(buyer, mine.id);
+    await ask(owner, theirs.id);
+
+    await signedInAs(page, owner.mobile);
+    await openRequests(page);
+    const cards = page.getByTestId('request-card');
+    await expect(cards).toHaveCount(2);
+    await expect(cards.nth(0)).toHaveAttribute('data-box', 'received');
+    await expect(cards.nth(0).getByTestId('request-direction')).toHaveText('Received');
+    await expect(cards.nth(1)).toHaveAttribute('data-box', 'sent');
+    await expect(cards.nth(1).getByTestId('request-direction')).toHaveText('Sent');
+    await expect(tabCount(page, 'All')).toHaveText('1');
+    await expect(tabCount(page, 'Number requests')).toHaveText('1');
+
+    await expect(cards.nth(0).getByTestId('request-note')).toBeVisible();
+    await expect(cards.nth(1).getByTestId('request-note')).toHaveCount(0);
+    await expect(cards.nth(0).getByRole('button', { name: 'Withdraw' })).toHaveCount(0);
+    await expect(cards.nth(1).getByRole('button', { name: 'Withdraw' })).toBeVisible();
+  });
+
+  test('a document request reaches the owner as a Share card and is gone once shared', async ({ page }) => {
+    const owner = await actor('Zztest Docs Panel Owner');
+    const flat = await listing(owner, 'docs');
+    const buyer = await actor('Zztest Docs Panel Buyer');
+    const asked = await api('POST', '/documents/requests', buyer.headers, {
+      propertyId: flat.id, categories: ['Index II'], acknowledgedDisclaimer: true,
+    });
+    expect(asked.status, `asking for documents (${JSON.stringify(asked.body)})`).toBe(201);
+
+    await signedInAs(page, owner.mobile);
+    await openRequests(page);
+    await expect(tabCount(page, 'Documents')).toHaveText('1');
+    await typeTab(page, 'Number requests').click();
+    await expect(page.getByTestId('requests-empty')).toContainText('No number requests yet.');
+    await typeTab(page, 'Documents').click();
+    const docCard = card(page, buyer.name);
+    await expect(docCard.getByTestId('request-direction')).toHaveText('Received');
+    await expect(docCard).toHaveAttribute('data-kind', 'document');
+    await expect(docCard.getByTestId('request-kind')).toHaveText('Documents');
+    await expect(docCard).toContainText('Wants to see: Index II');
+    await docCard.getByRole('button', { name: 'Share', exact: true }).click();
+    await expect(docCard).toHaveCount(0);
+
+    const rows = await api('GET', '/me/documents/requests?size=50', owner.headers);
+    expect(rows.body.content.find((r) => r.id === asked.body.id).status).toBe('granted');
   });
 });

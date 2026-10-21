@@ -28,9 +28,10 @@
   **only** when an owner accepts "verified contacts only". It renders nothing of its own: it sends the
   requester to `/verify-identity`, where they photograph a document and record a live selfie for a
   reviewer. It is a badge earn, not a gate.
-- **Owner side (triage leads):** dashboard Enquiries/Leads tab -
-  `src/pages/consumer/dashboard/EnquiriesPanel.jsx` + `LeadSheet.jsx`, fed by
-  `useDashboardData.js`. Route: `/dashboard` (owner view), `ProtectedRoute`.
+- **Owner side (triage leads):** Dashboard → Requests (`?tab=leads`) -
+  `src/pages/consumer/requests/RequestsPanel.jsx` + `dashboard/LeadSheet.jsx`, fed by `/me/requests`;
+  contact, flatmate and group requests also appear as request threads in Messages
+  (`messages/useRequestThreads.js`, `RequestThread.jsx`). Route: `/dashboard`, `ProtectedRoute`.
 - **Core logic:** `src/lib/contact.js`, `src/lib/store/listings.js` (opt-in Verified-badge helpers),
   `src/services/contactService.js`, `src/services/providers/mock/contactProvider.js`.
 
@@ -151,19 +152,17 @@ either participant turns one off, that surface is hidden while delivery still re
   (a real chat request the owner accepts in Messages); if off it just toasts "enquiry sent". It does
   **not** create a `contact_request` or an `enquiries` row.
 
-### Owner lead inbox (`EnquiriesPanel.jsx`)
-- Aggregates several request types into one normalized **lead descriptor** and a priority queue
-  (attention-first, then longest-waiting):
-  - **Contact requests** (`contact_requests`) - "wants to contact you", Accept / Decline; accepting
-    reveals the buyer's mobile to the owner for Call/WhatsApp.
-  - **Photo requests**, **Document requests** (grouped per buyer+property; grant/decline all),
-    **Flatmate requests** (accept/decline), and **Enquiries** (seed).
-- **Triage math:** `waitingOnYou` = pending contacts + pending flatmates + photo reqs + pending doc
-  groups; `totalLeads` = all requests + enquiries; oldest-waiting age drives an urgency chip and a
-  "reply within an hour" nudge. Per-row `waitPill`: `>=24h`/`>=1h` -> hot, fresh -> "new".
-- **LeadSheet.jsx:** per-lead detail with a private note and a follow-up date
-  (`leadNotes` / `getLeadAnnotations` / `setLeadAnnotation`, keyed by owner mobile + stable lead id),
-  plus Approve/Decline, the type's primary action, and Call/WhatsApp when a mobile is available.
+### Owner lead inbox (`requests/RequestsPanel.jsx`)
+- One list per user over both `/me/requests` boxes (kinds `contact`, `visit`, `photo`, `flatmate`,
+  `group`, `document`), filtered by type tabs; each card is marked Received or Sent. Received cards
+  carry Accept / Decline; Sent cards carry Remind / Withdraw, then Clear (and Open chat for an
+  accepted contact or flatmate request).
+  - Approving a contact request opens the chat with the buyer; the number shows in that chat.
+  - Contact, flatmate and group requests also show in Messages as locked request threads with the same
+    actions and, for a listing, its photo panel. No conversation exists until acceptance, so the
+    contact gate is unchanged.
+- **LeadSheet.jsx:** a received card's private note and follow-up date (`/me/lead-notes`, keyed by
+  `requestMeta.leadKey`).
 
 ### Owner-side record shape (number request)
 Stored under the owner's key; each item: `{ id, propId, buyerName, buyerMobile, status, requestedAt }`.

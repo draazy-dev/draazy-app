@@ -21,7 +21,8 @@ import LoadError from '../../components/LoadError.jsx';
 import OverviewPanel from './dashboard/OverviewPanel.jsx';
 import MyPropertiesPanel from './dashboard/MyPropertiesPanel.jsx';
 import MyRentalPanel from './dashboard/MyRentalPanel.jsx';
-import EnquiriesPanel from './dashboard/EnquiriesPanel.jsx';
+import RequestsPanel from './requests/RequestsPanel.jsx';
+import { Card } from './dashboard/components.jsx';
 import BillingPanel from './dashboard/BillingPanel.jsx';
 import ActivityPanel from './dashboard/ActivityPanel.jsx';
 import MobileNav from './dashboard/MobileNav.jsx';
@@ -87,12 +88,7 @@ export default function Dashboard() {
     apps, decideApp,
     decideContact, decideDocReqs, decideFlatmateReq, decidePhotoReq, mutateVisit, openReview, sendReview,
     dataStatus, dataError, retryData,
-    docReqsStatus, docReqsError, retryDocReqs,
-    contactReqsStatus, contactReqsError, retryContactReqs,
-    photoReqsStatus, photoReqsError, retryPhotoReqs,
-    flatmateReqsStatus, flatmateReqsError, retryFlatmateReqs,
-    appsStatus, appsError, retryApps,
-    isBusy, refreshData, setListings,
+    isBusy, refreshData, refreshRequests, setListings,
   } = useDashboardData({ user, toast, ownsProperty: caps.ownsProperty });
   /* "My Rental" shows for buyers/tenants and anyone with a finalised tenancy, not a pure owner; a pending co-fill
      invite also belongs there so an invited tenant always has a place to act. */
@@ -193,7 +189,7 @@ export default function Dashboard() {
       case 'activity':
         return <ActivityPanel key={'act:' + (sub || '')} initialSub={sub} recent={recent} />;
       case 'leads':
-        return <EnquiriesPanel contactReqs={contactReqs} decideContact={decideContact} photoReqs={photoReqs} decidePhotoReq={decidePhotoReq} flatmateReqs={flatmateReqs} decideFlatmateReq={decideFlatmateReq} docReqs={docReqs} decideDocReqs={decideDocReqs} listings={listings} apps={apps} decideApp={decideApp} openReview={openReview} reviewsByProp={reviewsByProp} contactReqsFailed={contactReqsStatus === 'error'} contactReqsError={contactReqsError} onRetryContactReqs={retryContactReqs} photoReqsFailed={photoReqsStatus === 'error'} photoReqsError={photoReqsError} onRetryPhotoReqs={retryPhotoReqs} docReqsFailed={docReqsStatus === 'error'} docReqsError={docReqsError} onRetryDocReqs={retryDocReqs} flatmateReqsFailed={flatmateReqsStatus === 'error'} flatmateReqsError={flatmateReqsError} onRetryFlatmateReqs={retryFlatmateReqs} appsFailed={appsStatus === 'error'} appsError={appsError} onRetryApps={retryApps} isBusy={isBusy} />;
+        return <Card className="p-3 sm:p-5"><RequestsPanel onChanged={refreshRequests} /></Card>;
       case 'finances':
         return <FinancesTab user={user} listings={listings} toast={toast} isOwner={isOwner} showRental={showRental} />;
       case 'documents':

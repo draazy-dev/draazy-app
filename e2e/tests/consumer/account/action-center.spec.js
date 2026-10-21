@@ -109,7 +109,7 @@ test('an owner shares a real contact request from the Action Center and clears t
   expect(approved.status, 'Accept must persist the owner approval on the server').toBe('approved');
 });
 
-test('a fresh seeker has an honest empty Action Center and no owner-only Requests navigation', async ({ page }) => {
+test('a fresh seeker has an honest empty Action Center and a Requests group holding Requests and Visits', async ({ page }) => {
   const seeker = await newActor(`Zztest Action Seeker ${letterTag()}`);
 
   await signedInAs(page, seeker.mobile);
@@ -125,5 +125,7 @@ test('a fresh seeker has an honest empty Action Center and no owner-only Request
   await expect(page.getByTestId('verify-badge-cta')).toBeVisible();
   await expect(page.getByTestId('action-center-clear')).toBeVisible();
   await expect(page.getByTestId('action-center')).toHaveCount(0);
-  await expect(page.locator('aside button', { hasText: 'Requests' })).toHaveCount(0);
+  const nav = page.getByRole('navigation', { name: 'Dashboard sections' });
+  await expect(nav.getByRole('button', { name: 'Requests' })).toHaveCount(2);
+  await expect(nav.getByRole('button', { name: 'Visits' })).toBeVisible();
 });

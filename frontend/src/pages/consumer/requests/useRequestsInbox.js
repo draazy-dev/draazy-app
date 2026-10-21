@@ -4,7 +4,16 @@ import { requestKey } from './requestMeta.js';
 
 const EMPTY = { items: [], status: 'loading' };
 
-export function useRequestsInbox() {
+export function useNow(everyMs = 30000) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), everyMs);
+    return () => clearInterval(timer);
+  }, [everyMs]);
+  return now;
+}
+
+export function useRequestsInbox({ refreshMs = 60000 } = {}) {
   const [boxes, setBoxes] = useState({ received: EMPTY, sent: EMPTY });
   const seq = useRef({ received: 0, sent: 0 });
 
@@ -25,17 +34,24 @@ export function useRequestsInbox() {
   useEffect(() => {
     load('received');
     load('sent');
-  }, [load]);
+    const poll = setInterval(() => {
+      if (document.hidden) return;
+      load('received', { quiet: true });
+      load('sent', { quiet: true });
+    }, refreshMs);
+    return () => clearInterval(poll);
+  }, [load, refreshMs]);
 
+  // Bumping the seq drops any list fetched before the change, which would otherwise undo it.
   const patchItem = useCallback((box, item, patch) => {
     const key = requestKey(item);
+    seq.current[box] += 1;
     setBoxes((cur) => ({
       ...cur,
       [box]: { ...cur[box], items: cur[box].items.map((it) => (requestKey(it) === key ? patch(it) : it)) },
     }));
   }, []);
 
-  // Bumping the seq drops any list fetched before the removal, which would otherwise bring the item back.
   const removeItem = useCallback((box, item) => {
     const key = requestKey(item);
     seq.current[box] += 1;

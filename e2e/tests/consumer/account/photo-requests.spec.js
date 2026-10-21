@@ -59,14 +59,16 @@ async function notifications(actorWithHeaders) {
   expect(read.status, 'reading the notification inbox').toBe(200);
   return read.body.content;
 }
-/** Open the owner's Photo requests sub-tab, asserting each step actually happened. */
-async function openPhotoRequests(page, owner) {
+/** Open the owner's Received requests and return the photo card for a buyer. */
+async function openPhotoRequest(page, owner, buyerName) {
   await signedInAs(page, owner.mobile);
-  await page.goto('/dashboard#enquiries');
-  await page.getByRole('tab', { name: /Photo requests/i }).click();
-  /* Positive anchor. Every remaining assertion in these tests is scoped to this panel, and an
-     all-absence or single-row check inside a panel that never rendered would pass on nothing. */
-  await expect(page.getByRole('heading', { name: 'Photo requests' })).toBeVisible();
+  await page.goto('/dashboard?tab=leads');
+  /* Positive anchor: the card must render before any absence check can mean anything. */
+  const card = page.getByTestId('request-card').filter({ hasText: buyerName });
+  await expect(card).toBeVisible({ timeout: 20000 });
+  await expect(card).toHaveAttribute('data-kind', 'photo');
+  await expect(card.getByTestId('request-kind')).toHaveText('Photos');
+  return card;
 }
 
 test.afterEach(async () => {
@@ -130,21 +132,21 @@ test('the owner marks photos added, and the buyer is told where to look', async 
   const before = await notifications(buyer);
   expect(before.some((n) => n.type === 'photo.added'), 'the buyer has no photo notification yet').toBe(false);
 
-  await openPhotoRequests(page, listing.owner);
-  await expect(page.getByText(buyer.name)).toBeVisible();
+  const card = await openPhotoRequest(page, listing.owner, buyer.name);
   /* `toPhotoRow` prefers the slug over the UUID, and `step=photos` matters because without it the
      answer to "send me pictures" is page one of a three-step wizard. */
 
   const editTarget = listing.slug || listing.id;
-  const cta = page.getByRole('link', { name: /Add photos/i }).first();
+  const cta = card.getByRole('link', { name: /Add photos/i });
   await expect(cta).toHaveAttribute('href', `/list-property?edit=${editTarget}&step=photos`);
 
   const decided = page.waitForResponse((response) =>
     /\/me\/photo-requests\//.test(new URL(response.url()).pathname) &&
     response.request().method() === 'PATCH');
-  await page.getByRole('button', { name: /Mark done/i }).first().click();
+  await card.getByRole('button', { name: 'Photos added', exact: true }).click();
   expect((await decided).status(), 'the decision is accepted').toBe(200);
-  await expect(page.getByText('Done', { exact: true })).toBeVisible();
+  await expect(page.getByRole('alert')).toContainText(/Marked done/);
+  await expect(card).toHaveCount(0);
 
   const stored = await ownerInbox(listing.owner);
   expect(stored[0].status, 'the server stores the decision, not just the button state').toBe('resolved');
@@ -167,19 +169,19 @@ test('the owner declines, and the buyer is told there are none coming', async ({
   const before = await notifications(buyer);
   expect(before.some((n) => n.type === 'photo.declined'), 'the buyer has no decline notice yet').toBe(false);
 
-  await openPhotoRequests(page, listing.owner);
-  await expect(page.getByText(buyer.name)).toBeVisible();
+  const card = await openPhotoRequest(page, listing.owner, buyer.name);
 
   const decided = page.waitForResponse((response) =>
     /\/me\/photo-requests\//.test(new URL(response.url()).pathname) &&
     response.request().method() === 'PATCH');
-  await page.getByRole('button', { name: /^Decline$/ }).first().click();
+  await card.getByRole('button', { name: 'Decline', exact: true }).click();
   expect((await decided).status(), 'the decline is accepted').toBe(200);
   /* "Declined" and "Done" are different words on purpose — reporting a decline as done would tell
      the owner their listing has new pictures that do not exist. */
 
-  await expect(page.getByText('Declined', { exact: true })).toBeVisible();
-  await expect(page.getByText('Done', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('alert')).toContainText(/Declined/);
+  await expect(page.getByRole('alert')).not.toContainText(/Marked done/);
+  await expect(card).toHaveCount(0);
 
   const stored = await ownerInbox(listing.owner);
   expect(stored[0].status, 'the decline is stored as its own terminal state').toBe('declined');

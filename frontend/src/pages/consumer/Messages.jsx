@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import '../../styles/routes/messages.css';
 import SharedReportModal from '../../components/ReportModal.jsx';
 import { OWNER_REPORT_REASONS } from '../../lib/reportReasons.js';
@@ -20,13 +20,19 @@ import {
 } from '../../services/conversationService.js';
 import { useConversationUnread } from '../../context/ConversationContext.jsx';
 import Inbox from './messages/Inbox.jsx';
+import RequestThread from './messages/RequestThread.jsx';
 import Thread from './messages/Thread.jsx';
+import { useRequestThreads } from './messages/useRequestThreads.js';
+import { targetSlug } from './requests/requestMeta.js';
+import { useRequestActions } from './requests/useRequestActions.js';
 
 // Canned openers keep a cold thread moving — the questions buyers actually ask.
 const INBOX_POLL_MS = 60000;
 const THREAD_FALLBACK_POLL_MS = 4000;
 const INBOX_FALLBACK_POLL_MS = 30000;
 const clientId = () => `c${Date.now()}${Math.random().toString(36).slice(2, 8)}`;
+// Staged chats and request threads exist only in this browser, so the conversation endpoints don't know them.
+const isLocalId = (id) => /^(staged|request):/.test(String(id || ''));
 const mergeMessages = (serverMessages = [], localMessages = []) => {
   const serverClientIds = new Set(serverMessages.map((m) => m.clientId).filter(Boolean));
   const localOnly = localMessages.filter((m) => (m.pending || m.failed) && m.clientId && !serverClientIds.has(m.clientId));
@@ -42,9 +48,9 @@ export default function Messages() {
   const { refresh: refreshChatBadge, streamConnected, subscribe } = useConversationUnread();
   const [convs, setConvs] = useState([]);
   const [params] = useSearchParams();
-  const paramTab = params.get('tab') === 'requests' ? 'requests' : null;
-  const paramBox = ['received', 'sent'].includes(params.get('box')) ? params.get('box') : null;
-  const [tab, setTab] = useState(paramTab || 'chats');
+  const navigate = useNavigate();
+  const wantId = params.get('c');
+  const openProp = params.get('openProp');
   const [activeId, setActiveId] = useState(null);
   const [search, setSearch] = useState('');
   const [narrow, setNarrow] = useState(false);
@@ -65,8 +71,10 @@ export default function Messages() {
   const photoUrls = useRef(new Set());
   const loadedRef = useRef(false);
   const autoOpened = useRef(false);
+  const pickedFirst = useRef(false);
   const flushQueueRef = useRef(() => {});
-  const active = useMemo(() => convs.find((c) => c.id === activeId) || null, [activeId, convs]);
+  const { inbox: requestInbox, threads } = useRequestThreads(convs);
+  const active = useMemo(() => convs.find((c) => c.id === activeId) || threads.find((c) => c.id === activeId) || null, [activeId, convs, threads]);
   activeIdRef.current = activeId;
   const typingUntil = active ? typing[active.id] || 0 : 0;
 
@@ -112,7 +120,7 @@ export default function Messages() {
   }, [refreshChatBadge]);
 
   const hydrate = useCallback((id, onlyIfNew = false) => {
-    if (!id || String(id).startsWith('staged:')) return;
+    if (!id || isLocalId(id)) return;
     getConversation(id)
       .then((full) => {
         if (!full) return;
@@ -131,8 +139,12 @@ export default function Messages() {
   /* Load the inbox, having first tried to send anything staged. */
   useEffect(() => { reload().catch(() => {}); }, [reload]);
 
-  // A notification link lands on this page already mounted, so the query string has to move the tab too.
-  useEffect(() => { if (paramTab) setTab(paramTab); }, [paramTab]);
+  const requestActions = useRequestActions({ inbox: requestInbox, toast, onChanged: () => reload({ quiet: true }).catch(() => {}) });
+
+  const legacyRequestsTab = params.get('tab') === 'requests';
+  useEffect(() => {
+    if (legacyRequestsTab) navigate('/dashboard?tab=leads', { replace: true });
+  }, [legacyRequestsTab, navigate]);
 
   useEffect(() => {
     const resize = () => setNarrow((wrapRef.current?.clientWidth || 9999) < 720);
@@ -166,7 +178,7 @@ export default function Messages() {
   }, [hydrate, reload, streamConnected]);
 
   useEffect(() => {
-    if (streamConnected || !activeId || String(activeId).startsWith('staged:')) return undefined;
+    if (streamConnected || !activeId || isLocalId(activeId)) return undefined;
     const timer = setInterval(() => { if (!document.hidden) hydrate(activeId); }, THREAD_FALLBACK_POLL_MS);
     return () => clearInterval(timer);
   }, [activeId, hydrate, streamConnected]);
@@ -190,28 +202,47 @@ export default function Messages() {
     return () => window.clearTimeout(timer);
   }, [activeId, typingUntil]);
 
-  // Desktop auto-opens the first thread; `?c=<id>` or `?openProp=<propertyId>` opens that one on any width.
+  // A link to `?c=` can land while this page is already mounted, e.g. right after accepting a request.
   useEffect(() => {
-    if (!convs.length) return;
-    const params = new URLSearchParams(window.location.search);
-    const want = params.get('c');
-    const openProp = params.get('openProp');
+    autoOpened.current = false;
+    if (wantId && loadedRef.current && !isLocalId(wantId)) reload({ quiet: true }).catch(() => {});
+  }, [openProp, reload, wantId]);
+
+  // A request thread goes away once it is decided or cleared; don't leave a blank pane open. Declared before the
+  // auto-open below so that, when an accepted request turns into its chat, the chat open wins.
+  useEffect(() => {
+    if (!String(activeId || '').startsWith('request:') || threads.some((c) => c.id === activeId)) return;
+    setActiveId(null);
+    setShowThread(false);
+    if (window.history.state?.pcThread) window.history.back();
+  }, [activeId, threads]);
+
+  // Desktop auto-opens the first thread once; `?c=<id>` or `?openProp=<propertyId>` opens that one on any width.
+  // Waits for both lists, or an accepted request could open before the chat that replaces it has loaded.
+  const sentStatus = requestInbox.boxes.sent.status;
+  useEffect(() => {
+    if (loading || sentStatus === 'loading' || (!convs.length && !threads.length)) return;
     const matchProp = (c) =>
       c.youAre === 'buyer' &&
       (c.propertyId === openProp || c.propertySlug === openProp || c.property?.slug === openProp);
+    const matchRequest = (c) =>
+      c.box === 'sent' && c.request.kind === 'contact' && (c.request.target?.id === openProp || targetSlug(c.request) === openProp);
     const target =
-      (want && convs.find((c) => c.id === want)) ||
-      (openProp && (convs.find((c) => !c.staged && matchProp(c)) || convs.find(matchProp)));
+      (wantId && (convs.find((c) => c.id === wantId) || threads.find((c) => c.id === wantId))) ||
+      (openProp && (convs.find((c) => !c.staged && matchProp(c)) || threads.find(matchRequest) || convs.find(matchProp)));
     if (target && target.id !== activeId && !autoOpened.current) {
       autoOpened.current = true;
       openConv(target.id);
     }
-    else if (!activeId && (wrapRef.current?.clientWidth || window.innerWidth) >= 720) {
+    else if (!activeId && !pickedFirst.current && (wrapRef.current?.clientWidth || window.innerWidth) >= 720) {
       const first = convs.find((c) => !c.staged && !c.archived);
-      if (first) openConv(first.id);
+      if (first) {
+        pickedFirst.current = true;
+        openConv(first.id);
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-open only follows conversation list changes
-  }, [convs.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-open only follows list and link changes
+  }, [convs.length, threads.length, wantId, openProp, loading, sentStatus]);
 
   // Optimistic: the badge clears on tap; `hydrate` posts the read only when the thread had unread.
   const openConv = (id, opts = {}) => {
@@ -373,7 +404,7 @@ export default function Messages() {
   };
 
   const typingNow = useCallback((id) => {
-    if (!id || String(id).startsWith('staged:')) return;
+    if (!id || isLocalId(id)) return;
     sendTyping(id).catch(() => {});
   }, []);
 
@@ -405,50 +436,50 @@ export default function Messages() {
   // The reveal is a gate read, so it lands after render. It starts closed and only ever opens, which is the safe
   // direction: a thread briefly showing a masked number is a cosmetic delay.
   const wrapCls = 'pc-wrap' + (narrow ? ' is-narrow' : '') + (showThread ? ' show-thread' : '');
+  const closeThread = () => { setShowThread(false); if (window.history.state?.pcThread) window.history.back(); };
 
   return (
     <div className="messages-page pt-2 pb-6">
       <div className="pc-shell max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          {/* Thread */}
-          {/* List */}
         <div ref={wrapRef} className={wrapCls}>
           <Inbox
             t={t}
             items={convs}
+            requests={threads}
             activeId={activeId}
-            tab={tab}
-            setTab={setTab}
             search={search}
             setSearch={setSearch}
             onOpen={openConv}
             onRetry={() => reload().catch(() => {})}
             onState={changeState}
             onBlock={block}
-            onStagedChanged={() => reload({ quiet: true }).catch(() => {})}
-            initialBox={paramBox}
             loading={loading}
             error={error}
           />
-          <Thread
-            t={t}
-            active={active}
-            userId={user?.id}
-            offline={offline}
-            sendError={sendError}
-            onBack={() => { setShowThread(false); if (window.history.state?.pcThread) window.history.back(); }}
-            onSend={sendText}
-            onPhoto={sendPhoto}
-            onPhotoError={(message) => toast(message, 'error')}
-            onTyping={typingNow}
-            typing={typingUntil > Date.now()}
-            onDelete={deleteMessage}
-            onState={changeState}
-            onBlock={block}
-            onReport={() => setReportOpen(true)}
-          />
+          {active?.request ? (
+            <RequestThread key={active.id} t={t} thread={active} actions={requestActions} onBack={closeThread} />
+          ) : (
+            <Thread
+              t={t}
+              active={active}
+              userId={user?.id}
+              offline={offline}
+              sendError={sendError}
+              onBack={closeThread}
+              onSend={sendText}
+              onPhoto={sendPhoto}
+              onPhotoError={(message) => toast(message, 'error')}
+              onTyping={typingNow}
+              typing={typingUntil > Date.now()}
+              onDelete={deleteMessage}
+              onState={changeState}
+              onBlock={block}
+              onReport={() => setReportOpen(true)}
+            />
+          )}
         </div>
       </div>
-      {reportOpen && active && !active.group ? (
+      {reportOpen && active && !active.group && !active.request ? (
         <SharedReportModal
           kind="user"
           reasons={OWNER_REPORT_REASONS}

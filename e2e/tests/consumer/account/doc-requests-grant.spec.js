@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, signedInAs, signedInAsNew } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 
 /* This drives the owner's actual grant screen and verifies the write outside the browser, so a
    dashboard-only local copy cannot pass as a database grant. */
@@ -53,20 +53,22 @@ async function ownerRow(request, reqId) {
   return row;
 }
 
-test.describe('the owner grants a document request from the Leads inbox', () => {
+test.describe('the owner shares documents from the Requests inbox', () => {
   let propId;
   let docIds = [];
   let reqId;
+  let buyerMobile;
 
-  test.beforeEach(async ({ request, page }) => {
+  test.beforeEach(async ({ request }) => {
     propId = await ownedListing(request);
     docIds = [];
     for (const category of CATEGORIES) {
       docIds.push(await upload(request, propId, category));
     }
 
-    const buyer = await signedInAsNew(page);
-    const buyerAuth = await authHeaders(buyer);
+    // No browser sign-in here: a seeded buyer session would be re-applied over the owner's on every navigation.
+    buyerMobile = uniqueMobile();
+    const buyerAuth = await authHeaders(buyerMobile);
     /* A registered-but-unnamed account renders blank in the inbox; naming it makes the assertion
        unconditional. */
     const named = await request.patch(`${API}/auth/me`, {
@@ -90,51 +92,50 @@ test.describe('the owner grants a document request from the Leads inbox', () => 
     }
   });
 
-  test('grants from the dashboard UI, and the grant reaches the database', async ({ page, request }) => {
-    /* Build the caption from the server row because the API never promised category order. */
+  test('shares from the dashboard Requests panel, and the grant reaches the database', async ({ page, request }) => {
     const before = await ownerRow(request, reqId);
     expect(before.status).toBe('pending');
-    const caption = `Wants ${before.categories.length} documents: ${before.categories.slice(0, 3).join(', ')}`;
+    const caption = `Wants to see: ${before.categories.join(', ')}`;
 
     await signedInAs(page, ACTORS.owner);
-    const inbox = page.waitForResponse((r) =>
-      new URL(r.url()).pathname.endsWith('/api/me/dashboard') &&
-      r.request().method() === 'GET' &&
-      r.status() === 200,
-    );
-    await page.goto('/dashboard#enquiries');
-    await inbox;
+    await page.goto('/dashboard?tab=leads');
 
-    // The Documents sub-tab lists only document requests, grouped one lead per buyer+property.
-    await page.getByRole('tab', { name: /Documents/i }).click();
-
-    await expect(page.getByText(BUYER_NAME).first()).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText(caption, { exact: false })).toBeVisible();
-
-    const grantAll = page.getByRole('button', { name: 'Grant all' });
-    await expect(grantAll).toBeVisible();
+    const card = page.getByTestId('request-card').filter({ hasText: BUYER_NAME });
+    await expect(card).toBeVisible({ timeout: 15000 });
+    await expect(card).toHaveAttribute('data-kind', 'document');
+    await expect(card.getByTestId('request-kind')).toHaveText('Documents');
+    await expect(card).toContainText(caption);
 
     const patched = page.waitForResponse((r) =>
       /\/api\/me\/documents\/requests\/[^/?]+$/.test(r.url()) && r.request().method() === 'PATCH',
     );
-    await grantAll.click();
-    /* The retired screen-only spec could not catch a dashboard that updated its local inbox and told
-       the server nothing. */
+    await card.getByRole('button', { name: 'Share', exact: true }).click();
     expect((await patched).status(), 'the grant was refused').toBe(200);
 
-    // The toast names the real count from the share ledger, not a blanket "granted". Matched
-    // without the leading "Access granted \u2014", whose em dash is not worth a byte-exact matcher.
-    await expect(page.getByRole('alert')).toContainText(/2 documents now visible to this buyer/i);
+    await expect(page.getByRole('alert')).toContainText(/Documents shared/i);
+    await expect(card).toHaveCount(0);
 
-    // After the re-read the group leaves the pending state: the buttons go and the row confirms.
-    await expect(page.getByRole('button', { name: 'Grant all' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: `Open ${BUYER_NAME} details` }).locator('..').getByText('All granted')).toBeVisible();
-
-    /* And the database agrees. `sharedDocumentCount` counts *files*, not categories, which is the
-       number that would stay at zero if the grant had matched no uploads. */
+    /* `sharedDocumentCount` counts files, not categories: it stays at zero if the grant matched no uploads. */
     const after = await ownerRow(request, reqId);
     expect(after.status).toBe('granted');
     expect(after.sharedDocumentCount).toBe(CATEGORIES.length);
     expect(after, 'the bearer token stays out of the owner inbox').not.toHaveProperty('shareToken');
+  });
+
+  test('the buyer sees the document request in Sent as Granted once shared', async ({ page, request }) => {
+    const granted = await request.patch(`${API}/me/documents/requests/${reqId}`, {
+      headers: await asOwner(),
+      data: { status: 'granted' },
+    });
+    expect(granted.status()).toBe(200);
+    const sent = await request.get(`${API}/me/requests?box=sent`, { headers: await authHeaders(buyerMobile) });
+    expect(sent.status()).toBe(200);
+    const row = (await sent.json()).content.find((r) => r.kind === 'document' && r.id === reqId);
+    expect(row, 'a document request is part of the buyer feed').toMatchObject({ state: 'accepted' });
+
+    await signedInAs(page, buyerMobile);
+    await page.goto('/dashboard?tab=leads');
+    const card = page.getByTestId('request-card').filter({ hasText: 'Wants to see' });
+    await expect(card.getByTestId('request-state')).toHaveText('Granted');
   });
 });

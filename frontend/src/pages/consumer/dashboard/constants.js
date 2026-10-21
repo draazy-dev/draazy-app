@@ -10,7 +10,7 @@ export const TABS = [
   { tab: 'activity', label: 'Alerts & activity', icon: 'bell' },
   // Role-aware (like Documents): owners see a property P&L, tenants see the Rent
   // Wallet, and a user who is both can switch.
-  { tab: 'leads', label: 'Requests', icon: 'messages-square', owner: true },
+  { tab: 'leads', label: 'Requests', icon: 'messages-square' },
   { tab: 'finances', label: 'Finances', icon: 'wallet' },
   { tab: 'documents', label: 'Documents', icon: 'folder-lock' },
   { tab: 'visits', label: 'Visits', icon: 'calendar-check' },
@@ -52,7 +52,7 @@ export function buildDashboardGroups({ visibleTabs, isOwner, showRental, hasRent
     : [
         group('home', 'Home', 'layout-grid', ['overview']),
         group('alerts', 'Alerts', 'bell', ['activity']),
-        group('visits', 'Visits', 'calendar-check', ['visits']),
+        group('requests', 'Requests', 'messages-square', ['leads', 'visits']),
         rentalOwn ? group('rental', 'Rental', 'key-round', ['rental']) : null,
         group('account', 'Account', 'user-cog', ['profile', 'billing', 'documents', 'finances', ...accountRental, 'properties']),
       ];

@@ -6,7 +6,7 @@ import { putSettings, settingsSnapshot } from '../../../helpers/refunds.js';
 
 const ask = (mobile, propertyId) => call('POST', '/contacts/request', mobile, { propertyId });
 const remaining = async (mobile) => (await entitlementsOf(mobile)).contacts.remaining;
-const card = (page, name) => page.locator('div.group.relative.rounded-xl').filter({ hasText: name }).first();
+const card = (page, name) => page.getByTestId('request-card').filter({ hasText: name });
 
 async function notificationTypes(mobile) {
   const res = await call('GET', '/notifications?size=100', mobile);
@@ -22,8 +22,7 @@ async function requestIdFor(owner, propertyId) {
 
 async function openOwnerRequests(page, owner) {
   await signedInAs(page, owner);
-  await page.goto('/dashboard#enquiries');
-  await page.getByRole('tab', { name: /^Number requests/i }).click();
+  await page.goto('/dashboard?tab=leads');
 }
 
 const pressRequestNumber = async (page) => {
@@ -43,14 +42,15 @@ test.describe('LIVE: contacts come back', () => {
     expect((await ask(seeker, listing.id)).status).toBe(200);
     expect(await remaining(seeker), 'a pending request counts against the allowance').toBe(14);
 
-    await test.step('the owner declines it from the Number requests tab', async () => {
+    await test.step('the owner declines it from the Requests tab', async () => {
       await openOwnerRequests(page, owner);
       const lead = card(page, 'Returns Seeker');
       await expect(lead).toBeVisible({ timeout: 20000 });
       const decided = page.waitForResponse((r) => /\/api\/me\/contact-requests\//.test(r.url()) && r.request().method() === 'PATCH');
       await lead.getByRole('button', { name: 'Decline' }).click();
       expect((await decided).status()).toBe(200);
-      await expect(card(page, 'Returns Seeker')).toContainText('Declined');
+      await expect(card(page, 'Returns Seeker')).toHaveCount(0);
+      expect((await requestIdFor(owner, listing.id)).status).toBe('declined');
     });
 
     await test.step('the seeker has the contact back and is told', async () => {
@@ -172,7 +172,7 @@ test.describe('LIVE: contacts come back', () => {
       await openOwnerRequests(page, owner);
       const lead = card(page, 'Early Seeker');
       await expect(lead).toBeVisible({ timeout: 20000 });
-      await lead.getByRole('button', { name: 'Accept' }).click();
+      await lead.getByRole('button', { name: 'Approve & chat' }).click();
       await expect(page.getByText('Make the listing live to share your number.')).toBeVisible();
       expect((await requestIdFor(owner, listing.id)).status).toBe('pending');
     });

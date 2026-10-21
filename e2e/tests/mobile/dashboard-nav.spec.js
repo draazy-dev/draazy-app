@@ -93,13 +93,13 @@ test.describe('Live dashboard navigation', () => {
       await expect(groupButton(page, 'home')).toHaveAttribute('aria-current', 'page');
     });
 
-    await test.step('a seeker gets Alerts and Visits instead, and they fit too', async () => {
+    await test.step('a seeker gets Alerts and Requests (Requests + Visits) instead, and they fit too', async () => {
       await page.context().clearCookies();
       await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
       await signedInAsNew(page);
       await page.goto('/dashboard');
       await expect(nav(page)).toBeVisible({ timeout: 20000 });
-      await expectGroups(page, ['Home', 'Alerts', 'Visits', 'Account']);
+      await expectGroups(page, ['Home', 'Alerts', 'Requests', 'Account']);
       for (const width of [360, 390, 414]) await expectSegmentsFit(page, width);
     });
   });
