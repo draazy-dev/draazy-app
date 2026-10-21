@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.Property;
+import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.support.AbstractApiTest;
@@ -36,6 +38,9 @@ class DemandSignalTest extends AbstractApiTest {
 
     @Autowired
     EntityManager em;
+
+    @Autowired
+    PropertyRepository properties;
 
     private void locality() {
         jdbc.update("""
@@ -251,6 +256,31 @@ class DemandSignalTest extends AbstractApiTest {
                         .value(Matchers.contains(7)))
                 .andExpect(jsonPath("$[?(@.localitySlug=='" + LOCALITY + "')].repeatSeekers")
                         .value(Matchers.contains(1)));
+    }
+
+    @Test
+    @DisplayName("a property view counts toward its owner's views, except the owner's own")
+    void aViewCountsTowardTheListing() throws Exception {
+        User owner = new User("9820950004", "owner");
+        owner.setMobileVerified(true);
+        owner = users.saveAndFlush(owner);
+        User visitor = new User("9820950005", "buyer");
+        visitor.setMobileVerified(true);
+        visitor = users.saveAndFlush(visitor);
+        Property listing = properties.saveAndFlush(
+                new Property(owner, "Viewed flat", "rent", "apartment", 25000L, "Kothrud", "Pune"));
+        String view = "{\"kind\":\"view\",\"propertyId\":\"" + listing.getId() + "\"}";
+
+        send(view);
+        for (User viewer : List.of(visitor, owner)) {
+            mvc.perform(post("/demand-signals").header("Authorization", bearer(viewer))
+                            .contentType(MediaType.APPLICATION_JSON).content(view))
+                    .andExpect(status().isAccepted());
+        }
+        send("{\"kind\":\"search\",\"propertyId\":\"" + listing.getId() + "\"}");
+
+        assertThat(jdbc.queryForObject("select views from properties where id = ?", Integer.class, listing.getId()))
+                .isEqualTo(2);
     }
 
     private User admin() {

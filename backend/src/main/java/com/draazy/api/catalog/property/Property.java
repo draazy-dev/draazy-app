@@ -518,8 +518,8 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private int docsCount = 0;
 
-    @Column(name = "views", nullable = false)
-    @Setter
+    // Not updatable: only countView writes it, and a full-row entity save would roll its increments back.
+    @Column(name = "views", nullable = false, updatable = false)
     private int views = 0;
 
     @Column(name = "enquiries", nullable = false)
