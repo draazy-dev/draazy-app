@@ -7,7 +7,7 @@ import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
 import useScrollLock from '../../hooks/useScrollLock.js';
 import ScrollRail from '../ScrollRail.jsx';
 
-export default function Modal({ open, onClose, title, children, footer, size = 'md' }) {
+export default function Modal({ open, onClose, title, children, footer, size = 'md', bare = false }) {
   const { t } = useTranslation();
   const swipe = useSwipeDismiss(onClose);
 
@@ -40,14 +40,21 @@ export default function Modal({ open, onClose, title, children, footer, size = '
           width,
         )}
       >
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6 sm:py-4">
-          <h3 className="text-lg font-bold text-white">{title}</h3>
-          <button onClick={onClose} aria-label={closeLabel} className="tap-target -mr-2 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition sm:mr-0 sm:min-h-0 sm:min-w-0 sm:p-1.5">
+        {/* `bare`: the body draws its own heading, so only the close button floats over it. */}
+        {bare ? (
+          <button onClick={onClose} aria-label={closeLabel} className="tap-target absolute right-2 top-2 z-10 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition sm:right-3 sm:top-3 sm:min-h-0 sm:min-w-0 sm:p-1.5">
             <X className="h-5 w-5" />
           </button>
-        </div>
-        <ScrollRail className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:flex-none sm:px-6 sm:py-5 sm:max-h-[calc(100dvh-12rem)]">{children}</ScrollRail>
-        {footer ? <div className="flex flex-wrap justify-end gap-2 border-t border-white/10 px-4 py-3 sm:px-6 sm:py-4">{footer}</div> : null}
+        ) : (
+          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 sm:px-6 sm:py-4">
+            <h3 className="text-lg font-bold text-white">{title}</h3>
+            <button onClick={onClose} aria-label={closeLabel} className="tap-target -mr-2 inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white transition sm:mr-0 sm:min-h-0 sm:min-w-0 sm:p-1.5">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+        <ScrollRail className={classNames('min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:flex-none sm:px-6 sm:py-5 sm:max-h-[calc(100dvh-12rem)]', bare && 'pt-6 sm:pt-8')}>{children}</ScrollRail>
+        {footer ? <div className={classNames('flex flex-wrap justify-end gap-2 px-4 py-3 sm:px-6 sm:py-4', bare ? 'pt-0 sm:pt-0 sm:pb-6' : 'border-t border-white/10')}>{footer}</div> : null}
       </div>
     </div>,
     document.body,

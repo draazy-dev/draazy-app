@@ -169,3 +169,23 @@
     background: rgb(var(--dz-c-rose-500) / .25);
   }
 }
+
+/* The OTP "send" step: the /signin card and the inline sign-in sheet share it. */
+.send-otp-btn {
+  background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .15), rgb(var(--dz-c-indigo-600) / .15));
+  border: 1px solid rgb(var(--dz-c-teal-500) / .3);
+  transition: all .3s cubic-bezier(.4, 0, .2, 1);
+}
+
+@media (hover: hover) {
+  .send-otp-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgb(var(--dz-c-teal-500) / .25), rgb(var(--dz-c-indigo-600) / .25));
+    border-color: rgb(var(--dz-c-teal-500) / .5);
+    transform: translateY(-1px);
+  }
+}
+
+.send-otp-btn:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
