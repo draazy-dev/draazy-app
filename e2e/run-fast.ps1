@@ -9,7 +9,9 @@ param(
     [int]$Shards = 4,
     [string]$Grep,
     [switch]$DryRun,
-    [switch]$Stop
+    [switch]$Stop,
+    # Shard 1's app port when 3322 is busy; the Maps specs need 3322 (the browser key's only origin).
+    [int]$AppPort1 = 3322
 )
 $ErrorActionPreference = 'Stop'
 $E2E = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -27,7 +29,7 @@ New-Item -ItemType Directory -Force -Path $STATE | Out-Null
 
 function ApiPort($i) { 8110 + $i }
 # Google's browser key admits only localhost:3322; shards.mjs pins the Maps specs (maps-specs.js) to shard 1.
-function AppPort($i) { if ($i -eq 1) { 3322 } else { 5210 + $i } }
+function AppPort($i) { if ($i -eq 1) { $AppPort1 } else { 5210 + $i } }
 function DbName($i) { "draazy_e2e_sh$i" }
 function JvmFile($i) { Join-Path $STATE "jvm-$i.json" }
 function JvmLog($i) { Join-Path $env:TEMP "draazy-shard-$i.log" }
