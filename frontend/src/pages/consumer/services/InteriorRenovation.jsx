@@ -7,7 +7,7 @@ import Icon from '../../../components/Icon.jsx';
 import { ServiceBreadcrumbs } from '../../../components/Breadcrumbs.jsx';
 import MobileField from '../../../components/MobileField.jsx';
 import { useScrollReveal } from '../../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../../lib/useSignInGate.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import ServiceTracker from '../../../components/ServiceTracker.jsx';
@@ -82,11 +82,15 @@ export default function InteriorRenovation() {
 
   const submit = (e) => {
     e.preventDefault();
-    // Public page; book the free consult only after sign-in (draft is restored on return).
-    if (!isIn) { sendToSignIn('services'); return; }
+    // Public page; book the free consult only after sign-in.
+    if (!isIn) { sendToSignIn('services', undefined, replay(e)); return; }
+    // A submit resumed after the sign-in sheet sees fields that were blank at mount; the account fills them.
+    const name = form.name.trim() || user?.name || '';
+    const mobile = form.mobile || user?.mobile || '';
+    if (name !== form.name || mobile !== form.mobile) setForm((p) => ({ ...p, name, mobile }));
     const ok = err.check([
-      { name: 'name', ok: !!form.name.trim(), msg: tr('services.interior.errName') },
-      { name: 'mobile', ok: /^[6-9]\d{9}$/.test((form.mobile || '').replace(/\D/g, '')), msg: tr('services.interior.errMobile') },
+      { name: 'name', ok: !!name, msg: tr('services.interior.errName') },
+      { name: 'mobile', ok: /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '')), msg: tr('services.interior.errMobile') },
       { name: 'scope', ok: !!form.scope, msg: tr('services.interior.errScope') },
     ], toast);
     if (!ok) return;
@@ -95,15 +99,15 @@ export default function InteriorRenovation() {
     createFlowRequest({
       type: 'interior',
       service: 'Interior & Renovation',
-      customer: { name: form.name },
+      customer: { name },
       details: {
         property: form.location || '',
         scope: form.scope,
         rooms: form.config,
         budget: form.budget,
         timeline: form.status,
-        contactName: form.name,
-        contactMobile: form.mobile,
+        contactName: name,
+        contactMobile: mobile,
       },
     }).catch(() => {});
     draft.clear();

@@ -7,7 +7,7 @@ import {
 } from '../../../services/documentService.js';
 import { docsFor, commercialProfileFromType } from '../list-property/constants.js';
 import { propertyKind } from './derivations.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../../lib/useSignInGate.js';
 
 /* Papers are never openly viewable: the owner approves which documents each buyer or tenant may see. */
 
@@ -153,8 +153,8 @@ export function DocumentsSection({ p, user, isIn, toast }) {
     ? `/view-documents/${encodeURIComponent(grantedReqs[0].id)}`
     : null;
 
-  const requestAccess = async () => {
-    if (!isIn) { sendToSignIn('docs'); return; }
+  const requestAccess = async (e) => {
+    if (!isIn) { sendToSignIn('docs', undefined, replay(e)); return; }
     if (!ack) { toast(t('property.ackFirst'), 'info'); return; }
     if (requestingRef.current) return;
     requestingRef.current = true;

@@ -857,6 +857,11 @@
       },
       "inviteErr": {
         "startOwn": "Start my own agreement",
+        "signIn": "Sign in to continue",
+        "signin": {
+          "title": "Sign in to open your invite",
+          "desc": "You were invited to add your details & documents. Sign in with the invited number to continue."
+        },
         "expired": {
           "title": "This invite is no longer available",
           "desc": "The co-fill link has expired or was already used. Ask the owner to resend it, or start your own rent agreement."

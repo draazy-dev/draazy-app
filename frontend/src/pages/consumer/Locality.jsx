@@ -4,7 +4,7 @@ import { Trans, useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import Byline from '../../components/Byline.jsx';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../lib/useSignInGate.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { createEntityReview, deleteReview, getEntityReviewSummary, listEntityReviews, reviewRefusal, updateReview } from '../../services/reviewService.js';
@@ -109,14 +109,13 @@ export default function Locality() {
 
   const postReview = (e) => {
     e.preventDefault();
-    // `signInPath` reads `window.location` at call time, so capture it before any async hop.
-    const back = window.location.pathname + window.location.search;
-    if (!isIn) { sendToSignIn('review', back); return; }
+    const again = replay(e);
+    if (!isIn) { sendToSignIn('review', undefined, again); return; }
     const review = { rating: pick, text: revText.trim() };
     setBusy(true);
     (editing ? updateReview(myReview.id, review) : createEntityReview('locality', locSlug, review))
       .then((saved) => {
-        if (saved === 'login') { sendToSignIn('review', back); return; }
+        if (saved === 'login') { sendToSignIn('review', undefined, again); return; }
         return reloadReviews().then(() => { resetComposer(); toast(t(editing ? 'common.reviewUpdated' : 'locality.reviewThanks')); });
       })
       .catch((err) => toast(reviewRefusal(err, t) || t('locality.reviewFailed'), 'error'))
@@ -138,9 +137,12 @@ export default function Locality() {
   };
 
   const setLocalityAlert = () => {
-    if (!isIn) { sendToSignIn('alerts'); return; }
-    createSavedSearch(buildAlertRecord({ deal: 'rent', localities: [locSlug] }, { [locSlug]: name }));
-    toast(t('locality.alertOn', { name }));
+    const createAlert = () => {
+      createSavedSearch(buildAlertRecord({ deal: 'rent', localities: [locSlug] }, { [locSlug]: name }));
+      toast(t('locality.alertOn', { name }));
+    };
+    if (!isIn) { sendToSignIn('alerts', undefined, createAlert); return; }
+    createAlert();
   };
 
   if (!loc && !guide) {

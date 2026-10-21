@@ -1,14 +1,13 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import {
   API,
-  E2E_OTP,
   authHeaders,
-  completeProfileIfAsked,
   seedConsent,
   signedInAs,
   signedInAsNew,
   uniqueMobile,
 } from '../../../helpers/liveAuth.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 // A slug no locality row will ever match and no other spec will ever write, so the count for it is this test's alone.
 const uniqueLocality = () => `zzalert-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
@@ -42,17 +41,20 @@ async function openEmptySearch(page, slug) {
 }
 
 test.describe('Property alerts (live)', () => {
-  test('an anonymous alert submit records the demand signal before routing to sign-in (D85)', async ({ page }) => {
+  test('an anonymous alert submit records the demand signal before opening the sign-in sheet (D85)', async ({ page }) => {
     const slug = uniqueLocality();
 
     expect(await demandRow(slug), 'the slug was already known to the report').toBeNull();
 
     const createBtn = await openEmptySearch(page, slug);
     await expect(page.getByText(/notify you in the app when new matches are listed/i)).toBeVisible();
+    const before = page.url();
     await createBtn.click();
 
-    await page.waitForURL(/\/signin\?reason=alerts/);
-    // Polled, because nothing awaits `recordSignal` — the component fires it and calls `navigate()` on the next line.
+    await expect(signInSheet(page)).toBeVisible();
+    await expect(page.getByRole('dialog', { name: /sign in to save this search/i })).toBeVisible();
+    await expect(page).toHaveURL(before);
+    // Polled, because nothing awaits `recordSignal` — the component fires it and opens the sheet on the next line.
     await expect.poll(
       async () => (await demandRow(slug))?.alerts ?? 0,
       { message: 'the anonymous submit never reached POST /demand-signals' },
@@ -103,20 +105,8 @@ test.describe('Property alerts (live)', () => {
 
     const createBtn = await openEmptySearch(page, slug);
     await createBtn.click();
-    await page.waitForURL(/\/signin\?reason=alerts/);
-    const next = new URL(page.url()).searchParams.get('next');
-    expect(next).toContain('alertNonce=');
-    expect(next).not.toContain('alertIntent');
-
-    await page.locator('#signin-mobile').fill(mobile);
-    await page.getByRole('button', { name: /send otp|continue/i }).click();
-    const boxes = page.locator('#root input[inputmode="numeric"]:not(#signin-mobile)');
-    await expect(boxes.first()).toBeVisible();
-    await boxes.first().click();
-    for (const digit of E2E_OTP) await page.keyboard.type(digit);
-    const verify = page.getByRole('button', { name: /verify|sign in|log in|continue/i });
-    if (await verify.count()) await verify.first().click();
-    await completeProfileIfAsked(page, { away: /\/signin/ });
+    await expect(signInSheet(page)).toBeVisible();
+    await verifyInSheet(page, mobile);
 
     await expect(page.getByText(/Create alert for/i)).toBeVisible();
     expect(await savedSearchesOf(headers), 'the return intent should not create until confirmed').toEqual([]);

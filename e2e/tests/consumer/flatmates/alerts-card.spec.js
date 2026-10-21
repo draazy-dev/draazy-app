@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { signInSheet } from '../../../helpers/signInSheet.js';
 
 /* Browser alert cards must prove the alert reaches the seeker's API list; localStorage mocks cannot
    catch field-name drift between the page's `label` and the wire's `name`. */
@@ -68,7 +69,7 @@ test('the empty-state card creates an alert on the seeker\'s account, under the 
 
 /* Dashboard-managed alerts need accounts; redirect plus zero POSTs proves anonymous creation did
    not silently disappear. */
-test('a signed-out seeker is sent to sign in, and no alert is created (D85)', async ({ page }) => {
+test('a signed-out seeker gets the sign-in sheet, and no alert is created (D85)', async ({ page }) => {
   const posts = watchCreates(page);
 
   await page.goto(`${BASE}/flatmates?view=rooms`);
@@ -76,9 +77,12 @@ test('a signed-out seeker is sent to sign in, and no alert is created (D85)', as
   await forceEmpty(page);
 
   await expect(createBtn(page)).toBeVisible();
+  const before = page.url();
   await createBtn(page).click();
 
-  await page.waitForURL(/\/signin\?reason=alerts/);
+  await expect(signInSheet(page)).toBeVisible();
+  await expect(page.getByRole('dialog', { name: /sign in to save this search/i })).toBeVisible();
+  await expect(page).toHaveURL(before);
   expect(posts).toHaveLength(0);
 });
 

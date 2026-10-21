@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { followSociety, listFollowedSocieties, unfollowSociety } from '../services/societyService.js';
 import { useAuth } from './AuthContext.jsx';
 
@@ -32,6 +32,7 @@ export function FollowProvider({ children }) {
   const [rows, setRows] = useState(() => new Map());
   const [loading, setLoading] = useState(false);
   const [writes, setWrites] = useState(0);
+  const settledWrites = useRef(0);
   // Read only once a screen asks: the shell itself draws no follow state.
   const [wanted, setWanted] = useState(false);
   const want = useCallback(() => setWanted(true), []);
@@ -53,8 +54,14 @@ export function FollowProvider({ children }) {
   }, []);
 
   const loadAll = useCallback(async () => {
-    const remote = await listFollowedSocieties();
     const still = await promote(readLocal());
+    let seen;
+    let remote;
+    // A follow that settled mid-read (one resumed right after sign-in) is missing from it.
+    do {
+      seen = settledWrites.current;
+      remote = await listFollowedSocieties();
+    } while (seen !== settledWrites.current);
     const next = new Set([...remote.map((r) => r.slug), ...still]);
     setRows(new Map(remote.map((r) => [r.slug, r])));
     setSlugs(next);
@@ -91,16 +98,19 @@ export function FollowProvider({ children }) {
     if (!slug) return false;
     const wasFollowed = slugs.has(slug);
     const next = !wasFollowed;
-
-    setSlugs((prev) => {
+    const mark = (on) => setSlugs((prev) => {
       const copy = new Set(prev);
-      if (next) copy.add(slug); else copy.delete(slug);
+      if (on) copy.add(slug); else copy.delete(slug);
       return copy;
     });
 
+    mark(next);
     setWrites((n) => n + 1);
     try {
       if (next) await followSociety(slug); else await unfollowSociety(slug);
+      settledWrites.current += 1;
+      // Re-assert: a list read that landed mid-write replaced `slugs` without this one.
+      mark(next);
       // A successful server write means the slug is real, so drop any local placeholder for it.
       const local = readLocal();
       if (local.includes(slug)) writeLocal(local.filter((s) => s !== slug));
@@ -110,11 +120,7 @@ export function FollowProvider({ children }) {
          subscribed to alerts they won't receive is the outcome to avoid. */
       const local = readLocal();
       if (local.includes(slug)) writeLocal(local.filter((s) => s !== slug));
-      setSlugs((prev) => {
-        const copy = new Set(prev);
-        if (next) copy.delete(slug); else copy.add(slug);
-        return copy;
-      });
+      mark(!next);
       return !next;
     } finally {
       setWrites((n) => n - 1);

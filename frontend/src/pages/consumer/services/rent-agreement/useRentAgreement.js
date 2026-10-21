@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { useScrollReveal } from '../../../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../../../lib/useSignInGate.js';
 import { useAuth } from '../../../../context/AuthContext.jsx';
 import { usePricing } from '../../../../context/PricingContext.jsx';
 import { useToast } from '../../../../context/ToastContext.jsx';
@@ -366,11 +366,11 @@ export function useRentAgreement() {
     /* `gated` represents resolved signed-out owner mode, distinct from pending authentication. */
 
   const gated = mode === 'owner' && !loading && !isIn;
-    /* Flush the debounced owner draft before navigation so recent input survives sign-in. */
+    /* Flush the debounced owner draft so recent input survives a reload mid-sign-in. */
 
-  const gateToSignIn = () => {
+  const gateToSignIn = (resume) => {
     flushDraft();
-    sendToSignIn('services');
+    sendToSignIn('services', undefined, resume);
   };
     /* Signed-out owners remain on public steps even when restored drafts name a later step. */
 
@@ -552,10 +552,13 @@ export function useRentAgreement() {
     if (!partyId && !requestId) return;
     if (loading) return;
     if (!isIn || !user?.mobile) {
+      // A dismissed sheet must leave a way back in: the header's sign-in drops this invite URL.
+      setInviteError({ kind: 'signin' });
       if (!signInSentRef.current) sendToSignIn('invite');
       signInSentRef.current = true;
       return;
     }
+    setInviteError((e) => (e?.kind === 'signin' ? null : e));
     let alive = true;
     (async () => {
       try {
@@ -764,7 +767,7 @@ export function useRentAgreement() {
   const next = () => {
      /* Validate before sign-in navigation so restored drafts return to a valid step. */
     if (!validateStep(step)) return;
-    if (gated && step >= LAST_PUBLIC_STEP) { gateToSignIn(); return; }
+    if (gated && step >= LAST_PUBLIC_STEP) { gateToSignIn(() => latestStep.current.next()); return; }
     // Warned at each transition, not only at the end: the limit is on the whole form, so naming the
     // offending field here puts it beside the control that has to shrink.
     if (detailsTooLong) toast(tr('services.ra.detailsTooLong', { field: tr(detailsWorstField.label), over: detailsSize - DETAILS_MAX_CHARS }), 'error');
@@ -997,7 +1000,7 @@ export function useRentAgreement() {
     // Hold while auth is unresolved; an expired session goes through `gateToSignIn` to keep the draft.
     if (submitting || done) return;
     if (loading) return;
-    if (!isIn) { gateToSignIn(); return; }
+    if (!isIn) { gateToSignIn(() => latestStep.current.generate()); return; }
     for (let s = 0; s <= 4; s++) {
       const e = stepErrors(s);
       if (Object.keys(e).length) { setStep(s); flagErrors(s, e); toast(tr('services.ra.validationRequired'), 'error'); return; }
@@ -1060,6 +1063,7 @@ export function useRentAgreement() {
     witness: missingIdentityFields.filter((field) => field.step === 'witness').map(labelIdentityReminder),
     review: missingIdentityFields.map(labelIdentityReminder),
   };
+  const latestStep = useLatest({ next, generate });
 
   return {
     rootRef, formRef, tr, isIn, user, navigate,
@@ -1078,6 +1082,6 @@ export function useRentAgreement() {
     identityReminders,
     stalledInvite, recoverInvite, recovering, payable, payFiled, paying, continuable, continueFiled,
     detailsSize, detailsMax: DETAILS_MAX_CHARS, detailsTooLong, detailsWorstField,
-    copyInviteLink, next, prev,
+    copyInviteLink, next, prev, signInToInvite: () => sendToSignIn('invite'),
   };
 }

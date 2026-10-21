@@ -5,7 +5,7 @@ import { Link, useParams } from 'react-router';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../lib/useSignInGate.js';
 import usePageHead from '../../lib/usePageHead.js';
 import { MIN_INDEXABLE, flatmateCopy, flatmatePath, isWomenOnly, landingPath, parseFlatmateLanding } from '../../lib/landingPages.js';
 import * as flatmateService from '../../services/flatmateService.js';
@@ -35,9 +35,10 @@ function Landing({ target }) {
   const count = women ? items.filter(isWomenOnly).length : total;
   usePageHead({ title: copy.title, description: copy.description, path: flatmatePath(target), noindex: loaded && count < MIN_INDEXABLE.flatmates });
 
-  const onSave = async (key) => {
-    if (!user) { sendToSignIn('save'); return; }
-    const on = !saved[key];
+  const onSave = async (key, want) => {
+    // The resume asks for "saved": toggling a row the account had already saved would unsave it.
+    if (!user) { sendToSignIn('save', undefined, () => latest.current(key, true)); return; }
+    const on = want ?? !saved[key];
     setSaved((m) => ({ ...m, [key]: on }));
     try {
       const kind = SAVE_KIND[key[0]];
@@ -48,6 +49,7 @@ function Landing({ target }) {
       toast('Could not update your saved list. Please try again.', 'error');
     }
   };
+  const latest = useLatest(onSave);
 
   return (
     <div ref={rootRef} className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-10">

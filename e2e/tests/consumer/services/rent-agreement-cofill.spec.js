@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, authHeaders, signedInAs, signedInAsNew, uniqueMobile, shownMobile } from '../../../helpers/liveAuth.js';
 import { AADHAAR, SOCIETY_PLACEHOLDER, active, clickNext, fillOwner, fillProperty, fillTenantPolice, fillTerms, fillWitnesses, inviteOwner, inviteTenant, uploadAll } from '../../../helpers/rentAgreementWizard.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 // Co-fill must be live: it spans two accounts and browser contexts.
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
@@ -261,7 +262,7 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     await expect(summary, 'the pay panel states the deed being paid for').toContainText('Rahul Nair');
   });
 
-  test('an invite addressed to one account is invisible to another, and a signed-out invitee is sent to sign in and back — the SERVER withholds it, and the mobile never enters the URL', async ({ page, browser }) => {
+  test('an invite addressed to one account is invisible to another, and a signed-out invitee gets the sign-in sheet and the invite resolves after it — the SERVER withholds it, and the mobile never enters the URL', async ({ page, browser }) => {
     const ownerMobile = uniqueMobile();
     const { accessToken: ownerToken } = await apiLogin(ownerMobile, { api: API });
     const tenantMobile = uniqueMobile();
@@ -293,15 +294,18 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
       const anon = await signedOut.newPage();
       await anon.goto(inviteUrl({ partyId, requestId }), { waitUntil: 'networkidle' });
 
-      await expect(anon).toHaveURL(/\/signin/);
-      await expect(anon).toHaveURL(/reason=invite/);
-      await expect(anon.getByRole('heading', { name: 'Sign in to complete your Rent Agreement' })).toBeVisible();
+      await expect(signInSheet(anon)).toBeVisible();
+      await expect(anon.getByRole('dialog', { name: 'Sign in to complete your Rent Agreement' })).toBeVisible();
 
       const url = new URL(anon.url());
-      expect(decodeURIComponent(url.searchParams.get('next') || ''), 'the invite is resumed after sign-in').toContain(`party=${partyId}`);
+      expect(url.pathname, 'the sheet opens over the invite link').toBe('/services/rent-agreement');
+      expect(url.searchParams.get('party')).toBe(partyId);
       // Live the number is never put in the URL, so a forwarded link does not disclose whose invite it is.
-      expect(url.searchParams.get('mobile'), 'the invited number is not leaked into the sign-in URL').toBeNull();
+      expect(url.searchParams.get('mobile'), 'the invited number is not leaked into the URL').toBeNull();
       expect(anon.url()).not.toContain(tenantMobile);
+
+      await verifyInSheet(anon, tenantMobile);
+      await expect(anon.getByText('Set up by the owner — view only'), 'the invite resolves after sign-in').toBeVisible({ timeout: 20000 });
     } finally {
       await signedOut.close();
     }

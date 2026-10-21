@@ -1,7 +1,8 @@
 import { test, expect } from '../../../fixtures/live.js';
-import { signedInAsNew } from '../../../helpers/liveAuth.js';
+import { signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 
-/* Assert /signin for guests and the rendered heading (not just ?post=1) for signed-in users, so a fork
+/* Assert the sign-in sheet for guests and the rendered heading (not just ?post=1) for signed-in users, so a fork
    that ignores auth cannot pass; the signed-in session is a real JWT. */
 
 test('"Find a flatmate" routes to the flatmate finder', async ({ page }) => {
@@ -12,10 +13,16 @@ test('"Find a flatmate" routes to the flatmate finder', async ({ page }) => {
   await expect(page).toHaveURL(/\/flatmates\?view=team-up/);
 });
 
-test('"Post your requirement" (guest) routes to sign-in', async ({ page }) => {
+test('"Post your requirement" (guest) opens the sign-in sheet, then the post form after sign-in', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Post your requirement' }).click();
-  await expect(page).toHaveURL(/\/signin/);
+  await expect(page).toHaveURL(/\/flatmates\?post=1/);
+  await expect(signInSheet(page)).toBeVisible({ timeout: 15_000 });
+  await expect(page).not.toHaveURL(/\/signin/);
+
+  await verifyInSheet(page, uniqueMobile());
+
+  await expect(page.getByRole('heading', { name: /Post your flatmate request/i })).toBeVisible({ timeout: 15_000 });
 });
 
 test('"Post your requirement" (signed-in) opens the post form directly', async ({ page }) => {

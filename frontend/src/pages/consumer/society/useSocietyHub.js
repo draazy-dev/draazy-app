@@ -5,7 +5,7 @@ import { useAuth } from '../../../context/AuthContext.jsx';
 import { useFollows } from '../../../context/FollowContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useScrollReveal } from '../../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../../lib/useSignInGate.js';
 import { fmtNum } from '../../../lib/format.js';
 import { fnvHash } from '../../../lib/hash.js';
 import { commuteInfo } from '../property/locationIntel.js';
@@ -125,13 +125,17 @@ export function useSocietyHub() {
   const age = soc.year ? NOW_YEAR - soc.year : null;
   const hero = HERO[fnvHash(soc.slug) % HERO.length];
 
-  const requireLogin = () => { if (!isIn) { sendToSignIn('society'); return false; } return true; };
+  const requireLogin = (resume) => { if (!isIn) { sendToSignIn('society', undefined, resume); return false; } return true; };
   const onFollow = async () => {
-    if (soc._generic || !requireLogin()) return;
     /* The toast reports the state the write settled on, not the one attempted: the context rolls a
        failed follow back, and promising alerts on a refused follow is a promise the page can't keep. */
-    const now = await follows.toggle(soc.slug);
-    toast(now ? `Following ${soc.name} — we'll alert you on new listings` : 'Unfollowed', now ? 'success' : 'info');
+    const follow = async () => {
+      const now = await follows.toggle(soc.slug);
+      toast(now ? `Following ${soc.name} — we'll alert you on new listings` : 'Unfollowed', now ? 'success' : 'info');
+    };
+    // The signed-out toggle sees nothing followed, so the resumed tap follows instead of undoing an existing follow.
+    if (soc._generic || !requireLogin(follow)) return;
+    follow();
   };
   const myReview = reviews.find((r) => r.mine);
   // Both reads: the headline comes from the summary, so re-reading only the cards would
@@ -146,8 +150,8 @@ export function useSocietyHub() {
     setRateOpen(true);
   };
   const toggleComposer = () => (rateOpen ? closeComposer() : openComposer());
-  const submitReview = () => {
-    if (soc._generic || !requireLogin()) return;
+  const submitReview = (e) => {
+    if (soc._generic || !requireLogin(replay(e))) return;
     // No `resident` flag: `categories` carries only the aspects the reviewer actually touched.
     const review = { rating: pick, text: revText.trim(), categories: cats };
     (myReview ? updateReview(myReview.id, review) : createEntityReview('society', soc.slug, review))
@@ -163,7 +167,7 @@ export function useSocietyHub() {
       .then(() => reloadReviews().then(() => { closeComposer(); toast(t('common.reviewDeleted'), 'success'); }))
       .catch(() => toast(t('common.reviewDeleteFailed'), 'error'));
   };
-  const openReport = (review) => { if (requireLogin()) setReportFor(review); };
+  const openReport = (review) => { if (requireLogin(() => setReportFor(review))) setReportFor(review); };
   const closeReport = () => setReportFor(null);
 
   /* Carry label keys plus value key and args, not text, so either language renders without this hook knowing. */

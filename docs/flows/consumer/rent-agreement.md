@@ -125,8 +125,8 @@
   **Police intimation** (LEG-2). After the registered copy, the tracker links the Pune City and
   Pimpri-Chinchwad Police portals; the step stays pending until ops records the owner's
   confirmation (optional reference number and date).
-- **Guards:** the page is publicly fillable; **generating** requires sign-in
-  (`/signin?reason=service&next=...`, draft restored). Invite mode forces sign-in (`reason=invite`,
+- **Guards:** the page is publicly fillable; **generating** requires sign-in (the in-page sign-in
+  sheet, which resumes the step). Invite mode forces sign-in (`reason=invite`,
   no mobile in the URL) and then resolves the invitation against the signed-in account. Guards are
   UX-only ([`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 1); the server's
   party check is the authority.
@@ -356,7 +356,7 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
 
 ### 5.6 Invite resolution & security (`useRentAgreement.js` invite init)
 - The deep link is `?party=<partyId>&request=<requestId>` and is **not** a bearer token: holding it
-  grants nothing. Signed-out -> `/signin?reason=invite&next=…`, with no mobile in the URL.
+  grants nothing. Signed-out -> the in-page sign-in sheet (`reason=invite`), with no mobile in the URL.
 - Signed in: the row is looked up in the caller's own `GET /me/service-request-invites`; a pending
   row is accepted (`POST /me/service-request-invites/{partyId}`), and then `GET /service-requests/{id}`
   decides — it 404s for anyone who is not a party, so a stranger gets the neutral "no longer

@@ -8,7 +8,7 @@ import Icon from './Icon.jsx';
 import { ServiceBreadcrumbs } from './Breadcrumbs.jsx';
 import MobileField from './MobileField.jsx';
 import { useScrollReveal } from '../lib/useScrollReveal.js';
-import { useSignInGate } from '../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../lib/useSignInGate.js';
 import { useAuth } from '../context/AuthContext.jsx';
 import { SUPPORT_PHONE, SUPPORT_TEL } from '../lib/supportContact.js';
 /* Two distinct writes: the ops lead ticket a desk calls back from, and the flow request the customer then tracks. */
@@ -70,12 +70,16 @@ export default function ServiceLanding({
   const submit = async (e) => {
     e.preventDefault();
     if (status === 'sending') return;
-    // Public page, so gate on use rather than on arrival; the draft carries input across the hop.
-    if (!isIn) { sendToSignIn('services'); return; }
+    // Public page, so gate on use rather than on arrival.
+    if (!isIn) { sendToSignIn('services', undefined, replay(e)); return; }
     const reqd = (quote?.fields || []).find((f) => f.required && !form[f.name]);
+    // A submit resumed after the sign-in sheet sees fields that were blank at mount; the account fills them.
+    const name = form.name.trim() || user?.name || '';
+    const mobile = form.mobile || user?.mobile || '';
+    if (name !== form.name || mobile !== form.mobile) setForm((p) => ({ ...p, name, mobile }));
     const ok = err.check([
-      { name: 'name', ok: !!form.name.trim(), msg: 'Please enter your name.' },
-      { name: 'mobile', ok: /^[6-9]\d{9}$/.test((form.mobile || '').replace(/\D/g, '')), msg: 'Enter a valid 10-digit mobile number.' },
+      { name: 'name', ok: !!name, msg: 'Please enter your name.' },
+      { name: 'mobile', ok: /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '')), msg: 'Enter a valid 10-digit mobile number.' },
       ...(reqd ? [{ name: reqd.name, ok: false, msg: `Please fill: ${reqd.label}` }] : []),
     ], toast);
     if (!ok) return;
@@ -100,7 +104,7 @@ export default function ServiceLanding({
     let filed = true;
     if (flowType) {
       try {
-        await createFlowRequest({ type: flowType, service, customer: { name: form.name }, ticketRef: ref, details });
+        await createFlowRequest({ type: flowType, service, customer: { name }, ticketRef: ref, details });
       } catch {
         filed = false;
       }

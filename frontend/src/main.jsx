@@ -13,6 +13,7 @@ import { VerificationProvider } from './context/VerificationContext.jsx';
 import { NotificationProvider } from './context/NotificationContext.jsx';
 import { ConversationProvider } from './context/ConversationContext.jsx';
 import { ToastProvider } from './context/ToastContext.jsx';
+import { SignInGateProvider } from './context/SignInGateContext.jsx';
 import { installMapsLoader } from './lib/mapsConfig.js';
 import { installGlobalErrorHandlers } from './lib/errorReporter.js';
 import { initPmf } from './lib/pmf.js';
@@ -73,7 +74,9 @@ const app = (
                 <NotificationProvider>
                   <CompareProvider>
                     <ToastProvider>
-                      <App />
+                      <SignInGateProvider>
+                        <App />
+                      </SignInGateProvider>
                     </ToastProvider>
                   </CompareProvider>
                 </NotificationProvider>

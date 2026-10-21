@@ -85,9 +85,3 @@ export function postAuthDest(params, fallback = '/dashboard') {
 
 /** The reason a gate will actually be answered with, which is not always the one it asked for. */
 export const gateReason = (reason) => (AUTH_REASONS.includes(reason) ? reason : 'default');
-
-/** `next` defaults to the originating page and is always validated, so it can't become an off-site redirect. */
-export function signInPath(reason, next) {
-  const dest = safeInAppPath(next ?? window.location.pathname + window.location.search);
-  return `/signin?reason=${gateReason(reason)}${dest ? `&next=${encodeURIComponent(dest)}` : ''}`;
-}

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, seedConsent, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 import { detailCta } from '../../../helpers/app.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
@@ -76,7 +77,7 @@ test('joining a group reaches the server: the host\'s inbox shows the request', 
     .toBe(true);
 });
 
-test('a signed-out user is routed to sign-in when joining a group', async ({ page }) => {
+test('a signed-out user joining a group gets the sign-in sheet, and the join runs after sign-in', async ({ page }) => {
   await seedConsent(page);
   await page.goto(`${BASE}/flatmates`);
   await page.getByRole('button', { name: /Team up/i }).first().click();
@@ -87,7 +88,15 @@ test('a signed-out user is routed to sign-in when joining a group', async ({ pag
 
   const joinBtn = detailCta(page, /Join group|Request to join/i);
   await expect(joinBtn).toBeVisible({ timeout: 15_000 });
+  const before = page.url();
   await joinBtn.click();
 
-  await expect(page).toHaveURL(/\/signin/, { timeout: 5_000 });
+  await expect(signInSheet(page)).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByRole('dialog', { name: /sign in to join the community/i })).toBeVisible();
+  await expect(page).toHaveURL(before);
+
+  await verifyInSheet(page, uniqueMobile());
+
+  await expect(page).toHaveURL(before);
+  await expect(page.getByText(/^\s*(You're in|Requested)\s*$/).filter({ visible: true }).first()).toBeVisible({ timeout: 15_000 });
 });

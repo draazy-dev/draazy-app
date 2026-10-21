@@ -20,8 +20,16 @@ export function SavedProvider({ children }) {
   const keysRef = useRef(keys);
   const busyRef = useRef(new Set());
   const lastForegroundReload = useRef(0);
+  const writes = useRef(0);
 
   useEffect(() => { keysRef.current = keys; }, [keys]);
+
+  // A read that overlapped a write may predate it (a heart resumed right after sign-in); re-read once.
+  const readKeys = useCallback(async () => {
+    const seen = writes.current;
+    const rows = await listSavedKeys();
+    return seen === writes.current ? rows : listSavedKeys();
+  }, []);
 
   const applyKeys = useCallback((rows) => {
     setKeys(new Map(rows.map((k) => [k.token, k.uuid])));
@@ -38,11 +46,11 @@ export function SavedProvider({ children }) {
       setLoading(true);
       setStatus('loading');
     }
-    const rows = await listSavedKeys();
+    const rows = await readKeys();
     applyKeys(rows);
     if (!silent) setLoading(false);
     return rows;
-  }, [applyKeys, isIn]);
+  }, [applyKeys, isIn, readKeys]);
 
   useEffect(() => {
     if (!isIn) {
@@ -53,7 +61,7 @@ export function SavedProvider({ children }) {
     let alive = true;
     setLoading(true);
     setStatus('loading');
-    listSavedKeys()
+    readKeys()
       .then((rows) => { if (alive) applyKeys(rows); })
       .catch((err) => {
         if (!alive) return;
@@ -64,7 +72,7 @@ export function SavedProvider({ children }) {
         if (alive) setLoading(false);
       });
     return () => { alive = false; };
-  }, [applyKeys, isIn]);
+  }, [applyKeys, isIn, readKeys]);
 
   useEffect(() => {
     if (!isIn) return undefined;
@@ -108,6 +116,9 @@ export function SavedProvider({ children }) {
     flip(next);
     try {
       if (next) await saveProperty(address); else await unsaveProperty(address);
+      writes.current += 1;
+      // Re-assert: a key read that landed mid-write replaced the map without this row.
+      flip(next);
       return true;
     } catch (err) {
       setError(err);

@@ -12,6 +12,7 @@ import { buildAlertRecord } from './listings/alertCriteria.js';
 import { toSavedCard } from './flatmates/helpers.js';
 import * as flatmateService from '../../services/flatmateService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useSignInGate } from '../../lib/useSignInGate.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { ActionSheet, AlertsRow, SkeletonRows, SwipeCard, UndoRow } from './saved/SavedPageParts.jsx';
 import '../../styles/routes/saved.css';
@@ -36,6 +37,7 @@ export default function Saved() {
   const { t: tr } = useTranslation();
   const { toast } = useToast();
   const { isIn } = useAuth();
+  const sendToSignIn = useSignInGate();
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState('all');
   const [sort, setSort] = useState('newest');
@@ -286,9 +288,9 @@ export default function Saved() {
                   <p className="text-[13px] text-gray-400">{tr('saved.guestBody')}</p>
                 </div>
               </div>
-              <Link to="/signin?reason=saved&next=%2Fsaved" className="btn-teal shrink-0 inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl text-white text-sm font-semibold">
+              <button type="button" onClick={() => sendToSignIn('saved')} className="btn-teal shrink-0 inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl text-white text-sm font-semibold">
                 <Icon name="log-in" className="w-4 h-4" /> {tr('saved.guestCta')}
-              </Link>
+              </button>
             </div>
           )}
 

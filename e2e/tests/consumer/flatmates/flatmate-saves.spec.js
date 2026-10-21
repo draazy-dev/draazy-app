@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, seedConsent, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 
@@ -237,7 +238,7 @@ test('the shortlist holds rooms and groups together, newest save first', async (
   await expect(page.getByText(title, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
 });
 
-test('saving while signed out asks for identity instead of writing a bookmark nobody owns', async ({ page }) => {
+test('saving while signed out opens the sign-in sheet, then saves for the new account without leaving the board', async ({ page }) => {
   const host = uniqueMobile();
   const hostAuth = await apiLogin(host);
   const society = `Zztest Anon ${stamp()}`;
@@ -245,6 +246,17 @@ test('saving while signed out asks for identity instead of writing a bookmark no
 
   await seedConsent(page);
   await openRooms(page);
+  const before = page.url();
   await cardFor(page, society).locator(".save-btn").click();
-  await expect(page).toHaveURL(/\/signin/, { timeout: 15_000 });
+  await expect(signInSheet(page)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('dialog', { name: /sign in to save this home/i })).toBeVisible();
+  await expect(page).toHaveURL(before);
+
+  const seeker = uniqueMobile();
+  await verifyInSheet(page, seeker);
+
+  await expect(page).toHaveURL(before);
+  await expect(cardFor(page, society).locator('.save-btn')).toHaveClass(/saved/, { timeout: 15_000 });
+  const { accessToken } = await apiLogin(seeker);
+  await expect.poll(async () => (await serverSaves(accessToken)).totalElements, { timeout: 15_000 }).toBe(1);
 });

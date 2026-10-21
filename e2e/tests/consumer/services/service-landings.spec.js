@@ -1,10 +1,11 @@
 /* ServiceLanding (packers, home loans, legal) shares one gate, prefill and hero, so each is asserted once;
    valuation and interior are bespoke. Submits: service-landing-ticket.spec.js, interior-lead.spec.js. */
 import { expect, test, ACTORS, STAFF } from '../../../fixtures/live.js';
-import { API, apiLogin, authHeaders, signIn, signedInAs, shownMobile } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, authHeaders, signIn, signedInAs, shownMobile, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { appReady } from '../../../helpers/app.js';
+import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 
-const nextParam = (path) => new RegExp(`next=${encodeURIComponent(path).replace(/\//g, '%2F')}`);
+const servicesSheet = (page) => page.getByRole('dialog', { name: /sign in to book services/i });
 
 /* The prefill is compared against what the API returns, not a literal, so a reseed cannot turn a
    regression into a pass and a page reading `draazyUser` cannot pass by coincidence. */
@@ -143,14 +144,44 @@ test.describe('property valuation landing, live', () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test('the certified report is gated behind sign-in, and the gate remembers where it interrupted', async ({ page }) => {
+  test('the certified report is gated behind a sign-in sheet, and the request files itself after sign-in', async ({ page }) => {
     await page.goto(PAGE);
+    // A complete form, so the filed request below proves the gated submit was replayed rather than lost.
+    await page.locator('input[data-err="name"]').fill('Gate Probe');
+    await page.locator('[data-err="mobile"] input').fill('9812345678');
+    await pickDropdown(page, 'purpose', 'Home loan / Mortgage');
 
+    const posts = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/service-requests(\?|$)/.test(r.url())) posts.push(r); });
     await page.locator('form').getByRole('button', { name: 'Request Valuation' }).click();
-    await expect(page).toHaveURL(/\/signin/);
-    await expect(page).toHaveURL(/reason=service/);
-    // `next=` makes the gate an interruption rather than a dead end; the draft is restored only if the return happens.
-    await expect(page).toHaveURL(nextParam(PAGE));
+    await expect(signInSheet(page)).toBeVisible();
+    await expect(servicesSheet(page)).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`${PAGE}$`));
+
+    await verifyInSheet(page, uniqueMobile());
+
+    await expect(page.getByRole('heading', { name: 'Request received!' })).toBeVisible({ timeout: 20000 });
+    expect(posts).toHaveLength(1);
+    expect(posts[0].postDataJSON().type).toBe('valuation');
+    await expect(page).toHaveURL(new RegExp(`${PAGE}$`));
+  });
+
+  test('a guest who left name and mobile blank has the request filed under the account they sign in with', async ({ page }) => {
+    await page.goto(PAGE);
+    await pickDropdown(page, 'purpose', 'Home loan / Mortgage');
+    await expect(page.locator('input[data-err="name"]')).toHaveValue('');
+
+    const posts = [];
+    page.on('request', (r) => { if (r.method() === 'POST' && /\/service-requests(\?|$)/.test(r.url())) posts.push(r); });
+    await page.locator('form').getByRole('button', { name: 'Request Valuation' }).click();
+    await expect(signInSheet(page)).toBeVisible();
+
+    await verifyInSheet(page, uniqueMobile(), { name: 'Zztest Valuation Guest' });
+
+    await expect(page.getByRole('heading', { name: 'Request received!' })).toBeVisible({ timeout: 20000 });
+    expect(posts).toHaveLength(1);
+    expect(posts[0].postDataJSON().type).toBe('valuation');
+    expect(JSON.stringify(posts[0].postDataJSON())).toContain('Zztest Valuation Guest');
   });
 
   test('for a signed-in visitor the form is addressed to the session, and submitting files the request', async ({ page }) => {
@@ -229,13 +260,13 @@ test.describe('interior & renovation landing, live', () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test('booking the consultation is gated behind sign-in, and the gate remembers where it interrupted', async ({ page }) => {
+  test('booking the consultation is gated behind a sign-in sheet that leaves the page where it is', async ({ page }) => {
     await page.goto(PAGE);
 
     await page.getByRole('button', { name: 'Book My Consultation' }).click();
-    await expect(page).toHaveURL(/\/signin/);
-    await expect(page).toHaveURL(/reason=service/);
-    await expect(page).toHaveURL(nextParam(PAGE));
+    await expect(signInSheet(page)).toBeVisible();
+    await expect(servicesSheet(page)).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`${PAGE}$`));
   });
 
   test('for a signed-in visitor the form opens addressed to the session, not to this browser', async ({ page }) => {
@@ -282,7 +313,7 @@ test.describe('home loans landing, live', () => {
     expect(consoleErrors).toEqual([]);
   });
 
-  test('a signed-out request for offers is sent to sign-in, and files nothing on the loans desk', async ({ page }) => {
+  test('a signed-out request for offers opens the sign-in sheet, and files nothing on the loans desk', async ({ page }) => {
     // Signed into the desk first: an absence on a desk nobody can read is not an absence.
     const desk = await apiLogin(STAFF.loans);
     expect(desk.accessToken).toBeTruthy();
@@ -305,11 +336,11 @@ test.describe('home loans landing, live', () => {
 
     await page.getByRole('button', { name: 'Get Loan Offers' }).click();
 
-    await expect(page).toHaveURL(/\/signin/);
-    await expect(page).toHaveURL(/reason=service/);
-    await expect(page).toHaveURL(nextParam(PAGE));
+    await expect(signInSheet(page)).toBeVisible();
+    await expect(servicesSheet(page)).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`${PAGE}$`));
 
-    // The redirect is not the claim: a gate that bounces the browser *after* posting makes the same URL.
+    // The sheet is not the claim: a gate that opens it *after* posting looks the same.
     expect(ticketPosts, 'a signed-out press sends no ticket request at all').toEqual([]);
 
     const arrived = (await loansQueue()).filter((t) => !before.has(t.id));

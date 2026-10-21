@@ -24,9 +24,11 @@
 - **Query params carried in:** `?next=<path>` (post-auth return), `?reason=<key>` (explicit intent
   copy), `?mobile=<digits>`, `?new=1` (sign-in bounced an unknown number to sign-up), `?ref=<code>`
   (referral, applied on sign-up).
-- **Triggers:** `ProtectedRoute` redirects (`/signin?next=...`), the header account button, the
-  "Sign In / Sign Up" nav links, and every in-page gate (contact owner, save, alerts, schedule
-  visit, list property).
+- **Triggers:** `ProtectedRoute` redirects (`/signin?next=...`), the header account button and the
+  "Sign In / Sign Up" nav links. In-page gates (contact owner, save, alerts, schedule visit, list
+  property, …) never come here: `useSignInGate(reason, next, resume)` opens the `InlineOtpSheet` over the
+  current page (`src/context/SignInGateContext.jsx`), then lands on `next` if it is elsewhere and runs
+  `resume`, so the tapped action completes without a re-tap.
 - **Source components:** `Signin.jsx`, `Signup.jsx`, shared auth kit under
   `src/components/auth/` (`useOtpFlow.js`, `OtpBoxes.jsx`, `AuthShell.jsx`, `MobileAuthIntro.jsx`),
   `MobileField.jsx`, `src/lib/authIntent.js`, `src/lib/auth.js`, `src/context/AuthContext.jsx`,

@@ -10,7 +10,7 @@ import { fmtINR, timeAgo, avatarFor } from '../../lib/format.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { maskPhone, fmtPhone, digits, isOwnerViewer } from '../../lib/contact.js';
-import { useSignInGate } from '../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../lib/useSignInGate.js';
 /* The card is a fixed seven fields, not a spread user row; the
    rating is its own read since rows on hand are only page one. */
 import { createEntityReview, deleteReview, getEntityReviewSummary, listEntityReviews, reviewRefusal, updateReview } from '../../services/reviewService.js';
@@ -166,8 +166,9 @@ export default function Owner() {
     setEditing(false);
   };
 
-  const postReview = () => {
-    if (!isIn) { sendToSignIn('review'); return; }
+  const postReview = (e) => {
+    const again = replay(e);
+    if (!isIn) { sendToSignIn('review', undefined, again); return; }
     if (!picked) { toast(t('owner.errRating'), 'error'); return; }
     if (!revText.trim()) { toast(t('owner.errComment'), 'error'); return; }
     if (posting) return;
@@ -177,7 +178,7 @@ export default function Owner() {
       .then((saved) => {
         /* A signed-out write answers 'login' rather than throwing; the
            check above isn't enough as a session can expire mid-page. */
-        if (saved === 'login') { sendToSignIn('review'); return; }
+        if (saved === 'login') { sendToSignIn('review', undefined, again); return; }
         return reloadReviews().then(() => {
           resetComposer();
           toast(t(editing ? 'common.reviewUpdated' : 'owner.reviewPosted'), 'success');
@@ -202,8 +203,8 @@ export default function Owner() {
       .finally(() => setPosting(false));
   };
 
-  const messageOwner = () => {
-    if (!isIn) { sendToSignIn('contact'); return; }
+  const messageOwner = (e) => {
+    if (!isIn) { sendToSignIn('contact', undefined, replay(e)); return; }
     if (latestListing) {
         queuePendingChat(latestListing, { firstMessage: introText });
       navigate(messagesLinkForProp(latestListing));

@@ -13,7 +13,7 @@ import { SHARE_REPORT_REASONS } from '../../lib/reportReasons.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useVerification } from '../../context/VerificationContext.jsx';
-import { useSignInGate } from '../../lib/useSignInGate.js';
+import { useLatest, useSignInGate } from '../../lib/useSignInGate.js';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
 import { recordAskLocally, rememberAsk } from '../../lib/data/flatmates.js';
 import * as flatmateService from '../../services/flatmateService.js';
@@ -98,7 +98,7 @@ export default function FlatmateDetail() {
   const patchItem = (next) => setState((s) => ({ ...s, item: { ...s.item, ...next, photos: s.item.photos } }));
 
   const onAsk = async (target, share = 'solo') => {
-    if (!user) { sendToSignIn(kind === 'group' ? 'community' : 'contact'); return; }
+    if (!user) { sendToSignIn(kind === 'group' ? 'community' : 'contact', undefined, () => latest.current.onAsk(target, share)); return; }
     const isVerified = verifying ? (await refreshVerification().catch(() => null))?.verified : identityVerified;
     if (kind === 'post' && target.verifiedContactOnly && !isVerified) {
       toast(t('flatmates.acceptsVerifiedOnlyToast', { name: target.name }), 'error');
@@ -170,18 +170,22 @@ export default function FlatmateDetail() {
     await load();
   };
 
-  const onSave = async () => {
-    if (!user) { sendToSignIn('save'); return; }
-    const next = !saved;
+  const onSave = async (want) => {
+    // The resume asks for "saved": toggling a post the account had already saved would unsave it.
+    if (!user) { sendToSignIn('save', undefined, () => latest.current.onSave(true)); return; }
+    const next = want === true || !saved;
     setSaved(next);
     try {
       if (next) await flatmateService.saveFlatmatePost(kind, id);
       else await flatmateService.unsaveFlatmatePost(kind, id);
+      // Re-assert: the saved-key read that sign-in starts can land mid-write without this row.
+      setSaved(next);
     } catch {
       setSaved(!next);
       toast(t('flatmates.saveFailed'), 'error');
     }
   };
+  const latest = useLatest({ onAsk, onSave });
 
   const back = (
     <Link to={kind === 'post' ? '/flatmates?view=team-up' : '/flatmates'} className="inline-flex items-center gap-1.5 min-h-[44px] -ml-2 px-2 rounded-xl text-sm text-gray-400 hover:text-white"><Icon name="arrow-left" className="w-4 h-4" /> {t('flatmates.detailBack')}</Link>

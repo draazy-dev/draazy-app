@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import '../../styles/routes/services-hub.css';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
-import { useSignInGate } from '../../lib/useSignInGate.js';
+import { replay, useSignInGate } from '../../lib/useSignInGate.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
 import { createTicket, joinServiceWaitlist } from '../../services/ticketService.js';
@@ -200,10 +200,10 @@ export default function Services() {
   const total = PACK.reduce((a, p) => a + (packSel[p.id] ? (movePack.items[p.id] || 0) : 0), 0);
   const save = Math.round(total * 0.12);
 
-  const bookPack = async () => {
+  const bookPack = async (e) => {
     const items = PACK.filter((p) => packSel[p.id]);
     if (!items.length) { toast(tr('services.hub.selectAtLeastOne'), 'error'); return; }
-    if (!isIn) { sendToSignIn('services'); return; }
+    if (!isIn) { sendToSignIn('services', undefined, replay(e)); return; }
     if (bookingRef.current) return;
     bookingRef.current = true;
     setBooking(true);

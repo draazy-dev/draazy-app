@@ -394,7 +394,7 @@ The single decision point every supply path calls - group create, single-room po
   search already narrows by radius, so `filters.near` bypasses the gate entirely.
 
 ### Contact gating (expressing interest)
-- **Flatmate interest (`onInterest`):** requires sign-in (else redirect to `/signin?reason=contact`).
+- **Flatmate interest (`onInterest`):** requires sign-in (else the in-page sign-in sheet, which re-runs the interest).
   Blocked if already interested (`hasInterest`). If the seeker set `verifiedContactOnly` and the
   actor is **not** verified -> blocked + verify modal. On success: `addInterest`, record a
   **host-facing request** (`addFlatmateRequest(seekerMobile, {kind:'flatmate', action:'request'})`),

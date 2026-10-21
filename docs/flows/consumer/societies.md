@@ -169,7 +169,7 @@ an unbound listing counts towards no hub.
 - **Sidebar:** follow card (`follows.toggle`, sign-in gated) and the "why Draazy" panel.
 
 ### 5.5 Follow & alert (`requireLogin`)
-- `requireLogin()` bounces guests to sign-in via `useSignInGate`; once signed in (L1) the action runs
+- `requireLogin()` opens the sign-in sheet via `useSignInGate`; once signed in (L1) the tapped action runs
   directly - there is no verification step. Gated: **follow, review, report a review, locality
   alert**.
 - Following a society notifies the follower (`match.society-listing`) when a home bound to it goes
