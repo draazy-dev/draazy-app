@@ -7,7 +7,7 @@ import { srcSetFor } from '../../../lib/imgSrcSet.js';
 import { MAX_PHOTOS_CEILING } from '../../../lib/uploads/policy.js';
 import VideoWalkthrough from './VideoWalkthrough.jsx';
 
-export function Gallery({ gallery, active, setActive, title, p, setLightbox, requestPhotos, priceStr }) {
+export function Gallery({ gallery, active, setActive, title, p, setLightbox, requestPhotos, priceStr, actions = null }) {
   const { t } = useTranslation();
   const count = gallery.length;
   const go = (dir) => setActive((i) => (i + dir + count) % count);
@@ -158,14 +158,11 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
           </>
         ) : null}
 
-        {/* On a phone the label is screen-reader only (it stays the accessible name), so min-w/h-btn keep the
-           bare icon at 44px. */}
-        <button type="button" onClick={() => setLightbox(true)} className="h-btn absolute top-4 right-4 flex items-center justify-center gap-2 min-w-[44px] sm:min-w-0 px-3.5 rounded-full glass-strong text-white text-sm font-semibold hover:bg-white/15 transition-smooth">
-          <Icon name="expand" className="w-4 h-4" /> <span className="sr-only sm:not-sr-only">{t('property.fullscreen')}</span>
+        {actions}
+        {/* The photo itself opens the lightbox on tap; this counter is the keyboard way in. */}
+        <button type="button" onClick={() => setLightbox(true)} aria-label={t('property.fullscreen') + ' ' + (active + 1) + '/' + count} className="tap-extend absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-white text-sm font-semibold cursor-pointer hover:bg-white/15 transition-smooth">
+          <Icon name="camera" className="w-4 h-4" aria-hidden="true" /> <span>{active + 1}/{count}</span>
         </button>
-        <div className="absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-white text-sm font-semibold">
-          <Icon name="camera" className="w-4 h-4" /> <span>{active + 1}/{count}</span>
-        </div>
 
         {/* Rendered here rather than duplicated-and-hidden: the parent decides which of the two positions gets the
            price, so exactly one lives in the DOM. */}

@@ -101,7 +101,7 @@ export const KB = [
     keywords: ['compare', 'comparison', 'versus', 'vs', 'side', 'difference'],
     q: 'Can I compare properties?',
     a: "Yes. Tap the compare icon on any listing card to add it, then open Compare to see price, area, BHK, furnishing and amenities side by side.",
-    actions: [{ label: 'Open Compare', to: '/compare', icon: 'git-compare' }],
+    actions: [{ label: 'Open Compare', to: '/compare', icon: 'scale' }],
   },
   {
     id: 'list-property',

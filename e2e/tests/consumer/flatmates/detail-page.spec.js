@@ -149,7 +149,7 @@ test.describe('LIVE: flatmate detail page', () => {
       await page.setViewportSize({ width: 1280, height: 900 });
       await expect(page.locator('button.thumbnail')).toHaveCount(3);
       await expect(page.locator('.req-photos-tile')).toHaveCount(0);
-      await page.getByRole('button', { name: 'Fullscreen' }).click();
+      await page.getByRole('button', { name: /^Fullscreen \d+\/\d+$/ }).click();
       await expect(page.locator('.dz-lightbox .dz-lb-caption')).toHaveText('3 / 3');
     });
   });

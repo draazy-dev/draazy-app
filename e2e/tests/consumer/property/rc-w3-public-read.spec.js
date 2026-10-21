@@ -52,6 +52,6 @@ test.describe('property page', () => {
     await seedConsent(page);
     await page.goto('/property/p5032');
     await expect(page.getByRole('button', { name: /^Photo 2 of \d+$/ }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Fullscreen', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Fullscreen \d+\/\d+$/ })).toBeVisible();
   });
 });
