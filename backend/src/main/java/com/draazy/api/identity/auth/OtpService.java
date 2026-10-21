@@ -129,6 +129,23 @@ public class OtpService {
         }
     }
 
+    /** Kill the boot if a predictable code would be sent to real handsets. A preset code exists for
+     * the console-logging mock senders; over live WhatsApp it is a known login code on a real phone. */
+    @PostConstruct
+    void rejectPresetCodeOverLiveWhatsApp() {
+        boolean whatsAppLive = environment.getProperty(
+                "draazy.providers.whatsapp.enabled", Boolean.class, false);
+        if (!whatsAppLive || (fixedCode.isEmpty() && sandboxCode.isEmpty())) {
+            return;
+        }
+        String key = fixedCode.isEmpty() ? "draazy.otp.sandbox-code" : "draazy.otp.fixed-code";
+        throw new IllegalStateException(
+                key + " is set while WhatsApp delivery is live (WHATSAPP_ENABLED=true), so every "
+                        + "login code sent to a real phone is the same. Unset WHATSAPP_ENABLED to use "
+                        + "the preset code, or unset the code (LOCAL_OTP_CODE, E2E_OTP_CODE, "
+                        + "DRAAZY_OTP_FIXED_CODE, DRAAZY_OTP_SANDBOX_CODE) to send random codes.");
+    }
+
     /** Generate a login code, persist its hash, and dispatch it. Rate-limited three ways and
      * {@code noRollbackFor} its refusals, both load-bearing — see docs/flows/consumer/auth.md. */
     @Transactional(noRollbackFor = {RateLimitedException.class,

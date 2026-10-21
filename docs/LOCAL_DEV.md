@@ -277,7 +277,8 @@ $env:WHATSAPP_OTP_TEMPLATE_LANG  = 'en_US'
 ```
 
 With the flag on, `MockOtpSender` steps aside and nothing is printed — the code only exists on the
-handset. Turn it back off to get the console line back.
+handset. Turn it back off to get the console line back. `LOCAL_OTP_CODE` must be unset too: the boot
+refuses a preset code while WhatsApp is live.
 
 **A test number may only message five recipients**, each verified by hand in the App Dashboard, so
 this cannot be used for the Playwright suite or for arbitrary seeded mobiles. It is a manual smoke

@@ -13,10 +13,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.core.env.Environment;
 import org.springframework.mock.env.MockEnvironment;
 
-/**
- * Covers the route the properties pins cannot: an exported env var outranks a classpath config file,
- * leaving only these boot guards. Reasoning: docs/flows/consumer/auth.md.
- */
+/** An exported env var outranks a classpath config file, so only these boot guards stop one.
+ * Reasoning: docs/flows/consumer/auth.md. */
 @DisplayName("The predictable-login-code guards — the ones that survive an environment variable")
 class OtpServiceFixedCodeGuardTest {
 
@@ -96,6 +94,29 @@ class OtpServiceFixedCodeGuardTest {
     }
 
     @Test
+    @DisplayName("a preset code is refused while WhatsApp delivery is live, on any profile")
+    void aPresetCodeNeverReachesARealHandset() {
+        assertThatThrownBy(() -> liveWhatsAppGuard("000000", "", "local"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("draazy.otp.fixed-code")
+                .hasMessageContaining("WHATSAPP_ENABLED")
+                .hasMessageContaining("LOCAL_OTP_CODE");
+        assertThatThrownBy(() -> liveWhatsAppGuard("", "000000", "sandbox"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("draazy.otp.sandbox-code");
+    }
+
+    @Test
+    @DisplayName("live WhatsApp with random codes, or a preset code on the mock sender, both boot")
+    void eitherHalfAloneIsFine() {
+        assertThatCode(() -> liveWhatsAppGuard("", "", "local")).doesNotThrowAnyException();
+        MockEnvironment mockSender = new MockEnvironment();
+        mockSender.setActiveProfiles("local");
+        assertThatCode(() -> service(mockSender, "000000", "").rejectPresetCodeOverLiveWhatsApp())
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     @DisplayName("an attempt cap that would lock the environment out, or stop defending it, is refused")
     void anUnusableAttemptCapIsRefused() {
         // Both ends, because the guard is an interval and an inverted comparison passes one bound
@@ -128,6 +149,13 @@ class OtpServiceFixedCodeGuardTest {
         MockEnvironment environment = new MockEnvironment();
         environment.setActiveProfiles(profiles);
         service(environment, "", sandboxCode).rejectSandboxCodeOutsideSandbox();
+    }
+
+    private static void liveWhatsAppGuard(String fixedCode, String sandboxCode, String... profiles) {
+        MockEnvironment environment = new MockEnvironment();
+        environment.setActiveProfiles(profiles);
+        environment.setProperty("draazy.providers.whatsapp.enabled", "true");
+        service(environment, fixedCode, sandboxCode).rejectPresetCodeOverLiveWhatsApp();
     }
 
     /** The same again, for the cap. No profile decides this one — an unusable cap is unusable. */
