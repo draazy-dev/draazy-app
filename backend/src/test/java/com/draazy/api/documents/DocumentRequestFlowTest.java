@@ -808,7 +808,7 @@ class DocumentRequestFlowTest extends AbstractApiTest {
         ask(buyer, p, "[\"Sale Deed\"]");
 
         assertThat(notificationsFor(owner)).singleElement().satisfies(row -> {
-            assertThat(row.get("link")).isEqualTo("/dashboard#leads");
+            assertThat(row.get("link")).isEqualTo("/dashboard?tab=leads&box=received");
             assertThat((String) row.get("body")).contains("Asked flat").doesNotContain(buyer.getMobile());
         });
         assertThat(notificationsFor(buyer)).isEmpty();

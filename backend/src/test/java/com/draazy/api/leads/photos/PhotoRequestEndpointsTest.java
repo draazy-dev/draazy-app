@@ -334,7 +334,7 @@ class PhotoRequestEndpointsTest extends AbstractApiTest {
 
         assertThat(notificationsFor(owner)).singleElement().satisfies(row -> {
             assertThat(row.get("type")).isEqualTo("photo.requested");
-            assertThat(row.get("link")).isEqualTo("/messages?tab=requests");
+            assertThat(row.get("link")).isEqualTo("/dashboard?tab=leads&box=received");
             assertThat((String) row.get("body")).contains("2 BHK in Kothrud");
         });
         assertThat(notificationsFor(buyer)).isEmpty();

@@ -197,7 +197,9 @@ class ContactGateEndpointsTest extends AbstractApiTest {
 
         assertThat(notificationsFor(owner)).singleElement().satisfies(row -> {
             assertThat(row.get("type")).isEqualTo("contact.received");
-            assertThat(row.get("link")).isEqualTo("/messages?tab=requests");
+            assertThat(row.get("link")).isEqualTo("/messages?c=request:contact:" + jdbc.queryForObject(
+                    "select id from contact_requests where requester_id = ? and property_id = ?", UUID.class,
+                    buyer.getId(), p.getId()));
             assertThat(row.get("body").toString()).contains("Notify on ask")
                     .doesNotContain(buyer.getMobile());
         });

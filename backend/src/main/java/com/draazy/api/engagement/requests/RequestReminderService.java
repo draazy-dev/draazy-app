@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,8 @@ public class RequestReminderService {
 
     private static final DateTimeFormatter WHEN =
             DateTimeFormatter.ofPattern("d MMM, h:mm a", Locale.ENGLISH).withZone(ZoneId.of("Asia/Kolkata"));
+
+    private static final Set<String> CONVERSATION_KINDS = Set.of("contact", "flatmate", "group");
 
     private final RequestSources sources;
     private final RequestReminderRepository reminders;
@@ -34,6 +37,11 @@ public class RequestReminderService {
         this.users = users;
         this.notifier = notifier;
         this.locks = locks;
+    }
+
+    private static String linkFor(String kind, UUID id) {
+        return CONVERSATION_KINDS.contains(kind) ? "/messages?c=request:" + kind + ":" + id
+                : "/dashboard?tab=leads&box=received";
     }
 
     @Transactional
@@ -58,7 +66,7 @@ public class RequestReminderService {
             String name = users.findById(requesterId).map(User::getName).filter(n -> !n.isBlank()).orElse("Someone");
             notifier.notify(recipientId, "request.reminder", "Reminder from " + name,
                     name + " is still waiting for your reply about " + view.target().title() + ".",
-                    "/messages?tab=requests");
+                    linkFor(kind, id));
         }
         return new RequestReminderResponse(reminders.countByKindAndRefId(kind, id), now,
                 ReminderSchedule.nextShown(view, now));

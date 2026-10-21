@@ -5216,7 +5216,7 @@ paths:
       summary: Requests inbox (received or sent)
       operationId: myRequests
       description: >
-        Every kind of request - contact, visit, photo, flatmate interest, group application - merged into
+        Every kind of request - contact, visit, photo, document, flatmate interest, group application - merged into
         one list. `received` is what is waiting on the caller as the recipient (pending only, most recently
         reminded first); `sent` is what the caller asked, pending first, plus anything decided in the last
         30 days that the caller has not cleared. `party` is always the other side and never carries a mobile.
@@ -5251,7 +5251,7 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [contact, visit, photo, flatmate, group] }
+        schema: { type: string, enum: [contact, visit, photo, document, flatmate, group] }
       - name: id
         in: path
         required: true
@@ -5262,7 +5262,7 @@ paths:
       operationId: removeMyRequest
       description: >
         Requester only. A pending request is withdrawn the way its own kind withdraws (a contact request
-        returns its credit; a visit is cancelled; a flatmate interest is deleted). A decided one is only
+        returns its credit; a visit is cancelled; a document request is marked withdrawn; a flatmate interest is deleted). A decided one is only
         hidden from the caller's sent box. Repeating the call is a no-op. Someone else's request, or one that
         does not exist, is `404`.
       responses:
@@ -5281,7 +5281,7 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [contact, visit, photo, flatmate, group] }
+        schema: { type: string, enum: [contact, visit, photo, document, flatmate, group] }
       - name: id
         in: path
         required: true
@@ -14920,7 +14920,7 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid, description: The underlying request row. }
-        kind: { type: string, enum: [contact, visit, photo, flatmate, group] }
+        kind: { type: string, enum: [contact, visit, photo, document, flatmate, group] }
         state: { type: string, enum: [pending, accepted, declined, expired, withdrawn] }
         status: { type: string, description: 'The kind''s own status, e.g. scheduled, confirmed, resolved, approved.' }
         party:
@@ -15442,7 +15442,7 @@ components:
         propertyId: { type: string }
         requester: { $ref: '#/components/schemas/Party' }
         categories: { type: array, items: { type: string } }
-        status: { type: string, enum: [pending, granted, declined, expired] }
+        status: { type: string, enum: [pending, granted, declined, expired, withdrawn] }
         sharedDocumentCount:
           type: integer
           format: int32

@@ -7,6 +7,7 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.UnauthorizedException;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.WithdrawnCooldown;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.documents.vault.Document;
 import com.draazy.api.documents.vault.DocumentMapper;
@@ -76,7 +77,19 @@ public class DocumentRequestService {
                         buyerId, property.getId(), DocumentRequestStatuses.PENDING)
                 .map(existing -> mapper.toRequesterDto(
                         existing, users.findById(buyerId).orElse(null), 0))
-                .orElseGet(() -> create(buyerId, property, body));
+                .orElseGet(() -> {
+                    refuseWhileCoolingDown(buyerId, property.getId());
+                    return create(buyerId, property, body);
+                });
+    }
+
+    private void refuseWhileCoolingDown(UUID buyerId, UUID propertyId) {
+        requests.findFirstByRequesterIdAndPropertyIdOrderByCreatedAtDesc(buyerId, propertyId)
+                .filter(last -> DocumentRequestStatuses.WITHDRAWN.equals(last.getStatus()))
+                .filter(last -> WithdrawnCooldown.active(last.getUpdatedAt(), Instant.now()))
+                .ifPresent(last -> {
+                    throw WithdrawnCooldown.refusal(last.getUpdatedAt());
+                });
     }
 
     // Paged because the owner writes none of these rows.
@@ -87,7 +100,8 @@ public class DocumentRequestService {
             return Page.empty(pageable);
         }
         Page<DocumentRequest> rows =
-                requests.findByPropertyIdInOrderByCreatedAtDesc(ownedPropertyIds, pageable);
+                requests.findByPropertyIdInAndStatusNotOrderByCreatedAtDesc(
+                        ownedPropertyIds, DocumentRequestStatuses.WITHDRAWN, pageable);
         Map<UUID, User> requesters = users
                 .findAllById(rows.getContent().stream()
                         .map(DocumentRequest::getRequesterId).distinct().toList())
@@ -261,7 +275,7 @@ public class DocumentRequestService {
                         (buyer == null || buyer.getName() == null || buyer.getName().isBlank()
                                 ? "Someone" : buyer.getName())
                                 + " asked to see documents for " + property.getTitle() + ".",
-                        "/dashboard#leads");
+                        "/dashboard?tab=leads&box=received");
             }
         } catch (DataIntegrityViolationException concurrentDuplicate) {
 
