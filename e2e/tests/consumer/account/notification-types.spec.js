@@ -199,14 +199,18 @@ test.describe('Notification types - live API', () => {
     await page.goto('/notifications');
     await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible();
 
+    const titles = {};
     for (const type of ['contact.received', 'photo.requested', 'offer.received', 'visit.requested']) {
       const [row] = await rowsOf(owner, type, [buyer]);
       expect(row, `${type} reached the owner`).toBeTruthy();
+      titles[type] = row.title;
     }
     await expect(page.locator('.notif', { hasText: 'New visit request' })).toBeVisible();
     await expect(page.locator('.notif', { hasText: 'New offer on' })).toBeVisible();
-    // A contact request and a photo request are both enquiries on one link, so the inbox folds them into one row.
-    await expect(page.locator('.notif', { hasText: '2 new enquiries' })).toBeVisible();
+    // Contact and photo requests deep-link to different places now, so each keeps its own row.
+    await expect(page.locator('.notif', { hasText: titles['contact.received'] })).toBeVisible();
+    await expect(page.locator('.notif', { hasText: titles['photo.requested'] })).toBeVisible();
+    await expect(page.locator('.notif', { hasText: '2 new enquiries' })).toHaveCount(0);
     expect(warnings, 'a server type missing from notificationMapper renders as a grey system row').toEqual([]);
   });
 });

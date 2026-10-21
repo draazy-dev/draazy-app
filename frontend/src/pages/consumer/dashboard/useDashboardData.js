@@ -97,7 +97,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     }
   }, [setBusy]);
 
-  const [flatmateReqs, flatmateReqsStatus, setFlatmateReqs, retryFlatmateReqs, flatmateReqsError, refreshFlatmateReqs] = useAsyncList(
+  const [flatmateReqs, , setFlatmateReqs, , , refreshFlatmateReqs] = useAsyncList(
     () => myRequests(),
     [user],
     !!user?.mobile,
@@ -105,7 +105,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
 
   // The document request inbox is a seam read, owner-scoped by the session, so like the contact inbox below it takes
   // its own effect rather than the synchronous localStorage read the panels above use.
-  const [docReqs, docReqsStatus, setDocReqs, retryDocReqs, docReqsError, refreshDocReqs] = useAsyncList(
+  const [docReqs, , setDocReqs, , , refreshDocReqs] = useAsyncList(
     () => listDocRequests(user.mobile),
     [user],
     ownerReads,
@@ -113,7 +113,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
 
   // The contact inbox is a network read and is owner-scoped by the session, so unlike the localStorage panels above
   // it takes no mobile argument. Same reasoning as the document inbox.
-  const [contactReqs, contactReqsStatus, setContactReqs, retryContactReqs, contactReqsError, refreshContactReqs] = useAsyncList(
+  const [contactReqs, , setContactReqs, , , refreshContactReqs] = useAsyncList(
     () => myContactRequests().then((res) => res.items.map(toLeadRow)),
     [user],
     ownerReads,
@@ -121,7 +121,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
 
   // Flatmate group applications on the caller's own listings. Owner-scoped by the session, like the contact inbox,
   // and read through the same seam the ops moderation board uses.
-  const [apps, appsStatus, setApps, retryApps, appsError, refreshApps] = useAsyncList(
+  const [apps, , setApps, , , refreshApps] = useAsyncList(
     () => listMyGroupApplications({ size: MAX_PAGE_SIZE }).then((res) => res.items),
     [user],
     ownerReads,
@@ -173,7 +173,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     });
   };
 
-  const [photoReqs, photoReqsStatus, setPhotoReqs, retryPhotoReqs, photoReqsError, refreshPhotoReqs] = useAsyncList(
+  const [photoReqs, , setPhotoReqs, , , refreshPhotoReqs] = useAsyncList(
     () => myPhotoRequests().then((res) => res.items.map(toPhotoRow)),
     [user],
     ownerReads,
@@ -369,6 +369,16 @@ export function useDashboardData({ user, toast, ownsProperty }) {
       .slice(0, 3));
   }, [searches]);
 
+  const refreshRequests = useCallback(() => {
+    refreshData();
+    refreshFlatmateReqs();
+    if (!ownerReads) return;
+    refreshContactReqs();
+    refreshPhotoReqs();
+    refreshDocReqs();
+    refreshApps();
+  }, [ownerReads, refreshApps, refreshContactReqs, refreshData, refreshDocReqs, refreshFlatmateReqs, refreshPhotoReqs]);
+
   const lastVisibleRefresh = useRef(0);
   useEffect(() => {
     const onVisible = () => {
@@ -376,17 +386,11 @@ export function useDashboardData({ user, toast, ownsProperty }) {
       const now = Date.now();
       if (now - lastVisibleRefresh.current < 30000) return;
       lastVisibleRefresh.current = now;
-      refreshData();
-      refreshFlatmateReqs();
-      if (!ownerReads) return;
-      refreshContactReqs();
-      refreshPhotoReqs();
-      refreshDocReqs();
-      refreshApps();
+      refreshRequests();
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [ownerReads, refreshApps, refreshContactReqs, refreshData, refreshDocReqs, refreshFlatmateReqs, refreshPhotoReqs]);
+  }, [refreshRequests]);
 
   const refreshReviews = useCallback(async () => {
     try {
@@ -419,14 +423,9 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
     apps, decideApp,
     decideContact, decideDocReqs, decideFlatmateReq, decidePhotoReq, mutateVisit, openReview, sendReview,
-    busyIds, isBusy, refreshData, setListings,
+    busyIds, isBusy, refreshData, refreshRequests, setListings,
     // Load state, so the page can say "we couldn't load this" instead of rendering a plausible
     // dashboard for a user whose data never arrived.
     dataStatus, dataError, retryData,
-    docReqsStatus, docReqsError, retryDocReqs,
-    contactReqsStatus, contactReqsError, retryContactReqs,
-    photoReqsStatus, photoReqsError, retryPhotoReqs,
-    flatmateReqsStatus, flatmateReqsError, retryFlatmateReqs,
-    appsStatus, appsError, retryApps,
   };
 }

@@ -100,7 +100,7 @@ test.describe('Chat with the owner from a listing', () => {
     await expect(page.getByRole('link', { name: /Chat with Owner/i })).toHaveCount(0);
   });
 
-  test('clicking "Contact Owner" requests contact, stages the chat and shows it waiting, with no composer', async ({ page }) => {
+  test('clicking "Contact Owner" requests contact and opens the waiting request thread, with no composer', async ({ page }) => {
     const { owner, id } = await fixture();
     const buyer = await actor('Zztest Staging Buyer');
     await signedInAs(page, buyer.mobile);
@@ -116,14 +116,17 @@ test.describe('Chat with the owner from a listing', () => {
     expect(ownerInbox.status, 'the owner can see the pending request').toBe(200);
     expect((ownerInbox.body?.content ?? []).some((row) => row.propertyId === id && row.status === 'pending')).toBe(true);
 
-    const chip = page.locator('.pc-propchip');
-    await expect(chip.getByText(/View listing/i)).toBeVisible({ timeout: 20000 });
-    await expect(chip.getByRole('link', { name: /View listing/i })).toHaveAttribute('href', `/property/${id}`);
-    // The message the seam composed on the buyer's behalf is already in the thread...
-    await expect(page.getByText(/interested in/i).first()).toBeVisible();
-    await expect(page.getByText(/Waiting for the owner to accept/i)).toBeVisible();
-    await expect(page.locator('.pc-input')).toHaveCount(0);
-    /* The server was never asked to create this thread, which is the whole point of staging — a
+    const thread = page.getByTestId('request-thread');
+    await expect(thread).toHaveAttribute('data-box', 'sent', { timeout: 20000 });
+    await expect(thread).toHaveAttribute('data-state', 'pending');
+    const chip = thread.getByTestId('chat-propchip');
+    await expect(chip.getByRole('link', { name: 'View listing' })).toHaveAttribute('href', '/property/' + id);
+    await expect(chip.getByRole('button', { name: 'Schedule visit' })).toBeVisible();
+    // The request message the seam composed on the buyer's behalf is the thread's only bubble.
+    await expect(thread.locator('.pc-bubble.me').getByText(/interested in/i)).toBeVisible();
+    await expect(thread.getByText('The chat opens once they accept.')).toBeVisible();
+    await expect(thread.getByRole('button', { name: 'Withdraw' })).toBeVisible();
+    await expect(page.locator('.pc-input')).toHaveCount(0);    /* The server was never asked to create this thread, which is the whole point of staging — a
        `POST /messages` here would have been a 403. An empty inbox is the proof. */
 
     const inbox = await api('GET', '/messages', buyer.headers);
@@ -185,7 +188,7 @@ test.describe('Chat with the owner from a listing', () => {
     await ownerPage.context().close();
   });
 
-  test('the owner\'s Chat on an approved lead opens the existing in-app thread, and nothing links to WhatsApp', async ({ page }) => {
+  test('an approved lead is a normal chat in the owner\'s Messages, not a request row, and nothing links to WhatsApp', async ({ page }) => {
     const { owner, id } = await fixture();
     const buyer = await actor('Zztest Lead Chat Buyer');
     await openTheGate(buyer, owner, id);
@@ -193,12 +196,14 @@ test.describe('Chat with the owner from a listing', () => {
     expect(conv.status).toBe(201);
 
     await signedInAs(page, owner.mobile);
-    await page.goto('/dashboard#leads');
-    await page.getByRole('tab', { name: /^Number requests/i }).click();
+    await page.goto('/dashboard?tab=leads');
+    await expect(page.getByTestId('requests-panel')).toBeVisible({ timeout: 20000 });
+    await expect(page.getByTestId('request-card')).toHaveCount(0);
     await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Chat with Zztest Lead Chat Buyer' }).first().click();
 
-    await expect(page).toHaveURL(new RegExp(`/messages\\?c=${conv.body.id}`));
+    await page.goto('/messages');
+    await expect(page.locator('.pc-conv[data-request-kind]')).toHaveCount(0);
+    await page.locator(`.pc-conv[data-conversation-id="${conv.body.id}"]`).click();
     await expect(page.getByText(/still available\?/i).first()).toBeVisible({ timeout: 20000 });
     await expect(page.locator('.pc-head a[href*="wa.me"]')).toHaveCount(0);
     const detail = await api('GET', `/messages/${conv.body.id}`, owner.headers);

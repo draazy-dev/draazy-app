@@ -4,9 +4,13 @@ const KIND_LABEL = {
   photo: 'Photos',
   flatmate: 'Flatmate',
   group: 'Group application',
+  document: 'Documents',
 };
 
-const ACCEPTED_LABEL = { contact: 'Approved', visit: 'Confirmed' };
+/** Kinds that connect two people, so they also show as a request thread in Messages. */
+export const CONNECTION_KINDS = new Set(['contact', 'flatmate', 'group']);
+
+const ACCEPTED_LABEL = { contact: 'Approved', visit: 'Confirmed', document: 'Granted' };
 
 const STATE_LABEL = {
   pending: 'Pending',
@@ -22,13 +26,31 @@ const DEFAULT_MESSAGE = {
   photo: (title) => `Could you add more photos of ${title}?`,
   flatmate: (title) => `Would like to connect about ${title}.`,
   group: (title) => `Would like to connect about ${title}.`,
+  document: (title) => `Would like to see the papers for ${title}.`,
 };
 
 export const requestKey = (item) => `${item.kind}:${item.id}`;
 
+export const threadId = (item) => `request:${requestKey(item)}`;
+
+// Must match the keys the old leads panel minted, or existing notes disappear from their rows.
+const LEAD_KEY = {
+  contact: (item) => `number:${item.id}`,
+  photo: (item) => `photo:${item.id}`,
+  flatmate: (item) => `flatmate:${item.id}`,
+  group: (item) => `app:${item.id}`,
+  document: (item) => `documents:${item.party?.id || ''}|${item.target?.id || ''}`,
+};
+
+export const leadKey = (item) => LEAD_KEY[item.kind]?.(item) || requestKey(item);
+
 export const isPending = (item) => item.state === 'pending';
 
 export const stateLabel = (item) => (item.state === 'accepted' && ACCEPTED_LABEL[item.kind]) || STATE_LABEL[item.state] || item.state;
+
+const STATE_TONE = { pending: 'pend', accepted: 'ok', declined: 'no', expired: 'muted', withdrawn: 'muted' };
+
+export const stateTone = (item) => STATE_TONE[item.state] || 'muted';
 
 export function kindLabel(item) {
   if (item.kind === 'visit' && item.slot) return `Visit · ${formatSlot(item.slot)}`;

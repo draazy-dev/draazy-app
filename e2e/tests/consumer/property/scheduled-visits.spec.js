@@ -166,20 +166,23 @@ test.describe('Scheduled visits (live)', () => {
       expect((await rowOf(asha)).status, 'the other booking is untouched').toBe('scheduled');
     });
 
-    await test.step('the Requests tab carries no Visit-requests sub-tab, and the inbox shows a lead-triage summary strip', async () => {
+    await test.step('the Requests tab shows the pending visit as a card under All only, with no summary strip', async () => {
       await page.goto('/dashboard#leads');
       await page.reload();
-      // The positive anchor: a sibling tab from the same static list. Without it the absence check
-      // below would pass just as happily against a Requests panel that never rendered.
-      await expect(page.getByRole('tab', { name: /Number requests/ }).first()).toBeVisible();
+      await expect(page.getByTestId('requests-panel')).toBeVisible();
+      await expect(page.getByTestId('requests-box-received')).toHaveCount(0);
+      const visitCards = page.getByTestId('request-card').filter({ has: page.getByTestId('request-kind').filter({ hasText: /^Visit/ }) });
+      await expect(visitCards).toHaveCount(1);
+      await expect(visitCards.getByTestId('request-direction')).toHaveText('Received');
+      for (const tab of ['Number requests', 'Photo requests', 'Documents', 'Flatmate']) {
+        await page.getByRole('tab', { name: new RegExp(`^${tab}`) }).click();
+        await expect(visitCards).toHaveCount(0);
+      }
       await expect(page.getByRole('tab', { name: /^Visit requests$/ })).toHaveCount(0);
-
-      await expect(page.getByText('Waiting on you')).toBeVisible();
-      await expect(page.getByText('Open leads')).toBeVisible();
-      await expect(page.getByText('Oldest waiting')).toBeVisible();
+      await expect(page.getByText('Open leads')).toHaveCount(0);
+      await expect(page.getByText('Oldest waiting')).toHaveCount(0);
     });
   });
-
   test('a buyer viewing their booked visit gets no WhatsApp handoff to the owner', async ({ page }) => {
     const { visitors } = await scene(['Asha Kulkarni']);
     const [asha] = visitors;

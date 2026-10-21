@@ -110,7 +110,7 @@ const rememberedAsk = (page, key) => expect.poll(
 ).toBe(true);
 
 const openInboxRequests = async (page) => {
-  await page.goto(`${BASE}/messages?tab=requests&box=sent`);
+  await page.goto(`${BASE}/dashboard?tab=leads`);
   await expect(page.getByTestId('requests-panel')).toBeVisible({ timeout: 20_000 });
 };
 /** The rooms board. A room created a moment ago is on the public feed only once `approve` has run,
@@ -158,8 +158,8 @@ test.describe('Flatmate interest doors (live)', () => {
       expect(errors, `console errors: ${errors.join('\n')}`).toEqual([]);
     });
 
-    await test.step('the enquiry hands off to Messages, so the sent door has somewhere to point', async () => {
-      expect(await queuedFor(page, `room-${room.id}`), 'the ask should be queued for Messages').toHaveLength(1);
+    await test.step('the enquiry hands off to Requests, so the sent door has somewhere to point', async () => {
+      expect(await queuedFor(page, `room-${room.id}`), 'the ask should be queued for the inbox').toHaveLength(1);
 
       await openInboxRequests(page);
       const sent = page.getByTestId('request-card').filter({ hasText: society });

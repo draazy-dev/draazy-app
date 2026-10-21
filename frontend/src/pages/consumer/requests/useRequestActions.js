@@ -1,7 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useOpenChat } from '../../../lib/useOpenChat.js';
 import { myContactRequests, respondToContactRequest } from '../../../services/contactService.js';
-import { dropPendingChat } from '../../../services/conversationService.js';
+import { dropPendingChat, openFlatmateRequestConversation, startConversation } from '../../../services/conversationService.js';
+import { respondDocRequest } from '../../../services/documentService.js';
 import { decideGroupApplication, decideRequest } from '../../../services/flatmateService.js';
 import { decidePhotoRequest } from '../../../services/photoRequestService.js';
 import { remindRequest, removeRequest } from '../../../services/requestInboxService.js';
@@ -14,14 +16,16 @@ const DECIDERS = {
   photo: (id, yes) => decidePhotoRequest(id, yes ? 'resolved' : 'declined'),
   flatmate: (id, yes) => decideRequest(id, yes ? 'accepted' : 'declined'),
   group: (id, yes) => decideGroupApplication(id, yes ? 'accepted' : 'declined'),
+  document: (id, yes) => respondDocRequest(null, id, yes ? 'granted' : 'declined'),
 };
 
 const DECIDED_TOAST = {
   contact: ['Accepted — you can chat now and see their number.', 'Request declined.'],
   visit: ['Visit confirmed.', 'Visit declined.'],
   photo: ['Marked done — the buyer has been told your new photos are up.', 'Declined — the buyer has been told there are no more photos coming.'],
-  flatmate: ['Request accepted — connect in Messages.', 'Request declined.'],
+  flatmate: ['Request accepted — your chat is open.', 'Request declined.'],
   group: ['Group application accepted.', 'Group application declined.'],
+  document: ['Documents shared — view-only for this buyer.', 'Document request declined.'],
 };
 
 const FAILED = 'That did not go through. Please try again.';
@@ -32,7 +36,8 @@ async function approvedMobile(id) {
   return row?.contact?.mobile || row?.requester?.mobile || '';
 }
 
-export function useRequestActions({ inbox, toast, onStagedChanged }) {
+export function useRequestActions({ inbox, toast, onChanged }) {
+  const navigate = useNavigate();
   const openChat = useOpenChat(toast);
   const inFlight = useRef(new Set());
   const [busy, setBusy] = useState(() => new Set());
@@ -53,6 +58,11 @@ export function useRequestActions({ inbox, toast, onStagedChanged }) {
 
   const chatAfterApproval = useCallback(async (item) => {
     try {
+      if (item.kind === 'flatmate') {
+        const conv = await openFlatmateRequestConversation(item.id);
+        navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
+        return;
+      }
       const mobile = await approvedMobile(item.id);
       if (!mobile) return;
       await openChat({
@@ -63,7 +73,7 @@ export function useRequestActions({ inbox, toast, onStagedChanged }) {
     } catch {
       /* the approval stands; the chat can be opened from Messages */
     }
-  }, [openChat]);
+  }, [navigate, openChat]);
 
   const decide = useCallback((item, yes) => guarded(item, async () => {
     try {
@@ -76,9 +86,10 @@ export function useRequestActions({ inbox, toast, onStagedChanged }) {
     }
     removeItem('received', item);
     toast(DECIDED_TOAST[item.kind][yes ? 0 : 1], yes ? 'success' : 'info');
-    if (item.kind === 'contact' && yes) await chatAfterApproval(item);
+    onChanged?.();
+    if ((item.kind === 'contact' || item.kind === 'flatmate') && yes) await chatAfterApproval(item);
     load('received', { quiet: true });
-  }), [chatAfterApproval, guarded, load, removeItem, toast]);
+  }), [chatAfterApproval, guarded, load, onChanged, removeItem, toast]);
 
   const remind = useCallback((item) => guarded(item, async () => {
     const applyNext = (res) => patchItem('sent', item, (it) => ({ ...it, reminders: { ...it.reminders, ...res } }));
@@ -111,12 +122,29 @@ export function useRequestActions({ inbox, toast, onStagedChanged }) {
       } catch {
         /* a leftover draft is harmless; the request itself is withdrawn */
       }
-      onStagedChanged?.();
     }
-    removeItem('sent', item);
+    onChanged?.();
+    if (withdrawing) patchItem('sent', item, (it) => ({ ...it, state: 'withdrawn' }));
+    else removeItem('sent', item);
     if (withdrawing) toast('Request withdrawn', 'info');
     load('sent', { quiet: true });
-  }), [guarded, load, onStagedChanged, removeItem, toast]);
+  }), [guarded, load, onChanged, patchItem, removeItem, toast]);
 
-  return { busy, decide, remind, remove };
+  // The accepted side may have no thread yet, e.g. the request was sent from another device.
+  const openAccepted = useCallback((item) => guarded(item, async () => {
+    try {
+      const conv = item.kind === 'flatmate'
+        ? await openFlatmateRequestConversation(item.id)
+        : await startConversation({
+          propertyId: item.target.id,
+          firstMessage: `Hi, I'm interested in "${item.target.title || 'your listing'}" on Draazy. Is it still available?`,
+          clientId: `open:${item.target.id}`,
+        });
+      navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
+    } catch (e) {
+      toast(e?.message || 'Could not open the chat. Please try again.', 'error');
+    }
+  }), [guarded, navigate, toast]);
+
+  return { busy, decide, remind, remove, openAccepted };
 }

@@ -1,10 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import Modal from '../../../components/ui/Modal.jsx';
 import DateField from '../../../components/ui/DateField.jsx';
 import { avatarFor, timeAgo } from '../../../lib/format.js';
-import { CallBtn, ChatBtn } from './components.jsx';
 /* Lead detail sheet — progressive disclosure for a single request. */
 
 const toDateInput = (ts) => {
@@ -14,10 +12,9 @@ const toDateInput = (ts) => {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 };
 
-export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation, busy = false }) {
+export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation }) {
   const [note, setNote] = useState(annotation?.note || '');
   const [followUp, setFollowUp] = useState(toDateInput(annotation?.followUpAt));
-  const [running, setRunning] = useState(false);
   const lastSavedNote = useRef(annotation?.note || '');
   const noteRef = useRef(note);
   const saveRef = useRef(onSaveAnnotation);
@@ -48,36 +45,7 @@ export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation,
     await flushNote();
     onClose();
   };
-
-  const run = async (fn) => {
-    if (!fn || running || busy) return;
-    setRunning(true);
-    try {
-      const ok = await fn();
-      if (ok === false) {
-        setRunning(false);
-        return;
-      }
-      await flushNote();
-      setRunning(false);
-      onClose();
-      return;
-    } catch {
-      setRunning(false);
-      return;
-    }
-  };
-  const pending = lead.canApprove && lead.status === 'pending';
-  const actionBusy = running || busy;
-  const statusLabel = {
-    pending: 'Waiting on you',
-    approved: 'Accepted',
-    accepted: 'Accepted',
-    resolved: 'Accepted',
-    granted: 'Accepted',
-    declined: 'Declined',
-    expired: 'Expired',
-  }[String(lead.status || '').toLowerCase()] || 'Declined';
+  const statusLabel = { pending: 'Waiting on you', accepted: 'Accepted', declined: 'Declined', expired: 'Expired', withdrawn: 'Withdrawn' }[lead.status] || lead.status;
 
   return (
     <Modal open onClose={close} title="Lead details" size="sm">
@@ -102,9 +70,6 @@ export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation,
           ) : null}
           {lead.requestedAt ? (
             <p className="flex items-center gap-2 text-gray-500"><Icon name="clock" className="h-4 w-4 flex-shrink-0" /> Requested {timeAgo(lead.requestedAt)}</p>
-          ) : null}
-          {lead.contactMobile || lead.maskedMobile ? (
-            <p className="flex items-center gap-2 text-gray-500"><Icon name="phone" className="h-4 w-4 flex-shrink-0" /> +91 {lead.contactMobile || lead.maskedMobile}</p>
           ) : null}
         </div>
 
@@ -134,33 +99,6 @@ export default function LeadSheet({ lead, annotation, onClose, onSaveAnnotation,
             ariaLabel="Follow-up date"
             className="field w-full rounded-xl px-3.5 py-2.5 text-sm"
           />
-        </div>
-
-        <div className="space-y-2 border-t border-white/10 pt-4">
-          {/* One-sided leads collapse to one full-width button instead of wiring Decline to undefined. */}
-          {pending ? (
-            <div className={lead.decline ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1 gap-2'}>
-              <button disabled={actionBusy} onClick={() => { void run(lead.approve); }} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-brand-teal/20 text-sm font-semibold text-brand-teal transition hover:bg-brand-teal/30 disabled:opacity-50">
-                <Icon name="check" className="h-4 w-4" /> {lead.approveLabel || 'Approve'}
-              </button>
-              {lead.decline ? (
-                <button disabled={actionBusy} onClick={() => { void run(lead.decline); }} className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl bg-white/5 text-sm font-semibold text-gray-300 transition hover:bg-white/10 disabled:opacity-50">
-                  <Icon name="x" className="h-4 w-4" /> {lead.declineLabel || 'Decline'}
-                </button>
-              ) : null}
-            </div>
-          ) : null}
-          {lead.primaryAction ? (
-            <Link to={lead.primaryAction.to} onClick={() => { void close(); }} className="inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl bg-brand-teal/20 text-sm font-semibold text-brand-teal transition hover:bg-brand-teal/30">
-              <Icon name={lead.primaryAction.icon || 'arrow-right'} className="h-4 w-4" /> {lead.primaryAction.label}
-            </Link>
-          ) : null}
-          {lead.contactMobile ? (
-            <div className={lead.chat ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1 gap-2'}>
-              <CallBtn mobile={lead.contactMobile} name={lead.name} label="Call" />
-              {lead.chat ? <ChatBtn onClick={() => { void close().then(lead.chat); }} name={lead.name} label="Chat" /> : null}
-            </div>
-          ) : null}
         </div>
       </div>
     </Modal>

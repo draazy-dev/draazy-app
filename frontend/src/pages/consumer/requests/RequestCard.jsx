@@ -1,29 +1,33 @@
 import { Link } from 'react-router';
+import '../../../styles/routes/messages.css';
 import Button from '../../../components/ui/Button.jsx';
 import Icon from '../../../components/Icon.jsx';
 import { relTime } from '../../../lib/chatFormat.js';
-import { initialsOf, isPending, kindLabel, messageOf, remindState, stateLabel } from './requestMeta.js';
+import { initialsOf, isPending, kindLabel, messageOf, remindState, stateLabel, stateTone } from './requestMeta.js';
 
 const ACCEPT_LABEL = {
   contact: 'Approve & chat',
   visit: 'Confirm',
   photo: 'Photos added',
-  flatmate: 'Accept',
+  flatmate: 'Accept & chat',
   group: 'Accept',
+  document: 'Share',
 };
 
-const PILL_TONE = { pending: 'pend', accepted: 'ok', declined: 'no', expired: 'muted', withdrawn: 'muted' };
-
-function Target({ item, onOpenStaged }) {
+export function Target({ item }) {
   const title = item.target?.title || 'Listing';
-  if (onOpenStaged) {
-    return (
-      <button type="button" className="pc-req-target" onClick={onOpenStaged} aria-label={`Open your chat draft about ${title}`}>
-        {title}
-      </button>
-    );
-  }
   return item.target?.link ? <Link to={item.target.link} className="pc-req-target">{title}</Link> : <span className="pc-req-target">{title}</span>;
+}
+
+function NoteLine({ note, onNote }) {
+  const followUp = note?.followUpAt ? new Date(note.followUpAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '';
+  return (
+    <button type="button" className="pc-req-note" onClick={onNote} data-testid="request-note">
+      <Icon name="pencil" className="w-3.5 h-3.5 shrink-0" />
+      <span>{note?.note || 'Add a private note'}</span>
+      {followUp ? <span className="pc-req-pill pend" data-testid="request-follow-up"><Icon name="calendar-clock" className="inline w-3 h-3" /> {followUp}</span> : null}
+    </button>
+  );
 }
 
 function ReceivedActions({ item, busy, onDecide }) {
@@ -32,14 +36,16 @@ function ReceivedActions({ item, busy, onDecide }) {
     <div className="pc-req-actions">
       <Button size="md" className="pc-req-btn" disabled={busy} onClick={() => onDecide(item, true)}>{ACCEPT_LABEL[item.kind]}</Button>
       <Button size="md" variant="secondary" className="pc-req-btn" disabled={busy} onClick={() => onDecide(item, false)}>Decline</Button>
+      {item.kind === 'photo' && item.target?.id ? <Link to={`/list-property?edit=${item.target.id}&step=photos`} className="pc-req-clear">Add photos</Link> : null}
     </div>
   );
 }
 
-function SentActions({ item, busy, now, onRemind, onWithdraw, onClear }) {
+function SentActions({ item, busy, now, onRemind, onWithdraw, onClear, onOpenChat }) {
   if (!isPending(item)) {
     return (
       <div className="pc-req-actions">
+        {onOpenChat ? <Button size="md" className="pc-req-btn" disabled={busy} onClick={() => onOpenChat(item)}>Open chat</Button> : null}
         <button type="button" className="pc-req-clear" disabled={busy} onClick={() => onClear(item)}>Clear</button>
       </div>
     );
@@ -55,7 +61,11 @@ function SentActions({ item, busy, now, onRemind, onWithdraw, onClear }) {
   );
 }
 
-export default function RequestCard({ item, box, now, busy, onOpenStaged, onDecide, onRemind, onWithdraw, onClear }) {
+export function RequestActions({ item, box, ...handlers }) {
+  return box === 'received' ? <ReceivedActions item={item} {...handlers} /> : <SentActions item={item} {...handlers} />;
+}
+
+export default function RequestCard({ item, box, now, busy, note, onNote, onDecide, onRemind, onWithdraw, onClear, onOpenChat }) {
   const name = item.party?.name || 'Someone';
   const reminded = box === 'received' && (item.reminders?.count || 0) > 0;
   const created = Date.parse(item.createdAt);
@@ -80,17 +90,20 @@ export default function RequestCard({ item, box, now, busy, onOpenStaged, onDeci
             <span className="pc-conv-time">{relTime(created)}</span>
           </div>
           <div className="pc-req-tags">
+            <span className={`pc-req-dir ${box}`} data-testid="request-direction">
+              <Icon name={box === 'sent' ? 'arrow-up-right' : 'arrow-down-left'} className="w-3 h-3" aria-hidden="true" />
+              {box === 'sent' ? 'Sent' : 'Received'}
+            </span>
             <span className="dz-tag dz-tag--muted" data-testid="request-kind">{kindLabel(item)}</span>
             {reminded ? <span className="dz-tag dz-tag--muted" data-testid="request-reminded">Reminded</span> : null}
-            {box === 'sent' ? <span className={`pc-req-pill ${PILL_TONE[item.state] || 'muted'}`} data-testid="request-state">{stateLabel(item)}</span> : null}
+            {box === 'sent' ? <span className={`pc-req-pill ${stateTone(item)}`} data-testid="request-state">{stateLabel(item)}</span> : null}
           </div>
         </div>
       </div>
-      <Target item={item} onOpenStaged={onOpenStaged} />
+      <Target item={item} />
       <p className="pc-req-msg">{messageOf(item)}</p>
-      {box === 'received'
-        ? <ReceivedActions item={item} busy={busy} onDecide={onDecide} />
-        : <SentActions item={item} busy={busy} now={now} onRemind={onRemind} onWithdraw={onWithdraw} onClear={onClear} />}
+      {onNote ? <NoteLine note={note} onNote={() => onNote(item)} /> : null}
+      <RequestActions item={item} box={box} busy={busy} now={now} onDecide={onDecide} onRemind={onRemind} onWithdraw={onWithdraw} onClear={onClear} onOpenChat={onOpenChat} />
     </article>
   );
 }

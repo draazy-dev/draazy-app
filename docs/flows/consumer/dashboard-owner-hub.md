@@ -157,15 +157,13 @@ property only. Drives the Overview rental card; it is not an Action Center row.
 for you" (neutral discovery fallback, `approved.slice(0,6)`). The code is explicit that recommended
 is never mislabeled as recently viewed.
 
-### Requests inbox (`EnquiriesPanel.jsx`)
-One inbox, six filters: `all` (default), `numbers`, `photos`, `documents`, `flatmate`, `enquiries`.
-Every request type is normalised into one lead descriptor, so the unified "All leads" queue, the
-tappable row -> detail sheet (`LeadSheet.jsx`), and the sheet's actions all behave identically. Sort
-is attention-first (`attention` = awaiting a decision from the owner), then longest-waiting; undated
-leads sink. Flatmate rows are labelled by `kind`: **Room enquiry** (`room`), **Group join** /
-**Group request** (`group`, by `action`), **Flatmate interest** (otherwise). The detail sheet also
-carries owner-private annotations - notes and follow-up dates keyed by a stable lead id
-(`getLeadAnnotations` / `setLeadAnnotation`) - which are never part of any consumer-visible payload.
+### Requests (`requests/RequestsPanel.jsx`)
+Tab id `leads`, shown to every user. One list over both `/me/requests` boxes, received (open) first
+then sent, under type tabs: All, Number requests, Photo requests, Documents, Flatmate (visits show
+under All only; each tab counts received open items). Each card carries a Received / Sent chip, the
+requester's message and its actions. Received cards also carry owner-private notes and follow-up
+dates (`LeadSheet.jsx`, `/me/lead-notes`), which are never part of any consumer-visible payload. The
+old `/messages?tab=requests` links redirect here.
 
 ### My Listings: type filter and letting a flat room by room
 - **Type filter:** My Listings is a mixed inventory (properties, flatmate rooms, flatmate requests,

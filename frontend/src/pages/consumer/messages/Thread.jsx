@@ -1,23 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
-import PropertyImage from '../../../components/ui/PropertyImage.jsx';
 import { digits, fmtPhone, isFullMobile } from '../../../lib/contact.js';
-import { fmtINR } from '../../../lib/format.js';
 import { formatTime } from '../../../lib/chatFormat.js';
 import { detailPath } from '../flatmates/helpers.js';
 import { ThreadAvatar } from './Inbox.jsx';
 import MessageList from './MessageList.jsx';
+import PropChip from './PropChip.jsx';
 
-const displayPrice = (p) => {
-  if (!p?.price) return '';
-  if (typeof p.price === 'string' && (p.price.includes('Cr') || p.price.includes('L') || p.price.includes('/mo') || p.price.includes(' '))) return p.price;
-  const num = typeof p.price === 'number' ? p.price : parseInt(String(p.price).replace(/[^\d]/g, ''), 10);
-  if (!num) return String(p.price);
-  return p.deal === 'rent' ? `${fmtINR(num)}/mo` : fmtINR(num);
-};
-
-const listingLine = (property) => [property?.bhk, property?.loc].filter(Boolean).join(' · ');
 const quickReplies = (property) => [
   'Is it still available?',
   'Can I visit this Saturday?',
@@ -63,7 +53,6 @@ export default function Thread({
   offline,
   sendError,
 }) {
-  const navigate = useNavigate();
   const [menu, setMenu] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
   const [draft, setDraft] = useState('');
@@ -204,12 +193,7 @@ export default function Thread({
               </div>
             )}
           </div>
-          {!active.group && active.propertyId ? <div className={'pc-propchip' + (active.property?.available === false ? ' unavailable' : '')}>
-            {active.property?.available === false ? <div className="pc-prop-empty"><Icon name="home" className="w-5 h-5" /></div> : <PropertyImage src={active.property.img} alt="" />}
-            <div className="t"><p>{active.property.title}</p><p>{active.property?.available === false ? 'No longer listed' : [displayPrice(active.property), listingLine(active.property)].filter(Boolean).join(' · ')}</p></div>
-            {active.property?.available !== false ? <button type="button" onClick={() => navigate(`/schedule-visit?listing=${active.propertyId}`)}>Schedule visit</button> : null}
-            <Link to={`/property/${active.propertyId}`}>{t('misc.msgViewListing')}</Link>
-          </div> : null}
+          {!active.group && active.propertyId ? <PropChip t={t} propertyId={active.propertyId} property={active.property} /> : null}
         </div>
 
         <MessageList

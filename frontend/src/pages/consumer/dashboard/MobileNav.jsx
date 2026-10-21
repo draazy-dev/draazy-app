@@ -26,8 +26,11 @@ export default function MobileNav({ groups = [], activeTab, onSelect, attentionC
     count: attentionCounts[section.tab] || 0,
   }));
 
+  const hasSubNav = subItems.length > 1;
+
   return (
-    <div className="dz-docks-under-nav sticky top-[var(--dz-nav-h)] z-30 -mx-4 mb-5 border-y border-white/10 bg-ink/95 px-4 py-2 backdrop-blur lg:hidden sm:-mx-6 sm:px-6" data-testid="dashboard-mobile-nav">
+    // With a sub-strip, its own underline is the bottom edge; a second border plus padding read as an empty band.
+    <div className={'dz-docks-under-nav sticky top-[var(--dz-nav-h)] z-30 -mx-4 mb-5 bg-ink/95 px-4 backdrop-blur lg:hidden sm:-mx-6 sm:px-6 ' + (hasSubNav ? 'border-t border-white/10 pt-2' : 'border-y border-white/10 py-2')} data-testid="dashboard-mobile-nav">
       <div
         role="tablist"
         aria-label="Dashboard sections"
@@ -64,9 +67,9 @@ export default function MobileNav({ groups = [], activeTab, onSelect, attentionC
           );
         })}
       </div>
-      {subItems.length > 1 ? (
+      {hasSubNav ? (
         <div className="mt-2" data-testid="dashboard-section-subnav">
-          <SubNav items={subItems} active={activeTab} onChange={onSelect} variant="underline" />
+          <SubNav items={subItems} active={activeTab} onChange={onSelect} variant="underline" wrapClassName="" />
         </div>
       ) : null}
     </div>

@@ -97,11 +97,14 @@ test('Action Center count, Requests rows and nav badge agree for mixed pending l
   await expect(page.locator('aside button', { hasText: 'Requests' }).first()).toContainText('3');
 
   await page.locator('aside button', { hasText: 'Requests' }).first().click();
-  await expect(page.getByRole('tab', { name: /All leads/i })).toContainText('3');
-  await expect(page.locator('div.group.relative.rounded-xl').filter({ hasText: /Zztest (Contact|Photo|Doc) Buyer/ })).toHaveCount(3);
+  await expect(page.getByRole('tab', { name: /^All/ }).locator('.dz-count')).toHaveText('3');
+  for (const tab of ['Number requests', 'Photo requests', 'Documents']) {
+    await expect(page.getByRole('tab', { name: new RegExp(`^${tab}`) }).locator('.dz-count')).toHaveText('1');
+  }
+  await expect(page.getByTestId('request-card').filter({ hasText: /Zztest (Contact|Photo|Doc) Buyer/ })).toHaveCount(3);
 });
 
-test('more than 20 pending contact requests all appear oldest first', async ({ page }) => {
+test('more than 20 pending contact requests all appear in the Requests panel, newest first', async ({ page }) => {
   const owner = await actor(`Zztest Many Owner ${letterTag()}`);
   const listing = await approvedListing(owner);
   const names = [];
@@ -119,9 +122,10 @@ test('more than 20 pending contact requests all appear oldest first', async ({ p
   await expect(page.getByTestId('action-item').first()).toContainText(names[0]);
 
   await page.goto('/dashboard#leads');
-  const rows = page.locator('div.group.relative.rounded-xl').filter({ hasText: /Zztest Old Contact/ });
+  const rows = page.getByTestId('request-card').filter({ hasText: /Zztest Old Contact/ });
   await expect(rows).toHaveCount(21, { timeout: 30000 });
-  await expect(rows.first()).toContainText(names[0]);
+  await expect(rows.first()).toContainText(names[20]);
+  await expect(rows.last()).toContainText(names[0]);
 });
 
 test('double-tapping Accept sends one successful contact decision', async ({ page }) => {
@@ -148,34 +152,66 @@ test('double-tapping Accept sends one successful contact decision', async ({ pag
   expect(successfulPatches).toHaveLength(1);
 
   await page.locator('aside button', { hasText: 'Requests' }).first().click();
-  await expect(page.locator('div.group.relative.rounded-xl').filter({ hasText: 'Zztest Double Buyer' })).toContainText('Accepted');
+  await expect(page.getByTestId('requests-panel')).toBeVisible();
+  await expect(page.getByTestId('request-card').filter({ hasText: 'Zztest Double Buyer' })).toHaveCount(0);
 });
 
-test('aborted contact request inbox shows LoadError with retry on All leads', async ({ page }) => {
+test('sharing a document in Requests clears its Overview action item and badge without a reload', async ({ page }) => {
+  const owner = await actor(`Zztest Refresh Owner ${letterTag()}`);
+  const listing = await approvedListing(owner);
+  await makeDoc(listing.id, 'Zztest Refresh Doc A', ['Index II']);
+  await makeDoc(listing.id, 'Zztest Refresh Doc B', ['Encumbrance Certificate']);
+
+  await signedInAs(page, owner.mobile);
+  await page.goto('/dashboard');
+  const items = page.getByTestId('action-item');
+  await expect(page.getByTestId('action-center').getByText('2 pending')).toBeVisible({ timeout: 20000 });
+  await expect(items.filter({ hasText: 'Zztest Refresh Doc A' })).toHaveCount(1);
+
+  const nav = (label) => page.locator('aside button', { hasText: label }).first();
+  await nav('Requests').click();
+  await page.getByTestId('request-card').filter({ hasText: 'Zztest Refresh Doc A' }).getByRole('button', { name: 'Share', exact: true }).click();
+  await expect(page.getByTestId('request-card').filter({ hasText: 'Zztest Refresh Doc A' })).toHaveCount(0);
+  await expect(nav('Requests')).toContainText('1');
+
+  await nav('Home').click();
+  await expect(page.getByTestId('action-center').getByText('1 pending')).toBeVisible();
+  await expect(items.filter({ hasText: 'Zztest Refresh Doc A' })).toHaveCount(0);
+  await expect(items.filter({ hasText: 'Zztest Refresh Doc B' })).toHaveCount(1);
+});
+
+test('aborted requests feed shows a retry state in the Requests panel, not an empty inbox', async ({ page }) => {
   await signedInAs(page, ACTORS.owner);
-  await page.route('**/api/me/dashboard', (route) => route.abort());
-  await page.route('**/api/me/contact-requests?**', (route) => route.abort());
-  await page.goto('/dashboard#enquiries');
-  await expect(page.getByRole('tab', { name: /All leads/i })).toBeVisible();
-  await expect(page.getByText(/couldn't (load every request|reach the server)/)).toBeVisible();
-  await expect(page.getByRole('button', { name: /try again|retry/i })).toBeVisible();
-  await expect(page.getByText('No leads yet.')).toHaveCount(0);
-});
+  await page.route('**/api/me/requests**', (route) => route.abort());
+  await page.goto('/dashboard?tab=leads');
+  await expect(page.getByTestId('requests-panel')).toBeVisible();
+  await expect(page.getByText("Couldn't load requests")).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Retry' })).toBeVisible();
+  await expect(page.getByTestId('requests-empty')).toHaveCount(0);
 
-test('document requests from two buyers stay separate and Grant all affects one group', async ({ page, request }) => {
+  await page.unroute('**/api/me/requests**');
+  await page.getByRole('button', { name: 'Retry' }).click();
+  await expect(page.getByText("Couldn't load requests")).toHaveCount(0);
+});
+test('document requests from two buyers stay separate and Share affects one request', async ({ page, request }) => {
   const owner = await actor(`Zztest Docs Owner ${letterTag()}`);
   const listing = await approvedListing(owner);
   const first = await makeDoc(listing.id, 'Zztest Doc Buyer A', ['Index II']);
   const second = await makeDoc(listing.id, 'Zztest Doc Buyer B', ['Encumbrance Certificate']);
 
   await signedInAs(page, owner.mobile);
-  await page.goto('/dashboard#enquiries');
-  await page.getByRole('tab', { name: /Documents/i }).click();
-  await expect(page.locator('div.group.relative.rounded-xl').filter({ hasText: 'Zztest Doc Buyer A' })).toHaveCount(1);
-  await expect(page.locator('div.group.relative.rounded-xl').filter({ hasText: 'Zztest Doc Buyer B' })).toHaveCount(1);
+  await page.goto('/dashboard?tab=leads');
+  const cardOf = (name) => page.getByTestId('request-card').filter({ hasText: name });
+  await expect(cardOf('Zztest Doc Buyer A')).toHaveCount(1);
+  await expect(cardOf('Zztest Doc Buyer B')).toHaveCount(1);
+  await expect(cardOf('Zztest Doc Buyer A')).toHaveAttribute('data-kind', 'document');
+  await expect(page.getByRole('tab', { name: /^Documents/ }).locator('.dz-count')).toHaveText('2');
+  await expect(cardOf('Zztest Doc Buyer A')).toContainText('Index II');
+  await expect(cardOf('Zztest Doc Buyer B')).toContainText('Encumbrance Certificate');
 
-  await page.locator('div.group.relative.rounded-xl').filter({ hasText: 'Zztest Doc Buyer A' }).getByRole('button', { name: 'Grant all' }).click();
-  await expect(page.locator('div.group.relative.rounded-xl').filter({ hasText: 'Zztest Doc Buyer A' })).toContainText('All granted');
+  await cardOf('Zztest Doc Buyer A').getByRole('button', { name: 'Share', exact: true }).click();
+  await expect(cardOf('Zztest Doc Buyer A')).toHaveCount(0);
+  await expect(cardOf('Zztest Doc Buyer B')).toHaveCount(1);
 
   const inbox = await request.get(`${API}/me/documents/requests?size=100`, { headers: owner.headers });
   expect(inbox.status()).toBe(200);

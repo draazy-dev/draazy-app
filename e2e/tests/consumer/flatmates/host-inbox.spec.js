@@ -56,23 +56,22 @@ test('host sees a seeker\'s room interest in the dashboard, and Accept persists 
     body: JSON.stringify({ message: 'I am interested in this room' }),
   });
   expect(interestRes.status, await interestRes.clone().text()).toBeLessThan(300);
-  // --- Browser: sign the host in and open the enquiries panel ---
+  // --- Browser: sign the host in and open the Requests panel ---
   await signedInAs(page, hostMobile);
-  await page.goto(`${BASE}/dashboard#enquiries`);
-  // The dashboard opens on "All leads" (the unified queue). The Flatmate sub-tab exists as a
-  // filter; verify it shows a badge proving the server returned the request, then select it.
-  const flatTab = page.getByRole('tab', { name: /Flatmate/i });
-  await expect(flatTab).toBeVisible({ timeout: 15_000 });
-  await flatTab.click();
-  // --- Assert the row renders with the room's society name and the kind label ---
-  // The row's "Open details" button carries the request's meta text. Locate by text content.
-  const rowText = page.getByText(new RegExp(`Room enquiry.*${society}|${society}.*Room enquiry`));
-  await expect(rowText.first()).toBeVisible({ timeout: 15_000 });
-  // --- Click Accept and prove it reaches the server ---
-  // Accept is rendered after the row in the same list item (our request is the only flatmate one).
-  const acceptBtn = page.getByRole('button', { name: /^Accept$/i }).first();
-  await expect(acceptBtn).toBeVisible({ timeout: 5_000 });
-  await acceptBtn.click();
+  await page.goto(`${BASE}/dashboard?tab=leads`);
+  // --- Assert the request renders as a flatmate card carrying the room's society name ---
+  const card = page.getByTestId('request-card').filter({ hasText: society });
+  await expect(card).toBeVisible({ timeout: 15_000 });
+  await expect(card).toHaveAttribute('data-kind', 'flatmate');
+  await expect(card.getByTestId('request-kind')).toHaveText('Flatmate');
+  await expect(card.getByTestId('request-direction')).toHaveText('Received');
+  await expect(page.getByRole('tab', { name: /^Flatmate/ }).locator('.dz-count')).toHaveText('1');
+  await page.getByRole('tab', { name: /^Number requests/ }).click();
+  await expect(card).toHaveCount(0);
+  await page.getByRole('tab', { name: /^Flatmate/ }).click();
+  await expect(card).toBeVisible();
+  // --- Accept and prove it reaches the server, then lands in the chat ---
+  await card.getByRole('button', { name: 'Accept & chat' }).click();
   // Poll API with a fresh client so browser state cannot satisfy the assertion.
   const { accessToken: freshHostToken } = await apiLogin(hostMobile);
   await expect
@@ -86,7 +85,6 @@ test('host sees a seeker\'s room interest in the dashboard, and Accept persists 
     }, { message: 'Accept must reach the server, not just flip the button', timeout: 15_000 })
     .toBe('accepted');
 
-  await page.getByTestId('flatmate-req-chat').click({ timeout: 15_000 });
   await expect(page).toHaveURL(/\/messages\?c=/, { timeout: 15_000 });
   await expect(page.locator('.pc-input')).toBeVisible({ timeout: 15_000 });
 });

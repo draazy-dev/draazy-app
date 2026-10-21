@@ -1,4 +1,4 @@
-export const SAFE_LINK_RE = /^\/(?!\/)[a-zA-Z0-9\-_/?=&#%.]*$/;
+export const SAFE_LINK_RE = /^\/(?!\/)[a-zA-Z0-9\-_/?=&#%.:]*$/;
 
 export const FILTERS = [
   { key: 'all', labelKey: 'notifications.filters.all', icon: 'inbox' },

@@ -69,7 +69,7 @@ test.afterEach(async () => {
   createdListings.clear();
 });
 
-test('a pending verified buyer keeps the server-provided Serious Buyer badge before approval', async ({ page, request }) => {
+test('a pending verified buyer shows the server-provided Verified mark on the Requests card before approval', async ({ page, request }) => {
   const fixture = await isolatedListing();
   const buyer = await actor(`Zztest Verified Buyer ${letterTag()}`);
   const unverifiedBuyer = await actor(`Zztest Unverified Buyer ${letterTag()}`);
@@ -105,33 +105,18 @@ test('a pending verified buyer keeps the server-provided Serious Buyer badge bef
   expect(unverifiedBefore.requester.verified, 'the server must distinguish the unverified control').toBe(false);
 
   await signedInAs(page, fixture.owner.mobile);
-  const contactInbox = page.waitForResponse((response) =>
-    new URL(response.url()).pathname === '/api/me/dashboard'
-    && response.request().method() === 'GET'
-    && response.status() === 200,
-  );
-  await page.goto('/dashboard#enquiries');
-  await contactInbox;
+  await page.goto('/dashboard?tab=leads');
 
-  const allLead = page.locator('div.group.relative.rounded-xl').filter({ hasText: before.requester.name }).first();
-  await expect(allLead).toBeVisible();
-  await expect(allLead).toContainText('Serious Buyer');
-  await expect(allLead).toContainText('Number request');
-  const unverifiedAllLead = page.locator('div.group.relative.rounded-xl').filter({ hasText: unverifiedBefore.requester.name }).first();
-  await expect(unverifiedAllLead).toBeVisible();
-  await expect(unverifiedAllLead).not.toContainText('Serious Buyer');
+  const verifiedCard = page.getByTestId('request-card').filter({ hasText: before.requester.name });
+  await expect(verifiedCard).toBeVisible({ timeout: 20000 });
+  await expect(verifiedCard.getByTestId('request-kind')).toHaveText('Number request');
+  await expect(verifiedCard).toContainText('Please share the number after reviewing my verified profile.');
+  await expect(verifiedCard.getByLabel('Verified')).toBeVisible();
 
-  await page.getByRole('tab', { name: /^Number requests/i }).click();
-  const numberRequest = page.locator('div.group.relative.rounded-xl').filter({ hasText: before.requester.name }).first();
-  await expect(numberRequest).toBeVisible();
-  await expect(numberRequest).toContainText('Serious Buyer');
-  await expect(numberRequest).toContainText('Wants to contact you');
-  await numberRequest.click();
-  await expect(page.getByText(`+91 ${before.requester.mobile}`).first(), 'the lead detail shows the masked mobile').toBeVisible();
-  const unverifiedNumberRequest = page.locator('div.group.relative.rounded-xl').filter({ hasText: unverifiedBefore.requester.name }).first();
-  await expect(unverifiedNumberRequest).toBeVisible();
-  await expect(unverifiedNumberRequest).not.toContainText('Serious Buyer');
-
+  const unverifiedCard = page.getByTestId('request-card').filter({ hasText: unverifiedBefore.requester.name });
+  await expect(unverifiedCard).toBeVisible();
+  await expect(unverifiedCard).toContainText('I am the unverified control for this badge.');
+  await expect(unverifiedCard.getByLabel('Verified')).toHaveCount(0);
   const after = await ownerRequest(request, fixture.owner, fixture.id, buyer);
   expect(after.status, 'viewing the inbox must not approve the request').toBe('pending');
   expect(after.requester.verified).toBe(true);

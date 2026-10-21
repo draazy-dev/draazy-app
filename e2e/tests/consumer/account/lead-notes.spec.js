@@ -80,12 +80,12 @@ test('an owner note and follow-up date are stored on the server, not in the brow
   expect(empty.body.find((n) => n.leadKey === leadKey), 'no annotation should exist yet').toBeFalsy();
 
   await signedInAs(page, fixture.owner.mobile);
-  await page.goto('/dashboard#enquiries');
+  await page.goto('/dashboard?tab=leads');
 
-  const lead = page.locator('div.group.relative.rounded-xl').filter({ hasText: buyer.name }).first();
+  const lead = page.getByTestId('request-card').filter({ hasText: buyer.name });
   await expect(lead).toBeVisible();
 
-  await lead.getByRole('button', { name: /^Open .* details$/ }).click();
+  await lead.getByTestId('request-note').click();
   const sheet = page.getByRole('dialog');
   await expect(sheet, 'the lead sheet must open before its fields can be trusted').toBeVisible();
 
@@ -122,13 +122,13 @@ test('an owner note and follow-up date are stored on the server, not in the brow
   const other = await page.context().browser().newContext();
   const otherPage = await other.newPage();
   await signedInAs(otherPage, fixture.owner.mobile);
-  await otherPage.goto('/dashboard#enquiries');
+  await otherPage.goto('/dashboard?tab=leads');
 
-  const otherLead = otherPage.locator('div.group.relative.rounded-xl').filter({ hasText: buyer.name }).first();
+  const otherLead = otherPage.getByTestId('request-card').filter({ hasText: buyer.name });
   await expect(otherLead).toBeVisible();
-  await expect(otherLead, 'the follow-up chip must render for the same owner in a fresh browser').toContainText('14 Mar');
+  await expect(otherLead.getByTestId('request-follow-up'), 'the follow-up pill must render for the same owner in a fresh browser').toContainText('14 Mar');
 
-  await otherLead.getByRole('button', { name: /^Open .* details$/ }).click();
+  await otherLead.getByTestId('request-note').click();
   const otherSheet = otherPage.getByRole('dialog');
   await expect(otherSheet).toBeVisible();
   await expect(otherSheet.locator('#lead-note')).toHaveValue(/before Diwali/);
@@ -152,11 +152,11 @@ test('clearing both fields deletes the annotation instead of storing a blank one
   const leadKey = `number:${row.id}`;
 
   await signedInAs(page, fixture.owner.mobile);
-  await page.goto('/dashboard#enquiries');
+  await page.goto('/dashboard?tab=leads');
 
-  const lead = page.locator('div.group.relative.rounded-xl').filter({ hasText: buyer.name }).first();
+  const lead = page.getByTestId('request-card').filter({ hasText: buyer.name });
   await expect(lead).toBeVisible();
-  await lead.getByRole('button', { name: /^Open .* details$/ }).click();
+  await lead.getByTestId('request-note').click();
   const sheet = page.getByRole('dialog');
   await expect(sheet).toBeVisible();
 
