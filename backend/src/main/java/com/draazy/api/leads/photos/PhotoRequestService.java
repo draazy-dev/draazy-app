@@ -80,7 +80,7 @@ public class PhotoRequestService {
             notifier.notify(owner.getId(), "photo.requested",
                     "Someone wants more photos",
                     "A buyer asked for more photos of " + property.getTitle() + ".",
-                    "/messages?tab=requests");
+                    "/dashboard?tab=leads&box=received");
         }
     }
 

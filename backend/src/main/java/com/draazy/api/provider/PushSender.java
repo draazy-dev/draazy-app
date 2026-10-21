@@ -25,8 +25,7 @@ class LoggingPushSender implements PushSender {
     }
 
     private static String conversationId(PushPayloads.Payload payload) {
-        return payload.url().startsWith("/messages?c=")
-                ? payload.url().substring("/messages?c=".length())
-                : "unknown";
+        String id = payload.url().startsWith("/messages?c=") ? payload.url().substring("/messages?c=".length()) : "";
+        return id.isEmpty() || id.startsWith("request:") ? "unknown" : id;
     }
 }

@@ -1,14 +1,17 @@
 package com.draazy.api.engagement.requests;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
+import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -36,6 +39,8 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
     ContactUsageService usage;
     @Autowired
     EntityManager em;
+    @Autowired
+    RequestSources sources;
 
     private void update(String sql, Object... args) {
         em.flush();
@@ -78,6 +83,18 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
                 UUID.class, visitor.getId(), p.getId());
     }
 
+    private UUID documentRequest(User buyer, Property p, String categoriesJson, String message) throws Exception {
+        String msg = message == null ? "" : ",\"message\":\"" + message + "\"";
+        as(buyer, post(Routes.Documents.REQUESTS).content("{\"propertyId\":\"" + p.getId() + "\",\"categories\":"
+                + categoriesJson + ",\"acknowledgedDisclaimer\":true" + msg + "}")).andExpect(status().isCreated());
+        return jdbc.queryForObject("select id from document_requests where requester_id = ? and property_id = ? "
+                + "and status = 'pending'", UUID.class, buyer.getId(), p.getId());
+    }
+
+    private String lastNotificationLink(User u, String type) {
+        return jdbc.queryForObject("select link from notifications where user_id = ? and type = ? "
+                + "order by created_at desc limit 1", String.class, u.getId(), type);
+    }
     private String photoUrl(Property p) {
         return Routes.PropertyPhotoRequests.BASE.replace("{id}", p.getId().toString());
     }
@@ -440,6 +457,125 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
         as(seeker, delete(url("flatmate", id))).andExpect(status().isNotFound());
     }
 
+    @Test
+    void documentRequest_showsInTheOwnersReceivedBoxAndTheBuyersSentBox() throws Exception {
+        User owner = user("9830000040", "owner");
+        User buyer = user("9830000041", "buyer");
+        Property p = listing(owner, "Doc flat");
+        UUID id = documentRequest(buyer, p, "[\"Sale Deed\",\"Index II\"]", null);
+        UUID noted = documentRequest(user("9830000042", "buyer"), p, "[]", "For my lawyer");
+
+        as(owner, get(Routes.MeRequests.BASE + "?box=received")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(2))
+                .andExpect(jsonPath("$.content[?(@.id=='" + id + "')].kind").value("document"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + id + "')].state").value("pending"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + id + "')].status").value("pending"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + id + "')].message").value("Wants to see: Sale Deed, Index II"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + id + "')].party.id").value(buyer.getId().toString()))
+                .andExpect(jsonPath("$.content[?(@.id=='" + id + "')].party.name").value("Person 9830000041"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + id + "')].target.type").value("property"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + id + "')].target.title").value("Doc flat"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + noted + "')].message").value("For my lawyer"));
+
+        as(buyer, get(Routes.MeRequests.BASE + "?box=sent")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(id.toString()))
+                .andExpect(jsonPath("$.content[0].kind").value("document"))
+                .andExpect(jsonPath("$.content[0].party.id").value(owner.getId().toString()))
+                .andExpect(jsonPath("$.content[0].target.link").value(org.hamcrest.Matchers.startsWith("/property/")))
+                .andExpect(jsonPath("$.content[0].reminders.nextAt").isNotEmpty());
+        as(buyer, get(Routes.MeRequests.BASE + "?box=received")).andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    @Test
+    void documentRequest_decisionsReadAsAcceptedDeclinedOrExpired_andAClearHidesThem() throws Exception {
+        User owner = user("9830000043", "owner");
+        User buyer = user("9830000044", "buyer");
+        UUID granted = documentRequest(buyer, listing(owner, "Granted"), "[]", null);
+        UUID declined = documentRequest(buyer, listing(owner, "Declined"), "[]", null);
+        UUID lapsed = documentRequest(buyer, listing(owner, "Lapsed"), "[]", null);
+        update("update document_requests set status = 'granted', expires_at = now() + interval '3 days' where id = ?",
+                granted);
+        update("update document_requests set status = 'declined' where id = ?", declined);
+        update("update document_requests set status = 'granted', expires_at = now() - interval '1 hour' where id = ?",
+                lapsed);
+
+        as(buyer, get(Routes.MeRequests.BASE + "?box=sent")).andExpect(jsonPath("$.content.length()").value(3))
+                .andExpect(jsonPath("$.content[?(@.id=='" + granted + "')].state").value("accepted"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + declined + "')].state").value("declined"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + lapsed + "')].state").value("expired"));
+        as(owner, get(Routes.MeRequests.BASE + "?box=received")).andExpect(jsonPath("$.content.length()").value(0));
+
+        as(buyer, delete(url("document", declined))).andExpect(status().isNoContent());
+
+        as(buyer, get(Routes.MeRequests.BASE + "?box=sent")).andExpect(jsonPath("$.content.length()").value(2));
+        assertThat(statusOf("document_requests", declined)).isEqualTo("declined");
+    }
+
+    @Test
+    void withdrawingADocumentRequest_removesItFromTheOwnersViews_andReAskingWaitsSevenDays() throws Exception {
+        User owner = user("9830000045", "owner");
+        User buyer = user("9830000046", "buyer");
+        Property p = listing(owner, "Withdrawn docs");
+        UUID id = documentRequest(buyer, p, "[\"Sale Deed\"]", null);
+
+        as(buyer, delete(url("document", id))).andExpect(status().isNoContent());
+
+        assertThat(statusOf("document_requests", id)).isEqualTo("withdrawn");
+        as(owner, get(Routes.MeRequests.BASE + "?box=received")).andExpect(jsonPath("$.content.length()").value(0));
+        as(owner, get(Routes.MeDocuments.REQUESTS)).andExpect(jsonPath("$.content.length()").value(0));
+        as(buyer, get(Routes.MeRequests.BASE + "?box=sent")).andExpect(jsonPath("$.content[0].state")
+                .value("withdrawn"));
+        as(owner, patch(Routes.MeDocuments.REQUEST_BY_ID.replace("{reqId}", id.toString()))
+                .content("{\"status\":\"granted\"}")).andExpect(status().isConflict());
+        assertThat(jdbc.queryForObject("select share_token from document_requests where id = ?", String.class, id))
+                .isNull();
+
+        String ask = "{\"propertyId\":\"" + p.getId() + "\",\"categories\":[],\"acknowledgedDisclaimer\":true}";
+        as(buyer, post(Routes.Documents.REQUESTS).content(ask)).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("recently_withdrawn"));
+
+        ageWithdrawal("document_requests", id);
+        as(buyer, post(Routes.Documents.REQUESTS).content(ask)).andExpect(status().isCreated());
+        as(owner, get(Routes.MeRequests.BASE + "?box=received")).andExpect(jsonPath("$.content.length()").value(1));
+    }
+
+    @Test
+    void withdrawingADocumentRequest_theOwnerAnsweredFirst_isAConflict() throws Exception {
+        User owner = user("9830000047", "owner");
+        User buyer = user("9830000048", "buyer");
+        UUID id = documentRequest(buyer, listing(owner, "Answered first"), "[]", null);
+        update("update document_requests set status = 'declined' where id = ?", id);
+
+        assertThatThrownBy(() -> sources.of("document").withdraw(buyer.getId(), id))
+                .isInstanceOf(ConflictException.class);
+        assertThat(statusOf("document_requests", id)).isEqualTo("declined");
+    }
+
+    @Test
+    void reminder_onADocumentRequest_notifiesTheOwnerWithoutOpeningAConversation() throws Exception {
+        User owner = user("9830000049", "owner");
+        User buyer = user("9830000050", "buyer");
+        UUID id = documentRequest(buyer, listing(owner, "Nudge docs"), "[]", null);
+        backdate("document_requests", id, 25);
+
+        as(buyer, post(remindUrl("document", id))).andExpect(status().isCreated())
+                .andExpect(jsonPath("$.count").value(1));
+
+        assertThat(lastNotificationLink(owner, "request.reminder")).isEqualTo("/dashboard?tab=leads&box=received");
+    }
+
+    @Test
+    void reminder_onAContactRequest_linksToItsConversationEntry() throws Exception {
+        User owner = user("9830000051", "owner");
+        User buyer = user("9830000052", "buyer");
+        UUID id = contactRequest(buyer, listing(owner, "Nudge contact"), null);
+        backdate("contact_requests", id, 25);
+
+        as(buyer, post(remindUrl("contact", id))).andExpect(status().isCreated());
+
+        assertThat(lastNotificationLink(owner, "request.reminder")).isEqualTo("/messages?c=request:contact:" + id);
+    }
     @Test
     void inbox_requiresSignIn() throws Exception {
         mvc.perform(get(Routes.MeRequests.BASE)).andExpect(status().isUnauthorized());

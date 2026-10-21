@@ -102,8 +102,9 @@ public class ContactService {
         Instant now = Instant.now();
         if (existing.isEmpty()) {
             requireRoomForAnotherRequest(viewerId, property.getId(), now);
-            contactRequests.saveAndFlush(new ContactRequest(property.getId(), viewerId, body.message()));
-            announceToOwner(owner, viewerId, property);
+            ContactRequest created =
+                    contactRequests.saveAndFlush(new ContactRequest(property.getId(), viewerId, body.message()));
+            announceToOwner(owner, viewerId, property, created.getId());
         } else if (isWithdrawn(existing.get()) || window.lapsed(existing.get().getStatus(), existing.get().getCreatedAt(), now)) {
             if (isWithdrawn(existing.get()) && WithdrawnCooldown.active(existing.get().getUpdatedAt(), now)) {
                 throw WithdrawnCooldown.refusal(existing.get().getUpdatedAt());
@@ -113,7 +114,7 @@ public class ContactService {
             requireRoomForAnotherRequest(viewerId, property.getId(), now);
             if (contactRequests.renewIfLapsed(existing.get().getId(), body.message(), now,
                     window.cutoff(now)) > 0) {
-                announceToOwner(owner, viewerId, property);
+                announceToOwner(owner, viewerId, property, existing.get().getId());
             }
         }
 
@@ -121,7 +122,7 @@ public class ContactService {
     }
 
     // Name only: the requester's mobile stays behind the gate the owner is being asked to open.
-    private void announceToOwner(User owner, UUID requesterId, Property property) {
+    private void announceToOwner(User owner, UUID requesterId, Property property, UUID requestId) {
         if (owner == null) {
             return;
         }
@@ -130,7 +131,7 @@ public class ContactService {
         notifier.notify(owner.getId(), "contact.received",
                 "New contact request",
                 name + " wants to contact you about " + property.getTitle() + ". Approve or decline it.",
-                "/messages?tab=requests");
+                "/messages?c=request:contact:" + requestId);
     }
 
     // A visit reaches the owner just as a contact request does, so it spends from the same allowance.
