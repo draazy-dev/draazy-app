@@ -43,6 +43,7 @@ class SqlConstructionGuardTest {
             Map.entry("admin/AdminIntegrationsService.java", "WHERE clause of fixed ' AND col = ?' literals"),
             Map.entry("admin/AdminMetricsRepository.java", "filters are literals; IST is a constant"),
             Map.entry("admin/AdminSlaService.java", "TRACK formatted with *_COMPLETED/*_OUTSTANDING constants"),
+            Map.entry("admin/alerts/StaffSlaSweep.java", "runs StaffSlaRule.CATALOGUE text blocks; stage durations are enum constants"),
             Map.entry("admin/staff/TeamPerformanceRepository.java", "team names come from DESK_TEAMS, not the caller"),
             Map.entry("catalog/property/PropertyCountsService.java", "JPA CriteriaQuery"),
             Map.entry("catalog/property/PropertySearchFragmentImpl.java", "JPA CriteriaQuery"),

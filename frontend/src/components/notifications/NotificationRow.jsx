@@ -23,11 +23,12 @@ export default function NotificationRow({
   swipeable = false,
   compact = false,
   delay = 0,
+  fallbackHref,
 }) {
   const { t } = useTranslation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const timer = useRef(null);
-  const href = safeNotificationLink(item.link);
+  const href = safeNotificationLink(item.link, fallbackHref);
   const meta = TYPE_META[item.type] || TYPE_META.system;
   const title = notificationTitle(item);
   const context = item.desc || '';

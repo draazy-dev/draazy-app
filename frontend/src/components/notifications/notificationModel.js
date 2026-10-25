@@ -1,14 +1,26 @@
 export const SAFE_LINK_RE = /^\/(?!\/)[a-zA-Z0-9\-_/?=&#%.:]*$/;
 
 export const FILTERS = [
-  { key: 'all', labelKey: 'notifications.filters.all', icon: 'inbox' },
-  { key: 'leads', labelKey: 'notifications.filters.leads', icon: 'user-plus' },
-  { key: 'updates', labelKey: 'notifications.filters.updates', icon: 'info' },
+  { key: 'all', labelKey: 'notifications.filters.all', icon: 'inbox', emptyKey: 'notifications.caughtUp' },
+  { key: 'leads', labelKey: 'notifications.filters.leads', icon: 'user-plus', emptyKey: 'notifications.noNewLeads' },
+  { key: 'updates', labelKey: 'notifications.filters.updates', icon: 'info', emptyKey: 'notifications.noNewUpdates' },
+];
+
+export const STAFF_FILTERS = [
+  { key: 'all', labelKey: 'notifications.filters.all', icon: 'inbox', emptyKey: 'notifications.caughtUp' },
+  { key: 'escalations', labelKey: 'notifications.filters.escalations', icon: 'shield-alert', emptyKey: 'notifications.noEscalations' },
+  { key: 'work', labelKey: 'notifications.filters.work', icon: 'timer', emptyKey: 'notifications.noNewWork' },
+  { key: 'updates', labelKey: 'notifications.filters.updates', icon: 'info', emptyKey: 'notifications.noNewUpdates' },
 ];
 
 const LEAD_TYPES = new Set(['enquiry', 'price', 'visit', 'share']);
+// Refund and service rows reaching staff are requests to act (refund filed, amendment applied), not news.
+const STAFF_WORK_TYPES = new Set(['queue', 'sla', 'refund', 'service']);
 
 export const TYPE_META = {
+  escalation: { icon: 'shield-alert', iconCls: 'text-rose-400', bgCls: 'bg-rose-400/15', plural: 'escalations' },
+  queue: { icon: 'inbox', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'queue arrivals' },
+  sla: { icon: 'timer', iconCls: 'text-amber-400', bgCls: 'bg-amber-400/15', plural: 'SLA reminders' },
   match: { icon: 'home', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'matches' },
   enquiry: { icon: 'messages-square', iconCls: 'text-teal-400', bgCls: 'bg-teal-400/15', plural: 'enquiries' },
   price: { icon: 'trending-down', iconCls: 'text-amber-400', bgCls: 'bg-amber-400/15', plural: 'price updates' },
@@ -25,14 +37,21 @@ export const TYPE_META = {
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
 
-export const safeNotificationLink = (link) => (typeof link === 'string' && SAFE_LINK_RE.test(link) ? link : '/notifications');
+export const safeNotificationLink = (link, fallback = '/notifications') =>
+  (typeof link === 'string' && SAFE_LINK_RE.test(link) ? link : fallback);
 
 export const notificationBucket = (n) => (LEAD_TYPES.has(n?.type) ? 'leads' : 'updates');
 
-export const matchesNotificationFilter = (n, filter) => filter === 'all' || notificationBucket(n) === filter;
+export const staffNotificationBucket = (n) => {
+  if (n?.type === 'escalation') return 'escalations';
+  return STAFF_WORK_TYPES.has(n?.type) ? 'work' : 'updates';
+};
 
-export const hasUnreadInFilter = (rows, filter) =>
-  rows.some((n) => !n.read && matchesNotificationFilter(n, filter));
+export const matchesNotificationFilter = (n, filter, bucket = notificationBucket) =>
+  filter === 'all' || bucket(n) === filter;
+
+export const hasUnreadInFilter = (rows, filter, bucket = notificationBucket) =>
+  rows.some((n) => !n.read && matchesNotificationFilter(n, filter, bucket));
 
 const dayKey = (at) => {
   const d = new Date(at || 0);

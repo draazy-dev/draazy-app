@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import Icon from './Icon.jsx';
 import LogoMark from './brand/LogoMark.jsx';
 import { getCookieConsent } from './CookieConsent.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
+import { alertsAskPending } from '../lib/browserAlerts.js';
 
 /* Chromium: stash beforeinstallprompt and call prompt() from a click (it throws outside a gesture). iOS/WebKit has
    no install API, so we can only point at Share → Add to Home Screen. */
@@ -51,6 +53,7 @@ const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
 export default function InstallPrompt() {
   const { t } = useTranslation();
   const { pathname } = useLocation();
+  const { isIn } = useAuth();
   const [deferred, setDeferred] = useState(null);
   const [engaged, setEngaged] = useState(false);
   const [gone, setGone] = useState(false);
@@ -115,7 +118,8 @@ export default function InstallPrompt() {
   };
 
   const ios = typeof navigator !== 'undefined' && isIOS();
-  if (gone || cookieBar || !engaged || (!deferred && !ios)) return null;
+  // One bottom card at a time: a signed-in user is asked about browser notifications first.
+  if (gone || cookieBar || !engaged || (!deferred && !ios) || (isIn && alertsAskPending())) return null;
 
   return (
     <div data-kbd-hide className="dz-safe-x fixed inset-x-0 bottom-[var(--dz-bottom-inset)] z-[1350] flex justify-center p-3 lg:hidden pointer-events-none">

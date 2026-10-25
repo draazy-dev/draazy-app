@@ -10,11 +10,15 @@ import {
   hasUnreadInFilter,
   isToday,
   matchesNotificationFilter,
+  notificationBucket,
+  STAFF_FILTERS,
+  staffNotificationBucket,
 } from '../../components/notifications/notificationModel.js';
 import { useScrollReveal } from '../../lib/useScrollReveal.js';
 import usePullToRefresh from '../../lib/usePullToRefresh.js';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { useToast } from '../../context/ToastContext.jsx';
+import { alertPermission, alertsSupported, browserAlertsOn, enableBrowserAlerts } from '../../lib/browserAlerts.js';
 import {
   dismiss as dismissIds,
   listNotifications,
@@ -63,8 +67,33 @@ function ShowOlder({ onClick }) {
   );
 }
 
-export default function Notifications() {
+// Staff have no Profile switch, so the inbox itself offers browser alerts until they are on.
+function StaffAlertsButton() {
   const { t } = useTranslation();
+  const { toast } = useToast();
+  const [on, setOn] = useState(browserAlertsOn);
+  if (on || !alertsSupported() || alertPermission() === 'denied') return null;
+  const turnOn = async () => {
+    try {
+      await enableBrowserAlerts();
+      setOn(true);
+      toast(t('browserAlerts.enabled'), 'success');
+    } catch {
+      if (alertPermission() === 'granted') setOn(true);
+      else toast(t('browserAlerts.blockedBody'), 'error');
+    }
+  };
+  return (
+    <button type="button" onClick={turnOn} data-testid="staff-alerts-on" className="flex min-h-[44px] items-center gap-1.5 rounded-xl border border-white/10 px-3 text-sm font-semibold text-gray-200 hover:border-teal-400/30 hover:text-teal-300">
+      <Icon name="bell" className="h-4 w-4" /> {t('browserAlerts.cta')}
+    </button>
+  );
+}
+
+export default function Notifications({ staff = false }) {
+  const { t } = useTranslation();
+  const filters = staff ? STAFF_FILTERS : FILTERS;
+  const bucket = staff ? staffNotificationBucket : notificationBucket;
   const { toast } = useToast();
   const { unread, refresh: refreshBadge } = useNotifications();
   const [notifs, setNotifs] = useState([]);
@@ -155,8 +184,8 @@ export default function Notifications() {
   const ptr = usePullToRefresh(reload);
 
   const rowsOf = useCallback(
-    (section) => collapseNotifications(notifs.filter((n) => n.section === section && matchesNotificationFilter(n, filter))),
-    [filter, notifs],
+    (section) => collapseNotifications(notifs.filter((n) => n.section === section && matchesNotificationFilter(n, filter, bucket))),
+    [bucket, filter, notifs],
   );
   const unreadRows = useMemo(() => rowsOf('unread'), [rowsOf]);
   const readRows = useMemo(() => rowsOf('read'), [rowsOf]);
@@ -257,7 +286,7 @@ export default function Notifications() {
   const readState = sections.read;
   const initialLoad = unreadState.status === 'loading' && !unreadRows.length;
   const hasMore = (section) => sections[section].status === 'ready' && sections[section].cursor < sections[section].total;
-  const caughtUpKey = filter === 'all' ? 'notifications.caughtUp' : filter === 'leads' ? 'notifications.noNewLeads' : 'notifications.noNewUpdates';
+  const caughtUpKey = filters.find((f) => f.key === filter)?.emptyKey ?? 'notifications.caughtUp';
 
   let delay = 0;
   const renderRow = (n) => {
@@ -265,6 +294,7 @@ export default function Notifications() {
     delay += 0.04;
     return (
       <NotificationRow
+        fallbackHref={staff ? '/admin/notifications' : undefined}
         key={`${n.type}-${n.link}-${n.id}`}
         item={n}
         onOpen={markRead}
@@ -305,14 +335,16 @@ export default function Notifications() {
                 {t('notifications.markAll')}
               </button>
             )}
-            <Link to="/dashboard#profile" aria-label={t('notifications.manage')} className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 text-gray-400 hover:border-teal-400/30 hover:text-teal-300">
-              <Icon name="user-cog" className="h-5 w-5" />
-            </Link>
+            {staff ? <StaffAlertsButton /> : (
+              <Link to="/dashboard#profile" aria-label={t('notifications.manage')} className="grid h-11 w-11 place-items-center rounded-xl border border-white/10 text-gray-400 hover:border-teal-400/30 hover:text-teal-300">
+                <Icon name="user-cog" className="h-5 w-5" />
+              </Link>
+            )}
           </div>
         </div>
 
         <HScroll role="tablist" aria-label={t('notifications.title')} fadeColor="var(--brand-dark)" wrapClassName="mb-5" className="flex gap-1 sm:gap-2 border-b border-white/10">
-          {FILTERS.map((f) => (
+          {filters.map((f) => (
             <button
               key={f.key}
               type="button"
@@ -322,7 +354,7 @@ export default function Notifications() {
               className={'dz-detail-tab' + (filter === f.key ? ' is-active' : '')}
             >
               <Icon name={f.icon} className="w-4 h-4" /> <span>{t(f.labelKey)}</span>
-              {hasUnreadInFilter(notifs, f.key) && <span className="h-1.5 w-1.5 rounded-full bg-teal-400" aria-hidden="true" />}
+              {hasUnreadInFilter(notifs, f.key, bucket) && <span className="h-1.5 w-1.5 rounded-full bg-teal-400" aria-hidden="true" />}
             </button>
           ))}
         </HScroll>

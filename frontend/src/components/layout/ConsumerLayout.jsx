@@ -8,6 +8,7 @@ import ConnectivityBanner from '../ConnectivityBanner.jsx';
 import ErrorBoundary from '../ErrorBoundary.jsx';
 import CookieConsent from '../CookieConsent.jsx';
 import InstallPrompt from '../InstallPrompt.jsx';
+import BrowserAlertsPrompt from '../BrowserAlertsPrompt.jsx';
 import AssistantWidget from '../assistant/AssistantWidget.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { AppFlagsProvider, useAppFlags } from '../../context/AppFlagsContext.jsx';
@@ -80,6 +81,7 @@ function ConsumerLayoutContent() {
           {/* Not on auth routes — interrupting a sign-in or OTP entry to sell an app install
               is how you lose the sign-in. */}
           {!authRoute && <InstallPrompt />}
+          {!authRoute && !chatRoute && <BrowserAlertsPrompt />}
           {showBottomNav && <BottomNav />}
         </div>
       </PostChooserProvider>

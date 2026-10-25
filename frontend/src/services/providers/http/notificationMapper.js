@@ -44,6 +44,11 @@ const TYPE_PREFIXES = [
   // A checkout paid too late (cancelled or expired order) is refunded automatically.
   ['subscription.refund', 'refund'],
   ['support', 'system'],
+  // Back-office queue alerts from the SLA sweep: new work, a reminder, a manager escalation.
+  ['queue', 'queue'],
+  ['sla', 'sla'],
+  ['escalation', 'escalation'],
+  ['team', 'system'],
 ];
 
 /** UI types that already mean what they say — passed through untouched. */
