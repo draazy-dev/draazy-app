@@ -1,36 +1,28 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAs, signedInAsNew, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAs, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
-import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
-import { fillSociety } from '../../../helpers/places.js';
+import { fillRoomDetails, fillRoomLocation, fillRoomPrice, nextStep, roomBasics, uploadRoomPhotos } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
-import { chooseLocality, pickLocality } from '../../../helpers/locality.js';
+import { chooseLocality } from '../../../helpers/locality.js';
 
 const track = flatmateCleanup(test);
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
 const unique = (tag) => `Live Listings ${tag} ${Date.now().toString(36)}`;
-const ROOM_PHOTO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAeAAAAHgCAIAAADytinCAAAFG0lEQVR42u3UMQ0AAAgEsXeCX0SgFRUkDE2q4IZLTQPwUCQAMGgADBrAoAEwaACDBsCgATBoAIMGwKABDBoAgwbAoAEMGgCDBjBoAAwawKABMGgADBrAoAEwaACDBsCgATBoAIMGwKABDBoAgwYwaAAMGgCDBjBoAAwawKABMGgADBrAoAEwaACDBsCgAQxaBQCDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgATBoAAwawKABMGgAgwbAoAEMGgCDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgATBoAIMGwKABMGgAgwbAoAEMGgCDBsCgAQwaAIMGMGgADBrAoFUAMGgADBrAoAEwaACDBsCgATBoAIMGwKABDBoAgwbAoAEMGgCDBjBoAAwawKABMGgADBrAoAEwaACDBsCgATBoAIMGwKABDBoAgwYwaAAMGgCDBjBoAAwawKABMGgADBrAoAEwaACDBsCgAQwaAIMGwKABDBoAgwYwaAAMGgCDBjBoAAwawKABMGgADBrAoAEwaACDBsCgAQwaAIMGwKABDBoAgwYwaAAMGgCDBjBoAAwawKABMGgAgwbAoAEwaACDBsCgAQwaAIMGwKABDBoAgwYwaAAMGsCgATBoAAwawKABMGgAgwbAoAEwaACDBsCgAQwaAIMGwKABDBoAgwYwaAAMGsCgATBoAAwawKABMGgAgwbAoAEwaACDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgATBoAAwawKABMGgAgwbAoAEMGgCDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgATBoAAwawKABMGgAgwbAoAEMGgCDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgATBoAIMGwKABMGgAgwbAoAEMGgCDBsCgAQwaAIMGMGgADBrAoAEwaAAMGsCgATBoAIMGwKABMGgAgwbAoAEMGgCDBjBoCQAMGgCDBjBoAAwawKABMGgADBrAoAEwaACDBsCgATBoAIMGwKABDBoAgwYwaAAMGgCDBjBoAAwawKABMGgADBrAoAEwaACDBsCgAQwaAIMGwKABDBoAgwYwaAAMGgCDBjBoAAwawKABMGgAg1YBwKABMGgAgwbAoAEMGgCDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgATBoAIMGwKABMGgAgwbAoAEMGgCDBsCgAQwaAIMGMGgADBrAoAEwaAAMGsCgATBoAIMGwKABMGgAgwbAoAEMGgCDBjBoFQAMGgCDBjBoAAwawKABMGgADBrAoAEwaACDBsCgATBoAIMGwKABDBoAgwYwaAAMGgCDBjBoAAwawKABMGgADBrAoAEwaACDBsCgAQwaAIMGwKABDBoAgwYwaAAMGgCDBjBoAAwawKABMGgAgwbAoAEwaACDBsCgAQwaAIMGwKABDBoAgwYwaAAMGgCDBjBoAAwawKABMGgAgwbAoAEwaACDBsCgAQwaAIMGwKABDBoAgwYwaAAMGsCgATBoAAwawKABMGgAgwbAoAEwaACDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgATBoAAwawKABMGgAgwbAoAEwaACDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgATBoAAwawKABMGgAgwbAoAEMGgCDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgATBoAIMGwKABMGgAgwbAoAEMGgCDBsCgAQwaAIMGMGgADBoAgwYwaAAMGsCgAbiybdjfVMQITnoAAAAASUVORK5CYII=', 'base64');
 
-async function fillTenantProof(page) {
-  await page.getByText('I have a registered rent agreement', { exact: true }).click();
-  await page.getByLabel('Upload registered rent agreement for room').setInputFiles({
-    name: 'agreement.png',
-    mimeType: 'image/png',
-    buffer: ROOM_PHOTO,
-  });
-  await page.getByLabel('The owner knows and agrees to sharing').check();
+async function expectAgreementDeferred(page) {
+  await expect(page.getByTestId('room-agreement-later')).toBeVisible();
+  await expect(page.getByLabel('Upload registered rent agreement for room')).toHaveCount(0);
 }
 
-async function hostsPost(token, { locality = 'Baner', name = 'Listings Seeker' } = {}) {
+async function hostsPost(token, { locality = 'Baner' } = {}) {
   const res = await fetch(`${API}/flatmates/posts`, {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
-      name,
       gender: 'female',
       age: 26,
       occupation: 'Engineer',
@@ -39,7 +31,6 @@ async function hostsPost(token, { locality = 'Baner', name = 'Listings Seeker' }
       moveIn: '2026-12-01',
       flatPref: 'women',
       roomPref: 'private',
-      tags: ['Vegetarian'],
       note: 'My Listings coverage',
     }),
   });
@@ -55,9 +46,9 @@ async function hostsGroup(token, title) {
     headers: auth(token),
     body: JSON.stringify({
       title,
-      name: 'Listings Host',
       locality: 'Baner',
       rent: 30000,
+      deposit: 50000,
       seats: 3,
       seatsOpen: 1,
       policy: 'any',
@@ -75,15 +66,16 @@ async function hostsRoom(token, society) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
+      ...(await roomBasics(token)),
       ...(await withSocietyId(token, { society })),
       roomType: 'Private room',
       locality: 'Baner',
       rentShare: 18000,
+      deposit: 36000,
       bhk: '2',
       attachedBath: 'attached',
       furnishing: 'semi',
       hostRole: 'tenant',
-      photos: await uploadedListingPhotos(token),
       ...(await tenantRoomAgreement(token)),
     }),
   });
@@ -105,11 +97,11 @@ test.describe('LIVE: my flatmate listings', () => {
     await page.goto('/flatmates?post=1');
     await expect(page.getByRole('heading', { name: /Post your flatmate request/i })).toBeVisible({ timeout: 20_000 });
 
-    await page.getByPlaceholder('e.g. Riya').fill('Form Seeker');
+    await expect(page.getByTestId('profile-name-note')).toContainText('Posting as Test Member');
     await page.getByLabel('Lowest monthly budget').fill('16000');
     const localityPicker = page.getByRole('button', { name: 'Preferred localities' });
     await chooseLocality(page, localityPicker, 'Baner');
-    await expect(localityPicker).toContainText('Baner');
+    await expect(page.getByRole('button', { name: 'Remove Baner' })).toBeVisible();
     // A success toast cannot prove the server accepted the payload.
     const posted = page.waitForResponse(
       (r) => r.url().includes('/flatmates/posts') && r.request().method() === 'POST',
@@ -120,6 +112,7 @@ test.describe('LIVE: my flatmate listings', () => {
 
     const { accessToken } = await apiLogin(mobile);
     const body = await created.json();
+    expect(body.name, 'the post should carry the profile name').toBe('Test Member');
     track('posts', body.id, accessToken);
     // An independent read proves caller ownership rather than browser-local success.
     const mine = await (await fetch(`${API}/me/flatmate-posts?size=100`, { headers: auth(accessToken) })).json();
@@ -129,11 +122,11 @@ test.describe('LIVE: my flatmate listings', () => {
 
   test('the posted request comes back on the board as the author own, live at once', async ({ page }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Listings Seeker' });
     await hostsPost(accessToken);
     await signedInAs(page, mobile);
     // Authors see pending posts so submissions remain visible before moderation.
-    await page.goto('/flatmates?view=team-up');
+    await page.goto('/flatmates?view=people');
     await expect(page.getByText('Your live request', { exact: true })).toBeVisible({ timeout: 20_000 });
 
     await openMyListings(page);
@@ -143,7 +136,7 @@ test.describe('LIVE: my flatmate listings', () => {
 
   test('the type filter narrows My Listings to requests, and the group goes away', async ({ page }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Listings Seeker' });
     const title = unique('Group');
     await hostsPost(accessToken);
     await hostsGroup(accessToken, title);
@@ -167,7 +160,7 @@ test.describe('LIVE: my flatmate listings', () => {
 
   test('a group-only host still gets a My Listings tab, and their group in it', async ({ page }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Listings Host' });
     const title = unique('OnlyGroup');
     await hostsGroup(accessToken, title);
     await signedInAs(page, mobile);
@@ -195,28 +188,21 @@ test.describe('LIVE: my flatmate listings', () => {
 
     await page.goto('/list-property?flatmate=1');
     await expect(page.locator('.lp-meter')).toBeVisible({ timeout: 20_000 });
-    await page.locator('[data-err="bhk"] .radio-pill', { hasText: '2 BHK' }).click();
-    await page.locator('[data-err="roomType"] .radio-pill', { hasText: 'Single (1 person)' }).click();
-    await page.getByRole('radiogroup', { name: 'People living in the flat now' })
-      .getByRole('radio', { name: '2', exact: true }).click();
-    await page.getByRole('spinbutton', { name: 'Notice period (days)' }).fill('30');
-    await fillTenantProof(page);
-    await page.getByRole('button', { name: /Next Step/i }).click();
+    await fillRoomDetails(page, { bhk: '2 BHK', roomType: 'Single (1 person)' });
+    await page.getByRole('button', { name: 'One more person' }).click();
+    await page.getByRole('button', { name: 'One more person' }).click();
+    await expect(page.getByRole('spinbutton', { name: 'People living there now' })).toHaveValue('2');
+    await nextStep(page);
 
-    await pickLocality(page, 'Baner');
-    await fillSociety(page, society);
-    await page.getByRole('button', { name: /Next Step/i }).click();
-    await expect(page.getByText('Rent & move-in', { exact: true })).toBeVisible();
-    await page.locator('input[data-err="rentShare"]').fill('13500');
-    await pickDate(page, '[data-err="availableFrom"]', '2026-12-01');
-    await page.getByRole('button', { name: /Next Step/i }).click();
+    await fillRoomLocation(page, { society });
+    await nextStep(page);
 
-    await page.locator('[data-err="photos"] label.upload-zone input[type="file"][multiple]').setInputFiles({
-      name: 'room.png',
-      mimeType: 'image/png',
-      buffer: ROOM_PHOTO,
-    });
-    await expect(page.locator('[data-err="photos"]')).toContainText('1 / 10 photos');
+    await expectAgreementDeferred(page);
+    await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: '2026-12-01', notice: '30' });
+    await nextStep(page);
+
+    await uploadRoomPhotos(page);
+    await expect(page.locator('[data-err="photos"]')).toContainText('3 / 10 photos');
 
     const suggested = await page.getByLabel('Headline').getAttribute('placeholder');
     expect(suggested).toMatch(/^Private room in 2 BHK /);
@@ -228,7 +214,7 @@ test.describe('LIVE: my flatmate listings', () => {
     await page.getByRole('button', { name: /Post & Find Flatmates/i }).click();
     const response = await posted;
     expect(response.status(), 'the wizard should create a room through the API').toBe(201);
-    expect(response.request().postDataJSON()).toMatchObject({ occupants: 2, noticePeriodDays: 30, title: suggested });
+    expect(response.request().postDataJSON()).toMatchObject({ occupants: 2, noticePeriodDays: 30, title: suggested, agreementDeclared: false });
     const room = await response.json();
     track('rooms', room.id, accessToken);
     // An independent read proves the server kept the room and its selected details.
@@ -248,6 +234,8 @@ test.describe('LIVE: my flatmate listings', () => {
     expect(stored, 'the wizard kept a browser-side copy of a server room').toEqual([]);
 
     await expect(page.getByText(/Flatmate Listing Posted/i)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId('room-agreement-nudge').getByRole('link', { name: 'Get verified' }))
+      .toHaveAttribute('href', `/dashboard?tab=documents&room=${room.id}`);
     await openMyListings(page);
     await expect(page.getByText(society, { exact: false }).first()).toBeVisible({ timeout: 20_000 });
     const outlook = await fetch(`${API}/flatmates/rooms/${room.id}`, {
@@ -262,9 +250,9 @@ test.describe('LIVE: my flatmate listings', () => {
     });
     expect(approved.status).toBe(200);
     await page.goto(`/flatmates/room/${room.id}`);
-    const fact = (label) => page.locator('dt', { hasText: label }).locator('xpath=following-sibling::dd[1]');
-    await expect(fact('Facing')).toHaveText('East', { timeout: 20_000 });
-    await expect(fact('Overlooking')).toHaveText('Garden');
+    const fact = (label) => page.locator('.detail-card', { has: page.getByText(label, { exact: true }) });
+    await expect(fact('Facing')).toContainText('East', { timeout: 20_000 });
+    await expect(fact('Overlooking')).toContainText('Garden');
     await expect(page.getByText('2 people live in this flat now')).toBeVisible();
   });
 
@@ -275,26 +263,17 @@ test.describe('LIVE: my flatmate listings', () => {
 
     await page.goto('/list-property?flatmate=1');
     await expect(page.locator('.lp-meter')).toBeVisible({ timeout: 20_000 });
-    await page.getByRole('button', { name: 'Row House', exact: true }).click();
-    await page.locator('[data-err="bhk"] .radio-pill', { hasText: '2 BHK' }).click();
-    await page.locator('[data-err="roomType"] .radio-pill', { hasText: 'Single (1 person)' }).click();
-    await fillTenantProof(page);
-    await page.getByRole('button', { name: /Next Step/i }).click();
+    await fillRoomDetails(page, { homeType: 'Row House', bhk: '2 BHK', roomType: 'Single (1 person)' });
+    await nextStep(page);
 
-    await pickLocality(page, 'Baner');
-    await fillSociety(page, society);
-    await page.getByRole('button', { name: /Next Step/i }).click();
-    await expect(page.getByText('Rent & move-in', { exact: true })).toBeVisible();
-    await page.locator('input[data-err="rentShare"]').fill('14500');
-    await pickDate(page, '[data-err="availableFrom"]', '2026-12-01');
-    await page.getByRole('button', { name: /Next Step/i }).click();
+    await fillRoomLocation(page, { society });
+    await nextStep(page);
 
-    await page.locator('[data-err="photos"] label.upload-zone input[type="file"][multiple]').setInputFiles({
-      name: 'room.png',
-      mimeType: 'image/png',
-      buffer: ROOM_PHOTO,
-    });
-    await expect(page.locator('[data-err="photos"]')).toContainText('1 / 10 photos');
+    await fillRoomPrice(page, { rent: '14500', deposit: '0', availableFrom: '2026-12-01' });
+    await nextStep(page);
+
+    await uploadRoomPhotos(page);
+    await expect(page.locator('[data-err="photos"]')).toContainText('3 / 10 photos');
 
     const posted = page.waitForResponse(
       (r) => r.url().includes('/flatmates/rooms') && r.request().method() === 'POST',
@@ -303,7 +282,7 @@ test.describe('LIVE: my flatmate listings', () => {
     const response = await posted;
     expect(response.status(), 'the wizard should create a room through the API').toBe(201);
     expect(response.request().postDataJSON(), 'the wizard dropped the host\u2019s pick')
-      .toMatchObject({ homeTypeLabel: 'Row House' });
+      .toMatchObject({ homeTypeLabel: 'Row House', deposit: 0, ownerConsentMobile: '9876501234' });
     const room = await response.json();
     track('rooms', room.id, accessToken);
 
@@ -318,14 +297,16 @@ test.describe('LIVE: my flatmate listings', () => {
       method: 'POST',
       headers: auth(accessToken),
       body: JSON.stringify({
+        ...(await roomBasics(accessToken)),
         homeTypeLabel: 'Bungalow',
+        details: { bathrooms: 2, floorsInHouse: 2 },
         bhk: '2',
         roomType: 'Private room',
         locality: 'Baner',
         society: unique('Bad Home Type'),
         rentShare: 14000,
+        deposit: 28000,
         availableFrom: '2026-12-01',
-        photos: await uploadedListingPhotos(accessToken),
         ...(await tenantRoomAgreement(accessToken)),
       }),
     });

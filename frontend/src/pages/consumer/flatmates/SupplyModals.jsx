@@ -7,7 +7,7 @@ export default function SupplyModals({ s }) {
   return (
     <>
       {s.postOpen && (
-        <PostModal setPostOpen={s.setPostOpen} submitPost={s.submitPost} postFormRef={s.postFormRef} postDraft={s.postDraft} post={s.post} setPost={s.setPost} postErr={s.postErr} editingId={s.editingId} />
+        <PostModal setPostOpen={s.setPostOpen} submitPost={s.submitPost} takeDownPost={s.takeDownPost} postFormRef={s.postFormRef} postDraft={s.postDraft} post={s.post} setPost={s.setPost} postErr={s.postErr} editingId={s.editingId} />
       )}
 
       {s.groupOpen && (
