@@ -59,7 +59,7 @@ class FlatmateErasureTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Team up in Baner","locality":"Baner","policy":"any",
-                                 "rent":30000,"seats":3,"seatsOpen":2,"name":"Host"}
+                                 "rent":30000,"deposit":10000,"seats":3,"seatsOpen":2,"name":"Host"}
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
@@ -102,6 +102,14 @@ class FlatmateErasureTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("{}"))
                     .andExpect(status().isCreated());
+            String requestId = jdbc.queryForObject("select id::text from flatmate_requests "
+                    + "where target_id = ?::uuid and requester_id = ?::uuid", String.class, groupId,
+                    joiner.getId().toString());
+            mvc.perform(patch(Routes.Flatmates.MY_REQUEST_BY_ID, requestId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"decision\":\"accepted\"}"))
+                    .andExpect(status().isOk());
         }
         assertThat(count("select seats_open from flatmate_groups where id = ?::uuid", groupId)).isZero();
 

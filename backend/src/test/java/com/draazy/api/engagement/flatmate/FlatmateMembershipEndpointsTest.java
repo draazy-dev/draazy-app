@@ -65,7 +65,7 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Team up in Baner","locality":"Baner","policy":"%s",
-                                 "rent":30000,"seats":3,"seatsOpen":2,"name":"Host"}
+                                 "rent":30000,"deposit":10000,"seats":3,"seatsOpen":2,"name":"Host"}
                                 """.formatted(policy)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
@@ -89,6 +89,16 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
                 .content("{\"gender\":\"female\"}"));
     }
 
+    private void accept(String groupId, User requester) throws Exception {
+        String requestId = jdbc.queryForObject("select id::text from flatmate_requests "
+                + "where target_id = ?::uuid and requester_id = ?::uuid", String.class, groupId,
+                requester.getId().toString());
+        mvc.perform(patch(Routes.Flatmates.MY_REQUEST_BY_ID, requestId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(hostOf(groupId)))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"accepted\"}"))
+                .andExpect(status().isOk());
+    }
     private ResultActions leave(String groupId, User who) throws Exception {
         return mvc.perform(delete(Routes.Flatmates.GROUP_MEMBERSHIP, groupId)
                 .header(HttpHeaders.AUTHORIZATION, bearer(who)));
@@ -134,6 +144,7 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
         User seeker = user("Leaver");
         String first = group("any");
         join(first, seeker).andExpect(status().isCreated());
+        accept(first, seeker);
         join(group("any"), seeker).andExpect(status().isCreated());
         assertThat(count("select seats_open from flatmate_groups where id = ?::uuid", first))
                 .isEqualTo(1);
@@ -165,7 +176,9 @@ class FlatmateMembershipEndpointsTest extends AbstractApiTest {
     @DisplayName("an admin lowering the limit is re-checked when the host accepts")
     void acceptRechecksTheLimit() throws Exception {
         User seeker = user("Waiting");
-        join(group("any"), seeker).andExpect(status().isCreated());
+        String open = group("any");
+        join(open, seeker).andExpect(status().isCreated());
+        accept(open, seeker);
         String gated = group("women");
         join(gated, seeker).andExpect(status().isCreated());
         String requestId = jdbc.queryForObject("select id::text from flatmate_requests "

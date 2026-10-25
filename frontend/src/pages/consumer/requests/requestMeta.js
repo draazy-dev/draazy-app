@@ -31,6 +31,11 @@ const DEFAULT_MESSAGE = {
 
 export const requestKey = (item) => `${item.kind}:${item.id}`;
 
+const SHARE_LABEL = { bring: 'Coming as 2', match: 'Wants a room-sharer' };
+
+/** Only the non-default intents are worth a tag: `bring` fills two places on accept. */
+export const shareLabel = (share) => SHARE_LABEL[share] || '';
+
 export const threadId = (item) => `request:${requestKey(item)}`;
 
 // Must match the keys the old leads panel minted, or existing notes disappear from their rows.
@@ -45,6 +50,9 @@ const LEAD_KEY = {
 export const leadKey = (item) => LEAD_KEY[item.kind]?.(item) || requestKey(item);
 
 export const isPending = (item) => item.state === 'pending';
+
+/** A seeker asking into a flatmate group; `kind: 'group'` is a group applying to a listing. */
+export const isGroupJoin = (item) => item.kind === 'flatmate' && item.target?.type === 'group';
 
 export const stateLabel = (item) => (item.state === 'accepted' && ACCEPTED_LABEL[item.kind]) || STATE_LABEL[item.state] || item.state;
 

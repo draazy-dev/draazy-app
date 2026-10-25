@@ -78,10 +78,10 @@ public class ConversationOpeningService {
     }
 
     public ConversationDto openForFlatmateRequest(AuthPrincipal caller, String requestId) {
-        UUID them = Ids.parseUuid(requestId)
-                .flatMap(id -> flatmateRequests.acceptedCounterparty(id, caller.userId()))
+        FlatmateRequestParties.Pair pair = Ids.parseUuid(requestId)
+                .flatMap(id -> flatmateRequests.chattable(id, caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate chat"));
-        return retryingPairRace(caller, () -> findOrCreatePair(caller, them));
+        return retryingPairRace(caller, () -> findOrCreatePair(caller, pair));
     }
 
     private <T> T retryingPairRace(AuthPrincipal caller, Supplier<T> attempt) {
@@ -101,13 +101,18 @@ public class ConversationOpeningService {
         }
     }
 
-    private ConversationDto findOrCreatePair(AuthPrincipal caller, UUID them) {
+    private ConversationDto findOrCreatePair(AuthPrincipal caller, FlatmateRequestParties.Pair accepted) {
         UUID me = caller.userId();
+        UUID them = accepted.counterparty();
         boolean ordered = Conversation.ordersFirst(me, them);
         Optional<Conversation> existing = conversations.findPair(
                 ordered ? me : them, ordered ? them : me, null);
         Conversation conversation = existing.orElseGet(() ->
                 conversations.saveAndFlush(new Conversation(me, them, null, null)));
+        // Guarded so re-opening the same post does not bump updatedAt and reorder the inbox.
+        if (!accepted.targetId().equals(conversation.getFlatmateTargetId())) {
+            conversation.aboutFlatmate(accepted.targetKind(), accepted.targetId());
+        }
         if (existing.isEmpty() && Roles.isBackOffice(caller.role())) {
             audit.record(caller, "conversation.started", "conversation",
                     conversation.getId().toString(), "counterparty", them.toString());

@@ -10,11 +10,11 @@ const tag = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 
 async function liveGroup() {
   const hostMobile = uniqueMobile();
-  const { accessToken } = await apiLogin(hostMobile);
+  const { accessToken } = await apiLogin(hostMobile, { name: 'Host' });
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
-    body: JSON.stringify({ title: `Chat ${tag()}`, name: 'Host', locality: 'Baner', rent: 30000, seats: 3, seatsOpen: 2, policy: 'any', role: 'tenant' }),
+    body: JSON.stringify({ title: `Chat ${tag()}`, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 2, policy: 'any', role: 'tenant' }),
   });
   expect(res.status, await res.clone().text()).toBe(201);
   const group = await res.json();
@@ -24,16 +24,21 @@ async function liveGroup() {
     method: 'PATCH', headers: auth(admin), body: JSON.stringify({ modStatus: 'live', note: 'e2e' }),
   });
   expect(mod.status, await mod.clone().text()).toBeLessThan(300);
-  return { group, hostMobile };
+  return { group, hostMobile, hostToken: accessToken };
 }
 
-async function member(groupId) {
+async function member(groupId, hostToken) {
   const mobile = uniqueMobile();
   const { accessToken } = await apiLogin(mobile);
   const res = await fetch(`${API}/flatmates/groups/${groupId}/join`, {
     method: 'POST', headers: auth(accessToken), body: JSON.stringify({ share: 'solo' }),
   });
   expect(res.status, await res.clone().text()).toBe(201);
+  const ask = await res.json();
+  const accepted = await fetch(`${API}/me/flatmate-requests/${ask.id}`, {
+    method: 'PATCH', headers: auth(hostToken), body: JSON.stringify({ decision: 'accepted' }),
+  });
+  expect(accepted.status, await accepted.clone().text()).toBe(200);
   return { mobile, token: accessToken };
 }
 
@@ -47,8 +52,8 @@ const say = (token, convId, body) => fetch(`${API}/messages/${convId}/reply`, {
 const thread = (token, convId) => fetch(`${API}/messages/${convId}`, { headers: auth(token) });
 
 test('host opens the group thread in Messages, sees who wrote what, and removing a member closes it to them', async ({ page }) => {
-  const { group, hostMobile } = await liveGroup();
-  const m = await member(group.id);
+  const { group, hostMobile, hostToken } = await liveGroup();
+  const m = await member(group.id, hostToken);
   const { conv } = await openThread(m.token, group.id);
   expect((await say(m.token, conv.id, 'Hi from the new flatmate')).status).toBe(201);
 
@@ -87,8 +92,8 @@ test('host opens the group thread in Messages, sees who wrote what, and removing
 });
 
 test('on a 360px phone a member reaches the group chat without zoom or sideways scroll; strangers get none', async ({ page, browser }) => {
-  const { group } = await liveGroup();
-  const m = await member(group.id);
+  const { group, hostToken } = await liveGroup();
+  const m = await member(group.id, hostToken);
 
   await page.setViewportSize({ width: 360, height: 740 });
   await signedInAs(page, m.mobile);

@@ -25,9 +25,9 @@ async function createGroup(token, title) {
     headers: auth(token),
     body: JSON.stringify({
       title,
-      name: 'Prefreeze Host',
       locality: 'Baner',
       rent: 25000,
+      deposit: 50000,
       seats: 3,
       seatsOpen: 2,
       policy: 'any',
@@ -43,25 +43,25 @@ async function createGroup(token, title) {
 
 test('joining a group reaches the server: the host\'s inbox shows the request', async ({ page }) => {
   const hostMobile = uniqueMobile();
-  const { accessToken: hostToken } = await apiLogin(hostMobile);
+  const { accessToken: hostToken } = await apiLogin(hostMobile, { name: 'Prefreeze Host' });
   const tag = Date.now().toString(36);
   const group = await createGroup(hostToken, `Join Test ${tag}`);
   await approve(group.id);
   // --- Browser: seeker signs in and clicks Join ---
   const seekerMobile = await signedInAsNew(page);
   await page.goto(`${BASE}/flatmates`);
-  await page.getByRole('button', { name: /Team up/i }).first().click();
+  await page.locator('button[data-tab="teams"]').click();
 
   const card = page.locator('.sf-card', { hasText: group.title });
   await expect(card).toBeVisible({ timeout: 15_000 });
 
   await card.getByRole('link', { name: group.title }).click();
   await expect(page).toHaveURL(new RegExp(`/flatmates/group/${group.id}$`));
-  const joinBtn = detailCta(page, /Join group/i);
+  const joinBtn = detailCta(page, /Request to join/i);
   await expect(joinBtn).toBeVisible({ timeout: 15_000 });
   await joinBtn.click();
 
-  await expect(page.getByText(/^\s*(You're in|Requested)\s*$/).filter({ visible: true }).first()).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText(/^\s*Requested\s*$/).filter({ visible: true }).first()).toBeVisible({ timeout: 5_000 });
   // --- API verification: the host's inbox contains the request ---
   const { accessToken: freshHostToken } = await apiLogin(hostMobile);
   await expect
@@ -80,13 +80,15 @@ test('joining a group reaches the server: the host\'s inbox shows the request', 
 test('a signed-out user joining a group gets the sign-in sheet, and the join runs after sign-in', async ({ page }) => {
   await seedConsent(page);
   await page.goto(`${BASE}/flatmates`);
-  await page.getByRole('button', { name: /Team up/i }).first().click();
-  const card = page.locator('.sf-card[data-sf-id^="g:"]').filter({ hasText: /seats? left/ }).first();
+  await page.locator('button[data-tab="teams"]').click();
+  // A gender-gated group asks "Who is asking?" before joining, which is a different flow.
+  const card = page.locator('.sf-card[data-sf-id^="g:"]')
+    .filter({ hasText: /seats? left/ }).filter({ hasNotText: /(Women|Men) only/ }).first();
   await card.waitFor({ timeout: 15_000 });
   await card.locator('h3 a').click();
   await expect(page).toHaveURL(/\/flatmates\/group\//);
 
-  const joinBtn = detailCta(page, /Join group|Request to join/i);
+  const joinBtn = detailCta(page, /Request to join/i);
   await expect(joinBtn).toBeVisible({ timeout: 15_000 });
   const before = page.url();
   await joinBtn.click();
@@ -98,5 +100,5 @@ test('a signed-out user joining a group gets the sign-in sheet, and the join run
   await verifyInSheet(page, uniqueMobile());
 
   await expect(page).toHaveURL(before);
-  await expect(page.getByText(/^\s*(You're in|Requested)\s*$/).filter({ visible: true }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/^\s*Requested\s*$/).filter({ visible: true }).first()).toBeVisible({ timeout: 15_000 });
 });

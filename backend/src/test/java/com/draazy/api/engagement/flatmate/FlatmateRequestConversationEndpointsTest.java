@@ -12,7 +12,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -23,7 +22,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.ResultActions;
 
-@DisplayName("Flatmates — an accepted request opens a chat between its two parties")
+@DisplayName("Flatmates — an accepted request, or a pending group join for its host, opens a chat")
 class FlatmateRequestConversationEndpointsTest extends AbstractApiTest {
 
     @Autowired
@@ -59,10 +58,11 @@ class FlatmateRequestConversationEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"bhk":"2","roomType":"Private room","locality":"Aundh",
-                                 "society":"Chat Towers","rentShare":15000,"hostRole":"owner",
-                                 "photos":["%s"]}
-                                """.formatted(UploadedPhotos.of(host.getId()))))
+                                {"bhk":"2","roomType":"Private room","attachedBath":"attached","locality":"Aundh",
+                                 "society":"Chat Towers","rentShare":15000,"deposit":30000,"hostRole":"owner",
+                                 %s,%s,%s}
+                                """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateRoomFixture.BASICS,
+                                FlatmateRoomFixture.DETAILS)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = idOf(json);
@@ -72,6 +72,34 @@ class FlatmateRequestConversationEndpointsTest extends AbstractApiTest {
         return id;
     }
 
+    private String group(User host) throws Exception {
+        String json = mvc.perform(post(Routes.Flatmates.GROUPS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"title":"Chat in Baner","locality":"Baner","policy":"any",
+                                 "rent":30000,"deposit":10000,"seats":3,"seatsOpen":2,"name":"Host"}
+                                """))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        String id = idOf(json);
+        em.flush();
+        jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
+        em.clear();
+        return id;
+    }
+
+    private String join(String groupId, User seeker) throws Exception {
+        mvc.perform(post(Routes.Flatmates.GROUP_JOIN, groupId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(seeker))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"share\":\"solo\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.status").value("pending"));
+        return jdbc.queryForObject(
+                "select id::text from flatmate_requests where target_id = ?::uuid and requester_id = ?::uuid",
+                String.class, groupId, seeker.getId().toString());
+    }
     private String ask(String roomId, User seeker) throws Exception {
         mvc.perform(post(Routes.Flatmates.ROOM_INTEREST, roomId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(seeker))
@@ -101,7 +129,8 @@ class FlatmateRequestConversationEndpointsTest extends AbstractApiTest {
     void acceptedRequestOpensOneSharedThread() throws Exception {
         User host = user("Host");
         User seeker = user("Seeker");
-        String requestId = ask(room(host), seeker);
+        String roomId = room(host);
+        String requestId = ask(roomId, seeker);
 
         open(requestId, seeker).andExpect(status().isNotFound());
         decide(host, requestId, "accepted");
@@ -110,6 +139,8 @@ class FlatmateRequestConversationEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.counterpartyName").value("Host"))
                 .andExpect(jsonPath("$.counterpartyMobile").doesNotExist())
+                .andExpect(jsonPath("$.flatmateKind").value("room"))
+                .andExpect(jsonPath("$.flatmateTargetId").value(roomId))
                 .andReturn().getResponse().getContentAsString());
         String fromHost = idOf(open(requestId, host).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
@@ -123,6 +154,7 @@ class FlatmateRequestConversationEndpointsTest extends AbstractApiTest {
         mvc.perform(get(Routes.Conversations.BY_ID, fromSeeker)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.flatmateKind").value("room"))
                 .andExpect(jsonPath("$.messages[0].body").value("Can I see the room on Saturday?"));
     }
 
@@ -141,5 +173,51 @@ class FlatmateRequestConversationEndpointsTest extends AbstractApiTest {
         decide(host, accepted, "accepted");
         open(accepted, seeker).andExpect(status().isNotFound());
         open("not-a-uuid", seeker).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("a group host can open a chat with a pending joiner to vet them; the joiner cannot until then")
+    void hostVetsAPendingGroupJoiner() throws Exception {
+        User host = user("GroupHost");
+        User joiner = user("Joiner");
+        String requestId = join(group(host), joiner);
+
+        open(requestId, joiner).andExpect(status().isNotFound());
+        String conversation = idOf(open(requestId, host)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.counterpartyName").value("Joiner"))
+                .andExpect(jsonPath("$.counterpartyMobile").doesNotExist())
+                .andReturn().getResponse().getContentAsString());
+
+        mvc.perform(post(Routes.Conversations.REPLY, conversation)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(joiner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"body\":\"Happy to share my work details.\"}"))
+                .andExpect(status().isCreated());
+        mvc.perform(get(Routes.Conversations.BY_ID, conversation)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.messages[0].body").value("Happy to share my work details."));
+        assertThat(jdbc.queryForObject("select status from flatmate_requests where id = ?::uuid",
+                String.class, requestId)).isEqualTo("pending");
+    }
+
+    @Test
+    @DisplayName("a pending room request stays closed to its host")
+    void pendingRoomRequestStaysClosedToTheHost() throws Exception {
+        User host = user("RoomHost");
+        String requestId = ask(room(host), user("Seeker3"));
+
+        open(requestId, host).andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("a declined group join is closed to the host")
+    void declinedGroupJoinIsClosedToTheHost() throws Exception {
+        User host = user("GroupHost2");
+        String requestId = join(group(host), user("Seeker4"));
+        decide(host, requestId, "declined");
+
+        open(requestId, host).andExpect(status().isNotFound());
     }
 }

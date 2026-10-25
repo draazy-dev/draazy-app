@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
+import Icon from '../../../components/Icon.jsx';
 import ConfirmModal from '../../../components/ui/ConfirmModal.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { myLeadNotes, saveLeadNote } from '../../../services/leadNoteService.js';
@@ -82,19 +83,22 @@ export default function RequestsPanel({ onChanged }) {
   const [tabKey, setTabKey] = useState('all');
   const [confirming, setConfirming] = useState(null);
   const [sheet, setSheet] = useState(null);
+  const [showPast, setShowPast] = useState(false);
   const now = useNow();
   const { received, sent } = inbox.boxes;
 
-  // Received holds only open requests, so listing it first puts everything awaiting you on top.
-  const rows = [
+  const all = [
     ...received.items.map((item) => ({ item, box: 'received' })),
     ...sent.items.map((item) => ({ item, box: 'sent' })),
   ];
   const tab = TABS.find((t) => t.key === tabKey);
-  const shown = rows.filter((row) => inTab(tab, row));
-  const tabs = TABS.map((t) => ({ ...t, count: rows.filter((row) => row.box === 'received' && inTab(t, row)).length }));
+  const shown = all.filter((row) => inTab(tab, row));
+  const open = shown.filter((row) => isPending(row.item));
+  const past = shown.filter((row) => !isPending(row.item));
+  const tabs = TABS.map((t) => ({ ...t, count: all.filter((row) => row.box === 'received' && isPending(row.item) && inTab(t, row)).length }));
   const loading = received.status === 'loading' || sent.status === 'loading';
   const failed = ['received', 'sent'].filter((b) => inbox.boxes[b].status === 'error');
+  const settled = !loading && !failed.length;
 
   const confirmingItem = confirming ? sent.items.find((it) => requestKey(it) === confirming) : null;
 
@@ -102,6 +106,24 @@ export default function RequestsPanel({ onChanged }) {
     setConfirming(null);
     if (confirmingItem) actions.remove(confirmingItem);
   };
+
+  const renderCard = ({ item, box }) => (
+    <RequestCard
+      key={requestKey(item)}
+      item={item}
+      box={box}
+      now={now}
+      busy={actions.busy.has(requestKey(item))}
+      note={box === 'received' ? leadNotes.notes[leadKey(item)] : undefined}
+      onNote={box === 'received' ? (it) => setSheet(asLead(it)) : undefined}
+      onDecide={actions.decide}
+      onRemind={actions.remind}
+      onWithdraw={(it) => setConfirming(requestKey(it))}
+      onClear={actions.remove}
+      onOpenChat={item.state === 'accepted' && CHAT_KINDS.has(item.kind) ? (box === 'sent' ? actions.openAccepted : actions.openReceived) : undefined}
+      onChatFirst={box === 'received' ? actions.openReceived : undefined}
+    />
+  );
 
   return (
     <div className="pc-reqs" data-testid="requests-panel">
@@ -113,23 +135,28 @@ export default function RequestsPanel({ onChanged }) {
           <button type="button" onClick={() => failed.forEach((b) => inbox.load(b))}>Retry</button>
         </div>
       ) : null}
-      {!loading && !failed.length && !shown.length ? <Empty tab={tab} /> : null}
-      {shown.map(({ item, box }) => (
-        <RequestCard
-          key={requestKey(item)}
-          item={item}
-          box={box}
-          now={now}
-          busy={actions.busy.has(requestKey(item))}
-          note={box === 'received' ? leadNotes.notes[leadKey(item)] : undefined}
-          onNote={box === 'received' ? (it) => setSheet(asLead(it)) : undefined}
-          onDecide={actions.decide}
-          onRemind={actions.remind}
-          onWithdraw={(it) => setConfirming(requestKey(it))}
-          onClear={actions.remove}
-          onOpenChat={box === 'sent' && item.state === 'accepted' && CHAT_KINDS.has(item.kind) ? actions.openAccepted : undefined}
-        />
-      ))}
+      {settled && !shown.length ? <Empty tab={tab} /> : null}
+      {open.map(renderCard)}
+      {settled && !open.length && past.length ? <p className="py-6 text-center text-sm text-gray-500" data-testid="requests-caught-up">Nothing waiting on you.</p> : null}
+      {past.length ? (
+        <button
+          type="button"
+          onClick={() => setShowPast((v) => !v)}
+          aria-expanded={showPast}
+          aria-controls="requests-past"
+          data-testid="requests-past-toggle"
+          className="mt-1 mb-2 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-xl border border-white/10 text-sm font-semibold text-gray-300 hover:bg-white/5"
+        >
+          {showPast ? 'Hide past requests' : `Show past requests (${past.length})`}
+          <Icon name="chevron-down" className={'h-4 w-4 transition-transform' + (showPast ? ' rotate-180' : '')} />
+        </button>
+      ) : null}
+      {showPast && past.length ? (
+        <section id="requests-past" data-testid="requests-past">
+          <h2 className="mb-3 mt-3 px-1 text-[11px] font-bold uppercase tracking-wider text-gray-500">Past requests</h2>
+          {past.map(renderCard)}
+        </section>
+      ) : null}
       {confirmingItem && isPending(confirmingItem) ? (
         <ConfirmModal
           title="Withdraw request?"

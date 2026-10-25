@@ -8,12 +8,12 @@ const auth = (token) => ({ 'content-type': 'application/json', authorization: `B
 const track = flatmateCleanup(test);
 
 async function liveGroup() {
-  const { accessToken } = await apiLogin(uniqueMobile());
+  const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Host' });
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
     body: JSON.stringify({
-      title: `Sticky ${Date.now().toString(36)}`, name: 'Host', locality: 'Baner', rent: 30000,
+      title: `Sticky ${Date.now().toString(36)}`, locality: 'Baner', rent: 30000, deposit: 50000,
       seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant',
     }),
   });
@@ -47,6 +47,9 @@ test.describe('LIVE: flatmate detail on a phone', () => {
     const barBox = await bar.boundingBox();
     expect(barBox.y + barBox.height, 'the bar sits inside the viewport').toBeLessThanOrEqual(844 + 1);
     expect(barBox.y, 'the bar is in the bottom thumb zone').toBeGreaterThan(844 / 2);
+    const askBox = await bar.getByRole('button', { name: 'Request to join' }).boundingBox();
+    expect(askBox.width / 390, 'the ask takes about half the width').toBeGreaterThan(0.4);
+    expect(askBox.width / 390).toBeLessThan(0.55);
 
     const fab = page.getByRole('button', { name: 'Open Draaz, the Draazy help assistant' });
     await expect(fab).toBeVisible();

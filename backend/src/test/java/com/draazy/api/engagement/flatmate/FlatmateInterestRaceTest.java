@@ -56,7 +56,7 @@ class FlatmateInterestRaceTest {
         // "one of you". Targets are arbitrary ids: the counter is keyed on the requester alone.
         for (int i = 0; i < CAP - 1; i++) {
             requests.saveAndFlush(new FlatmateRequest("flatmate", UUID.randomUUID(),
-                    hosts.get(0).getId(), requester.getId(), "request", "solo", "earlier"));
+                    hosts.get(0).getId(), requester.getId(), "solo", "earlier"));
         }
         assertThat(countForRequester()).isEqualTo(CAP - 1);
     }

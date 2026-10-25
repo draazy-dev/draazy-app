@@ -86,7 +86,7 @@ export default function Dashboard() {
     contactReqs, photoReqs, flatmateReqs, docReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
     apps, decideApp,
-    decideContact, decideDocReqs, decideFlatmateReq, decidePhotoReq, mutateVisit, openReview, sendReview,
+    decideContact, decideDocReqs, decideFlatmateReq, chatFlatmateReq, decidePhotoReq, mutateVisit, openReview, sendReview,
     dataStatus, dataError, retryData,
     isBusy, refreshData, refreshRequests, setListings,
   } = useDashboardData({ user, toast, ownsProperty: caps.ownsProperty });
@@ -161,7 +161,7 @@ export default function Dashboard() {
   const actionItems = buildActionItems({
     isOwner, contactReqs, apps, photoReqs, pendingDocGroups, listings, reviewsByProp,
     scheduledVisits, flatmateReqs, userId: user?.id, openReview, isBusy,
-    decideContact, decideApp, go, decideDocReqs, decidePhotoReq, decideFlatmateReq, mutateVisit, navigate,
+    decideContact, decideApp, go, decideDocReqs, decidePhotoReq, decideFlatmateReq, chatFlatmateReq, mutateVisit, navigate,
   });
   // Badge counts only items genuinely waiting on the owner, matching the Requests panel's
   // "Waiting on you"; an already-contactable enquiry needs no accept/decline decision.
@@ -193,7 +193,7 @@ export default function Dashboard() {
       case 'finances':
         return <FinancesTab user={user} listings={listings} toast={toast} isOwner={isOwner} showRental={showRental} />;
       case 'documents':
-        return <DocumentsTab user={user} listings={listings} toast={toast} isOwner={isOwner} />;
+        return <DocumentsTab user={user} listings={listings} toast={toast} isOwner={isOwner} onRoomBadgeChanged={refreshData} />;
       case 'visits':
         return <VisitsTab visits={visits} toast={toast} isOwner={isOwner} onUpdate={mutateVisit} />;
       case 'billing':
