@@ -233,8 +233,8 @@ class PropertyReraCheckTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("buyers see RERA checked only after a verified result, and never who checked")
-    void buyerSeesOnlyVerified() throws Exception {
+    @DisplayName("buyers see the owner-shared RERA ID but never the staff check, whatever its result")
+    void buyerNeverSeesTheCheck() throws Exception {
         User owner = user("9870000012", "owner");
         User staff = user("9870000013", "staff");
         User buyer = user("9870000014", "buyer");
@@ -243,14 +243,11 @@ class PropertyReraCheckTest extends AbstractApiTest {
         properties.saveAndFlush(p);
         String detail = "/properties/" + p.getId();
 
-        mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.reraChecked").doesNotExist());
-        rera(staff, p, "not_found").andExpect(status().isOk());
-        mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
-                .andExpect(jsonPath("$.reraChecked").doesNotExist());
         rera(staff, p, "verified").andExpect(status().isOk());
         mvc.perform(get(detail).header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
-                .andExpect(jsonPath("$.reraChecked").value(true))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reraId").value("P52100012345"))
+                .andExpect(content().string(not(containsString("reraCheck"))))
                 .andExpect(content().string(not(containsString(staff.getId().toString()))));
     }
 }

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { listingFreshness } from '../../../lib/freshness.js';
+import { mahaReraSearchUrl } from '../../../lib/maharera.js';
 
 // Every check is backed by a real listing field; nothing is implied that the data cannot show.
 export function VerificationSection({ p }) {
@@ -40,24 +41,6 @@ export function VerificationSection({ p }) {
       noLabel: t('property.unconfirmed'),
     },
   ];
-  if (p.reraId) {
-    checks.push({
-      passed: true,
-      icon: 'badge-check',
-      title: t('property.reraRegistered'),
-      yes: (
-        <>
-          {t('property.reraYes')}{' '}
-          <a href="https://maharera.maharashtra.gov.in/" target="_blank" rel="noopener noreferrer" className="text-emerald-300 hover:underline">
-            {t('property.mahaReraId', { id: p.reraId })}
-          </a>
-        </>
-      ),
-      no: '',
-      yesLabel: t('property.registered'),
-      noLabel: '',
-    });
-  }
 
   const passed = checks.filter((c) => c.passed).length;
   const total = checks.length;
@@ -91,6 +74,24 @@ export function VerificationSection({ p }) {
             </div>
           ))}
         </div>
+        {/* Kept out of `checks`: an owner-shared number is not a check Draazy passed, so it must not
+            raise the score. */}
+        {p.reraId ? (
+          <div data-testid="rera-shared" className="mt-4 rounded-xl border border-white/10 bg-white/[0.03] p-5 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-white/10">
+              <Icon name="file-text" className="w-5 h-5 text-slate-400" />
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-white text-sm mb-1">{t('property.reraSharedTitle')}</p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                {t('property.reraSharedDesc')}{' '}
+                <a href={mahaReraSearchUrl(p.reraId)} target="_blank" rel="noopener noreferrer" className="text-teal-300 hover:underline">
+                  {t('property.mahaReraId', { id: p.reraId })}
+                </a>
+              </p>
+            </div>
+          </div>
+        ) : null}
         <p className="text-slate-500 text-xs mt-4 flex items-start gap-1.5"><Icon name="info" className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> {t('property.verificationFooter', { ownership: isRent ? t('property.ownershipVerifiedTitle') : t('property.ownershipIndexTitle') })}</p>
       </div>
     </section>

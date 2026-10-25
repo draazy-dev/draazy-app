@@ -98,7 +98,7 @@ test('an unknown slug is a 404 from the API and renders an honest placeholder, n
   /* Unknown shared links still render, but must not assert facts about the building. */
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
 
-  await expect(page.getByText('Details not confirmed yet')).toBeVisible();
+  await expect(page.getByText('Limited details', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: /Add details/i })).toHaveCount(0);
 
   /* No specifications: each field must be absent, never an invented value indistinguishable from a real row. */

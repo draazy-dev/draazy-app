@@ -6,6 +6,7 @@ import MobileCollapse from '../../../components/ui/MobileCollapse.jsx';
 import { fmtINR, fmtNum, timeAgo } from '../../../lib/format.js';
 import { listingFreshness } from '../../../lib/freshness.js';
 import { cityLabelFor } from '../../../lib/geoConfig.js';
+import { mahaReraSearchUrl } from '../../../lib/maharera.js';
 import { OwnerCard } from './OwnerCard.jsx';
 import { DealPanel } from './DealPanel.jsx';
 import { GroupApplyCard } from './GroupApplyCard.jsx';
@@ -85,9 +86,8 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                     </Tip>
                   ))}
                   {p.reraId ? (
-                    <a href="https://maharera.maharashtra.gov.in/" target="_blank" rel="noopener noreferrer" className="dz-chip border border-emerald-500/25 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/15">
-                      <Icon name="badge-check" className="h-3.5 w-3.5" /> {tr('property.mahaReraId', { id: p.reraId })}
-                      {p.reraChecked ? <span data-testid="rera-checked" className="border-l border-emerald-500/30 pl-1.5">{tr('property.reraChecked')}</span> : null}
+                    <a href={mahaReraSearchUrl(p.reraId)} target="_blank" rel="noopener noreferrer" title={tr('property.reraVerifyTitle')} data-testid="rera-link" className="dz-chip border border-white/15 bg-white/[0.04] text-slate-200 hover:bg-white/[0.08]">
+                      {tr('property.reraSharedChip', { id: p.reraId })} <Icon name="external-link" className="h-3.5 w-3.5" />
                     </a>
                   ) : null}
                 </div>

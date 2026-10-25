@@ -2,7 +2,7 @@ import { expect, test } from '../../../fixtures/live.js';
 import { signedInAsNew } from '../../../helpers/liveAuth.js';
 import { mintSociety } from '../../../helpers/liveSociety.js';
 
-/* A minted society carries only a name and a place, the state the honest placeholder exists for; visitors cannot offer details for it. */
+/* A minted society carries only a name and a place; visitors cannot offer details for it. */
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
@@ -21,14 +21,14 @@ test('a seeded society prints its specification, and one nobody has confirmed pr
      stopped drawing the specification at all. */
   await openHub(page, CONFIRMED);
   await expect(statLabel(page, 'Total units')).toBeVisible();
-  await expect(page.getByText('Details not confirmed yet')).toHaveCount(0);
-  await expect(page.getByText('Society Verified')).toHaveCount(0);
+  await expect(page.getByText('Limited details', { exact: true })).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText(/RERA-registered|Society Verified/);
 
   const author = await signedInAsNew(page);
   const minted = await mintSociety(request, author, 'badge');
   await openHub(page, minted);
-  await expect(page.getByText('Details not confirmed yet')).toBeVisible();
-  await expect(page.getByText('Society Verified')).toHaveCount(0);
+  await expect(page.getByText('Limited details', { exact: true })).toBeVisible();
+  await expect(page.locator('main')).not.toContainText(/Society Verified|not confirmed|confirms the specifics|RERA-registered/i);
   await expect(statLabel(page, 'Total units')).toHaveCount(0);
   await expect(page.getByRole('button', { name: /Add details/i })).toHaveCount(0);
 });

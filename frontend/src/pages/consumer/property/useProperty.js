@@ -247,7 +247,7 @@ export default function useProperty() {
   } else {
     highlights.push([p.construction === 'new' ? 'hard-hat' : 'circle-check-big', possessionLabel]);
   }
-  if (p.reraId) highlights.push(['badge-check', tr('property.reraApproved')]);
+  if (p.reraId) highlights.push(['file-text', tr('property.reraShared')]);
   if (isLand) {
     if (plotZone) highlights.push(['layout-grid', tr('property.zoneLabel', { zone: plotZone })]);
     if (p.ownershipVerified) highlights.push(['file-check', tr('property.clearTitleHl')]);
@@ -287,7 +287,6 @@ export default function useProperty() {
   const tags = [];
   if (p.ownerVerified) tags.push([tr('property.verifiedOwner'), 'tag-emerald', 'user-check', 'tag.verifiedOwner']);
   if (p.ownershipVerified) tags.push([tr('property.ownershipVerified'), 'tag-emerald', 'file-check', 'tag.ownershipVerified']);
-  if (p.reraId) tags.push([tr('property.reraApproved'), 'tag-emerald', 'badge-check', 'tag.rera']);
   tags.push([tr('property.zeroBrokerageDirect'), '', 'hand-coins', 'tag.zeroBrokerage']);
 
   /* Re-stated here only to spend a toast instead of a round trip; the server enforces both

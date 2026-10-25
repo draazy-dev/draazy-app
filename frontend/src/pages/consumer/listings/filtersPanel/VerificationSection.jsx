@@ -11,7 +11,7 @@ export default function VerificationSection({ f, set }) {
   return (
     <FilterGroup icon="shield-check" title={t('listings.verification')} summary={selected ? t('listings.selectedCount', { count: selected }) : ''} defaultCollapsed>
       <div className="space-y-3">
-        {[['owner', 'user-check', t('listings.verifOwner'), 'text-emerald-400'], ['ownership', 'file-check', t('property.ownershipVerified'), 'text-teal-400'], ['rera', 'badge-check', t('listings.verifRera'), 'text-teal-400']]
+        {[['owner', 'user-check', t('listings.verifOwner'), 'text-emerald-400'], ['ownership', 'file-check', t('property.ownershipVerified'), 'text-teal-400'], ['rera', 'file-text', t('listings.verifRera'), 'text-teal-400']]
           .filter(([k]) => verifShown(k))
           .map(([k, ic, label, col]) => (
           <label key={k} className="relative flex items-center justify-between cursor-pointer">

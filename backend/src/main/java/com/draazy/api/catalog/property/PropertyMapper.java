@@ -44,6 +44,7 @@ public interface PropertyMapper {
     PropertySummary toSummary(Property property);
 
     @Mapping(target = "coverImage", expression = COVER)
+    @Mapping(target = "images", expression = "java(leadPhotos(property, PropertyCard.MAX_PHOTOS))")
     PropertyCard toCard(Property property);
 
     @Mapping(target = "coverImage", expression = COVER)
@@ -73,8 +74,7 @@ public interface PropertyMapper {
 
     SearchIndexEntry toIndexEntry(Property property);
 
-    @Mapping(target = "photos", expression = "java(property.getImages() == null ? java.util.List.of()"
-            + " : property.getImages().stream().limit(PropertyReel.MAX_PHOTOS).toList())")
+    @Mapping(target = "photos", expression = "java(leadPhotos(property, PropertyReel.MAX_PHOTOS))")
     PropertyReel toReel(Property property);
 
     @Mapping(target = "coverImage", expression = COVER)
@@ -117,7 +117,6 @@ public interface PropertyMapper {
     @Mapping(target = "availableDate",
             expression = "java(property.getAvailableOn() == null ? null : property.getAvailableOn().toString())")
     @Mapping(target = "furniture", expression = "java(formDetailStrings(property, \"furniture\"))")
-    @Mapping(target = "reraChecked", expression = "java(property.isReraVerified() ? Boolean.TRUE : null)")
     @Mapping(target = "commercial", expression = "java(toCommercial(property))")
     @Mapping(target = "land", expression = "java(toLand(property))")
     PropertyResponse toResponse(Property property, @Context ContactVisibility visibility,
@@ -299,6 +298,11 @@ public interface PropertyMapper {
         }
         var images = property.getImages();
         return images == null || images.isEmpty() ? null : images.get(0);
+    }
+
+    default List<String> leadPhotos(Property property, int max) {
+        var images = property.getImages();
+        return images == null ? List.of() : images.stream().limit(max).toList();
     }
 
     /** The gallery size, or one for a lone cover: what the quality score counts as photos. */

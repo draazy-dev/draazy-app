@@ -32,7 +32,7 @@ const SPOT_CHIPS = ['govt', 'doorstep', 'fast'];
 const FEATURED_SLUG = 'rentAgreement';
 const SERVICES = [
   ['Rent Agreement', 'file-signature', 'finance', '1521791136064-7986c2920216', 'Hassle-free online Maharashtra rent agreements with doorstep biometric.', '/services/rent-agreement', 'rentAgreement'],
-  ['Buy a Home', 'home', 'discover', '1600596542815-ffad4c1539a9', 'Browse owner-direct homes for sale across Pune, with ID, ownership and RERA badges where they apply.', '/listings?deal=buy', 'buyHome'],
+  ['Buy a Home', 'home', 'discover', '1600596542815-ffad4c1539a9', 'Browse owner-direct homes for sale across Pune, with ID and ownership badges, and the owner-shared RERA number where given.', '/listings?deal=buy', 'buyHome'],
   ['Rent a Home', 'key-round', 'discover', '1502672260266-1c1ef2d93688', 'Owner-direct rentals with zero brokerage and instant visit scheduling.', '/listings?deal=rent', 'rentHome'],
   ['Locality Insights', 'trending-up', 'discover', '1486406146926-c627a92ad1ab', 'Price trends, livability scores and connectivity for every Pune locality.', '/locality/baner', 'localityInsights'],
   ['Home Loans & EMI', 'badge-percent', 'finance', '1554224155-6726b3ff858f', 'Compare offers from partner banks, check eligibility and plan repayments with a built-in EMI calculator.', '/home-loans', 'homeLoans'],

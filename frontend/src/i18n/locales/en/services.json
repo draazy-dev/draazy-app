@@ -39,7 +39,7 @@
       "card": {
         "buyHome": {
           "name": "Buy a Home",
-          "desc": "Browse owner-direct homes for sale across Pune, with ID, ownership and RERA badges where they apply."
+          "desc": "Browse owner-direct homes for sale across Pune, with ID and ownership badges, and the owner-shared RERA number where given."
         },
         "rentHome": {
           "name": "Rent a Home",
