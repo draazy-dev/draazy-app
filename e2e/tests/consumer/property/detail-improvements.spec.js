@@ -4,7 +4,7 @@ import { API } from '../../../helpers/liveAuth.js';
 
 /* The benchmark is the server's listing-derived locality stats (null below three live listings), so
    each assertion follows what `GET /localities/<slug>` says rather than a fixed figure. */
-const SALE_FLAT_KNOWN = 'p5013';  // 1 BHK Flat, Baner
+const SALE_FLAT_KNOWN = 'p5013';  // 3 BHK Flat, Baner
 const SALE_LAND = 'p5124';        // Open Plot, Wagholi (buy, land) - seeded 2026-08-19
 const SALE_COMMERCIAL = 'p5101';  // Office Space, Baner (buy, commercial)
 const RENT_2BHK_KNOWN = 'p5121';  // 2 BHK Flat, Wakad

@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { trackErrors } from '../../../helpers/console.js';
 
-const SALE_FLAT = 'p5013';      // 1 BHK Flat, Baner (buy)
+const SALE_FLAT = 'p5013';      // 3 BHK Flat, Baner (buy)
 // No approved rent Flat is safe here; this approved rental exercises the same tip tiles.
-const RENT_HOME = 'p5015';      // 4 BHK Row House, Wakad (rent, approved).
+const RENT_HOME = 'p5015';      // 3 BHK Row House, Wakad (rent, approved).
 const COMMERCIAL = 'p5101';     // Office Space (buy)
 
 function relevant(errors) {

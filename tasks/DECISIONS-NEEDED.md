@@ -50,3 +50,8 @@ Nothing.
 | 328 | Access token in web storage | Accepted: refresh token is HttpOnly and the strict CSP is the control |
 | 329 | API fuzzer (Schemathesis) | No; `BoundaryValidationTest` covers it |
 | 330 | Second staff check on approvals (identity QA, property overrides, held drafts, appeals)? | No: one staff decision is final. Refunds keep two-person approval; staff still can't act on their own listing, case, appeal or uploaded registered copy |
+| 331 | Tenant-hosted flatmate Verified home | Rent agreement or light bill naming the owner, plus owner OTP/WhatsApp consent in both cases |
+| 332 | Verified home needs the host ID verified first? | Yes; posting still needs neither |
+| 333 | Owner renting a spare room without a Draazy listing | Lists the flat as a property and earns its Verified-owner badge; the room inherits it |
+| 334 | Flatmate publish checklist | Rooms and flat-holding groups need the 3 property ticks before Publish; seeker and hunting-group posts stay live-first, reviewed after |
+| 335 | Flatmate Needs info | Yes: reason code, post stays pending, host replies in the Support thread or edits |

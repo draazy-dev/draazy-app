@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 
 /* The card must describe the check Draazy performs (documents sighted by ops), not claim a registry search. */
 
-const VERIFIED_SALE = 'p5013';   // 1 BHK Flat in Baner (buy), approved, ownership_verified = true
-const UNVERIFIED_SALE = 'p5008'; // 2 BHK Penthouse in Baner (buy), approved, ownership_verified = false
+const VERIFIED_SALE = 'p5013';   // 3 BHK Flat in Baner (buy), approved, ownership_verified = true
+const UNVERIFIED_SALE = 'p5008'; // 2 BHK Flat in Baner (buy), approved, ownership_verified = false
 
 async function verificationTabText(page, id) {
   await page.goto(`/property/${id}`, { waitUntil: 'networkidle' });

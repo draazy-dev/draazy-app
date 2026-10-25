@@ -3,11 +3,11 @@ import { API, authHeaders } from '../../helpers/liveAuth.js';
 
 // The ledger is append-only, so reminder assertions use deltas, not absolute counts.
 const CONCIERGE = {
-  contacted: { id: 'd87532db-4b22-5356-8795-b48e8dbb0c98', title: '3 BHK Studio in Aundh', step: 'created' },
-  info_collected: { id: 'd92efc2e-a501-589d-b6ea-6d3173c5c59d', title: '2 BHK Studio in Magarpatta', step: 'created' },
+  contacted: { id: 'd87532db-4b22-5356-8795-b48e8dbb0c98', title: '3 BHK Flat in Aundh', step: 'created' },
+  info_collected: { id: 'd92efc2e-a501-589d-b6ea-6d3173c5c59d', title: '2 BHK Flat in Magarpatta', step: 'created' },
   listed: { id: '42ba0880-ee4f-5a78-9a8d-e70200409791', title: '1 BHK Flat in Kharadi', step: 'created' },
-  docs_submitted: { id: '9fd5a65b-0607-50e4-8f1c-3d1de0090017', title: '1 BHK Plot in Viman Nagar', ownerMobile: '9108512606', step: 'created' },
-  photos_uploaded: { id: '7847ad81-cc55-5db2-bacb-67d085e3ef4e', title: '2 BHK Row House in Kothrud', step: 'created' },
+  docs_submitted: { id: '9fd5a65b-0607-50e4-8f1c-3d1de0090017', title: 'Commercial Plot in Viman Nagar', ownerMobile: '9108512606', step: 'created' },
+  photos_uploaded: { id: '7847ad81-cc55-5db2-bacb-67d085e3ef4e', title: '3 BHK Row House in Kothrud', step: 'created' },
   claim_sent: { id: '11d1c69c-2e33-55a8-ac83-af36deb1b31c', title: '4 BHK Penthouse in Undri', ownerMobile: '9592138848', step: 'link_sent' },
 };
 
