@@ -1,6 +1,7 @@
 // Payload and request-count guards for the admin PII lists: users, enquiries/visits/deals, the bell and the palette.
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 const FULL = /^[6-9]\d{9}$/;
 const USER_ROW_KEYS = new Set([
@@ -100,6 +101,7 @@ test('the bell does not refetch on a route change, and the palette looks listing
   await expect.poll(() => gets.withPath('/api/admin/bell').length).toBe(1);
 
   await page.goto('/admin');
+  await expandAdminNav(page);
   await page.locator('a[href="/admin/users"]').first().click();
   await page.waitForURL('**/admin/users');
   await page.waitForTimeout(500);

@@ -69,9 +69,9 @@ A tile with a count but no **Oldest** age reads **Waiting**. **No tile exists** 
 
 ## The manager and admin Dashboard
 
-- **SLA health** (only if you have analytics access): Listing approval 24h, Ticket pickup 4h, Service delivery 3d, Concierge to live 7d. Green is 90% or more on time, amber 75-89%, red below 75%. Grey **Not recorded** means no data. **View full analytics** opens the SLA tab.
-- **Needs attention**: Pending Verification, Needs Follow-up, Flagged Listings, Open Reports, New Enquiries, Scheduled Visits, Open Service Requests, Deals in Progress. Each opens its desk.
-- **At a glance**: Total Users, Active Listings, Deals closed (30d), Signups today, Visits today. Revenue (last 30 days) shows for admins only.
+- **SLA health** (only if you have analytics access): Listing approval 24h, Ticket pickup 4h, Service delivery 3d, Concierge to live 7d, Flatmate review 24h. Green is 90% or more on time, amber 75-89%, red below 75%. Grey **Not recorded** means no data. **View full analytics** opens the SLA tab.
+- **Needs attention**: Pending Verification, Needs Follow-up, Flagged Listings, Open Reports, New Enquiries, Scheduled Visits, Open Service Requests, Deals in Progress, Flatmate Posts to Review, Flatmate Reports, Unanswered Flatmate Requests (pending over 48h). Each opens its desk.
+- **At a glance**: Total Users, Active Listings, Deals closed (30d), Signups today, Visits today. Revenue (last 30 days) shows for admins only. A **Flatmates** row adds Live Rooms, Active Seekers, Matches (30d) and Host Reply Rate (30d); the last two open the Flatmates analytics tab.
 - **Latest activity**: oldest pending verifications (5 rows, **View all**) and the latest service requests.
 - A tile is hidden when you cannot open its desk. A tile at 0 reads **All clear**.
 

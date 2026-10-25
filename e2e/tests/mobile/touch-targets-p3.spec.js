@@ -1,4 +1,5 @@
 import { test, expect } from '../../fixtures/live.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 /* boundingBox() returns the painted box, so controls that extend their hit area with a transparent ::before
    are measured via the pseudo-element; see COVERAGE.md, "Unpainted tap targets". */
@@ -110,6 +111,7 @@ test.describe('Admin shell on a field phone', () => {
     await consent(page);
     await login.asAdmin();
     await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await expandAdminNav(page);
 
     const nav = page.locator('aside nav');
     const last = nav.getByRole('link').last();
@@ -131,7 +133,7 @@ test.describe('Admin shell on a field phone', () => {
 
     const rail = page.locator('aside');
     const nav = rail.locator('nav');
-    await expect(nav.getByRole('link').first()).toBeVisible();
+    await expandAdminNav(page);
     // Retried inside the poll: the report content arrives after the rail, and a short page cannot scroll yet.
     await expect.poll(() => page.evaluate(() => {
       window.scrollTo({ top: 2000, behavior: 'instant' });

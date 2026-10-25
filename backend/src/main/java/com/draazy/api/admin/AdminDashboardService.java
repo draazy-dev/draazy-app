@@ -10,15 +10,12 @@ import com.draazy.api.security.PermissionMap;
 import com.draazy.api.services.ticket.TicketRow;
 import com.draazy.api.services.ticket.TicketService;
 import com.draazy.api.services.ticket.TicketStatuses;
-import java.time.Duration;
-import java.time.Instant;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AdminDashboardService {
 
-    private static final Duration STALE_AFTER = Duration.ofHours(48);
     private static final int ROWS = 5;
     private static final int TRAFFIC_DAYS = 30;
 
@@ -30,11 +27,12 @@ public class AdminDashboardService {
     private final AdminSlaService sla;
     private final PendingQueue pending;
     private final TicketService tickets;
+    private final AdminFlatmateAnalyticsService flatmates;
 
     public AdminDashboardService(AccountPermissions atoms, PermissionMap capabilities,
             AdminMetricsService metrics, AdminMetricsRepository counts,
             AdminPageViewAnalyticsService traffic, AdminSlaService sla, PendingQueue pending,
-            TicketService tickets) {
+            TicketService tickets, AdminFlatmateAnalyticsService flatmates) {
         this.atoms = atoms;
         this.capabilities = capabilities;
         this.metrics = metrics;
@@ -43,6 +41,7 @@ public class AdminDashboardService {
         this.sla = sla;
         this.pending = pending;
         this.tickets = tickets;
+        this.flatmates = flatmates;
     }
 
     public AdminDashboard dashboard(AuthPrincipal caller) {
@@ -52,6 +51,7 @@ public class AdminDashboardService {
         boolean enquiries = atoms.granted(caller, BackOfficePermissions.ENQUIRIES_READ);
         boolean ticketDesk = atoms.granted(caller, BackOfficePermissions.TICKETS_READ);
         boolean users = atoms.granted(caller, BackOfficePermissions.USERS_READ);
+        boolean flatmateDesk = atoms.granted(caller, BackOfficePermissions.FLATMATES_READ);
         return new AdminDashboard(
                 scorecard ? metrics.dashboard(caller) : null,
                 scorecard ? traffic() : null,
@@ -59,7 +59,8 @@ public class AdminDashboardService {
                 properties ? listings() : null,
                 enquiries ? demand() : null,
                 ticketDesk ? tickets(caller) : null,
-                users ? counts.countUsersWithRole("owner") : null);
+                users ? counts.countUsersWithRole("owner") : null,
+                flatmateDesk ? flatmates.glance() : null);
     }
 
     private AdminDashboard.Traffic traffic() {
@@ -70,7 +71,8 @@ public class AdminDashboardService {
         SlaSummary s = sla.glance();
         return new AdminDashboard.SlaGlance(
                 new AdminDashboard.Track(s.slaRatePct(), s.targetHours(), s.pendingBreachingCount()),
-                track(s.ticketPickup()), track(s.ticketDelivery()), track(s.conciergeToLive()));
+                track(s.ticketPickup()), track(s.ticketDelivery()), track(s.conciergeToLive()),
+                track(s.flatmateReview()));
     }
 
     private static AdminDashboard.Track track(SlaSummary.Track t) {
@@ -79,7 +81,7 @@ public class AdminDashboardService {
     }
 
     private AdminDashboard.Listings listings() {
-        var c = pending.counts(Instant.now().minus(STALE_AFTER));
+        var c = pending.counts();
         return new AdminDashboard.Listings(c.pending(), c.flagged(), c.followUp(),
                 pending.pending(ROWS, true));
     }

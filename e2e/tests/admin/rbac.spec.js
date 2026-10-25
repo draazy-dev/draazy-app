@@ -1,6 +1,7 @@
 // This covers the live atom model, not the retired mock role model.
 import { test, expect, STAFF } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 const navLink = (page, name) => page.locator('nav').getByRole('link', { name, exact: true });
 
@@ -17,6 +18,7 @@ test('an administrator sees every module in the console', async ({ page, login, 
   // Admin has every atom, so this proves nav uses `GET /me` permissions at all.
   await login.asAdmin();
   await page.goto('/admin');
+  await expandAdminNav(page);
   for (const tab of ALL_TABS) {
     await expect(navLink(page, tab)).toBeVisible();
   }
@@ -29,6 +31,7 @@ test('an operations account is moved to the staff portal, never served the admin
   await page.waitForURL('**/staff/properties');
   expect(new URL(page.url()).pathname).toBe('/staff/properties');
   await expect(page.getByRole('heading', { name: 'Properties', exact: true })).toBeVisible();
+  await expandAdminNav(page);
   await expect(navLink(page, 'Settings')).toHaveCount(0);
   await expect(navLink(page, 'Team & Access')).toHaveCount(0);
   expect(consoleErrors).toHaveLength(0);

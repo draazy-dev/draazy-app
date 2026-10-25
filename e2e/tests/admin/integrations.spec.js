@@ -1,5 +1,6 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile } from '../../helpers/liveAuth.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 const requestOtp = (mobile) => fetch(`${API}/auth/login`, {
   method: 'POST',
@@ -40,5 +41,6 @@ test('a manager neither sees the integrations module nor reads its API', async (
   await login.asManager();
   await page.goto('/admin/integrations');
   await expect(page).toHaveURL(/\/admin\/?$/);
+  await expandAdminNav(page);
   await expect(page.getByRole('link', { name: 'Integrations' })).toHaveCount(0);
 });

@@ -67,7 +67,7 @@ function Track({ title, desc, track, completedLabel, outstandingLabel }) {
 
 /** No weekly compliance line: it needs snapshots nothing writes. Null averages render 'not recorded', since
  * coercing to 0 would claim instant service and 0% compliance at once. */
-export default function SlaTab({ sla, failed, days }) {
+export default function SlaTab({ sla, failed, days, flatmates }) {
   if (failed) {
     return (
       <LoadFailedNotice>
@@ -159,13 +159,22 @@ export default function SlaTab({ sla, failed, days }) {
           outstandingLabel="In flight"
         />
       </div>
-      <Track
-        title="Concierge Pipeline"
-        desc="A staff-posted listing from creation to going live. Owner-posted listings are counted under review above, not here."
-        track={sla.conciergeToLive}
-        completedLabel="Went live"
-        outstandingLabel="Still pending"
-      />
+      <div className={flatmates && sla.flatmateReview ? 'grid gap-6 lg:grid-cols-2' : ''}>
+        <Track
+          title="Concierge Pipeline"
+          desc="A staff-posted listing from creation to going live. Owner-posted listings are counted under review above, not here."
+          track={sla.conciergeToLive}
+          completedLabel="Went live"
+          outstandingLabel="Still pending"
+        />
+        <Track
+          title="Flatmate Review"
+          desc="A seeker, room or group post from submission to its first moderation decision."
+          track={flatmates ? sla.flatmateReview : null}
+          completedLabel="Decided"
+          outstandingLabel="Awaiting review"
+        />
+      </div>
 
       {/* Targets are policy, not measurement — but every one of them is the number the server
           compared against, so the table cannot drift away from the panels above it. */}
@@ -177,7 +186,8 @@ export default function SlaTab({ sla, failed, days }) {
             ['Ticket pickup', sla.ticketPickup?.targetHours, 'Assign incoming service requests'],
             ['Service delivery', sla.ticketDelivery?.targetHours, 'Complete rent agreement, legal, etc.'],
             ['Concierge → Live', sla.conciergeToLive?.targetHours, 'Staff-posted property verified & live'],
-          ].map(([name, hoursTarget, desc]) => (
+            flatmates ? ['Flatmate review', sla.flatmateReview?.targetHours, 'Approve or reject new flatmate posts'] : null,
+          ].filter(Boolean).map(([name, hoursTarget, desc]) => (
             <div key={name} className="flex items-center justify-between border-b border-white/5 pb-2.5 last:border-0 last:pb-0">
               <div>
                 <div className="text-sm font-medium text-gray-200">{name}</div>

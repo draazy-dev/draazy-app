@@ -8,7 +8,6 @@ import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.BackOfficePermissions;
 import com.draazy.api.services.ticket.TicketService;
 import com.draazy.api.services.ticket.TicketStatuses;
-import java.time.Instant;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -42,7 +41,7 @@ public class AdminBellService {
 
     private AdminBell.Listings listings() {
         return new AdminBell.Listings(
-                pending.counts(Instant.now()).pending(),
+                pending.counts().pending(),
                 pending.pending(ROWS, false).stream()
                         .map(r -> new AdminBell.Listing(r.id(), r.title(), r.locality(), r.owner(), r.ownerMobile()))
                         .toList());

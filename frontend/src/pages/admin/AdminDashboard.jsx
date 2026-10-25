@@ -3,11 +3,12 @@ import { Link } from 'react-router';
 import {
   ShieldAlert, Flag, Mail, CalendarCheck, ConciergeBell, Handshake, MessageSquareWarning,
   Users, Building2, Building, IndianRupee, Trophy, UserPlus, MousePointerClick,
-  ArrowUpRight, CheckCheck, Clock,
+  ArrowUpRight, CheckCheck, Clock, UserCheck, Hourglass, BedDouble, UserSearch, HeartHandshake, Reply,
 } from 'lucide-react';
 import { adminDashboard } from '../../services/analyticsService.js';
 import { fmtINR, fmtNum } from '../../lib/format.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import { canOpenPath, hasPermission, ticketPath } from '../../lib/adminModules.js';
 import PageHeader from '../../components/ui/PageHeader.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -64,6 +65,7 @@ export default function AdminDashboard() {
 
 function PlatformDashboard({ user }) {
   const [data, setData] = useState(null);
+  const { tabEnabled } = useAdminFlags();
   const canOpen = (href) => canOpenPath(user, href);
 
   /* One read. Every figure is counted by the server over the whole set, and a section the caller
@@ -82,6 +84,8 @@ function PlatformDashboard({ user }) {
   if (!data) return <Loading />;
 
   const { kpis, traffic, sla, listings, demand, tickets, owners } = data;
+  const flatmatesOn = tabEnabled('flatmates');
+  const fm = flatmatesOn ? data.flatmates : null;
   const pendingVerif = listings?.pending ?? kpis?.pendingModeration ?? null;
   const openTickets = tickets?.open ?? null;
 
@@ -90,22 +94,31 @@ function PlatformDashboard({ user }) {
     { lbl: 'Needs Follow-up', val: listings?.followUp, icon: Clock, tint: 'rose', href: '/admin/properties?tab=followup', cta: 'Follow up now', show: Boolean(listings) },
     { lbl: 'Flagged Listings', val: listings?.flagged, icon: Flag, tint: 'rose', href: '/admin/properties?tab=flagged', cta: 'Investigate', show: Boolean(listings) },
     { lbl: 'Open Reports', val: kpis?.openReports, icon: MessageSquareWarning, tint: 'rose', href: '/admin/reports', cta: 'Review reports', show: Boolean(kpis) },
-    { lbl: 'New Enquiries', val: demand?.newEnquiries, icon: Mail, tint: 'indigo', href: '/admin/enquiries', cta: 'Respond now', show: Boolean(demand) },
-    { lbl: 'Scheduled Visits', val: demand?.scheduledVisits, icon: CalendarCheck, tint: 'teal', href: '/admin/enquiries', cta: 'Coordinate', show: Boolean(demand) },
+    { lbl: 'New Enquiries', val: demand?.newEnquiries, icon: Mail, tint: 'indigo', href: '/admin/enquiries?tab=enquiries&status=pending', cta: 'Respond now', show: Boolean(demand) },
+    { lbl: 'Scheduled Visits', val: demand?.scheduledVisits, icon: CalendarCheck, tint: 'teal', href: '/admin/enquiries?tab=visits&status=scheduled', cta: 'Coordinate', show: Boolean(demand) },
     { lbl: 'Open Service Requests', val: openTickets, icon: ConciergeBell, tint: 'coral', href: ticketPath({ desk: tickets?.openTeam }), cta: 'Assign & start', show: openTickets != null },
-    { lbl: 'Deals in Progress', val: demand?.dealsInProgress, icon: Handshake, tint: 'emerald', href: '/admin/enquiries', cta: 'Close deals', show: Boolean(demand) },
+    { lbl: 'Deals in Progress', val: demand?.dealsInProgress, icon: Handshake, tint: 'emerald', href: '/admin/enquiries?tab=deals', cta: 'Close deals', show: Boolean(demand) },
+    { lbl: 'Flatmate Posts to Review', val: fm?.awaitingReview, icon: UserCheck, tint: 'amber', href: '/admin/flatmates', cta: 'Moderate posts', show: Boolean(fm) },
+    { lbl: 'Flatmate Reports', val: fm?.openReports, icon: Flag, tint: 'rose', href: '/admin/reports?tab=posts', cta: 'Review reports', show: Boolean(fm) },
+    { lbl: 'Unanswered Flatmate Requests', val: fm?.unansweredRequests, icon: Hourglass, tint: 'indigo', href: '/admin/analytics?tab=flatmates', cta: 'Waiting over 48h', show: Boolean(fm) },
   ].filter((t) => t.show && canOpen(t.href)).map((t) => ({ ...t, attention: true, display: fmtNum(t.val) }));
   /* `revenue30d` is null for a `staff` caller by design — the server redacts that one figure rather
      than refusing the read. `fmtINR(null)` would print ₹0, so null hides the tile instead. */
   const glanceTilesAll = [
     { lbl: 'Total Users', val: kpis?.totalUsers, display: fmtNum(kpis?.totalUsers), icon: Users, tint: 'indigo', href: '/admin/users', sub: owners == null ? 'buyers & owners' : `${fmtNum(owners)} owners`, show: Boolean(kpis) },
     { lbl: 'Active Listings', val: kpis?.activeListings, display: fmtNum(kpis?.activeListings), icon: Building2, tint: 'teal', href: '/admin/properties?tab=all', sub: `${fmtNum(kpis?.totalListings)} total`, show: Boolean(kpis) },
-    { lbl: 'Revenue (last 30 days)', val: kpis?.revenue30d, display: fmtINR(kpis?.revenue30d), icon: IndianRupee, tint: 'emerald', href: '/admin/finance', sub: 'rolling window', show: kpis?.revenue30d != null },
+    { lbl: 'Revenue (last 30 days)', val: kpis?.revenue30d, display: kpis?.revenue30d < 0 ? `−${fmtINR(-kpis.revenue30d)}` : fmtINR(kpis?.revenue30d), icon: IndianRupee, tint: 'emerald', href: '/admin/finance', sub: 'rolling window', show: kpis?.revenue30d != null },
     { lbl: 'Deals closed (30d)', val: kpis?.dealsClosed30d, display: fmtNum(kpis?.dealsClosed30d), icon: Trophy, tint: 'coral', href: '/admin/enquiries', sub: 'last 30 days', show: Boolean(kpis) },
     { lbl: 'Signups today', val: traffic?.signupsToday, display: fmtNum(traffic?.signupsToday), icon: UserPlus, tint: 'rose', href: '/admin/users', sub: 'new registrations', show: Boolean(traffic) },
     { lbl: 'Visits today', val: traffic?.sessionsToday, display: fmtNum(traffic?.sessionsToday), icon: MousePointerClick, tint: 'indigo', href: '/admin/analytics', sub: `${fmtNum(traffic?.sessions30d)} in 30d`, show: Boolean(traffic) },
   ];
   const glanceTiles = glanceTilesAll.filter((t) => t.show && canOpen(t.href)).map((t) => ({ ...t, attention: false }));
+  const flatmateTiles = fm ? [
+    { lbl: 'Live Rooms', val: fm.liveRooms, display: fmtNum(fm.liveRooms), icon: BedDouble, tint: 'teal', href: '/admin/flatmates', sub: `${fmtNum(fm.liveGroups)} live groups` },
+    { lbl: 'Active Seekers', val: fm.activeSeekers, display: fmtNum(fm.activeSeekers), icon: UserSearch, tint: 'indigo', href: '/admin/flatmates', sub: `${fmtNum(fm.newSeekers7d)} new in 7d` },
+    { lbl: 'Matches (30d)', val: fm.matches30d, display: fmtNum(fm.matches30d), icon: HeartHandshake, tint: 'emerald', href: '/admin/analytics?tab=flatmates', sub: 'accepted requests & joins' },
+    { lbl: 'Host Reply Rate (30d)', val: fm.replyRatePct, display: fm.replyRatePct == null ? '—' : `${fm.replyRatePct}%`, icon: Reply, tint: 'coral', href: '/admin/analytics?tab=flatmates', sub: fm.medianReplyHours == null ? 'not measured yet' : `median reply ${fm.medianReplyHours}h` },
+  ].filter((t) => canOpen(t.href)).map((t) => ({ ...t, attention: false })) : [];
 
   /* Oldest first, because this card is a queue and not a feed: the listing that has waited longest
      is the one a moderator should open next. */
@@ -116,7 +129,7 @@ function PlatformDashboard({ user }) {
     <div>
       <PageHeader title="Dashboard" subtitle="Welcome back — here's what's happening across Draazy" />
 
-      <SlaHealthPanel sla={sla} />
+      <SlaHealthPanel sla={sla} flatmates={flatmatesOn} />
 
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className={SECTIONS}>Needs attention</h2>
@@ -136,6 +149,17 @@ function PlatformDashboard({ user }) {
           <StatTile key={t.lbl} tile={t} />
         ))}
       </div>
+
+      {flatmateTiles.length ? (
+        <section aria-labelledby="glance-flatmates-heading" data-testid="glance-flatmates">
+          <h3 id="glance-flatmates-heading" className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-400">Flatmates</h3>
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 sm:[grid-template-columns:repeat(auto-fit,minmax(195px,1fr))]">
+            {flatmateTiles.map((t) => (
+              <StatTile key={t.lbl} tile={t} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className={SECTIONS}>Latest activity</h2>

@@ -1,6 +1,7 @@
 import { test, expect } from '../../fixtures/live.js';
 import { API, authHeaders, identityChallengeToken, uniqueMobile } from '../../helpers/liveAuth.js';
 import { pickDate } from '../../helpers/datePicker.helper.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAARElEQVR4AeyROw0AIAxEL5WADzSw4AcRaGLBDzqKg7uhS4c2eVOTy33snemMtrYzDMErASBBB/0OMNTKCSIoi+pfEYAPAAD//68o26gAAAAGSURBVAMAR8QwUeUtYucAAAAASUVORK5CYII=', 'base64');
 const VERHOEFF_D = [
@@ -107,6 +108,7 @@ test('the admin sidebar KYC Review link opens the same queue, not a missing page
   await login.asAdmin();
 
   await page.goto('/admin');
+  await page.getByRole('button', { name: 'Listings & Users' }).click();
   await page.getByRole('link', { name: 'KYC Review', exact: true }).click();
   await expect(page).toHaveURL(/\/admin\/kyc-review$/);
   await expect(page.getByRole('heading', { name: 'KYC Review', exact: true })).toBeVisible();
@@ -191,6 +193,7 @@ test('a staffer without the KYC function can neither view nor decide cases', asy
 
   await login.asStaff('rental');
   await page.goto('/staff');
+  await expandAdminNav(page);
   await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'KYC Review' })).toHaveCount(0);
   await rejectPendingCase(request, owner);

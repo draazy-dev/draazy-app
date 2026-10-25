@@ -1,5 +1,6 @@
 package com.draazy.api.moderation.property;
 
+import com.draazy.api.catalog.property.Freshness;
 import com.draazy.api.catalog.property.PropertyStatus;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
@@ -26,13 +27,12 @@ public class PendingQueue {
              order by p.createdAt %s, p.id desc
             """;
 
-    // Follow-up = waiting past the cutoff, or posted by staff and not yet confirmed by its owner.
+    // followUp is the admin Follow-up tab's set, so the tile and the tab it opens agree.
     private static final String COUNTS = """
             select sum(case when p.status = :pending then 1 else 0 end),
                    sum(case when p.status = :flagged then 1 else 0 end),
-                   sum(case when p.status = :pending
-                             and (p.createdAt < :staleBefore
-                                  or (p.postedByAdmin = true and p.ownerConfirmedAt is null))
+                   sum(case when p.status = :approved
+                             and coalesce(p.lastConfirmedAt, p.createdAt) <= :unconfirmedBefore
                             then 1 else 0 end)
               from Property p
              where p.archived = false
@@ -58,11 +58,12 @@ public class PendingQueue {
     }
 
     @Transactional(readOnly = true)
-    public Counts counts(Instant staleBefore) {
+    public Counts counts() {
         Object[] r = (Object[]) em.createQuery(COUNTS)
                 .setParameter("pending", PropertyStatus.PENDING)
                 .setParameter("flagged", PropertyStatus.FLAGGED)
-                .setParameter("staleBefore", staleBefore)
+                .setParameter("approved", PropertyStatus.APPROVED)
+                .setParameter("unconfirmedBefore", Freshness.unconfirmedBefore(Instant.now()))
                 .getSingleResult();
         return new Counts(n(r[0]), n(r[1]), n(r[2]));
     }
