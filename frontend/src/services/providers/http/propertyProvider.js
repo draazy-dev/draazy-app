@@ -199,8 +199,9 @@ export async function myListing(id) {
   }
 }
 
-export async function addListing(listing) {
-  return toWriteResult(await post('/me/listings', toListingCreate(listing)));
+export async function addListing(listing, { homeId } = {}) {
+  const path = homeId ? `/me/managed-properties/${encodeURIComponent(homeId)}/listing` : '/me/listings';
+  return toWriteResult(await post(path, toListingCreate(listing)));
 }
 
 export const listingSlots = () => get('/me/listings/quota');

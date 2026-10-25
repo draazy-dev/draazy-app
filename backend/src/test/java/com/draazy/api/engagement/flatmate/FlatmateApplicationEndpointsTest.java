@@ -78,7 +78,7 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"%s","locality":"Kothrud","policy":"any","rent":45000,
+                                {"title":"%s","locality":"Kothrud","policy":"any","rent":45000,"deposit":10000,
                                  "seats":3,"seatsOpen":1,"name":"%s"}
                                 """.formatted(title, host.getName())))
                 .andExpect(status().isCreated())
@@ -446,7 +446,7 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {"title":"Still pending","locality":"Kothrud","policy":"any",
-                                     "rent":45000,"seats":3,"seatsOpen":1,"name":"Host Eleven"}
+                                     "rent":45000,"deposit":10000,"seats":3,"seatsOpen":1,"name":"Host Eleven"}
                                     """))
                     .andExpect(status().isCreated());
 

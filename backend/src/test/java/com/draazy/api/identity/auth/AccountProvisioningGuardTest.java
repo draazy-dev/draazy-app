@@ -13,10 +13,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * The signups gate sits at {@code provisionBuyer}'s single caller, not at the insert, so a second
- * caller disarms it. Reasoning: docs/flows/consumer/auth.md, "what stops an account obtaining a session".
- */
+/** The signups gate sits at provisionBuyer's one caller, so a second caller disarms it: docs/flows/consumer/auth.md. */
 @DisplayName("The signups gate — nothing may create a consumer account behind its back")
 class AccountProvisioningGuardTest {
 
@@ -47,7 +44,7 @@ class AccountProvisioningGuardTest {
 
                         If the new call site should honour the freeze, move the check down into \
                         UserService.provisionBuyer and delete this guard. If it should not, say so \
-                        here with the reason, the way provisionForStaff is exempt.""")
+                        here with the reason, the way provisionUnverified is exempt.""")
                 .containsExactly(GATED_CALLER);
     }
 

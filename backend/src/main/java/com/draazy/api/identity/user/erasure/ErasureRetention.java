@@ -123,9 +123,9 @@ public final class ErasureRetention {
                         + " number rather than a reference, so it outlives the pseudonymised users"
                         + " row that the rest of the saved search hangs off.",
                 "flatmate_groups.owner_consent_mobile / flatmate_rooms.owner_consent_mobile / "
-                        + "flatmate_owner_consents.owner_mobile — the flat owner's number, captured"
-                        + " as evidence of their consent to a flatmate post. The consent record keys"
-                        + " on the number itself.",
+                        + "flatmate_owner_consents.owner_mobile — the"
+                        + " flat owner's number, captured as evidence of their consent to a flatmate"
+                        + " post. The consent record keys on the number itself.",
                 "flatmate_seeker_posts — name, age and occupation are stored on the post rather than"
                         + " read through user_id, so the post keeps describing its author after the"
                         + " users row stops naming anybody. The post itself is taken off the board.",

@@ -93,6 +93,15 @@ public interface FlatmateRoomRepository extends JpaRepository<FlatmateRoom, UUID
 
     List<FlatmateRoom> findByHostIdAndArchivedFalseOrderByCreatedAtDesc(UUID hostId);
 
+    @Query("""
+            select r from FlatmateRoom r
+            where r.ownerConsentMobile = :mobile and r.addressFingerprint = :fingerprint
+              and r.ownerConsent = true and r.archived = false
+            order by r.createdAt desc, r.id desc
+            """)
+    List<FlatmateRoom> findConfirmedInFlat(@Param("mobile") String mobile,
+            @Param("fingerprint") String fingerprint);
+
     Page<FlatmateRoom> findByModStatusInAndArchivedFalse(Collection<String> modStatuses,
             Pageable pageable);
 

@@ -51,12 +51,12 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
 
     private static final String ON_BEHALF = """
             {"ownerMobile":"%s","ownerName":"Phoned In",
-             "listing":{"title":"%s","deal":"rent","propertyType":"apartment","price":25000,
+             "listing":{"title":"%s","deal":"rent","propertyType":"apartment","price":25000,"deposit":50000,
                         "locality":"Kothrud","city":"Pune"}}
             """;
     private static final String ON_BEHALF_WITH_IMAGES = """
             {"ownerMobile":"%s","ownerName":"Phoned In",
-             "listing":{"title":"%s","deal":"rent","propertyType":"apartment","price":25000,
+             "listing":{"title":"%s","deal":"rent","propertyType":"apartment","price":25000,"deposit":50000,
                         "locality":"Kothrud","city":"Pune","images":["%s"]}}
             """;
 
@@ -231,4 +231,23 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isForbidden());
     }
-}
+
+    @Test
+    @DisplayName("a rent listing keyed in by the desk needs a deposit, though 0 is fine")
+    void aRentListingNeedsADeposit() throws Exception {
+        User staff = user("9853900041", "staff");
+        String noDeposit = ON_BEHALF.replace("\"deposit\":50000,", "");
+
+        mvc.perform(post("/admin/properties")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(noDeposit.formatted("9853900042", "No deposit")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.message").value("listing.deposit is required for a rent listing."));
+        mvc.perform(post("/admin/properties")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(noDeposit.replace("\"price\":25000,", "\"price\":25000,\"deposit\":0,")
+                                .formatted("9853900042", "Zero deposit")))
+                .andExpect(status().isCreated());
+    }}

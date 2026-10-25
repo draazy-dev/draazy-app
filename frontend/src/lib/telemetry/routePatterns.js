@@ -58,6 +58,7 @@ export const ROUTE_PATTERNS = [
   '/owner-hub',
   '/owner-hub/property/:id',
   '/owner/:id',
+  '/owner-confirm',
   '/pay-rent',
   '/plans',
   '/privacy',

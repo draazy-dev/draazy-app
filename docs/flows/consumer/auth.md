@@ -215,9 +215,10 @@
   SMS-spend control — a frozen platform still delivers a code to every unknown number that asks. It
   throws 403 rather than 401 because the code has already been verified and burnt, so it must also be
   on `login`'s `noRollbackFor` list or one delivered code could be replayed for its whole TTL against a
-  platform refusing new members. Staff-driven provisioning (`UserService.provisionForStaff`) is not
+  platform refusing new members. Staff-driven provisioning (`UserService.provisionUnverified`) is not
   gated: freezing public onboarding is about who may walk in, not whether the office may still take a
-  listing over the phone. The gate sits at the caller rather than at the insert, so it holds only
+  listing over the phone. A flat owner who confirms a tenant's room from the WhatsApp link is the one
+  other caller, and it checks `signupsEnabled` itself before provisioning. The gate sits at the caller rather than at the insert, so it holds only
   while `UserService.provisionBuyer` has exactly one caller — `AccountProvisioningGuardTest` pins
   that over the source text, and its failure message says what to do with a second one.
 - **Staff sign-in equalises work on an unknown email** with a dummy BCrypt hash, and never reveals which

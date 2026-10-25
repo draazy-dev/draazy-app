@@ -63,6 +63,7 @@ export function toManaged(dto) {
     dueDay: Number(dto.dueDay) || 5,
     valuation: dto.valuation || null,
     publishedListingId: dto.publishedListingId || '',
+    sourceRoomId: dto.sourceRoomId || '',
     createdAt: toMillis(dto.createdAt),
     updatedAt: toMillis(dto.updatedAt),
   };

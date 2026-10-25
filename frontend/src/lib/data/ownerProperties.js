@@ -29,6 +29,7 @@ export function composeOwnerProperties(posted, managed) {
     .map((record) => ({
       id: record.id,
       managedId: record.id,
+      sourceRoomId: record.sourceRoomId || '',
       private: true,
       title: record.title,
       locality: record.locality,

@@ -5,9 +5,11 @@ import static com.draazy.api.jobs.ScheduledJob.Group.FREQUENT;
 import static com.draazy.api.jobs.ScheduledJob.Group.HOURLY;
 import static com.draazy.api.jobs.ScheduledJob.Group.NIGHTLY;
 
+import com.draazy.api.admin.alerts.StaffSlaSweep;
 import com.draazy.api.billing.plan.SubscriptionSweeper;
 import com.draazy.api.billing.referral.ReferralHoldSweep;
 import com.draazy.api.billing.referral.ReferralSignalRetention;
+import com.draazy.api.catalog.listing.ListingContentPurge;
 import com.draazy.api.catalog.listing.ListingDuplicateSweep;
 import com.draazy.api.catalog.managed.TrackedRentService;
 import com.draazy.api.common.PlatformTime;
@@ -16,6 +18,7 @@ import com.draazy.api.common.log.ErrorEventRetention;
 import com.draazy.api.common.payments.AbandonedCheckoutSweep;
 import com.draazy.api.documents.agreement.RentAgreementRenewalSweeper;
 import com.draazy.api.engagement.flatmate.FlatmateExpiryService;
+import com.draazy.api.engagement.flatmate.FlatmateOwnerNoticeService;
 import com.draazy.api.engagement.flatmate.FlatmateTrustReconciler;
 import com.draazy.api.engagement.notification.NotificationRetention;
 import com.draazy.api.engagement.notification.WaitingDigestService;
@@ -76,6 +79,11 @@ class JobCatalog {
     }
 
     @Bean
+    ScheduledJob staffSlaJob(StaffSlaSweep sweep) {
+        return new ScheduledJob("staff-sla", FREQUENT, sweep::sweepNow);
+    }
+
+    @Bean
     ScheduledJob subscriptionExpiryJob(SubscriptionSweeper subscriptions) {
         return new ScheduledJob("subscription-expiry", HOURLY, () -> subscriptions.expireLapsed(Instant.now()));
     }
@@ -133,6 +141,16 @@ class JobCatalog {
     @Bean
     ScheduledJob providerCallRetentionJob(ProviderCalls calls) {
         return new ScheduledJob("provider-call-retention", NIGHTLY, calls::purgeExpired);
+    }
+
+    @Bean
+    ScheduledJob listingContentPurgeJob(ListingContentPurge purge) {
+        return new ScheduledJob("listing-content-purge", NIGHTLY, drain(() -> purge.purgeDue(Instant.now())));
+    }
+
+    @Bean
+    ScheduledJob flatmateOwnerNoticePurgeJob(FlatmateOwnerNoticeService notices) {
+        return new ScheduledJob("flatmate-owner-notice-purge", NIGHTLY, notices::purgeExpired);
     }
 
     @Bean

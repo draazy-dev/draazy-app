@@ -71,6 +71,7 @@ class AuthorizationCoverageTest extends AbstractApiTest {
             "GET /societies", "GET /societies/{slug}", "GET /societies/{slug}/brief", "GET /societies/resolve",
             "GET /societies/top", "GET /reviews/{entityType}/{entityId}",
             "GET /flatmates/feed", "GET /flatmates/groups/{id}", "GET /flatmates/posts/{id}", "GET /flatmates/rooms/{id}",
+            "GET /flatmates/owner-notice", "POST /flatmates/owner-notice/answer",
             "GET /documents/shared/url",
             "POST /cities/waitlist", "POST /service-waitlist", "POST /demand-signals", "POST /page-views",
             "POST /client-errors",
