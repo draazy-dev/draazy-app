@@ -21,11 +21,14 @@ final class FlatmateConflicts {
 
     static final String DUPLICATE_ADDRESS = "duplicate_address";
 
-    /** The host has already accepted or declined, so the ask is no longer the requester's to retract. */
+    /** The host has accepted or declined, so the requester cannot retract the ask. */
     static final String ALREADY_DECIDED = "already_decided";
 
     /** Split rooms project a property address, so edit and delete share the same sub-code. */
     static final String SPLIT_ROOM = "split_room";
+
+    /** Every verification request needs KYC verified or in review; approval still needs it verified. */
+    static final String IDENTITY_REQUIRED = "identity_required";
 
     /** Strip prose before appending markers so routing patterns do not depend on caller spaces. */
     private static ConflictException marked(String prose, String subCode) {

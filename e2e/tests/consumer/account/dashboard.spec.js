@@ -1,5 +1,5 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
+import { API, authHeaders, fileIdentityCase, uploadedListingPhotos, signedInAs, uniqueMobile, letterTag } from '../../../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../../../helpers/moderation.js';
 import { openBadgeVault, uploadBadgeProof } from '../../../helpers/badgeVault.js';
 import { PHOTO_PNG } from '../../../helpers/listingPhotos.helper.js';
@@ -101,16 +101,19 @@ test('an owner with an approved listing gets Requests navigation and a Verified 
   const card = page.getByTestId('badge-request-card');
   await expect(card).toBeVisible();
   await expect(card.getByTestId('badge-state')).toHaveText('Not requested');
+  await expect(card.getByTestId('badge-id-step'), 'property verification starts with the ID check').toHaveAttribute('data-state', 'needed');
   await expect(card.getByTestId('request-badge')).toBeDisabled();
 });
 
 test('the vault badge request goes under review, and a staff decline comes back with its reason', async ({ page, request }) => {
   const owner = await newActor(`Zztest Dashboard Badge ${letterTag()}`);
   const listingId = await createApprovedListing(request, owner);
+  await fileIdentityCase(owner.mobile);
 
   await signedInAs(page, owner.mobile);
   const card = await openBadgeVault(page, listingId);
   await expect(card).toHaveAttribute('data-state', 'none');
+  await expect(card.getByTestId('badge-id-step'), 'an ID still in review does not hold the request back').toHaveAttribute('data-state', 'in-review');
   await uploadBadgeProof(page, card, 'Electricity Bill', { name: 'bill.png', mimeType: 'image/png', buffer: PHOTO_PNG });
   await card.getByTestId('request-badge').click();
   await expect(card.getByTestId('badge-state')).toHaveText('Under review');

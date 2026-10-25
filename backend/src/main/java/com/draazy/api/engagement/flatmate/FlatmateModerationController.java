@@ -10,6 +10,7 @@ import com.draazy.api.security.Roles;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -21,6 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -41,12 +43,15 @@ public class FlatmateModerationController {
             STAFF_OR_ADMIN + " and " + BackOfficePermissions.REQUIRE_FLATMATES_WRITE;
 
     private final FlatmateModerationService service;
+    private final FlatmateBadgeReviewService badgeReviews;
     private final FlatmateModerationDetails details;
     private final FlatmateModeratorEditService editor;
 
     public FlatmateModerationController(FlatmateModerationService service,
-            FlatmateModerationDetails details, FlatmateModeratorEditService editor) {
+            FlatmateBadgeReviewService badgeReviews, FlatmateModerationDetails details,
+            FlatmateModeratorEditService editor) {
         this.service = service;
+        this.badgeReviews = badgeReviews;
         this.details = details;
         this.editor = editor;
     }
@@ -59,14 +64,29 @@ public class FlatmateModerationController {
             @RequestParam(required = false) Boolean flagged,
             @PageableDefault(size = 20, sort = "createdAt",
                     direction = Sort.Direction.ASC) Pageable pageable) {
-        return PageResponse.of(service.queue(status, flagged, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
+        return PageResponse.of(badgeReviews.queue(status, flagged, Pageables.allowSort(pageable, SORTABLE)), dto -> dto);
     }
 
     @PatchMapping(Routes.Moderation.FLATMATE_REVIEW_BY_ID)
     @PreAuthorize(FLATMATES_WRITE)
     public FlatmateReviewDto decide(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
             @Valid @RequestBody DecisionRequest body) {
-        return service.decideReview(principal, id, body.decision(), body.note());
+        return badgeReviews.decideReview(principal, id, body.decision(), body.note(),
+                body.checks() == null ? null : body.checks().toChecks());
+    }
+
+    @GetMapping(Routes.Moderation.FLATMATE_REVIEW_DOCUMENT_URL)
+    @PreAuthorize(FLATMATES_WRITE)
+    public FlatmateReviewDocumentUrl reviewDocumentUrl(@CurrentUser AuthPrincipal principal,
+            @PathVariable UUID id) {
+        return badgeReviews.documentUrl(principal, id);
+    }
+
+    @PostMapping(Routes.Moderation.FLATMATE_REVIEW_REVOKE)
+    @PreAuthorize(FLATMATES_WRITE)
+    public FlatmateReviewDto revoke(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
+            @Valid @RequestBody RevokeRequest body) {
+        return badgeReviews.revokeReview(principal, id, body.reason());
     }
 
     @GetMapping(Routes.Moderation.FLATMATE_MODERATION_QUEUE)
@@ -112,7 +132,19 @@ public class FlatmateModerationController {
 
     /** Contract schema {@code DecisionRequest}: {@code approved} or {@code rejected}, with a reason
      * mandatory on a rejection (checked in the service, and again by the database). */
-    public record DecisionRequest(@NotBlank String decision, @Size(max = 600) String note) {
+    public record DecisionRequest(@NotBlank String decision, @Size(max = 600) String note,
+            @Valid Checks checks) {
+    }
+
+    /** What the reviewer confirms when approving a tenant-tier badge; the service names whatever is missing. */
+    public record Checks(Boolean nameMatches, Boolean addressMatches, LocalDate validTill, LocalDate issuedOn) {
+
+        FlatmateReviewChecks toChecks() {
+            return new FlatmateReviewChecks(nameMatches, addressMatches, validTill, issuedOn);
+        }
+    }
+
+    public record RevokeRequest(@NotBlank @Size(max = 300) String reason) {
     }
 
     /** The contract's inline moderation body. {@code note} is internal and never shown to consumers. */

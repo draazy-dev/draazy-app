@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
+import IdGateStep, { useIdGate } from './IdGateStep.jsx';
 import { badgeDocsFor } from '../../pages/consumer/list-property/constants.js';
 import { canonicalTypeKey, matchTypeKey } from '../../data/propertyTypes.js';
 import { requestOwnershipVerification } from '../../services/propertyReviewService.js';
@@ -20,6 +21,7 @@ const STATE_CHIP = {
 
 export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
   const { t } = useTranslation();
+  const { canRequest, inReview } = useIdGate();
   const [requested, setRequested] = useState(null);
   const [busy, setBusy] = useState(false);
   const proofs = badgeDocsFor(listing.deal, badgeTypeOf(listing.type)).filter((doc) => doc.verifies);
@@ -64,6 +66,7 @@ export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
       </div>
       {state === 'none' || state === 'declined' ? (
         <>
+          {(inReview || !canRequest) && <div className="mt-3"><IdGateStep inReview={inReview} source="property_badge" /></div>}
           <ul className="mt-3 space-y-2">
             {proofs.map((doc) => (
               <li key={doc.key} data-doc={doc.key} className="flex items-center gap-2 text-xs">
@@ -77,7 +80,7 @@ export default function BadgeRequestCard({ listing, docs, onUpload, toast }) {
               </li>
             ))}
           </ul>
-          <button type="button" onClick={request} disabled={!ready || busy} data-testid="request-badge"
+          <button type="button" onClick={request} disabled={!ready || !canRequest || busy} data-testid="request-badge"
             className="mt-4 w-full sm:w-auto min-h-[44px] px-4 rounded-lg bg-brand-teal text-ink text-sm font-semibold inline-flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed">
             <Icon name="shield-check" className="w-4 h-4" /> {busy ? t('dash.badge.requesting') : t('dash.badge.request')}
           </button>

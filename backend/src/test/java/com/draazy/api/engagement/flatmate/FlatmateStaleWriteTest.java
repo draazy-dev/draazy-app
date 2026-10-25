@@ -14,7 +14,7 @@ import com.draazy.api.documents.vault.PersonalDocumentRepository;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractCommittedApiTest;
-import com.draazy.api.support.UploadedPhotos;
+import com.draazy.api.support.IdentityCases;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -106,7 +106,7 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
         properties.saveAndFlush(flat);
         String groupId = created(post(Routes.Flatmates.GROUPS).header(HttpHeaders.AUTHORIZATION, bearer(host))
                 .contentType(MediaType.APPLICATION_JSON).content("""
-                        {"title":"Three of us","locality":"Kothrud","policy":"any","rent":45000,
+                        {"title":"Three of us","locality":"Kothrud","policy":"any","rent":45000,"deposit":10000,
                          "seats":3,"seatsOpen":1,"name":"Host"}"""));
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", groupId);
         String applicationId = created(post(Routes.Flatmates.GROUP_APPLY.replace("{id}", groupId))
@@ -131,16 +131,18 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
     void badgeDecisionKeepsTakedown() throws Exception {
         User host = user("04", Roles.Wire.BUYER);
         User staff = user("05", Roles.Wire.ADMIN);
+        jdbc.update("update users set verified = true where id = ?", host.getId());
         PersonalDocument doc = personalDocuments.saveAndFlush(new PersonalDocument(host.getId(),
                 "Registered Leave and Licence", "leave-and-licence.pdf",
                 "personal/" + host.getId() + "/" + UUID.randomUUID(), 184320L, "application/pdf"));
         String roomId = created(post(Routes.Flatmates.ROOMS).header(HttpHeaders.AUTHORIZATION, bearer(host))
                 .contentType(MediaType.APPLICATION_JSON).content("""
-                        {"bhk":"2","roomType":"Private room","attachedBath":"attached","furnishing":"semi",
+                        {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                          "locality":"Baner","society":"Stale Write Heights","rentShare":15000,"deposit":30000,
                          "availableFrom":"2026-12-01","lookingFor":"any","foodPref":"any",
-                         "agreementDeclared":true,"photos":["%s"],"note":"Sunny room.",%s}
-                        """.formatted(UploadedPhotos.of(host.getId()), FlatmateAgreementFixture.EVIDENCE)
+                         "agreementDeclared":true,"ownerConsentMobile":"9890000001",%s,"note":"Sunny room.",%s,%s,%s}
+                        """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateAgreementFixture.EVIDENCE,
+                                FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)
                         .replace("\"id\":\"agr-doc-1\"", "\"id\":\"" + doc.getId() + "\"")));
         String reviewId = jdbc.queryForObject("select id::text from flatmate_reviews where room_id = ?::uuid",
                 String.class, roomId);
@@ -151,7 +153,7 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
                 () -> jdbc.update("update flatmate_rooms set mod_status = 'removed' where id = ?::uuid", roomId),
                 patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, reviewId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"decision\":\"approved\",\"note\":\"ok\"}"));
+                        .content(FlatmateApprovals.approve("ok")));
 
         assertThat(status).isEqualTo(200);
         assertThat(column("flatmate_rooms", "mod_status", roomId)).isEqualTo("removed");
@@ -181,17 +183,19 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
     @DisplayName("owner consent waiting on a takedown of the room records consent without republishing it")
     void ownerConsentKeepsTakedown() throws Exception {
         User host = user("07", Roles.Wire.BUYER);
+        IdentityCases.submitted(jdbc, host.getId());
         String ownerMobile = "9791427799";
         PersonalDocument doc = personalDocuments.saveAndFlush(new PersonalDocument(host.getId(),
                 "Registered Leave and Licence", "leave-and-licence.pdf",
                 "personal/" + host.getId() + "/" + UUID.randomUUID(), 184320L, "application/pdf"));
         String roomId = created(post(Routes.Flatmates.ROOMS).header(HttpHeaders.AUTHORIZATION, bearer(host))
                 .contentType(MediaType.APPLICATION_JSON).content("""
-                        {"bhk":"2","roomType":"Private room","attachedBath":"attached","furnishing":"semi",
+                        {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                          "locality":"Baner","society":"Consent Race Towers","rentShare":15000,"deposit":30000,
                          "availableFrom":"2026-12-01","lookingFor":"any","foodPref":"any",
-                         "agreementDeclared":true,"photos":["%s"],"note":"Sunny room.",%s}
-                        """.formatted(UploadedPhotos.of(host.getId()), FlatmateAgreementFixture.EVIDENCE)
+                         "agreementDeclared":true,"ownerConsentMobile":"9890000001",%s,"note":"Sunny room.",%s,%s,%s}
+                        """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateAgreementFixture.EVIDENCE,
+                                FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)
                         .replace("\"id\":\"agr-doc-1\"", "\"id\":\"" + doc.getId() + "\"")));
         jdbc.update("update flatmate_rooms set mod_status = 'live', owner_consent_mobile = ?, address_fingerprint = ? "
                 + "where id = ?::uuid", ownerMobile, guardrails.fingerprint(

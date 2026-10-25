@@ -104,6 +104,17 @@ public class IdentityVerificationService {
                 .orElse(false);
     }
 
+    /** KYC verified or in review is enough to file a verification request; approval waits for verified.
+     * Seeded accounts carry the user flag without a case row. */
+    @Transactional(readOnly = true)
+    public boolean isSubmitted(UUID userId) {
+        boolean flagged = users.findById(userId).map(User::isVerified).orElse(false);
+        return flagged || verifications.findByUserId(userId)
+                .map(v -> VerificationStatuses.VERIFIED.equals(v.getStatus())
+                        || VerificationStatuses.PENDING.equals(v.getStatus()))
+                .orElse(false);
+    }
+
     @Transactional(readOnly = true)
     public Set<UUID> verifiedAmong(java.util.Collection<UUID> userIds) {
         if (userIds.isEmpty()) {

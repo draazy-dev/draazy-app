@@ -16,6 +16,7 @@ public record FlatmateModerationQueueDto(
         String locality,
         String freeText,
         List<String> photos,
+        Long rent,
         String recheckReason,
         Instant recheckRequestedAt,
         Instant createdAt) {
@@ -30,8 +31,8 @@ public record FlatmateModerationQueueDto(
         String where = post.getLocalities() == null ? null : String.join(", ", post.getLocalities());
         return new FlatmateModerationQueueDto(post.getId(), KIND_POST, post.getModStatus(),
                 nameOf(author), mobileOf(author), post.getName(), where, post.getNote(),
-                List.of(), post.getRecheck().getReason(),
-                post.getRecheck().getRequestedAt(), post.getCreatedAt());
+                List.of(), post.getBudgetMax() == null ? post.getBudget() : post.getBudgetMax(),
+                post.getRecheck().getReason(), post.getRecheck().getRequestedAt(), post.getCreatedAt());
     }
 
     static FlatmateModerationQueueDto of(FlatmateRoom room, User author) {
@@ -41,7 +42,7 @@ public record FlatmateModerationQueueDto(
                 : room.getSociety() + (room.getFlatNumber() == null ? "" : " " + room.getFlatNumber());
         return new FlatmateModerationQueueDto(room.getId(), KIND_ROOM, room.getModStatus(),
                 nameOf(author), mobileOf(author), headline, room.getLocality(), room.getNote(),
-                room.getPhotos() == null ? List.of() : List.copyOf(room.getPhotos()),
+                room.getPhotos() == null ? List.of() : List.copyOf(room.getPhotos()), room.getBudget(),
                 room.getRecheck().getReason(), room.getRecheck().getRequestedAt(),
                 room.getCreatedAt());
     }
@@ -49,7 +50,7 @@ public record FlatmateModerationQueueDto(
     static FlatmateModerationQueueDto of(FlatmateGroup group, User author) {
         return new FlatmateModerationQueueDto(group.getId(), KIND_GROUP, group.getModStatus(),
                 nameOf(author), mobileOf(author), group.getTitle(), group.getLocality(),
-                group.getNote(), List.of(), group.getRecheck().getReason(),
+                group.getNote(), List.of(), group.getRent(), group.getRecheck().getReason(),
                 group.getRecheck().getRequestedAt(), group.getCreatedAt());
     }
 
