@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
-import { postAsGroup, haveAFlat } from '../../../helpers/app.js';
-import { pickPlaceholderLocality } from '../../../helpers/locality.js';
+import { postAsGroup } from '../../../helpers/app.js';
+import { pickLocalitiesIn } from '../../../helpers/locality.js';
 /** Live UI coverage verifies group persistence, owner controls, and deletion. */
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
@@ -20,10 +20,18 @@ async function approve(groupId) {
   });
   expect(res.status).toBeLessThan(300);
 }
-/** The board's lazy chunk resolves well after `load`; "Move in now" is static, so it survives an empty feed. */
+/** The board's lazy chunk resolves well after `load`; the Rooms tab is static, so it survives an empty feed. */
 async function openBoard(page, query = '') {
   await page.goto(`${BASE}/flatmates${query}`);
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20_000 });
+}
+async function fillGroupForm(page, title) {
+  await postAsGroup(page);
+  await page.getByPlaceholder(/2 girls/i).fill(title);
+  await expect(page.getByTestId('profile-name-note')).toContainText('Test Member');
+  await pickLocalitiesIn(page, page.getByRole('button', { name: "Localities you'd live in" }), ['Baner']);
+  await page.getByLabel('Highest rent for the whole flat').fill('40000');
+  await page.getByLabel('Highest deposit').fill('80000');
 }
 // Create a group through the form the way a host does, and return the row the server minted.
 async function createGroupViaForm(page, token, title) {
@@ -31,13 +39,7 @@ async function createGroupViaForm(page, token, title) {
     (r) => /\/api\/flatmates\/groups(\?|$)/.test(r.url()) && r.request().method() === 'POST',
   );
 
-  await postAsGroup(page);
-  await haveAFlat(page);
-
-  await page.getByPlaceholder(/2 girls/i).fill(title);
-  await pickPlaceholderLocality(page);
-  await page.getByPlaceholder(/e\.g\. 34,000/i).fill('40000');
-  await page.getByPlaceholder(/Your name/i).fill('Group Owner');
+  await fillGroupForm(page, title);
   await page.getByRole('button', { name: /Create group/i }).click();
 
   const res = await posted;
@@ -50,12 +52,12 @@ async function createGroupViaForm(page, token, title) {
 }
 /** A group somebody else hosts, already public — the fixture the non-owner test needs. */
 async function otherHostsGroup(title) {
-  const { accessToken } = await apiLogin(uniqueMobile());
+  const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Somebody Else' });
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
     body: JSON.stringify({
-      title, name: 'Somebody Else', locality: 'Baner', rent: 40000,
+      title, locality: 'Baner', rent: 40000, deposit: 50000,
       seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant',
     }),
   });
@@ -65,16 +67,16 @@ async function otherHostsGroup(title) {
   await approve(group.id);
   return group;
 }
-/* A group has no address, so it sorts into Team up — but creation returns the host to the default
-   Move in now tab, where the card genuinely is not. */
+/* A group has no address, so it sorts into the Teams tab — but creation returns the host to the default
+   Rooms tab, where the card genuinely is not. */
 
 async function switchToTeamUp(page) {
-  await page.getByRole('button', { name: /Team up/ }).first().click();
+  await page.locator('button[data-tab="teams"]').click();
 }
 
 async function reopenOnTeamUp(page) {
   await page.reload();
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20_000 });
   await switchToTeamUp(page);
 }
 
@@ -142,13 +144,7 @@ test.describe('Flatmate group lifecycle (live)', () => {
       (r) => /\/api\/flatmates\/groups(\?|$)/.test(r.url()) && r.request().method() === 'POST',
     );
 
-    await postAsGroup(page);
-    await haveAFlat(page);
-    const title = uniqueTitle('twice');
-    await page.getByPlaceholder(/2 girls/i).fill(title);
-    await pickPlaceholderLocality(page);
-    await page.getByPlaceholder(/e\.g\. 34,000/i).fill('40000');
-    await page.getByPlaceholder(/Your name/i).fill('Group Owner');
+    await fillGroupForm(page, uniqueTitle('twice'));
     await page.getByRole('button', { name: /Create group/i }).dblclick();
 
     const created = await (await posted).json();

@@ -11,7 +11,6 @@ async function hostsPost(token, locality) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
-      name: 'Expiry Seeker',
       gender: 'female',
       age: 26,
       occupation: 'Engineer',
@@ -20,7 +19,6 @@ async function hostsPost(token, locality) {
       moveIn: '2026-12-01',
       flatPref: 'women',
       roomPref: 'private',
-      tags: ['Vegetarian'],
       note: 'Expiry coverage',
     }),
   });
@@ -33,7 +31,7 @@ async function hostsPost(token, locality) {
 test.describe('LIVE: flatmate post expiry', () => {
   test('an expired post shows as Expired on the dashboard and Renew puts it back', async ({ page }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Expiry Seeker' });
     await hostsPost(accessToken, 'Baner');
     await signedInAs(page, mobile);
 
@@ -67,7 +65,7 @@ test.describe('LIVE: flatmate post expiry', () => {
 
   test('a post reads its moderation state, not a hard-coded Live', async ({ page }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Expiry Seeker' });
     await hostsPost(accessToken, 'Aundh');
     await signedInAs(page, mobile);
 

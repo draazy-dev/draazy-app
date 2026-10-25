@@ -14,17 +14,19 @@ import java.util.List;
 /** Contract schema {@code FlatmateSeekerPostCreate}; also serves the PATCH. Enum-valued fields are
  * checked in the service against {@link FlatmateVocabulary} so the message can list what was expected. */
 public record FlatmateSeekerPostCreateRequest(
-        @NotBlank @Size(min = 2, max = 80) @NoContactDetails(message = NO_CONTACT) String name,
         String gender,
         @Min(18) @Max(120) Integer age,
         @Size(max = 80) @NoContactDetails(message = NO_CONTACT) String occupation,
         @NotNull @Min(1) @Max(10_000_000) Long budget,
         @Min(1) @Max(10_000_000) Long budgetMax,
-        @NotEmpty @Size(max = 10) List<@NotBlank @Size(max = 80) @NoContactDetails(message = NO_CONTACT) String> localities,
+        @NotEmpty @Size(max = FlatmateVocabulary.MAX_LOCALITIES) List<@NotBlank @Size(max = 80) @NoContactDetails(message = NO_CONTACT) String> localities,
         @Size(max = 40) @NoContactDetails(message = NO_CONTACT) String moveIn,
         String flatPref,
         String roomPref,
-        @Size(max = 20) List<@NotBlank @Size(max = 40) @NoContactDetails(message = NO_CONTACT) String> tags,
+        String furnishing,
+        Boolean gatedOnly,
+        Boolean attachedBath,
+        String parking,
         @Size(max = 600) @NoContactDetails(message = NO_CONTACT) String note,
         Boolean verifiedContactOnly,
         @Size(max = 120) @NoContactDetails(message = NO_CONTACT) String title) {

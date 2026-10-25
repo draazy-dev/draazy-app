@@ -33,7 +33,7 @@ async function hostsGroup(token, title, { seats = 3, seatsOpen = 1 } = {}) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
-      title, name: 'Seat Host', locality: 'Baner', rent: 45000, seats, seatsOpen,
+      title, locality: 'Baner', rent: 45000, deposit: 50000, seats, seatsOpen,
       policy: 'any', role: 'tenant',
     }),
   });
@@ -148,7 +148,7 @@ test.describe('Flatmate seat stepper (live)', () => {
   });
   test("a seeker gets no stepper on somebody else's group", async ({ page }) => {
     const strangerMobile = uniqueMobile();
-    const { accessToken: strangerToken } = await apiLogin(strangerMobile);
+    const { accessToken: strangerToken } = await apiLogin(strangerMobile, { name: 'Seat Host' });
     const title = uniqueTitle('stranger');
     const group = await hostsGroup(strangerToken, title, { seats: 3, seatsOpen: 2 });
 

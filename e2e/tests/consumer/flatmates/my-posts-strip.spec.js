@@ -17,7 +17,7 @@ async function create(kind, token, body) {
 }
 
 const group = (token, title, over = {}) => create('groups', token, {
-  title, name: 'Strip Host', locality: 'Baner', rent: 30000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant', ...over,
+  title, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant', ...over,
 });
 
 const strip = (page) => page.getByTestId('my-posts-strip');
@@ -39,18 +39,19 @@ async function rentListing(token, title) {
 const dropListing = async (id) =>
   rejectListingWithFetch(id, await authHeaders(ACTORS.admin), { reason: 'Zztest cleanup — my-posts strip fixture' });
 
-test('team up: own posts sit in the strip, capped at two with a View all link, and stay out of the feed', async ({ page }) => {
+test('teams and flatmates: own posts sit in the strip, capped at two with a View all link, and stay out of the feed', async ({ page }) => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Strip Host' });
   const post = await create('posts', accessToken, {
-    name: 'Strip Seeker', gender: 'female', age: 26, occupation: 'Engineer', budget: 16000,
-    localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'any', roomPref: 'private', tags: [], note: 'Strip test',
+    gender: 'female', age: 26, occupation: 'Engineer', budget: 16000,
+    localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'any', roomPref: 'private', note: 'Strip test',
   });
   const first = await group(accessToken, `Strip group A ${stamp()}`);
-  await group(accessToken, `Strip group B ${stamp()}`);
+  const second = await group(accessToken, `Strip group B ${stamp()}`);
+  const third = await group(accessToken, `Strip group C ${stamp()}`);
 
   await signedInAs(page, mobile);
-  await page.goto(`${BASE}/flatmates?view=team-up`);
+  await page.goto(`${BASE}/flatmates?view=teams`);
   await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 20_000 });
 
   await expect(strip(page).locator('.my-post-tile')).toHaveCount(2);
@@ -58,8 +59,14 @@ test('team up: own posts sit in the strip, capped at two with a View all link, a
   const viewAll = strip(page).getByRole('link', { name: 'View all (3)' });
   await expect(viewAll).toHaveAttribute('href', '/dashboard#listings');
 
+  for (const g of [first, second, third]) {
+    await expect(page.locator(`[data-sf-id="g:${g.id}"]`)).toHaveCount(0);
+  }
+
+  await page.locator('button[data-tab="people"]').click();
+  await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 20_000 });
+  await expect(strip(page).locator('.my-post-tile')).toHaveCount(1);
   await expect(page.locator(`[data-sf-id="s:${post.id}"]`)).toHaveCount(0);
-  await expect(page.locator(`[data-sf-id="g:${first.id}"]`)).toHaveCount(0);
 
   await strip(page).locator(`a[href="/flatmates/post/${post.id}"]`).click();
   await expect(page).toHaveURL(new RegExp(`/flatmates/post/${post.id}$`));
@@ -67,7 +74,7 @@ test('team up: own posts sit in the strip, capped at two with a View all link, a
 
 test('move in: a group tied to the host\'s flat appears in the move-in strip only', async ({ page }) => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Strip Host' });
   const listing = await rentListing(accessToken, `Zztest strip flat ${stamp()}`);
   expect((await approveListingWithFetch(listing.id, await authHeaders(ACTORS.admin))).status).toBe(200);
   try {
@@ -81,7 +88,7 @@ test('move in: a group tied to the host\'s flat appears in the move-in strip onl
     await expect(tile).toBeVisible({ timeout: 20_000 });
     await expect(tile).toContainText(title);
 
-    await page.getByRole('button', { name: /Team up/ }).first().click();
+    await page.locator('button[data-tab="teams"]').click();
     await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 20_000 });
     await expect(strip(page).locator(`a[href="/flatmates/group/${g.id}"]`)).toHaveCount(0);
   } finally {

@@ -4,6 +4,7 @@ import { Block } from '../board.jsx';
 import LocalitySelect from '../../../../components/ui/LocalitySelect.jsx';
 import DateField from '../../../../components/ui/DateField.jsx';
 import AvailabilityField from '../../../../components/ui/AvailabilityField.jsx';
+import { MAX_LOCALITIES } from '../../../consumer/flatmates/constants.js';
 
 const isoDate = (v) => (/^\d{4}-\d{2}-\d{2}/.test(v || '') ? v.slice(0, 10) : '');
 
@@ -25,9 +26,10 @@ function initialOf({ room, group, post }) {
 
 const wholeAtLeast = (v, min) => String(v).trim() !== '' && Number.isInteger(Number(v)) && Number(v) >= min;
 
-function problemOf(form) {
+function problemOf(form, initial) {
   if (!wholeAtLeast(form.rent, 1)) return 'Enter the rent as a whole number of rupees.';
   if (form.deposit !== null && !wholeAtLeast(form.deposit, 0)) return 'Enter the deposit as a whole number of rupees.';
+  if (form.localities !== initial.localities && form.localities.length > MAX_LOCALITIES) return `Keep up to ${MAX_LOCALITIES} localities.`;
   return form.localities.length ? '' : 'Add at least one locality.';
 }
 
@@ -58,7 +60,7 @@ export default function EditDetails({ detail, busy, onSave, onCancel }) {
   const [picking, setPicking] = useState(false);
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
   const singleLocality = Boolean(detail.room || (detail.group && !detail.group.hunting));
-  const problem = problemOf(form);
+  const problem = problemOf(form, initial);
 
   return (
     <Block icon={Pencil} title="Edit details">

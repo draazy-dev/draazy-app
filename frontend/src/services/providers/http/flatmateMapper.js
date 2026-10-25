@@ -122,7 +122,6 @@ export function toRoomViewModel(row) {
     food: row?.food || 'any',
     moveIn: row?.moveIn || '',
     availableFrom: row?.availableFrom || null,
-    tags: row?.tags || [],
     note: row?.note || '',
     cover: row?.cover || row?.photos?.[0] || null,
     photos: row?.photos || [],
@@ -152,7 +151,10 @@ export function toSeekerPostViewModel(row) {
     moveIn: row?.moveIn || '',
     flatPref: row?.flatPref || 'any',
     roomPref: row?.roomPref || 'any',
-    tags: row?.tags || [],
+    furnishing: row?.furnishing || null,
+    gatedOnly: !!row?.gatedOnly,
+    attachedBath: !!row?.attachedBath,
+    parking: row?.parking || null,
     note: row?.note || '',
     /* Required-contact verification and author verification are separate server decisions. */
     verifiedContactOnly: !!row?.verifiedContactOnly,
@@ -208,7 +210,6 @@ export function toGroupViewModel(row) {
     flagForReview: !!row?.flagForReview,
     modStatus,
     publiclyVisible: isPubliclyVisible(modStatus),
-    tags: row?.tags || [],
     note: row?.note || '',
     ownerName: row?.ownerName || '',
     ownerMobile: row?.ownerMobile || '',
@@ -229,6 +230,9 @@ export function toRoomCardViewModel(row) {
     kind: 'room',
     title: row?.title || '',
     propertyId: row?.propertyId || null,
+    hostRole: row?.hostRole || null,
+    verificationTier: row?.verificationTier || null,
+    reviewStatus: row?.reviewStatus || null,
     society: row?.society || '',
     flatType: row?.flatType || '',
     locality: row?.locality || '',
@@ -260,6 +264,10 @@ export function toGroupCardViewModel(row) {
     seatsLeft: seatsLeftOf(row),
     memberCount: Number(row?.memberCount) || 0,
     propertyId: row?.propertyId || null,
+    hostRole: row?.hostRole || null,
+    hunting: !!row?.hunting,
+    verificationTier: row?.verificationTier || null,
+    reviewStatus: row?.reviewStatus || null,
     modStatus,
     publiclyVisible: isPubliclyVisible(modStatus),
     createdAt: row?.createdAt ? Date.parse(row.createdAt) : Date.now(),
@@ -280,6 +288,7 @@ function toGroupPreferences(p) {
     gatedOnly: !!p.gatedOnly,
     bachelors: !!p.bachelors,
     furnishing: p.furnishing || null,
+    parking: p.parking || null,
     moveInBy: p.moveInBy || null,
   };
 }
@@ -323,7 +332,7 @@ export const VOCAB = {
   homeType: ['Flat', 'Independent House', 'Villa', 'Row House'],
   hostRole: ['owner', 'tenant'],
   share: ['solo', 'bring', 'match'],
-  tab: ['move-in', 'team-up'],
+  tab: ['move-in', 'team-up', 'people', 'teams'],
 };
 
 /** Pass a value through only if the server's vocabulary contains it; otherwise omit it. */

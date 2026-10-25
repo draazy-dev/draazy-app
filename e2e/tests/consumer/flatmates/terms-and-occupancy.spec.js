@@ -1,38 +1,41 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
 
 async function newHost() {
-  const { accessToken } = await apiLogin(uniqueMobile());
+  const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Asha K' });
   return accessToken;
 }
 
 let addresses = 0;
 const newSociety = () => `Terms Test ${Date.now().toString(36)}-${(addresses += 1)}`;
 
-async function postRoom(token, overrides = {}) {
+async function roomBody(token, overrides = {}) {
   const agreement = await tenantRoomAgreement(token);
-  const res = await fetch(`${API}/flatmates/rooms`, {
-    method: 'POST',
-    headers: auth(token),
-    body: JSON.stringify({
-      bhk: '2',
-      roomType: 'Private room',
-      locality: 'Baner',
-      ...(await withSocietyId(token, { society: newSociety() })),
-      rentShare: 16000,
-      availableFrom: '2026-12-01',
-      photos: await uploadedListingPhotos(token),
-      ...agreement,
-      ...overrides,
-    }),
+  return {
+    ...(await roomBasics(token)),
+    bhk: '2',
+    roomType: 'Private room',
+    locality: 'Baner',
+    ...(await withSocietyId(token, { society: newSociety() })),
+    rentShare: 16000,
+    deposit: 32000,
+    availableFrom: '2026-12-01',
+    ...agreement,
+    ...overrides,
+  };
+}
+
+async function postRoom(token, overrides = {}) {
+  return fetch(`${API}/flatmates/rooms`, {
+    method: 'POST', headers: auth(token), body: JSON.stringify(await roomBody(token, overrides)),
   });
-  return res;
 }
 
 async function createdRoom(token, overrides = {}) {
@@ -76,8 +79,7 @@ test.describe('flatmate terms, occupancy and the budget range', () => {
 
     expect(room.maintenanceBilling ?? null).toBeNull();
     expect(room.electricityBilling ?? null).toBeNull();
-    expect(room.noticePeriodDays ?? null).toBeNull();
-    expect(room.lockInMonths ?? null).toBeNull();
+    expect(room).toMatchObject({ noticePeriodDays: 30, lockInMonths: 0 });
   });
 
   test('a billing split the vocabulary does not know is refused', async () => {
@@ -94,7 +96,6 @@ test.describe('flatmate terms, occupancy and the budget range', () => {
       headers: auth(token),
       body: JSON.stringify({
         title: `Terms Group ${Date.now().toString(36)}`,
-        name: 'Asha K',
         locality: 'Baner',
         rent: 40000,
         deposit: 80000,
@@ -127,7 +128,6 @@ test.describe('flatmate terms, occupancy and the budget range', () => {
       headers: auth(await newHost()),
       body: JSON.stringify({
         title: `No Locality ${Date.now().toString(36)}`,
-        name: 'Asha K',
         rent: 40000,
         seats: 3,
         seatsOpen: 1,
@@ -143,7 +143,6 @@ test.describe('flatmate terms, occupancy and the budget range', () => {
   test('a seeker states a budget range, and a ceiling under the floor is refused', async () => {
     const token = await newHost();
     const body = {
-      name: 'Range Seeker',
       gender: 'female',
       age: 26,
       occupation: 'Engineer',
@@ -169,14 +168,26 @@ test.describe('flatmate terms, occupancy and the budget range', () => {
     expect((await inverted.json()).message).toMatch(/cannot be below/i);
   });
 
-  test('a room may be posted before it has been photographed, but not published', async () => {
+  test('a new room needs three photos, and one edited down to none still waits for Ops', async () => {
     const token = await newHost();
 
-    const pictured = await createdRoom(token);
-    expect(pictured.modStatus, 'below owner tier even a photographed room waits for Ops').toBe('pending');
+    const bare = await postRoom(token, { photos: [] });
+    expect(bare.status, 'a new room without photos').toBe(422);
+    expect((await bare.json()).message).toMatch(/at least 3 photos/);
 
-    const pictureless = await createdRoom(token, { photos: [] });
-    expect(pictureless.photos, 'an omitted gallery must arrive empty, not null').toEqual([]);
+    const body = await roomBody(token);
+    const pictured = await fetch(`${API}/flatmates/rooms`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
+    expect(pictured.status).toBe(201);
+    const room = await pictured.json();
+    track('rooms', room.id, token);
+    expect(room.modStatus, 'below owner tier even a photographed room waits for Ops').toBe('pending');
+
+    const stripped = await fetch(`${API}/flatmates/rooms/${room.id}`, {
+      method: 'PATCH', headers: auth(token), body: JSON.stringify({ ...body, photos: [] }),
+    });
+    expect(stripped.status, await stripped.clone().text()).toBe(200);
+    const pictureless = await stripped.json();
+    expect(pictureless.photos, 'an emptied gallery must arrive empty, not null').toEqual([]);
     expect(pictureless.modStatus, 'a pictureless room must not put itself on the board').toBe('pending');
   });
 });

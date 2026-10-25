@@ -14,18 +14,19 @@ import org.springframework.stereotype.Component;
 @Component
 class FlatmateEditRules {
 
-    /* Silent fields: {@code ownerConsentMobile} is not stored, {@code occupants}/{@code maxOccupants} are not in the mapper allowlist,
-       {@code society} derives from {@code societyId}, and {@code localitySlug} folds into the compared canonical locality name. */
+    /* Silent: ownerConsentMobile is not stored, occupants/maxOccupants are outside the mapper allowlist,
+       society derives from societyId, and localitySlug folds into the compared canonical locality. */
     static final Map<Class<?>, Set<String>> SILENT = Map.of(
             FlatmateRoomCreateRequest.class,
             Set.of("attachedBath", "lookingFor", "foodPref", "hostRole", "propertyId",
                     "agreementDeclared", "agreementDoc", "ownerConsentMobile", "ownerConsent",
                     "occupants", "maxOccupants", "gatedCommunity", "details", "society", "localitySlug"),
             FlatmateGroupCreateRequest.class,
-            Set.of("policy", "seatsOpen", "name", "role", "propertyId", "agreement",
+            Set.of("policy", "seatsOpen", "role", "propertyId", "agreement",
                     "agreementDoc", "localitySlug"),
             FlatmateSeekerPostCreateRequest.class,
-            Set.of("gender", "age", "flatPref", "roomPref", "verifiedContactOnly"));
+            Set.of("gender", "age", "flatPref", "roomPref", "verifiedContactOnly", "furnishing", "gatedOnly",
+                    "attachedBath", "parking"));
 
     /** {@code locality} is foundation here but only a re-check on a seeker post: a room's locality
      * asserts where a physical flat is and feeds the duplicate fingerprint. */
@@ -88,9 +89,6 @@ class FlatmateEditRules {
                 || !same(room.getOverlooking(), in.overlooking())) {
             rechecked.add("details");
         }
-        if (!sameList(room.getTags(), in.lifestyle())) {
-            rechecked.add("lifestyle");
-        }
 
         // Deposit and terms are the other half of the ask: watching `rentShare` alone would leave a
         // host free to move the money, or to add a lock-in, without tripping anything.
@@ -138,10 +136,6 @@ class FlatmateEditRules {
             rechecked.add("note");
         }
 
-        if (!sameList(group.getTags(), in.tags())) {
-            rechecked.add("lifestyle");
-        }
-
         /** Seats, because the card advertises `rent / seatsTotal`: halving them halves the per-head
          * price a reader sees without touching `rent`. */
         if (group.getSeatsTotal() != seats) {
@@ -158,10 +152,12 @@ class FlatmateEditRules {
 
     /** Nothing here is foundation: there is no address, tier or document, so a seeker post cannot
      * stop being the thing that was approved. */
-    FlatmateEditImpact classify(FlatmateSeekerPost post, FlatmateSeekerPostCreateRequest in) {
+    FlatmateEditImpact classify(FlatmateSeekerPost post, FlatmateSeekerPostCreateRequest in,
+            String profileName) {
         List<String> rechecked = new ArrayList<>();
 
-        if (!same(post.getName(), in.name())) {
+        // Staff-set profile names skip the self-service name pattern, so a rename still gets a look.
+        if (!same(post.getName(), profileName)) {
             rechecked.add("name");
         }
         if (!same(post.getOccupation(), in.occupation())) {
@@ -184,8 +180,7 @@ class FlatmateEditRules {
             rechecked.add("localities");
         }
 
-        if (!sameList(post.getTags(), FlatmateSeekerService.clean(in.tags()))
-                || !same(post.getMoveIn(), in.moveIn())) {
+        if (!same(post.getMoveIn(), in.moveIn())) {
             rechecked.add("details");
         }
 

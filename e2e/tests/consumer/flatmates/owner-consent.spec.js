@@ -2,8 +2,6 @@ import { test, expect } from '@playwright/test';
 import { API, E2E_OTP, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
-import { postAsGroup, haveAFlat } from '../../../helpers/app.js';
-import { pickPlaceholderLocality } from '../../../helpers/locality.js';
 /* `ownerConsent` is not client-settable (`FlatmateMapper.applyTo` drops it), so consent can only be
  * proven by creating a group afterwards and finding the flag the server itself wrote. */
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
@@ -20,9 +18,25 @@ async function approve(id) {
   expect(res.status, `approve ${id}: ${await res.clone().text()}`).toBeLessThan(300);
 }
 
+// New flat-shares are room posts, so the owner-consent OTP form is only reached by editing a legacy group.
+async function openLegacyGroup(page, token, title) {
+  const res = await fetch(`${API}/flatmates/groups`, {
+    method: 'POST',
+    headers: auth(token),
+    body: JSON.stringify({ title, locality: 'Baner', rent: 35000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant' }),
+  });
+  expect(res.status, await res.clone().text()).toBe(201);
+  const group = await res.json();
+  track('groups', group.id, token);
+  await page.goto(`${BASE}/flatmates?editGroup=${group.id}`);
+  await expect(page.getByRole('dialog', { name: 'Edit group' })).toBeVisible({ timeout: 20_000 });
+  await page.getByText(/registered rent agreement/i).click();
+  return group;
+}
+
 test('owner-consent OTP flow records consent on the server, and the card shows the chip', async ({ page }) => {
   const tenantMobile = uniqueMobile();
-  const { accessToken: tenantToken } = await apiLogin(tenantMobile);
+  const { accessToken: tenantToken } = await apiLogin(tenantMobile, { name: 'Consent Tenant' });
   // The owner mobile must be a DIFFERENT number (the server refuses self-consent).
   const ownerMobile = uniqueMobile();
 
@@ -32,9 +46,9 @@ test('owner-consent OTP flow records consent on the server, and the card shows t
     headers: auth(tenantToken),
     body: JSON.stringify({
       title,
-      name: 'Consent Tenant',
       locality: 'Baner',
       rent: 35000,
+      deposit: 50000,
       seats: 3,
       seatsOpen: 1,
       policy: 'any',
@@ -89,17 +103,13 @@ test('owner-consent OTP flow records consent on the server, and the card shows t
   await expect(chip).toBeVisible({ timeout: 20_000 });
 });
 
-test('the consent button needs a full 10-digit owner mobile, the modal records consent on the server, and a group created after it carries the flag', async ({ page }) => {
+test('the consent button needs a full 10-digit owner mobile, the modal records consent on the server, and the saved group carries the flag', async ({ page }) => {
   const tenantMobile = uniqueMobile();
   const ownerMobile = uniqueMobile();
-  const { accessToken: tenantToken } = await apiLogin(tenantMobile);
+  const { accessToken: tenantToken } = await apiLogin(tenantMobile, { name: 'Consent Tenant' });
   await signedInAs(page, tenantMobile);
 
-  await page.goto(`${BASE}/flatmates`);
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20_000 });
-  await postAsGroup(page);
-  await haveAFlat(page);
-  await page.getByText(/registered rent agreement/i).click();
+  const group = await openLegacyGroup(page, tenantToken, `Consent via UI ${Date.now().toString(36)}`);
 
   const consentBtn = page.getByRole('button', { name: /Verify owner consent/i });
   await expect(consentBtn).toBeVisible({ timeout: 5_000 });
@@ -111,11 +121,6 @@ test('the consent button needs a full 10-digit owner mobile, the modal records c
 
   await mobileField.fill('9700000001');
   await expect(consentBtn).toBeEnabled();
-  // The consent row is scoped to a flat (V30), named by title and locality, so the create below
-  // must reuse this title or the flag it asserts belongs to a different flat.
-  const title = `Consent via UI ${Date.now().toString(36)}`;
-  await page.getByPlaceholder(/2 girls/i).fill(title);
-  await pickPlaceholderLocality(page);
 
   await mobileField.fill(ownerMobile);
   await consentBtn.click();
@@ -127,37 +132,19 @@ test('the consent button needs a full 10-digit owner mobile, the modal records c
   await page.getByRole('button', { name: /Confirm consent/i }).click();
   await expect(page.getByRole('button', { name: /Confirm consent/i })).toBeHidden({ timeout: 15_000 });
   // The proof: `ownerConsent` is not client-settable, so it can only come back true from a
-  // `flatmate_owner_consents` row keyed on (owner mobile, tenant, flat) and found again at create.
-  const createRes = await fetch(`${API}/flatmates/groups`, {
-    method: 'POST',
-    headers: auth(tenantToken),
-    body: JSON.stringify({
-      title,
-      name: 'Consent Tenant',
-      locality: 'Baner',
-      rent: 35000,
-      role: 'tenant',
-      consentMobile: ownerMobile,
-    }),
-  });
-  const createBody = await createRes.text();
-  expect(createRes.status, createBody).toBe(201);
-  const created = JSON.parse(createBody);
-  track('groups', created.id, tenantToken);
-  expect(created.ownerConsent).toBe(true);
+  // `flatmate_owner_consents` row keyed on (owner mobile, tenant, flat) and found again at save.
+  const patched = page.waitForResponse((r) => r.url().endsWith(`/flatmates/groups/${group.id}`) && r.request().method() === 'PATCH');
+  await page.getByRole('button', { name: 'Save changes' }).click();
+  const res = await patched;
+  expect(res.status(), await res.text()).toBe(200);
+  expect((await res.json()).ownerConsent).toBe(true);
 });
 
 test('a wrong owner code says how many tries are left, not a blanket "did not match"', async ({ page }) => {
   const tenantMobile = uniqueMobile();
-  await apiLogin(tenantMobile);
+  const { accessToken } = await apiLogin(tenantMobile, { name: 'Consent Tenant' });
   await signedInAs(page, tenantMobile);
-  await page.goto(`${BASE}/flatmates`);
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20_000 });
-  await postAsGroup(page);
-  await haveAFlat(page);
-  await page.getByText(/registered rent agreement/i).click();
-  await page.getByPlaceholder(/2 girls/i).fill(`Consent wrong ${Date.now().toString(36)}`);
-  await pickPlaceholderLocality(page);
+  await openLegacyGroup(page, accessToken, `Consent wrong ${Date.now().toString(36)}`);
   await page.getByPlaceholder(/owner.*mobile|seeking a replacement/i).fill(uniqueMobile());
   await page.getByRole('button', { name: /Verify owner consent/i }).click();
   await page.getByRole('button', { name: /Send OTP to owner/i }).click();

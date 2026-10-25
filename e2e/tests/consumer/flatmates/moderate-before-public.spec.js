@@ -7,12 +7,11 @@ const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
 
-async function createPost(token, { locality = 'Baner', name = 'Moderation Tester', note = 'Moderation coverage' } = {}) {
+async function createPost(token, { locality = 'Baner', note = 'Moderation coverage' } = {}) {
   const res = await fetch(`${API}/flatmates/posts`, {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
-      name,
       gender: 'female',
       age: 26,
       occupation: 'Engineer',
@@ -21,7 +20,6 @@ async function createPost(token, { locality = 'Baner', name = 'Moderation Tester
       moveIn: '2026-12-01',
       flatPref: 'women',
       roomPref: 'private',
-      tags: ['Vegetarian'],
       note,
     }),
   });
@@ -37,9 +35,8 @@ async function created(res, token, kind) {
 }
 
 test('a new seeker post is live at once and waits on the Ops re-check board', async () => {
-  const { accessToken } = await apiLogin(uniqueMobile());
-  const name = `Live ${Date.now().toString(36)}`;
-  const post = await created(await createPost(accessToken, { name }), accessToken, 'posts');
+  const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Moderation Tester' });
+  const post = await created(await createPost(accessToken), accessToken, 'posts');
   expect(post.modStatus).toBe('live');
 
   const feed = await (await fetch(`${API}/flatmates/feed?tab=team-up&size=100`)).json();
@@ -55,18 +52,18 @@ test('a new seeker post is live at once and waits on the Ops re-check board', as
 
   // Positive first: the public feed is non-empty (other approved posts exist in the seed).
 test('a phone number in a seeker post is refused, not published', async () => {
-  const { accessToken } = await apiLogin(uniqueMobile());
+  const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Moderation Tester' });
   const res = await createPost(accessToken, { note: 'Call me on 98200 11223' });
   expect(res.status).toBe(422);
 });
 
 test('a group with a flat is still held until a moderator publishes it', async ({ page }) => {
-  const { accessToken } = await apiLogin(uniqueMobile());
+  const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Host' });
   const title = `Held flat ${Date.now().toString(36)}`;
   const group = await created(await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
-    body: JSON.stringify({ title, locality: 'Kothrud', policy: 'any', rent: 40000, seats: 3, seatsOpen: 1, name: 'Host', tags: [] }),
+    body: JSON.stringify({ title, locality: 'Kothrud', policy: 'any', rent: 40000, deposit: 50000, seats: 3, seatsOpen: 1 }),
   }), accessToken, 'groups');
   expect(group.modStatus).toBe('pending');
 

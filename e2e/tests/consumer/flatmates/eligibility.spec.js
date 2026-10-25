@@ -3,6 +3,7 @@ import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { liveListing, verifyOwnership } from '../../../helpers/referral.js';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const AGREEMENT_EVIDENCE = {
@@ -12,15 +13,15 @@ const AGREEMENT_EVIDENCE = {
 
 async function newHost() {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Asha K' });
   return { mobile, accessToken };
 }
 
 const groupBody = (over = {}) => ({
   title: `Tier Group ${Number(uniqueMobile()).toString(36)}`,
-  name: 'Asha K',
   locality: 'Baner',
   rent: 25000,
+  deposit: 50000,
   seats: 2,
   seatsOpen: 1,
   policy: 'any',
@@ -110,14 +111,15 @@ test.describe('Flatmate host eligibility tiers', () => {
     expect(group.propertyId ?? null).toBeNull();
   });
 
-  test('an owner who names their own approved listing earns the owner tier', async ({ page }) => {
-    const { accessToken: ownerToken } = await apiLogin(ACTORS.owner);
-    const mine = await (await fetch(`${API}/me/listings?size=50`, {
-      headers: auth(ownerToken),
-    })).json();
-    const approved = mine.content.find((l) => l.status === 'approved');
-    expect(approved, 'the seeded owner needs one approved listing').toBeTruthy();
+  test('an owner who names their own approved listing earns the owner tier only once its ownership is verified', async () => {
+    const ownerMobile = uniqueMobile();
+    const { accessToken: ownerToken } = await apiLogin(ownerMobile, { name: 'Asha K' });
+    const approved = await liveListing(ownerMobile);
 
+    const unbadged = await createGroup(ownerToken, { role: 'owner', propertyId: approved.id, locality: 'Baner' });
+    expect(unbadged.body.verificationTier, 'approval alone proves the listing, not who owns the flat').toBe('identity');
+
+    await verifyOwnership(ownerMobile, approved);
     const { status, body: group } = await createGroup(ownerToken, {
       role: 'owner', propertyId: approved.id, locality: approved.locality ?? 'Baner',
     });

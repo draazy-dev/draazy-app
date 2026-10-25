@@ -162,7 +162,7 @@ public class FlatmateModeratorEditService {
             List<String> localities = localityBinding.canonicalNames(
                     FlatmateSeekerService.clean(body.localities()), group.getLocalities());
             refuse(localities.isEmpty(), "A group needs a locality.");
-            refuse(localities.size() > (group.isHunting() ? FlatmateGroupPreferences.MAX_LOCALITIES : 1),
+            refuse(localities.size() > (group.isHunting() ? FlatmateVocabulary.MAX_LOCALITIES : 1),
                     "Too many localities for this group.");
             group.relocate(localities);
         }

@@ -77,10 +77,21 @@ public class FlatmateSeekerPost extends AuditedEntity implements FlatmateModerat
     @Setter
     private String roomPref = "any";
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "tags", nullable = false)
+    @Column(name = "furnishing")
     @Setter
-    private List<String> tags = new ArrayList<>();
+    private String furnishing;
+
+    @Column(name = "gated_only", nullable = false)
+    @Setter
+    private boolean gatedOnly = false;
+
+    @Column(name = "attached_bath", nullable = false)
+    @Setter
+    private boolean attachedBath = false;
+
+    @Column(name = "parking")
+    @Setter
+    private String parking;
 
     @Column(name = "note")
     @Setter

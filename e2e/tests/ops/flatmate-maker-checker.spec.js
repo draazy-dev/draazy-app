@@ -1,7 +1,8 @@
 import { ACTORS, expect, test } from '../../fixtures/live.js';
-import { API, apiLogin, uniqueMobile, uploadedListingPhotos } from '../../helpers/liveAuth.js';
+import { API, apiLogin, uniqueMobile } from '../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../helpers/roomWizard.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
 import { sql } from '../../helpers/monetisation.js';
 
@@ -18,10 +19,10 @@ async function call(method, path, token, body) {
 const moderate = async (id, modStatus, note) => call('PATCH', `/admin/flatmates/${id}/moderation`,
   (await apiLogin(STAFF)).accessToken, { modStatus, ...(note ? { note } : {}) });
 
-const postBody = (note) => ({ name: 'Asha', age: 27, budget: 16000, localities: ['Kothrud'], moveIn: '2026-12-01', note });
+const postBody = (note) => ({ age: 27, budget: 16000, localities: ['Kothrud'], moveIn: '2026-12-01', note });
 
 async function seekerPost(note) {
-  const { accessToken } = await apiLogin(uniqueMobile());
+  const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Asha' });
   const res = await call('POST', '/flatmates/posts', accessToken, postBody(note));
   expect(res.status, res.text).toBe(201);
   const post = JSON.parse(res.text);
@@ -32,9 +33,9 @@ async function seekerPost(note) {
 async function tenantRoom() {
   const { accessToken } = await apiLogin(uniqueMobile());
   const res = await call('POST', '/flatmates/rooms', accessToken, {
+    ...(await roomBasics(accessToken)),
     bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi', locality: 'Baner',
     rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01', lookingFor: 'any', foodPref: 'any',
-    photos: await uploadedListingPhotos(accessToken),
     ...(await tenantRoomAgreement(accessToken)),
     ...(await withSocietyId(accessToken, { society: `Checker Court ${stamp()}` })),
   });
@@ -92,7 +93,7 @@ test.describe('Flatmate maker-checker rules hold at the API', () => {
 
   test('an ask carrying a phone number is refused, and a stranger cannot edit the post', async () => {
     const { post } = await seekerPost(`Ask check ${stamp()}`);
-    const { accessToken: stranger } = await apiLogin(uniqueMobile());
+    const { accessToken: stranger } = await apiLogin(uniqueMobile(), { name: 'Asha' });
     const ask = await call('POST', `/flatmates/posts/${post.id}/interest`, stranger,
       { share: 'solo', message: 'Call me on 98765 43210' });
     expect(ask.status, ask.text).toBe(422);

@@ -12,9 +12,9 @@ const track = flatmateCleanup(test);
 function groupBody(title, locality = 'Baner') {
   return {
     title,
-    name: 'Guardrail Host',
     locality,
     rent: 30000,
+    deposit: 50000,
     seats: 3,
     seatsOpen: 1,
     policy: 'any',
@@ -35,7 +35,6 @@ async function createGroup(token, title, locality) {
 
 function postBody() {
   return {
-    name: 'Guardrail Seeker',
     gender: 'female',
     age: 25,
     occupation: 'Engineer',
@@ -44,7 +43,6 @@ function postBody() {
     moveIn: '2026-12-01',
     flatPref: 'any',
     roomPref: 'any',
-    tags: [],
     note: 'Guardrail takedown spec',
   };
 }
@@ -74,7 +72,7 @@ async function approve(id) {
 
 test('per-identity cap: a 4th non-owner group is refused with host_capped', async () => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Guardrail Host' });
 
   // Create three groups — each with a distinct title so fingerprints differ.
   const tag = Date.now().toString(36);
@@ -91,7 +89,7 @@ test('per-identity cap: a 4th non-owner group is refused with host_capped', asyn
 
 test('address dedupe: the same host cannot list the same flat twice', async () => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Guardrail Host' });
 
   const title = `Dedupe ${Date.now().toString(36)} Society`;
   const { status: s1 } = await createGroup(accessToken, title, 'Kothrud');
@@ -109,13 +107,13 @@ test('address dedupe: a DIFFERENT host claiming the same address still posts (fl
 
   // Host A claims the address.
   const mobileA = uniqueMobile();
-  const { accessToken: tokenA } = await apiLogin(mobileA);
+  const { accessToken: tokenA } = await apiLogin(mobileA, { name: 'Guardrail Host' });
   const { status: s1 } = await createGroup(tokenA, title, 'Hadapsar');
   expect(s1).toBe(201);
 
   // Host B claims the same address — not blocked, but flagged.
   const mobileB = uniqueMobile();
-  const { accessToken: tokenB } = await apiLogin(mobileB);
+  const { accessToken: tokenB } = await apiLogin(mobileB, { name: 'Guardrail Host' });
   const { status: s2, body } = await createGroup(tokenB, title, 'Hadapsar');
   expect(s2, 'a different host must NOT be blocked').toBe(201);
   expect(body.flagForReview, 'the post must be flagged for Ops review').toBe(true);
@@ -123,7 +121,7 @@ test('address dedupe: a DIFFERENT host claiming the same address still posts (fl
 
 test('D71 takedown: deleting a seeker post relieves the poster so they can post again', async () => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Guardrail Seeker' });
 
   // A seeker's cap is 1 live post (server enforces `already_live`).
   const post = await createPost(accessToken);

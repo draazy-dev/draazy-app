@@ -192,7 +192,7 @@ export async function signedInAs(page, mobile) {
 
 // Two calls are the contract: the first issues the OTP, the second redeems it. Back-office accounts
 // are refused there, so they take the password + authenticator route instead.
-export async function apiLogin(mobile, { api = API } = {}) {
+export async function apiLogin(mobile, { api = API, name } = {}) {
   const send = async (path, body) => {
     const res = await fetch(`${api}${path}`, {
       method: 'POST',
@@ -215,6 +215,16 @@ export async function apiLogin(mobile, { api = API } = {}) {
         ? ' - the server read this account and refused it; check `status` in the seed'
         : ' - is the backend running under BOTH the `dev` and `e2e` profiles?';
     throw new Error(`login ${mobile} failed (${status}): ${JSON.stringify(body)}${hint}`);
+  }
+  // Flatmate posts and groups take the poster's profile name, so a fresh account must have one.
+  if (name && !body.user?.name?.trim()) {
+    const profile = await fetch(`${api}/auth/me`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${body.accessToken}` },
+      body: JSON.stringify({ name }),
+    });
+    if (!profile.ok) throw new Error(`naming ${mobile} failed (${profile.status}): ${await profile.text()}`);
+    body.user = await profile.json();
   }
   return body;
 }
@@ -245,7 +255,7 @@ export async function identityChallengeToken(authorization, { api = API } = {}) 
   return (await res.json()).token;
 }
 
-// The new account's display name is always `Test Member`, so never assert on it.
+// The new account's display name is always `Test Member`.
 export async function signedInAsNew(page, { api = API } = {}) {
   const mobile = uniqueMobile();
   const session = await apiLogin(mobile, { api });
@@ -273,6 +283,16 @@ const TINY_PNG = Buffer.from(
 // Two calls: the simulate endpoint 404s on an account with no pending case, so file one first.
 export async function fileIdentityCase(mobile, { api = API } = {}) {
   const { authorization } = await authHeaders(mobile, { api });
+  await fileIdentityCaseAs(authorization, { api });
+  return authorization;
+}
+
+// `allowExisting` skips a verified account and accepts the 409 for one whose ID is already in review.
+export async function fileIdentityCaseAs(authorization, { api = API, allowExisting = false } = {}) {
+  if (allowExisting) {
+    const me = await fetch(`${api}/auth/me`, { headers: { authorization } });
+    if (me.ok && (await me.json()).verified) return;
+  }
   const form = new FormData();
   form.set('docType', 'pan');
   form.set('consent', 'true');
@@ -284,10 +304,9 @@ export async function fileIdentityCase(mobile, { api = API } = {}) {
     headers: { authorization },
     body: form,
   });
-  if (!filed.ok) {
-    throw new Error(`filing an identity case failed for ${mobile}: ${filed.status} ${await filed.text()}`);
+  if (!filed.ok && !(allowExisting && filed.status === 409)) {
+    throw new Error(`filing an identity case failed: ${filed.status} ${await filed.text()}`);
   }
-  return authorization;
 }
 
 export async function grantIdentityBadge(mobile, { api = API } = {}) {

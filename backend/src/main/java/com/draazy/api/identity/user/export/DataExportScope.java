@@ -73,6 +73,15 @@ public final class DataExportScope {
                 """,
                 Map.of()));
 
+        out.add(new Dataset("account", "user_living_style",
+                "Your optional living-style answers, shown to people you could share a home with.",
+                """
+                select answers, updated_at
+                  from user_living_style
+                 where user_id = :subjectId
+                """,
+                Map.of()));
+
         out.add(new Dataset("account", "push_subscriptions",
                 "Browser push endpoints registered to your account.",
                 """
@@ -307,7 +316,7 @@ public final class DataExportScope {
                 select id, title, deal, property_type, bhk, price, locality, locality_slug,
                        society, area, area_unit, furnishing, visibility, status, rented,
                        tenant_name, tenant_mobile, tenant_since, monthly_rent, due_day, valuation,
-                       published_listing_id,
+                       published_listing_id, source_room_id, address_fingerprint,
                        created_at, updated_at
                   from managed_properties
                  where owner_id = :subjectId
@@ -1001,7 +1010,7 @@ public final class DataExportScope {
                        verification_tier, agreement_declared, society_id, society,
                        flat_number, locality, localities, lat, lng, bhk, flat_type,
                        home_type_label, gated_community, furnishing, move_in, available_from,
-                       gender, food, tags, note, photos, status, archived, archived_at,
+                       gender, food, note, photos, status, archived, archived_at,
                        active_until, created_at, updated_at
                   from flatmate_rooms
                  where host_id = :subjectId
@@ -1019,9 +1028,9 @@ public final class DataExportScope {
                 "Flatmate groups you host.",
                 """
                 select id, title, locality, policy, rent, seats_total, seats_open, property_id,
-                       host_role, verification_tier, agreement_declared, owner_consent, tags,
+                       host_role, verification_tier, agreement_declared, owner_consent,
                        note, hunting, localities, pref_bhk, rent_min, deposit_min, deposit_max,
-                       gated_only, bachelors, furnishing, move_in_by,
+                       gated_only, bachelors, furnishing, parking, move_in_by,
                        archived, archived_at, active_until, created_at, updated_at
                   from flatmate_groups
                  where host_id = :subjectId
@@ -1078,7 +1087,8 @@ public final class DataExportScope {
                 "Posts you made looking for a flat or a flatmate.",
                 """
                 select id, name, gender, age, occupation, budget, localities, move_in, move_in_at,
-                       flat_pref, room_pref, tags, note, verified_contact_only, verified, lat,
+                       flat_pref, room_pref, furnishing, gated_only, attached_bath, parking,
+                       note, verified_contact_only, verified, lat,
                        lng, archived, archived_at, active_until, created_at, updated_at
                   from flatmate_seeker_posts
                  where user_id = :subjectId
@@ -1097,6 +1107,16 @@ public final class DataExportScope {
                  order by created_at desc
                 """,
                 Map.of()));
+
+        out.add(new Dataset("flatmate", "flatmate_owner_notices",
+                "WhatsApp notices sent to a flat owner because you listed a room in their flat.",
+                """
+                select id, room_id, owner_mobile, status, responded_at, expires_at, created_at
+                  from flatmate_owner_notices
+                 where host_id = :subjectId
+                 order by created_at desc
+                """,
+                withheld("token_hash", "Digest of the link credential sent to the owner.")));
 
         out.add(new Dataset("flatmate", "referrals_made",
                 "People you referred. Their name is included because the referrals screen already "

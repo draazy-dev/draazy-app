@@ -2,6 +2,7 @@ import { PAGE_LOAD_TTL, del, get, patch, post, put, unwrapPage, unwrapFullPage }
 // Leaf module, deliberately not re-exported through `http.js`, so this import stays cycle-free.
 import { MAX_PAGE_SIZE } from '../../apiLimits.js';
 import { readAccessToken } from '../../../lib/auth.js';
+import { bootstrapSection } from './bootstrap.js';
 import {
   conflictSubCode,
   CONFLICT_MARKER,
@@ -77,12 +78,12 @@ function roomBody(room) {
     availableFrom: room.availableFrom,
     lookingFor: vocab('gender', room.lookingFor),
     foodPref: vocab('food', room.foodPref),
-    lifestyle: room.lifestyle || room.tags,
     hostRole: vocab('hostRole', room.hostRole),
     agreementDeclared: room.agreementDeclared,
     agreementDoc: room.agreementDoc,
     ownerConsentMobile: room.ownerConsentMobile,
     ownerConsent: room.ownerConsent,
+    propertyId: room.propertyId || undefined,
     photos: room.photos || [],
     note: room.note,
     lat: room.lat,
@@ -113,6 +114,15 @@ export async function roomInterest(id, { share = 'solo', message, gender } = {})
   })));
 }
 
+/** Body `{ agreementDoc: { id } }`: a private-vault rent agreement or light bill for Ops to review. */
+export async function requestRoomBadge(id, body = {}) {
+  return post(`/flatmates/rooms/${encodeURIComponent(id)}/badge-request`, body);
+}
+
+export async function requestGroupBadge(id, body = {}) {
+  return post(`/flatmates/groups/${encodeURIComponent(id)}/badge-request`, body);
+}
+
 /** `POST /flatmates/groups` — form a group. */
 export async function createGroup(group = {}) {
   return toGroupViewModel(await post('/flatmates/groups', groupBody(group)));
@@ -132,6 +142,7 @@ export async function getFlatmateDetail(kind, id) {
   const res = await get(`/flatmates/${DETAIL_PATH[kind]}/${encodeURIComponent(id)}`);
   const item = DETAIL_MAPPER[kind](res?.item);
   if (kind === 'room' && Array.isArray(res?.photos) && res.photos.length) item.photos = res.photos;
+  if (kind === 'room') item.specs = res?.specs || null;
   return { kind, owned: !!res?.owned, item, verification: res?.verification || null };
 }
 
@@ -151,6 +162,7 @@ function preferencesBody(p) {
     gatedOnly: !!p.gatedOnly,
     bachelors: !!p.bachelors,
     furnishing: p.furnishing || undefined,
+    parking: p.parking || undefined,
     moveInBy: p.moveInBy || undefined,
   });
 }
@@ -169,14 +181,11 @@ function groupBody(group) {
     electricityBilling: group.electricityBilling,
     seats: group.seatsTotal == null ? undefined : Number(group.seatsTotal),
     seatsOpen: group.seatsOpen == null ? undefined : Number(group.seatsOpen),
-    /* Use `||`: a read-side group may carry `ownerName: ''`, and blank is not a name. */
-    name: group.name || group.ownerName || group.members?.[0]?.name,
     role: vocab('hostRole', group.hostRole ?? group.role),
     propertyId: group.propertyId,
     agreement: group.agreementDeclared ?? group.agreement,
     agreementDoc: group.agreementDoc,
     consentMobile: group.ownerConsentMobile ?? group.consentMobile,
-    tags: group.tags,
     note: group.note,
   });
   if (!group.preferences) return body;
@@ -236,11 +245,30 @@ export async function requestOwnerConsent({ ownerMobile, otp, title, society, lo
   return { consentRecorded: !!res?.consentRecorded };
 }
 
+// The token rides a header, never the URL, so it stays out of access logs and Referer.
+const noticeAuth = (token) => ({ auth: false, headers: { 'X-Owner-Notice-Token': token } });
+
+export async function getOwnerNotice(token) {
+  return get('/flatmates/owner-notice', undefined, noticeAuth(token));
+}
+
+export async function answerOwnerNotice(token, answer) {
+  return post('/flatmates/owner-notice/answer', { answer }, noticeAuth(token));
+}
+
+export async function getOwnerHomes() {
+  const rows = await get('/me/owner-homes');
+  return Array.isArray(rows) ? rows : [];
+}
+
+export async function getOwnerHomePrefill(managedId) {
+  return get(`/me/owner-homes/${encodeURIComponent(managedId)}/prefill`);
+}
+
 /** `POST /flatmates/posts` — advertise yourself as looking. `localities` is `@NotEmpty`. */
 export async function createPost(postBody = {}) {
   return toSeekerPostViewModel(await post('/flatmates/posts', clean({
     title: postBody.title,
-    name: postBody.name,
     gender: vocab('gender', postBody.gender),
     age: postBody.age == null ? undefined : Number(postBody.age),
     occupation: postBody.occupation,
@@ -250,7 +278,7 @@ export async function createPost(postBody = {}) {
     moveIn: postBody.moveIn,
     flatPref: vocab('flatPref', postBody.flatPref),
     roomPref: vocab('roomPref', postBody.roomPref),
-    tags: postBody.tags,
+    ...mustHavesBody(postBody),
     note: postBody.note,
     verifiedContactOnly: postBody.verifiedContactOnly,
   })));
@@ -259,7 +287,7 @@ export async function createPost(postBody = {}) {
 /** `PATCH /flatmates/posts/{id}` — partial by design: only dirty fields cross the seam. */
 export async function updatePost(id, patchBody = {}) {
   const body = {};
-  ['title', 'name', 'occupation', 'moveIn', 'note'].forEach((k) => {
+  ['title', 'occupation', 'moveIn', 'note'].forEach((k) => {
     if (patchBody[k] !== undefined) body[k] = patchBody[k];
   });
   if (patchBody.gender !== undefined) body.gender = vocab('gender', patchBody.gender);
@@ -270,9 +298,14 @@ export async function updatePost(id, patchBody = {}) {
   body.budgetMax = patchBody.budgetMax == null ? null : Number(patchBody.budgetMax);
   if (patchBody.age !== undefined) body.age = Number(patchBody.age);
   if (patchBody.localities !== undefined) body.localities = patchBody.localities;
-  if (patchBody.tags !== undefined) body.tags = patchBody.tags;
   if (patchBody.verifiedContactOnly !== undefined) body.verifiedContactOnly = patchBody.verifiedContactOnly;
+  // The server rewrites every must-have on a save, so all four always travel.
+  Object.assign(body, mustHavesBody(patchBody));
   return toSeekerPostViewModel(await patch(`/flatmates/posts/${encodeURIComponent(id)}`, body));
+}
+
+function mustHavesBody(p) {
+  return { furnishing: p.furnishing || null, gatedOnly: !!p.gatedOnly, attachedBath: !!p.attachedBath, parking: p.parking || null };
 }
 
 /** `DELETE /flatmates/posts/{id}`. */
@@ -344,8 +377,13 @@ export async function unsplitProperty(propertyId) {
   await del(`/properties/${encodeURIComponent(propertyId)}/split`);
 }
 
+/** `GET /bootstrap` → `flatmatePulse`. Null from a server that predates the section, so the panel hides. */
+export async function flatmatePulse() {
+  return (await bootstrapSection('flatmatePulse')) ?? null;
+}
+
 /** `tab` is the current vocabulary; the legacy `view=` form is only translated, never sent. */
-export async function feed(tab = 'move-in', filters = {}, page = 0, size = 24, { signal } = {}) {
+export async function feed(tab = 'move-in', filters = {}, page = 0, size = 24, { signal, auth = !!readAccessToken() } = {}) {
   const [minBudget, maxBudget] = budgetRange(filters.budget);
   const res = await get('/flatmates/feed', clean({
     tab: vocab('tab', tab) || 'move-in',
@@ -355,28 +393,38 @@ export async function feed(tab = 'move-in', filters = {}, page = 0, size = 24, {
     minBudget,
     maxBudget,
     gender: vocab('gender', filters.gender),
+    strictGender: filters.gender && filters.strictGender ? true : undefined,
+    roomType: filters.roomType,
+    furnishing: filters.furnishing,
     // `false` is not a filter — only send the flag when it is on, or every unfiltered read would
     // carry `verifiedOnly=false` and invite the server to grow a meaning for it.
     verifiedOnly: filters.verifiedOnly ? true : undefined,
+    gated: filters.gated ? true : undefined,
     moveInDays: moveInDays(filters.moveIn),
-    habits: filters.habits?.length ? filters.habits : undefined,
+    vibe: filters.vibe?.length ? filters.vibe : undefined,
     attachedBath: filters.attachedBath ? 'attached' : undefined,
     sharing: filters.sharing ? Number(filters.sharing) : undefined,
     sort: filters.sort,
     ...meParams(filters.me),
     page,
     size,
-  }), { auth: false, signal });
+  }), { auth, signal });
   // Rooms carry `roomType`, groups carry `members`, posts carry `budget` with no room fields.
   const { items, ...rest } = unwrapPage(res, { page, size });
+  const matches = res?.matches || {};
+  const withMatch = (vm, kind) => {
+    const styleMatch = matches[`${kind}:${vm.id}`];
+    return Number.isFinite(styleMatch) ? { ...vm, styleMatch } : vm;
+  };
   return {
     items: items.map((r) => {
-      if (r?.roomType || r?.roomKind) return toRoomViewModel(r);
-      if (r?.members || r?.seatsTotal != null) return toGroupViewModel(r);
-      return toSeekerPostViewModel(r);
+      if (r?.roomType || r?.roomKind) return withMatch(toRoomViewModel(r), 'room');
+      if (r?.members || r?.seatsTotal != null) return withMatch(toGroupViewModel(r), 'group');
+      return withMatch(toSeekerPostViewModel(r), 'post');
     }),
     verifiedTotal: res?.verifiedElements ?? 0,
     otherTabTotal: Number.isFinite(res?.otherTabElements) ? res.otherTabElements : null,
+    tabTotals: res?.tabElements ?? null,
     // `unwrapPage` names this `totalPages`; the board's pager reads `pageCount`, and an absent one
     // makes its clamp `NaN` rather than merely wrong.
     pageCount: res?.totalPages ?? 0,
@@ -495,13 +543,23 @@ export async function listFlatmateReviews({ status, flagged, page = 0, size = 20
 
 /** `PATCH /admin/flatmate-reviews/{id}` — a rejection without a reason is a 400 (and a DB constraint) because a host
  * told "no" without being told why cannot fix anything; the blank check saves a trip. */
-export async function decideFlatmateReview(id, decision, note) {
+export async function decideFlatmateReview(id, decision, note, checks) {
   return toReviewViewModel(
     await patch(`/admin/flatmate-reviews/${encodeURIComponent(id)}`, clean({
       decision,
       note: String(note || '').trim() || undefined,
+      checks,
     })),
   );
+}
+
+/** A short-lived signed URL; every open is audited server-side. */
+export async function getFlatmateReviewDocumentUrl(id) {
+  return (await get(`/admin/flatmate-reviews/${encodeURIComponent(id)}/document-url`))?.url || null;
+}
+
+export async function revokeFlatmateReview(id, reason) {
+  return toReviewViewModel(await post(`/admin/flatmate-reviews/${encodeURIComponent(id)}/revoke`, { reason }));
 }
 
 const statesParam = (modStatus) => (Array.isArray(modStatus) ? modStatus.join(',') : modStatus) || undefined;
@@ -522,6 +580,7 @@ const toModerationDetail = (res) => ({
   group: res?.group ? toGroupViewModel(res.group) : null,
   post: res?.post ? toSeekerPostViewModel(res.post) : null,
   review: res?.review ? toReviewViewModel(res.review) : null,
+  livingStyle: res?.livingStyle || {},
 });
 
 /** `GET /admin/flatmates/{id}` — one post/room/group in full, with its badge claim when it has one. */
@@ -590,4 +649,19 @@ export async function decideGroupApplication(id, status) {
   return toGroupApplicationViewModel(
     await patch(`/me/group-applications/${encodeURIComponent(id)}`, { status }),
   );
+}
+
+const toLivingStyle = (res) => ({ answers: res?.answers || {}, updatedAt: res?.updatedAt || null });
+
+export async function myLivingStyle() {
+  return toLivingStyle(await get('/me/living-style'));
+}
+
+export async function saveMyLivingStyle(answers) {
+  return toLivingStyle(await put('/me/living-style', { answers }));
+}
+
+export async function livingStyleOf(kind, id) {
+  const res = await get(`/flatmates/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/living-style`);
+  return { answers: res?.answers || {}, match: Number.isFinite(res?.match) ? res.match : null, common: res?.common || 0 };
 }

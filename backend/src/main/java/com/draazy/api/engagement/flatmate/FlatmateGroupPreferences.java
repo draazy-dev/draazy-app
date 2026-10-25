@@ -14,22 +14,21 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 public record FlatmateGroupPreferences(
-        @NotNull @Size(min = 1, max = MAX_LOCALITIES) List<@NotBlank @Size(max = 80) @NoContactDetails(message = NO_CONTACT) String> localities,
+        @NotNull @Size(min = 1, max = FlatmateVocabulary.MAX_LOCALITIES) List<@NotBlank @Size(max = 80) @NoContactDetails(message = NO_CONTACT) String> localities,
         @Size(max = 4) List<@NotBlank String> bhk,
         @Min(0) @Max(10_000_000) Long rentMin,
         @NotNull @Min(1) @Max(10_000_000) Long rentMax,
         @Min(0) @Max(10_000_000) Long depositMin,
-        @Min(0) @Max(10_000_000) Long depositMax,
+        @NotNull @Min(0) @Max(10_000_000) Long depositMax,
         boolean gatedOnly,
         boolean bachelors,
         String furnishing,
+        String parking,
         LocalDate moveInBy) {
-
-    public static final int MAX_LOCALITIES = 3;
 
     FlatmateGroupPreferences withLocalities(List<String> canonical) {
         return new FlatmateGroupPreferences(canonical, bhk, rentMin, rentMax, depositMin, depositMax,
-                gatedOnly, bachelors, furnishing, moveInBy);
+                gatedOnly, bachelors, furnishing, parking, moveInBy);
     }
 
     FlatmateGroupPreferences normalised() {
@@ -46,6 +45,7 @@ public record FlatmateGroupPreferences(
         return new FlatmateGroupPreferences(locs, sizes, rentMin, rentMax, depositMin, depositMax,
                 gatedOnly, bachelors,
                 FlatmateVocabulary.optional(furnishing, FlatmateVocabulary.FURNISHING, "furnishing"),
+                FlatmateVocabulary.optional(parking, FlatmateVocabulary.PARKING, "parking"),
                 moveInBy);
     }
 }

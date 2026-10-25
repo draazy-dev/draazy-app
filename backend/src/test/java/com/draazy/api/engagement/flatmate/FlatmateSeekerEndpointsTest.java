@@ -58,7 +58,7 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
         return """
                 {"name":"%s","gender":"female","age":26,"occupation":"UX Designer",
                  "budget":18000,"localities":["%s"],"moveIn":"2026-09-01",
-                 "flatPref":"women","roomPref":"private","tags":["Vegetarian"],
+                 "flatPref":"women","roomPref":"private",
                  "note":"Quiet, tidy, work from home twice a week."}
                 """.formatted(name, locality);
     }
@@ -151,6 +151,64 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
     @Nested
     @DisplayName("posting")
     class Posting {
+
+        @Test
+        @DisplayName("names the post from the profile, never from the body")
+        void nameComesFromTheProfile() throws Exception {
+            User author = user("9810000016", "Farah");
+            mvc.perform(post(Routes.Flatmates.POSTS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(author))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body("Someone Else", "Baner")))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.name").value("Farah"));
+        }
+
+        @Test
+        @DisplayName("refuses a poster whose profile has no name")
+        void profileWithoutNameCannotPost() throws Exception {
+            User author = user("9810000017", null);
+            mvc.perform(post(Routes.Flatmates.POSTS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(author))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body("Typed Name", "Baner")))
+                    .andExpect(status().isUnprocessableContent());
+        }
+
+        @Test
+        @DisplayName("keeps the flat must-haves and shows them to other people")
+        void mustHavesRoundTrip() throws Exception {
+            User author = user("9810000018", "Ira");
+            User reader = user("9810000019", "Juhi");
+            String json = body("Ira", "Baner").replace("\"note\"",
+                    "\"furnishing\":\"semi\",\"gatedOnly\":true,\"attachedBath\":true,\"parking\":\"bike\",\"note\"");
+            String created = mvc.perform(post(Routes.Flatmates.POSTS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(author))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(json))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.parking").value("bike"))
+                    .andReturn().getResponse().getContentAsString();
+            String id = publish(created.replaceAll(".*\"id\"\\s*:\\s*\"([^\"]+)\".*", "$1"));
+
+            mvc.perform(get(Routes.Flatmates.POST_BY_ID, id).header(HttpHeaders.AUTHORIZATION, bearer(reader)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.item.furnishing").value("semi"))
+                    .andExpect(jsonPath("$.item.gatedOnly").value(true))
+                    .andExpect(jsonPath("$.item.attachedBath").value(true))
+                    .andExpect(jsonPath("$.item.parking").value("bike"));
+        }
+
+        @Test
+        @DisplayName("refuses parking outside the vocabulary")
+        void unknownParkingIsRefused() throws Exception {
+            User author = user("9810000029", "Kavya");
+            mvc.perform(post(Routes.Flatmates.POSTS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(author))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(body("Kavya", "Baner").replace("\"note\"", "\"parking\":\"truck\",\"note\"")))
+                    .andExpect(status().isBadRequest());
+        }
 
         @Test
         @DisplayName("one live post per identity; a second is refused")
