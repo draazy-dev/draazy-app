@@ -49,12 +49,12 @@ class ContactRequestSource implements RequestSource {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestView> received(UUID recipientId) {
+    public List<RequestView> received(UUID recipientId, Instant since) {
         List<UUID> owned = properties.findIdsByOwnerId(recipientId);
         if (owned.isEmpty()) {
             return List.of();
         }
-        List<ContactRequest> rows = requests.findOpenForProperties(owned, window.cutoff(Instant.now()));
+        List<ContactRequest> rows = requests.findReceivedSince(owned, window.cutoff(Instant.now()), since);
         Map<UUID, Property> listings = listingsOf(rows);
         Map<UUID, User> requesters = usersById(rows.stream().map(ContactRequest::getRequesterId).toList());
         Set<UUID> verified = verifiedTenants.verifiedAmong(requesters.keySet());

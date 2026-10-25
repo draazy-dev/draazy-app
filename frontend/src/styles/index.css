@@ -3167,8 +3167,8 @@ label.lbl {
    stripped here. mapTypeControl / streetViewControl are honoured via <Map> props. */
 .gm-style .gm-fullscreen-control { display: none !important; }
 
-/* Mobile: Messages is a native, full-screen chat - drop the marketing footer and floating
-   assistant, run edge-to-edge, and fill the viewport so the composer pins to the screen bottom. */
+/* Mobile: Messages is a native chat - drop the marketing footer and floating assistant, run
+   edge-to-edge, and fill the space between the top bar and the tab bar. */
 @media (max-width: 767px) {
 
   .route-messages>footer,
@@ -3190,7 +3190,7 @@ label.lbl {
   }
 
   .messages-page .pc-wrap {
-    height: calc(100dvh - var(--dz-nav-h)) !important;
+    height: calc(100dvh - var(--dz-nav-h) - var(--dz-bottom-inset)) !important;
     border-radius: 0;
     border-left: 0;
     border-right: 0;
@@ -3492,10 +3492,16 @@ html.dz-reduce-motion .list-reveal {
   input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):not([type="button"]):not([type="submit"]),
   select,
   textarea { font-size: 16px !important; }
+
+  /* Zoom keys off the field's own size, so the placeholder can drop to the 14px control scale. */
+  input::placeholder,
+  textarea::placeholder { font-size: 14px; }
 }
 
 /* useKeyboardOpen: the soft keyboard is up, so bottom-pinned chrome would sit on top of the field being typed in. */
 .dz-kbd-open [data-kbd-hide] { display: none !important; }
+/* The chat pane is sized off the inset, so the composer would float a bar's height above the keyboard. */
+.dz-kbd-open .route-messages.has-bottom-nav { --dz-bottom-inset: var(--dz-safe-b); }
 html[data-scroll-locked] .dz-assistant-layer:not(.dz-assistant-layer--open) { display: none !important; }
 
 /* Appended to <body>, so it cannot read the inset .has-bottom-nav sets on the layout wrapper and
@@ -3530,8 +3536,8 @@ html[data-scroll-locked] .dz-assistant-layer:not(.dz-assistant-layer--open) { di
 
 .dz-autosave-flash.is-on { opacity: 1; }
 
-/* Below lg the tab bar owns the bottom edge. The two routes that do not mount it (messages,
-   auth) pin their own control to that edge, which this clears just the same. */
+/* Below lg the tab bar owns the bottom edge. Auth, which does not mount it, pins its own
+   control to that edge, which this clears just the same. */
 @media (max-width: 1023.98px) {
   .dz-autosave-flash { bottom: calc(var(--dz-bottom-nav-h) + var(--dz-bottom-nav-offset) + 16px); }
 }

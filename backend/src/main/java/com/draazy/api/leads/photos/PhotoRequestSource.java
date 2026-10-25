@@ -43,12 +43,12 @@ class PhotoRequestSource implements RequestSource {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestView> received(UUID recipientId) {
+    public List<RequestView> received(UUID recipientId, Instant since) {
         List<UUID> owned = properties.findIdsByOwnerId(recipientId);
         if (owned.isEmpty()) {
             return List.of();
         }
-        return toViews(photoRequests.findByPropertyIdInAndStatus(owned, PhotoRequestStatuses.PENDING), true);
+        return toViews(photoRequests.findReceivedSince(owned, since), true);
     }
 
     @Override

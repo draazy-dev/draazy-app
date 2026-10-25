@@ -13,6 +13,7 @@ public record RequestItem(
         Target target,
         String message,
         Instant slot,
+        String share,
         Instant createdAt,
         Instant decidedAt,
         Reminders reminders) {

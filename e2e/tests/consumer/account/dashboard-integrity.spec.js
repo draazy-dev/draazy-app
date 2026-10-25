@@ -153,7 +153,8 @@ test('double-tapping Accept sends one successful contact decision', async ({ pag
 
   await page.locator('aside button', { hasText: 'Requests' }).first().click();
   await expect(page.getByTestId('requests-panel')).toBeVisible();
-  await expect(page.getByTestId('request-card').filter({ hasText: 'Zztest Double Buyer' })).toHaveCount(0);
+  await page.getByTestId('requests-past-toggle').click();
+  await expect(page.getByTestId('request-card').filter({ hasText: 'Zztest Double Buyer' })).toHaveAttribute('data-state', 'accepted');
 });
 
 test('sharing a document in Requests clears its Overview action item and badge without a reload', async ({ page }) => {
@@ -171,7 +172,8 @@ test('sharing a document in Requests clears its Overview action item and badge w
   const nav = (label) => page.locator('aside button', { hasText: label }).first();
   await nav('Requests').click();
   await page.getByTestId('request-card').filter({ hasText: 'Zztest Refresh Doc A' }).getByRole('button', { name: 'Share', exact: true }).click();
-  await expect(page.getByTestId('request-card').filter({ hasText: 'Zztest Refresh Doc A' })).toHaveCount(0);
+  await page.getByTestId('requests-past-toggle').click();
+  await expect(page.getByTestId('request-card').filter({ hasText: 'Zztest Refresh Doc A' })).toHaveAttribute('data-state', 'accepted');
   await expect(nav('Requests')).toContainText('1');
 
   await nav('Home').click();
@@ -210,8 +212,9 @@ test('document requests from two buyers stay separate and Share affects one requ
   await expect(cardOf('Zztest Doc Buyer B')).toContainText('Encumbrance Certificate');
 
   await cardOf('Zztest Doc Buyer A').getByRole('button', { name: 'Share', exact: true }).click();
-  await expect(cardOf('Zztest Doc Buyer A')).toHaveCount(0);
-  await expect(cardOf('Zztest Doc Buyer B')).toHaveCount(1);
+  await page.getByTestId('requests-past-toggle').click();
+  await expect(cardOf('Zztest Doc Buyer A')).toHaveAttribute('data-state', 'accepted');
+  await expect(cardOf('Zztest Doc Buyer B')).toHaveAttribute('data-state', 'pending');
 
   const inbox = await request.get(`${API}/me/documents/requests?size=100`, { headers: owner.headers });
   expect(inbox.status()).toBe(200);

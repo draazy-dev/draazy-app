@@ -47,12 +47,12 @@ class VisitRequestSource implements RequestSource {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestView> received(UUID recipientId) {
+    public List<RequestView> received(UUID recipientId, Instant since) {
         List<UUID> owned = properties.findIdsByOwnerId(recipientId);
         if (owned.isEmpty()) {
             return List.of();
         }
-        return toViews(visits.findOpenForProperties(owned, Instant.now()), true);
+        return toViews(visits.findReceivedSince(owned, Instant.now(), since), true);
     }
 
     @Override

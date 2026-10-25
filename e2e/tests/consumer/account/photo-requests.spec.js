@@ -146,7 +146,10 @@ test('the owner marks photos added, and the buyer is told where to look', async 
   await card.getByRole('button', { name: 'Photos added', exact: true }).click();
   expect((await decided).status(), 'the decision is accepted').toBe(200);
   await expect(page.getByRole('alert')).toContainText(/Marked done/);
-  await expect(card).toHaveCount(0);
+  await page.getByTestId('requests-past-toggle').click();
+  await expect(card).toHaveAttribute('data-state', 'accepted');
+  await expect(card.getByTestId('request-state')).toHaveText('Accepted');
+  await expect(card.getByRole('button', { name: 'Photos added', exact: true })).toHaveCount(0);
 
   const stored = await ownerInbox(listing.owner);
   expect(stored[0].status, 'the server stores the decision, not just the button state').toBe('resolved');
@@ -181,7 +184,9 @@ test('the owner declines, and the buyer is told there are none coming', async ({
 
   await expect(page.getByRole('alert')).toContainText(/Declined/);
   await expect(page.getByRole('alert')).not.toContainText(/Marked done/);
-  await expect(card).toHaveCount(0);
+  await page.getByTestId('requests-past-toggle').click();
+  await expect(card).toHaveAttribute('data-state', 'declined');
+  await expect(card.getByTestId('request-state')).toHaveText('Declined');
 
   const stored = await ownerInbox(listing.owner);
   expect(stored[0].status, 'the decline is stored as its own terminal state').toBe('declined');

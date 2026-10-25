@@ -24,7 +24,15 @@ public interface RequestSource {
 
     record RequestView(UUID id, String kind, String state, String status, Party party, Target target,
             String message, Instant slot, Instant createdAt, Instant decidedAt, Instant expiresAt,
-            UUID recipientId) {
+            UUID recipientId, String share) {
+
+        /** Every kind but a flatmate interest has no share intent. */
+        public RequestView(UUID id, String kind, String state, String status, Party party, Target target,
+                String message, Instant slot, Instant createdAt, Instant decidedAt, Instant expiresAt,
+                UUID recipientId) {
+            this(id, kind, state, status, party, target, message, slot, createdAt, decidedAt, expiresAt,
+                    recipientId, null);
+        }
 
         public boolean pending() {
             return PENDING.equals(state);
@@ -36,7 +44,8 @@ public interface RequestSource {
     /** Everything the requester still has open, plus what was decided or created since {@code since}. */
     List<RequestView> sent(UUID requesterId, Instant since);
 
-    List<RequestView> received(UUID recipientId);
+    /** Everything still open for the recipient, plus what was decided since {@code since}. */
+    List<RequestView> received(UUID recipientId, Instant since);
 
     Optional<RequestView> findSent(UUID requesterId, UUID id);
 

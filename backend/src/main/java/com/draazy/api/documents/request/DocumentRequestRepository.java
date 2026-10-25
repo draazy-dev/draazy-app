@@ -23,8 +23,11 @@ public interface DocumentRequestRepository extends JpaRepository<DocumentRequest
             where dr.requesterId = :requesterId and (dr.status = 'pending' or dr.updatedAt >= :since)""")
     List<DocumentRequest> findSentSince(@Param("requesterId") UUID requesterId, @Param("since") Instant since);
 
-    @Query("select dr from DocumentRequest dr where dr.propertyId in :propertyIds and dr.status = 'pending'")
-    List<DocumentRequest> findOpenForProperties(@Param("propertyIds") Collection<UUID> propertyIds);
+    @Query("""
+            select dr from DocumentRequest dr
+            where dr.propertyId in :propertyIds and (dr.status = 'pending' or dr.updatedAt >= :since)""")
+    List<DocumentRequest> findReceivedSince(@Param("propertyIds") Collection<UUID> propertyIds,
+            @Param("since") Instant since);
 
     Optional<DocumentRequest> findByIdAndRequesterId(UUID id, UUID requesterId);
 

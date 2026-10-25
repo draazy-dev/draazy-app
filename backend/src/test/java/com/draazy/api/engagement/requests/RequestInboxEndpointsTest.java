@@ -107,8 +107,8 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
 
     private UUID flatmateInterest(User requester, User host) {
         UUID id = UUID.randomUUID();
-        update("insert into flatmate_requests (id, kind, target_id, host_id, requester_id, message) "
-                + "values (?, 'flatmate', ?, ?, ?, 'Hello there')", id, UUID.randomUUID(), host.getId(), requester.getId());
+        update("insert into flatmate_requests (id, kind, target_id, host_id, requester_id, share, message) "
+                + "values (?, 'flatmate', ?, ?, ?, 'bring', 'Hello there')", id, UUID.randomUUID(), host.getId(), requester.getId());
         return id;
     }
 
@@ -181,6 +181,8 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[?(@.kind=='photo')].id").value(photo.toString()))
                 .andExpect(jsonPath("$.content[?(@.kind=='flatmate')].id").value(flatmate.toString()))
                 .andExpect(jsonPath("$.content[?(@.kind=='flatmate')].message").value("Hello there"))
+                .andExpect(jsonPath("$.content[?(@.kind=='flatmate')].share").value("bring"))
+                .andExpect(jsonPath("$.content[?(@.kind=='contact')].share").value((Object) null))
                 .andExpect(jsonPath("$.content[?(@.kind=='group')].id").value(group.toString()))
                 .andExpect(jsonPath("$.content[0].reminders.count").value(0));
 
@@ -504,7 +506,10 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content[?(@.id=='" + granted + "')].state").value("accepted"))
                 .andExpect(jsonPath("$.content[?(@.id=='" + declined + "')].state").value("declined"))
                 .andExpect(jsonPath("$.content[?(@.id=='" + lapsed + "')].state").value("expired"));
-        as(owner, get(Routes.MeRequests.BASE + "?box=received")).andExpect(jsonPath("$.content.length()").value(0));
+        as(owner, get(Routes.MeRequests.BASE + "?box=received")).andExpect(jsonPath("$.content.length()").value(3))
+                .andExpect(jsonPath("$.content[?(@.id=='" + granted + "')].state").value("accepted"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + declined + "')].state").value("declined"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + lapsed + "')].state").value("expired"));
 
         as(buyer, delete(url("document", declined))).andExpect(status().isNoContent());
 
@@ -576,6 +581,50 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
 
         assertThat(lastNotificationLink(owner, "request.reminder")).isEqualTo("/messages?c=request:contact:" + id);
     }
+    @Test
+    void receivedBox_keepsDecidedRequestsBelowOpenOnes_forNinetyDays() throws Exception {
+        User owner = user("9830000053", "owner");
+        User buyer = user("9830000054", "buyer");
+        UUID approved = contactRequest(buyer, listing(owner, "Approved"), null);
+        UUID declined = photoRequest(buyer, listing(owner, "Declined photos"));
+        UUID old = contactRequest(user("9830000055", "buyer"), listing(owner, "Old"), null);
+        UUID open = flatmateInterest(user("9830000056", "buyer"), owner);
+        update("update contact_requests set status = 'approved' where id = ?", approved);
+        update("update photo_requests set status = 'declined' where id = ?", declined);
+        update("alter table contact_requests disable trigger trg_set_updated_at");
+        update("update contact_requests set status = 'approved', updated_at = now() - interval '91 days' where id = ?",
+                old);
+
+        as(owner, get(Routes.MeRequests.BASE + "?box=received")).andExpect(status().isOk())
+                .andExpect(jsonPath("$.content.length()").value(3))
+                .andExpect(jsonPath("$.content[0].id").value(open.toString()))
+                .andExpect(jsonPath("$.content[0].state").value("pending"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + approved + "')].state").value("accepted"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + approved + "')].decidedAt").isNotEmpty())
+                .andExpect(jsonPath("$.content[?(@.id=='" + declined + "')].state").value("declined"));
+    }
+
+    @Test
+    void clearingFromTheReceivedBox_hidesADecidedRequestOnlyForTheOwner_andRefusesAnOpenOne() throws Exception {
+        User owner = user("9830000057", "owner");
+        User buyer = user("9830000058", "buyer");
+        UUID decided = contactRequest(buyer, listing(owner, "Decided lead"), null);
+        UUID open = photoRequest(buyer, listing(owner, "Open lead"));
+        update("update contact_requests set status = 'approved' where id = ?", decided);
+
+        as(owner, delete(url("photo", open) + "?box=received")).andExpect(status().isConflict());
+        as(owner, delete(url("contact", decided) + "?box=received")).andExpect(status().isNoContent());
+        as(owner, delete(url("contact", decided) + "?box=received")).andExpect(status().isNoContent());
+
+        as(owner, get(Routes.MeRequests.BASE + "?box=received"))
+                .andExpect(jsonPath("$.content.length()").value(1))
+                .andExpect(jsonPath("$.content[0].id").value(open.toString()));
+        as(buyer, get(Routes.MeRequests.BASE + "?box=sent"))
+                .andExpect(jsonPath("$.content[?(@.id=='" + decided + "')].state").value("accepted"));
+        as(buyer, delete(url("photo", open) + "?box=received")).andExpect(status().isNotFound());
+        as(owner, delete(url("contact", decided) + "?box=archive")).andExpect(status().isBadRequest());
+    }
+
     @Test
     void inbox_requiresSignIn() throws Exception {
         mvc.perform(get(Routes.MeRequests.BASE)).andExpect(status().isUnauthorized());

@@ -145,6 +145,11 @@ test.describe('Dashboard → Requests', () => {
 
     await card(page, flat.title).getByRole('button', { name: 'Withdraw' }).click();
     await page.getByTestId('confirm-modal-ok').click();
+    await expect(page.getByText('Request withdrawn')).toBeVisible();
+    await expect(page.getByTestId('requests-past-toggle')).toHaveText(/Show past requests \(2\)/);
+    await expect(card(page, flat.title)).toHaveCount(0);
+    await page.getByTestId('requests-past-toggle').click();
+    await expect(page.getByTestId('requests-past-toggle')).toHaveAttribute('aria-expanded', 'true');
     await expect(card(page, flat.title)).toHaveAttribute('data-state', 'withdrawn');
     await expect(card(page, flat.title).getByTestId('request-state')).toHaveText('Withdrawn');
     await expect(card(page, flat.title).getByRole('button', { name: 'Clear' })).toBeVisible();
@@ -215,7 +220,7 @@ test.describe('Dashboard → Requests', () => {
     await expect(cards.nth(1).getByRole('button', { name: 'Withdraw' })).toBeVisible();
   });
 
-  test('a document request reaches the owner as a Share card and is gone once shared', async ({ page }) => {
+  test('a document request reaches the owner as a Share card and stays as Granted once shared', async ({ page }) => {
     const owner = await actor('Zztest Docs Panel Owner');
     const flat = await listing(owner, 'docs');
     const buyer = await actor('Zztest Docs Panel Buyer');
@@ -236,9 +241,60 @@ test.describe('Dashboard → Requests', () => {
     await expect(docCard.getByTestId('request-kind')).toHaveText('Documents');
     await expect(docCard).toContainText('Wants to see: Index II');
     await docCard.getByRole('button', { name: 'Share', exact: true }).click();
-    await expect(docCard).toHaveCount(0);
+    await page.getByTestId('requests-past-toggle').click();
+    await expect(docCard).toHaveAttribute('data-state', 'accepted');
+    await expect(docCard.getByTestId('request-state')).toHaveText('Granted');
+    await expect(docCard.getByRole('button', { name: 'Share', exact: true })).toHaveCount(0);
+    await expect(tabCount(page, 'Documents')).toHaveCount(0);
 
     const rows = await api('GET', '/me/documents/requests?size=50', owner.headers);
     expect(rows.body.content.find((r) => r.id === asked.body.id).status).toBe('granted');
+  });
+
+  test('an approved lead folds under Show past requests with its private note, and can be cleared', async ({ page }) => {
+    const owner = await actor('Zztest History Owner');
+    const flat = await listing(owner, 'history');
+    const approved = await actor('Zztest History Approved Buyer');
+    const waiting = await actor('Zztest History Waiting Buyer');
+    const approvedId = await ask(approved, flat.id);
+    await ask(waiting, flat.id);
+    const noted = await api('PUT', `/me/lead-notes/${encodeURIComponent(`number:${approvedId}`)}`, owner.headers,
+      { note: 'Zztest - call after 6pm about parking', followUpAt: null });
+    expect(noted.status, `saving the note (${JSON.stringify(noted.body)})`).toBe(200);
+    expect((await api('PATCH', `/me/contact-requests/${approvedId}`, owner.headers, { status: 'approved' })).status).toBe(200);
+
+    await signedInAs(page, owner.mobile);
+    await openRequests(page);
+    const cards = page.getByTestId('request-card');
+    await expect(cards).toHaveCount(1);
+    await expect(cards.nth(0)).toContainText(waiting.name);
+    await expect(cards.nth(0).getByRole('button', { name: 'Approve & chat' })).toBeVisible();
+    await expect(tabCount(page, 'All')).toHaveText('1');
+    const toggle = page.getByTestId('requests-past-toggle');
+    await expect(toggle).toHaveText(/Show past requests \(1\)/);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await toggle.click();
+    await expect(cards).toHaveCount(2);
+    const done = page.getByTestId('requests-past').getByTestId('request-card').filter({ hasText: approved.name });
+    await expect(done).toHaveAttribute('data-box', 'received');
+    await expect(done.getByTestId('request-state')).toHaveText('Approved');
+    await expect(done.getByTestId('request-note')).toContainText('call after 6pm about parking');
+    await expect(done.getByRole('button', { name: 'Approve & chat' })).toHaveCount(0);
+
+    await done.getByRole('button', { name: 'Open chat' }).click();
+    await expect(page).toHaveURL(/\/messages\?c=/, { timeout: 20000 });
+    await expect(page.locator('.pc-conv[data-request-kind]').filter({ hasText: approved.name })).toHaveCount(0);
+
+    await openRequests(page);
+    await toggle.click();
+    await card(page, approved.name).getByRole('button', { name: 'Clear' }).click();
+    await expect(card(page, approved.name)).toHaveCount(0);
+    await expect(toggle).toHaveCount(0);
+    await page.reload();
+    await expect(card(page, waiting.name)).toBeVisible({ timeout: 20000 });
+    await expect(toggle).toHaveCount(0);
+    const sentBox = await api('GET', '/me/requests?box=sent', approved.headers);
+    expect(sentBox.body.content.find((r) => r.id === approvedId)?.state, 'clearing is the owner\'s view only').toBe('accepted');
   });
 });

@@ -52,8 +52,12 @@ public interface FlatmateGroupApplicationRepository
     List<FlatmateGroupApplication> findSentSince(@Param("applicantId") UUID applicantId,
             @Param("modStatuses") Collection<String> modStatuses, @Param("since") Instant since);
 
-    List<FlatmateGroupApplication> findByListingIdInAndStatusAndModStatusIn(Collection<UUID> listingIds,
-            String status, Collection<String> modStatuses);
+    @Query("""
+            select a from FlatmateGroupApplication a
+            where a.listingId in :listingIds and a.modStatus in :modStatuses
+              and (a.status = 'pending' or a.updatedAt >= :since)""")
+    List<FlatmateGroupApplication> findReceivedSince(@Param("listingIds") Collection<UUID> listingIds,
+            @Param("modStatuses") Collection<String> modStatuses, @Param("since") Instant since);
 
     Optional<FlatmateGroupApplication> findByIdAndApplicantId(UUID id, UUID applicantId);
 

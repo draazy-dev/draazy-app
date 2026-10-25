@@ -49,7 +49,8 @@ test.describe('LIVE: contacts come back', () => {
       const decided = page.waitForResponse((r) => /\/api\/me\/contact-requests\//.test(r.url()) && r.request().method() === 'PATCH');
       await lead.getByRole('button', { name: 'Decline' }).click();
       expect((await decided).status()).toBe(200);
-      await expect(card(page, 'Returns Seeker')).toHaveCount(0);
+      await page.getByTestId('requests-past-toggle').click();
+      await expect(card(page, 'Returns Seeker')).toHaveAttribute('data-state', 'declined');
       expect((await requestIdFor(owner, listing.id)).status).toBe('declined');
     });
 

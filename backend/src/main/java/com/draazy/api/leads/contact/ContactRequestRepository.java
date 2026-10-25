@@ -97,9 +97,10 @@ public interface ContactRequestRepository extends JpaRepository<ContactRequest, 
 
     @Query("""
             select cr from ContactRequest cr
-            where cr.propertyId in :propertyIds and cr.status = 'pending' and cr.createdAt >= :replyCutoff""")
-    List<ContactRequest> findOpenForProperties(@Param("propertyIds") Collection<UUID> propertyIds,
-            @Param("replyCutoff") Instant replyCutoff);
+            where cr.propertyId in :propertyIds
+              and ((cr.status = 'pending' and cr.createdAt >= :replyCutoff) or cr.updatedAt >= :since)""")
+    List<ContactRequest> findReceivedSince(@Param("propertyIds") Collection<UUID> propertyIds,
+            @Param("replyCutoff") Instant replyCutoff, @Param("since") Instant since);
 
     Optional<ContactRequest> findByIdAndRequesterId(UUID id, UUID requesterId);
 

@@ -44,13 +44,12 @@ class GroupApplicationSource implements RequestSource {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestView> received(UUID recipientId) {
+    public List<RequestView> received(UUID recipientId, Instant since) {
         List<UUID> owned = properties.findIdsByOwnerId(recipientId);
         if (owned.isEmpty()) {
             return List.of();
         }
-        return toViews(applications.findByListingIdInAndStatusAndModStatusIn(
-                owned, FlatmateVocabulary.STATUS_PENDING, FlatmateVocabulary.MOD_PUBLIC), true);
+        return toViews(applications.findReceivedSince(owned, FlatmateVocabulary.MOD_PUBLIC, since), true);
     }
 
     @Override

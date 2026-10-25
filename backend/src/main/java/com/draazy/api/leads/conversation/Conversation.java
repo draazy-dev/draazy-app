@@ -24,6 +24,12 @@ public class Conversation extends AuditedEntity {
     @Column(name = "property_id", updatable = false)
     private UUID propertyId;
 
+    @Column(name = "flatmate_kind")
+    private String flatmateKind;
+
+    @Column(name = "flatmate_target_id")
+    private UUID flatmateTargetId;
+
     @Column(name = "last_message")
     private String lastMessage;
 
@@ -65,5 +71,10 @@ public class Conversation extends AuditedEntity {
     // The lower of the two ids, by Postgres uuid order.
     void setLastMessage(String lastMessage) {
         this.lastMessage = lastMessage;
+    }
+
+    void aboutFlatmate(String kind, UUID targetId) {
+        this.flatmateKind = kind;
+        this.flatmateTargetId = targetId;
     }
     }

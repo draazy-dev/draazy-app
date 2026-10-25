@@ -155,7 +155,8 @@ either participant turns one off, that surface is hidden while delivery still re
 ### Owner lead inbox (`requests/RequestsPanel.jsx`)
 - One list per user over both `/me/requests` boxes (kinds `contact`, `visit`, `photo`, `flatmate`,
   `group`, `document`), filtered by type tabs; each card is marked Received or Sent. Received cards
-  carry Accept / Decline; Sent cards carry Remind / Withdraw, then Clear (and Open chat for an
+  carry Accept / Decline, then stay for 90 days once decided with Open chat (accepted contact or
+  flatmate request) and Clear; Sent cards carry Remind / Withdraw, then Clear (and Open chat for an
   accepted contact or flatmate request).
   - Approving a contact request opens the chat with the buyer; the number shows in that chat.
   - Contact, flatmate and group requests also show in Messages as locked request threads with the same

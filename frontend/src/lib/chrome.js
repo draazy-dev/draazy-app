@@ -8,8 +8,8 @@ const SELF_PADDED = ['/', '/listings', '/property', '/signin', '/signup', '/staf
 /** Full-screen experiences: no marketing footer, no floating assistant. */
 const FULL_BLEED = ['/reels'];
 
-/** App-native chat. Goes full-screen below md and pins its composer to the viewport
-    bottom, so a tab bar would fight it for the same edge. */
+/** App-native chat. Below md its pane fills the space between the two bars, so the composer
+    sits on the tab bar; the bar steps aside while the keyboard is up. */
 const CHAT = ['/messages'];
 
 /** Focused conversion funnels. The long footer and the assistant bubble are noise
@@ -33,7 +33,7 @@ export function chromeFor(pathname) {
     authRoute,
     /* Reels keeps the tab bar despite being full-bleed: it is one of the five tabs,
        so removing it would strand the user with no route to the other four. */
-    showBottomNav: !chatRoute && !authRoute,
+    showBottomNav: !authRoute,
     showFooter: !fullBleed,
     showAssistant: !fullBleed,
   };

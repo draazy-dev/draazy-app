@@ -198,7 +198,12 @@ test.describe('Chat with the owner from a listing', () => {
     await signedInAs(page, owner.mobile);
     await page.goto('/dashboard?tab=leads');
     await expect(page.getByTestId('requests-panel')).toBeVisible({ timeout: 20000 });
-    await expect(page.getByTestId('request-card')).toHaveCount(0);
+    await expect(page.getByTestId('requests-caught-up')).toBeVisible();
+    await page.getByTestId('requests-past-toggle').click();
+    const lead = page.getByTestId('request-card');
+    await expect(lead).toHaveCount(1);
+    await expect(lead).toHaveAttribute('data-state', 'accepted');
+    await expect(lead.getByRole('button', { name: 'Open chat' })).toBeVisible();
     await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
 
     await page.goto('/messages');
@@ -208,5 +213,20 @@ test.describe('Chat with the owner from a listing', () => {
     await expect(page.locator('.pc-head a[href*="wa.me"]')).toHaveCount(0);
     const detail = await api('GET', `/messages/${conv.body.id}`, owner.headers);
     expect(detail.body.messages, 'reusing a thread posts nothing on the owner\'s behalf').toHaveLength(1);
+  });
+
+  test('when the owner deletes the listing, its chat stays readable but closes', async ({ page }) => {
+    const { owner, id } = await fixture();
+    const buyer = await actor('Zztest Closed Chat Buyer');
+    await openTheGate(buyer, owner, id);
+    const conv = await api('POST', '/messages', buyer.headers, { propertyId: id, body: 'Zztest — can I visit Sunday?' });
+    expect(conv.status).toBe(201);
+    expect((await api('DELETE', `/me/listings/${id}`, owner.headers)).status).toBe(200);
+
+    await signedInAs(page, buyer.mobile);
+    await page.goto(`/messages?c=${conv.body.id}`);
+    await expect(page.getByText(/can I visit Sunday\?/i).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('status').filter({ hasText: 'The owner deleted this listing' })).toBeVisible();
+    await expect(page.locator('.pc-input')).toHaveCount(0);
   });
 });

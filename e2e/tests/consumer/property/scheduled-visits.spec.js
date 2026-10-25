@@ -171,7 +171,7 @@ test.describe('Scheduled visits (live)', () => {
       await page.reload();
       await expect(page.getByTestId('requests-panel')).toBeVisible();
       await expect(page.getByTestId('requests-box-received')).toHaveCount(0);
-      const visitCards = page.getByTestId('request-card').filter({ has: page.getByTestId('request-kind').filter({ hasText: /^Visit/ }) });
+      const visitCards = page.locator('[data-testid="request-card"][data-state="pending"]').filter({ has: page.getByTestId('request-kind').filter({ hasText: /^Visit/ }) });
       await expect(visitCards).toHaveCount(1);
       await expect(visitCards.getByTestId('request-direction')).toHaveText('Received');
       for (const tab of ['Number requests', 'Photo requests', 'Documents', 'Flatmate']) {
