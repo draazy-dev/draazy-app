@@ -51,24 +51,36 @@ test.describe('Dashboard settings', () => {
     expect(patches).toEqual([]);
   });
 
-  test('Gender is set once from the profile, then locked', async ({ page }) => {
+  test('Gender allows two changes after the first pick, then locks', async ({ page }) => {
     const mobile = uniqueMobile();
     await signIn(page, mobile);
     await page.goto('/dashboard#profile');
     const gender = page.getByRole('button', { name: 'Gender', exact: true });
+    const save = page.getByRole('button', { name: 'Save changes' });
     await expect(gender).toBeEnabled();
+    await expect(page.getByText('You can change it 2 times after saving.')).toBeVisible();
+
+    const pick = async (label, value, left) => {
+      await gender.click();
+      await page.getByRole('option', { name: label, exact: true }).click();
+      const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/auth/me'));
+      await save.click();
+      const body = await (await saved).json();
+      expect(body.gender).toBe(value);
+      expect(body.genderChangesLeft).toBe(left);
+    };
 
     await page.getByLabel('Full name').fill(`Asha ${letterTag()}`);
-    await gender.click();
-    await page.getByRole('option', { name: 'Female' }).click();
-    const saved = page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/auth/me'));
-    await page.getByRole('button', { name: 'Save changes' }).click();
-    expect((await (await saved).json()).gender).toBe('female');
+    await pick('Female', 'female', 2);
+    await expect(page.getByText('You can change it 2 more times.')).toBeVisible();
+    await pick('Male', 'male', 1);
+    await expect(page.getByText('You can change it 1 more time.')).toBeVisible();
+    await pick('Female', 'female', 0);
     await expect(gender).toBeDisabled();
-    await expect(page.getByText('Set once. Contact support to change it.')).toBeVisible();
+    await expect(page.getByText('No changes left. Contact support to change it.')).toBeVisible();
 
     const headers = await authHeaders(mobile);
-    const other = await fetch(`${API}/auth/me`, { method: 'PATCH', headers, body: JSON.stringify({ gender: 'male' }) });
+    const other = await fetch(`${API}/auth/me`, { method: 'PATCH', headers, body: JSON.stringify({ gender: 'male', changeGender: true }) });
     expect(other.status).toBe(409);
 
     await page.reload();

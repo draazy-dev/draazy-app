@@ -88,9 +88,15 @@ public class User extends SoftDeleteEntity implements TokenSubject {
     @Setter
     private String avatar;
 
-    // No setter: the user sets it once through UserRepository.claimGender, afterwards only staff correct it.
+    // Few enough to stop flipping into men-only or women-only flatmate rooms, enough to undo a mis-tap.
+    public static final int SELF_GENDER_CHANGES = 2;
+
+    // No setter: the user writes it through UserRepository.claimGender/changeGender; staff correct it from the ID.
     @Column(name = "gender")
     private String gender;
+
+    @Column(name = "gender_changes", nullable = false, insertable = false, updatable = false)
+    private int genderChanges;
 
     // Hibernate-populated because DEFAULT now only covers raw-SQL inserts.
     @CreationTimestamp
@@ -144,6 +150,11 @@ public class User extends SoftDeleteEntity implements TokenSubject {
 
     public void correctGender(String value) {
         gender = value;
+    }
+
+    // Staff confirmed the gender from the ID, so a verified profile has none left.
+    public int genderChangesLeft() {
+        return verified ? 0 : Math.max(0, SELF_GENDER_CHANGES - genderChanges);
     }
 
     // Monotonic on purpose; lost-update race is accepted for this persona predicate.

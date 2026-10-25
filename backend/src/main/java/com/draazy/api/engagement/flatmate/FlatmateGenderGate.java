@@ -9,7 +9,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 /** A "women only" or "men only" room or group checks the requester's profile gender, which the first
- * binary answer (an ask or a seeker post) saves and the user cannot change afterwards. */
+ * binary answer (an ask or a seeker post) saves; afterwards only the profile's capped changes move it. */
 @Component
 class FlatmateGenderGate {
 
