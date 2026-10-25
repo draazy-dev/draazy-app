@@ -459,5 +459,6 @@
 
 .sf-page .fm-sheet > * + * { border-top: 1px solid rgb(var(--dz-c-white) / .06); }
 .sf-page .fm-row + .fm-row { border-top: 1px solid rgb(var(--dz-c-white) / .06); }
+.sf-page .fm-trust { background: linear-gradient(135deg, rgb(var(--dz-c-emerald-500) / .08), rgb(var(--dz-c-teal-500) / .06)); }
 
 .fm-sticky button { min-height: 44px; }
