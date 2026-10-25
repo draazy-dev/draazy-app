@@ -20,13 +20,13 @@ async function approve(id) {
 const savedGender = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('draazyUser') || '{}').gender);
 
 async function womenOnlyGroup() {
-  const { accessToken } = await apiLogin(uniqueMobile());
+  const { accessToken } = await apiLogin(uniqueMobile(), { name: 'Gate Host' });
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
     body: JSON.stringify({
-      title: `Gender gate ${Date.now().toString(36)} in Baner`, name: 'Gate Host', locality: 'Baner',
-      rent: 30000, seats: 3, seatsOpen: 2, policy: 'women', role: 'tenant',
+      title: `Gender gate ${Date.now().toString(36)} in Baner`, locality: 'Baner',
+      rent: 30000, deposit: 50000, seats: 3, seatsOpen: 2, policy: 'women', role: 'tenant',
     }),
   });
   const body = await res.text();

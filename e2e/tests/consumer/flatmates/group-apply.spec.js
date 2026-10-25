@@ -26,7 +26,7 @@ async function ownerRental(index) {
 }
 
 async function visibleGroup(host, title) {
-  const { accessToken } = await apiLogin(host.mobile);
+  const { accessToken } = await apiLogin(host.mobile, { name: host.name });
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(accessToken),
@@ -35,9 +35,9 @@ async function visibleGroup(host, title) {
       locality: 'Kothrud',
       policy: 'any',
       rent: 45000,
+      deposit: 50000,
       seats: 3,
       seatsOpen: 1,
-      name: host.name,
       role: 'tenant',
     }),
   });

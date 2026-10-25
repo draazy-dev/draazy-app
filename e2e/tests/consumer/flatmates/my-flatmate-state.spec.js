@@ -11,7 +11,6 @@ async function createPost(token, locality = 'Baner') {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
-      name: 'Dashboard Seeker',
       gender: 'female',
       age: 26,
       occupation: 'Engineer',
@@ -20,7 +19,6 @@ async function createPost(token, locality = 'Baner') {
       moveIn: '2026-12-01',
       flatPref: 'women',
       roomPref: 'private',
-      tags: ['Vegetarian'],
       note: 'Dashboard coverage',
     }),
   });
@@ -43,7 +41,7 @@ async function publish(postId) {
 test.describe('LIVE: caller-scoped flatmate state', () => {
   test('the dashboard reads the caller-owned post from /me rather than browser storage', async ({ page }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Dashboard Seeker' });
     const post = await createPost(accessToken);
 
     await signIn(page, mobile);
@@ -59,14 +57,14 @@ test.describe('LIVE: caller-scoped flatmate state', () => {
     const ownRequest = page.waitForResponse((response) =>
       response.url().includes('/api/me/flatmate-posts') && response.request().method() === 'GET' && response.status() === 200,
     );
-    await page.goto('/flatmates?view=team-up');
+    await page.goto('/flatmates?view=people');
     await ownRequest;
     await expect(page.getByText('Your live request', { exact: true })).toBeVisible();
-    await expect(page.getByText('Dashboard Seeker', { exact: false })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Your live request/ }).getByText('Dashboard Seeker')).toBeVisible();
   });
 
   test('a sent interest appears only in the requesters outbox', async () => {
-    const host = await apiLogin(uniqueMobile());
+    const host = await apiLogin(uniqueMobile(), { name: 'Dashboard Seeker' });
     const seeker = await apiLogin(uniqueMobile());
     const post = await createPost(host.accessToken, 'Kothrud');
     await publish(post.id);

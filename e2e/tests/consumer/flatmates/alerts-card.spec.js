@@ -1,6 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { signInSheet } from '../../../helpers/signInSheet.js';
+import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
+
+const track = flatmateCleanup(test);
 
 /* Browser alert cards must prove the alert reaches the seeker's API list; localStorage mocks cannot
    catch field-name drift between the page's `label` and the wire's `name`. */
@@ -22,6 +25,22 @@ async function seeker(page) {
   const mobile = await signedInAsNew(page);
   const { accessToken } = await apiLogin(mobile);
   return { mobile, accessToken };
+}
+
+/* A male author with a smoke-free vibe, so the Men + smoke-free filter pair still has a result, and
+   the viewer's own three answers, which are what unlock that chip. */
+async function seedSmokeFreeMaleAuthor(viewerToken) {
+  const author = await apiLogin(uniqueMobile(), { name: 'Smoke Free' });
+  const put = (token, answers) => fetch(`${API}/me/living-style`, { method: 'PUT', headers: auth(token), body: JSON.stringify({ answers }) });
+  expect((await put(author.accessToken, { smoking: 0 })).status).toBe(200);
+  expect((await put(viewerToken, { smoking: 0, food: 1, pets: 1 })).status).toBe(200);
+  const res = await fetch(`${API}/flatmates/posts`, {
+    method: 'POST',
+    headers: auth(author.accessToken),
+    body: JSON.stringify({ gender: 'male', age: 27, occupation: 'Analyst', budget: 15000, localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'men', roomPref: 'private', note: 'Alert card coverage' }),
+  });
+  expect(res.status, 'seeding a seeker post').toBe(201);
+  track('posts', (await res.json()).id, author.accessToken);
 }
 
 /* Force an empty result set so the card renders through its empty-state path: a gibberish
@@ -91,6 +110,7 @@ test('a signed-out seeker gets the sign-in sheet, and no alert is created (D85)'
 test('two filters reveal the card while results remain, and the facets reach the server', async ({ page }) => {
   const { accessToken } = await seeker(page);
   expect(await myAlerts(accessToken)).toHaveLength(0);
+  await seedSmokeFreeMaleAuthor(accessToken);
 
   await page.goto(`${BASE}/flatmates?view=flatmates`);
   await page.locator('.sf-card').first().waitFor({ timeout: 15000 });
@@ -103,12 +123,12 @@ test('two filters reveal the card while results remain, and the facets reach the
   await page.locator('button[aria-controls="sf-desktop-filters"]').click();
 
   await page.getByRole('button', { name: 'Men', exact: true }).click();
-  await page.getByRole('button', { name: 'Non-smoker', exact: true }).click();
+  await page.locator('#sf-desktop-filters [data-q="smoking"] button[data-v="0"]').click();
 
   /* Both controls must expose pressed state; CSS-only selection left screen readers blind to one
      segment. */
   await expect(page.getByRole('button', { name: 'Men', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('button', { name: 'Non-smoker', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#sf-desktop-filters [data-q="smoking"] button[data-v="0"]')).toHaveAttribute('aria-pressed', 'true');
 
   // Still matching somebody: this is what makes the card the 2-filter card and not the empty one.
   await expect(page.locator('.sf-card').first()).toBeVisible();
@@ -120,13 +140,13 @@ test('two filters reveal the card while results remain, and the facets reach the
   const [alert] = await myAlerts(accessToken);
   expect(alert.kind).toBe('flatmates');
   // Entered through the legacy `?view=flatmates`.
-  expect(alert.filters.tab).toBe('team-up');
+  expect(alert.filters.tab).toBe('people');
   // The facets the seeker actually chose, round-tripped through the blob rather than dropped.
   expect(alert.filters.gender).toBe('male');
-  expect(alert.filters.habits).toContain('Non-smoker');
+  expect(alert.filters.vibe).toContain('smoking:0');
   /* Assert the server `label`, not `filters.label`; the provider lifts that field out of the blob,
      so the fallback is unreachable. */
-  expect(alert.label).toMatch(/Team up/);
+  expect(alert.label).toMatch(/Flatmates/);
 });
 
 /* The dashboard panel, seeded over the API rather than into localStorage — under a live domain the
@@ -141,7 +161,7 @@ test('the dashboard panel silences an alert and deletes it, on the server both t
   const facets = {
     tab: 'move-in', q: '', locality: 'Baner', budget: 15000, moveIn: '',
     gender: 'female', sharing: '', attachedBath: false, verifiedOnly: true,
-    habits: ['Non-smoker'],
+    vibe: ['smoking:0'],
   };
   const created = await fetch(`${API}/me/saved-searches`, {
     method: 'POST',
@@ -162,7 +182,7 @@ test('the dashboard panel silences an alert and deletes it, on the server both t
 
   /* The badge and link prove the free-form `filters.tab` blob survived; a row, label and cadence
      picker would still render without it. */
-  await expect(page.getByText('Move in now').first()).toBeVisible();
+  await expect(page.getByText('Rooms', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('link', { name: /View matches/i })).toHaveAttribute('href', '/flatmates?view=move-in');
 
   // The cadence picker is the persisted control, not an on/off switch.

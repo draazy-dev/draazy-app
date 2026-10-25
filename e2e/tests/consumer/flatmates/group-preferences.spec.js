@@ -16,7 +16,7 @@ const localityPicker = (page) => page.getByRole('button', { name: "Localities yo
 
 async function openForm(page) {
   await page.goto('/flatmates');
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20_000 });
   await postAsGroup(page);
   await expect(page.getByPlaceholder(/2 girls/i)).toBeVisible({ timeout: 10_000 });
 }
@@ -29,7 +29,7 @@ test.describe('LIVE: a group still looking for a flat', () => {
     const title = `Hunting group ${Date.now().toString(36)}`;
     await openForm(page);
 
-    await expect(page.getByRole('button', { name: /Still looking for a flat/i })).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /I have a flat/i }), 'a flat with space to share is posted as a room').toHaveCount(0);
     await expect(page.getByPlaceholder(/e\.g\. 34,000/i), 'an exact rent belongs to a flat the group does not have yet').toHaveCount(0);
     await expect(page.getByRole('button', { name: /Current tenant/i })).toHaveCount(0);
 
@@ -46,10 +46,11 @@ test.describe('LIVE: a group still looking for a flat', () => {
     await page.getByRole('option', { name: 'Semi-furnished' }).click();
     await page.getByLabel('Gated society only').check();
     await page.getByLabel('Owner must allow bachelors').check();
+    await page.getByRole('group', { name: 'Parking' }).getByRole('button', { name: 'Car' }).click();
     const moveIn = page.getByTestId('group-preferences').getByTestId('move-in-field');
     await expect(moveIn.getByRole('button', { name: 'Flexible', exact: true }), 'a group states no move-in date unless asked').toHaveAttribute('aria-pressed', 'true');
     await moveIn.getByRole('button', { name: 'Immediate', exact: true }).click();
-    await page.getByPlaceholder(/Your name/i).fill('Hunt Host');
+    await expect(page.getByTestId('profile-name-note')).toContainText('Test Member');
 
     const posted = page.waitForResponse((r) => /\/api\/flatmates\/groups(\?|$)/.test(r.url()) && r.request().method() === 'POST');
     await page.getByRole('button', { name: /Create group/i }).click();
@@ -63,7 +64,7 @@ test.describe('LIVE: a group still looking for a flat', () => {
     track('groups', group.id, accessToken);
     expect(group.preferences).toMatchObject({
       localities: ['Baner', 'Wakad'], bhk: ['2', '3'], rentMin: 30000, rentMax: 45000,
-      depositMin: 60000, depositMax: 100000, furnishing: 'semi', gatedOnly: true, bachelors: true,
+      depositMin: 60000, depositMax: 100000, furnishing: 'semi', gatedOnly: true, bachelors: true, parking: 'car',
     });
     expect(group.propertyId ?? null).toBeNull();
     expect(group.modStatus, 'a group with no flat publishes itself').toBe('live');
@@ -71,27 +72,33 @@ test.describe('LIVE: a group still looking for a flat', () => {
 
     const origin = new URL(page.url()).origin;
     const stranger = await browser.newPage();
-    await stranger.goto(`${origin}/flatmates?view=team-up`);
+    await stranger.goto(`${origin}/flatmates?view=teams`);
     const card = stranger.locator('.sf-card', { hasText: title });
     await expect(card).toBeVisible({ timeout: 20_000 });
-    for (const fact of ['Baner, Wakad', 'Looking for a flat', 'Immediately']) {
+    for (const fact of ['Baner, Wakad', 'Looking for a flat', 'Immediately', '2 / 3 BHK']) {
       await expect(card.getByText(fact, { exact: true })).toBeVisible();
     }
     await expect(card.getByText(/₹15,000 – ₹22,500/)).toBeVisible();
+    await expect(card.getByTestId('must-haves').getByRole('listitem'), 'the must-haves show on the board card').toHaveText(['Semi-furnished', 'Gated society only', 'Car parking', 'Bachelors allowed']);
 
-    await stranger.goto(`${origin}/flatmates?view=team-up&movein=now`);
+    await stranger.goto(`${origin}/flatmates?view=teams&movein=now`);
     await expect(stranger.locator('.sf-card', { hasText: title }), 'the board’s Immediate filter finds the group').toBeVisible({ timeout: 20_000 });
     await stranger.close();
 
     await page.goto(`/flatmates/group/${group.id}`);
     await expect(page.getByRole('heading', { name: /The flat we’re looking for/ })).toBeVisible({ timeout: 20_000 });
+    const wanted = (label) => page.locator('.detail-card').filter({ has: page.getByText(label, { exact: true }) });
+    await expect(wanted('Flat size')).toContainText('2 / 3 BHK');
+    await expect(page.getByTestId('must-haves').getByRole('listitem')).toHaveText(['Semi-furnished', 'Gated society only', 'Car parking', 'Bachelors allowed']);
+    await expect(page.locator('.fm-sheet section h2').first(), 'the wanted flat leads the page, above the members').toContainText('The flat we’re looking for');
+    await expect(page.getByTestId('fm-trust')).toContainText('Number stays private');
     await expect(page.getByText('Immediately').first()).toBeVisible();
     const find = page.getByTestId('group-find-flats');
     const href = new URL(await find.getAttribute('href'), 'http://x');
     expect(href.pathname).toBe('/listings');
     expect(Object.fromEntries(href.searchParams)).toMatchObject({
       deal: 'rent', loc: 'baner,wakad', bhks: '2,3', rent: '30000-45000', deposit: '60000-100000',
-      furn: 'semi', tenants: 'bachelors', amen: 'security',
+      furn: 'semi', tenants: 'bachelors', amen: 'security,parking',
     });
 
     expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
@@ -104,7 +111,6 @@ test.describe('LIVE: a group still looking for a flat', () => {
     page.on('request', (r) => { if (/\/api\/flatmates\/groups(\?|$)/.test(r.url()) && r.method() === 'POST') sent = true; });
 
     await page.getByPlaceholder(/2 girls/i).fill('Unready group');
-    await page.getByPlaceholder(/Your name/i).fill('Nobody Yet');
     await page.getByRole('button', { name: /Create group/i }).click();
     await expect(page.getByText('Pick at least one locality.').first()).toBeVisible();
 
@@ -113,8 +119,10 @@ test.describe('LIVE: a group still looking for a flat', () => {
     await page.getByLabel('Highest rent for the whole flat').fill('40000');
     await page.getByRole('button', { name: /Create group/i }).click();
     await expect(page.getByText('Max budget can’t be below min.').first()).toBeVisible();
+    await expect(page.getByText("Add the most you'd pay as deposit. Type 0 for zero-deposit only.").first()).toBeVisible();
 
     await page.getByLabel('Highest rent for the whole flat').fill('60000');
+    await page.getByLabel('Highest deposit').fill('0');
     await page.getByPlaceholder(/2 girls/i).fill('Call 98200 11223');
     await page.getByRole('button', { name: /Create group/i }).click();
     await expect(page.getByText(/Remove the phone number, email or link/).first()).toBeVisible();

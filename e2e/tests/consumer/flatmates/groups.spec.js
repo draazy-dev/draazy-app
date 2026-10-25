@@ -8,7 +8,7 @@ const auth = (token) => ({ 'content-type': 'application/json', authorization: `B
 
 async function newHost() {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Asha K' });
   return { mobile, accessToken };
 }
 
@@ -20,9 +20,9 @@ async function newSeeker() {
 
 const groupBody = (over = {}) => ({
   title: 'Baner 3BHK Group',
-  name: 'Asha K',
   locality: 'Baner',
   rent: 35000,
+  deposit: 50000,
   seats: 3,
   seatsOpen: 1,
   policy: 'any',
@@ -255,7 +255,7 @@ test.describe('Flatmate groups', () => {
     });
     expect(partial.status).toBe(422);
     const refused = await partial.json();
-    expect(refused.fields.map((f) => f.field).sort()).toEqual(['locality', 'name', 'rent', 'title']);
+    expect(refused.fields.map((f) => f.field).sort()).toEqual(['deposit', 'locality', 'rent', 'title']);
     // Also checks the derived per-head rent is recomputed off the new rent — a stale `perHead`
     // would not show up in the status code.
     const full = await fetch(`${API}/flatmates/groups/${group.id}`, {

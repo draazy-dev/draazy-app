@@ -9,7 +9,6 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import java.util.List;
 import java.util.Map;
 
 @FlatDescribedUnlessHunting
@@ -28,13 +27,11 @@ public record FlatmateGroupCreateRequest(
         String electricityBilling,
         @Min(1) @Max(FlatmateGroup.MAX_SEATS) Integer seats,
         @Min(0) @Max(FlatmateGroup.MAX_SEATS) Integer seatsOpen,
-        @NotBlank @Size(min = 2, max = 80) @NoContactDetails(message = NO_CONTACT) String name,
         String role,
         String propertyId,
         Boolean agreement,
         Map<String, Object> agreementDoc,
         @IndianMobile String consentMobile,
-        @Size(max = 20) List<@NotBlank @Size(max = 40) @NoContactDetails(message = NO_CONTACT) String> tags,
         @Size(max = 600) @NoContactDetails(message = NO_CONTACT) String note,
         @Valid FlatmateGroupPreferences preferences) {
 

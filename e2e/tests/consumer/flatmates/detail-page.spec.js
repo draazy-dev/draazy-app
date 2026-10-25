@@ -5,6 +5,7 @@ import { approveListingWithFetch, rejectListingWithFetch } from '../../../helper
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { trackErrors } from '../../../helpers/console.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 
 const track = flatmateCleanup(test);
@@ -15,7 +16,7 @@ async function hostsGroup(token, title) {
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({ title, name: 'Detail Host', locality: 'Baner', rent: 30000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant' }),
+    body: JSON.stringify({ title, locality: 'Baner', rent: 30000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant', noticePeriodDays: 30, lockInMonths: 0 }),
   });
   expect(res.status, 'seeding a group').toBe(201);
   const group = await res.json();
@@ -27,7 +28,7 @@ async function hostsPost(token) {
   const res = await fetch(`${API}/flatmates/posts`, {
     method: 'POST',
     headers: auth(token),
-    body: JSON.stringify({ name: 'Detail Seeker', gender: 'female', age: 26, occupation: 'Engineer', budget: 18000, localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'women', roomPref: 'private', tags: [], note: 'Detail page coverage' }),
+    body: JSON.stringify({ gender: 'female', age: 26, occupation: 'Engineer', budget: 18000, localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'women', roomPref: 'private', note: 'Detail page coverage' }),
   });
   expect(res.status, 'seeding a seeker post').toBe(201);
   const post = await res.json();
@@ -38,7 +39,7 @@ async function hostsPost(token) {
 test.describe('LIVE: flatmate detail page', () => {
   test('the host reaches a pending group from My Listings and manages it; strangers cannot see it', async ({ page, browser }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Detail Host' });
     const title = unique('Group');
     const group = await hostsGroup(accessToken, title);
     await signedInAs(page, mobile);
@@ -54,6 +55,11 @@ test.describe('LIVE: flatmate detail page', () => {
     await expect(panel).toContainText('Under review');
     await expect(page.getByText(title).first()).toBeVisible();
     await expect(page.locator('.sf-card.reveal').first(), 'reduced motion hides a missing reveal hook, so assert the class it adds').toHaveClass(/\bvisible\b/);
+    const tile = (label) => page.locator('.detail-card').filter({ has: page.getByText(label, { exact: true }) });
+    await expect(tile('Open to')).toContainText('Anyone');
+    await expect(tile('Listed by')).toContainText('Current tenant');
+    await expect(tile('Notice period')).toContainText('30 days');
+    await expect(tile('Minimum stay')).toContainText('None');
 
     await panel.getByRole('link', { name: 'Edit' }).click();
     const dialog = page.getByRole('dialog', { name: 'Edit group' });
@@ -77,7 +83,7 @@ test.describe('LIVE: flatmate detail page', () => {
 
   test('the author opens a seeker post, sees it as theirs, and deletes it from the page', async ({ page }) => {
     const mobile = uniqueMobile();
-    const { accessToken } = await apiLogin(mobile);
+    const { accessToken } = await apiLogin(mobile, { name: 'Detail Seeker' });
     const post = await hostsPost(accessToken);
     await signedInAs(page, mobile);
     const errors = trackErrors(page);
@@ -87,6 +93,15 @@ test.describe('LIVE: flatmate detail page', () => {
     await expect(panel).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText('Your post').first()).toBeVisible();
     await expect(page.locator('.sf-card.reveal').first()).toHaveClass(/\bvisible\b/);
+    await expect(page.getByTestId('fm-trust'), 'every post carries the no-number promise').toContainText('Number stays private');
+    const wants = page.locator('section', { has: page.getByRole('heading', { name: 'Looking for' }) });
+    await expect(wants).toContainText('Private room');
+    await expect(wants).toContainText('Women only');
+    const about = page.locator('section', { has: page.getByRole('heading', { name: 'About' }) });
+    for (const [label, value] of [['Gender', 'Woman'], ['Age', '26'], ['Occupation', 'Engineer']]) {
+      await expect(about.locator('.detail-card').filter({ has: page.getByText(label, { exact: true }) })).toContainText(value);
+    }
+    await expect(about).toContainText('Detail page coverage');
     await expect(panel.getByRole('link', { name: 'Requests' })).toHaveCount(0);
 
     page.once('dialog', (d) => d.accept());
@@ -109,7 +124,7 @@ test.describe('LIVE: flatmate detail page', () => {
     const res = await fetch(`${API}/flatmates/rooms`, {
       method: 'POST',
       headers: auth(accessToken),
-      body: JSON.stringify({ ...(await withSocietyId(accessToken, { society })), roomType: 'Private room', locality: 'Baner', rentShare: 18000, bhk: '2', attachedBath: 'attached', furnishing: 'semi', hostRole: 'tenant', photos, ...(await tenantRoomAgreement(accessToken)) }),
+      body: JSON.stringify({ ...(await roomBasics(accessToken, { photos: 0 })), ...(await withSocietyId(accessToken, { society })), roomType: 'Private room', locality: 'Baner', rentShare: 18000, deposit: 36000, bhk: '2', attachedBath: 'attached', furnishing: 'semi', hostRole: 'tenant', photos, details: { bathrooms: 2, floor: '3', totalFloors: 10, balconies: 1, furniture: ['Bed', 'Wardrobe'] }, ...(await tenantRoomAgreement(accessToken)) }),
     });
     expect(res.status, 'seeding a room').toBe(201);
     const room = await res.json();
@@ -124,7 +139,12 @@ test.describe('LIVE: flatmate detail page', () => {
       await expect(page.getByTestId('flatmate-owner-panel')).toBeVisible({ timeout: 20_000 });
       await expect(page.getByText(society).first()).toBeVisible();
       await expect(page.locator('.sf-card.reveal').first()).toHaveClass(/\bvisible\b/);
-      await expect(page.getByText('Semi-Furnished')).toBeVisible();
+      const spec = (label) => page.locator('.detail-card').filter({ has: page.getByText(label, { exact: true }) });
+      await expect(spec('Furnishing')).toContainText('Semi-furnished');
+      await expect(spec('Floor')).toContainText('3rd of 10');
+      await expect(spec('Bathrooms')).toContainText('2');
+      await expect(spec('Balconies')).toContainText('1');
+      await expect(page.locator('.amenity-card')).toHaveText(['Bed', 'Wardrobe']);
       await expect(page.getByText(/property\./)).toHaveCount(0);
       expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
     });
@@ -132,6 +152,7 @@ test.describe('LIVE: flatmate detail page', () => {
     await test.step('a room\'s photos use the property page viewer: dots and counter on a phone, thumbnails and a lightbox', async () => {
       const hero = page.locator('.main-image-wrapper').first();
       await expect(hero).toContainText('1/3', { timeout: 20_000 });
+      await expect(hero.getByRole('button', { name: 'Share' }), 'share sits on the photo, as on a property page').toBeVisible();
       const dots = page.locator('[data-gallery-dots] button');
       await expect(dots).toHaveCount(3);
       await dots.nth(1).click();
@@ -187,7 +208,7 @@ test.describe('LIVE: flatmate detail page', () => {
   });
 
   test('a seeker who already said Interested gets a reminder on tap, not a dead button', async ({ page }) => {
-    const author = await apiLogin(uniqueMobile());
+    const author = await apiLogin(uniqueMobile(), { name: 'Detail Seeker' });
     const post = await hostsPost(author.accessToken);
     const admin = await apiLogin(ACTORS.admin);
     const live = await fetch(`${API}/admin/flatmates/${post.id}/moderation`, {

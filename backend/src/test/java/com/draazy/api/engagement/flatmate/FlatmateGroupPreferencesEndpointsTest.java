@@ -52,7 +52,7 @@ class FlatmateGroupPreferencesEndpointsTest extends AbstractApiTest {
                  "propertyId":"%s","consentMobile":"9800000001",
                  "preferences":{"localities":[%s],"bhk":[%s],"rentMin":%d,"rentMax":%d,
                    "depositMin":60000,"depositMax":120000,"gatedOnly":true,"bachelors":true,
-                   "furnishing":"semi","moveInBy":"2026-09-01"}}
+                   "furnishing":"semi","parking":"car","moveInBy":"2026-09-01"}}
                 """.formatted(UUID.randomUUID(), localities, bhk, rentMin, rentMax);
     }
 
@@ -96,6 +96,7 @@ class FlatmateGroupPreferencesEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.preferences.gatedOnly").value(true))
                 .andExpect(jsonPath("$.preferences.bachelors").value(true))
                 .andExpect(jsonPath("$.preferences.furnishing").value("semi"))
+                .andExpect(jsonPath("$.preferences.parking").value("car"))
                 .andExpect(jsonPath("$.preferences.moveInBy").value("2026-09-01"));
     }
 
@@ -190,7 +191,7 @@ class FlatmateGroupPreferencesEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Three of us, hunting","policy":"any","seats":3,
-                                 "seatsOpen":1,"name":"Asha","locality":"Baner","rent":42000,
+                                 "seatsOpen":1,"name":"Asha","locality":"Baner","rent":42000,"deposit":10000,
                                  "deposit":84000}
                                 """))
                 .andExpect(status().isOk())

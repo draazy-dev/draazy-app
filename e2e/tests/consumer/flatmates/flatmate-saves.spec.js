@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, seedConsent, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, seedConsent, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
@@ -30,9 +31,10 @@ async function createRoom(token, body) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
+      ...(await roomBasics(token)),
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
       locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01',
-      lookingFor: 'any', foodPref: 'any', photos: await uploadedListingPhotos(token),
+      lookingFor: 'any', foodPref: 'any',
       ...(await tenantRoomAgreement(token)),
       ...(await withSocietyId(token, body)),
     }),
@@ -49,7 +51,7 @@ async function createGroup(token, body) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
-      locality: 'Baner', rent: 45000, seats: 3, seatsOpen: 1, policy: 'any', name: 'Saves Host',
+      locality: 'Baner', rent: 45000, deposit: 50000, seats: 3, seatsOpen: 1,       policy: 'any',
       ...body,
     }),
   });
@@ -74,7 +76,7 @@ async function openRooms(page) {
 
 async function openSavedFlatmates(page) {
   await page.goto(`${BASE}/saved`);
-  const tab = page.getByRole('button', { name: /^Rooms\b/ });
+  const tab = page.getByRole('button', { name: /^Flatmates\b/ });
   await expect(tab).toBeVisible({ timeout: 20_000 });
   await tab.click();
 }
@@ -209,7 +211,7 @@ test('unsaving removes the row on the server, not just from the local list', asy
 test('the shortlist holds rooms and groups together, newest save first', async ({ page }) => {
   const host = uniqueMobile();
   const seeker = uniqueMobile();
-  const hostAuth = await apiLogin(host);
+  const hostAuth = await apiLogin(host, { name: 'Saves Host' });
   const seekerAuth = await apiLogin(seeker);
   const society = `Zztest Mixed ${stamp()}`;
   const title = `Zztest Mixed group ${stamp()} in Baner`;
@@ -246,6 +248,8 @@ test('saving while signed out opens the sign-in sheet, then saves for the new ac
 
   await seedConsent(page);
   await openRooms(page);
+  // The board rewrites the `rooms` alias to its default (no `view`) after a debounce.
+  await expect(page).toHaveURL(/\/flatmates$/);
   const before = page.url();
   await cardFor(page, society).locator(".save-btn").click();
   await expect(signInSheet(page)).toBeVisible({ timeout: 15_000 });

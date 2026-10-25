@@ -91,7 +91,6 @@ class FlatmateEditRulesCoverageTest {
             FlatmateGroup group = new FlatmateGroup();
             group.setTitle(in.title());
             group.setSeatsTotal(in.seats());
-            group.setTags(new ArrayList<>(in.tags()));
             group.setNote(in.note());
             group.hunt(in.preferences().normalised());
             return group;
@@ -131,8 +130,16 @@ class FlatmateEditRulesCoverageTest {
         @DisplayName("re-saving the stored values changes nothing")
         void unchangedIsSilent() {
             FlatmateSeekerPostCreateRequest in = postRequest();
-            assertThat(rules.classify(postMatching(in), in))
+            assertThat(rules.classify(postMatching(in), in, "Farah"))
                     .isEqualTo(FlatmateEditImpact.SILENT);
+        }
+
+        @Test
+        @DisplayName("a renamed profile re-checks the name")
+        void profileRenameIsRechecked() {
+            FlatmateSeekerPostCreateRequest in = postRequest();
+            assertThat(rules.classify(postMatching(in), in, "Farah Q").rechecked())
+                    .containsExactly("name");
         }
 
         @Test
@@ -141,7 +148,7 @@ class FlatmateEditRulesCoverageTest {
             FlatmateSeekerPostCreateRequest base = postRequest();
             FlatmateSeekerPost stored = postMatching(base);
             assertEachComponent(FlatmateSeekerPostCreateRequest.class, base,
-                    mutated -> rules.classify(stored, (FlatmateSeekerPostCreateRequest) mutated));
+                    mutated -> rules.classify(stored, (FlatmateSeekerPostCreateRequest) mutated, "Farah"));
         }
     }
 
@@ -243,7 +250,7 @@ class FlatmateEditRulesCoverageTest {
                 "East", "Garden", "Baner", null, UUID.randomUUID().toString(), "Alpha Heights", "B-402",
                 15000L, 30000L, 2, 3, 30, 6, "included", "separate",
                 LocalDate.of(2026, 9, 1), "any", "any",
-                List.of("non-smoker"), "tenant", UUID.randomUUID().toString(), true,
+                "tenant", UUID.randomUUID().toString(), true,
                 Map.<String, Object>of("url", "https://cdn.example/a.pdf"),
                 "9800000001", true,
                 List.of("https://cdn.example/1.jpg", "https://cdn.example/2.jpg"),
@@ -273,7 +280,6 @@ class FlatmateEditRulesCoverageTest {
         room.setMaintenanceBilling(in.maintenanceBilling());
         room.setElectricityBilling(in.electricityBilling());
         room.setAvailableFrom(in.availableFrom());
-        room.setTags(new ArrayList<>(in.lifestyle()));
         room.setPhotos(new ArrayList<>(in.photos()));
         room.setNote(in.note());
         room.setTitle(in.title());
@@ -285,22 +291,22 @@ class FlatmateEditRulesCoverageTest {
     private static FlatmateGroupCreateRequest groupRequest() {
         return new FlatmateGroupCreateRequest("Four of us in Baner", "Baner", null, "mixed",
                 48000L, 96000L, 30, 6, "shared", "separate", 4, 1,
-                "Asha", "tenant", UUID.randomUUID().toString(), true,
+                "tenant", UUID.randomUUID().toString(), true,
                 Map.of("url", "https://cdn.example/b.pdf"),
                 "9800000001",
-                List.of("non-smoker"), "Quiet flat.", null);
+                "Quiet flat.", null);
     }
 
     private static FlatmateGroupPreferences preferences(List<String> localities, List<String> bhk) {
         return new FlatmateGroupPreferences(localities, bhk, 30000L, 45000L, 60000L, 120000L,
-                true, true, "semi", LocalDate.of(2026, 9, 1));
+                true, true, "semi", "bike", LocalDate.of(2026, 9, 1));
     }
 
     private static FlatmateGroupCreateRequest huntingRequest(FlatmateGroupPreferences prefs) {
         FlatmateGroupCreateRequest b = groupRequest();
         return new FlatmateGroupCreateRequest(b.title(), null, null, b.policy(), null, null, null, null,
-                null, null, b.seats(), b.seatsOpen(), b.name(), null, null, null, null, null,
-                b.tags(), b.note(), prefs);
+                null, null, b.seats(), b.seatsOpen(), null, null, null, null, null,
+                b.note(), prefs);
     }
 
     private static FlatmateGroup groupMatching(FlatmateGroupCreateRequest in) {
@@ -313,28 +319,26 @@ class FlatmateEditRulesCoverageTest {
         group.setMaintenanceBilling(in.maintenanceBilling());
         group.setElectricityBilling(in.electricityBilling());
         group.setSeatsTotal(in.seats());
-        group.setTags(new ArrayList<>(in.tags()));
         group.setNote(in.note());
         group.setOwnerConsentMobile(in.consentMobile());
         return group;
     }
 
     private static FlatmateSeekerPostCreateRequest postRequest() {
-        return new FlatmateSeekerPostCreateRequest("Asha", "any", 27, "Designer", 18000L, 24000L,
-                List.of("Baner", "Aundh"), "now", "any", "any", List.of("non-smoker"),
+        return new FlatmateSeekerPostCreateRequest("any", 27, "Designer", 18000L, 24000L,
+                List.of("Baner", "Aundh"), "now", "any", "any", "semi", true, true, "car",
                 "Looking for a quiet flat.", true, "Designer looking in Baner");
     }
 
     private static FlatmateSeekerPost postMatching(FlatmateSeekerPostCreateRequest in) {
         FlatmateSeekerPost post = new FlatmateSeekerPost();
-        post.setName(in.name());
+        post.setName("Farah");
         post.setOccupation(in.occupation());
         post.setNote(in.note());
         post.setTitle(in.title());
         post.setBudget(in.budget());
         post.setBudgetMax(in.budgetMax());
         post.setLocalities(new ArrayList<>(in.localities()));
-        post.setTags(new ArrayList<>(in.tags()));
         post.setMoveIn(in.moveIn());
         return post;
     }

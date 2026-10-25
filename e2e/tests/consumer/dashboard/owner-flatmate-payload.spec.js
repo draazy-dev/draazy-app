@@ -10,7 +10,7 @@ const CARD_HIDDEN = ['members', 'ownerMobile', 'ownerName', 'ownerConsentMobile'
 
 async function newUser() {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Payload Member' });
   return { mobile, accessToken };
 }
 
@@ -19,7 +19,7 @@ async function createGroup(host, policy) {
     method: 'POST',
     headers: auth(host.accessToken),
     body: JSON.stringify({
-      title: `Owner payload ${Date.now().toString(36)}`, name: 'Host', locality: 'Baner', rent: 30000,
+      title: `Owner payload ${Date.now().toString(36)}`, locality: 'Baner', rent: 30000, deposit: 50000,
       seats: 2, seatsOpen: 1, policy, role: 'tenant',
     }),
   });
@@ -55,8 +55,8 @@ test.describe('Owner flatmate lists and inbox (live API)', () => {
       method: 'POST',
       headers: auth(author.accessToken),
       body: JSON.stringify({
-        name: 'Poster', gender: 'female', age: 26, occupation: 'Designer', budget: 18000,
-        localities: ['Baner'], moveIn, flatPref: 'women', roomPref: 'private', tags: ['Vegetarian'],
+        gender: 'female', age: 26, occupation: 'Designer', budget: 18000,
+        localities: ['Baner'], moveIn, flatPref: 'women', roomPref: 'private',
       }),
     });
     expect(created.status, await created.clone().text()).toBe(201);
