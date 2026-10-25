@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useId, useImperativeHandle, useLayo
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { classNames } from '../../lib/format.js';
+import Icon from '../Icon.jsx';
 import useSheetViewport from '../../lib/useSheetViewport.js';
 import useVisualViewportInsets from '../../lib/useVisualViewportInsets.js';
 import useSwipeDismiss from '../../lib/useSwipeDismiss.js';
@@ -32,6 +33,8 @@ const MultiSelect = forwardRef(function MultiSelect({
   onPick,
   noResultsText,
   anchored,
+  chips = false,
+  max = Infinity,
 }, ref) {
   /* Resolved at render rather than as a default parameter: a default is evaluated against whatever language was
      active on first mount and would never follow a later switch. */
@@ -48,6 +51,7 @@ const MultiSelect = forwardRef(function MultiSelect({
   const [asyncOpts, setAsyncOpts] = useState([]);
   const [loading, setLoading] = useState(false);
   const rootRef = useRef(null);
+  const boxRef = useRef(null);
   const triggerRef = useRef(null);
   const menuRef = useRef(null);
   const searchRef = useRef(null);
@@ -60,15 +64,15 @@ const MultiSelect = forwardRef(function MultiSelect({
   useVisualViewportInsets(open && picker);
 
   const selectedSet = useMemo(() => new Set(values), [values]);
+  const labelOf = useMemo(() => new Map(opts.map((o) => [o.value, o.label])), [opts]);
   const summary = useMemo(
     () => {
       const known = opts.filter((o) => selectedSet.has(o.value)).map((o) => o.label);
       // Values chosen from live search aren't in the static list — show them too.
-      const knownVals = new Set(opts.map((o) => o.value));
-      const extra = values.filter((v) => !knownVals.has(v));
+      const extra = values.filter((v) => !labelOf.has(v));
       return [...known, ...extra].join(', ');
     },
-    [opts, selectedSet, values],
+    [opts, labelOf, selectedSet, values],
   );
   const asyncNorm = useMemo(
     () => asyncOpts.map((o) => (typeof o === 'string' ? { value: o, label: o } : o)),
@@ -147,7 +151,7 @@ const MultiSelect = forwardRef(function MultiSelect({
   // overflow/transform trap and can flip up near the viewport edge.
 
   const position = useCallback(() => {
-    const trigger = triggerRef.current;
+    const trigger = boxRef.current || triggerRef.current;
     const menu = menuRef.current;
     if (!trigger || !menu) return;
     // Sheet mode is laid out entirely in CSS. Drop any inline geometry a previous
@@ -171,6 +175,8 @@ const MultiSelect = forwardRef(function MultiSelect({
     }
   }, [sheet]);
 
+  // A pill added or removed can rewrap the box the open menu is anchored to.
+  const boxRows = chips ? values.length : 0;
   useLayoutEffect(() => {
     if (!open) return undefined;
     position();
@@ -183,7 +189,7 @@ const MultiSelect = forwardRef(function MultiSelect({
       window.removeEventListener('scroll', onAnchor, true);
       window.removeEventListener('resize', onAnchor);
     };
-  }, [open, position, visible.length]);
+  }, [open, position, visible.length, boxRows]);
   /* A sheet covers the page, so the page behind it must not scroll with it. */
 
   useScrollLock(open && sheet);
@@ -203,6 +209,12 @@ const MultiSelect = forwardRef(function MultiSelect({
     const pending = pendingRef.current;
     const current = pending && sameValues(pending.from, values) ? pending.next : values;
     const has = current.includes(opt.value);
+    // Refused here, not by the parent: a pick the parent drops would linger in pendingRef
+    // and resurface on the next toggle.
+    if (!has && current.length >= max) {
+      if (autoClose) close();
+      return;
+    }
     const next = has
       ? current.filter((v) => v !== opt.value)
       : [...current, opt.value];
@@ -215,7 +227,12 @@ const MultiSelect = forwardRef(function MultiSelect({
     onChange(next);
     if (!has && onPick) onPick(opt);
     if (autoClose) close();
-  }, [onChange, values, autoClose, close, onPick, disabled]);
+  }, [onChange, values, autoClose, close, onPick, disabled, max]);
+
+  const remove = (value) => {
+    toggle({ value });
+    triggerRef.current?.focus({ preventScroll: true });
+  };
   /* Drag the card's top edge down to dismiss. Mobile-only by construction. */
 
   const swipe = useSwipeDismiss(close);
@@ -264,28 +281,48 @@ const MultiSelect = forwardRef(function MultiSelect({
     }
   };
 
+  const triggerButton = (
+    <button
+      type="button"
+      ref={triggerRef}
+      disabled={disabled}
+      aria-haspopup="listbox"
+      aria-expanded={open}
+      aria-label={ariaLabel}
+      aria-describedby={ariaDescribedBy}
+      className={classNames('dz-dropdown__trigger', !chips && invalid && 'dz-invalid dz-shake')}
+      onClick={() => (open ? close() : setOpen(true))}
+      onKeyDown={onKeyDown}
+    >
+      <span className={classNames('dz-dropdown__value', !(chips ? values.length : summary) && 'is-placeholder')}>
+        {chips ? (values.length ? '' : placeholder || t('ui.selectPlaceholder')) : summary || (placeholder || t('ui.selectPlaceholder'))}
+      </span>
+      <svg className="dz-dropdown__chev" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6 9l6 6 6-6" />
+      </svg>
+    </button>
+  );
+
   return (
     <div ref={rootRef} className={classNames('dz-dropdown', open && 'is-open', className)} data-err={dataErr}>
-      <button
-        type="button"
-        ref={triggerRef}
-        disabled={disabled}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={ariaLabel}
-        aria-describedby={ariaDescribedBy}
-        className={classNames('dz-dropdown__trigger', invalid && 'dz-invalid dz-shake')}
-        onClick={() => (open ? close() : setOpen(true))}
-        onKeyDown={onKeyDown}
-      >
-        <span className={classNames('dz-dropdown__value', !summary && 'is-placeholder')}>
-          {summary || (placeholder || t('ui.selectPlaceholder'))}
-        </span>
-        <svg className="dz-dropdown__chev" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </button>
-
+      {chips ? (
+        // Picks sit beside the trigger, not in it: a button cannot hold buttons.
+        <div
+          ref={boxRef}
+          className={classNames('dz-dropdown__box', disabled && 'is-disabled', invalid && 'dz-invalid dz-shake')}
+        >
+          {values.map((v) => {
+            const label = labelOf.get(v) || v;
+            return (
+              <button key={v} type="button" disabled={disabled} onClick={() => remove(v)} aria-label={t('ui.removeItem', { label })} className="dz-chip dz-chip--accent dz-chip--sm">
+                {label}
+                <Icon name="x" />
+              </button>
+            );
+          })}
+          {triggerButton}
+        </div>
+      ) : triggerButton}
       {open && typeof document !== 'undefined'
         ? createPortal(
               /* The card is a modal surface, so the page behind it must read as dismissed. */

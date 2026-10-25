@@ -157,6 +157,60 @@
   color: var(--dd-accent);
 }
 
+/* Chips mode: the box wears the trigger's skin; 1.4rem reads as a pill on one line and a card once it wraps. */
+.dz-dropdown__box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: var(--dd-trigger-height);
+  padding: 0.3rem 0.3rem 0.3rem 0.5rem;
+  background: var(--dd-bg);
+  border: 1px solid var(--dd-border);
+  border-radius: 1.4rem;
+  box-shadow: var(--dd-trigger-shadow);
+  transition: border-color var(--dd-speed) var(--dd-ease), box-shadow var(--dd-speed) var(--dd-ease), background-color var(--dd-speed) var(--dd-ease);
+}
+
+.dz-dropdown__box.is-disabled {
+  opacity: 0.55;
+}
+
+.dz-dropdown.is-open>.dz-dropdown__box {
+  border-color: var(--dd-accent);
+  box-shadow: var(--dd-trigger-shadow-open);
+}
+
+.dz-dropdown__box>.dz-dropdown__trigger {
+  flex: 1 0 2rem;
+  min-width: 0;
+  width: auto;
+  height: auto;
+  min-height: 2rem;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.dz-dropdown__box>.dz-dropdown__trigger:disabled {
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .dz-dropdown__box:not(.is-disabled):hover {
+    border-color: var(--dd-border-hover);
+    background: var(--dd-bg-hover);
+    box-shadow: var(--dd-trigger-shadow-hover);
+  }
+
+  .dz-dropdown__box>.dz-dropdown__trigger:hover {
+    background: transparent;
+    box-shadow: none;
+  }
+}
+
 .dz-dropdown__menu {
   position: absolute;
   left: 0;

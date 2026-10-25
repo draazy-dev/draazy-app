@@ -146,7 +146,7 @@ export default function LocalitySelect({
   return (
     <>
       {multi
-        ? <MultiSelect values={values} onChange={onChange} {...shared} />
+        ? <MultiSelect values={values} onChange={onChange} chips {...shared} />
         : <Select value={value} onChange={onChange} {...shared} />}
       <p className="mt-1 text-xs text-gray-400 empty:hidden" role="status">{busy ? t('ui.localityAdding') : ''}</p>
       {error ? <p id={errorId} className="mt-1 text-xs text-red-400" role="alert" data-testid="locality-error">{error}</p> : null}
