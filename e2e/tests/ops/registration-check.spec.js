@@ -5,7 +5,7 @@ import { ACTORS, BASELINE_STAFF, STAFF } from '../../fixtures/live.js';
 import { API, apiLogin, uploadedListingPhotos, signIn, uniqueMobile } from '../../helpers/liveAuth.js';
 import { pickDate } from '../../helpers/datePicker.helper.js';
 
-const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\13\\bin\\psql.exe';
+const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
 const TENANT_NAME = 'Live Check Tenant';
 const TYPED_NAME = 'Typed Only Tenant';
 

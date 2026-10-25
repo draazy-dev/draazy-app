@@ -79,8 +79,10 @@ function noindexOffProductionPlugin() {
 }
 /* Cache shell/static assets only; listing/account data must stay NetworkOnly so stale availability
    or private state never ships from a service worker. */
-function pwaPlugin() {
+function pwaPlugin(mode) {
   return VitePWA({
+    // pwa.spec.js asserts no worker on the dev server, which the e2e build stands in for.
+    disable: mode === 'e2e',
     // The shell must never be a version behind the deployed API contract, and a page reload has no
     // half-finished work to protect, so update silently rather than prompting.
     registerType: 'autoUpdate',
@@ -157,7 +159,7 @@ export default defineConfig(({ mode }) => ({
     ? { drop: ['console', 'debugger'] }
     : {},
   // spaFallbackPlugin reads files the blog, locality and route-head plugins write, so it runs after them.
-  plugins: [react(), phosphorWeightsPlugin(), helpContentPlugin({ root: __dirname }), blogPlugin({ root: __dirname }), localityGuidesPlugin({ root: __dirname }), contentIndexPlugin({ root: __dirname }), routeHeadsPlugin(), spaFallbackPlugin({ root: __dirname }), pwaPlugin(), apiBaseHtmlPlugin(), devInlineScriptHashesPlugin(), noindexOffProductionPlugin()],
+  plugins: [react(), phosphorWeightsPlugin(), helpContentPlugin({ root: __dirname }), blogPlugin({ root: __dirname }), localityGuidesPlugin({ root: __dirname }), contentIndexPlugin({ root: __dirname }), routeHeadsPlugin(), spaFallbackPlugin({ root: __dirname }), pwaPlugin(mode), apiBaseHtmlPlugin(), devInlineScriptHashesPlugin(), noindexOffProductionPlugin()],
   build: {
     rollupOptions: {
       output: {

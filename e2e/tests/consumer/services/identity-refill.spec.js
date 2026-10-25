@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
-const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\13\\bin\\psql.exe';
+const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
 const OWNER = 'Asha Patil';
 const TENANT = 'Ria Sharma';
 

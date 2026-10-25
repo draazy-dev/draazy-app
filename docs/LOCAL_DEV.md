@@ -26,7 +26,7 @@ The test suite asserts exact row counts against a schema Flyway built from empty
 
 ```powershell
 $env:PGPASSWORD = 'postgres'
-$psql = 'C:\Program Files\PostgreSQL\13\bin\psql.exe'
+$psql = 'C:\Program Files\PostgreSQL\17\bin\psql.exe'
 & $psql -U postgres -h localhost -d postgres -c "CREATE DATABASE draazy;"
 & $psql -U postgres -h localhost -d postgres -c "CREATE DATABASE draazy_test;"
 ```
@@ -116,7 +116,7 @@ cd backend; .\mvnw.cmd -o spring-boot:run -Dspring-boot.run.profiles=local    # 
 If you have added data locally that you care about, dump it first — it is not in the seed:
 
 ```powershell
-& "C:\Program Files\PostgreSQL\13\bin\pg_dump.exe" -U postgres -h localhost -d draazy `
+& "C:\Program Files\PostgreSQL\17\bin\pg_dump.exe" -U postgres -h localhost -d draazy `
     --data-only --column-inserts -f "$env:USERPROFILE\draazy-backup.sql"
 ```
 
