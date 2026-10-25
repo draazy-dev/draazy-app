@@ -11,6 +11,7 @@ import com.draazy.api.common.settings.ListingPolicyController;
 import com.draazy.api.common.settings.MovePackController;
 import com.draazy.api.common.settings.PricingController;
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.engagement.flatmate.FlatmatePulseService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,12 +28,13 @@ public class BootstrapController {
     private final SubscriptionService plans;
     private final PropertyCountsService counts;
     private final ListingCounts listingCounts;
+    private final FlatmatePulseService flatmatePulse;
     private final LegalController legal;
 
     public BootstrapController(AppFlagsController flags, GeoPolicyController geo, CityService cities,
             PricingController pricing, ListingPolicyController listingPolicy,
             MovePackController movePack, SubscriptionService plans, PropertyCountsService counts,
-            ListingCounts listingCounts, LegalController legal) {
+            ListingCounts listingCounts, FlatmatePulseService flatmatePulse, LegalController legal) {
         this.flags = flags;
         this.geo = geo;
         this.cities = cities;
@@ -42,6 +44,7 @@ public class BootstrapController {
         this.plans = plans;
         this.counts = counts;
         this.listingCounts = listingCounts;
+        this.flatmatePulse = flatmatePulse;
         this.legal = legal;
     }
 
@@ -49,6 +52,6 @@ public class BootstrapController {
     public BootstrapResponse bootstrap() {
         return new BootstrapResponse(flags.flags(), geo.geo(), cities.list(), pricing.pricing(),
                 listingPolicy.listingPolicy(), movePack.movePack(), plans.listPlans(), counts.counts(),
-                listingCounts.trustStats(), legal.legal());
+                listingCounts.trustStats(), flatmatePulse.pulse(), legal.legal());
     }
 }

@@ -1,15 +1,36 @@
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
+import { flatmatePulse } from '../../../services/flatmateService.js';
+import { bhkLabel } from '../../../lib/listingSeo.js';
+
+const AVATAR_TONES = ['from-pink-500 to-rose-400', 'from-blue-500 to-indigo-400', 'from-teal-500 to-teal-700'];
+const inr = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
 
 export default function FlatmatesSection({ navigate }) {
   const { t } = useTranslation();
+  const [pulse, setPulse] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    flatmatePulse()
+      .then((p) => { if (alive) setPulse(p); })
+      .catch(() => { /* the pitch stands on its own without live numbers */ });
+    return () => { alive = false; };
+  }, []);
+
+  const split = pulse?.split;
+  const seeking = pulse?.seeking > 0 ? pulse.seeking : 0;
+  const faces = seeking ? (pulse.initials || []).slice(0, AVATAR_TONES.length) : [];
+  const flat = split && bhkLabel(split.bhk);
+
   return (
     <section className="relative section-pb">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="reveal relative rounded-2xl sm:rounded-3xl overflow-hidden p-5 sm:p-10 md:p-14" style={{ background: 'var(--cta-bg-alt)' }}>
           <div className="absolute -top-10 -right-8 w-44 h-44 rounded-full" style={{ background: 'radial-gradient(circle,rgb(var(--dz-c-teal-500) / .25),transparent 70%)' }} />
           <div className="absolute bottom-0 left-1/4 w-32 h-32 rounded-full" style={{ background: 'radial-gradient(circle,rgb(var(--dz-c-pink-500) / .18),transparent 70%)' }} />
-          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-5 sm:gap-10 items-center">
+          <div className={`relative z-10 grid grid-cols-1 gap-5 sm:gap-10 items-center ${split || seeking ? 'lg:grid-cols-2' : ''}`}>
             <div>
               <span className="dz-tag bg-white/10 border border-white/15 text-teal-200 font-semibold mb-2.5 sm:mb-4"><Icon name="users-round" className="w-3.5 h-3.5" /> {t('home.flatmates.badge')}</span>
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold leading-tight mb-2 sm:mb-3">{t('home.flatmates.headingLead')} <span className="text-teal-400">{t('home.flatmates.headingHighlight')}</span></h2>
@@ -28,29 +49,41 @@ export default function FlatmatesSection({ navigate }) {
                 </button>
               </div>
             </div>
-            <div className="glass rounded-2xl p-4 sm:p-7 border border-white/10" style={{ background: 'var(--glass)' }}>
-              <div className="flex items-center justify-between gap-2 mb-4 sm:mb-5">
-                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                  <div className="shrink-0 w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-teal-600 to-teal-500 flex items-center justify-center shadow-lg shadow-teal-500/20"><Icon name="home" className="w-5 h-5 sm:w-6 sm:h-6 text-white" /></div>
-                  <div className="min-w-0">
-                    <p className="text-[11px] sm:text-xs text-gray-400 truncate">2 BHK in Baner</p>
-                    <p className="font-bold text-white text-sm sm:text-base whitespace-nowrap">₹34,000<span className="text-gray-400 text-[11px] sm:text-xs font-normal">{t('home.flatmates.perMonthWhole')}</span></p>
+            {(split || seeking > 0) && (
+              <div className="glass rounded-2xl p-4 sm:p-7 border border-white/10" style={{ background: 'var(--glass)' }}>
+                {split && (
+                  /* flex-wrap, not a fixed row: with Android's larger system font sizes the amount drops under its
+                     label instead of overlapping it. */
+                  <dl>
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 pb-3 sm:pb-4 border-b border-dashed border-white/15">
+                      <dt className="min-w-0 leading-snug">
+                        <span className="block text-[13px] sm:text-sm text-gray-300">{t('home.flatmates.wholeFlat')}</span>
+                        <span className="block text-[11px] sm:text-xs text-gray-400">
+                          {flat ? t('home.flatmates.flatIn', { flat, locality: split.locality }) : t('home.flatmates.anyFlatIn', { locality: split.locality })}
+                        </span>
+                      </dt>
+                      <dd className="ml-auto text-sm sm:text-base font-semibold text-gray-300 tabular-nums whitespace-nowrap">{inr(split.rent)}<span className="text-[11px] sm:text-xs font-normal text-gray-400">{t('home.flatmates.perMonth')}</span></dd>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-0.5 pt-3 sm:pt-4">
+                      <dt className="min-w-0 leading-snug">
+                        <span className="block text-[13px] sm:text-sm font-semibold text-white">{t('home.flatmates.yourShare')}</span>
+                        <span className="block text-[11px] sm:text-xs text-teal-300">{t('home.flatmates.splitWays', { seats: split.seats })}</span>
+                      </dt>
+                      <dd className="ml-auto text-xl sm:text-2xl font-extrabold text-teal-400 tabular-nums whitespace-nowrap">{inr(split.share)}<span className="text-[11px] sm:text-xs font-normal text-gray-400">{t('home.flatmates.perMonth')}</span></dd>
+                    </div>
+                  </dl>
+                )}
+                {split && seeking > 0 && <div className="h-px bg-white/10 my-4 sm:my-5" />}
+                {seeking > 0 && (
+                  <div className="flex items-center">
+                    {faces.map((initials, i) => (
+                      <div key={i} className={`shrink-0 w-8 h-8 sm:w-10 sm:h-10 ${i ? '-ml-2 sm:-ml-3' : ''} rounded-full bg-gradient-to-br ${AVATAR_TONES[i]} flex items-center justify-center text-white text-[10px] sm:text-xs font-bold shadow-md`}>{initials}</div>
+                    ))}
+                    <span className={`min-w-0 ${faces.length ? 'ml-2.5 sm:ml-3' : ''} text-[13px] sm:text-sm leading-snug text-gray-300`}><b className="text-white tabular-nums">{seeking.toLocaleString('en-IN')}</b> {t('home.flatmates.seeking', { count: seeking })}</span>
                   </div>
-                </div>
-                <Icon name="arrow-right" className="shrink-0 w-4 h-4 sm:w-5 sm:h-5 text-teal-300" />
-                <div className="text-right shrink-0">
-                  <p className="text-[11px] sm:text-xs text-gray-400">{t('home.flatmates.yourShare')}</p>
-                  <p className="text-xl sm:text-2xl font-extrabold text-teal-400 whitespace-nowrap">₹17,000<span className="text-gray-400 text-[11px] sm:text-xs font-normal">{t('home.flatmates.perMonth')}</span></p>
-                </div>
+                )}
               </div>
-              <div className="h-px bg-white/10 mb-4 sm:mb-5" />
-              <div className="flex items-center">
-                <div className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-pink-500 to-rose-400 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold shadow-md">RI</div>
-                <div className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 -ml-2 sm:-ml-3 rounded-full bg-gradient-to-br from-blue-500 to-indigo-400 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold shadow-md">SN</div>
-                <div className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 -ml-2 sm:-ml-3 rounded-full bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center text-white text-[10px] sm:text-xs font-bold shadow-md">AM</div>
-                <span className="ml-2.5 sm:ml-3 text-[13px] sm:text-sm text-gray-300"><b className="text-white">120+</b> {t('home.flatmates.lookingForFlatmate')}</span>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       </div>

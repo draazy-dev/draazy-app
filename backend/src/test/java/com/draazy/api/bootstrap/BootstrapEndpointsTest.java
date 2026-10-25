@@ -36,7 +36,9 @@ class BootstrapEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.counts.counts").isArray())
                 .andExpect(jsonPath("$.trustStats.totalListings").isNumber())
                 .andExpect(jsonPath("$.trustStats.verifiedListings").isNumber())
-                .andExpect(jsonPath("$.trustStats.verifiedOwners").isNumber());
+                .andExpect(jsonPath("$.trustStats.verifiedOwners").isNumber())
+                .andExpect(jsonPath("$.flatmatePulse.seeking").isNumber())
+                .andExpect(jsonPath("$.flatmatePulse.initials").isArray());
     }
 
     @Test
