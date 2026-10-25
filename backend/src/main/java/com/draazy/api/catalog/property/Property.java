@@ -20,7 +20,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.Formula;
@@ -35,6 +37,8 @@ import org.hibernate.type.SqlTypes;
 public class Property extends SoftDeleteEntity {
 
     public static final String OWNERSHIP_REVIEW_ITEM = "Ownership documents";
+
+    public static final String OWNER_DELETE_REASON = "Taken down by the owner";
 
     @Column(name = "slug")
     @Setter
@@ -310,6 +314,12 @@ public class Property extends SoftDeleteEntity {
     @Setter
     private String video;
 
+    @Column(name = "purge_after")
+    private Instant purgeAfter;
+
+    @Column(name = "content_purged_at")
+    private Instant contentPurgedAt;
+
     @Column(name = "status", nullable = false)
     private String status = PropertyStatus.PENDING;
 
@@ -344,6 +354,59 @@ public class Property extends SoftDeleteEntity {
 
     public void resumeByOwner() {
         setStatus(PropertyStatus.APPROVED);
+    }
+
+    /** The only archive that schedules a purge: every other one is a takedown kept intact as evidence. */
+    public void deleteByOwner(Instant purgeAfter) {
+        archive(OWNER_DELETE_REASON);
+        this.purgeAfter = purgeAfter;
+    }
+
+    @Override
+    public void archive(String reason) {
+        super.archive(reason);
+        this.purgeAfter = null;
+    }
+
+    @Override
+    public void restore() {
+        super.restore();
+        this.purgeAfter = null;
+    }
+
+    public boolean isContentPurged() {
+        return contentPurgedAt != null;
+    }
+
+    public boolean isDeletedByOwner() {
+        return isArchived() && OWNER_DELETE_REASON.equals(getArchiveReason());
+    }
+
+    // Video is included because PhotoService ignores anything that is not its own upload.
+    public Set<String> storedFiles() {
+        Set<String> files = new LinkedHashSet<>(images);
+        Stream.of(coverImage, floorPlan, video).filter(Objects::nonNull).forEach(files::add);
+        return files;
+    }
+
+    /** Keeps only what deals, invoices and chats still name; returns the files to delete from storage. */
+    public Set<String> purgeContent(Instant at) {
+        Set<String> files = storedFiles();
+        images = new ArrayList<>();
+        coverImage = null;
+        floorPlan = null;
+        video = null;
+        amenities = new ArrayList<>();
+        description = null;
+        formDetails = null;
+        address = null;
+        addressKey = null;
+        lat = null;
+        lng = null;
+        electricityMeterNo = null;
+        electricityMeterKey = null;
+        contentPurgedAt = at;
+        return files;
     }
 
     public void startReview() {

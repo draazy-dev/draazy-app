@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { openMessageStream, unreadCount as fetchUnreadCount } from '../services/conversationService.js';
 import { getAppFlags } from '../services/settingsService.js';
+import { browserAlertsOn } from '../lib/browserAlerts.js';
 import { useAuth } from './AuthContext.jsx';
 
 /* The chat badge count, held once for the whole app because the answer is a network call and a
@@ -95,7 +96,8 @@ export function ConversationProvider({ children }) {
     let controller = null;
     let timer = null;
     const start = () => {
-      if (stopped || document.hidden) return;
+      // A background tab with browser alerts on keeps listening: the server skips push while this stream is up.
+      if (stopped || (document.hidden && !browserAlertsOn())) return;
       controller = new AbortController();
       openMessageStream({
         signal: controller.signal,

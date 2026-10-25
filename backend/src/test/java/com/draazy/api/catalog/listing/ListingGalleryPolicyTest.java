@@ -44,7 +44,8 @@ class ListingGalleryPolicyTest {
     void setUp() {
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 new AuthPrincipal(OWNER, "owner", null, true, false), null, List.of()));
-        mvc = MockMvcBuilders.standaloneSetup(new MeListingsController(listings, mock(PropertyMapper.class), mock(PendingLeadLookup.class)))
+        mvc = MockMvcBuilders.standaloneSetup(new MeListingsController(listings, mock(ListingArchiveService.class),
+                        mock(PropertyMapper.class), mock(PendingLeadLookup.class)))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();

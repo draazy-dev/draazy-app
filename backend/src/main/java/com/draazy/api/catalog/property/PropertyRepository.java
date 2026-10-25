@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Limit;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -56,15 +57,38 @@ public interface PropertyRepository
     @Query("select p from Property p where p.id = :id")
     Optional<Property> findForVerificationDecision(@Param("id") UUID id);
 
-    /** Whether any other listing or flatmate room still shows this photo file. */
+    /** Whether any other listing, flatmate room or avatar still shows this photo file. */
     @Query(nativeQuery = true, value = """
             select exists (
                 select 1 from properties
                  where id <> :id and (cover_image = :url or floor_plan = :url
                        or images @> jsonb_build_array(cast(:url as text)))
                 union all
-                select 1 from flatmate_rooms where photos @> jsonb_build_array(cast(:url as text)))""")
+                select 1 from flatmate_rooms where photos @> jsonb_build_array(cast(:url as text))
+                union all
+                select 1 from users where avatar = :url)""")
     boolean photoUsedElsewhere(@Param("id") UUID id, @Param("url") String url);
+
+    /** What stops the owner deleting this listing, or null. Accepted offers are covered by
+     * the deal or confirmation they lead to. */
+    @Query(nativeQuery = true, value = """
+            select case
+                when exists (select 1 from properties where id = :id and deal_status = 'reserved') then 'deal'
+                when exists (select 1 from offers where property_id = :id and status in ('pending', 'countered'))
+                    then 'offer'
+                when exists (select 1 from finalization_requests where property_id = :id and status = 'pending')
+                    then 'finalization'
+                when exists (select 1 from service_requests where property_id = :id
+                             and status not in ('awaiting-payment', 'completed', 'cancelled'))
+                    then 'service'
+            end""")
+    String openWorkBlockingDelete(@Param("id") UUID id);
+
+    @Query("""
+            select p from Property p
+            where p.archived = true and p.purgeAfter <= :now and p.contentPurgedAt is null
+            order by p.purgeAfter""")
+    List<Property> findContentPurgeDue(@Param("now") Instant now, Limit limit);
 
     /** Serialises deal state changes on one listing so a concurrent second caller sees the committed state. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
