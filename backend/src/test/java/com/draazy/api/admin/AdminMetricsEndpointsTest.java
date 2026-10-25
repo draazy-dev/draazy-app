@@ -97,13 +97,16 @@ class AdminMetricsEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void financeAlwaysNamesEverySource() throws Exception {
+    void financeReturnsTheMonthAndAttentionShape() throws Exception {
         mvc.perform(get(Routes.Admin.FINANCE).header(HttpHeaders.AUTHORIZATION, admin()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.revenue").isNumber())
-                .andExpect(jsonPath("$.refunds").value(0))
-                .andExpect(jsonPath("$.breakdown[?(@.source == 'subscriptions')]").exists())
-                .andExpect(jsonPath("$.breakdown[?(@.source == 'boosts')]").doesNotExist());
+                .andExpect(jsonPath("$.mrr").isNumber())
+                .andExpect(jsonPath("$.month.collected").isNumber())
+                .andExpect(jsonPath("$.month.refunded").isNumber())
+                .andExpect(jsonPath("$.month.passThrough").isNumber())
+                .andExpect(jsonPath("$.month.net").isNumber())
+                .andExpect(jsonPath("$.attention.openDisputes").isNumber())
+                .andExpect(jsonPath("$.revenue").doesNotExist());
     }
 
     private long kpi(String token, String field) throws Exception {

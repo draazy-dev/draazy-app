@@ -1,30 +1,16 @@
-/** The one apparent exception is `unwrapPage` on the ledger, which is a shape adapter and not a calculation. */
 import { get, unwrapPage } from '../../http.js';
 
 /** Coerce to a whole-rupee number. An absent figure is zero, never `NaN` and never a string. */
 const rupees = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 
-/** A separate coercer because `users` and `payingUsers` are counts of people, not money. */
 const count = (value) => Math.max(0, Math.round(rupees(value)));
 
 export async function getFinanceOverview() {
   const res = (await get('/admin/finance')) || {};
+  const month = res.month || {};
+  const attention = res.attention || {};
   return {
-    revenue: rupees(res.revenue),
-    payoutsDue: rupees(res.payoutsDue),
-    payoutsCompleted: rupees(res.payoutsCompleted),
-    refunds: rupees(res.refunds),
-    breakdown: Array.isArray(res.breakdown)
-      ? res.breakdown.map((line) => ({ source: line.source, amount: rupees(line.amount) }))
-      : [],
-    payoutsMeasured: res.payoutsMeasured === true,
-    refundsMeasured: res.refundsMeasured === true,
-    serviceOrdersCounted: res.serviceOrdersCounted === true,
     mrr: rupees(res.mrr),
-    monthRevenue: rupees(res.monthRevenue),
-    users: count(res.users),
-    payingUsers: count(res.payingUsers),
-    pendingSettlement: rupees(res.pendingSettlement),
     plans: Array.isArray(res.plans)
       ? res.plans.map((p) => ({
         name: p.name,
@@ -36,30 +22,41 @@ export async function getFinanceOverview() {
         monthlyValue: rupees(p.monthlyValue),
       }))
       : [],
+    month: {
+      collected: rupees(month.collected),
+      refunded: rupees(month.refunded),
+      passThrough: rupees(month.passThrough),
+      net: rupees(month.net),
+      payments: count(month.payments),
+    },
+    attention: {
+      refundRequests: count(attention.refundRequests),
+      refundRequestAmount: rupees(attention.refundRequestAmount),
+      serviceRefunds: count(attention.serviceRefunds),
+      serviceRefundAmount: rupees(attention.serviceRefundAmount),
+      openDisputes: count(attention.openDisputes),
+      openDisputeAmount: rupees(attention.openDisputeAmount),
+    },
   };
 }
 
-/* Keep server ISO months intact; charts and CSV exports need different labels. */
 export async function getFinanceSeries(months = 12) {
   const rows = await get('/admin/finance/series', { months });
   if (!Array.isArray(rows)) return [];
   return rows.map((r) => ({
     month: r.month,
-    rent: rupees(r.rent),
     subscriptions: rupees(r.subscriptions),
-    // Always zero, and carried rather than dropped — see `financeService.js`.
     services: rupees(r.services),
+    refunds: rupees(r.refunds),
   }));
 }
 
-/** Empty filter values are omitted rather than sent blank. `?kind=` would reach the server as an empty string, which
- * is not one of the three values it accepts, so an unfiltered view would answer 400. */
+/** Empty filters are omitted: `?kind=` reaches the server as an empty string, which it answers with 400. */
 export async function listFinanceTransactions({
-  kind, status, days, q, page = 0, size = 20,
+  kind, days, q, page = 0, size = 20,
 } = {}) {
   const query = { page, size };
   if (kind) query.kind = kind;
-  if (status) query.status = status;
   if (days) query.days = days;
   if (q && q.trim()) query.q = q.trim();
 
@@ -70,13 +67,11 @@ export async function listFinanceTransactions({
     items: unwrapped.items.map((t) => ({
       id: t.id,
       date: t.date,
+      number: t.number,
       party: t.party,
       kind: t.kind,
       amount: rupees(t.amount),
-      status: t.status,
-      // Absent on every source but rent, and absent rather than null on the wire. `undefined`
-      // is what the column's own fallback already tests for.
-      method: t.method,
+      fee: rupees(t.fee),
     })),
   };
 }

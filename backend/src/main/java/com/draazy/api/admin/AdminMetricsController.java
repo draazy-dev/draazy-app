@@ -40,11 +40,10 @@ public class AdminMetricsController {
     @PreAuthorize(FINANCE_READ)
     public PageResponse<AdminFinanceTransaction> financeTransactions(
             @RequestParam(required = false) String kind,
-            @RequestParam(required = false) String status,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Integer days,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
-        return finance.financeTransactions(kind, status, q, days, page, size);
+        return finance.financeTransactions(kind, q, days, page, size);
     }
     }

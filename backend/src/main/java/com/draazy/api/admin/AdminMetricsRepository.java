@@ -5,7 +5,6 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -14,34 +13,50 @@ public class AdminMetricsRepository {
     // Spelled as a string because it is interpolated into SQL.
     private static final String IST = PlatformTime.IST.getId();
 
-    // A row later `cancelled` because it was superseded by an upgrade still counts, correctly: it was paid for.
-    // Each source is counted only where there is an unambiguous marker that money arrived.
-    private static final String REVENUE_BY_SOURCE = """
-            select 'subscriptions' as source, coalesce(sum(s.amount), 0) as amount
-              from subscriptions s
-                 where s.payment_ref is not null
-                   and s.status <> 'pending'
-               and (cast(:from as date) is null
-                    or (s.started_at at time zone '%1$s') >= cast(:from as date))
-               and (cast(:to   as date) is null
-                    or (s.started_at at time zone '%1$s') <  cast(:to   as date))
+    // Invoices are issued only when the gateway confirms a payment and credit notes only when it confirms a refund,
+    // so together they are the money ledger. `fee` is Draazy's own part; the rest is statutory pass-through.
+    private static final String MONEY = """
+            select i.id, i.number, i.user_id, cast((i.issued_at at time zone '%1$s') as date) as day,
+                   case when i.source_type = 'subscription' then 'subscription' else 'service' end as source,
+                   false as refund, i.amount as gross, i.taxable_amount as fee
+              from invoices i
+            union all
+            select c.id, c.number, c.user_id, cast((c.issued_at at time zone '%1$s') as date),
+                   case when c.source_type = 'subscription' then 'subscription' else 'service' end,
+                   true, -c.amount, -c.taxable_amount
+              from credit_notes c
             """.formatted(IST);
 
-    // A source column would change this operation for every caller to serve one screen.
+    private static final String WINDOW = """
+             where (cast(:from as date) is null or day >= cast(:from as date))
+               and (cast(:to   as date) is null or day <  cast(:to   as date))
+            """;
+
+    private static final String MONEY_TOTALS = """
+            select coalesce(sum(gross) filter (where not refund), 0),
+                   coalesce(-sum(gross) filter (where refund), 0),
+                   coalesce(sum(gross - fee), 0),
+                   coalesce(sum(fee), 0),
+                   count(*) filter (where not refund)
+              from (%s) money
+            """.formatted(MONEY) + WINDOW;
+
     // Buckets with no money in a given source simply do not appear; the service fills the gaps.
-    private static final String REVENUE_SERIES_BY_SOURCE = """
-            select bucket, source, sum(amount) as amount from (
-                select date_trunc(:interval, s.started_at at time zone '%1$s') as bucket,
-                       'subscriptions' as source, s.amount as amount
-                  from subscriptions s
-                 where s.payment_ref is not null
-                   and s.status <> 'pending'
-                   and (s.started_at at time zone '%1$s') >= cast(:from as date)
-                   and (s.started_at at time zone '%1$s') <  cast(:to   as date)
-            ) parts
-            group by bucket, source
-            order by bucket, source
-            """.formatted(IST);
+    private static final String FEE_SERIES = """
+            select cast(date_trunc('month', cast(day as timestamp)) as date) as bucket, source,
+                   coalesce(sum(fee) filter (where not refund), 0),
+                   coalesce(-sum(fee) filter (where refund), 0)
+              from (%s) money
+            """.formatted(MONEY) + WINDOW + " group by bucket, source order by bucket, source";
+
+    private static final String ATTENTION = """
+            select (select count(*) from refund_requests where status = 'pending_review'),
+                   (select coalesce(sum(amount), 0) from refund_requests where status = 'pending_review'),
+                   (select count(*) from service_request_refunds where status = 'requested'),
+                   (select coalesce(sum(amount), 0) from service_request_refunds where status = 'requested'),
+                   (select count(*) from payment_disputes where status = 'open'),
+                   (select coalesce(sum(amount), 0) from payment_disputes where status = 'open')
+            """;
 
     private static final String MRR = """
             select coalesce(sum(
@@ -79,42 +94,25 @@ public class AdminMetricsRepository {
              order by p.name, s.amount
             """;
 
-    // ARPPU's denominator, deliberately not `countUsers` (ARPU's): one cannot stand in for the other.
-    private static final String PAYING_USERS = """
-            select count(distinct s.user_id)
-              from subscriptions s
-                 where s.payment_ref is not null
-                   and s.status <> 'pending'
-               and s.amount > 0
-                   and (s.started_at at time zone '%1$s') >= cast(:from as date)
-                   and (s.started_at at time zone '%1$s') <  cast(:to   as date)
-            """.formatted(IST);
-
-    // `refunded` is deliberately not in that vocabulary.
     private static final String LEDGER_ROWS = """
-            select s.id as id,
-                   cast((s.started_at at time zone '%1$s') as date) as occurred_on,
-                   coalesce(u.name, 'Member') as party,
-                   'subscription' as kind,
-                   s.amount as amount,
-                   case when s.payment_ref is not null and s.status <> 'pending'
-                        then 'paid' else 'pending' end as settlement
-              from subscriptions s
-              left join users u on u.id = s.user_id
-             where s.amount > 0
-            """.formatted(IST);
+            select m.id, m.day as occurred_on, m.number, coalesce(u.name, 'Member') as party,
+                   case when m.refund then 'refund' else m.source end as kind,
+                   m.gross as amount, m.fee
+              from (%s) m
+              left join users u on u.id = m.user_id
+            """.formatted(MONEY);
 
     // The filter applied to `#LEDGER_ROWS`, written once and used by both the page and its count.
     // Every bound parameter is cast to its type before the null test.
     private static final String LEDGER_FILTER = """
-             where (cast(:kind       as text) is null or kind       = cast(:kind       as text))
-               and (cast(:settlement as text) is null or settlement = cast(:settlement as text))
-               and (cast(:q          as text) is null or party ilike cast(:q as text) escape '\\')
+             where (cast(:kind as text) is null or kind = cast(:kind as text))
+               and (cast(:q    as text) is null or party ilike cast(:q as text) escape '\\'
+                                                or number ilike cast(:q as text) escape '\\')
                and (cast(:since as date) is null or occurred_on >= cast(:since as date))
             """;
 
     private static final String LEDGER_PROJECTION =
-            "select id, occurred_on, party, kind, amount, settlement from ";
+            "select id, occurred_on, number, party, kind, amount, fee from ";
 
     private final EntityManager em;
 
@@ -178,25 +176,32 @@ public class AdminMetricsRepository {
                 .getSingleResult()).longValue();
     }
 
-    // SQL fragments come only from AdminMetricsService's fixed metric map, not requests.
-    @SuppressWarnings("unchecked")
-    public Map<String, Long> revenueBySource(LocalDate from, LocalDate to) {
-        List<Object[]> rows = em.createNativeQuery(REVENUE_BY_SOURCE)
+    public AdminFinance.Money money(LocalDate from, LocalDate to) {
+        Object[] row = (Object[]) em.createNativeQuery(MONEY_TOTALS)
                 .setParameter("from", from)
                 .setParameter("to", to)
-                .getResultList();
-        return rows.stream().collect(java.util.stream.Collectors.toMap(
-                row -> (String) row[0],
-                row -> ((Number) row[1]).longValue()));
+                .getSingleResult();
+        return new AdminFinance.Money(longAt(row, 0), longAt(row, 1), longAt(row, 2), longAt(row, 3),
+                longAt(row, 4));
     }
 
+    /** Rows of month bucket, source, fees invoiced, fees credited back. */
     @SuppressWarnings("unchecked")
-    public List<Object[]> revenueSeriesBySource(String interval, LocalDate from, LocalDate to) {
-        return em.createNativeQuery(REVENUE_SERIES_BY_SOURCE)
-                .setParameter("interval", interval)
+    public List<Object[]> feeSeries(LocalDate from, LocalDate to) {
+        return em.createNativeQuery(FEE_SERIES)
                 .setParameter("from", from)
                 .setParameter("to", to)
                 .getResultList();
+    }
+
+    public AdminFinance.Attention attention() {
+        Object[] row = (Object[]) em.createNativeQuery(ATTENTION).getSingleResult();
+        return new AdminFinance.Attention(longAt(row, 0), longAt(row, 1), longAt(row, 2), longAt(row, 3),
+                longAt(row, 4), longAt(row, 5));
+    }
+
+    private static long longAt(Object[] row, int index) {
+        return ((Number) row[index]).longValue();
     }
 
     /** Monthly run rate of the active subscription book, in whole rupees. See {@link #MRR}. */
@@ -209,20 +214,12 @@ public class AdminMetricsRepository {
         return em.createNativeQuery(PLAN_LINES).getResultList();
     }
 
-    public long payingUsers(LocalDate from, LocalDate to) {
-        return ((Number) em.createNativeQuery(PAYING_USERS)
-                .setParameter("from", from)
-                .setParameter("to", to)
-                .getSingleResult()).longValue();
-    }
-
     @SuppressWarnings("unchecked")
-    public List<Object[]> ledger(String kind, String settlement, String q, LocalDate since, int limit, long offset) {
+    public List<Object[]> ledger(String kind, String q, LocalDate since, int limit, long offset) {
         return em.createNativeQuery(LEDGER_PROJECTION + "(" + LEDGER_ROWS + ") ledger"
                 + LEDGER_FILTER
-                + " order by occurred_on desc nulls last, id limit :limit offset :offset")
+                + " order by occurred_on desc nulls last, number desc, id limit :limit offset :offset")
                 .setParameter("kind", kind)
-                .setParameter("settlement", settlement)
                 .setParameter("q", q)
                 .setParameter("since", since)
                 .setParameter("limit", limit)
@@ -230,11 +227,10 @@ public class AdminMetricsRepository {
                 .getResultList();
     }
 
-    public long ledgerCount(String kind, String settlement, String q, LocalDate since) {
+    public long ledgerCount(String kind, String q, LocalDate since) {
         return ((Number) em.createNativeQuery(
                 "select count(*) from (" + LEDGER_ROWS + ") ledger" + LEDGER_FILTER)
                 .setParameter("kind", kind)
-                .setParameter("settlement", settlement)
                 .setParameter("q", q)
                 .setParameter("since", since)
                 .getSingleResult()).longValue();
