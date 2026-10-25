@@ -17,6 +17,9 @@ public record PropertySummary(
         String propertyType,
         BigDecimal bhk,
         Long price,
+
+        /** Rent only; in Pune it runs to several months' rent, so a renter weighs it beside the rent itself. */
+        Long deposit,
         BigDecimal area,
         String areaUnit,
         String furnishing,
@@ -33,6 +36,7 @@ public record PropertySummary(
 
         String locality,
         String localitySlug,
+        String societyName,
         String city,
         Double lat,
         Double lng,
@@ -40,6 +44,7 @@ public record PropertySummary(
         boolean verified,
         boolean ownerVerified,
         boolean ownershipVerified,
+        String reraId,
         String status,
         String dealStatus,
 

@@ -238,7 +238,7 @@ Society:  minted(community) --ops merge--> merged (redirects to survivor) --ops 
   location tabs and shows a thin state. The placeholder carries **no** specs and no coordinates, so it
   takes the `_thin` branch: it never claims a builder, a unit count or an estimated rating for a
   building nobody has confirmed exists. A read that throws (not a 404) falls back to the same row.
-- **Thin society:** never fabricate specs; show "Details not confirmed yet".
+- **Thin society:** never fabricate specs; show "Limited details", and never claim Draazy verified or confirmed it.
 - **Empty states:** Societies index "No societies match your filters" with reset; Society homes tab
   hidden when 0 listings; Reviews tab hidden below 3 reviews; Locality inventory bar handles a
   locality with no live listings.

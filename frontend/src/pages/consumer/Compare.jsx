@@ -10,6 +10,7 @@ import { fmtArea, fmtINR, isSqftUnit } from '../../lib/format.js';
 import { useCompare } from '../../context/CompareContext.jsx';
 import Modal from '../../components/ui/Modal.jsx';
 import { cityLabelFor } from '../../lib/geoConfig.js';
+import { mahaReraSearchUrl } from '../../lib/maharera.js';
 
 const MAX = 4;
 const AMENITIES = [
@@ -56,7 +57,7 @@ function metric(p, t) {
     psf: p.area && isSqftUnit(p.areaUnit) ? Math.round(p.price / p.area) : 0,
     furnish: FURNISH_MAP[p.furnishing] ? t('compare.' + FURNISH_MAP[p.furnishing]) : (p.furnishing || '—'),
     possession: POSSESSION[p.construction] ? t('compare.' + POSSESSION[p.construction]) : '—',
-    rera: p.rera,
+    reraId: p.reraId || '',
     am,
   };
 }
@@ -72,7 +73,7 @@ const ROWS = [
   { label: 'Price / sq.ft.', tk: 'rowPsf', icon: 'ruler', best: 'min', get: (m) => (m.psf ? '₹' + m.psf.toLocaleString('en-IN') : '—'), cmp: (m) => m.psf },
   { label: 'Furnishing', tk: 'rowFurnishing', icon: 'sofa', get: (m) => m.furnish },
   { label: 'Possession', tk: 'rowPossession', icon: 'calendar', get: (m) => m.possession },
-  { label: 'RERA Verified', tk: 'rowRera', icon: 'shield-check', get: (m) => (m.rera ? 'rera-yes' : 'rera-no') },
+  { label: 'RERA shared', tk: 'rowRera', icon: 'file-text', get: (m) => m.reraId || 'rera-no' },
 ];
 
 export default function Compare() {
@@ -181,8 +182,7 @@ export default function Compare() {
         [t('compare.location'), (m) => m.loc],
         ...ROWS.map((r) => [t('compare.' + r.tk, { defaultValue: r.label }), (m) => {
           const v = r.get(m);
-          if (v === 'rera-yes') return t('compare.reraVerified');
-          if (v === 'rera-no') return t('compare.reraNotListed');
+          if (v === 'rera-no') return t('compare.reraNotShared');
           return String(v);
         }]),
         [t('compare.amenities'), (m) => `${amenityCount(m)} / ${AMENITIES.length}`],
@@ -315,8 +315,12 @@ export default function Compare() {
                               <td key={m.id} className="cmp-cell">
                                 <span className={'text-sm text-gray-200 ' + (win ? 'best' : '')}>
                                   {!m.available ? <span className="text-gray-600">—</span>
-                                    : raw === 'rera-yes' ? (<><Icon name="check-circle-2" className="w-4 h-4 chk inline" /> <span className="text-emerald-400">{t('compare.reraVerified')}</span></>)
-                                    : raw === 'rera-no' ? (<><Icon name="x-circle" className="w-4 h-4 crs inline" /> <span className="text-gray-500">{t('compare.reraNotListed')}</span></>)
+                                    : raw === 'rera-no' ? <span className="text-gray-500">{t('compare.reraNotShared')}</span>
+                                    : row.tk === 'rowRera' ? (
+                                      <a href={mahaReraSearchUrl(raw)} target="_blank" rel="noopener noreferrer" title={t('compare.reraVerifyTitle')} className="inline-flex items-center gap-1 text-teal-300 hover:underline">
+                                        {raw} <Icon name="external-link" className="w-3.5 h-3.5" />
+                                      </a>
+                                    )
                                     : raw}
                                   {win ? <span className="best-tag">{t('compare.best')}</span> : null}
                                 </span>

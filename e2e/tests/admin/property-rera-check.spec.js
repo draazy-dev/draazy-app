@@ -5,6 +5,7 @@ import { approveListing, rejectListing, tickChecklist } from '../../helpers/mode
 
 const RERA_ID = 'P52100012345';
 const RERA_ITEM = 'RERA ID checked on MahaRERA';
+const SEARCH_URL = `https://maharera.maharashtra.gov.in/projects-search-result?project_name=${RERA_ID}`;
 
 const created = new Set();
 
@@ -40,7 +41,7 @@ test('only a listing that quotes a RERA ID gets the fourth checklist item', asyn
   expect((await check(plain.id, 'verified')).status).toBe(409);
 });
 
-test('not found or mismatch blocks Approve; Verified lets it through and buyers see RERA checked', async ({ request }) => {
+test('not found or mismatch blocks Approve; Verified lets it through, and the buyer never sees the check', async ({ request }) => {
   const { id } = await reraListing();
   const headers = await authHeaders(ACTORS.admin);
   await tickChecklist(request, id, headers);
@@ -56,14 +57,11 @@ test('not found or mismatch blocks Approve; Verified lets it through and buyers 
     expect(blocked.json.error).toBe('rera_check_failed');
   }
 
-  const before = await call('GET', `/properties/${id}`, ACTORS.buyer);
-  expect(before.json.reraChecked).toBeUndefined();
-
   expect((await check(id, 'verified')).status).toBe(200);
   expect((await approveListing(request, id, headers)).status()).toBe(200);
   const after = await call('GET', `/properties/${id}`, ACTORS.buyer);
-  expect(after.json.reraChecked).toBe(true);
-  expect(JSON.stringify(after.json)).not.toContain('reraCheckedBy');
+  expect(after.json.reraId).toBe(RERA_ID);
+  expect(JSON.stringify(after.json)).not.toMatch(/reraCheck/);
 });
 
 test('a failed check can be sent back with the RERA reason, and the owner hears it', async ({ request }) => {
@@ -97,7 +95,7 @@ test('the review modal copies the ID, links to MahaRERA and records the three re
   await expect(row).toContainText(RERA_ID);
 
   const link = row.getByRole('link', { name: 'Open MahaRERA search' });
-  await expect(link).toHaveAttribute('href', 'https://maharera.maharashtra.gov.in/');
+  await expect(link).toHaveAttribute('href', SEARCH_URL);
   await expect(link).toHaveAttribute('target', '_blank');
   await expect(link).toHaveAttribute('rel', /noopener/);
 
@@ -114,7 +112,7 @@ test('the review modal copies the ID, links to MahaRERA and records the three re
   await expect(row.getByTestId('rera-mismatch')).toHaveAttribute('aria-pressed', 'true');
 });
 
-test('the buyer page shows RERA checked only after a verified result', async ({ page, request }) => {
+test('the buyer page shows the owner-shared RERA ID linked to MahaRERA, never the staff check', async ({ page, request }) => {
   const { id } = await reraListing();
   const headers = await authHeaders(ACTORS.admin);
   await tickChecklist(request, id, headers);
@@ -122,10 +120,7 @@ test('the buyer page shows RERA checked only after a verified result', async ({ 
   expect((await approveListing(request, id, headers)).status()).toBe(200);
 
   await page.goto(`/property/${id}`);
-  await expect(page.getByTestId('rera-checked')).toBeVisible();
-
-  expect((await check(id, 'not_found')).status).toBe(200);
-  await page.reload();
-  await expect(page.getByText(RERA_ID).first()).toBeVisible();
-  await expect(page.getByTestId('rera-checked')).toHaveCount(0);
+  await expect(page.getByTestId('rera-link')).toHaveAttribute('href', SEARCH_URL);
+  await expect(page.getByTestId('rera-link')).toContainText(`RERA shared: ${RERA_ID}`);
+  await expect(page.locator('main')).not.toContainText(/RERA (checked|verified|registered|approved)/i);
 });

@@ -10,7 +10,6 @@ function buildAbout(soc, locName, t) {
   const descriptor = [
     soc.towers ? t('society.descTower', { count: soc.towers }) : null,
     soc.units ? t('society.descHome', { count: fmtNum(soc.units) }) : null,
-    soc.rera ? t('society.descRera') : null,
   ].filter(Boolean).join(', ');
   const descArg = descriptor ? `${descriptor} ` : '';
 

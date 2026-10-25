@@ -87,7 +87,6 @@ export function toViewModel(p) {
     bhk: bhkLabel(p.bhk, p.propertyType),
     rera: Boolean(p.reraId),
     reraId: p.reraId ?? '',
-    reraChecked: p.reraChecked === true,
     // Unknown amounts must not become an owner's explicit zero when reopening an edit.
     deposit: p.deposit ?? null,
     maintenance: p.maintenance ?? null,

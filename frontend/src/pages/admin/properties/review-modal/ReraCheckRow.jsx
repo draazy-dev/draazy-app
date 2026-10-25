@@ -1,6 +1,7 @@
 import { Copy, ExternalLink } from 'lucide-react';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import { classNames } from '../../../../lib/format.js';
+import { mahaReraSearchUrl } from '../../../../lib/maharera.js';
 
 export const RERA_REVIEW_ITEM = 'RERA ID checked on MahaRERA';
 
@@ -27,7 +28,7 @@ export default function ReraCheckRow({ reraId, result, onRecord }) {
       <div className="flex flex-wrap gap-2">
         <button type="button" data-testid="rera-copy" onClick={copy}
           className="dz-btn dz-btn-ghost min-h-[44px] text-xs"><Copy className="h-3.5 w-3.5" /> Copy RERA ID</button>
-        <a href="https://maharera.maharashtra.gov.in/" target="_blank" rel="noopener noreferrer"
+        <a href={mahaReraSearchUrl(reraId)} target="_blank" rel="noopener noreferrer"
           className="dz-btn dz-btn-ghost min-h-[44px] text-xs"><ExternalLink className="h-3.5 w-3.5" /> Open MahaRERA search</a>
       </div>
       <div className="grid grid-cols-3 gap-2" role="group" aria-label="RERA check result">
