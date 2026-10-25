@@ -150,6 +150,9 @@ test.describe('Property detail — hero carousel', () => {
       expect(m.snap, 'the hero snaps along the axis it scrolls').toContain('x');
       // A swipe past the last photo must not hand the gesture to the page behind it.
       expect(m.overscrollX, 'overscrolling the last photo must not scroll the listing').toBe('contain');
+      // A single move may only ever advance one photo: mandatory snapping alone lets a fast fling skip several.
+      const stops = await track(page).evaluate((el) => [...el.children].map((c) => getComputedStyle(c).scrollSnapStop));
+      expect(new Set(stops), 'every slide must stop a fling').toEqual(new Set(['always']));
     });
 
     await test.step('scrolling the hero commits to the selected dot once it settles', async () => {
@@ -165,6 +168,8 @@ test.describe('Property detail — hero carousel', () => {
       await expect(page.locator('.main-image-wrapper').first(), 'a settled scroll must commit the photo').toContainText('2/');
       await expect(d.nth(1), 'the second photo owns the second dot').toHaveAttribute('aria-current', 'true');
       await expect(lit(page), 'exactly one dot may be lit at a time').toHaveCount(1);
+      // The dots follow the scroll live; the thumbnails show `active`, so this waits for the settle commit itself.
+      await expect(page.locator('button.thumbnail').nth(1), 'the settled scroll commits the photo').toHaveAttribute('aria-current', 'true');
     });
 
     await test.step('the last photo still lights its own dot', async () => {
@@ -213,5 +218,37 @@ test.describe('Property detail — hero carousel', () => {
       const overflowX = await track(page).evaluate((el) => getComputedStyle(el).overflowX);
       expect(overflowX, 'the desktop hero must not become a second horizontal scrollbar').toBe('hidden');
     });
+  });
+
+  test('one fast swipe advances exactly one photo, however far the fling would carry', async ({ page }) => {
+    await gotoProp(page);
+    const el = track(page);
+    expect(await dots(page).count(), 'this fixture needs at least four photos').toBeGreaterThan(4);
+
+    // Headless Chromium has no touch fling; a three-slide scrollBy hits the same directional snap a fling ends in.
+    await el.evaluate((t) => t.scrollBy({ left: t.clientWidth * 3, behavior: 'auto' }));
+    await expect.poll(() => el.evaluate((t) => Math.round(t.scrollLeft / t.clientWidth)),
+      { message: 'a long throw must still come to rest on the very next photo' }).toBe(1);
+    await expect(dots(page).nth(1)).toHaveAttribute('aria-current', 'true');
+  });
+
+  test('the dots and the counter follow the finger before the swipe settles', async ({ page }) => {
+    await gotoProp(page);
+    const d = dots(page);
+    const counter = page.locator('.main-image-wrapper').first();
+    expect(await d.count(), 'this fixture needs at least three photos').toBeGreaterThan(3);
+
+    // A held touch blocks the settle commit, so whatever lights here was driven by the scroll alone.
+    await track(page).evaluate((el) => {
+      el.dispatchEvent(new Event('touchstart', { bubbles: true }));
+      el.scrollTo({ left: el.clientWidth * 2, behavior: 'auto' });
+    });
+    await expect(d.nth(2), 'mid-drag, the dot under the finger is lit').toHaveAttribute('aria-current', 'true');
+    await expect(counter, 'mid-drag, the counter reads the photo under the finger').toContainText('3/');
+    await expect(lit(page)).toHaveCount(1);
+
+    await track(page).evaluate((el) => el.dispatchEvent(new Event('touchend', { bubbles: true })));
+    await expect(d.nth(2), 'releasing commits the same photo').toHaveAttribute('aria-current', 'true');
+    await expect(counter).toContainText('3/');
   });
 });

@@ -25,6 +25,7 @@
   height: calc(100vh - var(--dz-nav-h));
   height: calc(100dvh - var(--dz-nav-h));
   scroll-snap-align: start;
+  scroll-snap-stop: always;
   position: relative;
   overflow: hidden;
   display: flex;

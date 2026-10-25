@@ -5,7 +5,7 @@ import { API, authHeaders } from '../../../helpers/liveAuth.js';
    saved list and no shell reads for alerts, follows or identity. */
 
 const CARD = ['id', 'slug', 'title', 'deal', 'propertyType', 'bhk', 'price', 'area', 'locality', 'city',
-  'coverImage', 'ownerVerified', 'ownershipVerified'];
+  'coverImage', 'images', 'ownerVerified', 'ownershipVerified'];
 const SOCIETY = ['slug', 'name', 'localitySlug', 'listingCount'];
 const INDEX = ['deal', 'locality', 'localitySlug', 'societySlug', 'societyName', 'lat', 'lng'];
 const LAZY = ['/api/me/saved-searches', '/api/me/societies/following', '/api/me/verification/identity', '/api/me/saved'];

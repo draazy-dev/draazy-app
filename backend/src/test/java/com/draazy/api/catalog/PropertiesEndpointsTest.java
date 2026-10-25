@@ -534,6 +534,20 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void featuredCardsCarryAtMostFivePhotos() throws Exception {
+        Property many = save(owner("9810000098"), "Many", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);
+        many.setImages(List.of("/1.jpg", "/2.jpg", "/3.jpg", "/4.jpg", "/5.jpg", "/6.jpg"));
+        properties.saveAndFlush(many);
+        em.clear();
+
+        mvc.perform(get("/properties/featured"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].images.length()").value(5))
+                .andExpect(jsonPath("$[0].images[0]").value("/1.jpg"))
+                .andExpect(jsonPath("$[0].coverImage").value("/1.jpg"));
+    }
+
+    @Test
     void reelsCarryAtMostFivePhotosOfLiveRowsWithEnough() throws Exception {
         User o = owner("9810000096");
         Property many = save(o, "Many", "rent", "apartment", new BigDecimal("2"), 25000, "Baner", "approved", false);

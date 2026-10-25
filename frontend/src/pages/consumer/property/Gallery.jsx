@@ -17,15 +17,21 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
   const trackRef = useRef(null);
   const settle = useRef(0);
   const dragging = useRef(false);
+  /* The slide under the finger, display-only: the dots and counter follow it every frame, while `active`
+     waits for the scroll to settle. `null` once settled. */
+  const [live, setLive] = useState(null);
 
   /* The browser's own scroller carries the photo, rather than a handler measuring a drag and swapping the src on
      release. */
   const onScroll = () => {
+    const track = trackRef.current;
+    if (track && track.clientWidth) setLive(Math.round(track.scrollLeft / track.clientWidth));
     /* `scroll` fires every frame, and committing `active` mid-drag re-enters the effect below,
      * which would yank the track out from under the finger. */
     clearTimeout(settle.current);
     settle.current = setTimeout(() => {
       if (dragging.current) return;
+      setLive(null);
       const el = trackRef.current;
       if (!el || !el.clientWidth) return;
       const i = Math.round(el.scrollLeft / el.clientWidth);
@@ -62,8 +68,11 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
 
   const showPhoto = (i) => { setAsk(false); setActive(i); };
 
+  const pos = live ?? (ask ? count : active);
+  const onAsk = pos >= count;
+  const shown = Math.min(pos, count - 1);
   const dotCount = Math.min(count, MAX_PHOTOS_CEILING);
-  const litDot = ask ? -1 : Math.min(active, dotCount - 1);
+  const litDot = onAsk ? -1 : Math.min(pos, dotCount - 1);
   if (!count) {
     return (
       <>
@@ -126,14 +135,14 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
                  has scrolled past. */
               alt={t('property.photoAlt', { title, n: i + 1, total: count })}
               onClick={() => setLightbox(true)}
-              className="snap-start shrink-0 w-full h-full object-cover cursor-zoom-in"
+              className="snap-start snap-always shrink-0 w-full h-full object-cover cursor-zoom-in"
               style={i === active ? { viewTransitionName: `property-hero-${p.id}` } : undefined}
             />
           ))}
 
           {requestPhotos ? (
           /* The ask slide, last and phone-only. */
-          <div data-photo-ask="" className="sm:hidden relative z-20 snap-start shrink-0 w-full h-full flex flex-col items-center justify-center gap-3 px-8 text-center bg-ink-2">
+          <div data-photo-ask="" className="sm:hidden relative z-20 snap-start snap-always shrink-0 w-full h-full flex flex-col items-center justify-center gap-3 px-8 text-center bg-ink-2">
             <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-brand-teal-1/10 border border-brand-teal-2/30">
               <Icon name="image-plus" className="w-7 h-7 text-brand-teal-3" />
             </span>
@@ -160,8 +169,8 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
 
         {actions}
         {/* The photo itself opens the lightbox on tap; this counter is the keyboard way in. */}
-        <button type="button" onClick={() => setLightbox(true)} aria-label={t('property.fullscreen') + ' ' + (active + 1) + '/' + count} className="tap-extend absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-white text-sm font-semibold cursor-pointer hover:bg-white/15 transition-smooth">
-          <Icon name="camera" className="w-4 h-4" aria-hidden="true" /> <span>{active + 1}/{count}</span>
+        <button type="button" onClick={() => setLightbox(true)}         aria-label={t('property.fullscreen') + ' ' + (shown + 1) + '/' + count} className="tap-extend absolute bottom-4 right-4 flex items-center gap-2 px-4 py-2 rounded-full glass-strong text-white text-sm font-semibold cursor-pointer hover:bg-white/15 transition-smooth">
+                  <Icon name="camera" className="w-4 h-4" aria-hidden="true" /> <span>{shown + 1}/{count}</span>
         </button>
 
         {/* Rendered here rather than duplicated-and-hidden: the parent decides which of the two positions gets the
@@ -200,13 +209,13 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
         {requestPhotos ? (
         <button
           type="button"
-          aria-current={ask ? 'true' : undefined}
+          aria-current={onAsk ? 'true' : undefined}
           aria-label={t('property.requestMorePhotos')}
           onClick={() => setAsk(true)}
           data-tap-exempt
           className="shrink-0 inline-flex min-w-[24px] items-center justify-center h-11 px-2"
         >
-          <span className={'block w-2.5 h-2.5 rounded-full border-2 transition-all ' + (ask ? 'border-brand-teal-3 bg-brand-teal-3' : 'border-white/30')} />
+          <span className={'block w-2.5 h-2.5 rounded-full border-2 transition-all ' + (onAsk ?  'border-brand-teal-3 bg-brand-teal-3' : 'border-white/30')} />
         </button>
         ) : null}
       </div>
