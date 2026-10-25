@@ -3,9 +3,10 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import PropertyImage from '../../../components/ui/PropertyImage.jsx';
 import { CARD_SIZES } from '../../../lib/imgSrcSet.js';
-import { inr, matchFor, moveInLabel, FLATMATE_IMG, detailPath, roomTitle, hostTierMeta, showHostBadge } from './helpers.js';
+import { inr, matchFor, moveInLabel, FLATMATE_IMG, detailPath, roomTitle, hostTierMeta, showHostBadge, genderPref, foodLabel } from './helpers.js';
 import { roomKindOf, occupancyOf, filledSeatsOf, priceBasisOf, bestPerPersonRent, hasSharerAlready, roomTypeLabel, PRICE_ROOM, OCCUPANCY_EMPTY, OCCUPANCY_OCCUPIED } from './model.js';
-import { SaveBtn, MatchPill, Fresh, CardLink, TileChip } from './atoms.jsx';
+import { FURN_KEY } from './constants.js';
+import { SaveBtn, CardBadge, CardLink, TileChip, Facts } from './atoms.jsx';
 
 export function roomPriceLabel(r, tr) {
   /* Per-room pricing: the owner sets one rent for the room and tenants decide whether to split
@@ -41,7 +42,13 @@ function RoomCard({ r, i, saved, onSave, anchorId, myPost }) {
   const href = detailPath('room', r.id);
   const title = roomTitle(r);
   const where = [r.title && r.society, r.localities?.[0] || r.locality].filter(Boolean).join(', ');
-  const facts = [['bed-double', r.flatType], ['door-open', kind && tr('flatmates.roomKind_' + kind)], ['users', roomTypeLabel(r, tr)]].filter(([, label]) => label);
+  const facts = [
+    ['bed-double', r.flatType],
+    ['door-open', kind && tr('flatmates.roomKind_' + kind)],
+    ['users', roomTypeLabel(r, tr)],
+    ['sofa', FURN_KEY[r.furnishing] && tr('flatmates.' + FURN_KEY[r.furnishing])],
+  ];
+  const note = occupancyNote(r, tr);
   return (
     <div data-sf-id={anchorId} className="sf-card relative rounded-2xl overflow-hidden reveal" style={{ animationDelay: i * 0.03 + 's' }}>
       <div className="relative h-48 bg-white/5">
@@ -49,7 +56,6 @@ function RoomCard({ r, i, saved, onSave, anchorId, myPost }) {
         <PropertyImage src={r.img || r.cover || FLATMATE_IMG} sizes={CARD_SIZES} alt={title} loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
         {trust && <span className="badge-verified-icon absolute top-3 left-3" role="img" aria-label={trust} title={trust}><Icon name="shield-check" /></span>}
         <SaveBtn k={'r:' + r.id} saved={saved} onSave={onSave} className="heart-on-photo absolute top-3 right-3 z-[1]" />
-        <span className="absolute bottom-3 left-3 flex gap-1.5">{match ? <MatchPill match={match} /> : <Fresh item={r} />}</span>
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
@@ -62,8 +68,14 @@ function RoomCard({ r, i, saved, onSave, anchorId, myPost }) {
             <span className="block text-[11px] text-gray-500 mt-0.5 whitespace-nowrap">{roomPriceTag(r, tr)}</span>
           </div>
         </div>
-        {facts.length > 0 && <div className="flex items-center gap-3 text-xs text-gray-400 mt-3 flex-wrap">{facts.map(([ic, label]) => <span key={ic} className="flex items-center gap-1"><Icon name={ic} className="w-3.5 h-3.5" /> {label}</span>)}</div>}
-        {moveIn && <div className="flex mt-3"><TileChip icon="calendar-check">{moveInLabel(moveIn, 'From ')}</TileChip></div>}
+        <Facts items={facts} />
+        <div className="flex flex-wrap items-center gap-1.5 mt-3">
+          {moveIn && <TileChip icon="calendar-check">{moveInLabel(moveIn, 'From ')}</TileChip>}
+          {r.gender && r.gender !== 'any' && <TileChip icon={r.gender === 'female' ? 'venus' : 'mars'}>{genderPref(r.gender)}</TileChip>}
+          {r.food === 'veg' && <TileChip icon="utensils">{foodLabel(r.food)}</TileChip>}
+          {note && <TileChip icon="users">{note}</TileChip>}
+          <CardBadge item={r} match={match} />
+        </div>
       </div>
       <CardLink to={href} />
     </div>
