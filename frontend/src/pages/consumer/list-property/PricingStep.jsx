@@ -106,7 +106,7 @@ const PricingStep = ({
           <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             {!land && !commercial && (
               <div>
-                <label className={lbl3}>{t('listProperty.fields.monthlyMaintenance')} <span className="text-gray-500 font-normal">{t('listProperty.optional')}</span></label>
+                <label className={lbl3}>{t('listProperty.fields.monthlyMaintenance')}</label>
                 <div className="relative">
                   <div className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</div>
                   <input inputMode="numeric" maxLength={7} {...money('monthlyMaintenance')} placeholder={t('listProperty.ph.egMaint3500')} className={`${fld} pl-10 pr-16`} />
@@ -191,7 +191,7 @@ const PricingStep = ({
             <div className="mb-6">
               <label htmlFor="lp-rera" className={lbl3}>
                 {t('listProperty.fields.reraNo')}
-                {!reraRequired && <span className="text-gray-500 font-normal"> {t('listProperty.optional')}</span>}
+                {reraRequired && ' *'}
               </label>
               <input
                 id="lp-rera"

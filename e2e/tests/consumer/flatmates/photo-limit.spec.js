@@ -1,9 +1,7 @@
 import { test, expect } from '../../../fixtures/live.js';
 import { signedInAsNew } from '../../../helpers/liveAuth.js';
-import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { PHOTO_PNG } from '../../../helpers/listingPhotos.helper.js';
-import { fillSociety } from '../../../helpers/places.js';
-import { pickLocality } from '../../../helpers/locality.js';
+import { fillRoomDetails, fillRoomLocation, fillRoomPrice, nextStep } from '../../../helpers/roomWizard.js';
 
 const SMALL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4AWJiYGD4D8IgBpBmYAAAAAD//7vS9wEAAAAGSURBVAMAGDACA6ybwrYAAAAASUVORK5CYII=', 'base64');
 
@@ -11,22 +9,12 @@ async function openRoomPhotoStep(page) {
   await signedInAsNew(page);
   await page.goto('/list-property?flatmate=1');
   await expect(page.locator('.lp-meter')).toBeVisible({ timeout: 20_000 });
-  await page.locator('[data-err="bhk"] .radio-pill', { hasText: '2 BHK' }).click();
-  await page.locator('[data-err="roomType"] .radio-pill', { hasText: 'Single (1 person)' }).click();
-  await page.getByText('I have a registered rent agreement', { exact: true }).click();
-  await page.getByLabel('Upload registered rent agreement for room').setInputFiles({
-    name: 'agreement.png', mimeType: 'image/png', buffer: PHOTO_PNG,
-  });
-  await page.getByLabel('The owner knows and agrees to sharing').check();
-  await page.getByRole('button', { name: /Next Step/i }).click();
-
-  await pickLocality(page, 'Baner');
-  await fillSociety(page, 'Photo Limit Heights');
-  await page.getByRole('button', { name: /Next Step/i }).click();
-  await expect(page.getByText('Rent & move-in', { exact: true })).toBeVisible();
-  await page.locator('input[data-err="rentShare"]').fill('13500');
-  await pickDate(page, '[data-err="availableFrom"]', '2026-12-01');
-  await page.getByRole('button', { name: /Next Step/i }).click();
+  await fillRoomDetails(page, { bhk: '2 BHK', roomType: 'Single (1 person)' });
+  await nextStep(page);
+  await fillRoomLocation(page, { society: 'Photo Limit Heights' });
+  await nextStep(page);
+  await fillRoomPrice(page, { rent: '13500', deposit: '27000', availableFrom: '2026-12-01' });
+  await nextStep(page);
   await expect(page.locator('[data-err="photos"]')).toBeVisible();
 }
 

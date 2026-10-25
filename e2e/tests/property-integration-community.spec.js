@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { IGNORE as SHARED_IGNORE } from '../helpers/console.js';
-import { signedInAs, signedInAsNew, apiLogin, uniqueMobile, authHeaders, uploadedListingPhotos, API } from '../helpers/liveAuth.js';
+import { signedInAs, signedInAsNew, apiLogin, uniqueMobile, authHeaders, API } from '../helpers/liveAuth.js';
+import { roomBasics } from '../helpers/roomWizard.js';
 
 // OWNER has four listings, including one non-public row, to distinguish /me/listings from public search.
 const OWNER = { mobile: '9470744469', name: 'Meera Deshpande', total: 4, publiclyVisible: 3 };
@@ -309,28 +310,30 @@ test.describe('LIVE: the flatmates board against the real API', () => {
     const feed = page.waitForResponse((r) => /\/api\/flatmates\/feed\b/.test(r.url()) && r.request().method() === 'GET');
 
     await page.goto('/flatmates');
-    const moveIn = page.getByRole('button', { name: /Move in now/i });
+    const moveIn = page.locator('button[data-tab="move-in"]');
     await expect(moveIn).toBeVisible({ timeout: 20000 });
 
     const body = await (await feed).json();
     expect(body.otherTabElements, 'the feed carries the other tab\'s total').toEqual(expect.any(Number));
     expect(calls.filter((c) => /GET \/api\/flatmates\/feed/.test(c)), `API calls seen: ${calls.join(' | ')}`).toHaveLength(1);
 
-    await expect(moveIn).toHaveAttribute('aria-label', /\d+ homes/);
+    await expect(moveIn).toHaveAttribute('aria-label', /\d+ rooms/);
     const label = await moveIn.getAttribute('aria-label');
-    expect(Number(label.match(/(\d+) homes/)[1]), `the move-in tab is empty: ${label}`).toBeGreaterThan(0);
+    expect(Number(label.match(/(\d+) rooms/)[1]), `the move-in tab is empty: ${label}`).toBeGreaterThan(0);
   });
 
   test('a room posted through the API reaches the public board once it is moderated', async ({ page, request }) => {
     // A new host each time: the server caps live posts per host, and this room is never closed.
     const mobile = await signedInAsNew(page);
-    const photos = await uploadedListingPhotos((await apiLogin(mobile)).accessToken);
+    const basics = await roomBasics((await apiLogin(mobile)).accessToken);
     const marker = `live probe ${Date.now()}`;
-    const created = await page.evaluate(async ({ note, photos }) => {
+    const created = await page.evaluate(async ({ note, basics }) => {
       const svc = await import('/src/services/flatmateService.js');
       const room = await svc.createRoom({
+        ...basics,
         locality: 'Baner',
         rent: 14000,
+        deposit: 28000,
         bhk: '2',
         // The server requires the human-readable room type fixture.
         roomType: 'Private room',
@@ -339,11 +342,10 @@ test.describe('LIVE: the flatmates board against the real API', () => {
         hostRole: 'owner',
         lookingFor: 'any',
         foodPref: 'any',
-        photos,
         note,
       });
       return { id: room.id, budget: room.budget };
-    }, { note: marker, photos });
+    }, { note: marker, basics });
 
     expect(created.id, 'the server assigned no id').toBeTruthy();
     expect(created.budget, 'the created room came back with no price — check the budget/rent mapping').toBe(14000);
@@ -374,7 +376,7 @@ test.describe('LIVE: the flatmates board against the real API', () => {
 
   test('the filter bar narrows the board server-side, and an unknown value is dropped not matched', async ({ page }) => {
     await page.goto('/flatmates');
-    await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20000 });
+    await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20000 });
 
     const result = await page.evaluate(async () => {
       const svc = await import('/src/services/flatmateService.js');

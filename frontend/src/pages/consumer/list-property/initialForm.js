@@ -110,7 +110,6 @@ export const initialForm = {
   roomType: '',
   rentShare: '',
   lookingFor: 'any',
-  lifestyle: [],
   note: '',
   // Who is listing the room: an 'owner' lists their own flat, a 'tenant' is a sitting flatmate
   // seeking a replacement and self-attests a registered agreement for Ops consent.
@@ -119,4 +118,5 @@ export const initialForm = {
   agreementDoc: null,
   ownerConsentMobile: '',
   ownerConsent: false,
+  attachedPropertyId: '',
 };

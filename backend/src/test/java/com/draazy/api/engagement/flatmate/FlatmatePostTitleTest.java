@@ -9,7 +9,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
@@ -44,11 +43,12 @@ class FlatmatePostTitleTest extends AbstractApiTest {
 
     private static String roomBody(User host, String title) {
         return """
-                {"bhk":"2","roomType":"Private room","attachedBath":"attached","furnishing":"semi",
+                {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "locality":"Baner","society":"Headline Heights","rentShare":15000,"deposit":30000,
-                 "availableFrom":"2026-09-01","photos":["%s"],
-                 "hostRole":"owner","title":%s}
-                """.formatted(UploadedPhotos.of(host.getId()), title);
+                 "availableFrom":"2026-09-01",%s,
+                 "hostRole":"owner","title":%s,%s,%s}
+                """.formatted(FlatmateRoomFixture.photos(host.getId()), title, FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS);
     }
 
     private static String postBody(String title) {

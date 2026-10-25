@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAsNew, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAsNew } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 /* The fixture omits `propertyId` and declares no agreement, so the server derives the identity
    floor; owner tier is covered by `trust-badges.spec.js`. */
@@ -37,6 +38,7 @@ test('the host closes and reopens a real standalone room seat from its detail pa
     method: 'POST',
     headers: auth(accessToken),
     body: JSON.stringify({
+      ...(await roomBasics(accessToken)),
       bhk: '2',
       roomType: 'Private room',
       attachedBath: 'attached',
@@ -49,7 +51,6 @@ test('the host closes and reopens a real standalone room seat from its detail pa
       lookingFor: 'any',
       foodPref: 'any',
       hostRole: 'tenant',
-      photos: await uploadedListingPhotos(accessToken),
       ...(await tenantRoomAgreement(accessToken)),
     }),
   });
@@ -59,7 +60,7 @@ test('the host closes and reopens a real standalone room seat from its detail pa
   await publish(room.id);
 
   await page.goto(`${BASE}/flatmates`);
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20_000 });
   await page.getByTestId('my-posts-strip').locator(`a[href="/flatmates/room/${room.id}"]`).click({ timeout: 15_000 });
 
   const panel = page.getByTestId('flatmate-owner-panel');

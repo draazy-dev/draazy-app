@@ -2,10 +2,11 @@ import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { rejectListingWithFetch } from '../../../helpers/moderation.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
-import { PHOTO_PNG, uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
+import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { mintSociety, seedSocietyReviews } from '../../../helpers/liveSociety.js';
 import { fillSociety, pickGoogleSociety, pickSocietyNotOnMaps, stubPlaceId, wizardSocietyInput } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
+import { fillRoomDetails, fillRoomPrice, nextStep } from '../../../helpers/roomWizard.js';
 
 // Society identity is the Google Place ID: a pick resolves to the society that place already has,
 // offers nearby look-alikes before minting, and "Not on Google Maps" is the only way past without one.
@@ -205,14 +206,8 @@ test('the flatmate room wizard takes its society from the same Google picker', a
   await signedInAsNew(page);
   await page.goto(`${BASE}/list-property?flatmate=1`);
   await expect(page.locator('.lp-meter')).toBeVisible({ timeout: 20_000 });
-  await page.locator('[data-err="bhk"] .radio-pill', { hasText: '2 BHK' }).click();
-  await page.locator('[data-err="roomType"] .radio-pill', { hasText: 'Double sharing (up to 2)' }).click();
-  await page.getByText('I have a registered rent agreement', { exact: true }).click();
-  await page.getByLabel('Upload registered rent agreement for room').setInputFiles({
-    name: 'agreement.png', mimeType: 'image/png', buffer: PHOTO_PNG,
-  });
-  await page.getByLabel('The owner knows and agrees to sharing').check();
-  await page.getByRole('button', { name: /Next Step/i }).click();
+  await fillRoomDetails(page, { bhk: '2 BHK', roomType: 'Double sharing (up to 2)' });
+  await nextStep(page);
   await pickLocality(page, 'Baner');
 
   await wizardSocietyInput(page).click();
@@ -221,8 +216,11 @@ test('the flatmate room wizard takes its society from the same Google picker', a
   expect(mints).toHaveLength(1);
   expect(mints[0]).toMatchObject({ placeId: stubPlaceId(name), name });
   expect((await resolveByPlace(request, stubPlaceId(name), name)).society?.name).toBe(name);
-  await page.getByRole('button', { name: /Next Step/i }).click();
-  await expect(page.getByText('Rent & move-in', { exact: true })).toBeVisible();
+  await page.locator('[data-err="flatNumber"] input').fill('A-101');
+  await nextStep(page);
+  await fillRoomPrice(page, { rent: '15000', deposit: '30000', availableFrom: '2026-12-01' });
+  await nextStep(page);
+  await expect(page.locator('[data-err="photos"]')).toBeVisible();
 });
 
 test('the society hub offers its Reviews tab from three reviews, while the Review button is always there', async ({ page, request }) => {

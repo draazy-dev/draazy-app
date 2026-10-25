@@ -1,11 +1,12 @@
 import {
-  isResidentialType, isCommercialType, isLandType, commercialProfileFromType,
+  isResidentialType, isCommercialType, isLandType, isHouseType, commercialProfileFromType,
   keyPhotoCategoriesFor, MIN_PUBLISH_PHOTOS, MIN_PUBLISH_KEY_CATEGORIES, areaRangeFor,
 } from './constants.js';
 import { ADDRESS_PARTS } from '../../../lib/listingFormDetails.js';
 import { hasContactDetails } from './contactDetails.js';
 import { addDaysIso, istToday, MAX_AVAILABLE_DAYS, MAX_POSSESSION_DAYS } from '../../../lib/availability.js';
 import { YOUTUBE_ID_RE, normalizeYouTubeId } from './video.js';
+import { isValidMobile } from '../../../lib/hooks.js';
 
 const hasText = (v) => typeof v === 'string' && v.trim().length > 0;
 /* A required amount must be a real, positive number, so "0", "-5" and pasted junk are all
@@ -197,30 +198,49 @@ export const validateStep3 = (form, photos, original, maxPhotos) => {
   return covered.size < Math.min(MIN_PUBLISH_KEY_CATEGORIES, keyCats.length) ? { ...nextErr, photos: 'categories' } : nextErr;
 };
 
-// Room listings must not inherit whole-property ownership or pricing requirements.
-export const validateFlatmateStep1 = (form) => {
+// Room listings must not inherit whole-property ownership or pricing requirements. An edit is only
+// held to a field the saved room already answered, or one the host changes.
+const ROOM_NOTICE_MAX_DAYS = 180;
+const ROOM_LOCK_IN_MAX_MONTHS = 24;
+const isWholeInRange = (v, max) => hasValue(v) && Number.isInteger(Number(v)) && Number(v) >= 0 && Number(v) <= max;
+
+export const validateFlatmateRoom = (form, original) => {
   const err = {};
+  if (!form.homeTypeLabel) err.homeTypeLabel = true;
   if (!form.bhk) err.bhk = true;
   if (!form.roomType) err.roomType = true;
-  if (form.hostRole === 'tenant') {
-    if (!form.agreementDeclared) err.agreementDeclared = true;
-    if (!form.agreementDoc) err.agreementDoc = true;
-    if (!form.ownerConsent) err.ownerConsent = true;
+  if (!form.attachedBath) err.attachedBath = true;
+  if (!form.bathrooms) err.bathrooms = true;
+  if (!form.furnishing) err.furnishing = true;
+  if (isHouseType(form.propertyType)) {
+    if (!form.floorsInHouse) err.floorsInHouse = true;
+  } else {
+    if (isMissing(form.floor)) err.floor = true;
+    if (isMissing(form.totalFloors)) err.totalFloors = true;
+    if (!err.floor && !err.totalFloors && floorValue(form.floor) > floorValue(form.totalFloors)) err.floor = 'aboveTotal';
   }
-  return err;
+  return keepChangedErrors(err, form, original);
 };
 export const validateFlatmateLocation = (form, original) => {
-  const err = {};
-  if (!form.locality || (!form.localitySlug && !original)) err.locality = true;
+  const err = keepChangedErrors(hasText(form.flatNumber) ? {} : { flatNumber: true }, form, original);
   // A room saved before societies were Google-bound has no id to carry forward, so editing it is not blocked.
   const legacyRoom = !!original && !original.societyId;
   if (!form.societyId && !form.societyNotOnMaps && !legacyRoom) err.society = true;
   if (!form.pinPlaced) err.location = true;
+  if (!form.locality || (!form.localitySlug && !original)) err.locality = true;
   return err;
 };
-export const validateFlatmatePrice = (form) => {
-  const err = {};
+export const validateFlatmatePricing = (form, original) => {
+  const terms = {};
+  if (!isWholeInRange(form.noticePeriodDays, ROOM_NOTICE_MAX_DAYS)) terms.noticePeriodDays = true;
+  if (!isWholeInRange(form.lockInMonths, ROOM_LOCK_IN_MAX_MONTHS)) terms.lockInMonths = true;
+  const err = keepChangedErrors(terms, form, original);
   if (!isPositive(form.rentShare)) err.rentShare = true;
+  if (!isNonNegative(form.deposit)) err.deposit = true;
   if (!form.availableFrom) err.availableFrom = true;
+  if (form.hostRole === 'tenant') {
+    if (!form.ownerConsent) err.ownerConsent = true;
+    if (!isValidMobile(form.ownerConsentMobile)) err.ownerConsentMobile = true;
+  }
   return err;
 };

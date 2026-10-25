@@ -143,12 +143,14 @@ export async function open(page, path) {
 
 export async function openFlatmates(page, query = '') {
   await open(page, '/flatmates' + query);
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible();
+  await expect(flatmateTab(page, 'move-in')).toBeVisible();
 }
+
+export const flatmateTab = (page, key) => page.locator(`button[data-tab="${key}"]`);
 
 // Scope choices to the dialog because board cards duplicate their accessible names.
 const chooser = (page) => page.getByRole('dialog', { name: /What do you want to post/ });
-const whoChooser = (page) => page.getByRole('dialog', { name: /Who's looking/ });
+const flatmateChooser = (page) => page.getByRole('dialog', { name: /^Flatmates$/ });
 
 // A cold lazy route can accept a click before React attaches its handler, so click and assertion
 // retry as a unit; `isVisible()` reads false one frame after a success and re-clicks under the overlay.
@@ -160,25 +162,24 @@ async function openSheet(page) {
   }).toPass({ timeout: 15000 });
 }
 
-export async function postHavingPlace(page) {
+async function openFlatmateChoices(page) {
   await openSheet(page);
-  await chooser(page).getByRole('button', { name: /A room in my place/i }).click();
+  await chooser(page).getByRole('button', { name: /^Flatmates/ }).click();
+}
+
+export async function postHavingPlace(page) {
+  await openFlatmateChoices(page);
+  await flatmateChooser(page).getByRole('button', { name: /I have a room to fill/i }).click();
 }
 
 export async function postAsSolo(page) {
-  await openSheet(page);
-  await chooser(page).getByRole('button', { name: /I'm looking for a place/i }).click();
-  await whoChooser(page).getByRole('button', { name: /Just me/i }).click();
+  await openFlatmateChoices(page);
+  await flatmateChooser(page).getByRole('button', { name: /I need a room/i }).click();
 }
 
 export async function postAsGroup(page) {
-  await openSheet(page);
-  await chooser(page).getByRole('button', { name: /I'm looking for a place/i }).click();
-  await whoChooser(page).getByRole('button', { name: /Start a flatmate group/i }).click();
-}
-
-export async function haveAFlat(page) {
-  await page.getByRole('button', { name: /I have a flat/i }).click();
+  await openFlatmateChoices(page);
+  await flatmateChooser(page).getByRole('button', { name: /Team up to rent a flat/i }).click();
 }
 
 export const FLATMATE_STORES = {
@@ -206,14 +207,9 @@ export async function approveFlatmates(page, ...kinds) {
   await page.locator('.sf-card').first().waitFor({ timeout: 10_000 }).catch(() => {});
 }
 
-export async function switchToTeamUp(page) {
-  await page.getByRole('button', { name: /Team up/ }).first().click();
-  await page.waitForTimeout(300);
-}
-
 // Filter controls mount only after this toggle opens the collapsed grid.
 export async function openFlatmateFilters(page) {
-  const toggle = page.getByRole('button', { name: 'Filters', exact: true });
+  const toggle = page.getByRole('button', { name: /^Filters( \d+)?$/ });
   await toggle.waitFor({ timeout: 10_000 });
   // Deep links can open the grid, so toggling only when it remains collapsed preserves it.
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();

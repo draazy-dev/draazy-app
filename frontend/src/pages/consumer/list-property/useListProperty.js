@@ -22,16 +22,15 @@ import {
 } from './constants.js';
 import { initialForm } from './initialForm.js';
 import { classifyChanges } from './editPolicy.js';
-import { scrollToError, validateStep1, validateLocationStep, validatePricingStep, validateStep3, validateFlatmateStep1, validateFlatmateLocation, validateFlatmatePrice } from './validation.js';
+import { scrollToError, validateStep1, validateLocationStep, validatePricingStep, validateStep3, validateFlatmateRoom, validateFlatmateLocation, validateFlatmatePricing } from './validation.js';
 import { triggerConfetti } from './confetti.js';
 import { listingLabels, persistListing, roomHeadline } from './submit.js';
-import { hasContactDetails } from './contactDetails.js';
 import { headlineOf } from '../../../lib/headline.js';
 import { hasAgreementEvidence, numeric, terms } from '../flatmates/helpers.js';
 import { computeProgress } from './progress.js';
 import useListingMedia from './useListingMedia';
 import useListingLocation from './useListingLocation';
-import useRoomEdit from './useRoomEdit';
+import useRoomEdit, { useHomePrefill } from './useRoomEdit';
 import { LISTING_STEPS } from './StepNav.jsx';
 import { track } from '../../../lib/pmf.js';
 
@@ -97,6 +96,7 @@ export default function useListProperty() {
   const editId = searchParams.get('edit');
   const flatmateMode = searchParams.get('flatmate') === '1';
   const editRoomId = flatmateMode && !editId ? searchParams.get('editRoom') : null;
+  const homeId = !flatmateMode && !editId ? searchParams.get('home') : null;
   const rawStepParam = searchParams.get('step');
   const entryStep = parseStep(rawStepParam);
   const editEntryStep = useRef(entryStep);
@@ -105,6 +105,7 @@ export default function useListProperty() {
   const [rentMode, setRentMode] = useState(() => (flatmateMode && !editId ? 'flatmate' : 'whole'));
   const [showSuccess, setShowSuccess] = useState(false);
   const [postedListing, setPostedListing] = useState(null);
+  const [postedRoom, setPostedRoom] = useState(null);
   const [savedListingStatus, setSavedListingStatus] = useState('');
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [errors, setErrors] = useState({});
@@ -152,7 +153,7 @@ export default function useListProperty() {
   const previousOwnerId = useRef(ownerId);
   const expiredOwnerId = useRef('');
   const signedIn = !!ownerId;
-  const draftEnabled = !editId && !editRoomId && !authLoading;
+  const draftEnabled = !editId && !editRoomId && !homeId && !authLoading;
   const writeStepParam = useCallback((step, { replace = false, pushedFrom } = {}) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -229,7 +230,10 @@ export default function useListProperty() {
     if (roomDraft) setRentMode('flatmate');
     const step = Math.min(parseStep(savedStep), LISTING_STEPS.length);
     if (step > 1) writeStepParam(step, { replace: true });
-    return fields.locality && !fields.localitySlug ? { ...fields, locality: '', localitySlug: '' } : fields;
+    // `?flatmate=1` hides the Sale/Rent picker, so a restored sale draft
+    // must not strand the user outside the room flow.
+    const roomFields = roomDraft ? { ...fields, deal: 'rent' } : fields;
+    return roomFields.locality && !roomFields.localitySlug ? { ...roomFields, locality: '', localitySlug: '' } : roomFields;
   }, [editId, flatmateMode, ownerId, setPhotos, writeStepParam]);
   const draftForm = useMemo(() => ({
     ...form,
@@ -244,7 +248,7 @@ export default function useListProperty() {
   }, [editId]);
   const { clear: clearFormDraft, discard: discardFormDraft, flush: flushFormDraft, startFresh } = useFormDraft(LIST_PROPERTY_DRAFT_KEY, draftForm, restoreDraft, {
     enabled: draftEnabled,
-    omit: ['agreementDeclared', 'agreementDoc', 'hostRole', 'ownerConsentMobile', 'ownerConsent'],
+    omit: ['agreementDeclared', 'agreementDoc', 'hostRole', 'ownerConsentMobile', 'ownerConsent', 'attachedPropertyId'],
     onRestore: restoreDraftExtras,
   });
   useEffect(() => {
@@ -271,6 +275,7 @@ export default function useListProperty() {
     setRentMode(flatmateMode && !editId ? 'flatmate' : 'whole');
     setShowSuccess(false);
     setPostedListing(null);
+    setPostedRoom(null);
     setPassListingId('');
     setSavedListingStatus('');
     setShowResetConfirm(false);
@@ -324,6 +329,7 @@ export default function useListProperty() {
   const editKey = JSON.stringify([editId, ownerId, ownerMobile]);
   const editRequest = useRef(null);
   const roomEdit = useRoomEdit({ roomId: editRoomId, canLoad: !authLoading, setForm, setPhotos });
+  useHomePrefill({ homeId, canLoad: !authLoading && signedIn, setForm });
   const roomBaseline = editRoomId ? roomEdit.baseline : undefined;
   // A room PATCH leaves the binding alone unless it changed, so a room on an archived society can still be saved.
   const roomSocietyField = !editRoomId ? { societyId: form.societyId || '' }
@@ -571,13 +577,18 @@ export default function useListProperty() {
   const lastStep = LISTING_STEPS.length;
   const maxReachableStep = useCallback(() => {
     const original = baseline?.form;
-    const first = isFlatmateMode ? validateFlatmateStep1(form) : validateStep1(form, original);
-    if (Object.keys(first).length) return 1;
-    const locationErrors = isFlatmateMode ? validateFlatmateLocation(form, roomBaseline) : validateLocationStep(form, original);
+    if (isFlatmateMode) {
+      if (Object.keys(validateFlatmateRoom(form, roomBaseline)).length) return 1;
+      const locationErrors = validateFlatmateLocation(form, roomBaseline);
+      if (!editId && !locationSet && !editListing) locationErrors.location = true;
+      if (Object.keys(locationErrors).length) return 2;
+      return Object.keys(validateFlatmatePricing(form, roomBaseline)).length ? 3 : lastStep;
+    }
+    if (Object.keys(validateStep1(form, original)).length) return 1;
+    const locationErrors = validateLocationStep(form, original);
     if (!editId && !locationSet && !editListing) locationErrors.location = true;
     if (Object.keys(locationErrors).length) return 2;
-    const priceErrors = isFlatmateMode ? validateFlatmatePrice(form) : validatePricingStep(form, original);
-    return Object.keys(priceErrors).length ? 3 : lastStep;
+    return Object.keys(validatePricingStep(form, original)).length ? 3 : lastStep;
   }, [baseline, editId, editListing, form, isFlatmateMode, lastStep, locationSet, roomBaseline]);
   const goToStep = useCallback((step, { replace = false } = {}) => {
     if (!editReady) return;
@@ -608,9 +619,9 @@ export default function useListProperty() {
   const nextStep = () => {
     if (!editReady) return;
     const err = isFlatmateMode
-      ? (currentStep === 1 ? validateFlatmateStep1(form)
+      ? (currentStep === 1 ? validateFlatmateRoom(form, roomBaseline)
         : currentStep === 2 ? validateFlatmateLocation(form, roomBaseline)
-          : currentStep === 3 ? validateFlatmatePrice(form) : {})
+          : currentStep === 3 ? validateFlatmatePricing(form, roomBaseline) : {})
       : (currentStep === 1 ? validateStep1(form, baseline?.form)
         : currentStep === 2 ? validateLocationStep(form, baseline?.form)
           : currentStep === 3 ? validatePricingStep(form, baseline?.form) : {});
@@ -626,10 +637,10 @@ export default function useListProperty() {
         haptic('step');
       }
     };
-    if (currentStep === 3 && !signedIn) {
-      const authStep = Math.min(currentStep + 1, lastStep);
-      setCurrentStep(authStep);
-      writeStepParam(authStep, { replace: false, pushedFrom: currentStep });
+    // Sign in before the media step, which is the last one in both flows.
+    if (currentStep === lastStep - 1 && !signedIn) {
+      setCurrentStep(lastStep);
+      writeStepParam(lastStep, { replace: false, pushedFrom: currentStep });
       requestAuthPrompt();
       return;
     }
@@ -677,7 +688,7 @@ export default function useListProperty() {
       return;
     }
     const request = editRequest.current;
-    const res = await persistListing({ form, user, editId, editListing, photos });
+    const res = await persistListing({ form, user, editId, editListing, photos, homeId });
     if (editId && request !== editRequest.current) return;
     // Same owner already has this exact property live → stop and point them to it.
     if (res && res.ok === false && res.blocked) {
@@ -767,24 +778,22 @@ export default function useListProperty() {
 
   const submitFlatmate = async () => {
     if (!editReady || editId || posting || media.isMediaProcessing()) return;
-    const err = {};
-    if (!form.bhk) err.bhk = true;
-    if (!form.roomType) err.roomType = true;
-    if (form.hostRole === 'tenant') {
-      if (!form.agreementDeclared) err.agreementDeclared = true;
-      if (!hasAgreementEvidence(form.agreementDoc)) err.agreementDoc = true;
-      if (!form.ownerConsent) err.ownerConsent = true;
-    }
-    if (!form.locality || (!form.localitySlug && !editRoomId)) err.locality = true;
-    if (!form.societyId && !form.societyNotOnMaps && !(editRoomId && !roomEdit.baseline?.societyId)) err.society = true;
-    if (!form.pinPlaced) err.location = true;
-    if (!(Number(form.rentShare) > 0)) err.rentShare = true;
-    if (!form.availableFrom) err.availableFrom = true;
-    if (photos.length > media.maxPhotos) err.photos = 'max';
-    else if (photos.some((photo) => !photo.url)) err.photos = 'failed';
-    if (hasContactDetails(form.title)) err.title = true;
-    if (Object.keys(err).length) { setErrors(err); scrollToError(err); return; }
     if (!signedIn) { requestAuthPrompt(); return; }
+    const stepErrors = [
+      validateFlatmateRoom(form, roomBaseline),
+      validateFlatmateLocation(form, roomBaseline),
+      validateFlatmatePricing(form, roomBaseline),
+      validateStep3(form, photos, roomBaseline && { form: roomBaseline, images: roomEdit.photoUrls }, media.maxPhotos),
+    ];
+    const err = Object.assign({}, ...stepErrors);
+    if (photos.some((photo) => !photo.url)) err.photos = 'failed';
+    if (Object.keys(err).length) {
+      const failStep = stepErrors.findIndex((stepErr) => Object.keys(stepErr).length) + 1 || currentStep;
+      if (failStep !== currentStep) { setCurrentStep(failStep); writeStepParam(failStep, { replace: true }); }
+      setErrors(err);
+      scrollToError(err);
+      return;
+    }
     setPosting(true);
     try {
       const agreementDoc = form.hostRole === 'tenant' && form.agreementDeclared ? form.agreementDoc : null;
@@ -807,12 +816,12 @@ export default function useListProperty() {
         availableFrom: form.availableFrom,
         lookingFor: form.lookingFor,
         foodPref: form.foodPref,
-        lifestyle: form.lifestyle,
         hostRole: form.hostRole,
         agreementDeclared: !!form.agreementDeclared && hasAgreementEvidence(agreementDoc),
         agreementDoc,
         ownerConsentMobile: form.ownerConsentMobile,
         ownerConsent: form.hostRole === 'tenant' && !!form.ownerConsent,
+        propertyId: form.attachedPropertyId || undefined,
         photos: photos.map((photo) => photo.url),
         note: form.note,
         lat: form.propLat,
@@ -836,7 +845,7 @@ export default function useListProperty() {
         navigate('/dashboard#properties');
         return;
       }
-      await createRoom(room);
+      setPostedRoom(await createRoom(room));
       clearFormDraft();
       skipLeaveGuard.current = true;
       triggerConfetti();
@@ -877,6 +886,7 @@ export default function useListProperty() {
     showSuccess, showResetConfirm, setShowResetConfirm, errors,
     showLeaveConfirm, setShowLeaveConfirm, confirmLeave,
     postedListing,
+    postedRoom,
     authPromptOpen,
     setAuthPromptOpen,
     closeAuthPrompt,

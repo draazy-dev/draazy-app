@@ -38,6 +38,11 @@ import java.lang.annotation.Target;
                         .addPropertyNode("rent").addConstraintViolation();
                 ok = false;
             }
+            if (body.deposit() == null) {
+                ctx.buildConstraintViolationWithTemplate("must not be null")
+                        .addPropertyNode("deposit").addConstraintViolation();
+                ok = false;
+            }
             return ok;
         }
     }

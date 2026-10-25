@@ -3,6 +3,7 @@ import { API, apiLogin, authHeaders, uniqueMobile, uploadedListingPhotos } from 
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { trackErrors } from '../../../helpers/console.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 
 const track = flatmateCleanup(test);
@@ -12,15 +13,16 @@ const FALLBACK = /images\.unsplash\.com/;
 test.describe('LIVE: room card cover', () => {
   test('a room card shows the host\'s first photo, not the stock fallback', async ({ page }) => {
     const { accessToken } = await apiLogin(uniqueMobile());
-    const [COVER, SECOND] = await uploadedListingPhotos(accessToken, 2);
+    const [COVER, SECOND, THIRD] = await uploadedListingPhotos(accessToken, 3);
     const society = `Zztest Cover ${Date.now().toString(36)}`;
     const created = await fetch(`${API}/flatmates/rooms`, {
       method: 'POST',
       headers: auth(accessToken),
       body: JSON.stringify({
-        ...(await withSocietyId(accessToken, { society })), roomType: 'Private room', locality: 'Baner', rentShare: 17333, bhk: '2',
+        ...(await roomBasics(accessToken, { photos: 0 })),
+        ...(await withSocietyId(accessToken, { society })), roomType: 'Private room', locality: 'Baner', rentShare: 17333, deposit: 34666, bhk: '2',
         attachedBath: 'attached', furnishing: 'semi', lookingFor: 'any', foodPref: 'any',
-        availableFrom: '2026-12-01', hostRole: 'tenant', photos: [COVER, SECOND],
+        availableFrom: '2026-12-01', hostRole: 'tenant', photos: [COVER, SECOND, THIRD],
         ...(await tenantRoomAgreement(accessToken)),
       }),
     });
@@ -44,7 +46,7 @@ test.describe('LIVE: room card cover', () => {
 
     const errors = trackErrors(page);
     await page.goto('/flatmates');
-    await expect(page.getByRole('button', { name: /Move in now/i }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 30_000 });
     await page.getByPlaceholder(/^Try:/).fill(society);
     const card = page.locator(`[data-sf-id="r:${room.id}"]`);
     await expect(card).toBeVisible({ timeout: 15_000 });

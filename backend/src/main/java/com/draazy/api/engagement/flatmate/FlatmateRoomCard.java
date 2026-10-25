@@ -20,5 +20,8 @@ public record FlatmateRoomCard(
         String cover,
         String modStatus,
         String status,
-        Instant createdAt) {
+        Instant createdAt,
+        String hostRole,
+        String verificationTier,
+        String reviewStatus) {
 }
