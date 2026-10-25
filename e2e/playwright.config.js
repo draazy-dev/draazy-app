@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 import { NO_BACKEND } from './no-backend-specs.js';
+import { APP_ENV } from './app-env.js';
 
 // Every spec runs against the live API, so a `live-` prefix carries no meaning and only breeds copies.
 const prefixed = fs
@@ -16,6 +17,9 @@ if (process.env.CI || !['localhost', '127.0.0.1', '[::1]'].includes(new URL(BASE
 const API_PORT = process.env.API_PORT || '8081';
 // run-fast.ps1 doubles this for parallel shards, where every backend shares the same CPU.
 const TIMEOUT_SCALE = Math.max(1, Number(process.env.E2E_TIMEOUT_SCALE) || 1);
+// run-fast.ps1 points this at one shared build (scripts/build-app.mjs) so parallel shards skip per-module dev serving.
+const DIST = process.env.E2E_DIST;
+const APP_PORT = new URL(BASE_URL).port;
 
 // `tests/mobile/**` is phone-only; the desktop project ignores the same expression.
 const MOBILE = /[\\/]tests[\\/]mobile[\\/]/;
@@ -46,7 +50,7 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     actionTimeout: 15_000 * TIMEOUT_SCALE,
     navigationTimeout: 20_000 * TIMEOUT_SCALE,
-    // PostHog loads for real (VITE_POSTHOG_IN_DEV below), but nothing reaches PostHog unless a spec routes it.
+    // PostHog loads for real (VITE_POSTHOG_IN_DEV in app-env.js), but nothing reaches PostHog unless a spec routes it.
     launchOptions: { args: ['--host-resolver-rules=MAP *.posthog.com ~NOTFOUND'] },
   },
   projects: [
@@ -84,17 +88,17 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm --prefix ../frontend run dev -- --port ${new URL(BASE_URL).port} --strictPort`,
+    command: DIST
+      ? `npm --prefix ../frontend run preview -- --outDir "${DIST}" --port ${APP_PORT} --strictPort`
+      : `npm --prefix ../frontend run dev -- --port ${APP_PORT} --strictPort`,
     url: BASE_URL,
     timeout: 120_000,
     reuseExistingServer: false,
     stdout: 'ignore',
     stderr: 'pipe',
     env: {
-      VITE_API_BASE: '/api',
+      ...APP_ENV,
       VITE_PROXY_TARGET: `http://localhost:${API_PORT}`,
-      VITE_POSTHOG_KEY: 'phc_e2e',
-      VITE_POSTHOG_IN_DEV: 'on',
     },
   },
 });

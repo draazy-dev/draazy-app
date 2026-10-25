@@ -2,7 +2,7 @@
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\13\\bin\\psql.exe';
+const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
 const DB = process.env.E2E_DB_NAME || 'draazy_e2e';
 const USER = process.env.E2E_DB_USER || 'postgres';
 
@@ -11,11 +11,13 @@ const WAIVED = new Map([
   ['otp_codes', 'every login writes one; a seeded code is a seeded credential'],
   ['refresh_tokens', 'issued at login, by the same flow every spec starts with'],
   ['push_subscriptions', 'written by the push opt-in flow; a seeded endpoint would fake browser registration'],
+  ['flatmate_owner_notices', 'written when a tenant posts a room; the link token exists only in the WhatsApp message'],
   ['provider_call', 'written by every OTP, email and payment call the specs make'],
   ['error_event', 'written by the error appender and POST /api/client-errors; a seeded row would fake a captured failure'],
   ['audit_log', 'written BY the admin actions the ops specs assert on'],
   ['transactions', 'written by the payment flows; a seeded row would fake the thing under test'],
   ['outbound_message', 'the send queue - filled when a notification actually fires'],
+  ['staff_alert_log', 'dedupe ledger - written by the staff-sla sweep job, never seeded'],
   ['message_attachments', 'written by the chat upload spec'],
   ['erasure_requests', 'the DSR spec submits one'],
   ['city_waitlist', 'the waitlist form submits one'],

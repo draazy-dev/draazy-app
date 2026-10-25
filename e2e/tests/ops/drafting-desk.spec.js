@@ -20,7 +20,7 @@ const OWNER_AADHAAR = '999988887779';
 const panRow = (dialog) => dialog.getByText('PAN', { exact: true });
 
 const UNASSIGNED_REFUSAL = /not assigned to anyone yet/;
-const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\13\\bin\\psql.exe';
+const PSQL = process.env.PSQL || 'C:\\Program Files\\PostgreSQL\\17\\bin\\psql.exe';
 
 // Create one rental request as the customer and record the owner's identity numbers on it.
 async function seedRequest({ withProperty = false } = {}) {

@@ -34,8 +34,12 @@ function plan(listFile, durationsFile, shardArg, outFile) {
   const shards = Array.from({ length: Math.max(1, Math.min(Number(shardArg), perFile.size)) }, () => ({ seconds: 0, files: [] }));
   const byWeight = [...perFile.keys()].sort((a, b) => weight(b) - weight(a) || a.localeCompare(b));
   const place = (shard, f) => { shard.files.push(f); shard.seconds += weight(f); };
+  // run-fast.ps1 serves shard 1 on the Maps origin and shard 2 from the dev server, the only one with `/src/` modules.
+  const importsSrc = (f) => /import\(\s*['"`]\/src\/|=\s*['"`]\/src\//.test(readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'));
+  const pinned = (f) => needsMaps(f) || importsSrc(f);
   for (const f of byWeight.filter(needsMaps)) place(shards[0], f);
-  for (const f of byWeight.filter((f) => !needsMaps(f))) {
+  for (const f of byWeight.filter((f) => !needsMaps(f) && importsSrc(f))) place(shards[Math.min(1, shards.length - 1)], f);
+  for (const f of byWeight.filter((f) => !pinned(f))) {
     place(shards.reduce((min, s) => (s.seconds < min.seconds ? s : min)), f);
   }
   const used = shards.filter((s) => s.files.length);
