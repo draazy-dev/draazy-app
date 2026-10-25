@@ -37,14 +37,7 @@ public class AdminMetricsService {
                 metrics.countUsers(null),
                 metrics.countUsers(7),
                 metrics.countDealsClosed(30),
-                admin ? totalRevenue(today.minusDays(REVENUE_WINDOW_DAYS), today.plusDays(1))
+                admin ? metrics.money(today.minusDays(REVENUE_WINDOW_DAYS), today.plusDays(1)).net()
                         : null);
-    }
-
-    // The query window starts at the *aligned* boundary, not at `from`.
-    // Prefer an early bucket to a silently partial bucket; only the latter is invisible.
-    private long totalRevenue(LocalDate from, LocalDate to) {
-        return metrics.revenueBySource(from, to).values().stream()
-                .mapToLong(Long::longValue).sum();
     }
 }

@@ -6,7 +6,7 @@ audience: staff
 access: staff
 order: 28
 updated: 2026-10-10
-summary: How to read the Finance page, what it does not measure, and how to check it against the payment provider.
+summary: How to read the Finance page, what each figure counts, and how to check it against the payment provider.
 tags: [ops, internal, finance, revenue, payments]
 modules: [finance]
 ---
@@ -18,78 +18,73 @@ modules: [finance]
 
 **Monitor**
 
-- **Overview**: the **Not every figure below is measured** banner. Read it every time before you quote a number.
-- **Revenue this month** and its change against last month.
-- **MRR** (monthly recurring revenue) and the **Subscriptions** list.
-- **Transactions** tab, **Pending** chip: payments that started but are not confirmed.
+- **Needs attention** at the top of **Overview**: refund requests, service refunds and payment disputes waiting on a decision. It only shows when something is waiting.
+- **Net revenue** and its change against last month.
+- **MRR** (monthly recurring revenue) and the **Active paid plans** list.
 - Any gap between what **Finance** shows and what customers tell Support they paid.
 
 **Work on**
 
-- Weekly: compare the **Paid** total on **Transactions** with the payment provider console. See "Steps: weekly reconciliation".
-- Follow up with Support on payments that stay **Pending**. Check **Integrations** for the matching payment call first.
-- Download **Revenue CSV** at month end for the finance record and check it against the **Revenue by month** chart.
+- Clear **Needs attention**: each line links to the desk that decides it.
+- Weekly: compare **Transactions** with the payment provider console. See "Steps: weekly reconciliation".
+- Download **Revenue CSV** at month end for the finance record.
 - Report any figure that looks wrong to an admin with the tab, window and a screenshot.
 
 ## Desk and access
 
 Use **Finance** at `/admin/finance`. It is admin only and staff do not see it under `/staff`. It needs `finance:read`. The page is read-only: you can look and download CSV files, not edit or refund anything.
 
-An admin can switch the module off in **Settings → Feature flags → Admin Modules**.
+An admin can switch the module off in **Settings ? Feature flags ? Admin Modules**.
+
+## How the numbers are built
+
+Money is read from **invoices** and **credit notes**. An invoice is issued only when the payment provider confirms a payment, and a credit note only when a refund is paid. A checkout that never finished is not money.
+
+- **Collected**: everything customers paid.
+- **Refunded**: everything paid back.
+- **Pass-through**: stamp duty and registration on rent agreements. We collect it for the government, so it is not revenue.
+- **Net revenue**: Draazy's own fees, less fees refunded. Collected ? Refunded ? Pass-through = Net revenue. It can be negative in a month with large refunds.
+
+Days are counted in Indian time.
 
 ## What is on the page
 
 | Tab / control | What it shows |
 | --- | --- |
-| **Revenue CSV** (top right) | Downloads `draazy-revenue.csv` with Month, Subscriptions, Services and Total for the last 24 months |
-| **Overview** | Six tiles, four charts and the **Net position** card |
-| **Transactions** | The ledger of payments, with search, status chips and **Export CSV** |
+| **Revenue CSV** (top right) | Downloads `draazy-revenue.csv`: Month, Subscription fees, Service fees, Refunded fees and Net revenue for the last 24 months |
+| **Overview** | **Needs attention**, four tiles, **Revenue by month**, **This month** and **Active paid plans** |
+| **Transactions** | Every invoice and credit note, with search, Type and Date chips and **Export CSV** |
 
 **Overview tiles**
 
 | Tile | Meaning |
 | --- | --- |
-| **MRR** | Active, paid subscriptions, with quarterly plans divided by 3 and yearly by 12 |
-| **Revenue this month** | Money booked this month, with the change against last month |
-| **Services revenue** | Always shows a quoted value note. See "What is not measured" |
-| **Revenue (12 mo)** | Last 12 months of booked revenue |
-| **ARPU** | This month's revenue divided by all accounts |
-| **ARPPU** | This month's revenue divided by users who paid this month |
+| **Net revenue** | Draazy's fees this month after refunds, with the change against last month |
+| **Collected** | Everything paid this month, and how many payments |
+| **Refunded** | Everything paid back this month |
+| **MRR** | Active paid subscriptions, with quarterly plans divided by 3 and yearly by 12 |
 
-**Charts.** **Revenue by month** has a window of 6, 12 or 24 months. **Revenue mix** is this month only. **MRR growth** compares booked subscription revenue each month with the **MRR** tile, so the two can differ. **Subscriptions** groups paying plans by the price actually charged.
+**Revenue by month** stacks subscription and service fees per month, with refunds as bars below zero. Pick a window of 6, 12 or 24 months; the line under the title gives the net for that window. **This month** shows how Collected becomes Net revenue.
 
-**Transactions.** Search with **Search party…**. The chips are **All**, **Paid** and **Pending**. Each page has 20 rows, taken from the newest 100 loaded. The note "Showing the newest N of M" tells you when older ones are not in view. **Export CSV** downloads every row that matches your filters as `draazy-transactions.csv`, with the columns ID, Date, Party, Type, Platform take and Status. The eye icon opens the detail for one row.
-
-## What is not measured
-
-The banner lists what the page cannot count:
-
-- **Refunds.** **Net position** shows **Gross revenue**, **Refunds** and **Net retained**, but refunds are marked **Not measured**. The figure stays at ₹0 and does not include service-request refunds. Net retained equals gross for now.
-- **Services.** Revenue leaves out the services marketplace. A service order records a quote, not money received. So **Services revenue** is a quoted value and not income.
-
-Each one turns on only when engineering enables it in the server setup. Do not tell anyone a number includes them until the banner for that item is gone.
-
-How the numbers are built: a payment counts as revenue when a subscription has a payment reference and is not pending. It is dated by the day it started, in Indian time. The ledger only shows subscriptions today, and its only statuses are **Paid** and **Pending**. Check failed payments in **Integrations** instead (see [Settings and integrations](/help/a/settings-and-integrations)).
-
-There are no invoices, payouts or reconciliation tools on this page.
+**Transactions.** Search by customer name or by invoice or credit-note number. The **Type** chips are **All**, **Subscriptions**, **Services** and **Refunds**. Each row shows the number, date, amount and Draazy's fee; refunds show a minus sign. Each page has 20 rows, taken from the newest 100. The note "Showing the newest N of M" tells you when older ones are not in view. **Export CSV** downloads every matching row as `draazy-transactions.csv`. The eye icon opens one document with its pass-through.
 
 ## Steps: weekly reconciliation
 
-1. On **Transactions**, choose **Paid** and note the count and amount for the week.
+1. On **Transactions**, choose the week with the **Date** chips and note the count and amounts.
 2. Open **Integrations**, then **Open Cashfree** on the **Payments** card, and find the same dates in the provider console.
-3. Compare the counts and amounts. Search a **Party** in **Finance** if one is missing.
+3. Compare the counts and amounts. Search a name or number in **Finance** if one is missing.
 4. For a mismatch, look in the **Integrations** call log for **Payment order** and **Payment webhook** with the order id.
 5. If the money is in the provider console but not in **Finance**, report it to an admin with the order id. Do not edit anything yourself.
 
 ## Steps: answer a customer who says they paid
 
-1. Search the person in **Transactions** and read the **Status**.
-2. **Paid** means we received it. **Pending** means we did not confirm it.
-3. For **Pending**, check the call log with the order id. Raise it with an admin if the provider console shows it as paid.
+1. Search the person or the invoice number in **Transactions**.
+2. An invoice means we received the money. No invoice means we did not confirm it.
+3. With no invoice, check the call log with the order id. Raise it with an admin if the provider console shows it as paid.
 
 ## Never do
 
-- Do not quote **Revenue** as net of refunds or including services.
+- Do not quote **Collected** as revenue: it includes refunds still to come out and government pass-through.
 - Do not share the CSV files outside Draazy.
 - Do not promise a customer a refund. **Finance** cannot issue one; refunds are decided on the [Refunds desk](/help/a/refunds-desk).
 - Do not treat an empty ledger or an endless loading state as zero revenue. Reload, then report it.

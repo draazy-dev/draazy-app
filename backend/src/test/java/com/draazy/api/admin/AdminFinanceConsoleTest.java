@@ -13,6 +13,7 @@ import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -24,8 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 
-/** The seed carries no subscriptions or boosts, so each test inserts its own rows and asserts
- *  deltas — the database is shared and the seeded book may grow. */
+/** The database is shared and the book may grow, so each test inserts its own rows and asserts deltas. */
 @DisplayName("/admin/finance — the console's three reads")
 class AdminFinanceConsoleTest extends AbstractApiTest {
 
@@ -33,7 +33,6 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
 
     private static final long OWNER_PRO_MONTHLY = 208L;
 
-    /** Seeker Plus, ₹199 a month — already monthly, so it must pass through unchanged. */
     private static final long SEEKER_PLUS_PRICE = 199L;
 
     @Autowired UserRepository users;
@@ -49,27 +48,39 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
         return bearerFor("9877730001", Roles.Wire.ADMIN, "Console admin");
     }
 
-    private UUID planId(String name) {
-        return jdbc.queryForObject("select id from plans where name = ?", UUID.class, name);
-    }
-
-    /** Returns the display name, so a ledger assertion can isolate its row in a shared database. */
-    private String subscribe(String mobile, String displayName, String planName, String status) {
-        return subscribeAt(mobile, displayName, planName, status, null);
-    }
-
-    // A differing amount models a subscription charged at a different price than the plan's current one.
-    private String subscribeAt(String mobile, String displayName, String planName, String status,
-            Long amount) {
+    private UUID member(String mobile, String name) {
         User u = new User(mobile, Roles.Wire.BUYER);
-        u.setName(displayName);
+        u.setName(name);
         u.setMobileVerified(true);
-        UUID userId = users.saveAndFlush(u).getId();
-        jdbc.update("""
+        return users.saveAndFlush(u).getId();
+    }
+
+    private UUID subscribe(String mobile, String displayName, String planName, String status) {
+        UUID userId = member(mobile, displayName);
+        return jdbc.queryForObject("""
                 insert into subscriptions (user_id, plan_id, status, started_at, payment_ref, amount)
-                select ?, p.id, ?, now(), ?, coalesce(?, p.price) from plans p where p.id = ?
-                """, userId, status, "pay_" + mobile, amount, planId(planName));
-        return displayName;
+                select ?, p.id, ?, now(), ?, p.price from plans p where p.name = ?
+                returning id
+                """, UUID.class, userId, status, "pay_" + mobile, planName);
+    }
+
+    /** Stands in for the payment webhook, which issues the invoice; returns its number. */
+    private String invoice(UUID userId, String sourceType, long amount, long fee, Instant issuedAt) {
+        String number = "TST-INV-" + UUID.randomUUID();
+        jdbc.update("""
+                insert into invoices (number, user_id, source_type, source_id, amount, taxable_amount, issued_at)
+                values (?, ?, ?, ?, ?, ?, ?)
+                """, number, userId, sourceType, UUID.randomUUID(), amount, fee, Timestamp.from(issuedAt));
+        return number;
+    }
+
+    private String creditNote(UUID userId, String sourceType, long amount, long fee) {
+        String number = "TST-CN-" + UUID.randomUUID();
+        jdbc.update("""
+                insert into credit_notes (number, user_id, source_type, source_id, amount, taxable_amount)
+                values (?, ?, ?, ?, ?, ?)
+                """, number, userId, sourceType, UUID.randomUUID(), amount, fee);
+        return number;
     }
 
     private String body(String url, String token) throws Exception {
@@ -82,132 +93,164 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
         return ((Number) JsonPath.read(json, path)).longValue();
     }
 
-    @Nested
-    @DisplayName("the overview's models")
-    class Models {
+    private static long delta(String before, String after, String path) {
+        return num(after, path) - num(before, path);
+    }
 
-        /** A plan already billed monthly must pass through untouched rather than be divided again. */
+    @Nested
+    @DisplayName("the subscription book")
+    class Book {
+
         @Test
         void aYearlyPlanContributesATwelfthOfItsPriceToMrr() throws Exception {
             String token = admin();
-            long before = num(body(Routes.Admin.FINANCE, token), "$.mrr");
+            String before = body(Routes.Admin.FINANCE, token);
 
             subscribe("9877730010", "Yearly Member", "Owner Pro", "active");
 
-            long after = num(body(Routes.Admin.FINANCE, token), "$.mrr");
-            assertThat(after - before)
-                    .as("one Owner Pro at ₹%d a year is ₹%d a month, not ₹%d",
-                            OWNER_PRO_PRICE, OWNER_PRO_MONTHLY, OWNER_PRO_PRICE)
+            assertThat(delta(before, body(Routes.Admin.FINANCE, token), "$.mrr"))
+                    .as("one Owner Pro at ₹%d a year is ₹%d a month", OWNER_PRO_PRICE, OWNER_PRO_MONTHLY)
                     .isEqualTo(OWNER_PRO_MONTHLY);
         }
 
-        // Money follows the subscription, not the catalogue row it points at.
         @Test
         void aMonthlyPlanContributesItsWholePrice() throws Exception {
             String token = admin();
-            long before = num(body(Routes.Admin.FINANCE, token), "$.mrr");
+            String before = body(Routes.Admin.FINANCE, token);
 
             subscribe("9877730011", "Monthly Member", "Seeker Plus", "active");
 
-            assertThat(num(body(Routes.Admin.FINANCE, token), "$.mrr") - before)
-                    .isEqualTo(SEEKER_PLUS_PRICE);
+            assertThat(delta(before, body(Routes.Admin.FINANCE, token), "$.mrr")).isEqualTo(SEEKER_PLUS_PRICE);
         }
 
-        /** The band must be present and zero, and the disclosure flag asserted beside it: a
-         *  structural zero with no flag is indistinguishable from a measured one. */
         @Test
-        void aRepricedPlanDoesNotRestateWhatWasAlreadySold() throws Exception {
-            String token = admin();
-            long before = num(body(Routes.Admin.FINANCE, token), "$.revenue");
-            long soldAt = OWNER_PRO_PRICE * 2;
-
-            subscribeAt("9877730013", "Old Price Member", "Owner Pro", "active", soldAt);
-
-            assertThat(num(body(Routes.Admin.FINANCE, token), "$.revenue") - before)
-                    .as("revenue is what this subscription was charged (₹%d), not what Owner Pro"
-                            + " costs a new buyer today (₹%d)", soldAt, OWNER_PRO_PRICE)
-                    .isEqualTo(soldAt);
-        }
-
-        /** The pin promised in {@code REVENUE_SERIES_BY_SOURCE}'s Javadoc: two independently
-         *  written queries over the same sources must agree. */
-        @Test
-        void aCancelledSubscriptionLeavesMrrButStaysRevenue() throws Exception {
+        void aCancelledOrFreeSubscriptionBillsNothingNextMonth() throws Exception {
             String token = admin();
             String before = body(Routes.Admin.FINANCE, token);
 
             subscribe("9877730012", "Cancelled Member", "Owner Pro", "cancelled");
-
-            String after = body(Routes.Admin.FINANCE, token);
-            assertThat(num(after, "$.mrr") - num(before, "$.mrr"))
-                    .as("a cancelled subscription bills nothing next month")
-                    .isZero();
-            assertThat(num(after, "$.revenue") - num(before, "$.revenue"))
-                    .as("but it was paid for, so it is still revenue")
-                    .isEqualTo(OWNER_PRO_PRICE);
-        }
-
-        /** Otherwise every Owner Free signup is a ₹0 row burying the ones that matter. */
-        @Test
-        void aFreePlanIsNotRevenue() throws Exception {
-            String token = admin();
-            String before = body(Routes.Admin.FINANCE, token);
-
             subscribe("9877730013", "Free Member", "Owner Free", "active");
 
-            String after = body(Routes.Admin.FINANCE, token);
-            assertThat(num(after, "$.mrr") - num(before, "$.mrr")).isZero();
-            assertThat(num(after, "$.revenue") - num(before, "$.revenue")).isZero();
+            assertThat(delta(before, body(Routes.Admin.FINANCE, token), "$.mrr")).isZero();
         }
 
-        /** The acceptance half of the rejection above — otherwise "refuses everything" would pass. */
         @Test
-        void thePlanLinesSumToMrr() throws Exception {
+        void thePlanLinesSumToMrrAndCarryTheStickerPrice() throws Exception {
             String token = admin();
             subscribe("9877730014", "Book Member", "Owner Pro", "active");
+            subscribe("9877730015", "Pass Member", "Listing Pass", "active");
 
             String json = body(Routes.Admin.FINANCE, token);
             List<Map<String, Object>> plans = JsonPath.read(json, "$.plans");
-            long summed = plans.stream()
-                    .mapToLong(p -> ((Number) p.get("monthlyValue")).longValue())
-                    .sum();
-
-            assertThat(summed)
-                    .as("the card prints the lines above the total")
+            assertThat(plans.stream().mapToLong(p -> ((Number) p.get("monthlyValue")).longValue()).sum())
                     .isEqualTo(num(json, "$.mrr"));
-            assertThat(plans)
-                    .as("a line must carry the sticker price, not the normalised one")
-                    .anySatisfy(p -> {
-                        if ("Owner Pro".equals(p.get("name"))) {
-                            assertThat(((Number) p.get("price")).longValue())
-                                    .isEqualTo(OWNER_PRO_PRICE);
-                            assertThat(p.get("billingCycle")).isEqualTo("yearly");
-                            assertThat(p).containsEntry("termDays", null);
-                        }
-                    });
-        }
-
-        @Test
-        void aPassLineCarriesItsTermInDays() throws Exception {
-            String token = admin();
-            subscribe("9877730015", "Pass Member", "Listing Pass", "active");
-
-            List<Map<String, Object>> plans = JsonPath.read(body(Routes.Admin.FINANCE, token), "$.plans");
-
+            assertThat(plans).anySatisfy(p -> {
+                assertThat(p.get("name")).isEqualTo("Owner Pro");
+                assertThat(((Number) p.get("price")).longValue()).isEqualTo(OWNER_PRO_PRICE);
+                assertThat(p).containsEntry("termDays", null);
+            });
             assertThat(plans).anySatisfy(p -> {
                 assertThat(p.get("name")).isEqualTo("Listing Pass");
                 assertThat(((Number) p.get("termDays")).intValue()).isEqualTo(60);
             });
         }
 
-        /** The series and the ledger expose the same revenue mix, so all three need the admin guard. */
         @Test
-        void theTwoDenominatorsAreReportedSeparatelyAndAreOrdered() throws Exception {
-            String json = body(Routes.Admin.FINANCE, admin());
-            assertThat(num(json, "$.users"))
-                    .as("every payer has an account, so ARPU's denominator cannot be the smaller")
-                    .isGreaterThanOrEqualTo(num(json, "$.payingUsers"));
-            assertThat(num(json, "$.users")).isPositive();
+        void aPaidSubscriptionWithoutAnInvoiceIsNotMoney() throws Exception {
+            String token = admin();
+            String before = body(Routes.Admin.FINANCE, token);
+
+            subscribe("9877730016", "Uninvoiced Member", "Owner Pro", "active");
+
+            assertThat(delta(before, body(Routes.Admin.FINANCE, token), "$.month.collected"))
+                    .as("money is what the gateway confirmed, and only that issues an invoice")
+                    .isZero();
+        }
+    }
+
+    @Nested
+    @DisplayName("this month's money")
+    class Money {
+
+        @Test
+        void aSubscriptionInvoiceIsCollectedAndAllFee() throws Exception {
+            String token = admin();
+            String before = body(Routes.Admin.FINANCE, token);
+
+            invoice(member("9877730020", "Invoice Member"), "subscription", 999, 999, Instant.now());
+
+            String after = body(Routes.Admin.FINANCE, token);
+            assertThat(delta(before, after, "$.month.collected")).isEqualTo(999);
+            assertThat(delta(before, after, "$.month.net")).isEqualTo(999);
+            assertThat(delta(before, after, "$.month.passThrough")).isZero();
+            assertThat(delta(before, after, "$.month.payments")).isEqualTo(1);
+        }
+
+        @Test
+        void stampDutyInAServicePaymentIsPassThroughNotRevenue() throws Exception {
+            String token = admin();
+            String before = body(Routes.Admin.FINANCE, token);
+
+            invoice(member("9877730021", "Agreement Member"), "service_request", 5000, 999, Instant.now());
+
+            String after = body(Routes.Admin.FINANCE, token);
+            assertThat(delta(before, after, "$.month.collected")).isEqualTo(5000);
+            assertThat(delta(before, after, "$.month.passThrough")).isEqualTo(4001);
+            assertThat(delta(before, after, "$.month.net")).isEqualTo(999);
+        }
+
+        @Test
+        void aCreditNoteIsRefundedAndTakesItsFeeOutOfNet() throws Exception {
+            String token = admin();
+            String before = body(Routes.Admin.FINANCE, token);
+
+            UUID payer = member("9877730022", "Refunded Member");
+            invoice(payer, "service_request", 5000, 999, Instant.now());
+            creditNote(payer, "service_request_refund", 4001, 0);
+
+            String after = body(Routes.Admin.FINANCE, token);
+            assertThat(delta(before, after, "$.month.refunded")).isEqualTo(4001);
+            assertThat(delta(before, after, "$.month.passThrough")).as("the duty went back").isZero();
+            assertThat(delta(before, after, "$.month.net")).isEqualTo(999);
+            assertThat(num(after, "$.month.collected") - num(after, "$.month.refunded")
+                    - num(after, "$.month.passThrough"))
+                    .as("the breakdown reconciles")
+                    .isEqualTo(num(after, "$.month.net"));
+        }
+
+        @Test
+        void anInvoiceFromLastMonthIsNotThisMonths() throws Exception {
+            String token = admin();
+            String before = body(Routes.Admin.FINANCE, token);
+
+            Instant lastMonth = LocalDate.now(PlatformTime.IST).withDayOfMonth(1).minusDays(1)
+                    .atStartOfDay(PlatformTime.IST).toInstant();
+            invoice(member("9877730023", "Old Invoice Member"), "subscription", 999, 999, lastMonth);
+
+            assertThat(delta(before, body(Routes.Admin.FINANCE, token), "$.month.collected")).isZero();
+        }
+
+        @Test
+        void anOpenDisputeAndAPendingRefundNeedAttention() throws Exception {
+            String token = admin();
+            String before = body(Routes.Admin.FINANCE, token);
+
+            UUID order = subscribe("9877730024", "Disputing Member", "Owner Pro", "active");
+            UUID userId = jdbc.queryForObject("select user_id from subscriptions where id = ?", UUID.class, order);
+            jdbc.update("""
+                    insert into payment_disputes (dispute_ref, order_ref, user_id, subscription_id, amount)
+                    values (?, 'pay_9877730024', ?, ?, 2499)
+                    """, "TST-DSP-" + UUID.randomUUID(), userId, order);
+            jdbc.update("""
+                    insert into refund_requests (user_id, subscription_id, kind, basis, amount, idempotency_key)
+                    values (?, ?, 'contact_pack', 'pack_unused', 2499, ?)
+                    """, userId, order, UUID.randomUUID().toString());
+
+            String after = body(Routes.Admin.FINANCE, token);
+            assertThat(delta(before, after, "$.attention.openDisputes")).isEqualTo(1);
+            assertThat(delta(before, after, "$.attention.openDisputeAmount")).isEqualTo(2499);
+            assertThat(delta(before, after, "$.attention.refundRequests")).isEqualTo(1);
+            assertThat(delta(before, after, "$.attention.refundRequestAmount")).isEqualTo(2499);
         }
     }
 
@@ -215,13 +258,11 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
     @DisplayName("the monthly series")
     class Series {
 
-        /** The acceptance half: an administrator reaches all three, so the guard is not blanket. */
         @Test
         void everyMonthInTheWindowIsReturnedIncludingEmptyOnes() throws Exception {
             String json = body(Routes.Admin.FINANCE_SERIES + "?months=6", admin());
-            List<Object> points = JsonPath.read(json, "$");
 
-            assertThat(points).hasSize(6);
+            assertThat(JsonPath.<List<Object>>read(json, "$")).hasSize(6);
             List<String> months = JsonPath.read(json, "$[*].month");
             assertThat(months)
                     .as("oldest first, and the last bucket is the month we are in")
@@ -230,33 +271,23 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
         }
 
         @Test
-        void theServicesBandIsPresentAndStructurallyZero() throws Exception {
+        void eachSourceLandsInItsOwnBandAndTheMonthAgreesWithTheOverview() throws Exception {
             String token = admin();
-            mvc.perform(get(Routes.Admin.FINANCE_SERIES + "?months=3")
-                            .header(HttpHeaders.AUTHORIZATION, token))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[0].services").value(0))
-                    .andExpect(jsonPath("$[*].services", org.hamcrest.Matchers.everyItem(
-                            org.hamcrest.Matchers.is(0))));
+            String before = body(Routes.Admin.FINANCE_SERIES + "?months=1", token);
 
-            mvc.perform(get(Routes.Admin.FINANCE).header(HttpHeaders.AUTHORIZATION, token))
-                    .andExpect(jsonPath("$.serviceOrdersCounted").value(false));
-        }
-
-        @Test
-        void theCurrentMonthsBandsSumToTheOverviewsMonthRevenue() throws Exception {
-            String token = admin();
-            subscribe("9877730020", "Agreement Member", "Owner Pro", "active");
+            UUID payer = member("9877730030", "Band Member");
+            invoice(payer, "subscription", 999, 999, Instant.now());
+            invoice(payer, "service_request_amendment", 3000, 0, Instant.now());
+            invoice(payer, "service_request", 4000, 1499, Instant.now());
+            creditNote(payer, "subscription", 999, 999);
 
             String series = body(Routes.Admin.FINANCE_SERIES + "?months=1", token);
-            long banded = num(series, "$[0].subscriptions") + num(series, "$[0].services");
-
-            assertThat(banded)
+            assertThat(delta(before, series, "$[0].subscriptions")).isEqualTo(999);
+            assertThat(delta(before, series, "$[0].services")).as("fees only, never the duty").isEqualTo(1499);
+            assertThat(delta(before, series, "$[0].refunds")).isEqualTo(999);
+            assertThat(num(series, "$[0].subscriptions") + num(series, "$[0].services") - num(series, "$[0].refunds"))
                     .as("the chart and the headline tile describe the same month")
-                    .isEqualTo(num(body(Routes.Admin.FINANCE, token), "$.monthRevenue"));
-            assertThat(banded)
-                    .as("and the fixture makes this a real comparison, not 0 == 0")
-                    .isGreaterThanOrEqualTo(OWNER_PRO_PRICE);
+                    .isEqualTo(num(body(Routes.Admin.FINANCE, token), "$.month.net"));
         }
 
         @Test
@@ -271,96 +302,96 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
     }
 
     @Nested
-    @DisplayName("the settlement ledger")
+    @DisplayName("the ledger")
     class Ledger {
 
         @Test
-        void aSettledSubscriptionAppearsAtItsStickerPrice() throws Exception {
+        void anInvoiceIsARowFindableByPartyOrNumber() throws Exception {
             String token = admin();
-            String name = subscribe("9877730030", "Ledger Member", "Owner Pro", "active");
+            String number = invoice(member("9877730040", "Ledger Member"), "service_request", 5000, 999,
+                    Instant.now());
 
-            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS)
-                            .param("q", name)
-                            .header(HttpHeaders.AUTHORIZATION, token))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.totalElements").value(1))
-                    .andExpect(jsonPath("$.content[0].kind").value("subscription"))
-                    .andExpect(jsonPath("$.content[0].amount").value((int) OWNER_PRO_PRICE))
-                    .andExpect(jsonPath("$.content[0].status").value("paid"))
-                    .andExpect(jsonPath("$.content[0].party").value(name));
+            for (String q : List.of("Ledger Member", number)) {
+                mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", q)
+                                .header(HttpHeaders.AUTHORIZATION, token))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.totalElements").value(1))
+                        .andExpect(jsonPath("$.content[0].number").value(number))
+                        .andExpect(jsonPath("$.content[0].party").value("Ledger Member"))
+                        .andExpect(jsonPath("$.content[0].kind").value("service"))
+                        .andExpect(jsonPath("$.content[0].amount").value(5000))
+                        .andExpect(jsonPath("$.content[0].fee").value(999));
+            }
         }
 
         @Test
-        void daysKeepsOnlyPaymentsOccurringWithinTheIstWindow() throws Exception {
+        void aCreditNoteIsANegativeRefundRow() throws Exception {
             String token = admin();
-            String fresh = subscribe("9877730033", "Window Fresh Member", "Owner Pro", "active");
-            String stale = subscribe("9877730034", "Window Stale Member", "Owner Pro", "active");
-            jdbc.update("update subscriptions set started_at = ? where payment_ref = ?", Timestamp.from(
-                    LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
-                            .minus(1, ChronoUnit.MINUTES)), "pay_9877730034");
+            UUID payer = member("9877730041", "Refund Row Member");
+            invoice(payer, "subscription", 999, 999, Instant.now());
+            String note = creditNote(payer, "subscription", 999, 999);
 
-            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", "Window ").param("days", "1")
+            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", "Refund Row Member").param("kind", "refund")
                             .header(HttpHeaders.AUTHORIZATION, token))
                     .andExpect(jsonPath("$.totalElements").value(1))
-                    .andExpect(jsonPath("$.content[0].party").value(fresh));
-            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", stale).param("days", "7")
-                            .header(HttpHeaders.AUTHORIZATION, token))
-                    .andExpect(jsonPath("$.totalElements").value(1));
-            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", "Window ")
+                    .andExpect(jsonPath("$.content[0].number").value(note))
+                    .andExpect(jsonPath("$.content[0].amount").value(-999))
+                    .andExpect(jsonPath("$.content[0].fee").value(-999));
+            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", "Refund Row Member")
                             .header(HttpHeaders.AUTHORIZATION, token))
                     .andExpect(jsonPath("$.totalElements").value(2));
         }
 
         @Test
-        void aFreePlanIsNotALedgerRow() throws Exception {
+        void daysKeepsOnlyDocumentsIssuedWithinTheIstWindow() throws Exception {
             String token = admin();
-            String name = subscribe("9877730031", "Freebie Member", "Owner Free", "active");
+            invoice(member("9877730042", "Window Fresh Member"), "subscription", 999, 999, Instant.now());
+            invoice(member("9877730043", "Window Stale Member"), "subscription", 999, 999,
+                    LocalDate.now(PlatformTime.IST).atStartOfDay(PlatformTime.IST).toInstant()
+                            .minus(1, ChronoUnit.MINUTES));
 
-            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS)
-                            .param("q", name)
+            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", "Window ").param("days", "1")
                             .header(HttpHeaders.AUTHORIZATION, token))
-                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.totalElements").value(1))
+                    .andExpect(jsonPath("$.content[0].party").value("Window Fresh Member"));
+            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", "Window ").param("days", "7")
+                            .header(HttpHeaders.AUTHORIZATION, token))
+                    .andExpect(jsonPath("$.totalElements").value(2));
+        }
+
+        @Test
+        void anUnpaidCheckoutIsNotALedgerRow() throws Exception {
+            String token = admin();
+            subscribe("9877730044", "Checkout Member", "Owner Pro", "pending");
+
+            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("q", "Checkout Member")
+                            .header(HttpHeaders.AUTHORIZATION, token))
                     .andExpect(jsonPath("$.totalElements").value(0));
         }
 
         @Test
-        void aVocabularyTheLedgerCannotMatchIsRefusedRatherThanReturningNothing() throws Exception {
+        void onlyTheThreeKindsAreAccepted() throws Exception {
             String token = admin();
-            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS + "?status=closed")
-                            .header(HttpHeaders.AUTHORIZATION, token))
-                    .andExpect(status().isBadRequest());
-            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS + "?status=refunded")
-                            .header(HttpHeaders.AUTHORIZATION, token))
-                    .andExpect(status().isBadRequest());
+            for (String kind : List.of("subscription", "service", "refund")) {
+                mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("kind", kind)
+                                .header(HttpHeaders.AUTHORIZATION, token))
+                        .andExpect(status().isOk());
+            }
             for (String kind : List.of("deal", "featured")) {
-                mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS + "?kind=" + kind)
+                mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS).param("kind", kind)
                                 .header(HttpHeaders.AUTHORIZATION, token))
                         .andExpect(status().isBadRequest());
             }
         }
 
         @Test
-        void theVocabularyItDoesSpeakIsAccepted() throws Exception {
-            String token = admin();
-            mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS + "?kind=subscription")
-                            .header(HttpHeaders.AUTHORIZATION, token))
-                    .andExpect(status().isOk());
-            for (String state : List.of("paid", "pending", "failed")) {
-                mvc.perform(get(Routes.Admin.FINANCE_TRANSACTIONS + "?status=" + state)
-                                .header(HttpHeaders.AUTHORIZATION, token))
-                        .andExpect(status().isOk());
-            }
-        }
-
-        @Test
         void noRowCarriesAMobileNumber() throws Exception {
             String token = admin();
-            subscribe("9877730032", "Privacy Member", "Owner Pro", "active");
+            invoice(member("9877730045", "Privacy Member"), "subscription", 999, 999, Instant.now());
 
-            String json = body(Routes.Admin.FINANCE_TRANSACTIONS + "?size=100", token);
-            List<String> parties = JsonPath.read(json, "$.content[*].party");
-            assertThat(parties).as("the floor: the scan found rows to measure").isNotEmpty();
-            assertThat(parties)
+            List<String> parties = JsonPath.read(body(Routes.Admin.FINANCE_TRANSACTIONS + "?size=100", token),
+                    "$.content[*].party");
+            assertThat(parties).isNotEmpty()
                     .noneMatch(p -> p.matches(".*(?<!\\d)(?:\\+91[\\s-]?)?[6-9]\\d{9}(?!\\d).*"));
         }
     }
@@ -371,7 +402,7 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
 
         @Test
         void staffCannotReadAnyOfTheThree() throws Exception {
-            String staff = bearerFor("9877730040", Roles.Wire.STAFF, "Ops staff");
+            String staff = bearerFor("9877730050", Roles.Wire.STAFF, "Ops staff");
             for (String route : List.of(Routes.Admin.FINANCE, Routes.Admin.FINANCE_SERIES,
                     Routes.Admin.FINANCE_TRANSACTIONS)) {
                 mvc.perform(get(route).header(HttpHeaders.AUTHORIZATION, staff))
@@ -390,4 +421,3 @@ class AdminFinanceConsoleTest extends AbstractApiTest {
         }
     }
 }
-

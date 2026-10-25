@@ -1,31 +1,18 @@
-/* States of /admin/finance the live seed cannot reach (`draazy.finance.*` are server properties), so the finance
-   responses are patched; the component is real, only the payload is chosen. */
+/* States of /admin/finance the live seed cannot reach, so the finance responses are patched; the component is real,
+   only the payload is chosen. */
 import { test, expect, ACTORS } from '../../fixtures/live.js';
-import { API, authHeaders, signIn } from '../../helpers/liveAuth.js';
+import { signIn } from '../../helpers/liveAuth.js';
 
 const OVERVIEW = /\/api\/admin\/finance(\?.*)?$/;
 const SERIES = /\/api\/admin\/finance\/series(\?.*)?$/;
 const LEDGER = /\/api\/admin\/finance\/transactions(\?.*)?$/;
 
-const REFUNDS_NOTE = 'Refunds: not tracked here, so this stays at ₹0. Service-request refunds are not included.';
-const SERVICES_NOTE = 'Revenue excludes the services marketplace: a service order records a quote, not money received.';
-const SERVICES_QUOTED = 'Quoted value, not money received, so it is left out of revenue.';
+const ZERO_MONTH = { collected: 0, refunded: 0, passThrough: 0, net: 0, payments: 0 };
+const NO_ATTENTION = {
+  refundRequests: 0, refundRequestAmount: 0, serviceRefunds: 0, serviceRefundAmount: 0, openDisputes: 0, openDisputeAmount: 0,
+};
 
-async function patchOverview(page, getPatch) {
-  const seen = { hits: 0 };
-  await page.route(OVERVIEW, async (route) => {
-    if (route.request().resourceType() === 'document') return route.fallback();
-    seen.hits += 1;
-    const res = await route.fetch();
-    const body = await res.json();
-    const merged = { ...body, ...getPatch() };
-    for (const key of Object.keys(merged)) if (merged[key] === undefined) delete merged[key];
-    return route.fulfill({ response: res, json: merged });
-  });
-  return seen;
-}
-
-async function stageJson(page, pattern, json) {
+async function stage(page, pattern, json) {
   const seen = { hits: 0 };
   await page.route(pattern, async (route) => {
     if (route.request().resourceType() === 'document') return route.fallback();
@@ -38,141 +25,75 @@ async function stageJson(page, pattern, json) {
 async function openFinance(page) {
   await page.goto('/admin/finance');
   await expect(page.getByRole('heading', { name: 'Finance' })).toBeVisible();
-  await expect(page.getByText('MRR (subscriptions)')).toBeVisible();
+  await expect(page.getByTestId('finance-kpi').first()).toBeVisible();
 }
 
-const tile = (page, label) => page.locator('.dz-card').filter({ hasText: label }).first().locator('.text-xl.font-extrabold');
-const flowRow = (page, label) => page.locator('div.border-b').filter({ has: page.getByText(label, { exact: true }) });
+const kpi = (page, label) => page.getByTestId('finance-kpi').filter({ hasText: label }).locator('.text-xl');
 
-async function statusOptions(page) {
-  await page.getByRole('tab', { name: /^Transactions/ }).click();
-  const chips = page.getByRole('group', { name: 'Status' }).getByRole('button');
-  await expect(chips.first()).toBeVisible();
-  const labels = (await chips.allTextContents()).map((t) => t.trim());
-  await page.getByRole('tab', { name: 'Overview' }).click();
-  return labels;
-}
-
-async function expectInventedRowsGone(page) {
-  await expect(page.getByText(/Partner payouts/)).toHaveCount(0);
-  await expect(page.getByText(/Platform commission/)).toHaveCount(0);
-  await expect(page.getByText('Payouts & outstanding')).toHaveCount(0);
-  await expect(page.getByText('Rent held for landlords')).toHaveCount(0);
-  await expect(page.getByText('Owner plan', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Seeker plan', { exact: true })).toHaveCount(0);
-  expect(await statusOptions(page)).toEqual(['All', 'Paid', 'Pending']);
-}
-
-test.describe('finance console: empty subscription book', () => {
-  test('an empty book reads as zero, says no plans are active, and shows none of the invented rows', async ({ page }) => {
-    test.slow();
+test.describe('finance console: staged states', () => {
+  test('an empty book reads as zero everywhere, says no plans are active, and asks for no attention', async ({ page }) => {
     await signIn(page, ACTORS.admin, { screen: 'staff' });
-    const overview = await patchOverview(page, () => ({
-      mrr: 0, monthRevenue: 0, refunds: 0, payingUsers: 0, plans: [],
-    }));
-    const series = await stageJson(page, SERIES, []);
-    const ledger = await stageJson(page, LEDGER, {
-      content: [], totalElements: 0, totalPages: 0, number: 0, size: 100,
-    });
+    const overview = await stage(page, OVERVIEW, { mrr: 0, plans: [], month: ZERO_MONTH, attention: NO_ATTENTION });
+    const series = await stage(page, SERIES, []);
+    const ledger = await stage(page, LEDGER, { content: [], totalElements: 0, totalPages: 0, number: 0, size: 100 });
 
     await openFinance(page);
-    await expect(page.getByText('No active paid plans.')).toBeVisible();
-    await expect(page.locator('div.border-t').filter({ hasText: 'MRR total' })).toContainText('₹0');
-    for (const label of ['MRR (subscriptions)', 'Revenue this month', 'Services revenue', 'Revenue (12 mo)', 'ARPU', 'ARPPU']) {
-      await expect(tile(page, label), label).toHaveText('₹0');
+    for (const label of ['Net revenue', 'Collected', 'Refunded', 'MRR']) {
+      await expect(kpi(page, label), label).toHaveText('₹0');
     }
-    await expect(page.getByText('Across the 0 who paid this month.')).toBeVisible();
+    await expect(page.getByText('No active paid plans.')).toBeVisible();
+    await expect(page.getByTestId('finance-attention')).toHaveCount(0);
+    await expect(page.getByTestId('finance-window-net')).toHaveText('₹0 net over 12 months');
     await expect(page.locator('body')).not.toContainText(/NaN|Infinity/);
     await page.getByRole('tab', { name: /^Transactions/ }).click();
     await expect(page.getByText('No transactions match.')).toBeVisible();
-    await page.getByRole('tab', { name: 'Overview' }).click();
-
-    await expectInventedRowsGone(page);
 
     expect(overview.hits).toBeGreaterThan(0);
     expect(series.hits).toBeGreaterThan(0);
     expect(ledger.hits).toBeGreaterThan(0);
   });
 
-  test('on the seeded book the invented split, modelled plans and refund-shaped statuses are also absent', async ({ page }) => {
+  test('refunds, disputes and service refunds waiting on staff link to where they are decided', async ({ page }) => {
     await signIn(page, ACTORS.admin, { screen: 'staff' });
-    await openFinance(page);
-    await expect(page.getByText('MRR total')).toBeVisible();
-    await expectInventedRowsGone(page);
-  });
-});
-
-test.describe('finance console: structural-zero disclosure', () => {
-  test('by default the services and refund gaps are disclosed and the marked rows keep their figures', async ({ page, request }) => {
-    test.slow();
-    const flags = await request.get(`${API}/admin/finance`, { headers: await authHeaders(ACTORS.admin, { request }) })
-      .then((r) => r.json());
-    expect(flags.refundsMeasured, 'server default').toBe(false);
-    expect(flags.serviceOrdersCounted, 'server default').toBe(false);
-    expect(flags.payoutsCompleted, 'the payouts rail is gone, so there is nothing to disclose').toBeUndefined();
-
-    await signIn(page, ACTORS.admin, { screen: 'staff' });
-    const overview = await patchOverview(page, () => ({ monthRevenue: 4200, refunds: 0 }));
-    await stageJson(page, SERIES, [{ month: '2026-09-01', subscriptions: 3300, services: 900 }]);
+    await stage(page, OVERVIEW, {
+      mrr: 0,
+      plans: [],
+      month: ZERO_MONTH,
+      attention: {
+        refundRequests: 2, refundRequestAmount: 1398, serviceRefunds: 1, serviceRefundAmount: 4001, openDisputes: 1, openDisputeAmount: 2499,
+      },
+    });
 
     await openFinance(page);
-    const banner = page.getByTestId('finance-disclosures');
-    await expect(banner).toContainText('Not every figure below is measured');
-    await expect(banner).toContainText(REFUNDS_NOTE);
-    await expect(banner).toContainText(SERVICES_NOTE);
-    await expect(page.getByText(REFUNDS_NOTE)).toHaveCount(2);
-    await expect(page.getByText(SERVICES_NOTE)).toHaveCount(2);
-    await expect(page.getByText(SERVICES_QUOTED)).toHaveCount(2);
-
-    const gross = flowRow(page, 'Gross revenue');
-    await expect(gross).toContainText('₹4,200');
-    await expect(gross).toContainText('Not measured');
-    const refunds = flowRow(page, 'Refunds');
-    await expect(refunds).toContainText('₹0');
-    await expect(refunds).toContainText('Not measured');
-    await expect(flowRow(page, 'Net retained')).toContainText('₹4,200');
-    await expect(tile(page, 'Services revenue')).toHaveText('₹900');
-    await expect(tile(page, 'Revenue this month')).toHaveText('₹4,200');
-    expect(overview.hits).toBeGreaterThan(0);
+    const strip = page.getByTestId('finance-attention');
+    await expect(strip.getByRole('link', { name: /2 refund requests to decide/ })).toHaveAttribute('href', '/admin/refunds');
+    await expect(strip.getByRole('link', { name: /1 service refund to decide/ })).toHaveAttribute('href', '/admin/rent-agreement');
+    await expect(strip.getByRole('link', { name: /1 open payment dispute/ })).toHaveAttribute('href', '/admin/refunds?tab=disputes');
+    await expect(strip).toContainText('₹1,398');
+    await expect(strip).toContainText('₹4,001');
+    await expect(strip).toContainText('₹2,499');
   });
 
-  test('each flag controls only its own disclosure, and a missing flag reads as not measured', async ({ page }) => {
-    test.slow();
+  test('a month whose refunds exceed its fees reads as a negative net, with the drop against last month', async ({ page }) => {
     await signIn(page, ACTORS.admin, { screen: 'staff' });
-    let patch = {};
-    const overview = await patchOverview(page, () => patch);
+    await stage(page, OVERVIEW, {
+      mrr: 199,
+      plans: [{ name: 'Seeker Plus', audience: 'seeker', billingCycle: 'monthly', price: 199, active: 1, monthlyValue: 199, termDays: null }],
+      month: { collected: 999, refunded: 2000, passThrough: 0, net: -1001, payments: 1 },
+      attention: NO_ATTENTION,
+    });
+    await stage(page, SERIES, [
+      { month: '2026-09-01', subscriptions: 1000, services: 0, refunds: 0 },
+      { month: '2026-10-01', subscriptions: 999, services: 0, refunds: 2000 },
+    ]);
 
-    const cases = [
-      { name: 'both flags on', patch: { refundsMeasured: true, serviceOrdersCounted: true }, refunds: false, services: false },
-      { name: 'only refunds measured', patch: { refundsMeasured: true, serviceOrdersCounted: false }, refunds: false, services: true },
-      { name: 'only service orders counted', patch: { refundsMeasured: false, serviceOrdersCounted: true }, refunds: true, services: false },
-      { name: 'refunds flag absent, services on', patch: { refundsMeasured: undefined, serviceOrdersCounted: true }, refunds: true, services: false },
-      { name: 'services flag absent, refunds on', patch: { refundsMeasured: true, serviceOrdersCounted: undefined }, refunds: false, services: true },
-      { name: 'both flags absent', patch: { refundsMeasured: undefined, serviceOrdersCounted: undefined }, refunds: true, services: true },
-    ];
-
-    for (const c of cases) {
-      await test.step(c.name, async () => {
-        patch = { ...c.patch, monthRevenue: 4200, refunds: 0 };
-        const before = overview.hits;
-        await openFinance(page);
-        expect(overview.hits, 'the patched overview was served').toBeGreaterThan(before);
-
-        const banner = page.getByTestId('finance-disclosures');
-        if (c.refunds || c.services) await expect(banner).toBeVisible();
-        else await expect(banner).toHaveCount(0);
-
-        await expect(page.getByText(REFUNDS_NOTE)).toHaveCount(c.refunds ? 2 : 0);
-        await expect(page.getByText(SERVICES_NOTE)).toHaveCount(c.services ? 2 : 0);
-        await expect(page.getByText(SERVICES_QUOTED)).toHaveCount(c.services ? 2 : 0);
-        await expect(flowRow(page, 'Refunds').getByText('Not measured')).toHaveCount(c.refunds ? 1 : 0);
-        await expect(flowRow(page, 'Gross revenue').getByText('Not measured')).toHaveCount(c.services ? 1 : 0);
-
-        await expect(flowRow(page, 'Gross revenue')).toContainText('₹4,200');
-        await expect(flowRow(page, 'Refunds')).toContainText('₹0');
-        await expect(flowRow(page, 'Net retained')).toContainText('₹4,200');
-      });
-    }
+    await openFinance(page);
+    await expect(kpi(page, 'Net revenue')).toHaveText('−₹1,001');
+    await expect(page.getByTestId('finance-kpi').filter({ hasText: 'Net revenue' })).toContainText('-200.1% MoM');
+    await expect(page.getByTestId('finance-kpi').filter({ hasText: 'Collected' })).toContainText('1 payment this month');
+    await expect(page.getByTestId('finance-kpi').filter({ hasText: 'MRR' })).toContainText('1 active paid plan');
+    await expect(page.getByTestId('finance-month')).toContainText('−₹2,000');
+    await expect(page.getByTestId('finance-window-net')).toHaveText('−₹1 net over 12 months');
   });
 });
 
@@ -189,7 +110,19 @@ test.describe('finance console: failed reads', () => {
 
     await page.unroute(OVERVIEW);
     await page.getByRole('button', { name: 'Retry' }).click();
-    await expect(page.getByText('MRR (subscriptions)')).toBeVisible();
+    await expect(page.getByTestId('finance-kpi').first()).toBeVisible();
+  });
+
+  test('a failed monthly series says so on the chart and disables the revenue CSV, while the tiles still load', async ({ page }) => {
+    await signIn(page, ACTORS.admin, { screen: 'staff' });
+    await page.route(SERIES, async (route) => {
+      if (route.request().resourceType() === 'document') return route.fallback();
+      return route.fulfill({ status: 500, json: { error: 'internal_error', message: 'boom' } });
+    });
+
+    await openFinance(page);
+    await expect(page.getByRole('alert')).toContainText('Could not load the monthly figures.');
+    await expect(page.getByRole('button', { name: /Revenue CSV/ })).toBeDisabled();
   });
 
   test('a failed ledger read says so instead of "No transactions match."', async ({ page }) => {

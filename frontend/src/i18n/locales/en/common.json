@@ -97,18 +97,18 @@
   "postChooser": {
     "title": "What do you want to post?",
     "subtitle": "Pick the one that sounds like you — we'll take you to the right form.",
-    "whoTitle": "Who's looking?",
-    "whoSubtitle": "Search on your own, or start a group others can join.",
+    "flatmateStepTitle": "Flatmates",
+    "flatmateStepSubtitle": "Pick the one that fits you.",
     "propertyTitle": "A property to rent out or sell",
     "propertyDesc": "A flat, house, plot or commercial space you own or manage.",
-    "roomTitle": "A room in my place",
-    "roomDesc": "Share your place with a flatmate.",
-    "lookingTitle": "I'm looking for a place",
-    "lookingDesc": "You need a room or flatmates.",
-    "soloTitle": "Just me",
-    "soloDesc": "Owners and flatmates reach you.",
-    "groupTitle": "Start a flatmate group",
-    "groupDesc": "People ask to join. Find a flat together, or fill seats in yours.",
+    "flatmateTitle": "Flatmates",
+    "flatmateDesc": "Fill a room, find a room, or team up to rent a flat.",
+    "roomTitle": "I have a room to fill",
+    "roomDesc": "Your flat has a spare room or bed.",
+    "seekerTitle": "I need a room",
+    "seekerDesc": "People with a room reach you.",
+    "teamTitle": "Team up to rent a flat",
+    "teamDesc": "Find flatmates first, then a flat together.",
     "back": "Back"
   },
   "dashboard": {
@@ -133,22 +133,6 @@
       "profile": "Profile"
     }
   },
-  "adminFinance": {
-    "disclosureTitle": "Not every figure below is measured",
-    "disclosureLead": "These are structural zeros, not quiet months. Totals and averages computed from them carry the same caveat. Each turns live on its own flag.",
-    "refundsNotMeasured": "Refunds: not tracked here, so this stays at ₹0. Service-request refunds are not included.",
-    "servicesNotCounted": "Revenue excludes the services marketplace: a service order records a quote, not money received.",
-    "servicesQuoted": "Quoted value, not money received, so it is left out of revenue.",
-    "notMeasured": "Not measured",
-    "arpuBasis": "Across all {{count}} accounts.",
-    "arppuBasis": "Across the {{count}} who paid this month.",
-    "mrrChartBasis": "Subscription revenue booked each month. The tile above is the current run rate, which is a different question.",
-    "noActivePlans": "No active paid plans.",
-    "unavailableTitle": "Finance figures are unavailable",
-    "unavailableBody": "The finance service did not answer, so nothing is shown rather than zeros — a ₹0 here would be indistinguishable from a platform that earned nothing. Reload to try again.",
-    "ledgerUnavailable": "The ledger could not be loaded, so this table is empty for that reason rather than because there were no transactions.",
-    "ledgerTruncated": "Showing {{shown}} of {{total}} transactions. Narrow the filters to see the rest."
-  },
   "notifications": {
     "title": "Notifications",
     "unread": "unread updates",
@@ -161,6 +145,8 @@
     "caughtUp": "You're all caught up.",
     "noNewLeads": "No new leads.",
     "noNewUpdates": "No new updates.",
+    "noEscalations": "No escalations. Every queue is inside its SLA.",
+    "noNewWork": "No new queue work or reminders.",
     "showRead": "Show read notifications",
     "hideRead": "Hide read notifications",
     "readHeading": "Read",
@@ -184,7 +170,9 @@
     "filters": {
       "all": "All",
       "leads": "Leads",
-      "updates": "Updates"
+      "updates": "Updates",
+      "escalations": "Escalations",
+      "work": "My work"
     }
   }
 }
