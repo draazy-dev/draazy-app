@@ -6,8 +6,9 @@ import { pickDate } from '../../../helpers/datePicker.helper.js';
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
 const visibleLabel = (page, text) => page.locator('label:visible', { hasText: text });
-const MOVE_IN_TAB = /Move in now/i;
-const TEAM_UP_TAB = /Team up/i;
+const MOVE_IN_TAB = 'move-in';
+const PEOPLE_TAB = 'people';
+const TEAMS_TAB = 'teams';
 
 // Open the collapsed grid because its controls are absent until it expands.
 const openFilters = async (page) => {
@@ -16,57 +17,51 @@ const openFilters = async (page) => {
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 };
 
-const openTab = async (page, name) => {
+const tabButton = (page, key) => page.locator(`button[data-tab="${key}"]`);
+
+const openTab = async (page, key) => {
   await page.goto(`${BASE}/flatmates`);
   await page.locator('.sf-card').first().waitFor({ timeout: 10000 });
-  await page.getByRole('button', { name }).first().click();
+  await tabButton(page, key).click();
   await page.locator('.sf-card').first().waitFor({ timeout: 10000 });
   await openFilters(page);
 };
 
 test('each intent tab shows only the filters it can narrow', async ({ page }) => {
   test.slow();
-  await test.step('Move in now shows Move-in and hides the people-only Sharing filter', async () => {
+  await test.step('Rooms shows Move-in and hides the teams-only Sharing filter', async () => {
     await openTab(page, MOVE_IN_TAB);
     await expect(visibleLabel(page, 'Move-in')).toHaveCount(1);
     await expect(visibleLabel(page, 'Sharing')).toHaveCount(0);
   });
 
-  await test.step('Team up shows Sharing alongside Move-in', async () => {
-    await page.getByRole('button', { name: TEAM_UP_TAB }).first().click();
+  await test.step('Flatmates shows Move-in and hides the teams-only Sharing filter', async () => {
+    await tabButton(page, PEOPLE_TAB).click();
+    await page.locator('.sf-card').first().waitFor({ timeout: 10000 });
+    await expect(visibleLabel(page, 'Sharing')).toHaveCount(0);
+    await expect(visibleLabel(page, 'Move-in')).toHaveCount(1);
+  });
+
+  await test.step('Teams shows Sharing alongside Move-in', async () => {
+    await tabButton(page, TEAMS_TAB).click();
     await page.locator('.sf-card').first().waitFor({ timeout: 10000 });
     await expect(visibleLabel(page, 'Sharing')).toHaveCount(1);
     await expect(visibleLabel(page, 'Move-in')).toHaveCount(1);
   });
 
-  await test.step('Lifestyle filter appears on both tabs', async () => {
-    await expect(visibleLabel(page, 'Lifestyle')).toHaveCount(1);
-    await page.getByRole('button', { name: MOVE_IN_TAB }).first().click();
+  await test.step('Vibe filter appears on every tab', async () => {
+    await expect(visibleLabel(page, 'Vibe')).toHaveCount(1);
+    await expect(visibleLabel(page, 'Lifestyle')).toHaveCount(0);
+    await tabButton(page, MOVE_IN_TAB).click();
     await page.locator('.sf-card').first().waitFor({ timeout: 10000 });
-    await expect(visibleLabel(page, 'Lifestyle')).toHaveCount(1);
+    await expect(visibleLabel(page, 'Vibe')).toHaveCount(1);
   });
 
-  await test.step('switching Team up to Move in now drops the people-only Sharing filter', async () => {
+  await test.step('switching Teams to Rooms drops the teams-only Sharing filter', async () => {
     await expect(visibleLabel(page, 'Sharing')).toHaveCount(0);
     await expect(visibleLabel(page, 'Move-in')).toHaveCount(1);
   });
 });
-test('selecting a Lifestyle habit narrows the results', async ({ page }) => {
-  await page.goto(`${BASE}/flatmates?view=flatmates`);
-  await page.locator('.sf-card').first().waitFor({ timeout: 10000 });
-  await openFilters(page);
-  const before = await page.locator('.sf-card').count();
-
-  await page.getByRole('button', { name: 'Non-smoker', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Non-smoker', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  // The response rebuilds cards after `aria-pressed`; the retry makes the following count settled.
-  await expect(page.locator('.sf-card')).not.toHaveCount(before);
-  const after = await page.locator('.sf-card').count();
-
-  expect(after).toBeGreaterThan(0);
-  expect(after).toBeLessThan(before);
-});
-
 test('Move-in chips: Immediate narrows and toggles off, and By date widens beyond it', async ({ page }) => {
   await page.goto(`${BASE}/flatmates?view=flatmates`);
   await page.locator('.sf-card').first().waitFor({ timeout: 10000 });

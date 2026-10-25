@@ -25,7 +25,6 @@ public record FlatmateGroupFeedDto(
         boolean agreementDeclared,
         boolean ownerConsent,
         String reviewStatus,
-        List<String> tags,
         String note,
         String ownerName,
         Instant createdAt,

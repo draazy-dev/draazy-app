@@ -26,7 +26,7 @@ class FlatmateRoomShapeTest {
             "flatMax", "shareMax", "seatsTotal", "seatsOpen", "hostRole", "verificationTier",
             "verified", "reviewStatus", "society", "locality", "localities", "lat",
             "lng", "bhk", "flatType", "homeTypeLabel", "gatedCommunity", "furnishing", "moveIn",
-            "availableFrom", "gender", "food", "tags", "note", "cover", "owner", "createdAt", "facing",
+            "availableFrom", "gender", "food", "note", "cover", "owner", "createdAt", "facing",
             "overlooking");
 
     // Contact and moderation forensics have no place on the anonymous feed.

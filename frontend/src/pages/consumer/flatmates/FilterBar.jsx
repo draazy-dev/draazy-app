@@ -10,8 +10,10 @@ import { FilterGroup } from '../../../components/ui/FilterGroup.jsx';
 import useSwipeDismiss from '../../../lib/useSwipeDismiss.js';
 import LocalitySearchInput from '../../../components/search/LocalitySearchInput.jsx';
 import NearPlaceField from './NearPlaceField.jsx';
+import VibeFilter from './VibeFilter.jsx';
+import { normalizeVibe } from '../../../lib/flatmates/filterState.js';
 import { inr, BUDGET_MIN, BUDGET_MAX, budgetIsAny, isDateVal, todayIso } from './helpers.js';
-import { TAB_MOVE_IN, TAB_TEAM_UP } from './model.js';
+import { TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS } from './model.js';
 
 // One labelled cell. `className` lets a cell claim explicit grid placement (Near-a-place owns the
 // tall right column).
@@ -38,9 +40,15 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
   // Move-in applies to both feeds (a room has a date, so does a seeker), while flat size is a
   // "people" question and an attached bathroom is a "place" one.
   const showMoveIn = true;
-  const showSharing = tab === TAB_TEAM_UP;
+  const showSharing = tab === TAB_TEAMS;
   const showBath = tab === TAB_MOVE_IN;
+  const showRoomType = tab !== TAB_TEAMS;
+  const showHomeOnly = tab !== TAB_PEOPLE && !!filters.gender;
   const genderOptions = [['', t('flatmates.gEveryone')], ['female', t('flatmates.gWomen')], ['male', t('flatmates.gMen')]];
+  const roomTypes = [['private', t('flatmates.roomPrivate')], ['shared', t('flatmates.roomShared')]];
+  const furnishings = [['furnished', t('flatmates.furnFurnished')], ['semi', t('flatmates.furnSemi')]];
+  const homeOnlyLabel = t(filters.gender === 'male' ? 'flatmates.menOnlyHomes' : 'flatmates.womenOnlyHomes');
+  const labelOf = (pairs, v) => (pairs.find(([k]) => k === v) || [])[1] || '';
   const summaries = {
     budget: budgetIsAny(filters.budget) ? '' : budgetLbl,
     locality: filters.locality,
@@ -50,10 +58,12 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
     moveIn: filters.moveIn === 'now' ? t('flatmates.immediate') : isDateVal(filters.moveIn) ? filters.moveIn : '',
     /* Empty at the default, NOT the label of the default button: "Everyone" is right on a pill you choose from, but
        as a read-out it claims a filter is set and lights the narrowing tint. */
-    gender: filters.gender ? (genderOptions.find(([g]) => g === filters.gender) || [])[1] || '' : '',
+    gender: !filters.gender ? '' : showHomeOnly && filters.genderOnly ? homeOnlyLabel : labelOf(genderOptions, filters.gender),
+    roomType: labelOf(roomTypes, filters.roomType),
+    furnishing: labelOf(furnishings, filters.furnishing),
     sharing: filters.sharing ? t('flatmates.nSharing', { n: filters.sharing }) : '',
-    habits: filters.habits.join(', '),
-    trust: filters.verifiedOnly ? t('flatmates.verifiedOnly') : '',
+    vibe: filters.vibe.length ? t('flatmates.ls.fSelected', { count: filters.vibe.length }) : '',
+    trust: [filters.verifiedOnly && t('flatmates.verifiedOnly'), showBath && filters.gated && t('flatmates.gatedSociety')].filter(Boolean).join(' · '),
     bath: filters.attachedBath ? t('flatmates.attachedOnly') : '',
   };
   return (
@@ -109,30 +119,38 @@ function FilterControls({ filters, setF, seg, budgetLbl, genderLabel, tab, varia
       <Section sheet={sheet} icon="users-round" label={genderLabel} summary={summaries.gender}>
 
         {/* `aria-pressed` so the selected option is announced, not just tinted by `seg()`. */}
-        <div className="flex gap-2">
-          {genderOptions.map(([g, label]) => <button key={label} onClick={() => setF({ gender: g })} aria-pressed={filters.gender === g} className={seg(filters.gender === g)}>{label}</button>)}
+        <div className="flex flex-wrap gap-2">
+          {genderOptions.map(([g, label]) => <button key={label} onClick={() => setF(g ? { gender: g } : { gender: g, genderOnly: false })} aria-pressed={filters.gender === g} className={seg(filters.gender === g)}>{label}</button>)}
+          {showHomeOnly && <button type="button" onClick={() => setF({ genderOnly: !filters.genderOnly })} aria-pressed={filters.genderOnly} className={seg(filters.genderOnly) + ' inline-flex items-center gap-1.5'}><Icon name={filters.gender === 'male' ? 'mars' : 'venus'} className="w-3.5 h-3.5" /> {homeOnlyLabel}</button>}
         </div>
       </Section>
+      {showRoomType && (
+        <Section sheet={sheet} icon="door-open" label={t('flatmates.fRoomType')} summary={summaries.roomType}>
+          <div className="flex gap-2">
+            {roomTypes.map(([v, label]) => <button key={v} type="button" onClick={() => setF({ roomType: filters.roomType === v ? '' : v })} aria-pressed={filters.roomType === v} className={seg(filters.roomType === v)}>{label}</button>)}
+          </div>
+        </Section>
+      )}
+      {showBath && (
+        <Section sheet={sheet} icon="sofa" label={t('flatmates.fFurnishing')} summary={summaries.furnishing}>
+          <div className="flex gap-2">
+            {furnishings.map(([v, label]) => <button key={v} type="button" onClick={() => setF({ furnishing: filters.furnishing === v ? '' : v })} aria-pressed={filters.furnishing === v} className={seg(filters.furnishing === v)}>{label}</button>)}
+          </div>
+        </Section>
+      )}
       {showSharing && (
         <Section sheet={sheet} icon="users" label={t('flatmates.fSharing')} summary={summaries.sharing}>
           <div className="w-full lg:w-3/4"><NativeSelect value={filters.sharing} onChange={(e) => setF({ sharing: e.target.value })} className="field w-full rounded-full px-4 py-2 text-sm"><option value="">{t('flatmates.anySize')}</option>{[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{t('flatmates.nSharing', { n })}</option>)}</NativeSelect></div>
         </Section>
       )}
-      <Section sheet={sheet} icon="sparkles" label={t('flatmates.fLifestyle')} summary={summaries.habits}>
-        <div className="flex flex-wrap gap-2">
-          {[['Non-smoker', t('flatmates.lifeNonSmoker')], ['Vegetarian', t('flatmates.lifeVeg')], ['Pet-friendly', t('flatmates.lifePetOk')]].map(([tag, label]) => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => setF({ habits: filters.habits.includes(tag) ? filters.habits.filter((x) => x !== tag) : [...filters.habits, tag] })}
-              aria-pressed={filters.habits.includes(tag)}
-              className={seg(filters.habits.includes(tag))}
-            >{label}</button>
-          ))}
-        </div>
+      <Section sheet={sheet} icon="heart-handshake" label={t('flatmates.ls.fTitle')} summary={summaries.vibe} className="lg:col-span-3">
+        <VibeFilter vibe={filters.vibe} onChange={(vibe) => setF({ vibe: normalizeVibe(vibe) })} />
       </Section>
       <Section sheet={sheet} icon="shield-check" label={t('flatmates.fTrust')} summary={summaries.trust}>
-        <button onClick={() => setF({ verifiedOnly: !filters.verifiedOnly })} aria-pressed={filters.verifiedOnly} className={seg(filters.verifiedOnly) + ' inline-flex items-center gap-1.5'}><Icon name="shield-check" className="w-3.5 h-3.5" /> {t('flatmates.verifiedOnly')}</button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => setF({ verifiedOnly: !filters.verifiedOnly })} aria-pressed={filters.verifiedOnly} className={seg(filters.verifiedOnly) + ' inline-flex items-center gap-1.5'}><Icon name="shield-check" className="w-3.5 h-3.5" /> {t('flatmates.verifiedOnly')}</button>
+          {showBath && <button type="button" onClick={() => setF({ gated: !filters.gated })} aria-pressed={filters.gated} className={seg(filters.gated) + ' inline-flex items-center gap-1.5'}><Icon name="lock-keyhole" className="w-3.5 h-3.5" /> {t('flatmates.gatedSociety')}</button>}
+        </div>
       </Section>
       {showBath && (
         <Section sheet={sheet} icon="bath" label={t('flatmates.fWashroom')} summary={summaries.bath}>

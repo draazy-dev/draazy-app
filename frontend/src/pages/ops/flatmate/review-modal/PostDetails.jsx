@@ -1,5 +1,7 @@
-import { FileText, Image as ImageIcon, Info, MapPin, User } from 'lucide-react';
+import { FileText, HeartHandshake, Image as ImageIcon, MapPin, User } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { classNames, fmtINR, isoToDisplay } from '../../../../lib/format.js';
+import { STYLE_KEYS } from '../../../consumer/flatmates/livingStyle/questions.js';
 import { Block, fmtDate } from '../board.jsx';
 
 const human = (v) => {
@@ -44,7 +46,6 @@ function roomKvs(r) {
     ['Electricity', human(r.electricityBilling)],
     ['Host is', human(r.hostRole)],
     ['Gated community', r.gatedCommunity ? 'Yes' : 'No'],
-    ['Tags', list(r.tags), true],
   ];
 }
 
@@ -63,7 +64,6 @@ function groupKvs(g) {
     ['Maintenance', human(g.maintenanceBilling)],
     ['Electricity', human(g.electricityBilling)],
     ['Members', g.members.map((m) => m.name).filter(Boolean).join(', '), true],
-    ['Tags', list(g.tags), true],
   ];
 }
 
@@ -80,7 +80,6 @@ function postKvs(p) {
     ['Room preference', human(p.roomPref)],
     ['Only verified may contact', p.verifiedContactOnly ? 'Yes' : 'No'],
     ['Localities', list(p.localities), true],
-    ['Tags', list(p.tags), true],
   ];
 }
 
@@ -91,29 +90,31 @@ function hostOf({ room, group, post }) {
   return { name: '', mobile: '' };
 }
 
-export default function PostDetails({ detail }) {
-  const { item, room, group, post } = detail;
-  const kvs = (room ? roomKvs(room) : group ? groupKvs(group) : post ? postKvs(post) : [])
-    .filter(([, v]) => v);
-  const host = hostOf(detail);
+/** The half of a post a reviewer judges by eye: its photos and the free text nobody validated. */
+export function PostOverview({ item }) {
+  const { photos } = item;
   return (
     <>
-      {item.photos.length ? (
-        <Block icon={ImageIcon} title={`Photos (${item.photos.length})`}>
-          <div className="flatmate-mod-photos grid grid-cols-3 gap-2 sm:grid-cols-4">
-            {/* Index key: nothing de-duplicates the list. Every photo is shown — a swapped one is as likely last as first. */}
-            {item.photos.map((src, i) => (
-              <a key={i} href={src} target="_blank" rel="noreferrer noopener" className="block">
-                <img
-                  src={src}
-                  alt={`Photo ${i + 1} of ${item.photos.length}`}
-                  loading="lazy"
-                  decoding="async"
-                  className="aspect-square w-full rounded-xl object-cover ring-1 ring-white/10"
-                />
-              </a>
-            ))}
-          </div>
+      {photos.length || item.kind === 'room' ? (
+        <Block icon={ImageIcon} title={<>Photos <span className="text-xs font-normal text-gray-400">{photos.length}</span></>}>
+          {photos.length ? (
+            <div className="flatmate-mod-photos grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {/* Index key: nothing de-duplicates the list, and a swapped photo is as likely last as first. */}
+              {photos.map((src, i) => (
+                <a key={i} href={src} target="_blank" rel="noreferrer noopener" className="block overflow-hidden rounded-xl border border-white/10">
+                  <img
+                    src={src}
+                    alt={`Photo ${i + 1} of ${photos.length}`}
+                    loading="lazy"
+                    decoding="async"
+                    className="aspect-[4/3] w-full object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-amber-300">No photos submitted.</p>
+          )}
         </Block>
       ) : null}
 
@@ -125,18 +126,47 @@ export default function PostDetails({ detail }) {
           <p className="text-sm text-gray-500">Nothing written.</p>
         )}
       </Block>
+    </>
+  );
+}
 
+function VibeBlock({ livingStyle }) {
+  const { t } = useTranslation();
+  const answered = STYLE_KEYS.filter((k) => Number.isInteger(livingStyle?.[k]));
+  return (
+    <Block icon={HeartHandshake} title="Vibe">
+      {answered.length ? (
+        <ul data-testid="ops-vibe" className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+          {answered.map((k) => (
+            <li key={k} data-q={k}>
+              <span className="text-gray-400">{t(`flatmates.ls.q_${k}`)}: </span>
+              <span className="font-semibold text-gray-100">{t(`flatmates.ls.a_${k}_${livingStyle[k]}`)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p data-testid="ops-vibe-empty" className="text-sm text-gray-500">Not answered yet</p>
+      )}
+    </Block>
+  );
+}
+
+export default function PostDetails({ detail }) {
+  const { item, room, group, post } = detail;
+  const kvs = (room ? roomKvs(room) : group ? groupKvs(group) : post ? postKvs(post) : [])
+    .filter(([, v]) => v);
+  const host = hostOf(detail);
+  return (
+    <>
       {kvs.length ? (
-        <Block icon={Info} title="Details">
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-white/10 sm:grid-cols-3">
-            {kvs.map(([k, v, full]) => (
-              <div key={k} className={classNames('bg-ink-2 p-3', full && 'col-span-2 sm:col-span-3')}>
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{k}</div>
-                <div className="mt-0.5 break-words text-sm font-semibold text-gray-100">{v}</div>
-              </div>
-            ))}
-          </div>
-        </Block>
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-white/10 sm:grid-cols-3">
+          {kvs.map(([k, v, full]) => (
+            <div key={k} className={classNames('bg-ink-2 p-3', full && 'col-span-2 sm:col-span-3')}>
+              <div className="text-[11px] text-gray-500">{k}</div>
+              <div className="mt-0.5 break-words text-sm font-semibold text-gray-100">{v}</div>
+            </div>
+          ))}
+        </div>
       ) : null}
 
       <Block icon={User} title="Posted by">
@@ -149,6 +179,8 @@ export default function PostDetails({ detail }) {
           ) : null}
         </div>
       </Block>
+
+      <VibeBlock livingStyle={detail.livingStyle} />
     </>
   );
 }

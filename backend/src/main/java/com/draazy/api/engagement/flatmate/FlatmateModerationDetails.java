@@ -1,9 +1,12 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.engagement.livingstyle.LivingStyleCatalogue;
+import com.draazy.api.engagement.livingstyle.LivingStyleService;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,10 +21,11 @@ class FlatmateModerationDetails {
     private final UserRepository users;
     private final FlatmateMapper mapper;
     private final FlatmateRoomCards roomCards;
+    private final LivingStyleService livingStyle;
 
     FlatmateModerationDetails(FlatmateSeekerPostRepository posts, FlatmateRoomRepository rooms,
             FlatmateGroupRepository groups, FlatmateReviewRepository reviews, UserRepository users,
-            FlatmateMapper mapper, FlatmateRoomCards roomCards) {
+            FlatmateMapper mapper, FlatmateRoomCards roomCards, LivingStyleService livingStyle) {
         this.posts = posts;
         this.rooms = rooms;
         this.groups = groups;
@@ -29,6 +33,7 @@ class FlatmateModerationDetails {
         this.users = users;
         this.mapper = mapper;
         this.roomCards = roomCards;
+        this.livingStyle = livingStyle;
     }
 
     @Transactional(readOnly = true)
@@ -43,7 +48,8 @@ class FlatmateModerationDetails {
         User author = user(post.getUserId());
         return new FlatmateModerationDetailDto(
                 FlatmateModerationQueueDto.of(post, author), null, null,
-                mapper.toDto(post, new FlatmateMapper.SeekerView(mobileOf(author))), null);
+                mapper.toDto(post, new FlatmateMapper.SeekerView(mobileOf(author))), null,
+                styleOf(post.getUserId()));
     }
 
     private FlatmateModerationDetailDto ofRoom(FlatmateRoom room) {
@@ -53,7 +59,7 @@ class FlatmateModerationDetails {
                 .ownerViews(List.of(room), nameOf(host), mobileOf(host)).get(room.getId());
         return new FlatmateModerationDetailDto(
                 FlatmateModerationQueueDto.of(room, host), mapper.toDto(room, view), null,
-                null, reviewOf(review, host));
+                null, reviewOf(review, host), styleOf(room.getHostId()));
     }
 
     private FlatmateModerationDetailDto ofGroup(FlatmateGroup group) {
@@ -63,12 +69,17 @@ class FlatmateModerationDetails {
                 mobileOf(host), review == null ? null : review.getStatus());
         return new FlatmateModerationDetailDto(
                 FlatmateModerationQueueDto.of(group, host), null, mapper.toDto(group, view),
-                null, reviewOf(review, host));
+                null, reviewOf(review, host), styleOf(group.getHostId()));
+    }
+
+    /** Staff see every answer: the stranger rule protects members from each other, not from review. */
+    private Map<String, Integer> styleOf(UUID authorId) {
+        return authorId == null ? Map.of() : LivingStyleCatalogue.ordered(livingStyle.answersOf(authorId));
     }
 
     private static FlatmateReviewDto reviewOf(FlatmateReview review, User host) {
         return review == null ? null
-                : FlatmateReviewDto.of(review, nameOf(host), mobileOf(host));
+                : FlatmateReviewDto.of(review, host);
     }
 
     private User user(UUID id) {

@@ -69,12 +69,14 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                 "furnishing":"semi","locality":"DetailTown","society":"%s",
+                                 "locality":"DetailTown","society":"%s",
                                  "rentShare":15500,"deposit":31000,"availableFrom":"2026-09-01",
                                  "lookingFor":"any","foodPref":"any",
-                                 "photos":["%s"],"hostRole":"owner",
-                                 "note":"Sunny room near the metro."}
-                                """.formatted(society, photoOf(host))))
+                                 "photos":["%s","%s","%s"],"hostRole":"owner",
+                                 "note":"Sunny room near the metro.",%s,%s}
+                                """.formatted(society, photoOf(host), UploadedPhotos.of(host.getId()),
+                                UploadedPhotos.of(host.getId()), FlatmateRoomFixture.BASICS,
+                                FlatmateRoomFixture.DETAILS)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
     }
@@ -86,7 +88,7 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
                         .content("""
                                 {"name":"Detail Seeker","gender":"any","age":27,"budget":18000,
                                  "localities":["DetailTown"],"moveIn":"2026-09-01",
-                                 "flatPref":"any","roomPref":"private","tags":[],"note":"Quiet."}
+                                 "flatPref":"any","roomPref":"private","note":"Quiet."}
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
@@ -135,6 +137,31 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.post.budget").value(18000))
                 .andExpect(jsonPath("$.post.mobile").value("9811100003"))
                 .andExpect(jsonPath("$.room").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("the author's full living style rides along for staff, and is an empty object when unanswered")
+    void detailCarriesTheAuthorsLivingStyle() throws Exception {
+        User host = user("9811100021", "Style Host", Roles.Wire.BUYER);
+        User silent = user("9811100022", "Silent Seeker", Roles.Wire.BUYER);
+        jdbc.update("insert into user_living_style (user_id, answers) values (?, ?::jsonb)", host.getId(),
+                "{\"smoking\":0,\"food\":2,\"tidy\":1}");
+        String room = createRoom(host, "Style Heights");
+        String post = createPost(silent);
+        User staff = user("9811100023", "Mod", Roles.Wire.ADMIN);
+
+        mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, room)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.livingStyle.food").value(2))
+                .andExpect(jsonPath("$.livingStyle.smoking").value(0))
+                .andExpect(jsonPath("$.livingStyle.tidy").value(1))
+                .andExpect(jsonPath("$.room.tags").doesNotExist());
+        mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, post)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.livingStyle").value(Matchers.anEmptyMap()))
+                .andExpect(jsonPath("$.post.tags").doesNotExist());
     }
 
     @Test
@@ -195,7 +222,7 @@ class FlatmateModerationDetailTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(applicant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"Four of us","locality":"Baner","rent":45000,
+                                {"title":"Four of us","locality":"Baner","rent":45000,"deposit":10000,
                                  "seats":4,"name":"Applicant"}
                                 """))
                 .andExpect(status().isCreated())

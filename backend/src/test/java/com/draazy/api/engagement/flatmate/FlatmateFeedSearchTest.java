@@ -101,19 +101,34 @@ class FlatmateFeedSearchTest extends AbstractApiTest {
                         feed("move-in").param("moveInDays", "0"),
                         feed("move-in").param("moveInDays", "30"),
                         feed("team-up").param("moveInDays", "30")),
-                // One jsonb containment clause per habit, so the SQL grows with the request; a
-                // habit holding jsonb's structural characters is still just a string.
-                smoke("habits",
-                        feed("move-in").param("habits", "Non-smoker"),
-                        feed("move-in").param("habits", "Non-smoker", "Vegetarian", "Pet-friendly"),
-                        feed("team-up").param("habits", "Non-smoker", "Vegetarian"),
-                        feed("move-in").param("habits", "{\"a\":1}")),
+                // A guest's tokens are ignored; the signed-in SQL is covered by FlatmateVibeFilterTest.
+                smoke("vibe",
+                        feed("move-in").param("vibe", "smoking:0"),
+                        feed("move-in").param("vibe", "smoking:0", "food:0", "pets:1", "pets:2"),
+                        feed("team-up").param("vibe", "smoking:0", "food:0")),
                 // Room-only and group-only facets must narrow their own kind and not empty the other.
                 smoke("kindSpecificFacets",
                         feed("move-in").param("attachedBath", "attached"),
                         feed("move-in").param("attachedBath", "shared"),
                         feed("team-up").param("sharing", "3"),
                         feed("move-in").param("sharing", "2")),
+                // Each emits its own predicate per branch; unknown values and a lone strictGender widen.
+                smoke("roomFacets",
+                        feed("move-in").param("gender", "female").param("strictGender", "true"),
+                        feed("team-up").param("gender", "male").param("strictGender", "true"),
+                        feed("people").param("gender", "female").param("strictGender", "true"),
+                        feed("teams").param("gender", "female").param("strictGender", "true"),
+                        feed("move-in").param("strictGender", "true"),
+                        feed("move-in").param("roomType", "private"),
+                        feed("people").param("roomType", "shared"),
+                        feed("teams").param("roomType", "private"),
+                        feed("move-in").param("roomType", "dorm"),
+                        feed("move-in").param("furnishing", "semi"),
+                        feed("move-in").param("furnishing", "luxury"),
+                        feed("move-in").param("gated", "true"),
+                        feed("move-in").param("gated", "maybe"),
+                        feed("move-in").param("roomType", "private").param("furnishing", "furnished")
+                                .param("gated", "true").param("attachedBath", "attached")),
                 // A bounding box plus a cosine comparison, so it proves the coordinate column types.
                 smoke("radius",
                         feed("move-in").param("nearLat", "18.5204").param("nearLng", "73.8567")
@@ -183,7 +198,7 @@ class FlatmateFeedSearchTest extends AbstractApiTest {
                                 .param("gender", "female")
                                 .param("verifiedOnly", "true")
                                 .param("moveInDays", "30")
-                                .param("habits", "Non-smoker", "Vegetarian")
+                                .param("vibe", "smoking:0", "food:0")
                                 .param("attachedBath", "attached")
                                 .param("sharing", "3")
                                 .param("sort", "match")
@@ -200,7 +215,7 @@ class FlatmateFeedSearchTest extends AbstractApiTest {
                                 .param("gender", "male")
                                 .param("verifiedOnly", "true")
                                 .param("moveInDays", "30")
-                                .param("habits", "Non-smoker")
+                                .param("vibe", "smoking:0")
                                 .param("sharing", "2")
                                 .param("sort", "budget-low")
                                 .param("page", "0").param("size", "12")));

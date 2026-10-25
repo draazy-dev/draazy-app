@@ -50,7 +50,6 @@ public record FlatmateRoomFeedDto(
         LocalDate availableFrom,
         String gender,
         String food,
-        List<String> tags,
         String note,
         String cover,
         String owner,

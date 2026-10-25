@@ -31,7 +31,6 @@ public record FlatmateGroupDto(
         String addressFingerprint,
         boolean flagForReview,
         String modStatus,
-        List<String> tags,
         String note,
         String ownerName,
         String ownerMobile,

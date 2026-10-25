@@ -58,7 +58,7 @@ class FlatmateExpiryTest extends AbstractApiTest {
         return """
                 {"name":"%s","gender":"female","age":26,"occupation":"UX Designer",
                  "budget":18000,"localities":["%s"],"moveIn":"2026-09-01",
-                 "flatPref":"women","roomPref":"private","tags":["Vegetarian"],
+                 "flatPref":"women","roomPref":"private",
                  "note":"%s"}
                 """.formatted(name, locality, note);
     }

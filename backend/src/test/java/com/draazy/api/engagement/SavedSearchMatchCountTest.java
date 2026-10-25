@@ -396,9 +396,9 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
         seedLocality();
         jdbc.update("""
                 insert into flatmate_seeker_posts
-                    (user_id, name, gender, budget, localities, tags, mod_status)
+                    (user_id, name, gender, budget, localities, mod_status)
                 values (?, 'D227 Seeker', 'female', 18000, '[\"D227 Flatmate Town\"]'::jsonb,
-                    '[\"Vegetarian\"]'::jsonb, 'approved')
+                    'approved')
                 """, user.getId());
         em.flush();
         em.clear();
@@ -408,11 +408,54 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
                         Map.of("deal", "rent", "localities", List.of(SLUG), "bhk", List.of(99)),
                         Map.of("tab", "team-up", "locality", "D227 Flatmate Town",
                                 "budgetMin", 15000, "budget", 20000,
-                                "gender", "female", "habits", List.of("Vegetarian")),
+                                "gender", "female"),
                         null, null));
 
         assertThat(created.matchCount()).isEqualTo(1);
         assertThat(only(user).matchCount()).isEqualTo(1);
+    }
+
+    private void style(User user, String answers) {
+        jdbc.update("insert into user_living_style (user_id, answers) values (?, ?::jsonb)", user.getId(), answers);
+    }
+
+    private void seeker(String mobile, String answers) {
+        User author = owner(mobile);
+        if (answers != null) {
+            style(author, answers);
+        }
+        jdbc.update("insert into flatmate_seeker_posts (user_id, name, gender, budget, localities, mod_status)"
+                + " values (?, 'Vibe Seeker', 'any', 15000, '[\"D227 Flatmate Town\"]'::jsonb, 'approved')", author.getId());
+    }
+
+    @Test
+    @DisplayName("a vibe alert filters on the author's answers, with the alert owner standing in for the caller")
+    void vibeNarrowsAlertsForKeysTheOwnerAnswered() {
+        seedLocality();
+        seeker("9820600061", "{\"food\":0,\"smoking\":0}");
+        seeker("9820600062", "{\"food\":2}");
+        seeker("9820600063", null);
+        User answered = owner("9820600064");
+        style(answered, "{\"food\":1,\"smoking\":1,\"drinks\":1}");
+        User twoAnswers = owner("9820600066");
+        style(twoAnswers, "{\"food\":1,\"smoking\":1}");
+        em.flush();
+        em.clear();
+
+        assertThat(vibeCount(answered, List.of("food:0"))).isEqualTo(1);
+        assertThat(vibeCount(answered, List.of("food:0", "food:2"))).as("OR within a key").isEqualTo(2);
+        assertThat(vibeCount(answered, List.of("food:0", "smoking:1"))).as("AND across keys").isZero();
+        assertThat(vibeCount(answered, List.of("food:0", "smoking:0"))).isEqualTo(1);
+        assertThat(vibeCount(answered, List.of("pets:0", "bogus", "food:9"))).as("unanswered or malformed keys are ignored").isEqualTo(3);
+        assertThat(vibeCount(owner("9820600065"), List.of("food:0"))).as("an owner with no answers filters nothing").isEqualTo(3);
+        assertThat(vibeCount(twoAnswers, List.of("food:0"))).as("an owner below three answers filters nothing").isEqualTo(3);
+    }
+
+    private long vibeCount(User owner, List<String> vibe) {
+        return savedSearches.create(owner.getId(),
+                new SavedSearchCreateRequest("Vibe " + vibe + owner.getMobile(), "flatmates", null,
+                        Map.of("deal", "rent", "localities", List.of(SLUG), "bhk", List.of(99)),
+                        board("people", "vibe", vibe), null, null)).matchCount();
     }
 
     @Test
@@ -431,6 +474,95 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
 
         assertThat(only(searcher).matchCount()).isEqualTo(1);
         assertThat(savedSearches.list(poster.getId())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("people counts seeker posts only, teams counts hunting groups only")
+    void peopleAndTeamsTabsAreCountedSeparately() {
+        User user = owner("9820600031");
+        seedLocality();
+        jdbc.update("""
+                insert into flatmate_seeker_posts (user_id, name, gender, budget, localities, mod_status)
+                values (?, 'Tabs Seeker', 'any', 15000, '[\"D227 Flatmate Town\"]'::jsonb, 'approved')
+                """, user.getId());
+        jdbc.update("""
+                insert into flatmate_groups (host_id, title, locality, localities, rent, seats_total, seats_open, mod_status)
+                values (?, 'Tabs Team', 'D227 Flatmate Town', '[\"D227 Flatmate Town\"]'::jsonb, 30000, 3, 1, 'approved')
+                """, user.getId());
+        em.flush();
+        em.clear();
+
+        for (Object[] row : new Object[][] {{"people", 1}, {"teams", 1}, {"team-up", 2}, {"move-in", 0}}) {
+            SavedSearchResponse created = savedSearches.create(user.getId(),
+                    new SavedSearchCreateRequest("Tab " + row[0], "flatmates", null,
+                            Map.of("deal", "rent", "localities", List.of(SLUG), "bhk", List.of(99)),
+                            Map.of("tab", row[0], "locality", "D227 Flatmate Town"), null, null));
+            assertThat(created.matchCount()).as((String) row[0]).isEqualTo(row[1]);
+        }
+    }
+
+    private long flatmateCount(String mobile, Map<String, Object> criteria) {
+        User user = owner(mobile);
+        return savedSearches.create(user.getId(),
+                new SavedSearchCreateRequest("Facets " + mobile, "flatmates", null,
+                        Map.of("deal", "rent", "localities", List.of(SLUG), "bhk", List.of(99)),
+                        criteria, null, null)).matchCount();
+    }
+
+    private static Map<String, Object> board(String tab, Object... extra) {
+        Map<String, Object> criteria = new java.util.HashMap<>(Map.of("tab", tab, "locality", "D227 Flatmate Town"));
+        for (int i = 0; i < extra.length; i += 2) {
+            criteria.put((String) extra[i], extra[i + 1]);
+        }
+        return criteria;
+    }
+
+    @Test
+    @DisplayName("strictGender, roomType, furnishing and gated narrow an alert exactly as they narrow the board")
+    void flatmateFacetsNarrowAlerts() {
+        User host = owner("9820600040");
+        seedLocality();
+        String place = "D227 Flatmate Town";
+        jdbc.update("insert into flatmate_rooms (host_id, room_type, locality, budget, mod_status, gender,"
+                + " furnishing, gated_community) values (?, 'Private room', ?, 15000, 'approved', 'any', 'furnished', true)",
+                host.getId(), place);
+        jdbc.update("insert into flatmate_rooms (host_id, room_type, locality, budget, mod_status, gender,"
+                + " furnishing, gated_community) values (?, 'Shared room', ?, 12000, 'approved', 'female', 'semi', false)",
+                host.getId(), place);
+        String[] seekerMobiles = {"9820600038", "9820600039"};
+        String[][] seekers = {{"any", "any"}, {"female", "private"}};
+        for (int i = 0; i < seekers.length; i++) {
+            String[] seeker = seekers[i];
+            jdbc.update("insert into flatmate_seeker_posts (user_id, name, gender, room_pref, budget, localities,"
+                    + " mod_status) values (?, 'Seeker', ?, ?, 15000, ?::jsonb, 'approved')",
+                    owner(seekerMobiles[i]).getId(), seeker[0], seeker[1], "[\"" + place + "\"]");
+        }
+        for (String policy : new String[] {"any", "women"}) {
+            jdbc.update("insert into flatmate_groups (host_id, title, locality, localities, rent, seats_total,"
+                    + " seats_open, policy, mod_status) values (?, 'Team', ?, ?::jsonb, 30000, 3, 1, ?, 'approved')",
+                    host.getId(), place, "[\"" + place + "\"]", policy);
+        }
+        em.flush();
+        em.clear();
+
+        assertThat(flatmateCount("9820600041", board("move-in"))).isEqualTo(2);
+        assertThat(flatmateCount("9820600042", board("move-in", "gender", "female"))).isEqualTo(2);
+        assertThat(flatmateCount("9820600043", board("move-in", "gender", "female", "strictGender", true))).isEqualTo(1);
+        assertThat(flatmateCount("9820600044", board("move-in", "gender", "female", "strictGender", "yes"))).isEqualTo(2);
+        assertThat(flatmateCount("9820600045", board("move-in", "gated", true))).isEqualTo(1);
+        assertThat(flatmateCount("9820600046", board("move-in", "gated", "maybe"))).isEqualTo(2);
+        assertThat(flatmateCount("9820600047", board("move-in", "furnishing", "semi"))).isEqualTo(1);
+        assertThat(flatmateCount("9820600048", board("move-in", "furnishing", "luxury"))).isEqualTo(2);
+        assertThat(flatmateCount("9820600049", board("move-in", "roomType", "shared"))).isEqualTo(1);
+
+        assertThat(flatmateCount("9820600050", board("people", "gender", "female"))).isEqualTo(2);
+        assertThat(flatmateCount("9820600051", board("people", "gender", "female", "strictGender", true))).isEqualTo(1);
+        assertThat(flatmateCount("9820600052", board("people", "roomType", "shared"))).isEqualTo(1);
+        assertThat(flatmateCount("9820600053", board("people", "roomType", "private"))).isEqualTo(2);
+
+        assertThat(flatmateCount("9820600054", board("teams", "gender", "female"))).isEqualTo(2);
+        assertThat(flatmateCount("9820600055", board("teams", "gender", "female", "strictGender", true))).isEqualTo(1);
+        assertThat(flatmateCount("9820600056", board("teams", "roomType", "private", "gated", true))).isEqualTo(2);
     }
 
     @Test

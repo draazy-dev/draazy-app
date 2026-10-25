@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.error.NotFoundException;
+import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.identity.user.UserStatuses;
@@ -66,6 +67,7 @@ public class FlatmateDetailService {
                 .filter(r -> isHost(caller, r.getHostId()) || r.isVisible() && hostActive(r.getHostId()))
                 .orElseThrow(() -> NotFoundException.of("Room"));
         List<String> photos = List.copyOf(room.getPhotos());
+        FlatmateDetailDto.Specs specs = FlatmateDetailDto.Specs.of(room.getDetails());
         if (isHost(caller, room.getHostId())) {
             User me = users.findById(caller.userId()).orElse(null);
             Optional<FlatmateReview> review = reviews.findByRoomId(room.getId());
@@ -73,10 +75,10 @@ public class FlatmateDetailService {
                     .get(room.getId()).withHost(hostAnswers(room, review));
             return FlatmateDetailDto.owned(FlatmateDetailDto.KIND_ROOM,
                     mapper.toDto(room, view), photos,
-                    review.map(FlatmateDetailDto.Verification::of).orElse(null));
+                    review.map(FlatmateDetailDto.Verification::of).orElse(null)).withSpecs(specs);
         }
         return FlatmateDetailDto.visitor(FlatmateDetailDto.KIND_ROOM,
-                cards.render(List.of(room)).get(0), photos);
+                cards.render(List.of(room)).get(0), photos).withSpecs(specs);
     }
 
     @Transactional(readOnly = true)
@@ -108,7 +110,20 @@ public class FlatmateDetailService {
                 review.map(FlatmateReview::getAgreementDoc).map(FlatmateDetailService::withoutBytes)
                         .orElse(null),
                 agreement.getValidTill(),
-                room.getOwnerConsentMobile());
+                room.getOwnerConsentMobile(),
+                attachedFlat(room, review),
+                review.map(FlatmateReview::getReason).orElse(null),
+                review.map(FlatmateReview::isOwnerConsent).orElse(null));
+    }
+
+    /** A spare room never stores the flat it claimed, so the edit form gets it back from wherever the claim
+     * was kept — the address fingerprint for an owner, the review for a tenant — or a re-save drops the tier. */
+    private static UUID attachedFlat(FlatmateRoom room, Optional<FlatmateReview> review) {
+        String fingerprint = room.getAddressFingerprint();
+        if (fingerprint != null && fingerprint.startsWith(FlatmateGuardrails.PROPERTY_PREFIX)) {
+            return Ids.parseUuid(fingerprint.substring(FlatmateGuardrails.PROPERTY_PREFIX.length())).orElse(null);
+        }
+        return review.map(FlatmateReview::getTenancyPropertyId).orElse(null);
     }
 
     private static Map<String, Object> withoutBytes(Map<String, Object> doc) {
@@ -126,7 +141,7 @@ public class FlatmateDetailService {
                 d.noticePeriodDays(), d.lockInMonths(), d.maintenanceBilling(), d.electricityBilling(),
                 d.perHead(), d.seatsTotal(), d.seatsOpen(), d.members(), d.propertyId(), d.hostRole(),
                 d.verificationTier(), d.agreementDeclared(), d.ownerConsent(), mobile, d.reviewStatus(),
-                d.addressFingerprint(), d.flagForReview(), d.modStatus(), d.tags(), d.note(),
+                d.addressFingerprint(), d.flagForReview(), d.modStatus(), d.note(),
                 d.ownerName(), d.ownerMobile(), d.createdAt(), d.preferences());
     }
 

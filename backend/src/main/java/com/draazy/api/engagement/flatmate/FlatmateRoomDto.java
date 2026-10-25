@@ -57,7 +57,6 @@ public record FlatmateRoomDto(
         LocalDate availableFrom,
         String gender,
         String food,
-        List<String> tags,
         String note,
         String cover,
         List<String> photos,
@@ -71,6 +70,9 @@ public record FlatmateRoomDto(
             FlatmateRoomDetails details,
             Map<String, Object> agreementDoc,
             LocalDate agreementValidTill,
-            String ownerConsentMobile) {
+            String ownerConsentMobile,
+            UUID attachedPropertyId,
+            String reviewReason,
+            Boolean ownerConsentConfirmed) {
     }
 }

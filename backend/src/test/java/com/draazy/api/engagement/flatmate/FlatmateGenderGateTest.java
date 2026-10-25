@@ -11,7 +11,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,11 +60,12 @@ class FlatmateGenderGateTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(withSocietyIds("""
                                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                 "furnishing":"semi","locality":"Baner","society":"Sunrise Heights",
+                                 "locality":"Baner","society":"Sunrise Heights",
                                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
-                                 "lookingFor":"any","foodPref":"any","photos":["%s"],
-                                 "hostRole":"owner","note":"Sunny room, quiet building."}
-                                """.formatted(UploadedPhotos.of(host.getId())))))
+                                 "lookingFor":"any","foodPref":"any",%s,
+                                 "hostRole":"owner","note":"Sunny room, quiet building.",%s,%s}
+                                """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateRoomFixture.BASICS,
+                                FlatmateRoomFixture.DETAILS))))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         String id = idOf(json);
@@ -82,7 +82,7 @@ class FlatmateGenderGateTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Team up in Baner","locality":"Baner","policy":"%s",
-                                 "rent":30000,"seats":3,"seatsOpen":2,"name":"Host"}
+                                 "rent":30000,"deposit":10000,"seats":3,"seatsOpen":2,"name":"Host"}
                                 """.formatted(policy)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
@@ -102,7 +102,7 @@ class FlatmateGenderGateTest extends AbstractApiTest {
                         .content("""
                                 {"name":"Seeker","gender":"%s","age":26,"occupation":"Designer",
                                  "budget":18000,"localities":["Baner"],"moveIn":"2026-09-01",
-                                 "flatPref":"any","roomPref":"private","tags":["Vegetarian"],
+                                 "flatPref":"any","roomPref":"private",
                                  "note":"Quiet, tidy, work from home twice a week."}
                                 """.formatted(gender)));
     }

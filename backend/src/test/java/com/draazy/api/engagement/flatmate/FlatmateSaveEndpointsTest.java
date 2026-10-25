@@ -12,7 +12,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -71,10 +70,11 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
     private String createRoom(User host, String society) throws Exception {
         String body = withSocietyIds("""
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                 "furnishing":"semi","locality":"Baner","society":"%s","rentShare":15000,
+                 "locality":"Baner","society":"%s","rentShare":15000,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
-                 "foodPref":"any","hostRole":"owner","photos":["%s"]}
-                """.formatted(society, UploadedPhotos.of(host.getId())));
+                 "foodPref":"any","hostRole":"owner",%s,%s,%s}
+                """.formatted(society, FlatmateRoomFixture.photos(host.getId()), FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS));
         String json = mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -86,7 +86,7 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
 
     private String createGroup(User host, String title) throws Exception {
         String body = """
-                {"title":"%s","locality":"Baner","policy":"women","rent":40000,
+                {"title":"%s","locality":"Baner","policy":"women","rent":40000,"deposit":10000,
                  "seats":3,"seatsOpen":1,"name":"Host"}
                 """.formatted(title);
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
@@ -102,7 +102,7 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
         String body = """
                 {"name":"%s","gender":"female","age":26,"occupation":"UX Designer",
                  "budget":18000,"localities":["Baner"],"moveIn":"2026-09-01",
-                 "flatPref":"women","roomPref":"private","tags":["Vegetarian"]}
+                 "flatPref":"women","roomPref":"private"}
                 """.formatted(name);
         String json = mvc.perform(post(Routes.Flatmates.POSTS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(author))

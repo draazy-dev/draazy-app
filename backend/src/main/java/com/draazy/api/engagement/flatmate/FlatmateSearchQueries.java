@@ -1,9 +1,13 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.persistence.LikePatterns;
+import com.draazy.api.engagement.livingstyle.LivingStyleCatalogue;
+import com.draazy.api.engagement.livingstyle.LivingStyleViewer;
+import com.draazy.api.engagement.livingstyle.VibeFilter;
 import com.draazy.api.identity.user.UserStatuses;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -80,6 +84,31 @@ public class FlatmateSearchQueries {
         return countOnly(matchesCte(facets, params), params).total();
     }
 
+    /** The newest public group that has its flat — the board's own rows, so the panel cannot show a split the
+     * feed would hide. */
+    public FlatmatePulse.Split newestSplit() {
+        Map<String, Object> params = new HashMap<>();
+        Query query = em.createNativeQuery("""
+                select g.locality, p.bhk, g.rent, g.seats_total, g.per_head
+                from flatmate_groups g
+                left join properties p on p.id = g.property_id
+                """ + publicRows("g", "host_id", params) + SEP + """
+                and g.property_id is not null and g.seats_total > 1
+                order by g.created_at desc, g.id desc
+                limit 1
+                """);
+        params.forEach(query::setParameter);
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+        if (rows.isEmpty()) {
+            return null;
+        }
+        Object[] row = rows.getFirst();
+        return new FlatmatePulse.Split((String) row[0],
+                row[1] == null ? null : new BigDecimal(row[1].toString()),
+                ((Number) row[2]).longValue(), ((Number) row[3]).intValue(), ((Number) row[4]).longValue());
+    }
+
     private Result countOnly(String matches, Map<String, Object> params) {
         Query count = em.createNativeQuery(matches + """
                 select count(*), coalesce(sum(case when verified then 1 else 0 end), 0)
@@ -140,7 +169,39 @@ public class FlatmateSearchQueries {
             score.append(" + case when gender = :meGender or gender = 'any' then 1 else 0 end");
             params.put("meGender", f.meGender());
         }
+        if (f.meStyle().scorable()) {
+            appendStyleTerm(score, f.meStyle(), params);
+        }
         return "order by (" + score + ") desc, created_at desc, id desc\n";
+    }
+
+    /** Worth up to 4 for a perfect match, 0 when the author has not answered enough to compare. Only
+     * catalogue keys reach the SQL text; the viewer's values are bound. */
+    private static void appendStyleTerm(StringBuilder score, LivingStyleViewer viewer,
+            Map<String, Object> params) {
+        StringBuilder points = new StringBuilder();
+        StringBuilder common = new StringBuilder();
+        for (String key : LivingStyleCatalogue.KEYS) {
+            Integer mine = viewer.answers().get(key);
+            if (mine == null) {
+                continue;
+            }
+            String theirs = "s.answers ->> '" + key + "'";
+            String bind = "meStyle_" + key;
+            String sep = points.isEmpty() ? "" : " + ";
+            points.append(sep).append("case when ").append(theirs).append(" is not null then ")
+                    .append(LivingStyleCatalogue.MAX).append(" - abs(cast(").append(theirs)
+                    .append(" as integer) - cast(:").append(bind).append(" as integer)) else 0 end");
+            common.append(sep).append("case when ").append(theirs).append(" is not null then 1 else 0 end");
+            params.put(bind, mine);
+        }
+        params.put("meStyleUser", viewer.userId());
+        score.append(SEP).append(" + coalesce((select case when x.common >= ")
+                .append(LivingStyleCatalogue.MIN_COMMON).append(" then 4.0 * x.points / (")
+                .append(LivingStyleCatalogue.MAX).append(" * x.common) else 0 end")
+                .append(" from (select ").append(points).append(" as points, ").append(common)
+                .append(" as common from user_living_style s")
+                .append(" where s.user_id = matches.author_id and s.user_id <> :meStyleUser) x), 0)");
     }
 
     private static String matchesCte(FlatmateSearchQuery f, Map<String, Object> params) {
@@ -149,9 +210,12 @@ public class FlatmateSearchQueries {
                     + roomSelect(f, params) + "\nunion all\n" + groupSelect(f, params, true)
                     + "\n)\n";
         }
-        return "with matches as (\n"
-                + postSelect(f, params) + "\nunion all\n" + groupSelect(f, params, false)
-                + "\n)\n";
+        String body = switch (f.tab()) {
+            case FlatmateVocabulary.TAB_PEOPLE -> postSelect(f, params);
+            case FlatmateVocabulary.TAB_TEAMS -> groupSelect(f, params, false);
+            default -> postSelect(f, params) + "\nunion all\n" + groupSelect(f, params, false);
+        };
+        return "with matches as (\n" + body + "\n)\n";
     }
 
     /** Computed over every unarchived room BEFORE any facet applies — otherwise a budget filter
@@ -210,7 +274,8 @@ public class FlatmateSearchQueries {
         sql.append(perPersonPrice()).append(" as price,\n");
         sql.append("""
                        to_jsonb(array[r.locality]) as locs,
-                       r.gender as gender
+                       r.gender as gender,
+                       r.host_id as author_id
                 from flatmate_rooms r
                 join room_ledger l on l.id = r.id
                 """);
@@ -225,7 +290,7 @@ public class FlatmateSearchQueries {
                     and (lower(r.locality) like :q or lower(coalesce(r.society, '')) like :q
                          or lower(coalesce(r.note, '')) like :q
                          or lower(coalesce(r.flat_type, '')) like :q""")
-                    .append(" or ").append(jsonbTextLike("r.tags")).append(')');
+                    .append(')');
             params.put("q", like(f.q()));
         }
         if (f.minBudget() != null) {
@@ -237,12 +302,24 @@ public class FlatmateSearchQueries {
             params.put("maxBudget", f.maxBudget());
         }
         if (f.gender() != null) {
-            sql.append(" and (r.gender = :gender or r.gender = 'any')");
+            sql.append(f.strictGender() ? " and r.gender = :gender"
+                    : " and (r.gender = :gender or r.gender = 'any')");
             params.put("gender", f.gender());
         }
         if (f.attachedBath() != null) {
             sql.append(" and r.attached_bath = :attachedBath");
             params.put("attachedBath", f.attachedBath());
+        }
+        if (f.roomType() != null) {
+            sql.append(" and r.room_type = :roomType");
+            params.put("roomType", f.roomType().equals("private") ? "Private room" : "Shared room");
+        }
+        if (f.furnishing() != null) {
+            sql.append(" and r.furnishing = :furnishing");
+            params.put("furnishing", f.furnishing());
+        }
+        if (f.gated()) {
+            sql.append(" and r.gated_community");
         }
         if (f.moveInDays() != null) {
 
@@ -252,7 +329,7 @@ public class FlatmateSearchQueries {
                     .append(moveInHorizon());
             params.put("moveInDays", f.moveInDays());
         }
-        appendHabits(sql, "r", f, params);
+        appendVibe(sql, "r.host_id", f, params);
         appendRadius(sql, "r", f, params);
         if (f.verifiedOnly()) {
             sql.append(SEP).append(" and ").append(roomVerified());
@@ -284,11 +361,15 @@ public class FlatmateSearchQueries {
                        g.localities as locs,
                        case when g.policy = 'women' then 'female'
                             when g.policy = 'men' then 'male'
-                            else g.policy end as gender
+                            else g.policy end as gender,
+                       g.host_id as author_id
                 from flatmate_groups g
                 """);
         sql.append(publicRows("g", "host_id", params)).append('\n');
         sql.append(housed ? " and g.property_id is not null" : " and g.property_id is null");
+        if (housed && f.roomOnly()) {
+            sql.append(" and false");
+        }
 
         if (f.locality() != null) {
             sql.append(" and exists (select 1 from jsonb_array_elements_text(g.localities) as l(v)"
@@ -301,8 +382,7 @@ public class FlatmateSearchQueries {
              * the same permission as a name being queryable. */
             sql.append(SEP).append("""
                     and (lower(g.title) like :q or lower(coalesce(g.note, '')) like :q""")
-                    .append(" or ").append(jsonbTextLike("g.localities"))
-                    .append(" or ").append(jsonbTextLike("g.tags")).append(')');
+                    .append(" or ").append(jsonbTextLike("g.localities")).append(')');
             params.put("q", like(f.q()));
         }
 
@@ -320,7 +400,8 @@ public class FlatmateSearchQueries {
         }
         String policy = f.policy();
         if (policy != null) {
-            sql.append(" and (g.policy = :policy or g.policy = 'any')");
+            sql.append(f.strictGender() ? " and g.policy = :policy"
+                    : " and (g.policy = :policy or g.policy = 'any')");
             params.put("policy", policy);
         }
         if (f.sharing() != null) {
@@ -332,7 +413,7 @@ public class FlatmateSearchQueries {
             sql.append(" and (g.move_in_by is null or g.move_in_by <= ").append(moveInHorizon());
             params.put("moveInDays", f.moveInDays());
         }
-        appendHabits(sql, "g", f, params);
+        appendVibe(sql, "g.host_id", f, params);
         appendRadius(sql, "g", f, params);
         if (f.verifiedOnly()) {
 
@@ -348,7 +429,8 @@ public class FlatmateSearchQueries {
                        p.verified as verified,
                        cast(p.budget as numeric) as price,
                        p.localities as locs,
-                       p.gender as gender
+                       p.gender as gender,
+                       p.user_id as author_id
                 from flatmate_seeker_posts p
                 """);
         sql.append(publicRows("p", "user_id", params)).append('\n');
@@ -366,8 +448,7 @@ public class FlatmateSearchQueries {
             sql.append(SEP).append("""
                     and (lower(coalesce(p.occupation, '')) like :q
                          or lower(coalesce(p.note, '')) like :q""")
-                    .append(" or ").append(jsonbTextLike("p.localities"))
-                    .append(SEP).append("         or ").append(jsonbTextLike("p.tags")).append(')');
+                    .append(" or ").append(jsonbTextLike("p.localities")).append(')');
             params.put("q", like(f.q()));
         }
         if (f.minBudget() != null) {
@@ -379,8 +460,13 @@ public class FlatmateSearchQueries {
             params.put("maxBudget", f.maxBudget());
         }
         if (f.gender() != null) {
-            sql.append(" and (p.gender = :gender or p.gender = 'any')");
+            sql.append(f.strictGender() ? " and p.gender = :gender"
+                    : " and (p.gender = :gender or p.gender = 'any')");
             params.put("gender", f.gender());
+        }
+        if (f.roomType() != null) {
+            sql.append(" and p.room_pref in (:roomPref, 'any')");
+            params.put("roomPref", f.roomType());
         }
         if (f.moveInDays() != null) {
 
@@ -388,7 +474,7 @@ public class FlatmateSearchQueries {
                     .append(moveInHorizon());
             params.put("moveInDays", f.moveInDays());
         }
-        appendHabits(sql, "p", f, params);
+        appendVibe(sql, "p.user_id", f, params);
         appendRadius(sql, "p", f, params);
         if (f.verifiedOnly()) {
             sql.append(" and p.verified");
@@ -396,15 +482,9 @@ public class FlatmateSearchQueries {
         return sql.toString();
     }
 
-    private static void appendHabits(StringBuilder sql, String alias, FlatmateSearchQuery f,
+    private static void appendVibe(StringBuilder sql, String authorColumn, FlatmateSearchQuery f,
             Map<String, Object> params) {
-        List<String> habits = f.habits();
-        for (int i = 0; i < habits.size(); i++) {
-            String name = "habit" + i;
-            sql.append(" and ").append(alias).append(".tags @> to_jsonb(cast(:")
-                    .append(name).append(" as text))");
-            params.put(name, habits.get(i));
-        }
+        sql.append(VibeFilter.sql(authorColumn, f.vibe(), f.meStyle().answers(), params));
     }
 
     /** "Within N km of this point" without PostGIS — bounding box, then the exact great-circle test,

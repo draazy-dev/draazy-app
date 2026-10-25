@@ -204,11 +204,6 @@ public class FlatmateRoom extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private String food = "any";
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "tags", nullable = false)
-    @Setter
-    private List<String> tags = new ArrayList<>();
-
     @Column(name = "note")
     @Setter
     private String note;
