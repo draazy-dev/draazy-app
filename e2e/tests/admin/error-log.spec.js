@@ -1,5 +1,6 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 const report = (message) => fetch(`${API}/client-errors`, {
   method: 'POST',
@@ -80,5 +81,6 @@ test('a manager neither sees the error log nor reads its API', async ({ page, lo
   await login.asManager();
   await page.goto('/admin/error-log');
   await expect(page).toHaveURL(/\/admin\/?$/);
+  await expandAdminNav(page);
   await expect(page.getByRole('link', { name: 'Error log' })).toHaveCount(0);
 });

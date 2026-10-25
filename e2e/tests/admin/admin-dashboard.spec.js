@@ -84,6 +84,39 @@ test.describe('/admin dashboard — the scorecard is the server\'s', () => {
     await expect(page.getByText(/Smart alerts|Daily ops scorecard/i)).toHaveCount(0);
   });
 
+  test('flatmate tiles and the Flatmate review SLA track render the flatmates section the server sent', async ({ page, login }) => {
+    // Captured from the live response so the assertion cannot race other workers' writes.
+    let served;
+    await page.route('**/admin/dashboard', async (route) => {
+      const res = await route.fetch();
+      served = await res.json();
+      await route.fulfill({ response: res, json: served });
+    });
+    await openDashboard(page, login);
+    const f = served.flatmates;
+    expect(f, 'an admin holds the flatmates desk, so the section is served').toBeTruthy();
+
+    for (const [label, value] of [
+      ['Flatmate Posts to Review', f.awaitingReview],
+      ['Flatmate Reports', f.openReports],
+      ['Unanswered Flatmate Requests', f.unansweredRequests],
+      ['Live Rooms', f.liveRooms],
+      ['Active Seekers', f.activeSeekers],
+      ['Matches (30d)', f.matches30d],
+    ]) {
+      expect(await tileValue(page, label), label).toBe(value.toLocaleString('en-IN'));
+    }
+    expect(await tileValue(page, 'Host Reply Rate (30d)')).toBe(f.replyRatePct == null ? '—' : `${f.replyRatePct}%`);
+    await expect(tile(page, 'Live Rooms')).toContainText(`${f.liveGroups.toLocaleString('en-IN')} live groups`);
+
+    const track = page.getByTestId('sla-health').locator('.dz-card', { hasText: 'Flatmate review' });
+    const rate = served.sla.flatmateReview.slaRatePct;
+    await expect(track).toContainText(rate == null ? 'Not recorded' : `${rate}% within target`);
+
+    await tile(page, 'Flatmate Reports').click();
+    await expect(page).toHaveURL(/\/admin\/reports\?tab=posts$/);
+  });
+
   test('catalogue tiles render the counts GET /admin/dashboard sent, not a page of them', async ({ page, login }) => {
     await openDashboard(page, login);
 
@@ -104,6 +137,19 @@ test.describe('/admin dashboard — the scorecard is the server\'s', () => {
 
     // The sub-label catches browser-side counts from capped moderation pages.
     await expect(tile(page, 'Active Listings')).toContainText(`${k.totalListings} total`);
+  });
+
+  test('Needs Follow-up counts its own tab, and the demand tiles open their tab and status', async ({ page, login }) => {
+    await openDashboard(page, login);
+    const followUp = await api('GET', '/admin/properties?status=approved&archived=false&unconfirmed=true&size=1',
+      await authHeaders(ACTORS.admin));
+    expect(followUp.status).toBe(200);
+    expect(await tileValue(page, 'Needs Follow-up')).toBe(String(followUp.body.totalElements));
+
+    await tile(page, 'Scheduled Visits').click();
+    await expect(page).toHaveURL(/\/admin\/enquiries\?tab=visits&status=scheduled$/);
+    await expect(page.getByRole('group', { name: 'Status' }).getByRole('button', { name: /^Scheduled/ }))
+      .toHaveAttribute('aria-pressed', 'true');
   });
 
   test('revenue is served to an admin and withheld from staff, from the same endpoint', async ({ page, login }) => {

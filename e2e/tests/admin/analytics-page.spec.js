@@ -5,8 +5,8 @@ import { API, authHeaders } from '../../helpers/liveAuth.js';
 // The seeded admin, as used by the other live admin specs.
 const admin = () => authHeaders('9000000000');
 
-// Named once so the "all six" test cannot drift.
-const TABS = ['Traffic', 'Engagement', 'Funnel', 'Supply Gap', 'Pricing', 'SLA'];
+// Named once so the "all seven" test cannot drift.
+const TABS = ['Traffic', 'Engagement', 'Funnel', 'Flatmates', 'Supply Gap', 'Pricing', 'SLA'];
 
 // Deep links are the page contract, not a shortcut around the UI.
 async function openAnalytics(page, tab) {
@@ -14,7 +14,7 @@ async function openAnalytics(page, tab) {
   await expect(page.getByRole('heading', { name: /Analytics/i })).toBeVisible();
 }
 
-test('analytics opens on Traffic with all six tabs, no Conversion or Anonymous surfers tab, its chart cards and a CSV export, and logs no console errors', async ({ page, login, consoleErrors }) => {
+test('analytics opens on Traffic with all seven tabs, no Conversion or Anonymous surfers tab, its chart cards and a CSV export, and logs no console errors', async ({ page, login, consoleErrors }) => {
   test.slow();
   await login.asAdmin();
   await test.step('analytics page loads without errors', async () => {
@@ -23,7 +23,7 @@ test('analytics opens on Traffic with all six tabs, no Conversion or Anonymous s
     await expect(page.getByRole('tab', { name: 'Traffic' })).toBeVisible();
     expect(consoleErrors).toHaveLength(0);
   });
-  await test.step('analytics opens on Traffic and offers all six tabs', async () => {
+  await test.step('analytics opens on Traffic and offers all seven tabs', async () => {
     await openAnalytics(page);
     await expect(page.getByRole('tab', { name: 'Traffic' })).toHaveAttribute('aria-selected', 'true');
     for (const label of TABS) {
@@ -254,6 +254,60 @@ test('a failed funnel read says so instead of showing zero stages', async ({ pag
   await openAnalytics(page, 'funnel');
   await expect(page.getByRole('alert').filter({ hasText: /funnel report did not answer/i })).toBeVisible();
   await expect(page.getByTestId('funnel-posted')).toHaveCount(0);
+});
+
+test('Flatmates tab totals the weeks GET /admin/analytics/flatmates served', async ({ page, login }) => {
+  await login.asAdmin();
+  // Captured from the live response so the assertion cannot race other workers' writes.
+  let served;
+  await page.route('**/admin/analytics/flatmates*', async (route) => {
+    const res = await route.fetch();
+    served = await res.json();
+    await route.fulfill({ response: res, json: served });
+  });
+
+  await openAnalytics(page, 'flatmates');
+  await expect(page.getByText('New posts by week')).toBeVisible();
+  expect(served.weeks.length).toBeGreaterThan(0);
+
+  const sum = (key) => served.weeks.reduce((s, w) => s + w[key], 0);
+  const kpi = (id) => page.getByTestId(`flatmates-${id}`).locator('div').first();
+  await expect(kpi('posts')).toHaveText((sum('rooms') + sum('groups') + sum('seekers')).toLocaleString('en-IN'));
+  await expect(kpi('requests')).toHaveText(served.replies.sent.toLocaleString('en-IN'));
+  await expect(kpi('matches')).toHaveText(sum('matches').toLocaleString('en-IN'));
+  await expect(kpi('unanswered')).toHaveText(served.replies.unansweredNow.toLocaleString('en-IN'));
+  await expect(kpi('reply-rate')).toHaveText(served.replies.replyRatePct == null ? '—' : `${served.replies.replyRatePct}%`);
+});
+
+test('Flatmates tab shows unmeasured rates as a dash and ranks the locality shortfall', async ({ page, login }) => {
+  await login.asAdmin();
+  await page.route('**/admin/analytics/flatmates*', (route) => route.fulfill({
+    json: {
+      days: 90, from: '2026-01-01', to: '2026-04-01',
+      weeks: [{ week: '2026-03-23', rooms: 2, groups: 1, seekers: 4, requests: 0, matches: 0, replyRatePct: null }],
+      replies: { sent: 0, replyRatePct: null, acceptRatePct: null, medianReplyHours: null, unansweredNow: 0 },
+      localities: [{ locality: 'Zztest Baner', supply: 1, demand: 4 }, { locality: 'Zztest Aundh', supply: 3, demand: 1 }],
+    },
+  }));
+
+  await openAnalytics(page, 'flatmates');
+  await expect(page.getByTestId('flatmates-reply-rate').locator('div').first()).toHaveText('—');
+  await expect(page.getByTestId('flatmates-median-reply').locator('div').first()).toHaveText('—');
+  await expect(page.getByTestId('flatmates-posts').locator('div').first()).toHaveText('7');
+  const rows = page.getByTestId('flatmates-localities').locator('tbody tr');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText('Zztest Baner');
+  await expect(rows.first()).toContainText('+3');
+  await expect(rows.nth(1)).toContainText('-2');
+});
+
+test('a failed flatmates read says so instead of showing zero posts', async ({ page, login }) => {
+  await login.asAdmin();
+  await page.route('**/admin/analytics/flatmates*', (route) => route.fulfill({ status: 500, body: '{}' }));
+
+  await openAnalytics(page, 'flatmates');
+  await expect(page.getByRole('alert').filter({ hasText: /flatmates report did not answer/i })).toBeVisible();
+  await expect(page.getByTestId('flatmates-posts')).toHaveCount(0);
 });
 
 test('unmeasured values read as unmeasured and no tab presents generated numbers', async ({ page, login, request }) => {

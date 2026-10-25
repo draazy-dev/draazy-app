@@ -66,7 +66,8 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
     /** Audit writes run {@code REQUIRES_NEW} and survive a neighbour's rollback, so an average over
      *  the suite's leftovers could not tell a correct implementation from a broken one. */
     private void clearRecordedDecisions() {
-        jdbc.update("delete from audit_log where action = 'property.status' and entity = 'property'");
+        jdbc.update("delete from audit_log where action in ('property.status', 'property.verification.decision')"
+                + " and entity = 'property'");
     }
 
     /** {@code created_at} is stamped by the database on insert, so a listing's age is moved
@@ -120,6 +121,16 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                 insert into audit_log (actor, actor_role, action, entity, entity_id, metadata, at)
                 values ('sla-fixture', 'admin', 'property.status', 'property', ?,
                         jsonb_build_object('to', cast(? as text)),
+                        (select created_at from properties where id = ?)
+                        + make_interval(hours => cast(? as int)))
+                """, propertyId.toString(), toStatus, propertyId, hoursAfterCreation);
+    }
+
+    private void recordChecklistDecision(UUID propertyId, int hoursAfterCreation, String toStatus) {
+        jdbc.update("""
+                insert into audit_log (actor, actor_role, action, entity, entity_id, metadata, at)
+                values ('sla-fixture', 'admin', 'property.verification.decision', 'property', ?,
+                        jsonb_build_object('decision', 'approve', 'to', cast(? as text)),
                         (select created_at from properties where id = ?)
                         + make_interval(hours => cast(? as int)))
                 """, propertyId.toString(), toStatus, propertyId, hoursAfterCreation);
@@ -267,6 +278,17 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
                     .isEqualTo(1);
             assertThat(((Number) JsonPath.read(json, "$.avgHoursToReview")).doubleValue())
                     .isEqualTo(6.0);
+        }
+
+        @Test
+        void aVerificationChecklistDecisionCountsAsAReview() throws Exception {
+            clearRecordedDecisions();
+            recordChecklistDecision(listing("0032", PropertyStatus.APPROVED, 400), 7, "approved");
+
+            String json = body(Routes.Admin.ANALYTICS_SLA, admin());
+
+            assertThat(num(json, "$.reviewedCount")).isEqualTo(1);
+            assertThat(((Number) JsonPath.read(json, "$.avgHoursToReview")).doubleValue()).isEqualTo(7.0);
         }
 
         /** Breach counting, and the rate that follows from it. */
@@ -533,6 +555,19 @@ class AdminSlaAnalyticsTest extends AbstractApiTest {
             assertThat(num(json, "$.conciergeToLive.breachedCount"))
                     .as("200 hours is past a 168-hour target")
                     .isEqualTo(1);
+        }
+
+        @Test
+        void aVerificationChecklistApprovalCountsAsGoingLive() throws Exception {
+            clearRecordedDecisions();
+            UUID id = listing("0049", PropertyStatus.APPROVED, 400);
+            jdbc.update("update properties set posted_by_admin = true where id = ?", id);
+            recordChecklistDecision(id, 30, "approved");
+
+            String json = body(Routes.Admin.ANALYTICS_SLA, admin());
+
+            assertThat(num(json, "$.conciergeToLive.completedCount")).isEqualTo(1);
+            assertThat(((Number) JsonPath.read(json, "$.conciergeToLive.avgHours")).doubleValue()).isEqualTo(30.0);
         }
 
         /** Without the {@code posted_by_admin} filter this reports the whole catalogue's approval

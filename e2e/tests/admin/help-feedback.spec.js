@@ -1,5 +1,6 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 const send = (body) => fetch(`${API}/help/feedback`, {
   method: 'POST',
@@ -55,5 +56,6 @@ test('a manager neither sees help feedback nor reads its API', async ({ page, lo
   await login.asManager();
   await page.goto('/admin/help-feedback');
   await expect(page).toHaveURL(/\/admin\/?$/);
+  await expandAdminNav(page);
   await expect(page.getByRole('link', { name: 'Help feedback' })).toHaveCount(0);
 });

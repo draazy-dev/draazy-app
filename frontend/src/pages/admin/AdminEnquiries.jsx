@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { CheckCircle2, Download, Eye } from 'lucide-react';
 import { getDeal, getEnquiry, getEnquirySummary, getVisit, listDeals, listEnquiries, listVisits } from '../../services/enquiryBoardService.js';
 import { addNote } from '../../services/noteService.js';
@@ -41,8 +42,9 @@ const Dot = () => <span className="text-gray-600" aria-hidden="true">·</span>;
 export default function AdminEnquiries() {
   const { toast } = useToast();
   const [tab, setTab] = useTabParam(['enquiries', 'visits', 'deals', 'funnel'], 'enquiries');
+  const [searchParams] = useSearchParams();
   const [q, setQ] = useState('');
-  const [statusF, setStatusF] = useState('');
+  const [statusF, setStatusF] = useState(() => searchParams.get('status') || '');
   const [typeF, setTypeF] = useState('');
   const [dateRange, setDateRange] = useState('');
   const [list, setList] = useState(null);

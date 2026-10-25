@@ -68,10 +68,10 @@ export async function reviewSla(opts = {}) {
         hoursWaiting: num(p?.hoursWaiting),
       }))
       .filter((p) => p.hoursWaiting != null),
-    // The three turnaround tracks. See `toTrack`.
     ticketPickup: toTrack(s?.ticketPickup),
     ticketDelivery: toTrack(s?.ticketDelivery),
     conciergeToLive: toTrack(s?.conciergeToLive),
+    flatmateReview: toTrack(s?.flatmateReview),
   };
 }
 
@@ -79,6 +79,7 @@ export async function reviewSla(opts = {}) {
 export async function adminDashboard() {
   const d = (await get('/admin/dashboard')) || {};
   const k = d.kpis;
+  const f = d.flatmates;
   return {
     ...d,
     kpis: k && {
@@ -90,6 +91,18 @@ export async function adminDashboard() {
       newUsers7d: count(k.newUsers7d),
       dealsClosed30d: count(k.dealsClosed30d),
       revenue30d: num(k.revenue30d),
+    },
+    flatmates: f && {
+      awaitingReview: count(f.awaitingReview),
+      openReports: count(f.openReports),
+      unansweredRequests: count(f.unansweredRequests),
+      liveRooms: count(f.liveRooms),
+      liveGroups: count(f.liveGroups),
+      activeSeekers: count(f.activeSeekers),
+      newSeekers7d: count(f.newSeekers7d),
+      matches30d: count(f.matches30d),
+      replyRatePct: num(f.replyRatePct),
+      medianReplyHours: num(f.medianReplyHours),
     },
     tickets: d.tickets && { ...d.tickets, latest: (d.tickets.latest || []).map((t) => ({ ...t, desk: t.team })) },
   };
@@ -181,6 +194,37 @@ export async function funnel(opts = {}) {
       contacts: count(w?.contacts),
       visits: count(w?.visits),
       deals: count(w?.deals),
+    })),
+  };
+}
+
+export async function flatmates(opts = {}) {
+  const f = await get('/admin/analytics/flatmates', window_(opts));
+  const r = f?.replies;
+  return {
+    days: count(f?.days),
+    from: String(f?.from || ''),
+    to: String(f?.to || ''),
+    weeks: (Array.isArray(f?.weeks) ? f.weeks : []).map((w) => ({
+      week: String(w?.week || ''),
+      rooms: count(w?.rooms),
+      groups: count(w?.groups),
+      seekers: count(w?.seekers),
+      requests: count(w?.requests),
+      matches: count(w?.matches),
+      replyRatePct: num(w?.replyRatePct),
+    })),
+    replies: {
+      sent: count(r?.sent),
+      replyRatePct: num(r?.replyRatePct),
+      acceptRatePct: num(r?.acceptRatePct),
+      medianReplyHours: num(r?.medianReplyHours),
+      unansweredNow: count(r?.unansweredNow),
+    },
+    localities: (Array.isArray(f?.localities) ? f.localities : []).map((l) => ({
+      locality: String(l?.locality || ''),
+      supply: count(l?.supply),
+      demand: count(l?.demand),
     })),
   };
 }

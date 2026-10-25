@@ -1,5 +1,6 @@
 import { test, expect, ACTORS, STAFF } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 async function staffId(mobile) {
   const res = await fetch(`${API}/users?role=staff&q=${mobile}&size=5`, { headers: await authHeaders(ACTORS.admin) });
@@ -33,6 +34,7 @@ test.describe('back-office functions', () => {
     try {
       await login.asStaff('rental');
       await page.goto('/admin');
+      await expandAdminNav(page);
 
       await expect(page.getByRole('link', { name: 'KYC Review', exact: true })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Rent Agreement', exact: true })).toBeVisible();
@@ -101,6 +103,7 @@ test.describe('back-office functions', () => {
   test('staff get no Team Activity link', async ({ page, login, consoleErrors }) => {
     await login.asStaff('rental');
     await page.goto('/admin');
+    await expandAdminNav(page);
     await expect(page.getByRole('link', { name: 'Team Activity', exact: true })).toHaveCount(0);
     expect(consoleErrors).toHaveLength(0);
   });
@@ -112,11 +115,13 @@ test.describe('back-office functions', () => {
     try {
       await login.asStaff('rental');
       await page.goto('/admin');
+      await expandAdminNav(page);
       await expect(page.getByRole('link', { name: 'Reports', exact: true })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Flatmates', exact: true })).toHaveCount(0);
 
       await setFunctions(id, ['flatmates']);
       await page.goto('/admin');
+      await expandAdminNav(page);
       await expect(page.getByRole('link', { name: 'Flatmates', exact: true })).toBeVisible();
       await expect(page.getByRole('link', { name: 'Reports', exact: true })).toHaveCount(0);
     } finally {
@@ -136,6 +141,7 @@ test.describe('back-office functions', () => {
       await expect(page.getByTestId('my-functions')).toContainText('KYC review');
       await expect(page.getByTestId('my-functions')).toContainText('Rent Agreement');
       await expect(page.getByText(/happening across Draazy/)).toHaveCount(0);
+      await expandAdminNav(page);
       await expect(page.getByRole('link', { name: 'Analytics', exact: true })).toHaveCount(0);
 
       await page.goto('/admin/analytics');
@@ -143,6 +149,7 @@ test.describe('back-office functions', () => {
 
       await setFunctions(id, ['kyc', 'desk:rental', 'analytics']);
       await page.goto('/admin');
+      await expandAdminNav(page);
       await expect(page.getByRole('link', { name: 'Analytics', exact: true })).toBeVisible();
     } finally {
       await setFunctions(id, before.functions || before.permissions || []);

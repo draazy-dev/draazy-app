@@ -1,8 +1,8 @@
 /* Admin tabs use server-resolved atoms from `user.permissions`; the console composes no union. */
 import {
-  BarChart3, BookOpen, Building2, Calculator, FileSignature, FileText, Gauge, Gift, Landmark, LayoutDashboard, LifeBuoy,
-  MessageSquare, Paintbrush, Scale, Settings, Truck, Users, Flag, IndianRupee, UserPlus,
-  MapPin, Plug, UsersRound, Eraser, ThumbsUp, Undo2, Bug,
+  BarChart3, BookOpen, Briefcase, Building2, Calculator, FileSignature, FileText, Gauge, Gift, Headset, Landmark, LayoutDashboard, LifeBuoy,
+  Library, LineChart, MessageSquare, Paintbrush, Scale, Settings, ShieldCheck, Truck, Users, Flag, IndianRupee, UserPlus,
+  MapPin, Plug, UsersRound, Eraser, ThumbsUp, Undo2, Bug, Wallet,
 } from 'lucide-react';
 
 // `value` is the server's desk slug (`desk:<value>` function); Home Loans has tickets, not service requests.
@@ -26,34 +26,45 @@ export const ticketPath = (ticket, open = false) => {
 };
 
 const DESK_MODULES = SERVICE_DESKS.map(({ atom = 'services:read', writeAtom = 'services:write', ...d }) => ({
-  key: `desk:${d.value}`, label: d.label, path: d.path, icon: d.icon, desk: d.value, atom, writeAtom,
+  key: `desk:${d.value}`, label: d.label, path: d.path, icon: d.icon, desk: d.value, atom, writeAtom, group: 'desks',
 }));
+
+// Sidebar dropdowns, in display order; a module without a `group` stays pinned above them.
+export const NAV_GROUPS = [
+  { key: 'listings', label: 'Listings & Users', icon: Building2 },
+  { key: 'desks', label: 'Service Desks', icon: Briefcase },
+  { key: 'support', label: 'Support', icon: Headset },
+  { key: 'money', label: 'Money', icon: Wallet },
+  { key: 'content', label: 'Content & Places', icon: Library },
+  { key: 'insights', label: 'Insights', icon: LineChart },
+  { key: 'admin', label: 'Administration', icon: ShieldCheck },
+];
 
 export const ADMIN_MODULES = [
   { key: 'dashboard', label: 'Dashboard', path: '/admin', icon: LayoutDashboard, end: true, base: true },
   { key: 'runbooks', label: 'Runbooks', path: '/admin/runbooks', icon: BookOpen, base: true },
-  { key: 'kycReview', label: 'KYC Review', path: '/admin/kyc-review', icon: UserPlus, atom: 'identity:write' },
-  { key: 'analytics', label: 'Analytics', path: '/admin/analytics', icon: BarChart3, flagKey: 'analytics', atom: 'analytics:read' },
-  { key: 'postOnBehalf', label: 'Post on Behalf', path: '/admin/post-on-behalf', icon: UserPlus, atom: 'postOnBehalf:write' },
-  { key: 'staffActivity', label: 'Team Activity', path: '/admin/staff-activity', icon: Gauge, atom: 'audit:read' },
-  { key: 'properties', label: 'Properties', path: '/admin/properties', icon: Building2, atom: 'properties:read', writeAtom: 'properties:moderate' },
-  { key: 'users', label: 'Users', path: '/admin/users', icon: Users, atom: 'users:read' },
+  { key: 'properties', label: 'Properties', path: '/admin/properties', icon: Building2, group: 'listings', atom: 'properties:read', writeAtom: 'properties:moderate' },
+  { key: 'postOnBehalf', label: 'Post on Behalf', path: '/admin/post-on-behalf', icon: UserPlus, group: 'listings', atom: 'postOnBehalf:write' },
+  { key: 'kycReview', label: 'KYC Review', path: '/admin/kyc-review', icon: UserPlus, group: 'listings', atom: 'identity:write' },
+  { key: 'users', label: 'Users', path: '/admin/users', icon: Users, group: 'listings', atom: 'users:read' },
+  { key: 'flatmates', label: 'Flatmates', path: '/admin/flatmates', icon: Users, group: 'listings', flagKey: 'flatmates', atom: 'flatmates:read', writeAtom: 'flatmates:write' },
   ...DESK_MODULES,
-  { key: 'support', label: 'Support queue', path: '/admin/support', icon: LifeBuoy, flagKey: 'support', atom: 'tickets:read', writeAtom: 'tickets:write' },
-  { key: 'enquiries', label: 'Enquiries', path: '/admin/enquiries', icon: MessageSquare, atom: 'enquiries:read' },
-  { key: 'referrals', label: 'Referrals', path: '/admin/referrals', icon: Gift, atom: 'referrals:read', writeAtom: 'referrals:write' },
-  { key: 'refunds', label: 'Refunds', path: '/admin/refunds', icon: Undo2, atom: 'refunds:read', writeAtom: 'refunds:write' },
-  { key: 'finance', label: 'Finance', path: '/admin/finance', icon: IndianRupee, flagKey: 'finance', adminOnly: true, atom: 'finance:read' },
-  { key: 'content', label: 'Content', path: '/admin/content', icon: FileText, atom: 'content:read', writeAtom: 'content:write' },
-  { key: 'reports', label: 'Reports', path: '/admin/reports', icon: Flag, flagKey: 'reports', atom: ['reports:read', 'reviews:read'], writeAtom: 'reports:write' },
-  { key: 'flatmates', label: 'Flatmates', path: '/admin/flatmates', icon: Users, flagKey: 'flatmates', atom: 'flatmates:read', writeAtom: 'flatmates:write' },
-  { key: 'team', label: 'Team & Access', path: '/admin/team', icon: UsersRound, atom: 'users:write' },
-  { key: 'places', label: 'Places', path: '/admin/places', icon: MapPin, atom: ['localities:read', 'societies:read'] },
-  { key: 'settings', label: 'Settings', path: '/admin/settings', icon: Settings, adminOnly: true, atom: 'settings:read', writeAtom: 'settings:write' },
-  { key: 'integrations', label: 'Integrations', path: '/admin/integrations', icon: Plug, adminOnly: true, atom: 'settings:read' },
-  { key: 'erasure', label: 'Erasure requests', path: '/admin/erasure-requests', icon: Eraser, adminOnly: true, atom: 'settings:read' },
-  { key: 'helpFeedback', label: 'Help feedback', path: '/admin/help-feedback', icon: ThumbsUp, adminOnly: true, atom: 'settings:read' },
-  { key: 'errorLog', label: 'Error log', path: '/admin/error-log', icon: Bug, role: 'admin', atom: 'audit:read' },
+  { key: 'support', label: 'Support queue', path: '/admin/support', icon: LifeBuoy, group: 'support', flagKey: 'support', atom: 'tickets:read', writeAtom: 'tickets:write' },
+  { key: 'enquiries', label: 'Enquiries', path: '/admin/enquiries', icon: MessageSquare, group: 'support', atom: 'enquiries:read' },
+  { key: 'reports', label: 'Reports', path: '/admin/reports', icon: Flag, group: 'support', flagKey: 'reports', atom: ['reports:read', 'reviews:read'], writeAtom: 'reports:write' },
+  { key: 'finance', label: 'Finance', path: '/admin/finance', icon: IndianRupee, group: 'money', flagKey: 'finance', adminOnly: true, atom: 'finance:read' },
+  { key: 'refunds', label: 'Refunds', path: '/admin/refunds', icon: Undo2, group: 'money', atom: 'refunds:read', writeAtom: 'refunds:write' },
+  { key: 'referrals', label: 'Referrals', path: '/admin/referrals', icon: Gift, group: 'money', atom: 'referrals:read', writeAtom: 'referrals:write' },
+  { key: 'content', label: 'Content', path: '/admin/content', icon: FileText, group: 'content', atom: 'content:read', writeAtom: 'content:write' },
+  { key: 'places', label: 'Places', path: '/admin/places', icon: MapPin, group: 'content', atom: ['localities:read', 'societies:read'] },
+  { key: 'helpFeedback', label: 'Help feedback', path: '/admin/help-feedback', icon: ThumbsUp, group: 'content', adminOnly: true, atom: 'settings:read' },
+  { key: 'analytics', label: 'Analytics', path: '/admin/analytics', icon: BarChart3, group: 'insights', flagKey: 'analytics', atom: 'analytics:read' },
+  { key: 'staffActivity', label: 'Team Activity', path: '/admin/staff-activity', icon: Gauge, group: 'insights', atom: 'audit:read' },
+  { key: 'team', label: 'Team & Access', path: '/admin/team', icon: UsersRound, group: 'admin', atom: 'users:write' },
+  { key: 'settings', label: 'Settings', path: '/admin/settings', icon: Settings, group: 'admin', adminOnly: true, atom: 'settings:read', writeAtom: 'settings:write' },
+  { key: 'integrations', label: 'Integrations', path: '/admin/integrations', icon: Plug, group: 'admin', adminOnly: true, atom: 'settings:read' },
+  { key: 'erasure', label: 'Erasure requests', path: '/admin/erasure-requests', icon: Eraser, group: 'admin', adminOnly: true, atom: 'settings:read' },
+  { key: 'errorLog', label: 'Error log', path: '/admin/error-log', icon: Bug, group: 'admin', role: 'admin', atom: 'audit:read' },
 ];
 
 export const MODULE_BY_KEY = Object.fromEntries(ADMIN_MODULES.map((m) => [m.key, m]));

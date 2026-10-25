@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   ExternalLink, LogOut, Menu,
   X, UserPlus,
-  BookOpen, Moon, Sun,
+  BookOpen, ChevronDown, Moon, Sun,
 } from 'lucide-react';
 import LogoMark from '../brand/LogoMark.jsx';
 import ConnectivityBanner from '../ConnectivityBanner.jsx';
@@ -13,10 +13,11 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { roleLabel } from '../../lib/auth.js';
 import { setAppPrefs } from '../../lib/localPrefs.js';
 import { useIsLightTheme } from '../../lib/themeColour.js';
-import { ADMIN_MODULES, canAccessModule, hasPermission, moduleForPath, portalBase, portalPath, runbooksFor } from '../../lib/adminModules.js';
+import { ADMIN_MODULES, NAV_GROUPS, canAccessModule, hasPermission, moduleForPath, portalBase, portalPath, runbooksFor } from '../../lib/adminModules.js';
 import { useHelpTree } from '../../lib/useHelp.js';
 import { AdminFlagsProvider, useAdminFlags } from '../../context/AdminFlagsContext.jsx';
 import AdminTopbarTools from './AdminTopbarTools.jsx';
+import BrowserAlertsPrompt from '../BrowserAlertsPrompt.jsx';
 
 export default function AdminLayout() {
   return (
@@ -31,21 +32,45 @@ function AdminLayoutInner() {
   const { user, logout } = useAuth();
   const { tabEnabled } = useAdminFlags();
   /* `adminOnly` is not a third filter: the server's catalogue already makes those atoms administrator-only. */
-  const nav = ADMIN_MODULES
-    .filter((m) => (!m.flagKey || tabEnabled(m.flagKey)) && canAccessModule(user, m.key))
-    .map((m) => [portalPath(user, m.path), m.label, m.icon, m.end]);
+  const nav = ADMIN_MODULES.filter((m) => (!m.flagKey || tabEnabled(m.flagKey)) && canAccessModule(user, m.key));
+  const navGroups = NAV_GROUPS
+    .map((g) => ({ ...g, items: nav.filter((m) => m.group === g.key) }))
+    .filter((g) => g.items.length);
   const [open, setOpen] = useState(false);
+  // Only explicit toggles are stored; an untouched group is open exactly while it holds the current page.
+  const [expanded, setExpanded] = useState({});
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const light = useIsLightTheme();
   const { articles } = useHelpTree();
-  const pageModule = moduleForPath(pathname)?.key;
+  const currentModule = moduleForPath(pathname);
+  const pageModule = currentModule?.key;
   const pageRunbook = pageModule && runbooksFor(articles, user).find((a) => a.modules?.includes(pageModule));
   const runbookHref = portalPath(user, pageRunbook ? `/admin/runbooks/${pageRunbook.slug}` : '/admin/runbooks');
 
   const doLogout = () => {
     logout();
     navigate('/staff-login');
+  };
+
+  const navLink = ({ path, label, icon: Icon, end }) => {
+    const to = portalPath(user, path);
+    return (
+      <NavLink
+        key={to}
+        to={to}
+        end={!!end}
+        onClick={() => setOpen(false)}
+        className={({ isActive }) =>
+          /* py-3 below sm: nav rows at 40px are a long thumb-drag,
+             and a miss lands on the neighbouring section. */
+          'flex items-center gap-3 rounded-xl px-3 py-3 sm:py-2.5 text-sm transition-all ' +
+          (isActive ? 'bg-brand-teal/15 text-teal-300' : 'text-gray-300 hover:bg-white/5 hover:text-white')
+        }
+      >
+        <Icon className="h-4 w-4" /> {label}
+      </NavLink>
+    );
   };
 
   return (
@@ -75,22 +100,36 @@ function AdminLayoutInner() {
           </button>
         </div>
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pt-2 pb-[calc(0.5rem+var(--dz-safe-b))]">
-          {nav.map(([to, label, Icon, end]) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={!!end}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) =>
-                /* py-3 below sm: 16 nav rows at 40px are a long thumb-drag,
-                   and a miss lands on the neighbouring section. */
-                'flex items-center gap-3 rounded-xl px-3 py-3 sm:py-2.5 text-sm transition-all ' +
-                (isActive ? 'bg-brand-teal/15 text-teal-300' : 'text-gray-300 hover:bg-white/5 hover:text-white')
-              }
-            >
-              <Icon className="h-4 w-4" /> {label}
-            </NavLink>
-          ))}
+          {nav.filter((m) => !m.group).map(navLink)}
+          {navGroups.map((g) => {
+            if (g.items.length === 1) return navLink(g.items[0]);
+            const holdsPage = g.key === currentModule?.group;
+            const isOpen = expanded[g.key] ?? holdsPage;
+            const GroupIcon = g.icon;
+            return (
+              <div key={g.key}>
+                <button
+                  type="button"
+                  aria-expanded={isOpen}
+                  aria-controls={`admin-nav-${g.key}`}
+                  onClick={() => setExpanded((e) => ({ ...e, [g.key]: !isOpen }))}
+                  className={
+                    'flex w-full items-center gap-3 rounded-xl px-3 py-3 sm:py-2.5 text-sm font-semibold transition-all hover:bg-white/5 ' +
+                    (holdsPage && !isOpen ? 'text-teal-300' : 'text-gray-200 hover:text-white')
+                  }
+                >
+                  <GroupIcon className="h-4 w-4" />
+                  <span className="flex-1 text-left">{g.label}</span>
+                  <ChevronDown className={'h-4 w-4 text-gray-500 transition-transform ' + (isOpen ? 'rotate-180' : '')} />
+                </button>
+                {isOpen ? (
+                  <div id={`admin-nav-${g.key}`} className="ml-5 mt-1 space-y-1 border-l border-white/10 pl-2">
+                    {g.items.map(navLink)}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </nav>
       </aside>
 
@@ -174,6 +213,7 @@ function AdminLayoutInner() {
           </ErrorBoundary>
         </main>
       </div>
+      <BrowserAlertsPrompt staff />
     </div>
   );
 }

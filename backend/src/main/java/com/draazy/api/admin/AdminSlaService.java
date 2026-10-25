@@ -29,6 +29,9 @@ public class AdminSlaService {
     /** A staff-posted listing goes live within a week. */
     private static final int CONCIERGE_TARGET_HOURS = 168;
 
+    /** A flatmate post is decided within a day, like a listing. */
+    private static final int FLATMATE_TARGET_HOURS = 24;
+
     /** Guard rail on {@code ?days=}, matching {@code AdminSupplyGapService}. */
     private static final int MAX_WINDOW_DAYS = 365;
 
@@ -41,7 +44,7 @@ public class AdminSlaService {
                   from properties p
                   join audit_log a
                     on a.entity = 'property'
-                   and a.action = 'property.status'
+                       and a.action in ('property.status', 'property.verification.decision')
                    and (a.entity_id = cast(p.id as text) or a.entity_id = p.slug)
                  where p.archived = false
                  group by p.id, p.created_at
@@ -149,7 +152,7 @@ public class AdminSlaService {
               from properties p
               join audit_log a
                 on a.entity = 'property'
-               and a.action = 'property.status'
+               and a.action in ('property.status', 'property.verification.decision')
                and (a.entity_id = cast(p.id as text) or a.entity_id = p.slug)
                and a.metadata ->> 'to' in ('approved', 'paused')
              where p.posted_by_admin = true
@@ -168,6 +171,48 @@ public class AdminSlaService {
                and p.archived = false
                and p.status = 'pending'
             """;
+
+    private static final String FLATMATE_POSTS = """
+            (select id, created_at, updated_at, mod_status, recheck_requested_at, archived from flatmate_seeker_posts
+             union all
+             select id, created_at, updated_at, mod_status, recheck_requested_at, archived from flatmate_rooms
+             union all
+             select id, created_at, updated_at, mod_status, recheck_requested_at, archived from flatmate_groups) f
+            """;
+
+    private static final String FLATMATE_DECIDED = """
+            exists (select 1 from audit_log d
+                     where d.action = 'flatmate.moderate'
+                       and d.entity in ('flatmateSeekerPost', 'flatmateRoom', 'flatmateGroup')
+                       and d.entity_id = cast(f.id as text))""";
+
+    /** First decision only: a re-held post's second review is not timed, nor is a later takedown. */
+    private static final String FLATMATE_COMPLETED = """
+            select cast(extract(epoch from (min(a.at) - f.created_at)) / 3600.0
+                       as double precision) as hours
+              from %s
+              join audit_log a
+               on a.action = 'flatmate.moderate'
+               and a.entity in ('flatmateSeekerPost', 'flatmateRoom', 'flatmateGroup')
+               and a.entity_id = cast(f.id as text)
+               and a.metadata ->> 'from' = 'pending'
+             where f.archived = false
+             group by f.id, f.created_at
+            having (cast(:since as timestamptz) is null
+                   or min(a.at) >= cast(:since as timestamptz))
+            """.formatted(FLATMATE_POSTS);
+
+    /** A re-hold writes no audit row, so a post decided before waits from its last write (the hold), not creation. */
+    private static final String FLATMATE_OUTSTANDING = """
+            select cast(extract(epoch from (now() - case
+                        when f.mod_status <> 'pending' then f.recheck_requested_at
+                        when %s then f.updated_at
+                        else f.created_at end)) / 3600.0
+                       as double precision) as hours
+              from %s
+             where f.archived = false
+               and (f.mod_status = 'pending' or f.recheck_requested_at is not null)
+            """.formatted(FLATMATE_DECIDED, FLATMATE_POSTS);
 
     private final EntityManager em;
 
@@ -211,7 +256,8 @@ public class AdminSlaService {
                 num(row[4]), num(row[5]), withWorstPending ? worstPending() : List.of(),
                 track(PICKUP_COMPLETED, PICKUP_OUTSTANDING, PICKUP_TARGET_HOURS, since),
                 track(DELIVERY_COMPLETED, DELIVERY_OUTSTANDING, DELIVERY_TARGET_HOURS, since),
-                track(CONCIERGE_COMPLETED, CONCIERGE_OUTSTANDING, CONCIERGE_TARGET_HOURS, since));
+                track(CONCIERGE_COMPLETED, CONCIERGE_OUTSTANDING, CONCIERGE_TARGET_HOURS, since),
+                track(FLATMATE_COMPLETED, FLATMATE_OUTSTANDING, FLATMATE_TARGET_HOURS, since));
     }
 
     /** Four statements, not one: a single query would repeat the {@code :target} comparison under four aliases. */

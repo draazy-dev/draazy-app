@@ -9,7 +9,8 @@ import { useAuth } from '../../context/AuthContext.jsx';
 import { useHelpTree } from '../../lib/useHelp.js';
 import { useNotifications } from '../../context/NotificationContext.jsx';
 import { listNotifications, markAllRead, markRead } from '../../services/notificationService.js';
-import { safeNotificationLink } from '../notifications/notificationModel.js';
+import { safeNotificationLink, TYPE_META } from '../notifications/notificationModel.js';
+import Icon from '../Icon.jsx';
 import { SERVICE_DESKS, canOpenPath, hasPermission, portalPath, runbooksFor, ticketPath } from '../../lib/adminModules.js';
 /** Rows shown per data category. The chip beside it carries the size of the whole match. */
 
@@ -34,6 +35,7 @@ const NOTHING = { items: [], total: 0 };
 
 const NAV_INDEX_FULL = [
   { label: 'Dashboard', keywords: 'dashboard home overview', path: '/admin', icon: LayoutDashboard, flag: null },
+  { label: 'Notifications', keywords: 'notifications alerts escalations sla reminders inbox bell', path: '/admin/notifications', icon: Bell, flag: null },
   { label: 'Analytics', keywords: 'analytics stats chart graph', path: '/admin/analytics', icon: BarChart3, flag: 'analytics' },
   { label: 'Properties', keywords: 'properties listings homes flats apartments manage', path: '/admin/properties', icon: Building2, flag: null },
   { label: 'Users', keywords: 'users people accounts customers owners tenants members', path: '/admin/users', icon: Users, flag: null },
@@ -73,9 +75,8 @@ const FEATURES_INDEX = [
   { label: 'Deals', keywords: 'deals closed gmv transactions negotiation', path: '/admin/enquiries?tab=deals', parent: 'Enquiries', flag: null },
   { label: 'Conversion Funnel', keywords: 'funnel conversion pipeline enquiry visit deal time drop-off', path: '/admin/enquiries?tab=funnel', parent: 'Enquiries', flag: null },
 
-  { label: 'Revenue Charts', keywords: 'revenue charts mrr subscriptions services featured', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
-  { label: 'Transactions', keywords: 'transactions ledger payments billing invoices', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
-  { label: 'Financial Models', keywords: 'models subscription payout calculations', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
+  { label: 'Revenue', keywords: 'revenue charts mrr subscriptions services refunds net collected plans', path: '/admin/finance', parent: 'Finance', flag: 'finance' },
+  { label: 'Transactions', keywords: 'transactions ledger payments billing invoices credit notes refunds', path: '/admin/finance?tab=transactions', parent: 'Finance', flag: 'finance' },
 
   { label: 'FAQs', keywords: 'faqs frequently asked questions help', path: '/admin/content', parent: 'Content', flag: 'content.enabled' },
 
@@ -318,8 +319,10 @@ export default function AdminTopbarTools() {
   useEffect(() => {
     if (!notifOpen) return undefined;
     let live = true;
-    listNotifications({ page: 0, size: 20 })
-      .then((page) => { if (live) setMine(page.items.filter((n) => !n.read).slice(0, 5)); })
+    // Escalations first: they are the rows a manager must not have to scroll for.
+    const rank = (n) => (n.type === 'escalation' ? 0 : 1);
+    listNotifications({ page: 0, size: 50, read: false })
+      .then((page) => { if (live) setMine([...page.items].sort((a, b) => rank(a) - rank(b) || b.at - a.at).slice(0, 5)); })
       .catch(() => { if (live) setMine([]); });
     return () => { live = false; };
   }, [notifOpen, unread]);
@@ -329,7 +332,7 @@ export default function AdminTopbarTools() {
   const go = (path) => { setSearchOpen(false); setPhoneSearch(false); setNotifOpen(false); setQ(''); navigate(portalPath(user, path)); };
   const openMine = (n) => {
     markRead(n.id).catch(() => {}).finally(refreshUnread);
-    go(safeNotificationLink(n.link));
+    go(safeNotificationLink(n.link, '/admin/notifications'));
   };
   const readAll = () => { markAllRead().catch(() => {}).finally(refreshUnread); };
   const roleIcon = (role) => (role === 'staff' ? Wrench : role === 'owner' ? ShieldCheck : User);
@@ -443,10 +446,14 @@ export default function AdminTopbarTools() {
       <div className="relative" ref={notifRef}>
         <button onClick={() => setNotifOpen((o) => !o)} className="tap-extend relative grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5 text-gray-300 hover:text-white" aria-label="Notifications" title={unseen > 0 ? `${unseen} unread` : 'Notifications'}>
           <Bell className="h-4 w-4" />
-          {unseen > 0 && <span data-testid="notif-unread-dot" className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-rose-400" />}
+          {unseen > 0 && (
+            <span data-testid="notif-unread-dot" className="absolute -right-1.5 -top-1.5 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-rose-500 px-1 text-[10px] font-bold leading-none text-white">
+              {unseen > 99 ? '99+' : unseen}
+            </span>
+          )}
         </button>
         {notifOpen && (
-          <div data-testid="admin-notifications" className="absolute right-0 z-40 mt-2 w-80 overflow-y-auto rounded-2xl border border-white/10 bg-ink-2 p-2 shadow-2xl" style={{ maxHeight: '70vh' }}>
+          <div data-testid="admin-notifications" className="absolute right-0 z-40 mt-2 w-80 overflow-y-auto rounded-2xl border border-white/10 bg-ink-2 p-2 shadow-2xl max-sm:fixed max-sm:inset-x-3 max-sm:top-14 max-sm:z-[60] max-sm:mt-0 max-sm:w-auto" style={{ maxHeight: '70vh' }}>
             {notif.total === 0 && notif.blind.length === 0 && unread === 0 ? (
               <div className="px-3 py-6 text-center text-sm text-gray-500">All caught up.</div>
             ) : (
@@ -457,12 +464,15 @@ export default function AdminTopbarTools() {
                       <span>For you ({unread})</span>
                       <button onClick={readAll} className="normal-case tracking-normal text-teal-300 hover:text-teal-200">Mark all read</button>
                     </div>
-                    {mine.map((n) => (
-                      <button key={n.id} onClick={() => openMine(n)} className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5">
-                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-rose-500/15 text-rose-300"><Bell className="h-4 w-4" /></span>
-                        <span className="min-w-0"><span className="block truncate text-sm text-white">{n.title}</span><span className="block truncate text-xs text-gray-400">{n.desc}</span></span>
-                      </button>
-                    ))}
+                    {mine.map((n) => {
+                      const meta = TYPE_META[n.type] || TYPE_META.system;
+                      return (
+                        <button key={n.id} onClick={() => openMine(n)} data-type={n.type} className={'flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/5' + (n.type === 'escalation' ? ' border border-rose-400/30 bg-rose-500/[0.06]' : '')}>
+                          <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${meta.bgCls}`}><Icon name={meta.icon} className={`h-4 w-4 ${meta.iconCls}`} /></span>
+                          <span className="min-w-0"><span className="block truncate text-sm text-white">{n.title}</span><span className="block truncate text-xs text-gray-400">{n.desc}</span></span>
+                        </button>
+                      );
+                    })}
                   </>
                 )}
                 {notif.replied.length > 0 && (
@@ -513,6 +523,9 @@ export default function AdminTopbarTools() {
                 )}
               </>
             )}
+            <button onClick={() => go('/admin/notifications')} className="mt-1 flex min-h-[44px] w-full items-center justify-center rounded-xl border-t border-white/10 text-sm font-semibold text-teal-300 hover:bg-white/5">
+              View all notifications
+            </button>
           </div>
         )}
       </div>

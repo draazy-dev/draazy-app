@@ -1,6 +1,7 @@
 /* Negative assertions are anchored on live-rendered positives so a missing page, mock fallback or
    typo cannot pass as a successful removal. */
 import { test, expect } from '../../fixtures/live.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 async function openAdmin(page, path) {
   await page.goto(path);
@@ -21,6 +22,7 @@ test('/admin/support serves the Support queue, and the sidebar offers it beside 
   });
   await test.step('the sidebar offers the Support queue and the Home Loans desk, and no Services overview', async () => {
     await openAdmin(page, '/admin');
+    await expandAdminNav(page);
 
     await expect(page.locator('nav a[href="/admin/home-loans"]').first()).toBeVisible();
     await expect(page.locator('nav a[href="/admin/services"]')).toHaveCount(0);

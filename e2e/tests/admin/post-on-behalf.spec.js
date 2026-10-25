@@ -14,6 +14,7 @@ const listing = (title) => ({
   deal: 'rent',
   propertyType: 'Flat',
   price: 32000,
+  deposit: 64000,
   locality: 'Kharadi',
   city: 'Pune',
   bhk: 2,
@@ -217,7 +218,7 @@ test('the desk asks only the critical facts, and each one reaches the server', a
   await login.asAdmin();
   await page.goto('/admin/post-on-behalf');
 
-  await page.getByLabel('Internal Notes (optional)').fill('Zztest owner prefers calls after 6pm');
+  await page.getByLabel('Internal Notes').fill('Zztest owner prefers calls after 6pm');
   await ownerAndProperty(page, { name: 'Critical Owner', mobile: ownerMobile, carpetArea: '950' });
   await expect(page.getByRole('group', { name: 'Furnishing' })).toBeVisible();
   for (const gone of ['Amenities', 'Bathrooms', 'Balconies', 'Facing', 'Overlooking', 'Built-up Area (sq.ft)']) {
@@ -290,6 +291,7 @@ test('the society leads the location step and decides the locality, which a late
   await page.getByRole('button', { name: /Next/i }).click();
 
   await page.locator('#pob-price').fill('26000');
+  await page.locator('#pob-deposit').fill('52000');
   await page.getByRole('button', { name: /Next/i }).click();
   await expect(page.getByText(`${society}, Pashan`)).toBeVisible();
   await page.getByRole('button', { name: /Send to Owner/i }).click();
@@ -344,6 +346,7 @@ test('the desk hands the owner a claim link over WhatsApp, and records it only o
   await pickPlaceholderLocality(page, 'Baner');
   await page.getByRole('button', { name: /Next/i }).click();
   await page.locator('#pob-price').fill('25000');
+  await page.locator('#pob-deposit').fill('50000');
   await page.getByRole('button', { name: /Next/i }).click();
   await page.getByRole('button', { name: /Send to Owner/i }).click();
   await expect(page.getByRole('heading', { name: 'Listing created' })).toBeVisible({ timeout: 15000 });
@@ -375,6 +378,7 @@ test('the sidebar reaches the wizard, step one will not be skipped, and the mone
   await login.asAdmin();
 
   await page.goto('/admin');
+  await page.locator('aside').getByRole('button', { name: 'Listings & Users' }).click();
   await page.locator('aside').getByRole('link', { name: /Post on Behalf/i }).click();
   await expect(page).toHaveURL(/\/admin\/post-on-behalf$/);
   await expect(page.getByText('Post on Behalf of Owner')).toBeVisible();
@@ -433,6 +437,7 @@ test('a property type switched away from takes its bedroom configuration with it
   await pickPlaceholderLocality(page, 'Baner');
   await page.getByRole('button', { name: /Next/i }).click();
   await page.locator('#pob-price').fill('9000000');
+  await page.locator('#pob-deposit').fill('0');
   await page.getByRole('button', { name: /Next/i }).click();
 
   // Destination one: the summary the operator reads immediately before pressing Send.
@@ -517,6 +522,7 @@ test('a commercial listing files its type and shell, and asks nothing the owner 
   await page.getByRole('button', { name: /Next/i }).click();
 
   await page.locator('#pob-price').fill('180000');
+  await page.locator('#pob-deposit').fill('540000');
   // A rental is not asked its tenancy, on screen as well as on the wire.
   await expect(page.getByText('Tenancy Status')).toHaveCount(0);
 

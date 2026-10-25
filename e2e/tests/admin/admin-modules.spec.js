@@ -1,5 +1,6 @@
 import { test, expect, ACTORS } from '../../fixtures/live.js';
 import { API, authHeaders } from '../../helpers/liveAuth.js';
+import { expandAdminNav } from '../../helpers/adminNav.js';
 
 // Every Admin Modules switch, flipped off through the API and asserted on screen, then back on.
 // The settings document is shared, so each test restores what it touched in a `finally`.
@@ -28,6 +29,7 @@ for (const { key, path } of TAB_MODULES) {
     try {
       await setAdminFlags({ tab: { [key]: false } });
       await page.goto('/admin');
+      await expandAdminNav(page);
       await expect(sidebar(page).locator('a[href="/admin/properties"]')).toBeVisible();
       await expect(sidebar(page).locator(`a[href="${path}"]`)).toHaveCount(0);
       await page.goto(path);
@@ -36,16 +38,19 @@ for (const { key, path } of TAB_MODULES) {
       await setAdminFlags({ tab: { [key]: true } });
     }
     await page.goto('/admin');
+    await expandAdminNav(page);
     await expect(sidebar(page).locator(`a[href="${path}"]`)).toBeVisible();
   });
 }
 
 test('tab flags also hide a module from a manager sidebar', async ({ page, login }) => {
   await login.asManager();
+  await expandAdminNav(page);
   await expect(sidebar(page).locator('a[href="/admin/support"]')).toBeVisible();
   try {
     await setAdminFlags({ tab: { support: false } });
     await page.reload();
+    await expandAdminNav(page);
     await expect(sidebar(page).locator('a[href="/admin/properties"]')).toBeVisible();
     await expect(sidebar(page).locator('a[href="/admin/support"]')).toHaveCount(0);
   } finally {
