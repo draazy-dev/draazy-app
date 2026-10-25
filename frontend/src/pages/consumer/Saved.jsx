@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import PropertyImage from '../../components/ui/PropertyImage.jsx';
+import HScroll from '../../components/ui/HScroll.jsx';
+import Select from '../../components/ui/Select.jsx';
 import { CARD_SIZES } from '../../lib/imgSrcSet.js';
 import { useSavedItems } from '../../context/SavedContext.jsx';
 import { useSavedSearches } from '../../context/SavedSearchContext.jsx';
 import { fmtINR } from '../../lib/format.js';
 import usePullToRefresh from '../../lib/usePullToRefresh.js';
 import { buildAlertRecord } from './listings/alertCriteria.js';
-import { toSavedCard } from './flatmates/helpers.js';
+import { detailPath, toSavedCard } from './flatmates/helpers.js';
 import * as flatmateService from '../../services/flatmateService.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useSignInGate } from '../../lib/useSignInGate.js';
@@ -21,7 +23,7 @@ const CATEGORIES = [
   { key: 'all', label: 'All', labelKey: 'catAllLabel', icon: 'heart' },
   { key: 'buy', label: 'Buy', labelKey: 'catBuyLabel', icon: 'home' },
   { key: 'rent', label: 'Rent', labelKey: 'catRentLabel', icon: 'key' },
-  { key: 'flatmates', label: 'Rooms', labelKey: 'catRoomsLabel', icon: 'users-round' },
+  { key: 'flatmates', label: 'Flatmates', labelKey: 'catFlatmatesShort', icon: 'users-round' },
 ];
 
 const SORTS = [['newest', 'Newest', 'sortNewest'], ['price-desc', 'Price: High to Low', 'sortPriceHigh'], ['price-asc', 'Price: Low to High', 'sortPriceLow']];
@@ -41,8 +43,8 @@ export default function Saved() {
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState('all');
   const [sort, setSort] = useState('newest');
+  const sortRef = useRef(null);
   const [removing, setRemoving] = useState(() => new Set());
-  /* Ids removed but not yet committed — they render as an undo row instead of a card. */
   const [pendingRemoval, setPendingRemoval] = useState(() => new Map());
   const [alerting, setAlerting] = useState(() => new Set());
   const [actionCard, setActionCard] = useState(null);
@@ -78,7 +80,6 @@ export default function Saved() {
     };
   }), [savedList.items]);
 
-  /* Load the flatmate half once per identity. */
   const [cards, setCards] = useState([]);
   const loadFlatmateSaves = useCallback(
     () => readFlatmateSaves()
@@ -101,9 +102,6 @@ export default function Saved() {
     return () => clearTimeout(t);
   }, []);
 
-        /* Drop it locally first so the card leaves with the animation, then tell the server. */
-      // If it came from the property shortlist, unsave it there — `dynamicSaved` is derived from the
-      // context, so the card disappears when that write lands rather than from a second local list.
   const commitRemoval = useCallback((card, { animate = true } = {}) => {
     if (!card) return;
     if (!animate) {
@@ -150,7 +148,6 @@ export default function Saved() {
 
   useEffect(() => { commitRef.current = commitRemoval; }, [commitRemoval]);
 
-  /* Stage the card as undoable, then commit on a timer. Shared by the swipe and by the per-card remove buttons. */
   const stageRemove = useCallback((card) => {
     if (!card || pendingRef.current.has(card.id)) return;
     const next = new Map(pendingRef.current);
@@ -229,9 +226,6 @@ export default function Saved() {
     allCards.forEach((c) => { m[c.cat] = (m[c.cat] || 0) + 1; });
     return m;
   }, [allCards]);
-  /* Shared by the pill strip, the bottom-sheet switcher and the per-category empty state, so the three can never
-     drift apart on a rename. */
-
   const catLabel = useCallback((c) => (c ? tr('saved.' + c.labelKey, { defaultValue: c.label }) : ''), [tr]);
   const items = useMemo(() => {
     const filtered = tab === 'all' ? allCards : allCards.filter((c) => c.cat === tab);
@@ -255,6 +249,14 @@ export default function Saved() {
   const isLoading = savedList.status === 'loading';
   const isError = savedList.status === 'error';
 
+  useLayoutEffect(() => {
+    const trigger = sortRef.current;
+    if (!trigger) return;
+    const dropdown = trigger.parentElement;
+    dropdown.style.width = 'max-content';
+    dropdown.style.width = `${trigger.getBoundingClientRect().width * 1.5}px`;
+  }, [sort, tr, items.length, isLoading, isError]);
+
   return (
     <div ref={ptr.ref} className="saved-page">
       {(ptr.pullDistance > 0 || ptr.isRefreshing) && (
@@ -270,9 +272,6 @@ export default function Saved() {
       <div className="pt-5 sm:pt-8 lg:pt-10 pb-20 min-h-[100dvh]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className={'mb-5 sm:mb-8 fade-in' + (mounted ? ' visible' : '')}>
-            <span className="dz-tag bg-teal-500/10 border border-teal-500/20 text-teal-400 font-semibold mb-3">
-              <Icon name="heart" className="w-3.5 h-3.5" /> {tr('saved.badge')}
-            </span>
             <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2">{tr('saved.title')}</h1>
             {summaryParts && <p className="text-gray-400 text-sm"><span className="text-teal-400 font-semibold">{summaryParts}</span></p>}
           </div>
@@ -305,41 +304,47 @@ export default function Saved() {
             </div>
           ) : allCards.length > 0 ? (
             <>
-              {/* Three pills across a 360px viewport truncate their own labels and leave no room for the
-                 descriptions, so phones get a bottom sheet instead. */}
-              <div className={'saved-tabs mb-4 flex items-center gap-1.5 overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.03] p-1 fade-in' + (mounted ? ' visible' : '')}>
+              <HScroll
+                role="group"
+                aria-label={tr('saved.categoryLabel')}
+                wrapClassName={'mb-4 fade-in' + (mounted ? ' visible' : '')}
+                className="saved-tabs flex gap-1 border-b border-white/10 sm:gap-2"
+              >
                 {CATEGORIES.map((c) => (
                   <button
                     key={c.key}
+                    type="button"
                     onClick={() => setTab(c.key)}
                     aria-pressed={tab === c.key}
-                    className={'saved-tab seg min-h-[44px] flex-1 rounded-xl px-2 py-2 text-center text-xs font-semibold text-gray-300 sm:text-sm' + (tab === c.key ? ' active' : '')}
+                    className={'saved-tab dz-detail-tab min-h-[44px]' + (tab === c.key ? ' is-active' : '')}
                   >
                     <span className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
-                      <Icon name={c.icon} className="h-3.5 w-3.5 flex-shrink-0 max-[389px]:hidden" />
+                      <Icon name={c.icon} className="h-4 w-4 flex-shrink-0" />
                       <span>{catLabel(c)}</span>
                       <span className="dz-count tab-count">{counts[c.key]}</span>
                     </span>
                   </button>
                 ))}
-              </div>
+              </HScroll>
 
               <AlertsRow searches={savedSearches.searches} status={savedSearches.status} isIn={isIn} />
 
               {items.length > 0 && (
-                <div className={'flex items-center justify-end mb-4 sm:mb-6 fade-in' + (mounted ? ' visible' : '')}>
-                  <label className="flex items-center gap-2 text-sm text-gray-400">
-                    <Icon name="sliders-horizontal" className="w-4 h-4 text-teal-400" />
-                    <span className="hidden sm:inline">{tr('saved.sortBy')}</span>
-                    <select value={sort} onChange={(e) => setSort(e.target.value)} className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-teal-400/50">
-                      {SORTS.map(([v, label, tk]) => <option key={v} value={v} className="bg-ink">{tr('saved.' + tk, { defaultValue: label })}</option>)}
-                    </select>
-                  </label>
+                <div className={'flex items-center justify-end gap-2 mb-4 sm:mb-6 fade-in' + (mounted ? ' visible' : '')}>
+                  <Icon name="sliders-horizontal" className="h-4 w-4 text-teal-400" />
+                  <Select
+                    ref={sortRef}
+                    value={sort}
+                    onChange={setSort}
+                    ariaLabel={tr('saved.sortBy')}
+                    options={SORTS.map(([value, label, tk]) => ({ value, label: tr('saved.' + tk, { defaultValue: label }) }))}
+                    size="sm"
+                    anchored
+                  />
                 </div>
               )}
 
               {items.length > 0 ? (
-                  /* The gesture is invisible until someone tries it, so say it once. */
                 <div key={tab} className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-6 lg:grid-cols-3 lg:gap-8">
                   {items.map((c, i) => (pendingRemoval.has(c.id) ? (
                     <UndoRow key={c.id} label={tr('saved.removedTitle', { title: c.title })} undoLabel={tr('saved.undo')} undoAria={tr('saved.undoAria', { title: c.title })} onUndo={() => undoRemove(c.id)} />
@@ -352,7 +357,7 @@ export default function Saved() {
                       className={'property-card rounded-2xl overflow-hidden fade-in' + (mounted ? ' visible' : '') + (removing.has(c.id) ? ' removing' : '') + ` fade-in-delay-${(i % 3) + 1}`}
                     >
                       <div className="flex min-h-[96px] items-center gap-3 p-2 md:block md:min-h-0 md:p-0">
-                        <Link to={c.cat === 'flatmates' ? '/flatmates' : `/property/${c.id}`} className="saved-row-link flex min-w-0 flex-1 items-center gap-3 md:block">
+                        <Link to={c.cat === 'flatmates' ? detailPath(c.saveKind, c.id.slice(2)) : `/property/${c.id}`} className="saved-row-link flex min-w-0 flex-1 items-center gap-3 md:block">
                           <div className="card-image relative h-[88px] w-[88px] flex-shrink-0 rounded-xl md:h-56 md:w-full md:rounded-none">
                             <PropertyImage src={c.img} sizes={`(max-width: 767px) 88px, ${CARD_SIZES}`} alt={c.title} className="w-full h-full object-cover" />
                             <div className="hidden md:block absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
@@ -379,7 +384,7 @@ export default function Saved() {
                                   <Icon name={alerting.has(c.id) ? 'loader-2' : 'bell-plus'} className={'w-4 h-4' + (alerting.has(c.id) ? ' animate-spin' : '')} />
                                 </button>
                                 <button type="button" onClick={() => stageRemove(c)} title={tr('saved.removeFromSaved')} aria-label={tr('saved.removeFromSaved')} className="remove-btn w-11 h-11 shrink-0 rounded-xl border border-white/10 text-red-300 flex items-center justify-center">
-                                  <Icon name="heart" weight="fill" className="w-4 h-4" />
+                                  <Icon name="trash-2" className="w-4 h-4" />
                                 </button>
                               </span>
                             </>
@@ -390,11 +395,13 @@ export default function Saved() {
                           )}
                         </div>
                         <div className="flex flex-col gap-2 md:hidden">
-                          <button type="button" onClick={() => setActionCard(c)} aria-label={tr('saved.moreActions')} className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-white/10 text-xl leading-none text-gray-300">
-                            ⋯
-                          </button>
+                          {c.cat !== 'flatmates' && (
+                            <button type="button" disabled={alerting.has(c.id)} onClick={() => { void createAlert(c); }} title={tr('saved.createAlertAria')} aria-label={tr('saved.createAlertAria')} className="grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-white/10 text-gray-300 disabled:opacity-60">
+                              <Icon name={alerting.has(c.id) ? 'loader-2' : 'bell-plus'} className={'h-4 w-4' + (alerting.has(c.id) ? ' animate-spin' : '')} />
+                            </button>
+                          )}
                           <button type="button" onClick={() => stageRemove(c)} title={tr('saved.removeFromSaved')} aria-label={tr('saved.removeFromSaved')} className="remove-btn grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-white/10 text-red-300">
-                            <Icon name="heart" weight="fill" className="w-4 h-4" />
+                            <Icon name="trash-2" className="w-4 h-4" />
                           </button>
                         </div>
                       </div>

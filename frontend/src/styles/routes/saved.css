@@ -71,7 +71,7 @@
   color: rgb(var(--dz-c-slate-300));
 }
 
-.saved-page .saved-tab.active .tab-count {
+.saved-page .saved-tab.is-active .tab-count {
   background: rgb(var(--dz-c-teal-500) / 0.2);
   border-color: rgb(var(--dz-c-teal-500) / 0.4);
   color: rgb(var(--dz-c-teal-300));

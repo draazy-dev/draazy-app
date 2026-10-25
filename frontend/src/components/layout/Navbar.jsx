@@ -47,9 +47,7 @@ export default function Navbar() {
   const cityRef = useRef(null);
   const acctRef = useRef(null);
   const acctDrawerRef = useRef(null);
-  // `count` is the server's total, not the length of a page, so the badge stays right for a
-  // shortlist longer than one page. The context is already empty when signed out.
-  const savedCount = isIn ? saved.count : 0;
+  const savedCount = isIn ? saved.totalCount : 0;
   const chatBadge = isIn ? chatUnread : 0;
 
   const path = location.pathname.toLowerCase();
