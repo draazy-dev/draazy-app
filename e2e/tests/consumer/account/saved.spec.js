@@ -1,4 +1,4 @@
-import { test, expect } from '../../../fixtures/live.js';
+import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, authHeaders, uniqueMobile, signedInAs } from '../../../helpers/liveAuth.js';
 import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 
@@ -93,7 +93,7 @@ test('the shortlist the page renders is the one the server holds, with no consol
   await expect(page.locator('.saved-tabs')).toContainText('All');
   await expect(page.locator('.saved-tabs')).toContainText('Buy');
   await expect(page.locator('.saved-tabs')).toContainText('Rent');
-  await expect(page.locator('.saved-tabs')).toContainText('Rooms');
+  await expect(page.locator('.saved-tabs')).toContainText('Flatmates');
 
   await expect(page.locator('.property-card')).toHaveCount(4);
   await expect(page.getByText('4 homes')).toBeVisible();
@@ -139,6 +139,142 @@ test('remove stages an undo without telling the server, then commits the unsave 
   const removed = uuids.find((u) => u !== survivorId);
   expect(removed, 'the row left on the server is not one of the two that were shortlisted').toBeTruthy();
   expect(deletes[0], 'the browser unsaved a different property than the one the server dropped').toContain(removed);
+});
+
+test('saved controls use scrolling underline tabs, themed sorting and direct delete on phone and desktop', async ({ page, consoleErrors }) => {
+  const { mobile, headers } = await actor();
+  const { buy, rent } = await pickListings();
+  const listings = [...buy, ...rent];
+  await shortlist(headers, listings);
+  await openSaved(page, mobile);
+  const cards = page.getByTestId('saved-card');
+  await expect(cards).toHaveCount(4);
+  await expect(page.getByText('Your favourites', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'More saved actions', exact: true })).toHaveCount(0);
+
+  for (const width of [320, 440, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    const strip = page.locator('.saved-tabs');
+    await expect(strip).toHaveClass(/hscroll-row/);
+    const tabs = strip.locator('.saved-tab');
+    await expect(tabs).toHaveCount(4);
+    const tops = await tabs.evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+    expect(new Set(tops).size).toBe(1);
+    await expect(tabs.first()).toHaveClass(/dz-detail-tab.*is-active/);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+    const sort = page.getByRole('button', { name: 'Sort by', exact: true });
+    await expect(sort).toHaveClass(/dz-dropdown__trigger/);
+    const sortBox = await sort.boundingBox();
+    const naturalWidth = await sort.evaluate((el) => {
+      const clone = el.parentElement.cloneNode(true);
+      clone.style.width = 'max-content';
+      clone.style.position = 'absolute';
+      clone.style.visibility = 'hidden';
+      el.parentElement.parentElement.append(clone);
+      const width = clone.getBoundingClientRect().width;
+      clone.remove();
+      return width;
+    });
+    expect(sortBox.width / naturalWidth).toBeCloseTo(1.5, 1);
+    const rowBox = await sort.locator('..').locator('..').boundingBox();
+    expect(sortBox.width).toBeLessThan(290);
+    expect(Math.abs(sortBox.x + sortBox.width - rowBox.x - rowBox.width)).toBeLessThan(2);
+    for (const [label, descending] of [['Price: Low to High', false], ['Price: High to Low', true]]) {
+      await sort.click();
+      const menu = page.getByRole('listbox', { name: 'Sort by', exact: true });
+      await expect(menu).not.toHaveClass(/dz-dropdown__menu--sheet/);
+      const menuBox = await menu.boundingBox();
+      expect(menuBox.width).toBeLessThan(300);
+      await page.getByRole('option', { name: label, exact: true }).click();
+      await expect(sort).toContainText(label);
+      const titles = await cards.locator('h3').allTextContents();
+      expect(titles).toEqual(expect.arrayContaining(listings.map((p) => p.title)));
+      const priceByTitle = new Map(listings.map((p) => [p.title, p.price]));
+      const prices = titles.map((title) => priceByTitle.get(title));
+      const expected = listings.map((p) => p.price).sort((a, b) => descending ? b - a : a - b);
+      expect(prices).toEqual(expected);
+    }
+
+    const remove = cards.first().getByRole('button', { name: 'Remove from saved', exact: true });
+    await expect(remove).toBeVisible();
+    await remove.click();
+    const undo = page.getByRole('button', { name: /Undo removing/i });
+    await expect(undo).toBeFocused();
+    await undo.click();
+    await expect(cards).toHaveCount(4);
+  }
+  expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
+});
+
+test('saved rooms, groups and flatmate posts open their own detail pages', async ({ page, login, consoleErrors }) => {
+  const headers = await authHeaders(ACTORS.buyer);
+  const response = await api('/me/flatmate-saves?size=100', headers);
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  const saved = body.content || body.items || [];
+  const targets = saved.map((row) => ({
+    id: row.id,
+    kind: row.roomType || row.roomKind ? 'room' : row.members || row.seatsTotal != null ? 'group' : 'post',
+  }));
+  expect(new Set(targets.map((row) => row.kind))).toEqual(new Set(['room', 'group', 'post']));
+  await seedConsent(page);
+  await login.asBuyer();
+
+  for (const width of [440, 1280]) {
+    await page.setViewportSize({ width, height: 956 });
+    for (const target of targets) {
+      await page.goto('/saved');
+      await page.getByRole('button', { name: /^Flatmates\b/ }).click();
+      const path = `/flatmates/${target.kind}/${target.id}`;
+      const link = page.locator(`.saved-row-link[href="${path}"]`);
+      await expect(link).toBeVisible();
+      const title = await link.locator('h3').innerText();
+      await link.click();
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    }
+  }
+  expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
+});
+
+test('header saved count includes homes and flatmates and tracks confirmed removals', async ({ page, consoleErrors }) => {
+  const { mobile, headers } = await actor();
+  const { buy } = await pickListings();
+  await shortlist(headers, buy);
+  const sourceHeaders = await authHeaders(ACTORS.buyer);
+  const response = await api('/me/flatmate-saves/keys', sourceHeaders);
+  expect(response.status).toBe(200);
+  const keys = await response.json();
+  expect(keys.length).toBeGreaterThan(0);
+  for (const { kind, id } of keys) {
+    const saved = await api(`/me/flatmate-saves/${kind}/${id}`, headers, { method: 'PUT' });
+    expect(saved.status).toBe(204);
+  }
+  const total = buy.length + keys.length;
+  await openSaved(page, mobile);
+  const cards = page.getByTestId('saved-card');
+  await expect(cards).toHaveCount(total);
+  const badge = page.locator('nav').getByRole('link', { name: 'Saved properties', exact: true }).locator('span');
+  await expect(badge).toHaveText(String(total));
+  await page.getByRole('button', { name: /^Flatmates\b/ }).click();
+  await expect(cards).toHaveCount(keys.length);
+  await cards.first().getByRole('button', { name: 'Remove from saved' }).click();
+  const undo = page.getByRole('button', { name: /Undo removing/ });
+  await expect(undo).toBeVisible();
+  await expect(badge).toHaveText(String(total));
+  await undo.click();
+  await expect(cards).toHaveCount(keys.length);
+  const link = cards.first().locator('.saved-row-link');
+  const detailUrl = await link.getAttribute('href');
+  await cards.first().getByRole('button', { name: 'Remove from saved' }).click();
+  await expect(badge).toHaveText(String(total - 1), { timeout: 15000 });
+  const [, kind, id] = detailUrl.match(/\/flatmates\/(room|post|group)\/([^/?#]+)/);
+  const board = { room: ['rooms', 'r'], post: ['people', 's'], group: ['teams', 'g'] }[kind];
+  await page.goto(`/flatmates?view=${board[0]}`);
+  await page.locator(`[data-sf-id="${board[1]}:${id}"] .save-btn`).click();
+  await expect(badge).toHaveText(String(total));
+  expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
 });
 
 test('visible tabs re-read saved homes created elsewhere', async ({ page, playwright }) => {
