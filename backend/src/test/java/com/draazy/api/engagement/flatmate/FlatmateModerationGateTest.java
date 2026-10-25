@@ -12,7 +12,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.util.ArrayList;
 import java.util.List;
 import org.hamcrest.Matchers;
@@ -70,7 +69,7 @@ class FlatmateModerationGateTest extends AbstractApiTest {
         return """
                 {"name":"%s","gender":"any","age":27,"occupation":"Analyst",
                  "budget":18000,"localities":["%s"],"moveIn":"2026-09-01",
-                 "flatPref":"any","roomPref":"private","tags":[],"note":"%s"}
+                 "flatPref":"any","roomPref":"private","note":"%s"}
                 """.formatted(name, locality, note);
     }
 
@@ -80,9 +79,9 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Three of us, hunting","policy":"any","seats":3,"seatsOpen":1,
-                                 "name":"Host","tags":[],
+                                 "name":"Host",
                                  "preferences":{"localities":["%s"],"bhk":["2"],"rentMin":30000,
-                                   "rentMax":45000,"gatedOnly":false,"bachelors":false}}
+                                   "rentMax":45000,"depositMax":100000,"gatedOnly":false,"bachelors":false}}
                                 """.formatted(locality)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.modStatus").value("live"))
@@ -95,13 +94,14 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                 "furnishing":"semi","locality":"%s","society":"%s",
+                                 "locality":"%s","society":"%s",
                                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                                  "lookingFor":"any","foodPref":"any",
-                                 "photos":["%s"],
+                                 %s,
                                  "hostRole":"owner",
-                                 "note":"Sunny room."}
-                                """.formatted(locality, society, UploadedPhotos.of(host.getId()))))
+                                 "note":"Sunny room.",%s,%s}
+                                """.formatted(locality, society, FlatmateRoomFixture.photos(host.getId()),
+                                FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
     }
@@ -111,8 +111,8 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"%s","locality":"%s","policy":"any","rent":40000,
-                                 "seats":3,"seatsOpen":1,"name":"Host","tags":[]}
+                                {"title":"%s","locality":"%s","policy":"any","rent":40000,"deposit":10000,
+                                 "seats":3,"seatsOpen":1,"name":"Host"}
                                 """.formatted(title, locality)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
@@ -212,7 +212,7 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                             .content("""
                                     {"name":"Bhavna","gender":"any","age":27,"budget":18000,
                                      "localities":["GateTownE"],"moveIn":"2026-09-01",
-                                     "flatPref":"any","roomPref":"private","tags":[],"note":"Hi."}
+                                     "flatPref":"any","roomPref":"private","note":"Hi."}
                                     """))
                     .andExpect(status().isCreated())
 
@@ -229,11 +229,12 @@ class FlatmateModerationGateTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                     "furnishing":"semi","locality":"GateTownF","society":"Ch House",
+                                     "locality":"GateTownF","society":"Ch House",
                                      "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                                      "lookingFor":"any","foodPref":"any",
-                                     "photos":["%s"],"hostRole":"owner","note":"Hi."}
-                                    """.formatted(UploadedPhotos.of(host.getId()))))
+                                     %s,"hostRole":"owner","note":"Hi.",%s,%s}
+                                    """.formatted(FlatmateRoomFixture.photos(host.getId()),
+                                    FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)))
                     .andExpect(status().isCreated())
                     // Without this the client has no way to distinguish "saved" from "published",
                     // and would show a success screen for a post nobody can see.

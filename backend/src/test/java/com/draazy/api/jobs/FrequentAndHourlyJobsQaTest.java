@@ -747,7 +747,7 @@ class FrequentAndHourlyJobsQaTest extends AbstractJobQaTest {
             UUID flatmates = jdbc.queryForObject("""
                     insert into saved_searches (user_id, name, filters, criteria, alert_frequency, channel, kind,
                                                 created_at, updated_at)
-                    values (?, 'mates', '{}'::jsonb, '{"tab":"move-in","locality":"Baner","habits":["early-bird"],
+                    values (?, 'mates', '{}'::jsonb, '{"tab":"move-in","locality":"Baner","vibe":["pets:1"],
                     "budget":20000,"moveIn":"now"}'::jsonb, 'instant', 'push', 'flatmates', ?, ?) returning id
                     """, UUID.class, seeker.getId(), ts(ago(Duration.ofHours(3))), ts(ago(Duration.ofHours(3))));
             match(Duration.ofMinutes(20));

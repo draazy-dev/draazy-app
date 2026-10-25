@@ -14,6 +14,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.IdentityCases;
 import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
@@ -63,6 +64,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
         u.setName(name);
         u.setMobileVerified(true);
         User saved = users.saveAndFlush(u);
+        IdentityCases.submitted(jdbc, saved.getId());
         createdActors.add(saved.getId().toString());
         return saved;
     }
@@ -83,12 +85,13 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
     private static String roomBody(String locality, String society, String roomType, int rent,
             String photo, String note) {
         return """
-                {"bhk":"2","roomType":"%s","attachedBath":"attached","furnishing":"semi",
+                {"bhk":"2","roomType":"%s","attachedBath":"attached",
                  "locality":"%s","society":"%s","rentShare":%d,"deposit":30000,
                  "availableFrom":"2026-09-01","lookingFor":"any","foodPref":"any",
-                 "agreementDeclared":true,"photos":["%s"],"note":"%s",%s}
-                """.formatted(roomType, locality, society, rent, photo, note,
-                FlatmateAgreementFixture.EVIDENCE);
+                 "ownerConsentMobile":"9890000001","agreementDeclared":true,"photos":["%s","%s","%s"],"note":"%s",%s,%s,%s}
+                """.formatted(roomType, locality, society, rent, photo, photo.replace(".jpg", "-2.jpg"),
+                photo.replace(".jpg", "-3.jpg"), note, FlatmateAgreementFixture.EVIDENCE,
+                FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS);
     }
 
     private String withUploads(User owner, String body) {
@@ -216,7 +219,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].recheckReason",
                             Matchers.contains("photos")))
                     .andExpect(jsonPath("$.content[?(@.id == '" + id + "')].photoCount",
-                            Matchers.contains(1)))
+                            Matchers.contains(3)))
                     .andExpect(jsonPath("$.content[0].photos").doesNotExist());
         }
 
@@ -289,11 +292,13 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(ownedEvidence(owner, """
                                     {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                     "furnishing":"semi","locality":"EditTownF","society":"Zeta Villa",
+                                     "locality":"EditTownF","society":"Zeta Villa",
                                      "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
-                                     "lookingFor":"any","foodPref":"veg","agreementDeclared":true,
-                                     "photos":["https://cdn.example/f1.jpg"],"note":"Sunny room.",%s}
-                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                                     "lookingFor":"any","foodPref":"veg","ownerConsentMobile":"9890000001","agreementDeclared":true,
+                                     "photos":["https://cdn.example/f1.jpg","https://cdn.example/f1-2.jpg","https://cdn.example/f1-3.jpg"],
+                                     "note":"Sunny room.",%s,%s,%s}
+                                    """.formatted(FlatmateAgreementFixture.EVIDENCE, FlatmateRoomFixture.BASICS,
+                                    FlatmateRoomFixture.DETAILS))))
                     .andExpect(status().isOk());
 
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownF"))
@@ -358,23 +363,25 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
             User mod = admin("9812000032");
             String body = """
                     {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                     "furnishing":"semi","locality":"EditTownM","society":"Nu Nest",
+                     "locality":"EditTownM","society":"Nu Nest",
                      "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
-                     "lookingFor":"any","foodPref":"any","hostRole":"%s","agreementDeclared":%s,%s
-                     "photos":["https://cdn.example/m1.jpg"],"note":"Sunny room."}
+                     "lookingFor":"any","foodPref":"any","hostRole":"%s","ownerConsentMobile":"9890000001","agreementDeclared":%s,%s
+                     "photos":["https://cdn.example/m1.jpg","https://cdn.example/m2.jpg","https://cdn.example/m3.jpg"],
+                     "note":"Sunny room.",%s,%s}
                     """;
             // No agreement, so the ladder leaves it at identity tier: pending, never reviewed.
             String id = idIn(mvc.perform(post(Routes.Flatmates.ROOMS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content(withUploads(owner, body.formatted("owner", "false", ""))))
+                            .content(withUploads(owner, body.formatted("owner", "false", "", FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS))))
                     .andExpect(status().isCreated())
                     .andExpect(jsonPath("$.modStatus").value("pending"))
                     .andReturn().getResponse().getContentAsString());
 
             // A declared agreement silently moves the tier, so edit must not let a pending
             // post walk itself onto the feed without real evidence.
-            editRoom(owner, id, body.formatted("tenant", "true", FlatmateAgreementFixture.EVIDENCE + ","));
+            editRoom(owner, id, body.formatted("tenant", "true", FlatmateAgreementFixture.EVIDENCE + ",",
+                    FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS));
 
             mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "EditTownM"))
                     .andExpect(status().isOk())
@@ -401,12 +408,14 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(ownedEvidence(owner, """
                                     {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                     "furnishing":"semi","locality":"EditTownN","society":"Xi Court",
+                                     "locality":"EditTownN","society":"Xi Court",
                                      "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
-                                     "lookingFor":"any","foodPref":"any","agreementDeclared":true,
+                                     "lookingFor":"any","foodPref":"any","ownerConsentMobile":"9890000001","agreementDeclared":true,
                                      "lat":18.5362,"lng":73.8939,
-                                     "photos":["https://cdn.example/n1.jpg"],"note":"Sunny room.",%s}
-                                    """.formatted(FlatmateAgreementFixture.EVIDENCE))))
+                                     "photos":["https://cdn.example/n1.jpg","https://cdn.example/n1-2.jpg","https://cdn.example/n1-3.jpg"],
+                                     "note":"Sunny room.",%s,%s,%s}
+                                    """.formatted(FlatmateAgreementFixture.EVIDENCE, FlatmateRoomFixture.BASICS,
+                                    FlatmateRoomFixture.DETAILS))))
                     .andExpect(status().isOk());
 
             recheckBoard(admin("9812000034"), "room")
@@ -425,8 +434,8 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(ownedEvidence(owner, """
-                                    {"title":"%s","locality":"%s","policy":"any","rent":%d,
-                                     "seats":3,"seatsOpen":1,"name":"Host","tags":[],
+                                    {"title":"%s","locality":"%s","policy":"any","rent":%d,"deposit":10000,
+                                     "seats":3,"seatsOpen":1,"name":"Host",
                                      "agreement":true,"note":"Chill flat.",%s}
                                     """.formatted(title, locality, rent,
                                     FlatmateAgreementFixture.EVIDENCE))))
@@ -446,7 +455,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(ownedEvidence(owner, """
                                     {"title":"Four of us now","locality":"EditTownP","policy":"any",
-                                     "rent":40000,"seats":3,"seatsOpen":1,"name":"Host","tags":[],
+                                     "rent":40000,"deposit":10000,"seats":3,"seatsOpen":1,"name":"Host",
                                      "agreement":true,"note":"Chill flat.",%s}
                                     """.formatted(FlatmateAgreementFixture.EVIDENCE))))
                     .andExpect(status().isOk());
@@ -465,8 +474,8 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
-                                    {"title":"Three of us","locality":"","policy":"any","rent":40000,
-                                     "seats":3,"seatsOpen":1,"name":"Host","tags":[],
+                                    {"title":"Three of us","locality":"","policy":"any","rent":40000,"deposit":10000,
+                                     "seats":3,"seatsOpen":1,"name":"Host",
                                      "agreement":true,"note":"Chill flat."}
                                     """))
                     .andExpect(status().isUnprocessableEntity())
@@ -486,7 +495,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                                     {"name":"%s","gender":"any","age":27,"occupation":"Analyst",
                                      "budget":18000,"localities":["EditTownG"],
                                      "moveIn":"2026-09-01","flatPref":"any","roomPref":"private",
-                                     "tags":[],"note":"%s"}
+                                     "note":"%s"}
                                     """.formatted(name, note)))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString());
@@ -512,7 +521,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                                     {"name":"Writer","gender":"any","age":27,
                                      "occupation":"Analyst","budget":18000,
                                      "localities":["EditTownG"],"moveIn":"2026-09-01",
-                                     "flatPref":"any","roomPref":"private","tags":[],
+                                     "flatPref":"any","roomPref":"private",
                                      "note":"Now near the metro, flexible on dates."}
                                     """))
                     .andExpect(status().isOk());
@@ -580,7 +589,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .content("""
                                     {"name":"Seeker","gender":"any","budget":18000,
                                      "localities":["EditTownG"],"moveIn":"2026-09-01",
-                                     "flatPref":"any","roomPref":"private","tags":[],"note":"Hi"}
+                                     "flatPref":"any","roomPref":"private","note":"Hi"}
                                     """))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString());
@@ -592,6 +601,17 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.post.localities", Matchers.contains("EditTownG", "EditTownH")))
                     .andExpect(jsonPath("$.post.moveIn").value("2026-11-01"));
             edit(mod, id, "{\"deposit\":10000}").andExpect(status().isUnprocessableEntity());
+            edit(mod, id, "{\"localities\":[\"EditTownG\",\"EditTownH\",\"EditTownI\",\"EditTownJ\"]}")
+                    .andExpect(status().isUnprocessableEntity());
+            mvc.perform(post(Routes.Flatmates.POSTS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host("9812000067", "Seeker4")))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"name":"Seeker","gender":"any","budget":18000,
+                                     "localities":["EditTownG","EditTownH","EditTownI","EditTownJ"],
+                                     "flatPref":"any","roomPref":"private","note":"Hi"}
+                                    """))
+                    .andExpect(status().isUnprocessableEntity());
         }
 
         @Test
@@ -603,7 +623,7 @@ class FlatmateEditRemoderationTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(ownedEvidence(owner, """
                                     {"title":"Three of us","locality":"EditTownQ","policy":"any",
-                                     "rent":40000,"seats":3,"seatsOpen":1,"name":"Host","tags":[],
+                                     "rent":40000,"deposit":10000,"seats":3,"seatsOpen":1,"name":"Host",
                                      "agreement":true,"note":"Chill flat.",%s}
                                     """.formatted(FlatmateAgreementFixture.EVIDENCE))))
                     .andExpect(status().isCreated())

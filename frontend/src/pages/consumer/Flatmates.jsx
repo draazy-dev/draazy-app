@@ -21,7 +21,7 @@ export default function Flatmates() {
     flatmateTabs, mapGated, gateAreas, kindWord,
     filtersActive, mapItems, setMapAreas, onInterest, onRoomInterest, onJoin,
     onSave, saved, interestedFor, goToPosting, myPost, myRooms, myGroups,
-    activeList, otherCount, switchTab,
+    activeList, otherCount, otherTab, switchTab,
     ownsGroup, ownsRoom,
     toast, activeFilterCount, raiseHint,
     openPostChooser,
@@ -66,7 +66,7 @@ export default function Flatmates() {
                 <p className="text-xs text-gray-500 flex items-center gap-1.5"><Icon name="info" className="w-3.5 h-3.5" /> {t('flatmates.mapInfo', { kind: t('flatmates.kind_' + kindWord) })}</p>
                 {filters.near ? (
                   <button type="button" onClick={() => setF({ near: '', nearLabel: '', nearRadius: 5, nearMode: 'km' })}                   className="dz-chip dz-chip--accent dz-chip--sm hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200">
-                                      <Icon name="map-pinned" /> {t('flatmates.nearChip', { label: filters.nearLabel || t('flatmates.placeWord'), radius: filters.nearRadius, unit: filters.nearMode === 'km' ? t('flatmates.unitKm') : t('flatmates.unitMin') })} <Icon name="x" />
+                                      <Icon name="map-pinned" /> {t('flatmates.nearChip', { label: filters.nearLabel || t('flatmates.placeWord'), radius: filters.nearRadius, unit: filters.nearMode === 'min' ? t('flatmates.unitMin') : t('flatmates.unitKm') })} <Icon name="x" />
                   </button>
                 ) : (
                   <button type="button" onClick={() => setMapAreas(new Set())} className="text-[11px] font-medium text-teal-400 hover:text-teal-300 inline-flex items-center gap-1"><Icon name="rotate-ccw" className="w-3 h-3" /> {t('flatmates.changeAreas')}</button>
@@ -75,7 +75,6 @@ export default function Flatmates() {
               <Suspense fallback={<div className="flex items-center justify-center h-96"><div className="w-8 h-8 border-2 border-teal-400/30 border-t-teal-400 rounded-full animate-spin" /></div>}>
                 <FlatmateMap
                   items={mapItems}
-                  tab={tab}
                   kindWord={kindWord}
                   onFilter={(l) => setF({ locality: l })}
                   onInterest={onInterest}
@@ -90,7 +89,7 @@ export default function Flatmates() {
             </div>
             )
           ) : (
-            <Results tab={tab} myPost={myPost} myRooms={myRooms} myGroups={myGroups} activeList={activeList} total={total} verifiedTotal={verifiedTotal} page={page} pageCount={pageCount} onGoToPage={goToPage} loaded={loaded} searching={searching} otherCount={otherCount} onSwitchTab={switchTab} saved={saved} onSave={onSave} ownsGroup={ownsGroup} ownsRoom={ownsRoom} filtersActive={filtersActive} onClearFilters={clearFilters} onPost={openPostChooser} filters={filters} toast={toast} activeFilterCount={activeFilterCount} raiseHint={raiseHint} onRaiseBudget={() => raiseHint && setF({ budget: [filters.budget[0], raiseHint.budget] })} feedFailed={feedFailed} feedError={feedError} onRetryFeeds={retryFeeds} sortMode={sortMode} onSort={onSort} />
+            <Results tab={tab} myPost={myPost} myRooms={myRooms} myGroups={myGroups} activeList={activeList} total={total} verifiedTotal={verifiedTotal} page={page} pageCount={pageCount} onGoToPage={goToPage} loaded={loaded} searching={searching} otherCount={otherCount} otherTab={otherTab} onSwitchTab={switchTab} saved={saved} onSave={onSave} ownsGroup={ownsGroup} ownsRoom={ownsRoom} filtersActive={filtersActive} onClearFilters={clearFilters} onPost={openPostChooser} filters={filters} toast={toast} activeFilterCount={activeFilterCount} raiseHint={raiseHint} onRaiseBudget={() => raiseHint && setF({ budget: [filters.budget[0], raiseHint.budget] })} feedFailed={feedFailed} feedError={feedError} onRetryFeeds={retryFeeds} sortMode={sortMode} onSort={onSort} setF={setF} budgetLbl={budgetLbl} />
           )}
         </div>
       </div>

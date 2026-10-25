@@ -7,8 +7,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.engagement.flatmate.FlatmateRoomFixture;
 import com.draazy.api.identity.user.User;
-import com.draazy.api.support.UploadedPhotos;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -24,17 +24,18 @@ class CrossUserFlatmateOwnershipTest extends AbstractSecurityTest {
 
     private String room(User host, long rentShare) {
         return withSocietyIds("""
-                {"bhk":"2","roomType":"Private room","attachedBath":"attached","furnishing":"semi",
+                {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "locality":"Baner","society":"Sunrise Heights","rentShare":%d,"deposit":30000,
                  "availableFrom":"2026-09-01","lookingFor":"any","foodPref":"any",
-                 "photos":["%s"],"hostRole":"owner","note":"Sunny room."}
-                """.formatted(rentShare, UploadedPhotos.of(host.getId())));
+                 %s,"hostRole":"owner","note":"Sunny room.",%s,%s}
+                """.formatted(rentShare, FlatmateRoomFixture.photos(host.getId()), FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS));
     }
 
     private static String group(String title) {
         return """
-                {"title":"%s","locality":"Baner","policy":"women","rent":40000,
-                 "seats":3,"seatsOpen":1,"name":"Host","tags":["Vegetarian"]}
+                {"title":"%s","locality":"Baner","policy":"women","rent":40000,"deposit":10000,
+                 "seats":3,"seatsOpen":1,"name":"Host"}
                 """.formatted(title);
     }
 

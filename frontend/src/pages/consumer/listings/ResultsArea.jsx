@@ -10,6 +10,7 @@ import MapGate from './MapGate.jsx';
 import Select from '../../../components/ui/Select.jsx';
 import Button from '../../../components/ui/Button.jsx';
 import Pager from '../../../components/ui/Pager.jsx';
+import ActiveFilterChips from '../../../components/ui/ActiveFilterChips.jsx';
 import useBackToClose from '../../../hooks/useBackToClose.js';
 import { flatmatesUrl } from './matchers.js';
 import { RANGE, rangeChanged } from '../../../lib/listings/filterState.js';
@@ -115,25 +116,15 @@ export default function ResultsArea({ f, set, localities, aiQuery, setAiQuery, s
                 </div>
               </div>
 
-              {activeChips.length ? (
-                /* py-1.5 leaves room inside the scroller for each chip's 44px ::before target. */
-                <div className="flex items-center gap-2 -mx-4 px-4 py-1.5 mb-3 overflow-x-auto no-scrollbar sm:mx-0 sm:px-0 sm:mb-5 sm:flex-wrap sm:overflow-visible list-reveal" style={{ animationDelay: '200ms' }}>
-                  <span className="hidden sm:inline text-xs text-gray-500 mr-0.5">{t('listings.activeFilters')}</span>
-                  {activeChips.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={c.remove}
-                      aria-label={t('listings.removeFilter', { label: c.label })}
-                      className="af-chip dz-chip dz-chip--accent dz-chip--sm"
-                    >
-                      {c.label}
-                      <Icon name="x" />
-                    </button>
-                  ))}
-                  <button type="button" onClick={clearAll} className="af-clear-all dz-chip dz-chip--sm">{t('listings.clearAllLower')}</button>
-                </div>
-              ) : null}
+              <ActiveFilterChips
+                chips={activeChips}
+                onClearAll={clearAll}
+                heading={t('listings.activeFilters')}
+                removeLabel={(label) => t('listings.removeFilter', { label })}
+                clearAllLabel={t('listings.clearAllLower')}
+                className="list-reveal"
+                style={{ animationDelay: '200ms' }}
+              />
 
               {f.deal === 'rent' && f.types.has('flatmates') ? (
                 <Link to={flatmatesUrl(f, locNameBySlug)} className="flex items-center gap-4 mb-6 rounded-2xl border border-teal-500/25 bg-gradient-to-r from-teal-500/10 to-teal-400/5 px-5 py-4 hover:border-teal-400/50 transition-all group">

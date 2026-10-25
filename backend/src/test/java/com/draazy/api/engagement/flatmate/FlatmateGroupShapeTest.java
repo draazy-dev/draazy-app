@@ -24,7 +24,7 @@ class FlatmateGroupShapeTest {
             "lockInMonths", "maintenanceBilling", "electricityBilling",
             "perHead", "seatsTotal", "seatsOpen",
             "members", "propertyId", "hostRole", "verificationTier", "agreementDeclared",
-            "ownerConsent", "reviewStatus", "tags", "note", "ownerName", "createdAt",
+            "ownerConsent", "reviewStatus", "note", "ownerName", "createdAt",
             "preferences");
 
     // See {@link FlatmateGroupFeedDto} for the evidence behind each host-only field.

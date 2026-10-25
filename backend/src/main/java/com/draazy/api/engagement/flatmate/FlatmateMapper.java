@@ -150,7 +150,6 @@ public interface FlatmateMapper {
     @Mapping(target = "societyId", source = "societyId", qualifiedByName = "uuidOrNull")
     @Mapping(target = "flatNumber", source = "flatNumber", qualifiedByName = "trimmedOrNull")
     @Mapping(target = "availableFrom", source = "availableFrom")
-    @Mapping(target = "tags", source = "lifestyle", qualifiedByName = "stringsOrEmpty")
 
     @Mapping(target = "photos", source = "photos", qualifiedByName = "stringsOrEmpty")
     @Mapping(target = "note", source = "note", qualifiedByName = "trimmedOrNull")
@@ -179,7 +178,6 @@ public interface FlatmateMapper {
     /** Same allowlist treatment for a group. {@code propertyId} arrives in the request but is only
      * honoured after {@code deriveTier} confirms owner tier, so the service writes it, not this. */
     @Mapping(target = "seatsOpen", source = "seatsOpen")
-    @Mapping(target = "tags", source = "tags", qualifiedByName = "stringsOrEmpty")
     @Mapping(target = "note", source = "note", qualifiedByName = "trimmedOrNull")
     @Mapping(target = "ownerConsentMobile", source = "consentMobile", qualifiedByName = "mobileNormaliseOrNull")
     void applyTo(FlatmateGroupCreateRequest body, @MappingTarget FlatmateGroup group);

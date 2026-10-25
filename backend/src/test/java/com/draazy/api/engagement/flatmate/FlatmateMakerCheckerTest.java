@@ -16,7 +16,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +60,7 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
         User u = new User(mobile, role);
         u.setName("U" + mobile.substring(6));
         u.setMobileVerified(true);
+        u.setVerified(true);
         User saved = users.saveAndFlush(u);
         createdActors.add(saved.getId().toString());
         return saved;
@@ -77,7 +77,7 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
                         .content("""
                                 {"name":"Asha","gender":"any","age":27,"budget":18000,
                                  "localities":["Baner"],"moveIn":"2026-12-01",
-                                 "flatPref":"any","roomPref":"private","tags":[],"note":"Quiet."}
+                                 "flatPref":"any","roomPref":"private","note":"Quiet."}
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
@@ -88,11 +88,12 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
                 "Registered Leave and Licence", "leave-and-licence.pdf",
                 "personal/" + host.getId() + "/" + UUID.randomUUID(), 184320L, "application/pdf"));
         String body = """
-                {"bhk":"2","roomType":"Private room","attachedBath":"attached","furnishing":"semi",
+                {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "locality":"Baner","society":"Maker Checker Heights","rentShare":15000,"deposit":30000,
                  "availableFrom":"2026-12-01","lookingFor":"any","foodPref":"any",
-                 "agreementDeclared":true,"photos":["%s"],"note":"Sunny room.",%s}
-                """.formatted(UploadedPhotos.of(host.getId()), FlatmateAgreementFixture.EVIDENCE)
+                 "agreementDeclared":true,"ownerConsentMobile":"9890000001",%s,"note":"Sunny room.",%s,%s,%s}
+                """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateAgreementFixture.EVIDENCE,
+                        FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)
                 .replace("\"id\":\"agr-doc-1\"", "\"id\":\"" + doc.getId() + "\"");
         return idIn(mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -121,7 +122,7 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
         return mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, reviewId)
                 .header(HttpHeaders.AUTHORIZATION, bearer(mod))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"decision\":\"%s\",\"note\":\"%s\"}".formatted(decision, note)));
+                .content(FlatmateApprovals.decision(decision, note)));
     }
 
     @Test
@@ -134,7 +135,7 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
                         .content("""
                                 {"name":"Asha","gender":"any","age":27,"budget":18000,
                                  "localities":["Baner"],"moveIn":"2026-12-01",
-                                 "flatPref":"any","roomPref":"private","tags":[],"note":"Quiet."}
+                                 "flatPref":"any","roomPref":"private","note":"Quiet."}
                                 """))
                 .andExpect(status().isForbidden());
     }
@@ -374,23 +375,29 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
     @DisplayName("an address or locality field may not carry contact details either")
     void addressFieldsRefuseContactDetails() throws Exception {
         User host = user("9300000039", Roles.Wire.BUYER);
-        String base = "\"roomType\":\"Private room\",\"rentShare\":15000";
-        for (String fields : List.of(
-                "\"locality\":\"Baner\",\"society\":\"Call 98765 43210\"",
-                "\"locality\":\"Baner\",\"flatNumber\":\"98765 43210\"",
-                "\"locality\":\"Baner\",\"facing\":\"wa.me/919876543210\"",
-                "\"locality\":\"Baner\",\"overlooking\":\"a@b.co\"",
-                "\"locality\":\"Baner 98765 43210\"",
-                "\"locality\":\"Baner\",\"details\":{\"tower\":\"98765 43210\"}",
-                "\"locality\":\"Baner\",\"details\":{\"furniture\":[\"Bed, call 9876543210\"]}")) {
-            refused(Routes.Flatmates.ROOMS, host, "{" + base + "," + fields + "}");
+        String base = "\"locality\":\"Baner\",\"bhk\":\"2\",\"attachedBath\":\"attached\","
+                + "\"roomType\":\"Private room\",\"rentShare\":15000,\"deposit\":30000,"
+                + FlatmateRoomFixture.BASICS + "," + FlatmateRoomFixture.DETAILS + ","
+                + FlatmateRoomFixture.photos(host.getId());
+        String locality = "\"locality\":\"Baner\"";
+        for (String body : List.of(
+                base.replace(locality, locality + ",\"society\":\"Call 98765 43210\""),
+                base.replace("\"A-101\"", "\"98765 43210\""),
+                base.replace(locality, locality + ",\"facing\":\"wa.me/919876543210\""),
+                base.replace(locality, locality + ",\"overlooking\":\"a@b.co\""),
+                base.replace(locality, "\"locality\":\"Baner 98765 43210\""),
+                base.replace(FlatmateRoomFixture.DETAILS_FIELDS,
+                        FlatmateRoomFixture.DETAILS_FIELDS + ",\"tower\":\"98765 43210\""),
+                base.replace(FlatmateRoomFixture.DETAILS_FIELDS,
+                        FlatmateRoomFixture.DETAILS_FIELDS + ",\"furniture\":[\"Bed, call 9876543210\"]"))) {
+            refused(Routes.Flatmates.ROOMS, host, "{" + body + "}");
         }
         refused(Routes.Flatmates.GROUPS, host, """
-                {"title":"Two of us","locality":"wa.me/919876543210","policy":"any","rent":40000,
+                {"title":"Two of us","locality":"wa.me/919876543210","policy":"any","rent":40000,"deposit":10000,
                  "seats":3,"seatsOpen":2,"name":"Host"}""");
         refused(Routes.Flatmates.GROUPS, host, """
                 {"title":"Two of us","policy":"any","seats":3,"seatsOpen":2,"name":"Host",
-                 "preferences":{"localities":["Baner 98765 43210"],"rentMax":40000,"gatedOnly":false,"bachelors":false}}""");
+                 "preferences":{"localities":["Baner 98765 43210"],"rentMax":40000,"depositMax":100000,"gatedOnly":false,"bachelors":false}}""");
         refused(Routes.Flatmates.POSTS, host, """
                 {"name":"Asha","budget":18000,"localities":["Baner 98765 43210"]}""");
     }
@@ -611,7 +618,7 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Two of us in Aundh","locality":"Aundh","policy":"women",
-                                 "rent":40000,"seats":3,"seatsOpen":2,"name":"Host"}
+                                 "rent":40000,"deposit":10000,"seats":3,"seatsOpen":2,"name":"Host"}
                                 """))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());
         sql("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", id);
@@ -646,7 +653,7 @@ class FlatmateMakerCheckerTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"Three of us","locality":"Kothrud","policy":"any","rent":45000,
+                                {"title":"Three of us","locality":"Kothrud","policy":"any","rent":45000,"deposit":10000,
                                  "seats":3,"seatsOpen":1,"name":"Host"}
                                 """))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString());

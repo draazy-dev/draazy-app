@@ -3,7 +3,7 @@ import { useLocation, useSearchParams } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import { useLocalityCoords } from './useLocalityCoords.js';
 import { localitiesIn } from '../../../services/localityService.js';
-import { TAB_MOVE_IN, TAB_TEAM_UP, normalizeTab, decorateRooms } from './model.js';
+import { TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS, TABS, TAB_ICON, KIND_WORD, normalizeTab, decorateRooms } from './model.js';
 import { inr, withCoords, BUDGET_MIN, BUDGET_MAX, budgetIsAny, segClass } from './helpers.js';
 import {
   applyFlatmateStateToSearchParams,
@@ -11,6 +11,7 @@ import {
   flatmateFiltersEqual,
   flatmateFiltersFromParams,
   hasFlatmateSearchParams,
+  normalizeVibe,
   readRememberedFlatmateSearch,
   saveRememberedFlatmateSearch,
   sortFromParams,
@@ -18,8 +19,11 @@ import {
 import toFlatmateQuery from './facetQuery.js';
 import useFlatmatesSearch from './useFlatmatesSearch.js';
 import useRaiseHint from './useRaiseHint.js';
+import useLivingStyle from './livingStyle/useLivingStyle.js';
+import { MIN_COMMON } from './livingStyle/questions.js';
+import LivingStyleEntry from './livingStyle/LivingStyleEntry.jsx';
 
-export const emptyFilters = { q: '', locality: '', budget: [BUDGET_MIN, BUDGET_MAX], moveIn: '', gender: '', sharing: '', verifiedOnly: false, attachedBath: false, habits: [], near: '', nearLabel: '', nearRadius: 5, nearMode: 'km' };
+export const emptyFilters = { q: '', locality: '', budget: [BUDGET_MIN, BUDGET_MAX], moveIn: '', gender: '', genderOnly: false, roomType: '', furnishing: '', sharing: '', verifiedOnly: false, gated: false, attachedBath: false, vibe: [], near: '', nearLabel: '', nearRadius: 5, nearMode: 'km' };
 // Only `near` itself counts as an active filter, so a leftover radius cannot inflate the badge
 // after the place is cleared.
 const NEAR_TUNING_KEYS = ['nearLabel', 'nearRadius', 'nearMode'];
@@ -38,12 +42,13 @@ const isoInDays = (n) => {
 
 // Takes no row collections: the server filters, ranks, counts and pages the board. A client-side pass over a fetched
 // slice would make every filter, the ranking and the counts mean "of the first N".
-export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, openPostModal, onPost }) {
+export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, openPostModal, onPost, viewer }) {
   const [params, setParams] = useSearchParams();
   const { pathname } = useLocation();
+  const style = useLivingStyle();
   const initFromUrl = () => (hasFlatmateSearchParams(params)
     ? flatmateFiltersFromParams(params, emptyFilters)
-    : readRememberedFlatmateSearch(emptyFilters) || { ...emptyFilters, budget: [...emptyFilters.budget], habits: [] });
+    : readRememberedFlatmateSearch(emptyFilters) || { ...emptyFilters, budget: [...emptyFilters.budget], vibe: [] });
   // Map view only — never touches the list, the URL or the posting model. Empty => focus gate.
   const [mapAreas, setMapAreas] = useState(() => new Set());
   const [filters, setFilters] = useState(initFromUrl);
@@ -55,7 +60,7 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
   const urlWriteModeRef = useRef('replace');
   const lastWrittenRef = useRef('');
   const onSort = (s) => {
-    if (s === 'match' && !myPost) { toast(t('flatmates.toastPostToRank')); openPostModal(); return; }
+    if (s === 'match' && !myPost && style.count < MIN_COMMON) { toast(t('flatmates.toastPostToRank')); openPostModal(); return; }
     urlWriteModeRef.current = 'push';
     setSortMode(s);
   };
@@ -78,15 +83,19 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     setMapAreas(new Set());
     setFilters((f) => ({
       ...f,
-      sharing: next === TAB_TEAM_UP ? f.sharing : '',
+      sharing: next === TAB_TEAMS ? f.sharing : '',
       attachedBath: next === TAB_MOVE_IN ? f.attachedBath : false,
+      furnishing: next === TAB_MOVE_IN ? f.furnishing : '',
+      gated: next === TAB_MOVE_IN ? f.gated : false,
+      roomType: next === TAB_TEAMS ? '' : f.roomType,
+      genderOnly: next === TAB_PEOPLE ? false : f.genderOnly,
     }));
   };
 
   const activeFilterCount = useMemo(() => Object.keys(emptyFilters).filter((k) => {
     if (k === 'q' || NEAR_TUNING_KEYS.includes(k)) return false;
     // `budget` is a tuple, so it needs the bounds test: the `Array.isArray` rule below is right for
-    // `habits` but permanently true of a range, and the badge would never read zero.
+    // `vibe` but permanently true of a range, and the badge would never read zero.
     if (k === 'budget') return !budgetIsAny(filters.budget);
     const def = emptyFilters[k];
     return Array.isArray(def) ? filters[k].length > 0 : filters[k] !== def;
@@ -96,12 +105,12 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
   // "Clear filters" must be able to undo.
   const filtersActive = useMemo(() => activeFilterCount > 0 || filters.q !== '', [activeFilterCount, filters.q]);
   // Spread, including the nested arrays: handing the shared module constant out as state would let
-  // one future `filters.habits.push(...)` corrupt the app-wide default permanently.
+  // one future `filters.vibe.push(...)` corrupt the app-wide default permanently.
   const clearFilters = () => {
     urlWriteModeRef.current = 'replace';
     clearRememberedFlatmateSearch();
     lastWrittenRef.current = '';
-    setFilters({ ...emptyFilters, budget: [...emptyFilters.budget], habits: [] });
+    setFilters({ ...emptyFilters, budget: [...emptyFilters.budget], vibe: [] });
     setMapAreas(new Set());
   };
 
@@ -109,7 +118,7 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     lastWrittenRef.current = '';
     const nextFilters = hasFlatmateSearchParams(source)
       ? flatmateFiltersFromParams(source, emptyFilters)
-      : readRememberedFlatmateSearch(emptyFilters) || { ...emptyFilters, budget: [...emptyFilters.budget], habits: [] };
+      : readRememberedFlatmateSearch(emptyFilters) || { ...emptyFilters, budget: [...emptyFilters.budget], vibe: [] };
     setFilters((current) => (flatmateFiltersEqual(current, nextFilters) ? current : nextFilters));
 
     const nextSort = sortFromParams(source);
@@ -169,7 +178,8 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
   }
   const requestPage = pagedKey === requestKey ? page : 0;
 
-  const search = useFlatmatesSearch({ tab, filters: query, page: requestPage, size });
+  const styleKey = viewer ? `${viewer}|${style.version}` : '';
+  const search = useFlatmatesSearch({ tab, filters: query, page: requestPage, size, viewer: styleKey });
   // Centres only place map pins, so the list view never looks them up.
   const localityCoords = useLocalityCoords(viewMode === 'map'
     ? search.items.flatMap((it) => (it.localities?.length ? it.localities : [it.locality]))
@@ -197,10 +207,12 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
   // `null` until the server has answered once, so a tab badge can say "not known yet" rather than
   // asserting zero. See `tabCount` below.
   const loadedTotal = search.loaded ? total : null;
-  // Cross-tab rescue: when this feed is empty the other may still hold stock for the same filters.
+  const tabTotal = (key) => (key === tab ? loadedTotal ?? search.tabTotals?.[key] ?? null : search.tabTotals?.[key] ?? null);
+  // Cross-tab rescue: when this feed is empty another may still hold stock for the same filters.
   // Counted by the server over the whole match, not by the browser over rows already fetched.
-  const otherTab = tab === TAB_MOVE_IN ? TAB_TEAM_UP : TAB_MOVE_IN;
-  const otherCount = search.otherCount ?? 0;
+  const otherTab = TABS.filter((key) => key !== tab)
+    .reduce((best, key) => ((tabTotal(key) ?? 0) > (tabTotal(best) ?? 0) ? key : best));
+  const otherCount = tabTotal(otherTab) ?? 0;
   const switchTab = () => selectTab(otherTab);
 
   // When a tab returns nothing and budget is the binding constraint, ask what the cheapest
@@ -216,7 +228,7 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     });
     return m;
   }, [activeList, localityCoords]);
-  const kindWord = tab === TAB_MOVE_IN ? 'homes' : 'flatmates';
+  const kindWord = KIND_WORD[tab];
 
   // Only areas that hold matching posts, ranked by count, so a pick never dead-ends.
   const gateAreas = useMemo(
@@ -257,11 +269,11 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
     const q = rawQuery.toLowerCase().trim();
     if (!q) return false;
     const seq = ++smartSeqRef.current;
-    const next = { ...emptyFilters, budget: [...emptyFilters.budget], habits: [], q: rawQuery };
+    const next = { ...emptyFilters, budget: [...emptyFilters.budget], vibe: [], q: rawQuery };
     const parts = [];
 
-    if (/\b(girl|woman|women|female)\b/.test(q)) { next.gender = 'female'; parts.push(t('flatmates.gWomen')); }
-    else if (/\b(boy|man|men|male|guy)\b/.test(q)) { next.gender = 'male'; parts.push(t('flatmates.gMen')); }
+    if (/\b(girls?|wom[ae]n|females?|ladies)\b/.test(q)) { next.gender = 'female'; parts.push(t('flatmates.gWomen')); }
+    else if (/\b(boys?|m[ae]n|males?|guys?)\b/.test(q)) { next.gender = 'male'; parts.push(t('flatmates.gMen')); }
 
     // A sentence only ever states a CEILING ("under 12000", "15k"), so the floor stays at
     // BUDGET_MIN — inferring a minimum would hide the cheap rooms the seeker most wants.
@@ -286,11 +298,19 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
 
     if (/\battach(ed)?\b.*\b(bath|washroom|toilet)|private\s*(bath|washroom|toilet)/.test(q)) { next.attachedBath = true; parts.push(t('flatmates.attachedBath')); }
 
-    const habits = [];
-    if (/non[-\s]?smok|no\s*smoking|smoke[-\s]?free/.test(q)) habits.push('Non-smoker');
-    if (/\bvegetarian\b/.test(q) || (/\bveg\b/.test(q) && !/non[-\s]?veg/.test(q))) habits.push('Vegetarian');
-    if (/\bpet(s|[-\s]?friendly)?\b/.test(q)) habits.push('Pet-friendly');
-    if (habits.length) { next.habits = habits; parts.push(...habits); }
+    if (next.gender && tab !== TAB_PEOPLE && /\b(only|strictly)\b/.test(q)) { next.genderOnly = true; parts.push(t(next.gender === 'male' ? 'flatmates.menOnlyHomes' : 'flatmates.womenOnlyHomes')); }
+    if (tab !== TAB_TEAMS && /\bprivate\s*room\b/.test(q)) { next.roomType = 'private'; parts.push(t('flatmates.roomPrivate')); }
+    else if (tab !== TAB_TEAMS && /\b(shared\s*room|twin\s*sharing)\b/.test(q)) { next.roomType = 'shared'; parts.push(t('flatmates.roomShared')); }
+    if (tab === TAB_MOVE_IN && /\bsemi[-\s]?furnished\b/.test(q)) { next.furnishing = 'semi'; parts.push(t('flatmates.furnSemi')); }
+    else if (tab === TAB_MOVE_IN && /\b(fully\s*)?furnished\b/.test(q)) { next.furnishing = 'furnished'; parts.push(t('flatmates.furnFurnished')); }
+    if (tab === TAB_MOVE_IN && /\bgated\b/.test(q)) { next.gated = true; parts.push(t('flatmates.gatedSociety')); }
+
+    const vibe = [];
+    const addVibe = (key, answers) => answers.forEach((a) => { vibe.push(`${key}:${a}`); parts.push(t(`flatmates.ls.a_${key}_${a}`)); });
+    if (/non[-\s]?smok|no\s*smoking|smoke[-\s]?free/.test(q)) addVibe('smoking', [0]);
+    if (/\bvegetarian\b/.test(q) || (/\bveg\b/.test(q) && !/non[-\s]?veg/.test(q))) addVibe('food', [0]);
+    if (/\bpet(s|[-\s]?friendly)?\b/.test(q)) addVibe('pets', [1, 2]);
+    next.vibe = normalizeVibe(vibe);
 
     // If at least one structured filter was understood, drop the raw sentence so it stops fighting
     // the chips. If nothing parsed, keep it as a plain text search.
@@ -304,33 +324,34 @@ export function useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, 
   };
 
   const tabCls = (on) =>
-    'seg flex-1 sm:flex-none min-w-0 justify-center sm:justify-start text-[13px] sm:text-sm font-semibold px-2.5 sm:px-4 py-2.5 min-h-11 rounded-xl text-gray-300 flex items-center gap-1.5 sm:gap-2'
+    'seg flex-auto sm:flex-none min-w-0 justify-center sm:justify-start text-xs sm:text-sm font-semibold px-2 sm:px-4 py-2.5 min-h-11 rounded-xl text-gray-300 flex items-center gap-1 sm:gap-2'
     + (on ? ' active' : '');
   /* Counts are rendered: stock a seeker cannot see is stock they never switch tabs for. */
   const tabCount = (n) => (
-    <span className={'dz-count ml-0.5 tabular-nums ' + (n ? 'bg-white/10 text-gray-100' : 'bg-white/5 text-gray-500')}>{n == null ? '·' : n}</span>
+    <span className={'dz-count tabular-nums ' + (n ? 'bg-white/10 text-gray-100' : 'bg-white/5 text-gray-500')}>{n == null ? '·' : n}</span>
   );
-  const moveInCount = tab === TAB_MOVE_IN ? loadedTotal : search.otherCount;
-  const teamUpCount = tab === TAB_TEAM_UP ? loadedTotal : search.otherCount;
   /* `aria-label` REPLACES the content, so it cannot say "0" where the badge deliberately says
    * "·". */
-  const tabLabel = (countedKey, plainKey, n) => (n == null ? t(plainKey) : t(countedKey, { count: n }));
+  const tabLabel = (key, n) => (n == null ? t(`flatmates.ariaTab_${key}`) : t(`flatmates.ariaTabCount_${key}`, { count: n }));
   const flatmateTabs = (
-    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-      <div className="flex items-center gap-2">
-        <button onClick={() => selectTab(TAB_MOVE_IN)} aria-current={tab === TAB_MOVE_IN ? 'page' : undefined} aria-label={tabLabel('flatmates.ariaMoveInCount', 'flatmates.ariaMoveIn', moveInCount)} className={tabCls(tab === TAB_MOVE_IN)}>
-          <Icon name="door-open" className="w-4 h-4 shrink-0" /> <span className="truncate">{t('flatmates.tabMoveIn')}</span>{tabCount(moveInCount)}
-        </button>
-        <button onClick={() => selectTab(TAB_TEAM_UP)} aria-current={tab === TAB_TEAM_UP ? 'page' : undefined} aria-label={tabLabel('flatmates.ariaTeamUpCount', 'flatmates.ariaTeamUp', teamUpCount)} className={tabCls(tab === TAB_TEAM_UP)}>
-          <Icon name="users-round" className="w-4 h-4 shrink-0" /> <span className="truncate">{t('flatmates.tabTeamUp')}</span>{tabCount(teamUpCount)}
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          {TABS.map((key) => (
+            <button key={key} type="button" data-tab={key} onClick={() => selectTab(key)} aria-current={tab === key ? 'page' : undefined} aria-label={tabLabel(key, tabTotal(key))} className={tabCls(tab === key)}>
+              <Icon name={TAB_ICON[key]} className="hidden sm:block w-4 h-4 shrink-0" /> <span className="truncate">{t(`flatmates.tab_${key}`)}</span>{tabCount(tabTotal(key))}
+            </button>
+          ))}
+        </div>
+        <div className="hidden sm:block flex-1" />
+
+        {/* Styled in routes/flatmates.css: buttons.css loads later and would win the specificity tie. */}
+        <button onClick={onPost} className="sf-post-cta btn-teal h-10 inline-flex items-center justify-center gap-2 px-4 rounded-full text-white text-sm font-semibold w-full sm:w-auto shrink-0">
+          <Icon name="plus" className="w-4 h-4" /> {t('flatmates.postCta')}
         </button>
       </div>
-      <div className="hidden sm:block flex-1" />
-
-      {/* The rule lives in routes/flatmates.css because buttons.css loads later and would win the specificity tie. */}
-      <button onClick={onPost} className="sf-post-cta btn-teal h-10 inline-flex items-center justify-center gap-2 px-4 rounded-full text-white text-sm font-semibold w-full sm:w-auto shrink-0">
-        <Icon name="plus" className="w-4 h-4" /> {t('flatmates.postCta')}
-      </button>
+      <p data-testid="sf-tab-hint" className="text-xs text-gray-400 leading-snug">{t(`flatmates.tabHint_${tab}`)}</p>
+      <LivingStyleEntry />
     </div>
   );
 

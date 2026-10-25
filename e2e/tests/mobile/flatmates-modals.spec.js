@@ -65,14 +65,14 @@ test.describe('Flatmates modals', () => {
   });
 
   test('Escape closes the picker on top of the sheet, not the sheet under it', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('dz_cookie_consent_v1', JSON.stringify({ necessary: true, functional: true, analytics: true, marketing: true, version: 1, ts: Date.now() })));
     await signedInAsNew(page);
     await openModal(page, '1');
 
-    /* The lifestyle picker presents as its own sheet on a phone. Its Escape lives on the menu while
+    /* The locality picker presents as its own sheet on a phone. Its Escape lives on the menu while
        the form's lives on `document`, so without `stopPropagation` one press dismisses both. */
     const sheet = page.locator('.sf-modal');
-    // Scoped: the filter drawer stays mounted behind the sheet and offers a `Lifestyle` button too.
-    await sheet.getByRole('button', { name: 'Lifestyle preferences' }).click();
+    await sheet.getByRole('button', { name: 'Preferred localities' }).click();
     const menu = page.locator('.dz-menu, [role="listbox"]').first();
     await expect(menu).toBeVisible();
 

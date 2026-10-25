@@ -17,7 +17,6 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,27 +24,8 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/**
- * D94 — a saved search that actually tells its owner something.
- *
- * <p><strong>What was wrong.</strong> {@code saved_searches.alert_frequency} has existed since V7.
- * The card renders it, the user picks it, {@code PATCH /me/saved-searches/{id}} lets them change
- * it, and nothing read it. The sweep computed {@code new_count} every thirty minutes and stopped
- * there, so an alert notified its owner only if the owner came back and looked — which is the
- * thing a saved search exists to replace. The feature was complete in every respect except the one
- * it is named after.
- *
- * <p><strong>Why the cadence is tested and not just the send.</strong> Sending on every sweep
- * would be the easy half and would break the promise in the other direction: "Daily" delivered
- * every thirty minutes is not a partial implementation of the user's choice, it is the opposite of
- * it under the same label. {@link #dailyCadenceIsMeasuredFromTheLastAlert} is the assertion that matters most
- * here, because it is the one that fails if someone later "simplifies" the due check away.
- *
- * <p>Notifications are counted through {@code jdbc} rather than the repository so the assertion is
- * about what reached the table, not about what an in-memory collaborator was asked to do.
- *
- * <p>Fixtures: a locality and listings created inline; nothing here depends on the seed.
- */
+// The cadence, not just the send, is under test: "Daily" fired every sweep would break the user's choice.
+// Alerts are counted via jdbc so the assertion is about what reached the table.
 @DisplayName("D94 - saved-search alerts are actually sent")
 class SavedSearchAlertTest extends AbstractApiTest {
 
@@ -85,10 +65,7 @@ class SavedSearchAlertTest extends AbstractApiTest {
                 """, LOCALITY, "D94 Alert Locality", "Pune");
     }
 
-    /**
-     * A saved search watching {@link #LOCALITY} at {@link #ODD_BHK}, with its baseline pinned so
-     * that listings created after this call are the only ones that can match.
-     */
+    // Baseline pinned so only listings created after this call can match.
     private SavedSearch alertFor(User user, String frequency) {
         SavedSearch search = new SavedSearch(user.getId(), "rent " + LOCALITY);
         search.setFilters("{\"deal\":\"rent\",\"localities\":[\"" + LOCALITY
@@ -154,10 +131,7 @@ class SavedSearchAlertTest extends AbstractApiTest {
         assertThat(alertsFor(user)).isZero();
     }
 
-    /**
-     * The regression this whole column exists to prevent. The sweep runs every thirty minutes; a
-     * daily alert must survive forty-eight of those without sending twice.
-     */
+    // The sweep runs every thirty minutes; a daily alert must survive 48 of them without sending twice.
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
             "twenty minutes later it does not fire twice in a day | 20 | 1",
@@ -189,10 +163,7 @@ class SavedSearchAlertTest extends AbstractApiTest {
                 .isEqualTo(expectedAlerts);
     }
 
-    /**
-     * A fall in the count is bookkeeping, not news. The count drops to zero on the tick after an
-     * alert fires because the baseline moves with {@code updated_at}; nobody should hear about it.
-     */
+    // The count drops to zero the tick after an alert because the baseline moves with updated_at; not news.
     @Test
     @DisplayName("a falling count never notifies")
     void aFallingCountIsSilent() {
@@ -222,16 +193,16 @@ class SavedSearchAlertTest extends AbstractApiTest {
                 new SavedSearchCreateRequest("Old flatmate alert", "flatmates", null, null,
                         Map.of("tab", "team-up", "locality", "D94 Flatmate Town",
                                 "budgetMin", 10000, "budget", 20000,
-                                "gender", "female", "habits", List.of("Vegetarian")),
+                                "gender", "female"),
                         null, null));
         Instant baseline = Instant.now().minusSeconds(60);
         jdbc.update("update saved_searches set updated_at = ? where id = ?::uuid",
                 Timestamp.from(baseline), created.id());
         jdbc.update("""
                 insert into flatmate_seeker_posts
-                    (user_id, name, gender, budget, localities, tags, mod_status, created_at)
+                    (user_id, name, gender, budget, localities, mod_status, created_at)
                 values (?, 'Old Seeker', 'female', 18000, '[\"D94 Flatmate Town\"]'::jsonb,
-                    '[\"Vegetarian\"]'::jsonb, 'approved', ?)
+                    'approved', ?)
                 """, user.getId(), Timestamp.from(baseline.minusSeconds(86_400)));
         em.flush();
         em.clear();

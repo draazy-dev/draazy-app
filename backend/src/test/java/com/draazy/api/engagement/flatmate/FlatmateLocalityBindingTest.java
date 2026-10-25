@@ -48,7 +48,7 @@ class FlatmateLocalityBindingTest extends AbstractApiTest {
                 .content("""
                         {"name":"Locality Seeker","gender":"female","age":26,"occupation":"UX Designer",
                          "budget":18000,"localities":[%s],"moveIn":"2026-09-01",
-                         "flatPref":"women","roomPref":"private","tags":["Vegetarian"],"note":"Quiet and tidy."}
+                         "flatPref":"women","roomPref":"private","note":"Quiet and tidy."}
                         """.formatted(localities)));
     }
 
@@ -74,7 +74,7 @@ class FlatmateLocalityBindingTest extends AbstractApiTest {
         return mvc.perform(post(Routes.Flatmates.GROUPS)
                 .header(HttpHeaders.AUTHORIZATION, bearer(u))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"title\":\"Four of us\",\"policy\":\"any\",\"rent\":45000,\"seats\":3,"
+                .content("{\"title\":\"Four of us\",\"policy\":\"any\",\"rent\":45000,\"deposit\":10000,\"seats\":3,"
                         + "\"seatsOpen\":1,\"name\":\"Locality Seeker\"," + localityBody + "}"));
     }
 

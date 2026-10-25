@@ -3,20 +3,14 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../../../components/Icon.jsx';
 import { inr } from './helpers.js';
 
-// `chips` say why the result is empty; `hint` is the cheapest post just past the budget, one tap to widen it.
-function Empty({ icon, title, text, primary, filtersActive, onClearFilters, chips = [], query, hint, onRaiseBudget, rescue }) {
+// `hint` is the cheapest post just past the budget, one tap to widen it.
+function Empty({ icon, title, text, primary, filtersActive, onClearFilters, hint, onRaiseBudget, rescue }) {
   const { t } = useTranslation();
   return (
     <div className="text-center py-10">
       <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-white/5 flex items-center justify-center"><Icon name={icon} className="w-7 h-7 text-gray-500" /></div>
       <p className="text-white font-semibold">{title}</p>
       <p className="text-gray-500 text-sm mt-1 max-w-sm mx-auto">{text}</p>
-      {(query || chips.length > 0) && (
-        <div className="mt-3 flex items-center justify-center gap-1.5 flex-wrap max-w-md mx-auto">
-          {query && <span className="dz-tag bg-white/5 border border-white/10 text-gray-300"><Icon name="search" className="w-3 h-3" /> “{query}”</span>}
-          {chips.map((c, i) => <span key={i} className="dz-tag bg-white/5 border border-white/10 text-gray-300"><Icon name={c.icon} className="w-3 h-3" /> {c.text}</span>)}
-        </div>
-      )}
       {/* Outranks the budget hint: the other tab matches the same filters, so switching costs no compromise. */}
       {rescue && rescue.count > 0 && (
         <div className="mt-4 max-w-sm mx-auto rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3">
