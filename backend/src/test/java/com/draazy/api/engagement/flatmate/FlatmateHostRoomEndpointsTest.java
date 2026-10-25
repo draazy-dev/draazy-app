@@ -75,12 +75,13 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
     private String roomBody(User host, String locality, String society) {
         return """
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                 "furnishing":"semi","locality":"%s","society":"%s","rentShare":15000,
+                 "locality":"%s","society":"%s","rentShare":15000,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
-                 "foodPref":"any","photos":["%s"],
+                 "foodPref":"any","photos":["%s","%s","%s"],
                  "hostRole":"owner",
-                 "note":"Sunny room, quiet building."}
-                """.formatted(locality, society, photoOf(host));
+                 "note":"Sunny room, quiet building.",%s,%s}
+                """.formatted(locality, society, photoOf(host), UploadedPhotos.of(host.getId()),
+                UploadedPhotos.of(host.getId()), FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS);
     }
 
     private String createRoom(User host, String locality, String society) throws Exception {
@@ -175,8 +176,8 @@ class FlatmateHostRoomEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].owner").doesNotExist())
                     .andExpect(jsonPath("$.content[0].addressFingerprint").doesNotExist())
                     .andExpect(jsonPath("$.content[0].flagForReview").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].verificationTier").doesNotExist())
-                    .andExpect(jsonPath("$.content[0].reviewStatus").doesNotExist())
+                    .andExpect(jsonPath("$.content[0].verificationTier").value("identity"))
+                    .andExpect(jsonPath("$.content[0].hostRole").isNotEmpty())
                     .andExpect(jsonPath("$.content[0].host").doesNotExist())
                     .andExpect(jsonPath("$.content[0].photos").doesNotExist())
                     .andExpect(jsonPath("$.content[0].lat").doesNotExist())

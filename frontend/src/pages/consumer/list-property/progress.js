@@ -119,7 +119,6 @@ const flatmateItems = (form, photos) => [
   { done: filled(form.availableFrom) },
   { done: filled(form.lookingFor) },
   { done: filled(form.foodPref) },
-  { done: nonEmptyArr(form.lifestyle) },
   { frac: Math.min(photos.length, STRONG_PHOTO_COUNT) / STRONG_PHOTO_COUNT, nudge: 'photos' },
   { done: filled(form.note), nudge: 'description' },
 ];

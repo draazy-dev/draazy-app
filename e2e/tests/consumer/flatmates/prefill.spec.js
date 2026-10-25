@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, signedInAs, signedInAsNew, shownMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
-import { trackErrors } from '../../../helpers/console.js';
-import { postAsGroup, haveAFlat } from '../../../helpers/app.js';
+import { pickDate } from '../../../helpers/datePicker.helper.js';
+import { fillRoomDetails, fillRoomLocation, nextStep, uploadRoomPhotos } from '../../../helpers/roomWizard.js';
 // Derive assertions from real owner and tenant inventory so prefill cannot pass against fixture literals.
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
@@ -12,97 +12,86 @@ async function myListings(token) {
   return (await res.json()).content || [];
 }
 
-async function openGroupModal(page) {
-  await page.goto('/flatmates');
-  await expect(page.getByRole('button', { name: /^Post( Property)?$/ }).first()).toBeVisible({ timeout: 20_000 });
-  await postAsGroup(page);
-  await haveAFlat(page);
-  await expect(page.getByPlaceholder(/2 girls/i)).toBeVisible({ timeout: 10_000 });
+async function openPriceStep(page) {
+  await page.goto('/list-property?flatmate=1');
+  await expect(page.locator('.lp-meter')).toBeVisible({ timeout: 20_000 });
+  await fillRoomDetails(page, { bhk: '2 BHK', roomType: 'Single (1 person)' });
+  await nextStep(page);
+  await fillRoomLocation(page, { society: `Prefill Heights ${Date.now().toString(36)}` });
+  await nextStep(page);
+  await expect(page.getByRole('heading', { name: 'Rent & terms', exact: true })).toBeVisible();
+  await page.locator('input[data-err="rentShare"]').fill('13500');
+  await page.locator('input[data-err="deposit"]').fill('27000');
+  await pickDate(page, '[data-err="availableFrom"]', '2026-12-01');
+  await page.getByRole('spinbutton', { name: 'Notice period (days)' }).fill('30');
+  await page.getByRole('spinbutton', { name: 'Minimum stay (months)' }).fill('0');
 }
 
-async function attachProperty(page, title) {
-  await page.getByRole('button', { name: /Attach a verified property/i }).click();
-  await page.getByRole('option', { name: title, exact: true }).click();
-}
+const backStep = (page) => page.getByRole('button', { name: 'Back', exact: true }).click();
 
-const titleField = (page) => page.getByPlaceholder(/2 girls/i);
-const rentField = (page) => page.getByPlaceholder(/e\.g\. 34,000/i);
+const role = (page, name) => page.getByRole('group', { name: 'You are the' }).getByRole('button', { name, exact: true });
+const listingPicker = (page) => page.getByRole('button', { name: 'Link your Draazy listing' });
+const tenancyPicker = (page) => page.getByRole('button', { name: 'Renting through Draazy? Link your tenancy' });
+const bhkPill = (page, bhk) => page.getByRole('group', { name: 'Size', exact: true })
+  .getByRole('button', { name: Number(bhk) >= 4 ? '4+ BHK' : `${bhk} BHK`, exact: true });
+const localityValue = (page) => page.locator('[data-err="locality"] .dz-dropdown__value');
 
-test.describe('LIVE: group-form prefill', () => {
-  test('an owner attaching a real listing gets its locality and rent from the server, while sale prices and unapproved rows are kept out', async ({ page }) => {
+test.describe('LIVE: room-post prefill from a listing or tenancy', () => {
+  test('an owner links an approved listing, gets its locality and size, and the post sends its UUID; unapproved rows are not offered', async ({ page }) => {
     test.slow();
-    const errors = trackErrors(page);
     const { accessToken } = await apiLogin(ACTORS.owner);
     const all = await myListings(accessToken);
-    await signedInAs(page, ACTORS.owner);
-
-    await test.step('an owner attaching a real rent listing gets its locality and its rent, both from the server', async () => {
-      const listing = all.find((row) => row.status === 'approved' && row.deal === 'rent');
-      expect(listing, 'the seeded owner needs an approved rent listing').toBeTruthy();
-
-      await openGroupModal(page);
-      await page.getByRole('button', { name: /Flat owner/i }).click();
-      await attachProperty(page, listing.title);
-      // Assert generated structure so the source row, not fixture text, supplies BHK and locality.
-      await expect(titleField(page)).toHaveValue(
-        new RegExp(`1 more flatmate for a ${listing.bhk} BHK in ${listing.locality}`, 'i'),
-      );
-      await expect(rentField(page)).toHaveValue(Number(listing.price).toLocaleString('en-IN'));
-    });
-
-    await test.step('a sale listing prefills the title but leaves rent empty, because a sale price is not a monthly rent', async () => {
-      const listing = all.find((row) => row.status === 'approved' && row.deal !== 'rent');
-      expect(listing, 'the seeded owner needs an approved non-rent listing').toBeTruthy();
-
-      await openGroupModal(page);
-      await page.getByRole('button', { name: /Flat owner/i }).click();
-      await attachProperty(page, listing.title);
-
-      await expect(titleField(page)).toHaveValue(
-        new RegExp(`1 more flatmate for a ${listing.bhk} BHK in ${listing.locality}`, 'i'),
-      );
-      // The positive price proves the empty rent field rejects a real sale value.
-      expect(listing.price, 'the sale row should carry a price worth refusing').toBeGreaterThan(0);
-      await expect(rentField(page)).toHaveValue('');
-    });
-
-    await test.step('a listing that has not passed moderation is not offered as proof of ownership', async () => {
-      const unapproved = all.find((row) => row.status !== 'approved');
-      expect(unapproved, 'the seeded owner needs a non-approved listing for this to mean anything').toBeTruthy();
-
-      await openGroupModal(page);
-      await page.getByRole('button', { name: /Flat owner/i }).click();
-      await page.getByRole('button', { name: /Attach a verified property/i }).click();
-      // An approved row anchors the absent unapproved option against an empty menu.
-      const approved = all.find((row) => row.status === 'approved');
-      await expect(page.getByRole('option', { name: approved.title, exact: true })).toBeVisible();
-      await expect(page.getByRole('option', { name: unapproved.title, exact: true })).toHaveCount(0);
-    });
-
-    expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
-  });
-  test('an attached listing is sent as its UUID, not its URL slug', async ({ page }) => {
-    const { accessToken } = await apiLogin(ACTORS.owner);
-    const listing = (await myListings(accessToken)).find((row) => row.status === 'approved' && row.deal === 'rent' && row.slug);
+    const listing = all.find((row) => row.status === 'approved' && row.deal === 'rent' && row.slug);
+    const unapproved = all.find((row) => row.status !== 'approved');
     expect(listing, 'the seeded owner needs an approved rent listing with a slug').toBeTruthy();
+    expect(unapproved, 'the seeded owner needs a non-approved listing for this to mean anything').toBeTruthy();
     await signedInAs(page, ACTORS.owner);
-    await openGroupModal(page);
-    await page.getByRole('button', { name: /Flat owner/i }).click();
-    await attachProperty(page, listing.title);
+    await openPriceStep(page);
+    await role(page, 'Owner').click();
 
-    // Stubbed so the run leaves no group behind; only the body the form sends matters.
+    await listingPicker(page).click();
+    // An approved row anchors the absent unapproved option against an empty menu.
+    await expect(page.getByRole('option', { name: listing.title, exact: true })).toBeVisible();
+    await expect(page.getByRole('option', { name: unapproved.title, exact: true })).toHaveCount(0);
+    await page.getByRole('option', { name: listing.title, exact: true }).click();
+    await test.step('the link fills the locality on Location and the size on Details', async () => {
+      await backStep(page);
+      await expect(localityValue(page)).toHaveText(listing.locality);
+      await backStep(page);
+      await expect(bhkPill(page, listing.bhk)).toHaveAttribute('aria-pressed', 'true');
+      await nextStep(page);
+      await nextStep(page);
+    });
+
+    await test.step('switching role drops the claim, so a tenant never carries the owner badge', async () => {
+      await role(page, 'Tenant').click();
+      await role(page, 'Owner').click();
+      await expect(listingPicker(page)).toContainText("Don't link");
+      await listingPicker(page).click();
+      await page.getByRole('option', { name: listing.title, exact: true }).click();
+    });
+
+    // Stubbed so the run leaves no room behind; only the body the form sends matters.
     let sent;
-    await page.route('**/api/flatmates/groups', (route) => {
+    await page.route('**/api/flatmates/rooms', (route) => {
       sent = route.request().postDataJSON();
       return route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":"stubbed"}' });
     });
-    await page.getByPlaceholder('Your name').fill('Zztest Host');
-    await page.getByRole('button', { name: 'Create group' }).click();
+    let photoId = 0;
+    await page.route('**/api/me/photos', (route) => {
+      photoId += 1;
+      return route.fulfill({
+        status: 201, contentType: 'application/json', body: JSON.stringify({ url: `https://cdn.example.test/prefill-room-${photoId}.jpg` }),
+      });
+    });
+    await nextStep(page);
+    await uploadRoomPhotos(page);
+    await page.getByRole('button', { name: /Post & Find Flatmates/i }).click();
     await expect.poll(() => sent?.propertyId).toBe(listing.id);
+    expect(sent.hostRole).toBe('owner');
   });
 
-  test('a sitting tenant prefills from their real tenancy, and the owner-consent step becomes one tap', async ({ page }) => {
-    const errors = trackErrors(page);
+  test('a sitting tenant links their real tenancy and gets its locality and the owner mobile', async ({ page }) => {
     const { accessToken } = await apiLogin(ACTORS.tenant);
     const tenancies = await (await fetch(`${API}/me/tenancies`, { headers: auth(accessToken) })).json();
     const tenancy = (Array.isArray(tenancies) ? tenancies : [tenancies]).find((row) => row.status !== 'ended');
@@ -112,26 +101,26 @@ test.describe('LIVE: group-form prefill', () => {
     expect(flat.locality, 'the tenancy flat needs a locality to derive from').toBeTruthy();
 
     await signedInAs(page, ACTORS.tenant);
-    await openGroupModal(page);
-    await page.getByRole('button', { name: /Prefill from your Draazy tenancy/i }).click();
+    await openPriceStep(page);
+    await expect(role(page, 'Tenant')).toHaveAttribute('aria-pressed', 'true');
+    await tenancyPicker(page).click();
     await page.getByRole('option', { name: flat.title, exact: true }).click();
-
-    await expect(titleField(page)).toHaveValue(new RegExp(`^1 more flatmate in ${flat.locality}$`, 'i'));
-    await expect(rentField(page)).toHaveValue(Number(tenancy.rent).toLocaleString('en-IN'));
 
     const ownerMobile = String(tenancy.owner?.mobile || '').replace(/\D/g, '').slice(-10);
     expect(ownerMobile, 'the tenancy should name the landlord').toHaveLength(10);
-    await expect(page.getByPlaceholder(/10-digit mobile/i)).toHaveValue(shownMobile(ownerMobile));
-    // Prefill enables consent but never substitutes for the owner's OTP.
-    await expect(page.getByRole('button', { name: /Verify owner consent via OTP/i })).toBeEnabled();
-
-    expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
+    await expect(page.locator('input[autocomplete="tel-national"]')).toHaveValue(shownMobile(ownerMobile));
+    await expect(page.getByLabel('The owner knows and agrees to sharing'), 'linking fills facts; the host still attests consent').not.toBeChecked();
+    await backStep(page);
+    await expect(localityValue(page)).toHaveText(flat.locality);
   });
 
-  test('a tenant with no tenancy on record is not offered a prefill they cannot use', async ({ page }) => {
+  test('a host with no listing or tenancy on record is not offered a link they cannot use', async ({ page }) => {
     await signedInAsNew(page);
-    await openGroupModal(page);
-    await expect(page.getByRole('button', { name: /Prefill from your Draazy tenancy/i })).toHaveCount(0);
-    await expect(titleField(page)).toBeVisible();
+    await openPriceStep(page);
+    await expect(page.getByTestId('room-agreement-later')).toBeVisible();
+    await expect(tenancyPicker(page)).toHaveCount(0);
+    await role(page, 'Owner').click();
+    await expect(page.getByTestId('room-agreement-later')).toHaveCount(0);
+    await expect(listingPicker(page)).toHaveCount(0);
   });
 });

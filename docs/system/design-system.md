@@ -140,7 +140,7 @@ is now the minority pattern and should not be used in new code.
 
 - Gap between inline controls: `gap-3` (12px) or `gap-2` (8px) for tight groups
 - Filter section padding: `p-4 sm:p-5`
-- Label above control: `text-xs font-medium text-gray-400 mb-1.5`
+- Compact surfaces use `text-xs font-medium text-gray-400 mb-1.5`; property and flatmate posting forms use 14px field labels and choice labels. Supporting copy uses `text-xs` (12px), and touch inputs/selects/textareas retain the global 16px anti-zoom size, with 14px placeholders.
 - Section spacing: `space-y-6` between major cards
 
 ### Border Radius
@@ -460,9 +460,10 @@ hits the hidden one first.
 - `.consumer-main` headings scale down exactly 20% below 640px, scoped to `h1/h2/h3` so numeric price
   and stat spans reusing the same `text-*` utilities keep their emphasis.
 - **Never let an editable field's font-size fall below 16px on touch.** Touch browsers zoom into any
-  field under 16px on focus, forcing the user to pinch back out; our controls run 13-14px, so every
+  field under 16px on focus, forcing the user to pinch back out; our controls use 14px by default, so every
   `input`/`select`/`textarea` is lifted to `16px !important` under `pointer: coarse`. The
-  `!important` is required to beat class-scoped rules.
+  `!important` is required to beat class-scoped rules. Placeholders stay at 14px because zoom is
+  triggered by the field's own size, not the placeholder's.
 - A `px` font-size is not "safe" from dynamic type — it *is* the accessibility failure. Labels that
   must scale are authored in `rem` with an overflow guard, and never with `leading-none` (line-height
   1 is shorter than ascent+descent and clips glyphs).

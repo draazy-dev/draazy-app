@@ -146,7 +146,7 @@ test.describe('Mobile listing wizard', () => {
 
     await page.getByRole('button', { name: 'Rent', exact: true }).click();
     await page.getByRole('button', { name: /Find a flatmate/ }).click();
-    await expect(page.getByText('This room is for *', { exact: true })).toBeVisible();
+    await expect(page.getByRole('group', { name: 'Room type', exact: true })).toBeVisible();
 
     for (const gone of ['Carpet Area', 'Built-up Area', 'Facing', 'Overlooking', 'Age of Property']) {
       await expect(page.getByText(gone, { exact: true }), `${gone} is not a flatmate question`).toHaveCount(0);
@@ -161,6 +161,7 @@ test.describe('Mobile listing wizard', () => {
       if (flatmate) {
         await page.getByRole('button', { name: 'Rent', exact: true }).click();
         await page.getByRole('button', { name: /Find a flatmate/ }).click();
+        await expect(page.getByRole('group', { name: 'Room type', exact: true })).toBeVisible();
       }
       for (const width of [360, 390, 412, 1280]) {
         await page.setViewportSize({ width, height: 844 });

@@ -18,6 +18,21 @@ export const Pill = ({ selected, onClick, children, className = '', dataErr, ari
 
 export { default as FieldError } from '../../../components/ui/FieldError.jsx';
 
+// One row of equal-width answers, so a 2–4 option question never wraps or hides behind a dropdown on a phone.
+// `fit` sizes tiles to their text instead, for one long label ("Semi-Furnished") that would wrap in a third.
+export const PillRow = ({ options, value, onChange, label, cols = 'grid-cols-2', fit = false, role = 'button', dataErr, invalid = false }) => (
+  <div
+    role={role === 'radio' ? 'radiogroup' : 'group'}
+    aria-label={label}
+    data-err={dataErr}
+    className={`${fit ? 'flex' : `grid ${cols}`} gap-2 ${invalid ? 'dz-invalid-group' : ''}`}
+  >
+    {options.map(([v, l]) => (
+      <Pill key={v} role={role} selected={value === v} onClick={() => onChange(v)} className={`min-h-[var(--btn-h)] px-2 py-1.5 inline-flex items-center justify-center text-center leading-tight ${fit ? 'grow whitespace-nowrap' : ''}`}>{l}</Pill>
+    ))}
+  </div>
+);
+
 export const Toggle = ({ on, onClick, ariaLabel }) => (
   <div
     onClick={onClick}

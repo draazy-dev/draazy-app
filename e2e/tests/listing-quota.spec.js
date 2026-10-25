@@ -48,12 +48,13 @@ test.describe('Listing quota — live', () => {
     });
 
     // Flatmate rooms do not occupy listing slots, so this path was never tiered.
-    await test.step('the flatmate flow opens, and the whole-flat flow is one tap away', async () => {
+    await test.step('the room flow opens straight on the room, without re-asking what is being posted', async () => {
       await page.goto('/list-property?flatmate=1', { waitUntil: 'networkidle' });
       await expect(page.getByTestId('listing-wizard')).toBeVisible({ timeout: 15000 });
-      await page.getByText('Rent out the whole place').click();
-      await expect(page.getByTestId('listing-wizard')).toBeVisible();
-      await expect(page.getByText('Find a flatmate')).toBeVisible();
+      await expect(page.getByRole('group', { name: 'Room type', exact: true })).toBeVisible();
+      await expect(page.getByText('Rent out the whole place')).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Sale', exact: true })).toHaveCount(0);
+      await expect(page.getByText(/^\d+ of 1 free live listing used$/)).toHaveCount(0);
     });
   });
 

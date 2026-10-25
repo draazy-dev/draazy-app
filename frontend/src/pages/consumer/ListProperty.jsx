@@ -1,4 +1,4 @@
-import { Sparkles, CheckCircle2, LayoutDashboard } from 'lucide-react';
+import { Sparkles, CheckCircle2, LayoutDashboard, BadgeCheck } from 'lucide-react';
 import { useSearchParams, Link } from 'react-router';
 import { useAuth } from '../../context/AuthContext';
 import { usePricing } from '../../context/PricingContext';
@@ -22,8 +22,8 @@ const ListPropertyForm = () => {
   const vm = useListProperty();
   const { fee } = usePricing();
   const {
-    t, navigate, showSuccess, isFlatmateMode, editId, editRoomId, editApproved, editChanges, claimMode,
-    postedListing, savedListingStatus, editReady, editLoading, editLoadError, retryEditLoad, legacyAddress,
+    t, navigate, showSuccess, isFlatmateMode, flatmateMode, editId, editRoomId, editApproved, editChanges, claimMode,
+    postedListing, postedRoom, savedListingStatus, editReady, editLoading, editLoadError, retryEditLoad, legacyAddress,
     authPromptOpen, closeAuthPrompt,
     progressState, passListingId,
     activeListingCount, listingLimit, quotaFull, currentStep, setCurrentStep,
@@ -111,6 +111,15 @@ const ListPropertyForm = () => {
               </Link>
             </div>
           )}
+          {isFlatmateMode && postedRoom?.id && postedRoom.hostRole === 'tenant' && !postedRoom.agreementDeclared && (
+            <div className="mb-6 rounded-xl border border-teal-400/30 bg-teal-400/5 p-4 text-left" data-testid="room-agreement-nudge">
+              <p className="text-sm font-semibold text-white">{t('listProperty.success.agreementTitle')}</p>
+              <p className="mt-1 text-xs text-gray-400">{t('listProperty.success.agreementBody')}</p>
+              <Link to={`/dashboard?tab=documents&room=${encodeURIComponent(postedRoom.id)}`} className="btn-teal mt-3 inline-flex min-h-[44px] items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-white font-semibold text-sm">
+                <BadgeCheck className="w-4 h-4" /> {t('listProperty.success.agreementCta')}
+              </Link>
+            </div>
+          )}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button onClick={() => navigate('/dashboard#properties')} className="btn-teal inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl text-white font-semibold text-sm">
               <LayoutDashboard className="w-4 h-4" /> {t('listProperty.success.goToListings')}
@@ -172,8 +181,8 @@ const ListPropertyForm = () => {
 
               {(currentStep === 1) && (
                 <PropertyDetailsStep
-                  allowFlatmate={!editId && !editRoomId}
-                  lockDeal={!!editRoomId}
+                  allowFlatmate={!editId && !flatmateMode}
+                  lockDeal={!!editRoomId || (flatmateMode && !editId)}
                   form={form}
                   set={set}
                   onPropertyType={changePropertyType}
@@ -188,7 +197,6 @@ const ListPropertyForm = () => {
                   isHouse={isHouse}
                   toggleInArray={toggleInArray}
                   nextStep={nextStep}
-                  money={money}
                   onReset={openResetConfirm}
                 />
               )}
@@ -268,7 +276,6 @@ const ListPropertyForm = () => {
                   form={form}
                   set={set}
                   errors={errors}
-                  money={money}
                   photos={photos}
                   handlePhotoUpload={handlePhotoUpload}
                   removePhoto={removePhoto}
@@ -278,15 +285,15 @@ const ListPropertyForm = () => {
                   mediaStatus={mediaStatus}
                   prevStep={prevStep}
                   nextStep={nextStep}
+                  money={money}
                   submitFlatmate={submitFlatmate}
                   isEditing={!!editRoomId}
                   onReset={openResetConfirm}
-                  mapSearch={mapSearch}
-                  onMapSearchChange={onMapSearchChange}
-                  runMapSearch={runMapSearch}
-                  mapSearchStatus={mapSearchStatus}
-                  onAreaSelect={onAreaSelect}
                   onSocietyPick={onSocietyPick}
+                  societyFillNotice={societyFillNotice}
+                  canUseCurrentLocation={canUseCurrentLocation}
+                  useCurrentLocation={useCurrentLocation}
+                  currentLocationStatus={currentLocationStatus}
                   geoFillStatus={geoFillStatus}
                   flyTo={flyTo}
                   onLocalityChange={onLocalityChange}
@@ -311,7 +318,6 @@ const ListPropertyForm = () => {
   );
 };
 // Remount per owner/listing so pending uploads, geocodes and draft timers cannot cross editors.
-
 const ListProperty = () => {
   const [searchParams] = useSearchParams();
   const { user } = useAuth();

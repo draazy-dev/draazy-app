@@ -141,7 +141,7 @@ test('a fresh Details step: unselected deal and BHK, strength meter, StepNav and
     expect(await pctOf(page)).toBeGreaterThan(start);
   });
 
-  await test.step('a flatmate post keeps the same four phases as any listing', async () => {
+  await test.step('a flatmate post takes four steps, like the property form: details, location, price, then photos', async () => {
     await page.locator('.radio-pill', { hasText: 'Rent' }).first().click();
     await page.locator('.radio-pill', { hasText: 'Find a flatmate' }).first().click();
     await expect(page.locator('.lp-steps__item')).toHaveText([/Details/, /Location/, /Price/, /Photos/]);

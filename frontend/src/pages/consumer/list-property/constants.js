@@ -103,7 +103,6 @@ export const withInFlatAsFurniture = (listing) => {
     furniture: [...new Set([...(listing.furniture || []), ...moved.map((a) => LEGACY_IN_FLAT_AMENITIES[a])])],
   };
 };
-export const lifestyleTags = ['Non-smoker', 'Early riser', 'Night owl', 'Pet-friendly', 'Working professional', 'Student', 'Fitness', 'Vegetarian'];
 
 const lightBillDoc = (deal) => ({
   key: 'Electricity Bill',
@@ -372,14 +371,14 @@ const commercialProfileDocs = {
   workspace: { buy: [], rent: [] },
   retail: {
     buy: [{ key: 'Shop Act License', label: 'Shop Act (Gumasta) License', cta: 'Upload Shop Act License', hint: 'Maharashtra trade licence for a retail establishment.' }],
-    rent: [{ key: 'Shop Act License', label: 'Shop Act License (optional)', cta: 'Upload Shop Act License', hint: 'Speeds up a retail tenant’s own licensing.' }],
+    rent: [{ key: 'Shop Act License', label: 'Shop Act License', cta: 'Upload Shop Act License', hint: 'Speeds up a retail tenant’s own licensing.' }],
   },
   industrial: {
     buy: [
       { key: 'MPCB Consent', label: 'MPCB (Pollution) Consent', cta: 'Upload MPCB Consent', hint: 'Consent to Operate from the Maharashtra Pollution Control Board.' },
       { key: 'Factory License', label: 'Factory License', cta: 'Upload Factory License', hint: 'Required to run a manufacturing / industrial unit.' },
     ],
-    rent: [{ key: 'MPCB Consent', label: 'MPCB Consent (optional)', cta: 'Upload MPCB Consent', hint: 'Reassures manufacturing tenants the site is compliant.' }],
+    rent: [{ key: 'MPCB Consent', label: 'MPCB Consent', cta: 'Upload MPCB Consent', hint: 'Reassures manufacturing tenants the site is compliant.' }],
   },
 };
 /* The NA Order slot is on all four land sets because the conversion question is asked of both
@@ -402,7 +401,7 @@ export const farmSaleDocs = [
 ];
 export const farmRentDocs = [
   ...badgeDocsFor('rent', 'farmland'),
-  { key: 'Land Revenue Receipt', label: 'Land Revenue / Tax Receipt (optional)', cta: 'Upload Revenue Receipt' },
+  { key: 'Land Revenue Receipt', label: 'Land Revenue / Tax Receipt', cta: 'Upload Revenue Receipt' },
   naOrderDoc,
 ];
 

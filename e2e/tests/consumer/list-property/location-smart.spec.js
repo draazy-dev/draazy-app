@@ -3,6 +3,7 @@ import { signedInAsNew } from '../../../helpers/liveAuth.js';
 import { pickFloors, readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
+import { fillRoomDetails, nextStep } from '../../../helpers/roomWizard.js';
 
 const BANER_PIN = { lat: 18.5602, lng: 73.7861, locality: 'Baner', pincode: '411045' };
 const uniqueName = (stem) => `${stem} ${Date.now().toString(36)}`;
@@ -49,6 +50,29 @@ test('the society pick leads the location step and autofills safe fields; the cu
   await expect(page.getByRole('button', { name: /Zoom out map/i })).toBeVisible();
   await page.getByRole('button', { name: /Use my current location/i }).click();
   await expect.poll(() => page.evaluate(() => window.__geoRequested)).toBe(true);
+});
+
+test('the room post finds the society once, above the map, and it fills the locality and pin', async ({ page }) => {
+  await signedInAsNew(page);
+  await page.goto('/list-property?flatmate=1');
+  await expect(page.locator('.lp-meter')).toBeVisible({ timeout: 20_000 });
+  await fillRoomDetails(page, { bhk: '2 BHK', roomType: 'Single (1 person)' });
+  await nextStep(page);
+  await expect(page.locator('input[data-err="society"]')).toBeVisible();
+
+  await expect(page.locator('input[data-err="society"]')).toHaveCount(1);
+  await expect(page.getByPlaceholder(/Search a locality, society or area/i)).toHaveCount(0);
+  const { societyY, mapY } = await page.evaluate(() => ({
+    societyY: document.querySelector('input[data-err="society"]').getBoundingClientRect().y,
+    mapY: document.querySelector('[data-err="location"]').getBoundingClientRect().y,
+  }));
+  expect(societyY).toBeLessThan(mapY);
+
+  const NAME = uniqueName('Zz Room Heights');
+  await fillSociety(page, NAME, BANER_PIN);
+  await expect(page.locator('[data-err="locality"]')).toContainText('Baner');
+  await expect(page.getByText(`Filled from ${NAME}`)).toBeVisible();
+  await expect(page.getByText(/Location set:/i)).toBeVisible();
 });
 
 test('a society pick takes the society\'s own locality over a hand pick, but never overwrites an owner-entered pincode', async ({ page }) => {

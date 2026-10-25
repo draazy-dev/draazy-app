@@ -65,14 +65,16 @@ class FlatmateRoomCards {
                 (first, duplicate) -> first));
     }
 
-    /** The host's own list: no names, no review lookup — the card carries neither. */
+    /** The host's own list: no names; one batched review lookup for the badge state. */
     List<FlatmateRoomCard> ownerCards(List<FlatmateRoom> window) {
         Map<UUID, Integer> ledger = committedByFlat(window);
+        Map<UUID, String> verdicts = reviewStatuses.forRooms(window);
         return window.stream().map(room -> new FlatmateRoomCard(
                 room.getId(), room.getTitle(), room.getPropertyId(), room.getSociety(),
                 room.getFlatType(), room.getLocality(), room.getLocalities(), room.getBudget(),
                 mapper.shareMax(room, committedFor(room, ledger)), room.getOccupants(),
-                mapper.coverOf(room), room.getModStatus(), room.getStatus(), room.getCreatedAt()))
+                mapper.coverOf(room), room.getModStatus(), room.getStatus(), room.getCreatedAt(),
+                room.getHostRole(), room.getVerificationTier(), verdicts.get(room.getId())))
                 .toList();
     }
 

@@ -15,7 +15,6 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -75,7 +74,7 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"title":"Two of us in Aundh","locality":"Aundh","policy":"women",
-                                 "rent":40000,"seats":2,"seatsOpen":1,"name":"Host"}
+                                 "rent":40000,"deposit":10000,"seats":2,"seatsOpen":1,"name":"Host"}
                                 """))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
@@ -88,12 +87,13 @@ class FlatmateAcceptanceEndpointsTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                                 "furnishing":"semi","locality":"Aundh","society":"Accept Towers",
+                                 "locality":"Aundh","society":"Accept Towers",
                                  "rentShare":15000,"deposit":30000,"availableFrom":"2026-09-01",
                                  "lookingFor":"any","foodPref":"any",
-                                 "photos":["%s"],"hostRole":"owner",
-                                 "note":"Quiet room."}
-                                """.formatted(UploadedPhotos.of(host.getId()))))
+                                 %s,"hostRole":"owner",
+                                 "note":"Quiet room.",%s,%s}
+                                """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateRoomFixture.BASICS,
+                                FlatmateRoomFixture.DETAILS)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return publish("flatmate_rooms", idOf(json));
