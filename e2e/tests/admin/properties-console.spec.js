@@ -1,5 +1,5 @@
 import { expect, test, ACTORS, STAFF } from '../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, signIn, uniqueMobile, completeStaffPostedListing } from '../../helpers/liveAuth.js';
+import { API, authHeaders, fileIdentityCaseAs, uploadedListingPhotos, signIn, uniqueMobile, completeStaffPostedListing } from '../../helpers/liveAuth.js';
 import { appReady } from '../../helpers/app.js';
 import { approveListing, rejectListing } from '../../helpers/moderation.js';
 
@@ -80,6 +80,7 @@ async function badgeRequestListing(request, tag) {
   const listing = await pendingListing(`badge ${tag}`);
   expect((await approveListing(request, listing.id, await authHeaders(ACTORS.admin))).status()).toBe(200);
   await uploadOwnershipDocument(listing.headers, listing.id);
+  await fileIdentityCaseAs(listing.headers.authorization);
   const asked = await api('POST', `/properties/${listing.id}/verification/ownership/request`, listing.headers);
   expect(asked.status, asked.text).toBe(200);
   return listing;

@@ -1,6 +1,6 @@
 import Icon from '../../../../components/Icon.jsx';
 import PropertyImage from '../../../../components/ui/PropertyImage.jsx';
-import ListingStatusCard, { getOwnerListingStatusMeta } from '../../../../components/listing/ListingStatusCard.jsx';
+import ListingStatusCard, { getOwnerListingStatusMeta, ListingStatusAction } from '../../../../components/listing/ListingStatusCard.jsx';
 import { fmtINR, fmtNum, fmtDate } from '../../../../lib/format.js';
 import { onlySeeksOwnershipBadge } from '../../../../lib/recheckFields.js';
 import { qualityTips, qualityColor } from '../../../../lib/qualityScore.js';
@@ -37,8 +37,6 @@ export default function ListingCard({
     l.bhk && (/BHK|RK/i.test(l.bhk) ? l.bhk : `${l.bhk} BHK`),
     l.furnishing && (FURNISH_LABEL[String(l.furnishing).toLowerCase()] || l.furnishing),
   ].filter(Boolean).join(' · ');
-  // Keep lifecycle primary, with the same pill opening its verification thread.
-
   const hasReview = !closed && !reserved && !!review;
   const ownerStatusMeta = !l.flatmate && !closed && !reserved ? getOwnerListingStatusMeta(l, review, t) : null;
   const finalRejected = ownerStatusMeta?.state === 'rejected';
@@ -61,6 +59,9 @@ export default function ListingCard({
   const needsPass = !l.flatmate && l.status === 'paused' && !passTill && quota?.full;
   const flatmateKind = l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : null;
   const splitRoom = flatmateKind === 'room' && !!l.propertyId;
+  const tenantRoom = flatmateKind === 'room' && l.hostRole === 'tenant' && !splitRoom;
+  const tenantGroup = flatmateKind === 'group' && l.hostRole === 'tenant' && !l.hunting;
+  const roomBadgeStatus = l.verificationTier === 'tenant' ? l.reviewStatus : null;
   const editHref = `/list-property?edit=${l.id}`;
   const viewHref = flatmateKind ? detailPath(flatmateKind, l.id) : `/property/${l.id}`;
   const editAction = l.flatmateGroup
@@ -70,8 +71,6 @@ export default function ListingCard({
       : flatmateKind === 'room'
         ? (splitRoom ? null : { icon: 'edit', label: 'Edit', to: roomEditHref(l.id) })
         : { icon: 'edit', label: 'Edit', to: editHref };
-  // One prominent primary action, chosen by what the owner most needs to do next.
-
   let primary = null;
   if (flatmateKind && l.status === 'expired') primary = { label: 'Renew for 30 days', icon: 'refresh-cw', tone: 'emerald', onClick: () => onRenew(flatmateKind, l) };
   else if (needsPass) primary = { label: t('listingLifecycle.goLive', { price: passPrice }), icon: 'zap', tone: 'teal', to: `/checkout?plan=listing-pass&property=${encodeURIComponent(listingId)}` };
@@ -115,6 +114,18 @@ export default function ListingCard({
         : withdrawAction),
   ];
   const recheckReason = l.recheckReason || 'Core details you edited are being re-checked. Your listing stays live.';
+  const statusTag = statusPill && (
+    <StatusTag
+      type={statusPill.onClick ? 'button' : undefined}
+      onClick={statusPill.onClick}
+      title={statusPill.onClick ? 'Open the verification review for this listing' : undefined}
+      aria-label={statusPill.onClick && unread ? `${statusPill.label} — ${unread} unread verification message${unread > 1 ? 's' : ''}` : undefined}
+      className={'dz-tag relative font-semibold ' + statusPill.cls + (statusPill.onClick ? ' hover:brightness-110 transition' : '')}
+    >
+      <Icon name={statusPill.icon} className="w-3 h-3" /> {statusPill.label}
+      {statusPill.onClick && unread ? <span aria-hidden="true" className="dz-count absolute -top-1.5 -right-1.5 bg-rose-500 text-white">{unread}</span> : null}
+    </StatusTag>
+  );
 
   return (
     <div className="rounded-xl bg-white/[0.03] overflow-hidden">
@@ -146,18 +157,7 @@ export default function ListingCard({
             )}
           </div>
           <div className="flex flex-row flex-wrap items-center gap-1.5 sm:flex-col sm:items-end sm:flex-shrink-0">
-            {statusPill && (
-              <StatusTag
-                type={statusPill.onClick ? 'button' : undefined}
-                onClick={statusPill.onClick}
-                title={statusPill.onClick ? 'Open the verification review for this listing' : undefined}
-                aria-label={statusPill.onClick && unread ? `${statusPill.label} — ${unread} unread verification message${unread > 1 ? 's' : ''}` : undefined}
-                className={'dz-tag relative font-semibold ' + statusPill.cls + (statusPill.onClick ? ' hover:brightness-110 transition' : '')}
-              >
-                <Icon name={statusPill.icon} className="w-3 h-3" /> {statusPill.label}
-                {statusPill.onClick && unread ? <span aria-hidden="true" className="dz-count absolute -top-1.5 -right-1.5 bg-rose-500 text-white">{unread}</span> : null}
-              </StatusTag>
-            )}
+            {!l.flatmate && statusTag}
             {l.archived && l.archivedNote && <p className="w-full text-xs leading-snug text-gray-400 sm:max-w-[16rem] sm:text-right">{l.archivedNote}</p>}
             {/* Rechecking an edit does not take the original listing offline. */}
             {((l.recheckPending && !onlySeeksOwnershipBadge(l)) || l.reReview) && (
@@ -181,6 +181,40 @@ export default function ListingCard({
           </div>
         </div>
       </div>
+
+      {l.flatmate && (
+        <div className="px-3 pb-3 sm:px-4">
+          <div data-testid={`flatmate-status-${l.id}`} className="rounded-xl border border-white/8 bg-white/[0.025] px-4 py-3">
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+                {statusTag}
+                {['approved', 'pending'].includes(l.status) && (
+                  <p className="text-xs leading-relaxed text-gray-300">
+                    {t(l.status === 'approved' ? 'dash.flatmateCard.live' : 'dash.flatmateCard.pending')}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-1 sm:shrink-0">
+                {onShare && (
+                  <ListingStatusAction action={{ kind: 'button', onClick: () => onShare(l, viewHref), icon: 'share-2', label: t('owner.listingStatus.actions.share') }} />
+                )}
+                {(tenantRoom || tenantGroup) && (
+                  <ListingStatusAction
+                    secondary
+                    action={{
+                      kind: 'link',
+                      href: `/dashboard?tab=documents&${flatmateKind}=${encodeURIComponent(l.id)}`,
+                      testId: `room-verification-${l.id}`,
+                      icon: 'shield-check',
+                      label: t(roomBadgeStatus === 'approved' ? 'dash.roomBadge.verified' : roomBadgeStatus === 'pending' ? 'dash.roomBadge.pendingAction' : 'dash.roomBadge.getBadge'),
+                    }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!l.flatmate && !closed && !reserved && (
         <div className="px-3 pb-3 sm:px-4">

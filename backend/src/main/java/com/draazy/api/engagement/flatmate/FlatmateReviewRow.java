@@ -13,6 +13,8 @@ public record FlatmateReviewRow(
         UUID groupId,
         String host,
         String hostMobile,
+        boolean hostVerified,
+        String evidenceType,
         String address,
         String tier,
         boolean flagForReview,
@@ -22,6 +24,6 @@ public record FlatmateReviewRow(
     static FlatmateReviewRow of(FlatmateReviewRepository.QueueRow r, User host) {
         return new FlatmateReviewRow(r.getId(), r.getKind(), r.getRoomId(), r.getGroupId(),
                 host == null ? null : host.getName(), host == null ? null : host.getMobile(),
-                r.getAddress(), r.getTier(), r.getFlagForReview(), r.getOwnerConsent(), r.getCreatedAt());
+                host != null && host.isVerified(), r.getEvidenceType(), r.getAddress(), r.getTier(), r.getFlagForReview(), r.getOwnerConsent(), r.getCreatedAt());
     }
 }

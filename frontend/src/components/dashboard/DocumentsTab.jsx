@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import Icon from '../Icon.jsx';
 import IdInput from '../IdInput.jsx';
 import BadgeRequestCard from './BadgeRequestCard.jsx';
+import RoomBadgeRequestCard from './RoomBadgeRequestCard.jsx';
 import AgreementPerks from './AgreementPerks.jsx';
 import PropertyImage from '../ui/PropertyImage.jsx';
 import Select from '../ui/Select.jsx';
@@ -218,7 +219,7 @@ function VaultSkeleton() {
   );
 }
 
-export default function DocumentsTab({ user, listings, toast, isOwner = false }) {
+export default function DocumentsTab({ user, listings, toast, isOwner = false, onRoomBadgeChanged }) {
   const { t, i18n } = useTranslation();
   const hraMonths = useMemo(() => monthOptions().map((v) => ({ value: v, label: monthLabel(v, i18n.language) })), [i18n.language]);
   /* Both caller-scoped, and the agreement list answers for either side of the lease — this tab renders an owner pack
@@ -259,9 +260,29 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
   useEffect(() => {
     if (rental.loaded && !isOwner && isTenant) setContext((c) => (c === 'personal' ? 'tenancy' : c));
   }, [rental.loaded, isOwner, isTenant]);
-  const linkedProp = useSearchParams()[0].get('prop');
+  const searchParams = useSearchParams()[0];
+  const linkedProp = searchParams.get('prop');
+  const linkedRoom = searchParams.get('room') || searchParams.get('group');
+  const linkedFlatmate = linkedRoom ? `${searchParams.get('room') ? 'room' : 'group'}:${linkedRoom}` : null;
+  // A tenant's room or flat-holding group is a rented home, so it sits in the same property picker; values carry
+  // their kind because flatmate ids and listing ids share no namespace.
+  const flatmateOptions = (listings || [])
+    .filter((l) => l.flatmate && !l.flatmatePost && l.hostRole === 'tenant' && !(l.flatmateGroup && l.hunting))
+    .map((l) => ({ value: `${l.flatmateGroup ? 'group' : 'room'}:${l.id}`, label: `${l.title} · ${t('dash.roomBadge.flatmateTag')}` }));
+  if (linkedFlatmate && !flatmateOptions.some((o) => o.value === linkedFlatmate)) {
+    flatmateOptions.unshift({ value: linkedFlatmate, label: t('dash.roomBadge.roomFallback') });
+  }
+  const appliedRoom = useRef(null);
   const linkedListing = linkedProp ? propList.find((l) => l.id === linkedProp || l.uuid === linkedProp) : null;
-  const [docProp, setDocProp] = useState(linkedListing?.id || propList[0]?.id || 'portfolio');
+  const [docProp, setDocProp] = useState(linkedFlatmate || linkedListing?.id || propList[0]?.id || 'portfolio');
+  useEffect(() => {
+    if (linkedFlatmate && appliedRoom.current !== linkedFlatmate) {
+      appliedRoom.current = linkedFlatmate;
+      contextChosen.current = true;
+      setContext('owner');
+      setDocProp(linkedFlatmate);
+    }
+  }, [linkedFlatmate]);
   const appliedLink = useRef(linkedListing ? linkedProp : null);
   const [tenProp, setTenProp] = useState('');
   useEffect(() => {
@@ -275,7 +296,9 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
       setDocProp(linkedListing.id);
       return;
     }
-    if (!propList.some((l) => l.id === docProp)) setDocProp(propList[0]?.id || 'portfolio');
+    if (!propList.some((l) => l.id === docProp) && !flatmateOptions.some((o) => o.value === docProp)) {
+      setDocProp(propList[0]?.id || flatmateOptions[0]?.value || 'portfolio');
+    }
   }, [listings, linkedProp]); // eslint-disable-line react-hooks/exhaustive-deps -- linkedProp derives from listings
   useEffect(() => {
     if (tenancies.length && !tenancies.some((t) => t.propId === tenProp)) setTenProp(tenancies[0].propId);
@@ -287,6 +310,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
   // Keep `docProp` as the picker value for stable deep links; translate only at the API boundary.
 
   const selectedListing = propList.find((l) => l.id === docProp);
+  const [flatmateKind, flatmateId] = flatmateOptions.some((o) => o.value === docProp) ? docProp.split(':') : [];
   const docPropertyId = selectedListing?.uuid || docProp;
   const activeProp = context === 'owner' ? docPropertyId : 'personal';
   // Vault reads are async, reloaded whenever identity, selected property or a mutation changes.
@@ -294,7 +318,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
   const mobile = user?.mobile;
   // 'portfolio' is the empty-state bucket shown before any listing exists. It is not a real listing
   // id, so it has no server vault — skip the fetch, or the GET 404s.
-  const ownerVaultEnabled = !!mobile && !!docPropertyId && docPropertyId !== 'portfolio';
+  const ownerVaultEnabled = !!mobile && !!docPropertyId && docPropertyId !== 'portfolio' && !flatmateId;
   const [ownerDocs, ownerStatus, setOwnerDocs, reloadOwner, ownerError] = useAsyncList(
     () => listDocuments(mobile, docPropertyId), [mobile, docPropertyId], ownerVaultEnabled,
   );
@@ -318,8 +342,9 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
     ? agreements.filter((ra) => agreementMatchesProp(ra, selectedTenancy.propId, selectedTenancy))
     : agreements;
 
-  const propOptions = propList.length
-    ? propList.map((l) => ({ value: l.id, label: l.title + (l.deal === 'rent' ? ` · ${t('dash.dealRent')}` : ` · ${t('dash.dealSale')}`) }))
+  const listingOptions = propList.map((l) => ({ value: l.id, label: l.title + (l.deal === 'rent' ? ` · ${t('dash.dealRent')}` : ` · ${t('dash.dealSale')}`) }));
+  const propOptions = listingOptions.length || flatmateOptions.length
+    ? [...listingOptions, ...flatmateOptions]
     : [{ value: 'portfolio', label: t('dash.myPortfolio') }];
 
   const uploadForCategory = (category) => {
@@ -404,7 +429,7 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
         <div className="relative flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-4">
-              <Ring done={headerDone} total={headerTotal} loading={vaultLoading} size={60} stroke={6} />
+              {!(context === 'owner' && flatmateId) && <Ring done={headerDone} total={headerTotal} loading={vaultLoading} size={60} stroke={6} />}
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <Icon name="folder-lock" className="w-5 h-5 text-teal-400" />
@@ -428,14 +453,14 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
                 </li>
               </ul>
             )}
-            {(isOwner || isTenant) && (
-              <div className="inline-flex mt-4 p-1 rounded-full bg-white/5 border border-white/10">
+            {(isOwner || isTenant || flatmateOptions.length > 0) && (
+              <div className="inline-flex max-w-full overflow-x-auto mt-4 p-1 rounded-full bg-white/5 border border-white/10">
                 {[
-                  isOwner && ['owner', 'home', 'dash.ctxOwner'],
+                  (isOwner || flatmateOptions.length > 0) && ['owner', 'home', 'dash.ctxOwner'],
                   isTenant && ['tenancy', 'key', 'dash.ctxTenancy'],
                   ['personal', 'fingerprint', 'dash.ctxPersonal'],
                 ].filter(Boolean).map(([c, ic, labelKey]) => (
-                  <button key={c} onClick={() => { contextChosen.current = true; setContext(c); }} className={'px-4 h-9 rounded-full text-xs font-semibold transition inline-flex items-center gap-1.5 ' + (context === c ? 'bg-brand-teal text-ink' : 'text-gray-400 hover:text-white')}>
+                  <button key={c} onClick={() => { contextChosen.current = true; setContext(c); }} className={'shrink-0 px-4 min-h-11 rounded-full text-xs font-semibold transition inline-flex items-center gap-1.5 ' + (context === c ? 'bg-brand-teal text-ink' : 'text-gray-400 hover:text-white')}>
                     <Icon name={ic} className="w-3.5 h-3.5" /> {t(labelKey)}
                   </button>
                 ))}
@@ -459,43 +484,53 @@ export default function DocumentsTab({ user, listings, toast, isOwner = false })
 
       {context === 'owner' && (
         <>
-          {ownerStatus === 'error' ? (
-            <LoadError message={t('dash.vaultLoadError')} error={ownerError} onRetry={reloadOwner} t={t} />
-          ) : ownerStatus === 'loading' && ownerDocs.length === 0 ? (
-            <VaultSkeleton />
+          {flatmateId ? (
+            <>
+              <RoomBadgeRequestCard key={`${mobile}:${docProp}`} kind={flatmateKind} roomId={flatmateId} personalDocs={personalDocs}
+                onRequested={() => { reloadPersonal(); onRoomBadgeChanged?.(flatmateId); }} toast={toast} />
+              {personalStatus === 'error' && <LoadError message={t('dash.vaultLoadError')} error={personalError} onRetry={reloadPersonal} t={t} />}
+            </>
           ) : (
             <>
-              {selectedListing && ownerStatus === 'ready' ? (
-                <BadgeRequestCard key={selectedListing.uuid} listing={selectedListing} docs={ownerDocs} onUpload={uploadForCategory} toast={toast} />
-              ) : null}
-              {OWNER_GROUPS.map((g) => (
-                <CategoryCard key={g.id} group={g} docs={ownerDocs} open={!!openSections[g.id]} onToggle={toggle} onUpload={uploadForCategory} onRemove={removeDoc} onView={viewDoc} />
-              ))}
-            </>
-          )}
-
-          <PanelCard id="ownerAgreements" icon="file-signature" tone="teal" title={t('dash.rentAgreement')}
-            sub={selectedListing ? t('dash.agreementForProp', { title: selectedListing.title }) : t('dash.agreementForThis')}
-            badge={propAgreements.length ? pill('bg-teal-500/15 text-teal-300', String(propAgreements.length)) : null}
-            open={!!openSections.ownerAgreements} onToggle={toggle}>
-            <AgreementList ras={propAgreements} ownerView emptyText={t('dash.noAgreementProp')} />
-          </PanelCard>
-          {/* The loan checklist is derived from the vault, so it only means anything once the vault is read — hiding
-             it while loading/errored avoids a confident, wrong progress count. */}
-
-          {ownerStatus === 'ready' && (
-            <PanelCard id="checklist" icon="clipboard-list" tone="amber" title={t('dash.loanChecklist')} sub={t('dash.loanChecklistSub')}
-              badge={pill(checklist.items.every((i) => i.done) ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300', `${checklist.items.filter((i) => i.done).length}/${checklist.items.length}`)}
-              open={!!openSections.checklist} onToggle={toggle}>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {checklist.items.map((it) => (
-                  <div key={it.name} className={'flex items-center gap-3 p-2.5 rounded-lg border ' + (it.done ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-white/[0.08] bg-white/[0.02]')}>
-                    <Icon name={it.done ? 'check-circle' : 'circle'} className={'w-4 h-4 flex-shrink-0 ' + (it.done ? 'text-emerald-400' : 'text-gray-500')} />
-                    <span className={'text-xs ' + (it.done ? 'text-emerald-300' : 'text-gray-400')}>{it.name}</span>
-                  </div>
+              {ownerStatus === 'error' ? (
+              <LoadError message={t('dash.vaultLoadError')} error={ownerError} onRetry={reloadOwner} t={t} />
+            ) : ownerStatus === 'loading' && ownerDocs.length === 0 ? (
+              <VaultSkeleton />
+            ) : (
+              <>
+                {selectedListing && ownerStatus === 'ready' ? (
+                  <BadgeRequestCard key={selectedListing.uuid} listing={selectedListing} docs={ownerDocs} onUpload={uploadForCategory} toast={toast} />
+                ) : null}
+                {OWNER_GROUPS.map((g) => (
+                  <CategoryCard key={g.id} group={g} docs={ownerDocs} open={!!openSections[g.id]} onToggle={toggle} onUpload={uploadForCategory} onRemove={removeDoc} onView={viewDoc} />
                 ))}
-              </div>
+              </>
+            )}
+
+            <PanelCard id="ownerAgreements" icon="file-signature" tone="teal" title={t('dash.rentAgreement')}
+              sub={selectedListing ? t('dash.agreementForProp', { title: selectedListing.title }) : t('dash.agreementForThis')}
+              badge={propAgreements.length ? pill('bg-teal-500/15 text-teal-300', String(propAgreements.length)) : null}
+              open={!!openSections.ownerAgreements} onToggle={toggle}>
+              <AgreementList ras={propAgreements} ownerView emptyText={t('dash.noAgreementProp')} />
             </PanelCard>
+            {/* The loan checklist is derived from the vault, so it only means anything once the vault is read — hiding
+               it while loading/errored avoids a confident, wrong progress count. */}
+
+            {ownerStatus === 'ready' && (
+              <PanelCard id="checklist" icon="clipboard-list" tone="amber" title={t('dash.loanChecklist')} sub={t('dash.loanChecklistSub')}
+                badge={pill(checklist.items.every((i) => i.done) ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300', `${checklist.items.filter((i) => i.done).length}/${checklist.items.length}`)}
+                open={!!openSections.checklist} onToggle={toggle}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {checklist.items.map((it) => (
+                    <div key={it.name} className={'flex items-center gap-3 p-2.5 rounded-lg border ' + (it.done ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-white/[0.08] bg-white/[0.02]')}>
+                      <Icon name={it.done ? 'check-circle' : 'circle'} className={'w-4 h-4 flex-shrink-0 ' + (it.done ? 'text-emerald-400' : 'text-gray-500')} />
+                      <span className={'text-xs ' + (it.done ? 'text-emerald-300' : 'text-gray-400')}>{it.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </PanelCard>
+            )}
+            </>
           )}
 
           {(docReqs.length > 0 || reqStatus === 'error') && (

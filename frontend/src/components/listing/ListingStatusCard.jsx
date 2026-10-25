@@ -134,9 +134,9 @@ const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, on
   return { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
 };
 
-function Action({ action, secondary = false }) {
+export function ListingStatusAction({ action, secondary = false }) {
   const cls = secondary
-    ? 'min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-gray-300 transition-colors hover:text-white'
+    ? 'min-h-[44px] inline-flex items-center justify-center gap-1.5 rounded-lg border border-brand-teal/25 bg-brand-teal/10 px-3 py-2 text-xs font-semibold text-brand-teal-3 transition-colors hover:bg-brand-teal/20'
     : 'min-h-[44px] flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 rounded-lg bg-brand-teal px-3.5 py-2 text-xs font-semibold text-white transition-colors hover:bg-brand-teal-1';
   if (action.kind === 'button') {
     return (
@@ -215,9 +215,9 @@ export default function ListingStatusCard({
           ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
-          {action ? <Action action={action} /> : null}
-          {getBadge ? <Action action={getBadge} secondary /> : null}
-          {reportWrong ? <Action action={reportWrong} secondary /> : null}
+          {action ? <ListingStatusAction action={action} /> : null}
+          {getBadge ? <ListingStatusAction action={getBadge} secondary /> : null}
+          {reportWrong ? <ListingStatusAction action={reportWrong} secondary /> : null}
         </div>
       </div>
     </div>

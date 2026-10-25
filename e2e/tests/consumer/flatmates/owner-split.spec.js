@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS, STAFF } from '../../../fixtures/live.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { verifyOwnership } from '../../../helpers/referral.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -20,7 +21,7 @@ async function api(method, path, headers, body) {
 
 const created = [];
 
-async function ownerWithFlat({ deal = 'rent', bhk = 3, price = 36000, approve = true, propertyType = 'Flat', owner } = {}) {
+async function ownerWithFlat({ deal = 'rent', bhk = 3, price = 36000, approve = true, verified = false, propertyType = 'Flat', owner } = {}) {
   const mobile = owner?.mobile ?? uniqueMobile();
   const { accessToken } = owner ?? await apiLogin(mobile);
 
@@ -41,6 +42,7 @@ async function ownerWithFlat({ deal = 'rent', bhk = 3, price = 36000, approve = 
     const approved = await approveListingWithFetch(listing.json.id, await authHeaders(ACTORS.admin));
     expect(approved.status, approved.text).toBe(200);
   }
+  if (verified) await verifyOwnership(mobile, { id: listing.json.id });
 
   const record = { mobile, accessToken, listingId: listing.json.id, split: false };
   created.push(record);
@@ -216,7 +218,7 @@ test('the split modal is legible and behaves like a dialog', async ({ page }) =>
 
 test('a split room carries the owner badge publicly; once someone moves in the flat cannot be withdrawn', async ({ page }) => {
   test.slow();
-  const flat = await ownerWithFlat();
+  const flat = await ownerWithFlat({ verified: true });
   await signedInAs(page, flat.mobile);
   await openMyProperties(page, 'Zztest owner split');
   await splitInto(page, 1);
@@ -228,7 +230,7 @@ test('a split room carries the owner badge publicly; once someone moves in the f
     .find((r) => String(r.propertyId) === String(flat.listingId));
   expect(room, 'the split must have produced a room').toBeTruthy();
 
-  await test.step('rooms split from an approved flat carry the owner badge on the public board', async () => {
+  await test.step('rooms split from an ownership-verified flat carry the owner badge on the public board', async () => {
     /* The badge is the whole point of splitting rather than posting a room: the flat was already proven.
        Decided by the server from the parent's status — `verificationTier` is not a field any client sends. */
     const detail = await api('GET', `/flatmates/rooms/${room.id}`, auth(flat.accessToken));

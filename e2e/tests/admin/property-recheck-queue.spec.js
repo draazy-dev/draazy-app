@@ -1,6 +1,6 @@
 // Admin → Properties → **Re-check Queue** (Q14) against the live API.
 import { test, expect, ACTORS } from '../../fixtures/live.js';
-import { API, authHeaders, uploadedListingPhotos, uniqueMobile } from '../../helpers/liveAuth.js';
+import { API, authHeaders, fileIdentityCaseAs, uploadedListingPhotos, uniqueMobile } from '../../helpers/liveAuth.js';
 import { appReady } from '../../helpers/app.js';
 import { approveListing, rejectListing } from '../../helpers/moderation.js';
 
@@ -227,6 +227,7 @@ test('an upload alone queues nothing; the vault request does, and staff can decl
   expect(uploaded.body.recheckPending, 'filing a paper in the vault is not a badge request').toBe(false);
   expect(uploaded.body.ownershipRequestedAt ?? null).toBeNull();
 
+  await fileIdentityCaseAs(owner.authorization);
   const asked = await api('POST', `/properties/${id}/verification/ownership/request`, owner);
   expect(asked.status).toBe(200);
   const mine = await api('GET', `/me/listings/${id}`, owner);

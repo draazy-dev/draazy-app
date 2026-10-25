@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Ban, Check, EyeOff, Gavel, History } from 'lucide-react';
+import { Ban, Check, CheckCircle, EyeOff, History } from 'lucide-react';
 import Badge from '../../../../components/ui/Badge.jsx';
 import { Block, fmtDate } from '../board.jsx';
 import { MOD_LABEL } from '../FlatmateQueueCard.jsx';
@@ -20,7 +20,7 @@ export default function DecisionSection({ modStatus, recheck, publishLabel = 'Pu
 
   return (
     <Block
-      icon={Gavel}
+      icon={CheckCircle}
       title="Decision"
       aside={<Badge status={modStatus}>{MOD_LABEL[modStatus] || null}</Badge>}
       className="flatmate-decision-section"
@@ -52,7 +52,7 @@ export default function DecisionSection({ modStatus, recheck, publishLabel = 'Pu
       <p id="flatmate-decision-note-hint" className="mt-1 text-xs text-gray-400">Needed to hide, remove, or restore a removed item. Stays internal.</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {actions.map((a) => (
-          <button key={a.id} type="button" disabled={busy || (a.needsNote && noNote)} aria-describedby={a.needsNote ? 'flatmate-decision-note-hint' : undefined} onClick={() => onDecide(a.id, note)} className={`dz-btn ${a.cls}`}>
+          <button key={a.id} type="button" disabled={busy || (a.needsNote && noNote)} aria-describedby={a.needsNote ? 'flatmate-decision-note-hint' : undefined} onClick={() => onDecide(a.id, note)} className={`dz-btn min-h-[44px] ${a.cls}`}>
             <a.icon className="h-4 w-4" />{a.label}
           </button>
         ))}

@@ -13,6 +13,8 @@ export const updateRoom = async (id, room) => (await provider()).updateRoom(id, 
 export const setRoomSeats = async (id, seatsOpen) => (await provider()).setRoomSeats(id, seatsOpen);
 /** How many people actually live there. Distinct from seats: fact versus intention. */
 export const setRoomOccupants = async (id, occupants) => (await provider()).setRoomOccupants(id, occupants);
+export const requestRoomBadge = async (id, body) => (await provider()).requestRoomBadge(id, body);
+export const requestGroupBadge = async (id, body) => (await provider()).requestGroupBadge(id, body);
 /** Ask to take the room. Creates a `pending` request in the host's inbox. */
 export const roomInterest = async (id, body) => (await provider()).roomInterest(id, body);
 
@@ -40,6 +42,14 @@ export const withdrawInterest = async (kind, id) => (await provider()).withdrawI
 /** The same acknowledgement taken *before* the group exists: keyed on (owner mobile, tenant), so it can be granted
  * first and read back at submit. Called twice — without `otp`, then with it. */
 export const requestOwnerConsent = async (body) => (await provider()).requestOwnerConsent(body);
+/** The owner's side of a tenant's room post, opened from the WhatsApp link. No session: the token is the credential. */
+export const getOwnerNotice = async (token) => (await provider()).getOwnerNotice(token);
+/** `answer` = `agree` | `decline`. */
+export const answerOwnerNotice = async (token, answer) => (await provider()).answerOwnerNotice(token, answer);
+/** The caller's private homes saved from a tenant's room post, each with the flatmate posts in it. */
+export const getOwnerHomes = async () => (await provider()).getOwnerHomes();
+/** Wizard prefill for one owner home; rejects 404 when it isn't the caller's. */
+export const getOwnerHomePrefill = async (managedId) => (await provider()).getOwnerHomePrefill(managedId);
 
 /* ─── Seeker posts ──────────────────────────────────────────────────────────────────────────── */
 
@@ -72,6 +82,8 @@ export const unsplitProperty = async (propertyId) => (await provider()).unsplitP
 
 /** The interleaved tab feed, and the board's only search. `tab` is `move-in` | `team-up`. */
 export const feed = async (tab, filters, page, size, opts) => (await provider()).feed(tab, filters, page, size, opts);
+/** `{ seeking, initials, split? }` for the home panel, or null. */
+export const flatmatePulse = async () => (await provider()).flatmatePulse();
 
 /* ─── Shortlist ─────────────────────────────────────────────────────────────────────────────── */
 
@@ -80,17 +92,26 @@ export const listFlatmateSaves = async (params) => (await provider()).listFlatma
 /* Shortlist keys stay unpaged because the board already holds the cards they decorate. */
 export const listFlatmateSaveKeys = async () => (await provider()).listFlatmateSaveKeys();
 /** Idempotent. A second tap on an already-saved post is not an error. */
-export const saveFlatmatePost = async (kind, id) => (await provider()).saveFlatmatePost(kind, id);
+export const FLATMATE_SAVES_CHANGED = 'dz:flatmate-saves-changed';
+export const saveFlatmatePost = async (kind, id) => {
+  await (await provider()).saveFlatmatePost(kind, id);
+  window.dispatchEvent(new Event(FLATMATE_SAVES_CHANGED));
+};
 /** Idempotent. Succeeds with or without an existing row. */
-export const unsaveFlatmatePost = async (kind, id) => (await provider()).unsaveFlatmatePost(kind, id);
+export const unsaveFlatmatePost = async (kind, id) => {
+  await (await provider()).unsaveFlatmatePost(kind, id);
+  window.dispatchEvent(new Event(FLATMATE_SAVES_CHANGED));
+};
 
 /* ─── Ops: verification, moderation, group applications ─────────────────────────────────────── */
 
 /** The host-verification queue. `{ status, flagged, page, size }`, all optional. Paged. */
 export const listFlatmateReviews = async (params) => (await provider()).listFlatmateReviews(params);
 /** **A rejection needs a `note`** — the server 400s without one, and a host told "no" without being told why cannot
- * fix anything. */
-export const decideFlatmateReview = async (id, decision, note) => (await provider()).decideFlatmateReview(id, decision, note);
+ * fix anything. A tenant-tier approval needs `checks` `{ nameMatches, addressMatches, validTill | issuedOn }`. */
+export const decideFlatmateReview = async (id, decision, note, checks) => (await provider()).decideFlatmateReview(id, decision, note, checks);
+export const getFlatmateReviewDocumentUrl = async (id) => (await provider()).getFlatmateReviewDocumentUrl(id);
+export const revokeFlatmateReview = async (id, reason) => (await provider()).revokeFlatmateReview(id, reason);
 
 /** The post-moderation backlog. `kind` and `modStatus` may be lists; the page is global across them. */
 export const listFlatmateModeration = async (params) => (await provider()).listFlatmateModeration(params);
@@ -121,3 +142,10 @@ export const applyGroupToListing = async (groupId, listingId) => (await provider
 export const listMyGroupApplications = async (params) => (await provider()).listMyGroupApplications(params);
 /** The owner accepts or declines. Writes `status` only, and only once (409 on a second call). */
 export const decideGroupApplication = async (id, status) => (await provider()).decideGroupApplication(id, status);
+
+/** The caller's optional living-style answers, `{ answers: { key: 0..2 }, updatedAt }`. */
+export const myLivingStyle = async () => (await provider()).myLivingStyle();
+/** Replaces every answer; an empty object forgets them. */
+export const saveMyLivingStyle = async (answers) => (await provider()).saveMyLivingStyle(answers);
+/** Signed-in only. The author's answers plus `match` (0–100, null under 3 shared answers); 404 when not visible. */
+export const livingStyleOf = async (kind, id) => (await provider()).livingStyleOf(kind, id);

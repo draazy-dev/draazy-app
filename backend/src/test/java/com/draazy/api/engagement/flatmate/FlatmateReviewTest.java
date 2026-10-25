@@ -40,7 +40,7 @@ class FlatmateReviewTest {
         FlatmateReview review = legacyReview();
 
         review.reopenAfterEdit("Baner", FlatmateVocabulary.TIER_TENANT, false, true,
-                agreement, new AgreementRegistration(), null);
+                agreement, new AgreementRegistration(), null, null);
 
         assertThat(review.getAgreement().getValidTill()).isEqualTo(validTill);
     }

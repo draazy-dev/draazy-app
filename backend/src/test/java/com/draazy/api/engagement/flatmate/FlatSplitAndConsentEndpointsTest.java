@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.OwnershipVerified;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
@@ -17,6 +18,7 @@ import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.hamcrest.Matchers;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 
@@ -38,6 +41,9 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
 
     @Autowired
     PropertyRepository properties;
+
+    @Autowired
+    ApplicationEventPublisher events;
 
     private final List<String> createdActors = new ArrayList<>();
 
@@ -65,6 +71,12 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                 45000L, "Baner", "Pune");
         p.setBhk(BigDecimal.valueOf(bhk));
         p.setStatus(status);
+        return properties.saveAndFlush(p);
+    }
+
+    private Property badgedListing(User owner, String status, int bhk) {
+        Property p = listing(owner, status, bhk);
+        p.verifyOwnership(Instant.now(), null);
         return properties.saveAndFlush(p);
     }
 
@@ -106,10 +118,10 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
     class Splitting {
 
         @Test
-        @DisplayName("an approved flat's rooms are born owner-tier and badged")
+        @DisplayName("an approved, Verified-owner flat's rooms are born owner-tier and badged")
         void approvedParentConfersTheBadge() throws Exception {
             User owner = user("9830000001", "Owner");
-            Property flat = listing(owner, PropertyStatus.APPROVED, 2);
+            Property flat = badgedListing(owner, PropertyStatus.APPROVED, 2);
 
             mvc.perform(post(Routes.Properties.SPLIT, flat.getId())
                             .header(HttpHeaders.AUTHORIZATION, bearer(owner))
@@ -125,6 +137,38 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.rooms[1].attachedBath").value("shared"))
 
                     .andExpect(jsonPath("$.rooms[0].priceBasis").value("room"));
+        }
+
+        @Test
+        @DisplayName("an approved flat without the Verified owner badge splits into identity-tier rooms")
+        void approvedButUnbadgedParentConfersNothing() throws Exception {
+            User owner = user("9830000014", "Unbadged");
+            Property flat = listing(owner, PropertyStatus.APPROVED, 2);
+
+            mvc.perform(post(Routes.Properties.SPLIT, flat.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(splitBody(3, "bedroom", "living")))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.tier").value("identity"))
+                    .andExpect(jsonPath("$.pending").value(true))
+                    .andExpect(jsonPath("$.rooms[0].verified").value(false));
+        }
+
+        @Test
+        @DisplayName("a lapsed Verified owner badge counts as no badge")
+        void lapsedBadgeConfersNothing() throws Exception {
+            User owner = user("9830000015", "Lapsed");
+            Property flat = listing(owner, PropertyStatus.APPROVED, 2);
+            flat.verifyOwnership(Instant.now().minusSeconds(7200), Instant.now().minusSeconds(3600));
+            properties.saveAndFlush(flat);
+
+            mvc.perform(post(Routes.Properties.SPLIT, flat.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(splitBody(3, "bedroom", "living")))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.tier").value("identity"));
         }
 
         @Test
@@ -144,7 +188,7 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
         }
 
         @Test
-        @DisplayName("approving the flat later promotes its split rooms to owner-tier (D287)")
+        @DisplayName("approving and then badging the flat later promotes its split rooms to owner-tier (D287)")
         void approvalPromotesRoomsSplitWhilePending() throws Exception {
             User owner = user("9830000012", "Patient");
             User admin = user("9830000013", "Checker", Roles.Wire.ADMIN);
@@ -166,11 +210,47 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                             .content("{\"status\":\"approved\"}"))
                     .andExpect(status().isOk());
 
-            assertThat(jdbc.queryForList(
+            assertThat(roomTiers(flat)).hasSize(2).containsOnly("identity");
+
+            Property approved = properties.findById(flat.getId()).orElseThrow();
+            approved.verifyOwnership(Instant.now(), null);
+            properties.saveAndFlush(approved);
+            events.publishEvent(new OwnershipVerified(flat.getId()));
+            properties.flush();
+
+            assertThat(roomTiers(flat)).hasSize(2).containsOnly("owner");
+        }
+
+        @Test
+        @DisplayName("a badge granted before approval promotes the rooms on approval")
+        void approvalAfterTheBadgePromotesRooms() throws Exception {
+            User owner = user("9830000016", "Early badge");
+            User admin = user("9830000017", "Checker2", Roles.Wire.ADMIN);
+            Property flat = badgedListing(owner, PropertyStatus.PENDING, 2);
+            flat.setLocalitySlug("baner");
+            properties.saveAndFlush(flat);
+
+            mvc.perform(post(Routes.Properties.SPLIT, flat.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(splitBody(3, "bedroom", "living")))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.tier").value("identity"));
+
+            tickChecklist(flat, admin);
+            mvc.perform(patch(Routes.Moderation.PROPERTY_STATUS, flat.getId())
+                            .header(HttpHeaders.AUTHORIZATION, bearer(admin))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"status\":\"approved\"}"))
+                    .andExpect(status().isOk());
+
+            assertThat(roomTiers(flat)).hasSize(2).containsOnly("owner");
+        }
+
+        private List<String> roomTiers(Property flat) {
+            return jdbc.queryForList(
                     "select verification_tier from flatmate_rooms where property_id = ? and not archived",
-                    String.class, flat.getId()))
-                    .hasSize(2)
-                    .containsOnly("owner");
+                    String.class, flat.getId());
         }
 
         @Test
@@ -392,7 +472,7 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
                                     {"title":"Replacement flatmate","locality":"Baner",
-                                     "rent":40000,"name":"Host","role":"tenant"}
+                                     "rent":40000,"deposit":10000,"name":"Host","role":"tenant"}
                                     """))
                     .andExpect(status().isCreated())
                     .andReturn().getResponse().getContentAsString();
@@ -426,7 +506,7 @@ class FlatSplitAndConsentEndpointsTest extends AbstractApiTest {
                             .header(HttpHeaders.AUTHORIZATION, bearer(applicant))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
-                                    {"title":"Four of us","locality":"Baner","rent":45000,
+                                    {"title":"Four of us","locality":"Baner","rent":45000,"deposit":10000,
                                      "seats":4,"name":"Applicant"}
                                     """))
                     .andExpect(status().isCreated())

@@ -61,7 +61,9 @@ class DaytimeEngagementJobsQaTest extends AbstractJobQaTest {
     }
 
     private User person(int n) {
-        return user(String.format("%02d", n), "buyer");
+        User person = user(String.format("%02d", n), "buyer");
+        jdbc.update("update users set verified = true where id = ?", person.getId());
+        return person;
     }
 
     private static Timestamp ts(Instant at) {
@@ -110,6 +112,14 @@ class DaytimeEngagementJobsQaTest extends AbstractJobQaTest {
     private UUID seekerPost(User seeker, String modStatus) {
         return insertId("insert into flatmate_seeker_posts (user_id, name, budget, mod_status)"
                 + " values (?, 'QA seeker', 20000, ?)", seeker.getId(), modStatus);
+    }
+
+    private UUID badgedListing(User owner, String status, String locality) {
+        Property p = new Property(owner, "QA flat " + UUID.randomUUID(), "rent", "apartment", 25000L, locality,
+                "Pune");
+        p.setStatus(status);
+        p.verifyOwnership(Instant.now(), null);
+        return properties.saveAndFlush(p).getId();
     }
 
     private UUID listing(User owner, String status, String locality) {
@@ -302,7 +312,7 @@ class DaytimeEngagementJobsQaTest extends AbstractJobQaTest {
     @DisplayName("owner-tier badges follow the linked listing down: tier falls back and live posts return to review")
     void ownerTierReconcilesDownward() {
         User owner = person(30);
-        UUID approvedListing = listing(owner, "approved", "Baner");
+        UUID approvedListing = badgedListing(owner, "approved", "Baner");
         UUID pendingListing = listing(owner, "pending", "Baner");
         UUID archivedListing = listing(owner, "approved", "Baner");
         jdbc.update("update properties set archived = true where id = ?", archivedListing);
@@ -367,7 +377,7 @@ class DaytimeEngagementJobsQaTest extends AbstractJobQaTest {
     void ownerTierIsStableWhileTheListingStands() {
         User owner = person(40);
         User host = person(41);
-        UUID listing = listing(owner, "approved", "Baner");
+        UUID listing = badgedListing(owner, "approved", "Baner");
         UUID room = ownerRoom(host, "prop:" + listing, "live", false);
 
         runGroup(Group.DAYTIME);
@@ -544,6 +554,8 @@ class DaytimeEngagementJobsQaTest extends AbstractJobQaTest {
         User identityTier = person(73);
         User validForever = person(74);
         User stranger = person(75);
+        User noIdentity = person(76);
+        jdbc.update("update users set verified = false where id = ?", noIdentity.getId());
 
         UUID mOk = tenantRoom(localityMatch);
         UUID rOk = review("room", mOk, localityMatch, "tenant", "pending", true, null, baner);
@@ -588,6 +600,10 @@ class DaytimeEngagementJobsQaTest extends AbstractJobQaTest {
         UUID rGroup = review("group", gGroup, groupHost, "tenant", "pending", true, null, inSociety1);
         registeredAgreement(landlord, inSociety1, groupHost.getMobile(), "registered", staff.getId());
 
+        UUID mNoIdentity = tenantRoom(noIdentity);
+        UUID rNoIdentity = review("room", mNoIdentity, noIdentity, "tenant", "pending", true, null, baner);
+        registeredAgreement(landlord, baner, noIdentity.getMobile(), "registered", staff.getId());
+
         UUID mNoProperty = tenantRoom(noClaimedProperty);
         UUID rNoProperty = review("room", mNoProperty, noClaimedProperty, "tenant", "pending", true, null, null);
         registeredAgreement(landlord, baner, noClaimedProperty.getMobile(), "registered", staff.getId());
@@ -624,11 +640,11 @@ class DaytimeEngagementJobsQaTest extends AbstractJobQaTest {
         assertThat(noteTypes(validForever)).containsExactly("flatmate.review.approved");
 
         for (UUID stillPending : List.of(rWrongLocality, rNoConsent, rUnverified, rElse, rDraft, rEnded,
-                rWrongSociety, rNoProperty, rIdentity)) {
+                rWrongSociety, rNoProperty, rIdentity, rNoIdentity)) {
             assertThat(column("flatmate_reviews", stillPending, "status")).isEqualTo("pending");
         }
         for (User quiet : List.of(wrongLocality, noConsent, unverified, someoneElsesAgreement, draftAgreement,
-                endedAgreement, wrongSociety, noClaimedProperty, identityTier)) {
+                endedAgreement, wrongSociety, noClaimedProperty, identityTier, noIdentity)) {
             assertThat(noteTypes(quiet)).as(quiet.getMobile()).isEmpty();
         }
         assertThat(column("flatmate_rooms", mWrongLocality, "flag_for_review")).isEqualTo("true");
@@ -780,6 +796,11 @@ class DaytimeEngagementJobsQaTest extends AbstractJobQaTest {
                     throw new IllegalStateException("vendor down");
                 }
                 return !vendorRejects.contains(mobile);
+            }
+
+            @Override
+            public boolean sendOwnerNotice(String mobile, String tenantName, String place, String link) {
+                return false;
             }
         };
         ReflectionTestUtils.setField(digestTarget(), "messenger", fake);

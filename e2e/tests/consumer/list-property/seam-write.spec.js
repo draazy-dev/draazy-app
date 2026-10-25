@@ -3,7 +3,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { istInDays } from '../../../helpers/availability.js';
-import { signedInAsNew, authHeaders, API } from '../../../helpers/liveAuth.js';
+import { signedInAsNew, authHeaders, API, fileIdentityCase } from '../../../helpers/liveAuth.js';
 import { PHOTO_PNG, uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { approveListingWithFetch } from '../../../helpers/moderation.js';
 import { openBadgeVault, uploadBadgeProof } from '../../../helpers/badgeVault.js';
@@ -303,6 +303,7 @@ test('sale: an Index II in the vault unlocks the badge request, which waits for 
   await page.setViewportSize({ width: 390, height: 844 });
   const mobile = await postAFlat(page, { flat: 'D-401', society: 'Evidence Sale Court', deal: 'buy' });
   const row = await savedRow(mobile);
+  await fileIdentityCase(mobile);
   const card = await openBadgeVault(page, row.id);
   await expect(card.getByTestId('badge-state')).toHaveText('Not requested');
   await expect(card.locator('li[data-doc]')).toHaveCount(2);

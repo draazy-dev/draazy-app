@@ -13,6 +13,7 @@ import com.draazy.api.common.trust.WithdrawnCooldown;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -33,32 +34,37 @@ public class FlatmateApplicationService {
     private final GroupApplicationHydrator hydrator;
     private final Notifier notifier;
     private final RateLimitLock locks;
+    private final FlatmateReviewStatuses reviewStatuses;
 
     public FlatmateApplicationService(FlatmateGroupApplicationRepository applications,
             FlatmateGroupRepository groups, PropertyRepository properties,
             GroupApplicationHydrator hydrator, Notifier notifier,
-            RateLimitLock locks) {
+            RateLimitLock locks, FlatmateReviewStatuses reviewStatuses) {
         this.applications = applications;
         this.groups = groups;
         this.properties = properties;
         this.hydrator = hydrator;
         this.notifier = notifier;
         this.locks = locks;
+        this.reviewStatuses = reviewStatuses;
     }
 
     /** Host view: the card draws the moderation state and the seats; the edit form reads the one group it opens. */
     @Transactional(readOnly = true)
     public Page<FlatmateGroupCard> myGroups(AuthPrincipal caller, Pageable pageable) {
-        return groups.findMine(caller.userId(), pageable).map(FlatmateApplicationService::card);
+        Page<FlatmateGroup> page = groups.findMine(caller.userId(), pageable);
+        Map<UUID, String> verdicts = reviewStatuses.forGroups(page.getContent());
+        return page.map(group -> card(group, verdicts.get(group.getId())));
     }
 
-    private static FlatmateGroupCard card(FlatmateGroup group) {
+    private static FlatmateGroupCard card(FlatmateGroup group, String reviewStatus) {
         List<String> localities = group.isHunting() && !group.getLocalities().isEmpty()
                 ? List.copyOf(group.getLocalities())
                 : group.getLocality() == null ? List.of() : List.of(group.getLocality());
         return new FlatmateGroupCard(group.getId(), group.getTitle(), group.getLocality(), localities,
                 group.getRent(), group.getSeatsTotal(), group.openSeats(), group.getMembers().size(),
-                group.getPropertyId(), group.getModStatus(), group.getCreatedAt());
+                group.getPropertyId(), group.getModStatus(), group.getCreatedAt(), group.getHostRole(),
+                group.isHunting(), group.getVerificationTier(), reviewStatus);
     }
 
     /** Host-only, and a stranger's group id is a 404: applying binds every group member to a flat and rent. */

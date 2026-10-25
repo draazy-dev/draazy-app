@@ -35,19 +35,19 @@ class FlatmatePublication {
         var standing = roomId != null ? reviews.findByRoomId(roomId) : reviews.findByGroupId(groupId);
         if (standing.isPresent()) {
             standing.get().reopenAfterEdit(address, tier, flagged, claim.ownerConsent(),
-                claim.doc(), claim.registration(), claim.tenancyPropertyId());
+                claim.doc(), claim.registration(), claim.tenancyPropertyId(), claim.evidenceType());
             reviews.saveAndFlush(standing.get());
             return;
         }
         reviews.saveAndFlush(new FlatmateReview(kind, roomId, groupId, caller.userId(), address,
             tier, flagged, claim.ownerConsent(), claim.doc(), claim.registration(),
-            claim.tenancyPropertyId()));
+            claim.tenancyPropertyId(), claim.evidenceType()));
     }
 
     /** {@code ownerConsent} is a derived fact, never a request field: callers must obtain it from
      * {@code FlatmateOwnerConsentService}, or ten arbitrary digits would certify a sub-let. */
-        record AgreementClaim(Map<String, Object> doc, AgreementRegistration registration,
-            boolean ownerConsent, UUID tenancyPropertyId) {
+    record AgreementClaim(Map<String, Object> doc, AgreementRegistration registration,
+            boolean ownerConsent, UUID tenancyPropertyId, String evidenceType) {
     }
 
     String stateFor(String tier, boolean flagged, boolean flatless) {

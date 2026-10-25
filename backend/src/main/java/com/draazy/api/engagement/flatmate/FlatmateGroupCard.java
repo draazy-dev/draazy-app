@@ -17,5 +17,9 @@ public record FlatmateGroupCard(
         int memberCount,
         UUID propertyId,
         String modStatus,
-        Instant createdAt) {
+        Instant createdAt,
+        String hostRole,
+        boolean hunting,
+        String verificationTier,
+        String reviewStatus) {
 }

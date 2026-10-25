@@ -6,7 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
-/** Shared by {@link FlatmateModerationService} (a moderator's verdict) and
+/** Shared by {@link FlatmateBadgeReviewService} (a moderator's verdict) and
  * {@code FlatmateTrustReconciler} (a scheduled one), so the badge rule lives in exactly one place. */
 @Component
 class FlatmateBadges {

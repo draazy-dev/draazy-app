@@ -37,9 +37,12 @@ public class FlatmateSupplyController {
     private final FlatmateSupplyService service;
     private final FlatmateOwnerConsentService consentService;
     private final PhotoLimit photoLimit;
+    private final FlatmateBadgeRequestService badges;
 
     public FlatmateSupplyController(FlatmateSupplyService service,
-            FlatmateOwnerConsentService consentService, PhotoLimit photoLimit) {
+            FlatmateOwnerConsentService consentService, PhotoLimit photoLimit,
+            FlatmateBadgeRequestService badges) {
+        this.badges = badges;
         this.service = service;
         this.consentService = consentService;
         this.photoLimit = photoLimit;
@@ -173,5 +176,19 @@ public class FlatmateSupplyController {
     }
 
     public record OccupantsRequest(@NotNull @Min(0) Integer occupants) {
+    }
+
+    @PostMapping(Routes.Flatmates.ROOM_BADGE_REQUEST)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
+    public FlatmateRoomDto requestBadge(@CurrentUser AuthPrincipal principal, @PathVariable UUID id,
+            @Valid @RequestBody FlatmateBadgeRequest body) {
+        return badges.request(principal, id, body);
+    }
+
+    @PostMapping(Routes.Flatmates.GROUP_BADGE_REQUEST)
+    @PreAuthorize("hasAnyRole('" + Roles.BUYER + "', '" + Roles.OWNER + "')")
+    public FlatmateGroupDto requestGroupBadge(@CurrentUser AuthPrincipal principal,
+            @PathVariable UUID id, @Valid @RequestBody FlatmateBadgeRequest body) {
+        return badges.requestForGroup(principal, id, body);
     }
 }
