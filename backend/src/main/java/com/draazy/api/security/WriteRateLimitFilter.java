@@ -33,6 +33,7 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
             Routes.Documents.SHARED,
             Routes.Documents.SHARED_URL,
             Routes.Societies.RESOLVE,
+            Routes.Flatmates.OWNER_NOTICE,
             "/me/data-export");
 
     /** Callbacks get their own budget: they can't share a user bucket and are {@code permitAll}, so not exempt. */
@@ -45,6 +46,9 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
     /** Ceiling on a callback body, as nothing else bounds JSON here; {@code 64L} avoids int overflow. */
     private static final long MAX_CALLBACK_BODY_BYTES = 64L * 1024;
 
+    /** Another person's answers sit behind a public listing id, so reading them listing by listing is metered. */
+    private static final Duration LIVING_STYLE_WINDOW = Duration.ofMinutes(10);
+
     private static final Logger log = LoggerFactory.getLogger(WriteRateLimitFilter.class);
 
     static final String FORWARDED_FOR = "X-Forwarded-For";
@@ -53,16 +57,19 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
     private final WriteRateLimitStore callbackLimiter;
     private final WriteRateLimitStore localityResolveLimiter;
     private final WriteRateLimitStore propertyReadLimiter;
+    private final WriteRateLimitStore livingStyleLimiter;
     private final Duration window;
     private final boolean proxyAware;
     private volatile boolean misconfigurationLogged;
 
     /** The two counter families need separate namespaces; they must never share a counter on a shared backend. */
     public WriteRateLimitFilter(int budget, Duration window, boolean proxyAware,
-            WriteRateLimitStore.Factory stores, int localityResolveBudget, int propertyReadBudget) {
+            WriteRateLimitStore.Factory stores, int localityResolveBudget, int propertyReadBudget,
+            int livingStyleBudget) {
         this.limiter = stores.create("w", budget, window);
         this.localityResolveLimiter = stores.create("loc", localityResolveBudget, window);
         this.propertyReadLimiter = stores.create("pr", propertyReadBudget, window);
+        this.livingStyleLimiter = stores.create("ls", livingStyleBudget, LIVING_STYLE_WINDOW);
         // Computed as a long and clamped: at int width this wraps above 42,949,672 and would hand
         // the callbacks a *smaller* budget than everyone else.
         long callbackBudget = (long) budget * CALLBACK_BUDGET_MULTIPLIER;
@@ -102,6 +109,10 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
+        if (isLivingStyleRead(request, path) && !allow(livingStyleLimiter, request, response)) {
+            return;
+        }
+
         if (!isLimited(request, path) || allow(limiter, request, response)) {
             chain.doFilter(request, response);
         }
@@ -136,6 +147,13 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
         boolean listings = path.equals(Routes.Properties.BASE) || path.startsWith(Routes.Properties.BASE + "/");
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return read && listings && !(auth != null && auth.getPrincipal() instanceof AuthPrincipal);
+    }
+
+    /** {@code /flatmates/{kind}/{id}/living-style}: the id varies, so the exact-path set cannot hold it. */
+    private static boolean isLivingStyleRead(HttpServletRequest request, String path) {
+        boolean read = "GET".equals(request.getMethod()) || "HEAD".equals(request.getMethod());
+        String[] parts = path.split("/", -1);
+        return read && parts.length == 5 && parts[1].equals("flatmates") && parts[4].equals("living-style");
     }
 
     private static boolean isLimited(HttpServletRequest request, String path) {

@@ -2,8 +2,10 @@ package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.web.PageResponse;
 import java.util.List;
+import java.util.Map;
 
-/** {@code verifiedElements} is counted by the statement that produced the page so the two cannot disagree. */
+/** {@code verifiedElements} is counted by the statement that produced the page so the two cannot disagree.
+ * {@code matches} holds living-style scores for the page rows only, and is empty for guests. */
 public record FlatmateFeedResponse<T>(
         List<T> content,
         int page,
@@ -12,10 +14,11 @@ public record FlatmateFeedResponse<T>(
         int totalPages,
         String sort,
         long verifiedElements,
-        long otherTabElements) {
+        long otherTabElements,
+        Map<String, Long> tabElements,
+        Map<String, Integer> matches) {
 
-    public static <T> FlatmateFeedResponse<T> of(PageResponse<T> page, long verifiedElements,
-            long otherTabElements) {
+    public static <T> FlatmateFeedResponse<T> of(PageResponse<T> page, FlatmateFeedService.FeedResult result) {
         return new FlatmateFeedResponse<>(
                 page.content(),
                 page.page(),
@@ -23,7 +26,9 @@ public record FlatmateFeedResponse<T>(
                 page.totalElements(),
                 page.totalPages(),
                 page.sort(),
-                verifiedElements,
-                otherTabElements);
+                result.verifiedTotal(),
+                result.otherTabTotal(),
+                result.tabTotals(),
+                result.matches());
     }
 }

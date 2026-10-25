@@ -6,7 +6,7 @@ import { API } from '../../../helpers/liveAuth.js';
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 
 const header = (page) =>
-  page.locator('p').filter({ hasText: /home[s]? with a room available|(person|people) look/ }).first();
+  page.locator('p').filter({ hasText: /rooms? to move into|(person|people) needs? a room|teams? looking for a flat/ }).first();
 
 const countsFrom = async (locator) => {
   const text = await locator.innerText();

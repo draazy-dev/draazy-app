@@ -6,7 +6,7 @@ import { useSavedSearchCreate } from '../../../context/SavedSearchContext.jsx';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useSignInGate } from '../../../lib/useSignInGate.js';
 import { buildFlatmateAlertRecord, flatmateCriteriaChips } from './alertCriteria.js';
-import { TAB_MOVE_IN } from './model.js';
+import { KIND_WORD } from './model.js';
 
 const ALERT_FLAG = 'createAlert';
 const ALERT_NONCE = 'alertNonce';
@@ -24,8 +24,7 @@ export default function FlatmateAlertCard({ filters, tab, toast }) {
   const sendToSignIn = useSignInGate();
   const consumedReturn = useRef(false);
 
-  const isMoveIn = tab === TAB_MOVE_IN;
-  const word = isMoveIn ? t('flatmates.kind_homes') : t('flatmates.kind_flatmates');
+  const word = t(`flatmates.kind_${KIND_WORD[tab] || 'homes'}`);
   const record = useMemo(() => buildFlatmateAlertRecord(filters, tab), [filters, tab]);
   const chips = useMemo(() => flatmateCriteriaChips(record), [record]);
 

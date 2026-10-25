@@ -149,7 +149,7 @@ export function useFlatmates() {
   const { groupOpen, isVerified, setVerifyOpen, openPostModal } = supply;
   const pickers = useGroupPickers(user, groupOpen);
 
-  const discovery = useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, openPostModal, onPost: openPostChooser });
+  const discovery = useFlatmateDiscovery({ tab, setTab, viewMode, t, toast, myPost, openPostModal, onPost: openPostChooser, viewer: user?.mobile || '' });
   const { setF } = discovery;
   searchRef.current = { refresh: discovery.refreshSearch };
 

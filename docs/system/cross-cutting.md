@@ -648,6 +648,11 @@ bucket, `draazy.security.rate-limit.property-reads-per-window` (default 600 a mi
 walking the catalogue is refused while a person browsing never meets it. Signed-in callers are not
 metered here.
 
+**Living-style reads** (`GET`/`HEAD` on `/flatmates/{kind}/{id}/living-style`) get their own per-caller
+bucket, `draazy.security.rate-limit.living-style-reads-per-window` (default 60 per 10 minutes): another
+person's answers sit behind a public listing id, so walking listings would otherwise harvest them.
+The id varies, so the filter matches the path shape rather than the exact-path set.
+
 **Provider callbacks get their own budget rather than an exemption.** They cannot share the ordinary
 bucket: they arrive from a handful of provider addresses, and a refused callback is a customer who
 paid and was not credited. Nor may they be exempt — they are `permitAll`, so an attacker can send

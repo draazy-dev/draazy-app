@@ -1,13 +1,20 @@
 import { ROOM_SHARE_MAX } from '../../../lib/data/flatSplit.js';
 
 export const TAB_MOVE_IN = 'move-in';
+export const TAB_PEOPLE = 'people';
+export const TAB_TEAMS = 'teams';
+/* Retired board tab (seekers + hunting groups in one list). Saved alerts still carry it, and the
+ * server still answers it, so it is only ever read, never offered. */
 export const TAB_TEAM_UP = 'team-up';
-export const TABS = [TAB_MOVE_IN, TAB_TEAM_UP];
+export const TABS = [TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS];
+export const TAB_ICON = { [TAB_MOVE_IN]: 'door-open', [TAB_PEOPLE]: 'user-search', [TAB_TEAMS]: 'users-round' };
+export const KIND_WORD = { [TAB_MOVE_IN]: 'homes', [TAB_PEOPLE]: 'flatmates', [TAB_TEAMS]: 'teams' };
 
 const TAB_ALIAS = {
   rooms: TAB_MOVE_IN,
-  flatmates: TAB_TEAM_UP,
-  groups: TAB_TEAM_UP,
+  flatmates: TAB_PEOPLE,
+  [TAB_TEAM_UP]: TAB_PEOPLE,
+  groups: TAB_TEAMS,
 };
 export const normalizeTab = (v) => (TABS.includes(v) ? v : TAB_ALIAS[v] || TAB_MOVE_IN);
 
@@ -54,10 +61,10 @@ export const occupancyOf = (item) => {
    the same decision as a solo seeker. */
 export const hasAddress = (item) => !!(item && (item.propertyId || item.society));
 export const tabOf = (item) => {
-  if (!item) return TAB_TEAM_UP;
+  if (!item) return TAB_PEOPLE;
   if (item.kind === 'room') return TAB_MOVE_IN;
-  if (item.kind === 'group') return hasAddress(item) ? TAB_MOVE_IN : TAB_TEAM_UP;
-  return TAB_TEAM_UP;
+  if (item.kind === 'group') return hasAddress(item) ? TAB_MOVE_IN : TAB_TEAMS;
+  return TAB_PEOPLE;
 };
 
 export const asKind = (kind) => (item) => ({ ...item, kind });

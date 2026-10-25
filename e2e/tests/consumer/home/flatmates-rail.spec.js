@@ -10,7 +10,7 @@ test('"Find a flatmate" routes to the flatmate finder', async ({ page }) => {
   await page.getByRole('button', { name: 'Find a flatmate' }).click();
   // The view is the assertion, not just the route. "Find a flatmate" is the browse-people entry
   // point, and `move-in` — the other tab — is a different question with a different result set.
-  await expect(page).toHaveURL(/\/flatmates\?view=team-up/);
+  await expect(page).toHaveURL(/\/flatmates\?view=people/);
 });
 
 test('"Post your requirement" (guest) opens the sign-in sheet, then the post form after sign-in', async ({ page }) => {

@@ -137,7 +137,7 @@ test.describe('Flatmates filter sheet', () => {
   });
 
   test('the budget filter has a floor, and a post priced below it drops out', async ({ page }) => {
-    const feed = await fetch(`${API}/flatmates/feed?tab=team-up&size=100`).then((r) => r.json());
+    const feed = await fetch(`${API}/flatmates/feed?tab=people&size=100`).then((r) => r.json());
     const priced = feed.content
       .filter((p) => Number.isFinite(p.budget) && p.budget > 0 && p.budget <= 40000)
       .sort((a, b) => a.budget - b.budget);
@@ -150,7 +150,7 @@ test.describe('Flatmates filter sheet', () => {
     expect(dear.budget, 'the seed no longer spans a ₹1,000 budget gap').toBeGreaterThanOrEqual(floor);
 
     await withConsent(page);
-    await page.goto('/flatmates?view=team-up', { waitUntil: 'domcontentloaded' });
+    await page.goto('/flatmates?view=people', { waitUntil: 'domcontentloaded' });
     await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 30_000 });
 
     const before = await cardIds(page);

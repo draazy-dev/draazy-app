@@ -38,6 +38,7 @@ public class SecurityConfig {
     private final int writeBudget;
     private final int localityResolveBudget;
     private final int propertyReadBudget;
+    private final int livingStyleBudget;
     private final Duration rateLimitWindow;
     private final boolean proxyAware;
     private final Optional<OriginGateFilter> originGate;
@@ -49,6 +50,7 @@ public class SecurityConfig {
             @Value("${draazy.security.rate-limit.writes-per-window:120}") int writeBudget,
             @Value("${draazy.security.rate-limit.locality-resolves-per-window:10}") int localityResolveBudget,
             @Value("${draazy.security.rate-limit.property-reads-per-window:600}") int propertyReadBudget,
+            @Value("${draazy.security.rate-limit.living-style-reads-per-window:60}") int livingStyleBudget,
             @Value("${draazy.security.rate-limit.window-seconds:60}") long windowSeconds,
             @Value("${draazy.security.trusted-proxies:none}") String trustedProxies,
             @Value("${draazy.security.origin-secret}") String originSecret) {
@@ -65,6 +67,7 @@ public class SecurityConfig {
         this.writeBudget = writeBudget;
         this.localityResolveBudget = localityResolveBudget;
         this.propertyReadBudget = propertyReadBudget;
+        this.livingStyleBudget = livingStyleBudget;
         this.rateLimitWindow = Duration.ofSeconds(windowSeconds);
 
         this.originGate = OriginGateFilter.fromSetting(originSecret);
@@ -140,6 +143,10 @@ public class SecurityConfig {
                                 Routes.Flatmates.ROOM_BY_ID,
                                 Routes.Flatmates.POST_BY_ID).permitAll()
 
+                        // Owner WhatsApp link: the X-Owner-Notice-Token header is the credential.
+                        .requestMatchers(HttpMethod.GET, Routes.Flatmates.OWNER_NOTICE).permitAll()
+                        .requestMatchers(HttpMethod.POST, Routes.Flatmates.OWNER_NOTICE_ANSWER).permitAll()
+
                         // Public editorial + reviews. Per-method because the two review routes
                         // serve a public GET and an authenticated POST on the identical path.
                         .requestMatchers(HttpMethod.GET,
@@ -174,7 +181,7 @@ public class SecurityConfig {
             // ~700 MockMvc tests share one anonymous bucket; WriteRateLimitTest turns it back on.
             http.addFilterAfter(
                     new WriteRateLimitFilter(writeBudget, rateLimitWindow, proxyAware,
-                            rateLimitStores, localityResolveBudget, propertyReadBudget),
+                            rateLimitStores, localityResolveBudget, propertyReadBudget, livingStyleBudget),
                     JwtAuthFilter.class);
         }
 
