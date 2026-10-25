@@ -9,12 +9,12 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.photo.ListingPhotoFiles;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
-import com.draazy.api.moderation.property.PropertyPhotoTakedownService;
 import com.draazy.api.moderation.verification.PropertyReviewRepository;
 import com.draazy.api.provider.FileStorage;
 import com.draazy.api.support.AbstractApiTest;
@@ -91,7 +91,7 @@ class PropertyPhotoTakedownTest extends AbstractApiTest {
 
     private void commitSideEffects() {
         TransactionSynchronizationManager.getSynchronizations().stream()
-                .filter(sync -> sync.getClass().getName().startsWith(PropertyPhotoTakedownService.class.getName()))
+                .filter(sync -> sync.getClass().getName().startsWith(ListingPhotoFiles.class.getName()))
                 .forEach(TransactionSynchronization::afterCommit);
     }
 

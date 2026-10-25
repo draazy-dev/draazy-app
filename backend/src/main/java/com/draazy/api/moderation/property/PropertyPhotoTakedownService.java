@@ -1,7 +1,7 @@
 package com.draazy.api.moderation.property;
 
 import com.draazy.api.catalog.listing.ListingDuplicateProbe;
-import com.draazy.api.catalog.photo.PhotoService;
+import com.draazy.api.catalog.photo.ListingPhotoFiles;
 import com.draazy.api.catalog.property.PhotoHash;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyLifecycle;
@@ -17,18 +17,12 @@ import com.draazy.api.security.AuthPrincipal;
 import java.util.List;
 import java.util.Map;
 import org.hibernate.Hibernate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /** Staff pull one photo from a listing, short of pulling the whole listing. */
 @Service
 public class PropertyPhotoTakedownService {
-
-    private static final Logger log = LoggerFactory.getLogger(PropertyPhotoTakedownService.class);
 
     static final Map<String, String> REASONS = Map.of(
             "not_the_property", "it does not show this property",
@@ -42,18 +36,18 @@ public class PropertyPhotoTakedownService {
     private final VerificationCases cases;
     private final AuditService audit;
     private final Notifier notifier;
-    private final PhotoService photos;
+    private final ListingPhotoFiles photoFiles;
 
     public PropertyPhotoTakedownService(PropertyRepository properties, PropertyLifecycle lifecycle,
             ListingDuplicateProbe duplicates, VerificationCases cases,
-            AuditService audit, Notifier notifier, PhotoService photos) {
+            AuditService audit, Notifier notifier, ListingPhotoFiles photoFiles) {
         this.properties = properties;
         this.lifecycle = lifecycle;
         this.duplicates = duplicates;
         this.cases = cases;
         this.audit = audit;
         this.notifier = notifier;
-        this.photos = photos;
+        this.photoFiles = photoFiles;
     }
 
     @Transactional
@@ -95,9 +89,7 @@ public class PropertyPhotoTakedownService {
         notifier.notify(property.getOwner().getId(), "listing.photo_removed",
                 "A photo was removed from your listing", ownerNote,
                 "/list-property?edit=" + property.getId() + "&step=photos");
-        if (!properties.photoUsedElsewhere(property.getId(), photo)) {
-            deleteFileAfterCommit(photo);
-        }
+        photoFiles.deleteUnusedAfterCommit(property.getId(), List.of(photo));
         return property;
     }
 
@@ -115,20 +107,5 @@ public class PropertyPhotoTakedownService {
         return sentBack
                 ? note + " It had no other photos, so it needs changes: add a photo to send it back for review."
                 : note + " You can add another photo any time.";
-    }
-
-    // After commit, so a rollback never leaves a listing pointing at a deleted file.
-    private void deleteFileAfterCommit(String photo) {
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                try {
-                    photos.delete(photo);
-                } catch (RuntimeException e) {
-                    log.warn("Photo {} was removed from the listing but its file was not deleted: {}",
-                            photo, e.toString());
-                }
-            }
-        });
     }
 }

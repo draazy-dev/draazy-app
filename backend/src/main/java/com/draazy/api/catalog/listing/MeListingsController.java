@@ -33,12 +33,14 @@ import org.springframework.web.bind.annotation.RestController;
 public class MeListingsController {
 
     private final ListingService listingService;
+    private final ListingArchiveService archiveService;
     private final PropertyMapper propertyMapper;
     private final PendingLeadLookup pendingLeads;
 
-    public MeListingsController(ListingService listingService, PropertyMapper propertyMapper,
-            PendingLeadLookup pendingLeads) {
+    public MeListingsController(ListingService listingService, ListingArchiveService archiveService,
+            PropertyMapper propertyMapper, PendingLeadLookup pendingLeads) {
         this.listingService = listingService;
+        this.archiveService = archiveService;
         this.propertyMapper = propertyMapper;
         this.pendingLeads = pendingLeads;
     }
@@ -108,7 +110,7 @@ public class MeListingsController {
     /** Archive frees the one-listing free-tier slot without hard-deleting the row. */
     @DeleteMapping(Routes.MeListings.BY_ID)
     public ListingWriteResult archive(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
-        return propertyMapper.toTakenDown(listingService.archive(principal.userId(), id));
+        return propertyMapper.toTakenDown(archiveService.deleteByOwner(principal.userId(), id));
     }
 
     private OwnerListingCard card(Property property) {

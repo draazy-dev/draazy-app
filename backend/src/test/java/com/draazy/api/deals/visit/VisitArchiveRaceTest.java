@@ -2,7 +2,7 @@ package com.draazy.api.deals.visit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.draazy.api.catalog.listing.ListingService;
+import com.draazy.api.catalog.listing.ListingArchiveService;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
@@ -28,7 +28,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class VisitArchiveRaceTest {
 
     @Autowired VisitService visitService;
-    @Autowired ListingService listings;
+    @Autowired ListingArchiveService listings;
     @Autowired UserRepository users;
     @Autowired PropertyRepository properties;
     @Autowired JdbcTemplate jdbc;
@@ -79,7 +79,7 @@ class VisitArchiveRaceTest {
                 if (i == 0) {
                     visitService.schedule(buyer.getId(), booking);
                 } else {
-                    listings.archive(owner.getId(), id.toString());
+                    listings.deleteByOwner(owner.getId(), id.toString());
                 }
             });
 

@@ -34,13 +34,13 @@ public class ContactReturns {
                 listing + " " + what + " \u2014 your contact is back.", "/property/" + row.getPropertyId());
     }
 
-    /** Expires what is still pending on a listing that just closed, telling each seeker their contact is back. */
+    /** Expires what is still pending on a listing that closed or came down; each seeker gets their contact back. */
     @Transactional
-    public void expirePendingForClosedListing(UUID propertyId) {
+    public void expirePendingForClosedListing(UUID propertyId, String what) {
         for (ContactRequest row : requests.findByPropertyIdAndStatus(propertyId, ContactRequestStatuses.PENDING)) {
             if (requests.updateStatusIfCurrent(row.getId(), ContactRequestStatuses.PENDING,
                     ContactRequestStatuses.EXPIRED) > 0) {
-                notifySeeker(row, "was closed");
+                notifySeeker(row, what);
             }
         }
     }

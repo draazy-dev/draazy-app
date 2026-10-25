@@ -87,6 +87,15 @@ public final class ErrorCodes {
 
     public static final String LISTING_NOT_EDITABLE = "listing_not_editable";
 
+    // 409 on an owner delete: a deal, offer, confirmation or paid service must be settled first.
+    public static final String LISTING_HAS_OPEN_WORK = "listing_has_open_work";
+
+    // 409 on a chat message: the owner deleted the listing the chat is about.
+    public static final String CONVERSATION_CLOSED = "conversation_closed";
+
+    // 409 on restore: the undo window ended and the listing's photos and details are gone.
+    public static final String LISTING_CONTENT_PURGED = "listing_content_purged";
+
     public static final String LISTING_INCOMPLETE = "listing_incomplete";
 
     public static final String DUPLICATE_SUBMISSION = "duplicate_submission";

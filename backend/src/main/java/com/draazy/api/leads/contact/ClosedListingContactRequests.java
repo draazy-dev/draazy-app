@@ -1,11 +1,12 @@
 package com.draazy.api.leads.contact;
 
+import com.draazy.api.catalog.property.PropertyArchived;
 import com.draazy.api.catalog.property.PropertyClosed;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-// Runs in the deal-close transaction: approving is refused once the listing is not live, so a pending request
-// left behind could only be answered with an error.
+// Runs in the deal-close or archive transaction: approving is refused once the listing is not live, so a pending
+// request left behind could only be answered with an error.
 @Component
 class ClosedListingContactRequests {
 
@@ -17,6 +18,11 @@ class ClosedListingContactRequests {
 
     @EventListener
     void onClosed(PropertyClosed event) {
-        returns.expirePendingForClosedListing(event.propertyId());
+        returns.expirePendingForClosedListing(event.propertyId(), "was closed");
+    }
+
+    @EventListener
+    void onArchived(PropertyArchived event) {
+        returns.expirePendingForClosedListing(event.propertyId(), "was taken down");
     }
 }

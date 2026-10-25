@@ -1,6 +1,7 @@
 package com.draazy.api.catalog.listing;
 
 import com.draazy.api.catalog.locality.LocalityBinding;
+import com.draazy.api.catalog.photo.ListingPhotoFiles;
 import com.draazy.api.catalog.property.AddressKey;
 import com.draazy.api.catalog.property.AvailableOn;
 import com.draazy.api.catalog.property.DealIntent;
@@ -64,14 +65,17 @@ public class ListingService {
     private final PhotoLimit photoLimit;
     private final PlatformSettings settings;
     private final ListingSubmissionGuard submissions;
+    private final ListingPhotoFiles photoFiles;
 
     public ListingService(PropertyRepository properties, UserRepository users,
             LocalityBinding localities, ListingEditRules editRules, PropertyMapper propertyMapper,
             PropertyLifecycle propertyLifecycle, ListingCaseNotes caseNotes, ListingDuplicateProbe duplicates,
             ListingQuota quota, RateLimitLock locks, ListingPhotoSources photoSources,
-            PhotoLimit photoLimit, PlatformSettings settings, ListingSubmissionGuard submissions) {
+            PhotoLimit photoLimit, PlatformSettings settings, ListingSubmissionGuard submissions,
+            ListingPhotoFiles photoFiles) {
         this.properties = properties;
         this.submissions = submissions;
+        this.photoFiles = photoFiles;
         this.settings = settings;
         this.users = users;
         this.caseNotes = caseNotes;
@@ -131,19 +135,6 @@ public class ListingService {
         }
         p.resumeByOwner();
         duplicates.flag(p);
-        return properties.save(p);
-    }
-
-    /** Soft and idempotent, with a server-owned reason: docs/flows/consumer/list-property-wizard.md 9.5. */
-    @Transactional
-    public Property archive(UUID userId, String idOrSlug) {
-        Property p = resolveOwned(userId, idOrSlug)
-                .orElseThrow(() -> NotFoundException.of("Listing"));
-        if (!p.isArchived()) {
-            p.archive("Taken down by the owner");
-            properties.endListingPasses(p.getId());
-            propertyLifecycle.announceArchived(p);
-        }
         return properties.save(p);
     }
 
@@ -250,6 +241,7 @@ public class ListingService {
                     "This listing is closed and can no longer be edited.");
         }
         String statusBefore = p.getStatus();
+        Set<String> filesBefore = p.storedFiles();
         boolean answeringInfoRequest = PropertyStatus.PENDING.equals(statusBefore) && p.isAwaitingOwnerInfo();
         List<Object> signalBefore = duplicates.signalOf(p);
         requireNonEmptyPhotosIfPresent(in.images());
@@ -305,6 +297,8 @@ public class ListingService {
         if (photosMoved || !duplicates.signalOf(p).equals(signalBefore)) {
             duplicates.flag(p);
         }
+        filesBefore.removeAll(p.storedFiles());
+        photoFiles.deleteUnusedAfterCommit(p.getId(), filesBefore);
         return p;
     }
 

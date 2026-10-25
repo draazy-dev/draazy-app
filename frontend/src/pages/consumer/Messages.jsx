@@ -318,7 +318,7 @@ export default function Messages() {
   }, [activeId, flushQueue, hydrate, reload]);
 
   const sendText = (text, replyTo = null, retryId = null) => {
-    if (!active || active.staged || active.blocked || active.blockedYou) return;
+    if (!active || active.staged || active.blocked || active.blockedYou || active.listingDeleted) return;
     setSendError('');
     const body = String(text || '').trim();
     if (!body) return;
@@ -350,6 +350,11 @@ export default function Messages() {
         return;
       }
       const message = err?.message || t('misc.msgSendFailed');
+      if (err?.code === 'conversation_closed') {
+        setSendError('');
+        patchConv(active.id, (c) => ({ ...c, listingDeleted: true, messages: c.messages.filter((m) => m.clientId !== id) }));
+        return;
+      }
       if (err?.status === 403 && /can't message/i.test(message)) {
         setSendError('');
         patchConv(active.id, (c) => ({ ...c, blockedYou: true, messages: c.messages.filter((m) => m.clientId !== id) }));
@@ -363,7 +368,7 @@ export default function Messages() {
     // instead of posting a fake fixed-time card.
 
   const sendPhoto = ({ file, caption = '', previewUrl, retry } = {}) => {
-    if (!active || active.staged || active.blocked || !file) return;
+    if (!active || active.staged || active.blocked || active.listingDeleted || !file) return;
     if (!['image/jpeg', 'image/png'].includes(file.type) || file.size > 8_000_000) {
       toast('Upload a JPEG or PNG up to 8 MB.', 'error');
       if (previewUrl) URL.revokeObjectURL(previewUrl);

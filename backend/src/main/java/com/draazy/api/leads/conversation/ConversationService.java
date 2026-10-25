@@ -2,6 +2,8 @@ package com.draazy.api.leads.conversation;
 
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.common.error.ConflictException;
+import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.RateLimitedException;
 import com.draazy.api.common.attachment.MessageAttachment;
@@ -331,6 +333,10 @@ public class ConversationService {
             return;
         }
         UUID other = conversation.other(author.userId());
+        if (conversations.aboutOwnerDeletedListing(conversation.getId())) {
+            throw new ConflictException(ErrorCodes.CONVERSATION_CLOSED,
+                    "The owner deleted this listing, so this chat is closed.");
+        }
         if (conversations.blockedEitherWay(author.userId(), other)) {
             throw new ForbiddenException("You can't message this user");
         }
