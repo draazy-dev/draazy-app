@@ -3,7 +3,7 @@ import { trackErrors } from '../../../helpers/console.js';
 
 /* SALE pages must never show RENT-only blocks, and land/plot listings hide apartment-only sections. */
 
-const SALE_FLAT = 'p5013';       // 1 BHK Flat in Baner (buy)
+const SALE_FLAT = 'p5013';       // 3 BHK Flat in Baner (buy)
 const SALE_PLOT = 'p5124';       // Open Plot in Wagholi (buy, land) - seeded 2026-08-19
 const RENT_FLAT = 'p5121';       // 2 BHK Flat for rent in Wakad - seeded 2026-08-19
 

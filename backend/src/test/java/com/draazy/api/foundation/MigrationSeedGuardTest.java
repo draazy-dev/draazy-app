@@ -27,7 +27,9 @@ class MigrationSeedGuardTest {
     // Versions whose inserts are one-time backfills, each with why losing them to the reset costs nothing.
     private static final Map<String, String> BACKFILLS = Map.of(
             "26.10.36",
-            "Inserts one timeline row per held draft it releases; a reset database has no held drafts to release.");
+            "Inserts one timeline row per held draft it releases; a reset database has no held drafts to release.",
+            "26.10.52",
+            "Copies retired per-post lifestyle tags into user_living_style; a reset database has no posts to copy from.");
 
     // Tables whose rows a versioned migration once seeded, and which the repeatable seed now owns alone.
     // Keyed by table because the seed owns these rows with no version to point at.

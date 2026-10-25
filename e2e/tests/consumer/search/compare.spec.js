@@ -1,5 +1,5 @@
 import { test, expect } from '../../../fixtures/live.js';
-const A = 'p5013'; // 1 BHK Flat, Baner (buy)
+const A = 'p5013'; // 3 BHK Flat, Baner (buy)
 const B = 'p5121'; // 2 BHK Flat, Wakad (rent)
 // The global cookie-consent banner is also role="dialog"; seed consent so it never
 // overlays the comparison surface.
@@ -47,7 +47,7 @@ test.describe('Compare properties — /compare', () => {
     // row still quoting sq.ft. is the price one, suppressed for listings not measured in sq.ft.
     await expect(page.getByText('Area', { exact: true })).toBeVisible();
     await expect(page.getByText('Price / sq.ft.', { exact: true })).toBeVisible();
-    await expect(page.getByText('RERA Verified', { exact: true })).toBeVisible();
+    await expect(page.getByText('RERA shared', { exact: true })).toBeVisible();
     await expect(page.getByText('Amenities', { exact: true })).toBeVisible();
 
     await expect(page.getByRole('button', { name: 'Reset' })).toBeVisible();

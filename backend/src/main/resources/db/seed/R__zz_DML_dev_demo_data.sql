@@ -383,7 +383,7 @@ INSERT INTO public.flatmate_seeker_posts (id, user_id, name, budget, localities,
     ON CONFLICT DO NOTHING;
 INSERT INTO public.flatmate_seeker_posts (id, user_id, name, budget, localities, note, mod_status, created_at, updated_at) VALUES ('f1c7000c-0000-4000-8000-000000000002', 'f1c70000-0000-4000-8000-000000000002', 'Priya Nair', 12000, '["Kharadi"]'::jsonb, 'Happy either way on private or shared.', 'approved', '2026-08-06 09:15:00+05:30', '2026-08-06 09:15:00+05:30')
     ON CONFLICT DO NOTHING;
-INSERT INTO public.flatmate_seeker_posts (id, user_id, name, budget, localities, note, verified, mod_status, created_at, updated_at) VALUES ('f1c7000c-0000-4000-8000-000000000003', '3ad0171b-3206-53e2-b6dc-732bf4e1b44c', 'Meera Deshpande', 22000, '["Baner","Balewadi"]'::jsonb, 'Letting out a room in my own flat while I am posted out of the city for a year.', true, 'approved', '2026-08-06 09:20:00+05:30', '2026-08-06 09:20:00+05:30')
+INSERT INTO public.flatmate_seeker_posts (id, user_id, name, budget, localities, note, verified, mod_status, created_at, updated_at) VALUES ('f1c7000c-0000-4000-8000-000000000003', '3ad0171b-3206-53e2-b6dc-732bf4e1b44c', 'Meera Deshpande', 22000, '["Baner","Balewadi"]'::jsonb, 'Architect, working from a Balewadi studio. Looking for a calm flat with people who keep regular hours.', true, 'approved', '2026-08-06 09:20:00+05:30', '2026-08-06 09:20:00+05:30')
     ON CONFLICT DO NOTHING;
 
 INSERT INTO public.flatmate_groups (id, host_id, title, locality, rent, seats_total, seats_open, host_role, note, mod_status, created_at, updated_at) VALUES ('f1c7000d-0000-4000-8000-000000000001', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Two seats in a 3 BHK, Kharadi', 'Kharadi', 42000, 3, 1, 'tenant', 'Lease starts next month, split three ways.', 'approved', '2026-08-06 09:20:00+05:30', '2026-08-06 09:20:00+05:30')
@@ -542,11 +542,11 @@ UPDATE public.societies SET listing_count = 1
  WHERE slug = 'skyline-heights-baner' AND listing_count = 0;
 
 
-UPDATE public.flatmate_seeker_posts SET move_in = '30', tags = '["Vegetarian", "Student"]'
+UPDATE public.flatmate_seeker_posts SET move_in = '30'
  WHERE id = 'f1c7000c-0000-4000-8000-000000000001' AND move_in IS NULL;
-UPDATE public.flatmate_seeker_posts SET move_in = '60', tags = '["Night owl", "Fitness"]'
+UPDATE public.flatmate_seeker_posts SET move_in = '60'
  WHERE id = 'f1c7000c-0000-4000-8000-000000000002' AND move_in IS NULL;
-UPDATE public.flatmate_seeker_posts SET move_in = 'now', tags = '["Non-smoker", "Working professional"]'
+UPDATE public.flatmate_seeker_posts SET move_in = 'now'
  WHERE id = 'f1c7000c-0000-4000-8000-000000000003' AND move_in IS NULL;
 
 INSERT INTO public.users
@@ -562,27 +562,27 @@ VALUES
 
 INSERT INTO public.flatmate_seeker_posts
     (id, user_id, name, gender, age, occupation, budget, localities, move_in, flat_pref, room_pref,
-     tags, note, verified_contact_only, verified, mod_status, archived, created_at, updated_at)
+     note, verified_contact_only, verified, mod_status, archived, created_at, updated_at)
 VALUES
- ('f1c7000c-0000-4000-8000-000000000004', 'f1c70000-0000-4000-8000-000000000021', 'Sneha Joshi', 'female', 26, 'Data Analyst', 18000, '["Hinjawadi", "Wakad"]', '15', 'women', 'private', '["Non-smoker", "Early riser", "Fitness"]', 'WFO at Hinjawadi. Want to split a 2BHK with a like-minded girl. Gym buddy a bonus.', false, true, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000c-0000-4000-8000-000000000005', 'f1c70000-0000-4000-8000-000000000022', 'Aditi Rao', 'female', 24, 'UX Designer', 16000, '["Kharadi"]', 'now', 'women', 'private', '["Non-smoker", "Working professional"]', 'Starting at a Kharadi studio next week - can move in immediately. Clean and quiet.', false, true, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000c-0000-4000-8000-000000000006', 'f1c70000-0000-4000-8000-000000000023', 'Pooja Shah', 'female', 25, 'Marketing Lead', 17000, '["Wakad"]', '15', 'women', 'any', '["Non-smoker", "Night owl"]', 'Relocating to Pune this month. Need a 2BHK flatmate - easy-going and tidy.', false, false, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000c-0000-4000-8000-000000000007', 'f1c70000-0000-4000-8000-000000000024', 'Karan Malhotra', 'male', 23, 'QA Engineer', 14000, '["Hadapsar"]', '30', 'any', 'shared', '["Vegetarian", "Student"]', 'Fresh grad sharing a 2BHK to keep rent low. Open to a shared room.', false, false, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000c-0000-4000-8000-000000000008', 'f1c70000-0000-4000-8000-000000000025', 'Nikhil Rane', 'male', 29, 'Product Manager', 21000, '["Kothrud"]', '60', 'men', 'private', '["Fitness"]', 'Lease ends in two months, planning ahead. Private room in Kothrud preferred.', false, true, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30')
+ ('f1c7000c-0000-4000-8000-000000000004', 'f1c70000-0000-4000-8000-000000000021', 'Sneha Joshi', 'female', 26, 'Data Analyst', 18000, '["Hinjawadi", "Wakad"]', '15', 'women', 'private', 'WFO at Hinjawadi. Want to split a 2BHK with a like-minded girl. Gym buddy a bonus.', false, true, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000c-0000-4000-8000-000000000005', 'f1c70000-0000-4000-8000-000000000022', 'Aditi Rao', 'female', 24, 'UX Designer', 16000, '["Kharadi"]', 'now', 'women', 'private', 'Starting at a Kharadi studio next week - can move in immediately. Clean and quiet.', false, true, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000c-0000-4000-8000-000000000006', 'f1c70000-0000-4000-8000-000000000023', 'Pooja Shah', 'female', 25, 'Marketing Lead', 17000, '["Wakad"]', '15', 'women', 'any', 'Relocating to Pune this month. Need a 2BHK flatmate - easy-going and tidy.', false, false, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000c-0000-4000-8000-000000000007', 'f1c70000-0000-4000-8000-000000000024', 'Karan Malhotra', 'male', 23, 'QA Engineer', 14000, '["Hadapsar"]', '30', 'any', 'shared', 'Fresh grad sharing a 2BHK to keep rent low. Open to a shared room.', false, false, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000c-0000-4000-8000-000000000008', 'f1c70000-0000-4000-8000-000000000025', 'Nikhil Rane', 'male', 29, 'Product Manager', 21000, '["Kothrud"]', '60', 'men', 'private', 'Lease ends in two months, planning ahead. Private room in Kothrud preferred.', false, true, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30')
     ON CONFLICT DO NOTHING;
 
 
 INSERT INTO public.flatmate_groups
     (id, host_id, title, locality, policy, rent, seats_total, seats_open, host_role, verification_tier,
-     agreement_declared, owner_consent, flag_for_review, mod_status, tags, note, archived, created_at, updated_at)
+     agreement_declared, owner_consent, flag_for_review, mod_status, note, archived, created_at, updated_at)
 VALUES
- ('f1c7000d-0000-4000-8000-000000000002', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', '2 girls need 1 more for a 2 BHK, Baner', 'Baner', 'women', 34000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', '["Non-smoker", "Working professional"]', 'Working professionals, non-smokers. Move-in within a month.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000003', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Two seats open in a 3 BHK, Hinjawadi', 'Hinjawadi', 'any', 45000, 4, 2, 'tenant', 'identity', false, false, false, 'approved', '["Working professional"]', 'Walkable to Phase 1. Two rooms free from next month.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000004', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'One seat in a 2 BHK, Wakad', 'Wakad', 'men', 28000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', '["Non-smoker", "Early riser"]', 'Quiet flat, two of us work early shifts.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000005', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Sharing a 3 BHK near Magarpatta, Hadapsar', 'Hadapsar', 'any', 39000, 4, 2, 'tenant', 'identity', false, false, false, 'approved', '["Vegetarian"]', 'Veg kitchen. Close to the Magarpatta gate.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000006', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Last seat in a 2 BHK, Kothrud', 'Kothrud', 'any', 26000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', '["Fitness", "Night owl"]', 'Long-term flat, one room opening up.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000007', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'One seat in a 2 BHK, Aundh', 'Aundh', 'any', 31000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', '["Working professional"]', 'Near ITI Road. One room free from the 1st.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000008', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Two seats in a 3 BHK, Balewadi', 'Balewadi', 'women', 36000, 4, 2, 'tenant', 'identity', false, false, false, 'approved', '["Non-smoker", "Fitness"]', 'Close to the sports complex. Two rooms open.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30')
+ ('f1c7000d-0000-4000-8000-000000000002', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', '2 girls need 1 more for a 2 BHK, Baner', 'Baner', 'women', 34000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', 'Working professionals, non-smokers. Move-in within a month.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000d-0000-4000-8000-000000000003', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Two seats open in a 3 BHK, Hinjawadi', 'Hinjawadi', 'any', 45000, 4, 2, 'tenant', 'identity', false, false, false, 'approved', 'Walkable to Phase 1. Two rooms free from next month.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000d-0000-4000-8000-000000000004', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'One seat in a 2 BHK, Wakad', 'Wakad', 'men', 28000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', 'Quiet flat, two of us work early shifts.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000d-0000-4000-8000-000000000005', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Sharing a 3 BHK near Magarpatta, Hadapsar', 'Hadapsar', 'any', 39000, 4, 2, 'tenant', 'identity', false, false, false, 'approved', 'Veg kitchen. Close to the Magarpatta gate.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000d-0000-4000-8000-000000000006', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Last seat in a 2 BHK, Kothrud', 'Kothrud', 'any', 26000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', 'Long-term flat, one room opening up.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000d-0000-4000-8000-000000000007', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'One seat in a 2 BHK, Aundh', 'Aundh', 'any', 31000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', 'Near ITI Road. One room free from the 1st.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+ ('f1c7000d-0000-4000-8000-000000000008', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Two seats in a 3 BHK, Balewadi', 'Balewadi', 'women', 36000, 4, 2, 'tenant', 'identity', false, false, false, 'approved', 'Close to the sports complex. Two rooms open.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30')
     ON CONFLICT DO NOTHING;
 
 -- Residential rent/plot anchors. Every locality here is load-bearing against
@@ -694,7 +694,7 @@ UPDATE public.properties SET age_years = 9,  floor = 11, total_floors = 14, faci
 UPDATE public.properties SET age_years = 1,  floor = 3,  total_floors = 12, facing = 'North',      overlooking = 'Garden' WHERE slug = 'p5133';
 UPDATE public.properties SET age_years = 3,  floor = 5,  total_floors = 8,  facing = 'North'  WHERE slug = 'p5023';
 UPDATE public.properties SET age_years = 6,  floor = 9,  total_floors = 9,  facing = 'West'  WHERE slug = 'p5008';
-UPDATE public.properties SET age_years = 18, floor = 2,  total_floors = 5,  facing = 'South' WHERE slug = 'p5013';
+UPDATE public.properties SET age_years = 4,  floor = 2,  total_floors = 5,  facing = 'South' WHERE slug = 'p5013';
 -- Independent house: an age, but no society and no floor in a building it does not sit in.
 UPDATE public.properties SET age_years = 2 WHERE slug = 'p5130';
 -- p5010 (villa) is left entirely unstated on purpose. Do not fill it in.
@@ -862,6 +862,190 @@ UPDATE public.properties SET age_years = 2,  floor = 1,  total_floors = 7  WHERE
 UPDATE public.properties SET age_years = 8,  floor = 10, total_floors = 14 WHERE slug = 'p5146';
 UPDATE public.properties SET age_years = 4,  floor = 5,  total_floors = 9  WHERE slug = 'p5148';
 
+-- Random legacy type/BHK/area pairs made coherent; slug, status, deal, locality, owner and type family stay
+-- (registry `legacyCoherence`), stated values win via COALESCE, and the description guard spares dev edits.
+UPDATE public.properties p SET
+    title = v.title, property_type = v.ptype, bhk = v.bhk, area = v.area, price = v.price, furnishing = v.furn,
+    floor = COALESCE(p.floor, v.floor), total_floors = COALESCE(p.total_floors, v.tf),
+    facing = COALESCE(p.facing, v.facing), age_years = COALESCE(p.age_years, v.age),
+    bathrooms = v.baths, balconies = v.balc, parking = v.park, possession = v.poss,
+    maintenance = v.maint, deposit = COALESCE(p.deposit, v.dep), land_use = COALESCE(p.land_use, v.land),
+    amenities = CASE WHEN v.ptype = 'Plot' THEN '["security", "power"]'::jsonb ELSE p.amenities END,
+    description = v.descr,
+    images = (SELECT jsonb_agg('https://images.unsplash.com/photo-' || u.id || '?auto=format&fit=crop&w=800&q=70' ORDER BY u.n)
+                FROM unnest(string_to_array(v.photos, ' ')) WITH ORDINALITY u(id, n)),
+    cover_image = 'https://images.unsplash.com/photo-' || split_part(v.photos, ' ', 1) || '?auto=format&fit=crop&w=800&q=70'
+FROM (VALUES
+  ('p5000', '4 BHK Villa in Magarpatta', 'Villa', 4::numeric, 2098::numeric, 64000::bigint, 'semi-furnished', NULL::int, 2, 'East', 4, 2, 2, 6, 'ready-to-move', NULL::bigint, NULL::bigint, NULL,
+   'Independent villa on a quiet Magarpatta lane with a private lawn, two covered parking spots and an open terrace. Modular kitchen and wardrobes in every bedroom.',
+   '1613490493576-7fde63acd811 1600210492486-724fe5c67fb0 1556912173-3bb406ef7e77 1505693416388-ac5ce068fe85 1552321554-5fefe8c9ef14'),
+  ('p5001', 'Residential Plot in Bavdhan', 'Plot', NULL, 1774, 15611200, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'residential',
+   'Clear-title residential plot in a gated Bavdhan layout with internal tar roads, street lights and a water connection at the boundary.',
+   '1500382017468-9049fed747ef 1592982537447-7440770cbfc9 1500076656116-558758c991c1'),
+  ('p5002', '3 BHK Penthouse in Kothrud', 'Penthouse', 3, 1950, 26500000, 'unfurnished', 14, 14, 'West', 3, 3, 2, NULL, 'under-construction', 6500, NULL, NULL,
+   'Top-floor penthouse with a private terrace over Kothrud, double-height living room and three attached bathrooms. Possession on completion.',
+   '1600573472550-8090b5e0745e 1597211833712-5e41faa202ea 1502005229762-cf1b2da7c5d6 1600607687939-ce8a6c25118c 1631049307264-da0ec9d70304'),
+  ('p5003', '1 RK Studio in Viman Nagar', 'Studio', 0, 420, 17000, 'furnished', 6, 12, 'North', 1, 1, 0, 5, 'ready-to-move', 1500, 51000, NULL,
+   'Furnished studio near Phoenix Marketcity with a kitchenette, wardrobe and a queen bed. Lift, power backup and 24x7 security.',
+   '1536376072261-38c75010e6c9 1513694203232-719a280e022f 1489171078254-c3365d6e359f 1584622650111-993a426fbf0a'),
+  ('p5004', '3 BHK Penthouse in Pimple Saudagar', 'Penthouse', 3, 2050, 55000, 'furnished', 16, 16, 'East', 3, 2, 2, 3, 'ready-to-move', 6000, 330000, NULL,
+   'Furnished penthouse on the sixteenth floor with a wrap-around terrace, home theatre corner and two covered parking spots.',
+   '1597211833712-5e41faa202ea 1600573472550-8090b5e0745e 1600210491892-03d54c0aaf87 1617325247661-675ab4b64ae2 1620626011761-996317b8d101'),
+  ('p5005', '1 BHK Flat in Kothrud', 'Flat', 1, 621, 6955200, 'semi-furnished', 3, 7, 'North', 1, 1, 1, 12, 'ready-to-move', 1800, NULL, NULL,
+   'Compact 1 BHK in an established Kothrud society, walking distance to Karve Road and the metro. Covered parking and a lift.',
+   '1574362848149-11496d93a7c7 1560448204-e02f11c3d0e2 1484154218962-a197022b5858 1595526114035-0d45ed16cfbf'),
+  ('p5006', '4 BHK Penthouse in Hinjawadi', 'Penthouse', 4, 2400, 62000, 'semi-furnished', 22, 22, 'West', 4, 3, 2, 4, 'ready-to-move', 5500, NULL, NULL,
+   'Sky penthouse above Hinjawadi Phase 1 with a private deck, four en-suite bedrooms and a separate utility. Ten minutes to the IT parks.',
+   '1502005229762-cf1b2da7c5d6 1600607687939-ce8a6c25118c 1618221195710-dd6b41faaea6 1566665797739-1674de7a421a 1600489000022-c2086d79f9d4'),
+  ('p5007', 'Shared room in a 2 BHK Flat in Balewadi', 'Flat', 2, 1080, 9500, 'semi-furnished', 1, 6, 'South', 2, 1, 1, 4, 'ready-to-move', NULL, NULL, NULL,
+   'A twin-sharing room in a 2 BHK near Balewadi High Street. Wi-Fi, washing machine and a cook shared by the flat.',
+   '1522771739844-6a9f6d5f14af 1540518614846-7eded433c457 1502672260266-1c1ef2d93688 1556909212-d5b604d0c90d'),
+  ('p5008', '2 BHK Flat in Baner', 'Flat', 2, 778, 7624400, 'unfurnished', 9, 14, 'West', 2, 1, 1, 6, 'ready-to-move', 2800, NULL, NULL,
+   'Top-floor 2 BHK in a RERA-registered Baner society with a clubhouse, pool and garden. Open views to the west.',
+   '1545324418-cc1a3fa10c00 1493809842364-78817add7ffb 1600585152220-90363fe7e115 1616594039964-ae9021a400a0 1507652313519-d4e9174996dd'),
+  ('p5009', '3 BHK Flat in Kharadi', 'Flat', 3, 1362, 38000, 'semi-furnished', 11, 18, 'East', 2, 2, 1, 3, 'ready-to-move', 3500, 114000, NULL,
+   'Semi-furnished 3 BHK close to EON IT Park with wardrobes, a modular kitchen and two balconies facing the garden.',
+   '1460317442991-0ec209397118 1600210492486-724fe5c67fb0 1556912173-3bb406ef7e77 1505693416388-ac5ce068fe85 1552321554-5fefe8c9ef14'),
+  ('p5010', '3 BHK Villa in Undri', 'Villa', 3, 1950, 14500000, 'unfurnished', NULL, 2, 'East', 4, 2, 2, 3, 'ready-to-move', 2500, NULL, NULL,
+   'G+1 villa in a gated Undri community with a clubhouse and pool. Private garden, servant room and parking for two cars.',
+   '1613977257363-707ba9348227 1600121848594-d8644e57abab 1484154218962-a197022b5858 1586105251261-72a756497a11 1560448075-bb485b067938'),
+  ('p5011', '3 BHK Villa in Magarpatta', 'Villa', 3, 2200, 58000, 'furnished', NULL, 2, 'North', 3, 2, 2, 8, 'ready-to-move', 3000, 174000, NULL,
+   'Furnished 3 BHK villa over two floors inside Magarpatta City, with a private lawn and covered parking.',
+   '1580587771525-78b9dba3b914 1554995207-c18c203602cb 1600489000022-c2086d79f9d4 1615874959474-d609969a20ed 1584622650111-993a426fbf0a'),
+  ('p5012', '3 BHK Flat in NIBM Road', 'Flat', 3, 1450, 11200000, 'unfurnished', 9, 20, 'South', 3, 2, 1, NULL, 'new-launch', 4000, NULL, NULL,
+   'New-launch 3 BHK off NIBM Road with a clubhouse, jogging track and EV charging. Bare-shell interiors, ready for your own fit-out.',
+   '1597047084897-51e81819a499 1630699144867-37acec97df5a 1522708323590-d24dbb6b0267 1600585152220-90363fe7e115'),
+  ('p5013', '3 BHK Flat in Baner', 'Flat', 3, 1573, 15415400, 'furnished', 2, 5, 'South', 3, 2, 2, 4, 'ready-to-move', 4500, NULL, NULL,
+   'Furnished 3 BHK in a low-rise Baner society, two minutes from Baner Road. Every bedroom has an attached bath; two covered parking spots.',
+   '1545324418-cc1a3fa10c00 1560448204-e02f11c3d0e2 1484101403633-562f891dc89a 1600489000022-c2086d79f9d4 1631049307264-da0ec9d70304 1620626011761-996317b8d101'),
+  ('p5014', 'Private room in a 2 BHK Flat in Balewadi', 'Flat', 2, 860, 13500, 'semi-furnished', 6, 10, NULL, 2, 1, 1, 8, 'ready-to-move', NULL, NULL, NULL,
+   'A private room with its own wardrobe in a 2 BHK let to working professionals. Shared kitchen, Wi-Fi and housekeeping twice a week.',
+   '1617104678098-de229db51175 1595526114035-0d45ed16cfbf 1554995207-c18c203602cb 1556909212-d5b604d0c90d'),
+  ('p5015', '3 BHK Row House in Wakad', 'Row House', 3, 1650, 38000, 'unfurnished', NULL, 2, 'North', 3, 2, 2, 9, 'ready-to-move', NULL, NULL, NULL,
+   'G+1 row house in a gated Wakad scheme with a front sit-out, a car porch and a terrace. Close to Dange Chowk and the Hinjawadi road.',
+   '1567496898669-ee935f5f647a 1628624747186-a941c476b7ef 1598928506311-c55ded91a20c 1484154218962-a197022b5858 1505693416388-ac5ce068fe85'),
+  ('p5016', '4 BHK Row House in Magarpatta', 'Row House', 4, 1872, 61000, 'furnished', NULL, 3, 'East', 4, 3, 2, 7, 'ready-to-move', NULL, NULL, NULL,
+   'Furnished G+2 row house in Magarpatta with a private garden, four bedrooms with attached baths and a terrace sit-out.',
+   '1605146769289-440113cc3d00 1600566753376-12c8ab7fb75b 1600121848594-d8644e57abab 1617325247661-675ab4b64ae2 1584622650111-993a426fbf0a'),
+  ('p5017', '4 BHK Villa in Koregaon Park', 'Villa', 4, 3600, 72000000, 'unfurnished', NULL, 3, 'South', 5, 3, 3, NULL, 'new-launch', 8000, NULL, NULL,
+   'New-launch bungalow in Koregaon Park Annexe: private pool deck, home lift, staff quarters and parking for three cars.',
+   '1564013799919-ab600027ffc6 1600596542815-ffad4c1539a9 1600210491892-03d54c0aaf87 1556912173-3bb406ef7e77 1615874959474-d609969a20ed 1552321554-5fefe8c9ef14'),
+  ('p5018', '1 RK Flat in Pimple Saudagar', 'Flat', 0, 380, 11000, 'unfurnished', 2, 4, 'West', 1, 0, 0, 10, 'ready-to-move', NULL, 33000, NULL,
+   'Compact 1 RK with a separate kitchen platform, near Kunal Icon Road. Ideal for one working professional.',
+   '1489171078254-c3365d6e359f 1513694203232-719a280e022f 1507652313519-d4e9174996dd'),
+  ('p5019', '4 BHK Flat in Bavdhan', 'Flat', 4, 2100, 19500000, 'unfurnished', 15, 22, 'East', 4, 3, 2, NULL, 'under-construction', 6000, NULL, NULL,
+   'Under-construction 4 BHK facing the NDA hills, with a private lobby and four bathrooms. RERA possession date in the agreement.',
+   '1574362848149-11496d93a7c7 1630699144867-37acec97df5a 1600607687939-ce8a6c25118c 1600585152220-90363fe7e115'),
+  ('p5020', '4 BHK Flat in Baner', 'Flat', 4, 2026, 21500000, 'unfurnished', 10, 16, 'North', 4, 3, 2, 4, 'ready-to-move', 7000, NULL, NULL,
+   'Large 4 BHK on Baner-Pashan Link Road with a servant room, three balconies and two covered parking spots.',
+   '1515263487990-61b07816b324 1600210492486-724fe5c67fb0 1556909212-d5b604d0c90d 1566665797739-1674de7a421a 1620626011761-996317b8d101'),
+  ('p5021', '2 BHK Flat in Kharadi', 'Flat', 2, 1001, 9109100, 'unfurnished', 7, 18, 'East', 2, 2, 1, NULL, 'new-launch', 3200, NULL, NULL,
+   'New-launch 2 BHK beside the Kharadi IT corridor, RERA registered, with a clubhouse, pool and children''s play area.',
+   '1460317442991-0ec209397118 1502672260266-1c1ef2d93688 1600489000022-c2086d79f9d4 1540518614846-7eded433c457 1552321554-5fefe8c9ef14'),
+  ('p5022', '3 BHK Flat in Aundh', 'Flat', 3, 2400, 28320000, 'unfurnished', 12, 20, 'West', 3, 3, 2, NULL, 'under-construction', 7500, NULL, NULL,
+   'Under-construction 3 BHK on ITI Road, Aundh, with a sundeck, three balconies and a clubhouse on the podium.',
+   '1545324418-cc1a3fa10c00 1630699144867-37acec97df5a 1600210491892-03d54c0aaf87 1556912173-3bb406ef7e77'),
+  ('p5023', '2 BHK Flat in Bavdhan', 'Flat', 2, 658, 5790400, 'furnished', 5, 8, 'North', 2, 1, 1, 3, 'ready-to-move', 2200, NULL, NULL,
+   'Furnished 2 BHK in a three-year-old Bavdhan society near Chandani Chowk. Clubhouse, garden and a play area.',
+   '1574362848149-11496d93a7c7 1493809842364-78817add7ffb 1484154218962-a197022b5858 1595526114035-0d45ed16cfbf'),
+  ('p5024', '3 BHK Row House in Kothrud', 'Row House', 3, 2249, 25188800, 'semi-furnished', NULL, 2, 'East', 3, 2, 2, 15, 'ready-to-move', 3000, NULL, NULL,
+   'Corner row house off Paud Road with a front garden, a car porch and a terrace. Semi-furnished, with wardrobes and a modular kitchen.',
+   '1628624747186-a941c476b7ef 1567496898669-ee935f5f647a 1560185007-cde436f6a4d0 1586105251261-72a756497a11'),
+  ('p5025', '4 BHK Villa in Kothrud', 'Villa', 4, 3200, 52500000, 'unfurnished', NULL, 3, 'North', 4, 3, 2, NULL, 'new-launch', 7000, NULL, NULL,
+   'New-launch G+2 villa in a gated Kothrud enclave with a home office, private terrace and four en-suite bedrooms.',
+   '1582268611958-ebfd161ef9cf 1599809275671-b5942cabc7a2 1618221195710-dd6b41faaea6 1600585152220-90363fe7e115 1617325247661-675ab4b64ae2'),
+  ('p5026', '1 RK Studio in Baner', 'Studio', 0, 420, 4200000, 'unfurnished', 8, 14, 'East', 1, 1, 0, NULL, 'new-launch', 1200, NULL, NULL,
+   'New-launch studio near Baner Road with a kitchenette and a balcony. Clubhouse and co-working lounge in the building.',
+   '1536376072261-38c75010e6c9 1513694203232-719a280e022f 1584622650111-993a426fbf0a'),
+  ('p5027', '1 RK Studio in Magarpatta', 'Studio', 0, 450, 16000, 'furnished', 4, 12, 'South', 1, 1, 1, 6, 'ready-to-move', 1200, 48000, NULL,
+   'Furnished studio inside Magarpatta City with a kitchenette, bed, desk and wardrobe. Walk to Seasons Mall.',
+   '1489171078254-c3365d6e359f 1536376072261-38c75010e6c9 1556909212-d5b604d0c90d'),
+  ('p5028', 'Commercial Plot in Viman Nagar', 'Plot', NULL, 4000, 60000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 360000, 'commercial',
+   'Commercially zoned corner plot on a 60-ft road in Viman Nagar, offered on a long lease for a showroom or a parking yard.',
+   '1592982537447-7440770cbfc9 1500382017468-9049fed747ef 1500076656116-558758c991c1'),
+  ('p5029', '1 RK Studio in Kharadi', 'Studio', 0, 400, 14000, 'furnished', 9, 15, 'West', 1, 0, 0, 4, 'ready-to-move', 1000, 42000, NULL,
+   'Furnished studio five minutes from EON IT Park, with a kitchenette, wardrobe and a work desk.',
+   '1513694203232-719a280e022f 1489171078254-c3365d6e359f 1507652313519-d4e9174996dd'),
+  ('p5030', '1 BHK Flat in Kharadi', 'Flat', 1, 620, 19000, 'unfurnished', 5, 12, 'North', 1, 1, 1, 6, 'ready-to-move', 1500, 57000, NULL,
+   'Unfurnished 1 BHK near Kharadi bypass with a covered parking spot and a balcony over the society garden.',
+   '1460317442991-0ec209397118 1493809842364-78817add7ffb 1556909212-d5b604d0c90d 1616594039964-ae9021a400a0'),
+  ('p5031', '1 RK Studio in Undri', 'Studio', 0, 410, 2900000, 'semi-furnished', 3, 10, 'East', 1, 1, 0, 5, 'ready-to-move', 900, NULL, NULL,
+   'Semi-furnished studio in Undri with a kitchenette and a balcony. Lift, security and power backup.',
+   '1536376072261-38c75010e6c9 1513694203232-719a280e022f 1584622650111-993a426fbf0a'),
+  ('p5032', 'Plot on lease in Pimple Saudagar', 'Plot', NULL, 2400, 25000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+   'Fenced, level plot on a 40-ft road in Pimple Saudagar, available on lease. Electricity connection and a gate at the boundary.',
+   '1500382017468-9049fed747ef 1592982537447-7440770cbfc9 1500076656116-558758c991c1'),
+  ('p5033', 'Shared room in a 3 BHK Flat in Balewadi', 'Flat', 3, 1250, 8500, 'semi-furnished', 12, 12, 'East', 2, 2, 1, 15, 'ready-to-move', NULL, NULL, NULL,
+   'A twin-sharing room on the top floor of a 3 BHK. Pets welcome; the flat shares a cook, Wi-Fi and a washing machine.',
+   '1540518614846-7eded433c457 1617104678098-de229db51175 1560448204-e02f11c3d0e2 1600489000022-c2086d79f9d4'),
+  ('p5034', '2 BHK Flat in Pimple Saudagar', 'Flat', 2, 821, 22000, 'furnished', 7, 14, 'South', 2, 1, 1, 5, 'ready-to-move', 2000, NULL, NULL,
+   'Furnished 2 BHK near Kunal Icon Road with sofa, beds, fridge and washing machine. Lift, gym and covered parking.',
+   '1574362848149-11496d93a7c7 1522708323590-d24dbb6b0267 1484154218962-a197022b5858 1595526114035-0d45ed16cfbf'),
+  ('p5035', '2 BHK Flat in Magarpatta', 'Flat', 2, 1050, 30000, 'furnished', 6, 12, 'East', 2, 2, 1, 7, 'ready-to-move', 2500, 90000, NULL,
+   'Furnished 2 BHK inside Magarpatta City with two balconies, a modular kitchen and a covered parking spot.',
+   '1515263487990-61b07816b324 1502672260266-1c1ef2d93688 1556912173-3bb406ef7e77 1505693416388-ac5ce068fe85'),
+  ('p5036', 'Residential Plot in Undri', 'Plot', NULL, 2000, 9000000, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'residential',
+   'NA residential plot in a developing Undri layout with a compound wall, internal roads and a water line.',
+   '1592982537447-7440770cbfc9 1500382017468-9049fed747ef 1500076656116-558758c991c1'),
+  ('p5037', '4 BHK Penthouse in Undri', 'Penthouse', 4, 2273, 15001800, 'unfurnished', 18, 18, 'South', 4, 3, 2, NULL, 'under-construction', 5500, NULL, NULL,
+   'Under-construction duplex penthouse with a private terrace garden and views over the Undri hills. Possession as per RERA.',
+   '1600573472550-8090b5e0745e 1502005229762-cf1b2da7c5d6 1600210492486-724fe5c67fb0 1566665797739-1674de7a421a')
+) AS v(slug, title, ptype, bhk, area, price, furn, floor, tf, facing, baths, balc, park, age, poss, maint, dep, land, descr, photos)
+WHERE p.slug = v.slug
+  AND p.description LIKE 'Spacious % Zero brokerage, deal directly with the verified owner.';
+
+-- Wagholi flats and room listings stay at two photos for the reels 24-cap; p5133 stays photoless (`postedTypes`),
+-- p5150 keeps its pair (`mapDrawer`).
+UPDATE public.properties p SET
+    images = (SELECT jsonb_agg('https://images.unsplash.com/photo-' || u.id || '?auto=format&fit=crop&w=800&q=70' ORDER BY u.n)
+                FROM unnest(string_to_array(v.photos, ' ')) WITH ORDINALITY u(id, n)),
+    cover_image = 'https://images.unsplash.com/photo-' || split_part(v.photos, ' ', 1) || '?auto=format&fit=crop&w=800&q=70'
+FROM (VALUES
+  ('p5101', '1497366216548-37526070297c 1497366811353-6870744d04b2 1604328698692-f76ea9498e76'),
+  ('p5102', '1441986300917-64674bd600d8 1604719312566-8912e9227c6a 1567401893414-76b7b1e5a7a5'),
+  ('p5103', '1519567241046-7f570eee3ce6 1567401893414-76b7b1e5a7a5 1604719312566-8912e9227c6a'),
+  ('p5104', '1553413077-190dd305871c 1586528116311-ad8dd3c8310d 1586528116493-a029325540fa'),
+  ('p5105', '1565891741441-64926e441838 1513828583688-c52646db42da 1565793298595-6a879b1d9492'),
+  ('p5106', '1497215728101-856f4ea42174 1524758631624-e2822e304c36 1567521464027-f127ff144326 1556761175-b413da4baf72'),
+  ('p5107', '1497366754035-f200968a6e72 1517502884422-41eaead166d4 1497366811353-6870744d04b2'),
+  ('p5108', '1567401893414-76b7b1e5a7a5 1441986300917-64674bd600d8 1604719312566-8912e9227c6a'),
+  ('p5109', '1519567241046-7f570eee3ce6 1441986300917-64674bd600d8 1567401893414-76b7b1e5a7a5'),
+  ('p5110', '1586528116311-ad8dd3c8310d 1553413077-190dd305871c 1586528116493-a029325540fa'),
+  ('p5111', '1513828583688-c52646db42da 1565793298595-6a879b1d9492 1565891741441-64926e441838'),
+  ('p5112', '1524758631624-e2822e304c36 1567521464027-f127ff144326 1556761175-b413da4baf72 1497215728101-856f4ea42174'),
+  ('p5120', '1515263487990-61b07816b324 1522708323590-d24dbb6b0267 1556909212-d5b604d0c90d 1616594039964-ae9021a400a0'),
+  ('p5121', '1574362848149-11496d93a7c7 1502672260266-1c1ef2d93688 1484154218962-a197022b5858 1595526114035-0d45ed16cfbf'),
+  ('p5122', '1460317442991-0ec209397118 1493809842364-78817add7ffb 1586105251261-72a756497a11'),
+  ('p5123', '1597047084897-51e81819a499 1600210492486-724fe5c67fb0 1600489000022-c2086d79f9d4 1617325247661-675ab4b64ae2'),
+  ('p5124', '1500382017468-9049fed747ef 1592982537447-7440770cbfc9 1500076656116-558758c991c1'),
+  ('p5130', '1568605114967-8130f3a36994 1570129477492-45c003edd2be 1600585154340-be6161a56a0c 1600047509807-ba8f99d2cdde'),
+  ('p5131', '1592982537447-7440770cbfc9 1500382017468-9049fed747ef 1500076656116-558758c991c1'),
+  ('p5132', '1574943320219-553eb213f72d 1625246333195-78d9c38ad449 1500076656116-558758c991c1'),
+  ('p5140', '1545324418-cc1a3fa10c00 1560448204-e02f11c3d0e2'),
+  ('p5141', '1574362848149-11496d93a7c7 1502672260266-1c1ef2d93688'),
+  ('p5142', '1460317442991-0ec209397118 1522708323590-d24dbb6b0267'),
+  ('p5143', '1597047084897-51e81819a499 1493809842364-78817add7ffb'),
+  ('p5144', '1515263487990-61b07816b324 1600210492486-724fe5c67fb0'),
+  ('p5145', '1545324418-cc1a3fa10c00 1554995207-c18c203602cb'),
+  ('p5146', '1574362848149-11496d93a7c7 1484101403633-562f891dc89a'),
+  ('p5147', '1460317442991-0ec209397118 1501183638710-841dd1904471'),
+  ('p5148', '1597047084897-51e81819a499 1560185007-cde436f6a4d0'),
+  ('p5149', '1515263487990-61b07816b324 1505691938895-1758d7feb511'),
+  ('p5160', '1625246333195-78d9c38ad449 1574943320219-553eb213f72d 1500076656116-558758c991c1'),
+  ('p5161', '1500076656116-558758c991c1 1625246333195-78d9c38ad449 1574943320219-553eb213f72d'),
+  ('p5162', '1574943320219-553eb213f72d 1500076656116-558758c991c1 1625246333195-78d9c38ad449'),
+  ('p5163', '1625246333195-78d9c38ad449 1500076656116-558758c991c1 1574943320219-553eb213f72d'),
+  ('p5164', '1500076656116-558758c991c1 1574943320219-553eb213f72d 1625246333195-78d9c38ad449'),
+  ('p5165', '1522771739844-6a9f6d5f14af 1560448204-e02f11c3d0e2'),
+  ('p5166', '1631049307264-da0ec9d70304 1618221195710-dd6b41faaea6'),
+  ('p5167', '1540518614846-7eded433c457 1502672260266-1c1ef2d93688'),
+  ('p5168', '1615874959474-d609969a20ed 1493809842364-78817add7ffb'),
+  ('p5169', '1576941089067-2de3c901e126 1598228723793-52759bba239c 1600121848594-d8644e57abab 1505693416388-ac5ce068fe85'),
+  ('p5170', '1580587771525-78b9dba3b914 1613977257363-707ba9348227 1600607687939-ce8a6c25118c 1556912173-3bb406ef7e77'),
+  ('p5171', '1574943320219-553eb213f72d 1625246333195-78d9c38ad449 1500076656116-558758c991c1')
+) AS v(slug, photos)
+WHERE p.slug = v.slug AND jsonb_array_length(p.images) <= 2;
+
 
 -- Two more community-minted societies for the candidates queue. `communitySocieties` in the fixture registry.
 
@@ -941,14 +1125,17 @@ VALUES
  ('f1c70000-0000-4000-8000-000000000035', 'Vikram Sethi',    '9700000035', 'buyer', 'active', 'Pune', true, true, 0, '2026-08-20 10:20:00+05:30', '2026-08-20 10:20:00+05:30', '2026-08-20 10:20:00+05:30'),
  ('f1c70000-0000-4000-8000-000000000036', 'Divya Menon',     '9700000036', 'buyer', 'active', 'Pune', true, true, 0, '2026-08-20 10:25:00+05:30', '2026-08-20 10:25:00+05:30', '2026-08-20 10:25:00+05:30'),
  ('f1c70000-0000-4000-8000-000000000037', 'Ishaan Kulkarni', '9700000037', 'buyer', 'active', 'Pune', true, true, 0, '2026-08-20 10:30:00+05:30', '2026-08-20 10:30:00+05:30', '2026-08-20 10:30:00+05:30'),
- ('f1c70000-0000-4000-8000-000000000038', 'Tanvi Deshmukh',  '9700000038', 'buyer', 'active', 'Pune', true, true, 0, '2026-08-20 10:35:00+05:30', '2026-08-20 10:35:00+05:30', '2026-08-20 10:35:00+05:30')
+ ('f1c70000-0000-4000-8000-000000000038', 'Tanvi Deshmukh',  '9700000038', 'buyer', 'active', 'Pune', true, true, 0, '2026-08-20 10:35:00+05:30', '2026-08-20 10:35:00+05:30', '2026-08-20 10:35:00+05:30'),
+ ('f1c70000-0000-4000-8000-000000000039', 'Aakash Patil',    '9700000039', 'buyer', 'active', 'Pune', true, true, 0, '2026-08-20 10:40:00+05:30', '2026-08-20 10:40:00+05:30', '2026-08-20 10:40:00+05:30'),
+ ('f1c70000-0000-4000-8000-000000000040', 'Neha Kapoor',     '9700000040', 'buyer', 'active', 'Pune', true, true, 0, '2026-08-20 10:45:00+05:30', '2026-08-20 10:45:00+05:30', '2026-08-20 10:45:00+05:30'),
+ ('f1c70000-0000-4000-8000-000000000041', 'Rohit Bhosale',   '9700000041', 'buyer', 'active', 'Pune', true, true, 0, '2026-08-20 10:50:00+05:30', '2026-08-20 10:50:00+05:30', '2026-08-20 10:50:00+05:30'),
+ ('f1c70000-0000-4000-8000-000000000042', 'Kavita Iyer',     '9700000042', 'owner', 'active', 'Pune', true, true, 0, '2026-08-20 10:55:00+05:30', '2026-08-20 10:55:00+05:30', '2026-08-20 10:55:00+05:30')
     ON CONFLICT DO NOTHING;
 
 -- Preserve manual room edits and compute relative availability at seed time.
 UPDATE public.flatmate_rooms
    SET society = 'Nyati Elan', flat_type = '2 BHK', home_type_label = 'Flat',
        deposit = 32000, available_from = current_date + 5, food = 'veg',
-       tags = '["Non-smoker", "Working professional"]',
        photos = '["https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=70"]',
        seats_total = 1, seats_open = 1, updated_at = now()
  WHERE id = 'f1c7000b-0000-4000-8000-000000000001' AND society IS NULL;
@@ -956,7 +1143,6 @@ UPDATE public.flatmate_rooms
 UPDATE public.flatmate_rooms
    SET society = 'Rohan Abhilasha', flat_type = '3 BHK', home_type_label = 'Flat',
        deposit = 19000, available_from = current_date + 21, food = 'nonveg',
-       tags = '["Non-veg ok", "Fitness"]',
        photos = '["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=70"]',
        seats_total = 1, seats_open = 1, updated_at = now()
  WHERE id = 'f1c7000b-0000-4000-8000-000000000002' AND society IS NULL;
@@ -965,7 +1151,7 @@ INSERT INTO public.flatmate_rooms
     (id, host_id, room_type, attached_bath, budget, deposit, seats_total, seats_open,
      host_role, verification_tier, agreement_declared, mod_status,
      society, locality, localities, lat, lng, bhk, flat_type, home_type_label,
-     gated_community, furnishing, move_in, available_from, gender, food, tags, note, photos,
+     gated_community, furnishing, move_in, available_from, gender, food, note, photos,
      created_at, updated_at)
 VALUES
  ('f1c7000b-0000-4000-8000-000000000003', 'f1c70000-0000-4000-8000-000000000031',
@@ -973,7 +1159,6 @@ VALUES
   'tenant', 'identity', false, 'approved',
   'Skyline Heights', 'Baner', '["Baner"]', 18.5590, 73.7770, '2', '2 BHK', 'Flat',
   true, 'semi', 'now', DATE '2026-09-10', 'female', 'veg',
-  '["Non-smoker", "Working professional", "Vegetarian"]',
   'One private room with attached bathroom in a 2 BHK. Society has a gym and 24x7 security. Looking for a working woman, veg preferred.',
   '["https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-05 09:00:00+05:30', '2026-09-05 09:00:00+05:30'),
@@ -983,7 +1168,6 @@ VALUES
   'tenant', 'tenant', true, 'approved',
   'Lodha Belmondo', 'Hinjawadi', '["Hinjawadi"]', 18.5913, 73.7389, '3', '3 BHK', 'Flat',
   true, 'furnished', '15', DATE '2026-09-25', 'male', 'any',
-  '["Non-veg ok", "Working professional", "Fitness"]',
   'Spare room in a fully furnished 3 BHK near Phase 1. Two working guys already here, relaxed crowd.',
   '["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-04 11:30:00+05:30', '2026-09-04 11:30:00+05:30'),
@@ -993,7 +1177,6 @@ VALUES
   'tenant', 'identity', false, 'approved',
   'Gera World of Joy', 'Kharadi', '["Kharadi"]', 18.5515, 73.9435, '2', '2 BHK', 'Flat',
   false, 'semi', '30', DATE '2026-10-05', 'any', 'any',
-  '["Student", "Non-smoker"]',
   'Twin-sharing room in a 2 BHK near EON IT Park. Budget-friendly and walkable to work.',
   '["https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-01 18:45:00+05:30', '2026-09-01 18:45:00+05:30'),
@@ -1003,7 +1186,6 @@ VALUES
   'tenant', 'tenant', true, 'approved',
   'Rohan Iris', 'Wakad', '["Wakad"]', 18.5980, 73.7620, '2', '2 BHK', 'Flat',
   true, 'furnished', 'now', DATE '2026-09-12', 'female', 'veg',
-  '["Vegetarian", "Early riser", "Pet-friendly"]',
   'Bright private room with attached bathroom and a balcony. Quiet, family-friendly society. Cat-friendly home.',
   '["https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-03 08:15:00+05:30', '2026-09-03 08:15:00+05:30'),
@@ -1013,7 +1195,6 @@ VALUES
   'tenant', 'identity', false, 'approved',
   'Kumar Princeville', 'Viman Nagar', '["Viman Nagar"]', 18.5679, 73.9143, '3', '3 BHK', 'Flat',
   false, 'semi', '15', DATE '2026-09-28', 'any', 'nonveg',
-  '["Non-veg ok", "Night owl", "Working professional"]',
   'Premium 3 BHK near Phoenix Mall with one room free. Suits IT and aviation schedules.',
   '["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=70"]',
   '2026-08-31 16:00:00+05:30', '2026-08-31 16:00:00+05:30'),
@@ -1023,7 +1204,6 @@ VALUES
   'tenant', 'identity', false, 'approved',
   'Green Meadows Bungalow', 'Kothrud', '["Kothrud"]', 18.5074, 73.8077, '3', '3 BHK', 'Independent House',
   true, 'furnished', '30', DATE '2026-10-08', 'female', 'veg',
-  '["Vegetarian", "Non-smoker", "Working professional"]',
   'Private room with attached bath on the first floor of an independent house in a gated lane. Terrace access, parking, quiet street.',
   '["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-02 12:00:00+05:30', '2026-09-02 12:00:00+05:30'),
@@ -1034,7 +1214,6 @@ VALUES
   'tenant', 'identity', false, 'approved',
   'Sai Sankul', 'Hadapsar', '["Hadapsar"]', 18.5018, 73.9364, '1', '1 BHK', 'Flat',
   false, 'unfurnished', 'now', DATE '2026-09-09', 'any', 'any',
-  '["Student", "Early riser"]',
   'Cheapest way into Hadapsar -- a shared room in a 1 BHK, five minutes from the bus depot. Bring your own mattress.',
   '["https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-06 07:30:00+05:30', '2026-09-06 07:30:00+05:30'),
@@ -1044,7 +1223,6 @@ VALUES
   'tenant', 'identity', false, 'pending',
   'Nyati Elysia', 'Hadapsar', '["Hadapsar"]', 18.5089, 73.9260, '4', '4 BHK', 'Flat',
   true, 'semi', '60', DATE '2026-11-01', 'male', 'nonveg',
-  '["Non-veg ok", "Fitness", "Night owl"]',
   'Room in a 4 BHK behind Amanora. Posted just now, still waiting on the listing check.',
   '["https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-07 21:10:00+05:30', '2026-09-07 21:10:00+05:30')
@@ -1056,7 +1234,7 @@ INSERT INTO public.flatmate_rooms
      budget, deposit, occupants, max_occupants, seats_total, seats_open,
      host_role, verification_tier, agreement_declared, mod_status,
      society, locality, localities, lat, lng, bhk, flat_type, home_type_label,
-     gated_community, furnishing, move_in, available_from, gender, food, tags, note, photos,
+     gated_community, furnishing, move_in, available_from, gender, food, note, photos,
      created_at, updated_at)
 VALUES
  ('f1c7000b-0000-4000-8000-000000000011', 'f1c70000-0000-4000-8000-000000000010',
@@ -1065,7 +1243,6 @@ VALUES
   'owner', 'owner', true, 'approved',
   'Balewadi Highstreet Residences', 'Balewadi', '["Balewadi"]', 18.575, 73.769, '3', '3 BHK', 'Flat',
   true, 'furnished', 'now', DATE '2026-09-10', 'any', 'any',
-  '["Working professional", "Non-smoker"]',
   'Master bedroom with attached bathroom and balcony. Take it on your own or split it with someone.',
   '["https://images.unsplash.com/photo-1505691938895-1758d7feb511?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-05 10:00:00+05:30', '2026-09-05 10:00:00+05:30'),
@@ -1076,7 +1253,6 @@ VALUES
   'owner', 'owner', true, 'approved',
   'Balewadi Highstreet Residences', 'Balewadi', '["Balewadi"]', 18.575, 73.769, '3', '3 BHK', 'Flat',
   true, 'furnished', 'now', DATE '2026-09-10', 'any', 'any',
-  '["Working professional"]',
   'Second bedroom in the same flat, shares the common bathroom. Walkable to the stadium side.',
   '["https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-05 10:00:00+05:30', '2026-09-05 10:00:00+05:30'),
@@ -1087,7 +1263,6 @@ VALUES
   'owner', 'owner', true, 'approved',
   'Balewadi Highstreet Residences', 'Balewadi', '["Balewadi"]', 18.575, 73.769, '3', '3 BHK', 'Flat',
   true, 'furnished', 'now', DATE '2026-09-10', 'any', 'any',
-  '["Student", "Working professional"]',
   'Partitioned living room -- the cheapest way into this society, and lower still if you split it.',
   '["https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-05 10:00:00+05:30', '2026-09-05 10:00:00+05:30')
@@ -1097,20 +1272,18 @@ VALUES
 INSERT INTO public.flatmate_groups
     (id, host_id, property_id, title, locality, policy, rent, seats_total, seats_open,
      host_role, verification_tier, agreement_declared, owner_consent, owner_consent_mobile,
-     mod_status, tags, note, created_at, updated_at)
+     mod_status, note, created_at, updated_at)
 VALUES
  ('f1c7000d-0000-4000-8000-000000000009', 'f1c70000-0000-4000-8000-000000000010',
   NULL,
   'Owner-let 2 BHK in Wakad, one seat left', 'Wakad', 'any', 24000, 2, 1,
   'owner', 'owner', true, false, NULL, 'live',
-  '["Working professional", "Non-smoker"]',
   'I own the flat and live in Mumbai. One tenant already in, looking for one more on the same agreement.',
   '2026-09-05 11:00:00+05:30', '2026-09-05 11:00:00+05:30'),
 
  ('f1c7000d-0000-4000-8000-000000000010', 'f1c70000-0000-4000-8000-000000000031',
   NULL, 'Full 3 BHK in Kharadi, waitlist only', 'Kharadi', 'women', 39000, 3, 0,
   'tenant', 'identity', false, false, NULL, 'approved',
-  '["Vegetarian", "Non-smoker"]',
   'All three of us are settled in. Leaving this up so people can put their name down for March.',
   '2026-09-04 15:20:00+05:30', '2026-09-04 15:20:00+05:30'),
 
@@ -1118,21 +1291,18 @@ VALUES
  ('f1c7000d-0000-4000-8000-000000000011', 'f1c70000-0000-4000-8000-000000000032',
   NULL, 'Non-smokers 3 BHK in Baner, one seat', 'Baner', 'women', 33000, 3, 1,
   'tenant', 'tenant', true, true, '9820011223', 'approved',
-  '["Non-smoker", "Early riser", "Fitness"]',
   'Landlord has agreed in writing to a replacement on the existing agreement, so no fresh deposit.',
   '2026-09-03 09:40:00+05:30', '2026-09-03 09:40:00+05:30'),
 
  ('f1c7000d-0000-4000-8000-000000000012', 'f1c70000-0000-4000-8000-000000000033',
   NULL, 'Two seats in a 3 BHK, Kothrud', 'Kothrud', 'men', 30000, 3, 2,
   'tenant', 'identity', false, false, NULL, 'pending',
-  '["Non-veg ok", "Night owl"]',
   'Two of us moving out at the end of the month, so two seats going together or separately.',
   '2026-09-07 20:00:00+05:30', '2026-09-07 20:00:00+05:30'),
 
  ('f1c7000d-0000-4000-8000-000000000013', 'f1c70000-0000-4000-8000-000000000034',
   NULL, 'Girls 3 BHK share in Viman Nagar', 'Viman Nagar', 'women', 32000, 3, 1,
   'tenant', 'identity', false, false, NULL, 'approved',
-  '["Vegetarian", "Working professional"]',
   'Two of us here already, both in aviation. Looking for one more, preferably veg.',
   '2026-09-02 17:00:00+05:30', '2026-09-02 17:00:00+05:30')
     ON CONFLICT DO NOTHING;
@@ -1146,6 +1316,150 @@ UPDATE public.flatmate_groups SET mod_status = 'approved'
 -- The search reads `localities` for every group, so a housed group must list its one locality there.
 UPDATE public.flatmate_groups SET localities = jsonb_build_array(locality)
  WHERE NOT hunting AND localities = '[]'::jsonb;
+
+-- Room details answer every field the room form asks; a few rows leave facing / title / furniture unstated on purpose.
+UPDATE public.flatmate_rooms r
+   SET title = v.title, flat_number = v.flat_number, details = v.details::jsonb,
+       facing = v.facing, overlooking = v.overlooking,
+       notice_period_days = v.np, lock_in_months = v.li,
+       maintenance_billing = v.mb, electricity_billing = v.eb,
+       photos = v.photos::jsonb, updated_at = now()
+  FROM (VALUES
+ ('f1c7000b-0000-4000-8000-000000000001', NULL, 'B-702',
+  '{"floor": "7", "totalFloors": 12, "bathrooms": 2, "balconies": 1, "furniture": ["Bed", "Wardrobe", "Fans", "Curtains", "Geyser"], "tower": "B", "street": "Baner-Pashan Link Road", "landmark": "Opp. Balewadi High Street", "pincode": "411045"}',
+  'East', 'Garden', 30, 3, 'included', 'shared',
+  '["https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600489000022-c2086d79f9d4?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000002', 'Twin sharing in a furnished 3 BHK', 'C-404',
+  '{"floor": "4", "totalFloors": 14, "bathrooms": 2, "balconies": 2, "furniture": ["Bed", "Wardrobe", "AC", "Refrigerator", "Washing Machine", "TV", "Sofa", "Microwave"], "tower": "C", "pincode": "411057"}',
+  'North', 'Amenity', 30, 1, 'shared', 'shared',
+  '["https://images.unsplash.com/photo-1631049307264-da0ec9d70304?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1556912173-3bb406ef7e77?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000003', NULL, 'A-002',
+  '{"floor": "Ground", "totalFloors": 14, "bathrooms": 2, "balconies": 0, "furniture": ["Bed", "Wardrobe", "Geyser"], "tower": "A", "landmark": "Near Baner Gaon bus stop", "pincode": "411045"}',
+  'West', 'Parking', 15, 0, 'included', 'separate',
+  '["https://images.unsplash.com/photo-1615874959474-d609969a20ed?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000004', 'Furnished room for a working guy near Phase 1', 'D-1103',
+  '{"floor": "11", "totalFloors": 22, "bathrooms": 3, "balconies": 2, "furniture": ["Bed", "Wardrobe", "AC", "TV", "Sofa", "Refrigerator", "Washing Machine", "Microwave", "Dining Table", "Water Purifier", "Modular Kitchen"], "tower": "D", "street": "Hinjawadi Phase 1 Road", "pincode": "411057"}',
+  'North', 'Main Road', 60, 6, 'separate', 'separate',
+  '["https://images.unsplash.com/photo-1566665797739-1674de7a421a?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600121848594-d8644e57abab?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600585152220-90363fe7e115?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000005', NULL, 'F-301',
+  '{"floor": "3", "totalFloors": 7, "bathrooms": 1, "balconies": 1, "furniture": ["Bed", "Fans"], "pincode": "411014"}',
+  NULL, NULL, 30, 0, 'included', 'included',
+  '["https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1493809842364-78817add7ffb?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000006', 'Bright room with a private balcony', 'E-905',
+  '{"floor": "9", "totalFloors": 13, "bathrooms": 2, "balconies": 3, "furniture": ["Bed", "Wardrobe", "AC", "Refrigerator", "Washing Machine", "Curtains", "Light Fittings"], "tower": "E", "pincode": "411057"}',
+  'South', 'Garden', 30, 2, 'included', 'shared',
+  '["https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1556909212-d5b604d0c90d?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000007', NULL, 'A-1502',
+  '{"floor": "15", "totalFloors": 18, "bathrooms": 2, "balconies": 1, "furniture": ["Bed", "Wardrobe", "Fans", "Geyser", "Kitchen Trolley"], "tower": "A", "landmark": "Behind Phoenix Marketcity", "pincode": "411014"}',
+  'East', 'Main Road', 45, 3, 'shared', 'separate',
+  '["https://images.unsplash.com/photo-1617325247661-675ab4b64ae2?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1574362848149-11496d93a7c7?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000008', 'First-floor room in a Kothrud bungalow', '12',
+  '{"floorsInHouse": 2, "bathrooms": 3, "balconies": 1, "furniture": ["Bed", "Wardrobe", "Sofa", "Dining Table", "Refrigerator", "Water Purifier", "Geyser"], "street": "Lane 4, Karve Nagar", "pincode": "411038"}',
+  'North', 'Garden', 30, 6, 'included', 'shared',
+  '["https://images.unsplash.com/photo-1570129477492-45c003edd2be?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1501183638710-841dd1904471?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000009', NULL, '204',
+  '{"floor": "2", "totalFloors": 4, "bathrooms": 1, "balconies": 0, "furniture": [], "pincode": "411028"}',
+  NULL, 'Main Road', 15, 0, 'included', 'included',
+  '["https://images.unsplash.com/photo-1630699144867-37acec97df5a?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1515263487990-61b07816b324?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1560448075-bb485b067938?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000010', NULL, 'C-604',
+  '{"floor": "6", "totalFloors": 12, "bathrooms": 4, "balconies": 2, "furniture": ["Bed", "Wardrobe", "Geyser", "Fans", "Curtains"], "tower": "C", "pincode": "411028"}',
+  'West', 'Amenity', 90, 11, 'separate', 'separate',
+  '["https://images.unsplash.com/photo-1586105251261-72a756497a11?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1554995207-c18c203602cb?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600489000022-c2086d79f9d4?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000011', NULL, 'C-803',
+  '{"floor": "8", "totalFloors": 14, "bathrooms": 3, "balconies": 2, "furniture": ["Bed", "Wardrobe", "AC", "Curtains", "Light Fittings"], "tower": "C", "pincode": "411045"}',
+  'West', 'Amenity', 60, 11, 'included', 'separate',
+  '["https://images.unsplash.com/photo-1540518614846-7eded433c457?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1620626011761-996317b8d101?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000012', NULL, 'C-803',
+  '{"floor": "8", "totalFloors": 14, "bathrooms": 3, "balconies": 2, "furniture": ["Bed", "Wardrobe", "Fans"], "tower": "C", "pincode": "411045"}',
+  'West', 'Amenity', 60, 11, 'included', 'separate',
+  '["https://images.unsplash.com/photo-1617104678098-de229db51175?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600210491892-03d54c0aaf87?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600585152220-90363fe7e115?auto=format&fit=crop&w=800&q=70"]'),
+ ('f1c7000b-0000-4000-8000-000000000013', NULL, 'C-803',
+  '{"floor": "8", "totalFloors": 14, "bathrooms": 3, "balconies": 2, "furniture": ["Sofa", "TV", "Fans", "Curtains"], "tower": "C", "pincode": "411045"}',
+  'West', 'Amenity', 60, 11, 'included', 'separate',
+  '["https://images.unsplash.com/photo-1600210491892-03d54c0aaf87?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600585152220-90363fe7e115?auto=format&fit=crop&w=800&q=70"]')
+ ) AS v(id, title, flat_number, details, facing, overlooking, np, li, mb, eb, photos)
+ WHERE r.id = v.id::uuid AND r.details IS NULL;
+
+-- Terms on every housed group but Aundh (the unstated case); Baner's replacement seat has no fresh deposit.
+UPDATE public.flatmate_groups g
+   SET deposit = v.deposit, notice_period_days = v.np, lock_in_months = v.li,
+       maintenance_billing = v.mb, electricity_billing = v.eb, updated_at = now()
+  FROM (VALUES
+ ('f1c7000d-0000-4000-8000-000000000001', 84000, 30, 0, 'shared', 'shared'),
+ ('f1c7000d-0000-4000-8000-000000000002', 68000, 30, 3, 'included', 'shared'),
+ ('f1c7000d-0000-4000-8000-000000000003', 90000, 60, 6, 'separate', 'separate'),
+ ('f1c7000d-0000-4000-8000-000000000004', 56000, 30, 0, 'included', 'included'),
+ ('f1c7000d-0000-4000-8000-000000000005', 78000, 15, 1, 'shared', 'separate'),
+ ('f1c7000d-0000-4000-8000-000000000006', 52000, 30, 0, 'included', 'shared'),
+ ('f1c7000d-0000-4000-8000-000000000008', 72000, 45, 3, 'shared', 'shared'),
+ ('f1c7000d-0000-4000-8000-000000000009', 48000, 60, 11, 'included', 'separate'),
+ ('f1c7000d-0000-4000-8000-000000000010', 78000, 30, 0, 'shared', 'shared'),
+ ('f1c7000d-0000-4000-8000-000000000011', 0, 30, 0, 'included', 'shared'),
+ ('f1c7000d-0000-4000-8000-000000000012', 60000, 30, 2, 'shared', 'separate'),
+ ('f1c7000d-0000-4000-8000-000000000013', 64000, 30, 3, 'included', 'shared')
+ ) AS v(id, deposit, np, li, mb, eb)
+ WHERE g.id = v.id::uuid AND g.deposit IS NULL AND g.notice_period_days IS NULL;
+
+-- The only Villa and Row House rooms; the villa is tenant-hosted with the owner's consent on record.
+INSERT INTO public.flatmate_rooms
+    (id, host_id, room_type, attached_bath, budget, deposit, seats_total, seats_open,
+     host_role, verification_tier, agreement_declared, owner_consent, owner_consent_mobile, mod_status,
+     title, society, flat_number, locality, localities, lat, lng, bhk, flat_type, home_type_label,
+     gated_community, furnishing, move_in, available_from, gender, food, note, photos,
+     details, facing, overlooking, notice_period_days, lock_in_months, maintenance_billing, electricity_billing,
+     created_at, updated_at)
+VALUES
+ ('f1c7000b-0000-4000-8000-000000000014', 'f1c70000-0000-4000-8000-000000000041',
+  'Private room', 'attached', 22000, 50000, 1, 1,
+  'tenant', 'identity', true, true, '9822045678', 'approved',
+  'Garden-facing room in a Bavdhan villa', 'Ivy Estate Villas', 'Villa 9', 'Bavdhan', '["Bavdhan"]', 18.5108, 73.7804, '4', '4 BHK', 'Villa',
+  true, 'furnished', '15', DATE '2026-10-20', 'any', 'any',
+  'Ground-floor room opening onto the lawn, in a 4 BHK villa I rent with two friends. The owner has agreed to a third flatmate. House help comes daily.',
+  '["https://images.unsplash.com/photo-1613977257363-707ba9348227?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600210491892-03d54c0aaf87?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600585152220-90363fe7e115?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?auto=format&fit=crop&w=800&q=70"]',
+  '{"floorsInHouse": 3, "bathrooms": 4, "balconies": 2, "furniture": ["Bed", "Wardrobe", "AC", "TV", "Sofa", "Refrigerator", "Washing Machine", "Dining Table", "Modular Kitchen", "Water Purifier"], "street": "Ivy Estate Road", "landmark": "Near Chandani Chowk", "pincode": "411021"}',
+  'East', 'Garden', 30, 3, 'shared', 'shared',
+  '2026-09-07 10:30:00+05:30', '2026-09-07 10:30:00+05:30'),
+
+ ('f1c7000b-0000-4000-8000-000000000015', 'f1c70000-0000-4000-8000-000000000042',
+  'Shared room', 'shared', 8500, 17000, 1, 1,
+  'owner', 'identity', false, false, NULL, 'approved',
+  'Twin sharing in a quiet row house', 'Shubham Row Houses', 'RH-6', 'Pimple Saudagar', '["Pimple Saudagar"]', 18.5975, 73.7997, '3', '3 BHK', 'Row House',
+  false, 'semi', '60', DATE '2026-11-15', 'female', 'veg',
+  'I live on the ground floor; the upper floor has two rooms for working women or students. Shared kitchen, bike parking, no deposit hikes.',
+  '["https://images.unsplash.com/photo-1567496898669-ee935f5f647a?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1484101403633-562f891dc89a?auto=format&fit=crop&w=800&q=70"]',
+  '{"floorsInHouse": 2, "bathrooms": 2, "balconies": 1, "furniture": ["Bed", "Wardrobe", "Fans", "Geyser"], "street": "Kunal Icon Road", "pincode": "411027"}',
+  'South', 'Parking', 30, 0, 'included', 'included',
+  '2026-09-06 18:00:00+05:30', '2026-09-06 18:00:00+05:30')
+    ON CONFLICT DO NOTHING;
+
+-- Hunting groups have no flat yet: one states every preference, the other only where and how much.
+INSERT INTO public.flatmate_groups
+    (id, host_id, property_id, title, locality, localities, policy, rent, rent_min, seats_total, seats_open,
+     host_role, verification_tier, agreement_declared, owner_consent, owner_consent_mobile, mod_status,
+     hunting, pref_bhk, deposit_min, deposit_max, gated_only, bachelors, furnishing, move_in_by,
+     note, created_at, updated_at)
+VALUES
+ ('f1c7000d-0000-4000-8000-000000000014', 'f1c70000-0000-4000-8000-000000000039', NULL,
+  'Two of us hunting a 2-3 BHK near Hinjawadi', 'Hinjawadi', '["Hinjawadi", "Wakad"]', 'any', 45000, 30000, 3, 1,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '["2", "3"]', 60000, 100000, true, true, 'semi', current_date + 30,
+  'Two of us work in Phase 2 and want a third before we sign. Gated society, semi-furnished, owner fine with bachelors.',
+  '2026-09-06 12:00:00+05:30', '2026-09-06 12:00:00+05:30'),
+
+ ('f1c7000d-0000-4000-8000-000000000015', 'f1c70000-0000-4000-8000-000000000040', NULL,
+  'Looking for a flatmate to rent a 2 BHK in Kharadi', 'Kharadi', '["Kharadi"]', 'women', 30000, NULL, 2, 1,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '[]', NULL, NULL, false, false, NULL, NULL,
+  'Moving out of a PG. Open on furnishing and size if the rent works.',
+  '2026-09-05 19:30:00+05:30', '2026-09-05 19:30:00+05:30')
+    ON CONFLICT DO NOTHING;
+
+INSERT INTO public.flatmate_group_members (id, group_id, user_id, name, initials, verified, created_at, updated_at)
+VALUES
+ ('f1c7000e-0000-4000-8000-000000000016', 'f1c7000d-0000-4000-8000-000000000014', 'f1c70000-0000-4000-8000-000000000039', 'Aakash Patil', 'AP', true, '2026-09-06 12:00:00+05:30', '2026-09-06 12:00:00+05:30'),
+ ('f1c7000e-0000-4000-8000-000000000017', 'f1c7000d-0000-4000-8000-000000000014', NULL, 'Rohan', 'R', false, '2026-09-06 12:00:00+05:30', '2026-09-06 12:00:00+05:30'),
+ ('f1c7000e-0000-4000-8000-000000000018', 'f1c7000d-0000-4000-8000-000000000015', 'f1c70000-0000-4000-8000-000000000040', 'Neha Kapoor', 'NK', true, '2026-09-05 19:30:00+05:30', '2026-09-05 19:30:00+05:30')
+    ON CONFLICT DO NOTHING;
 
 -- Consent rows retain the landlord approval audit trail for tenant-hosted groups.
 INSERT INTO public.flatmate_owner_consents (id, owner_mobile, granted_by, group_id, granted_at, created_at, updated_at)
@@ -1249,23 +1563,47 @@ VALUES
 -- Seeker localities preserve the map cap and ensure move-in and habit filters narrow results.
 INSERT INTO public.flatmate_seeker_posts
     (id, user_id, name, gender, age, occupation, budget, localities, move_in,
-     flat_pref, room_pref, tags, note, verified_contact_only, verified, mod_status,
+     flat_pref, room_pref, note, verified_contact_only, verified, mod_status,
      created_at, updated_at)
 VALUES
  ('f1c7000c-0000-4000-8000-000000000009', 'f1c70000-0000-4000-8000-000000000037',
   'Ishaan Kulkarni', 'male', 27, 'Backend Engineer', 20000, '["Balewadi"]', '30',
-  'any', 'private', '["Non-veg ok", "Working professional", "Fitness"]',
-  'Moving from Bangalore in October. Would rather pay more for a private room than share.',
+  'any', 'private', 'Moving from Bangalore in October. Would rather pay more for a private room than share.',
   true, false, 'approved',
   '2026-09-06 08:00:00+05:30', '2026-09-06 08:00:00+05:30'),
 
  ('f1c7000c-0000-4000-8000-000000000010', 'f1c70000-0000-4000-8000-000000000038',
   'Tanvi Deshmukh', 'female', 22, 'Student', 11000, '["Viman Nagar"]', 'now',
-  'women', 'shared', '["Vegetarian", "Student", "Non-smoker"]',
-  'Second-year student at Symbiosis, looking for a women-only flat close to campus.',
+  'women', 'shared', 'Second-year student at Symbiosis, looking for a women-only flat close to campus.',
   false, false, 'approved',
   '2026-09-07 13:00:00+05:30', '2026-09-07 13:00:00+05:30')
     ON CONFLICT DO NOTHING;
+
+-- The neutral seekers keep gender and preferences at `any`; age and occupation are not facets.
+UPDATE public.flatmate_seeker_posts s
+   SET age = v.age, occupation = v.occupation, updated_at = now()
+  FROM (VALUES
+ ('f1c7000c-0000-4000-8000-000000000001', 24, 'MBA student'),
+ ('f1c7000c-0000-4000-8000-000000000002', 27, 'Software Engineer'),
+ ('f1c7000c-0000-4000-8000-000000000003', 31, 'Architect')
+ ) AS v(id, age, occupation)
+ WHERE s.id = v.id::uuid AND s.age IS NULL;
+
+UPDATE public.flatmate_seeker_posts
+   SET note = 'Architect, working from a Balewadi studio. Looking for a calm flat with people who keep regular hours.'
+ WHERE id = 'f1c7000c-0000-4000-8000-000000000003'
+   AND note = 'Letting out a room in my own flat while I am posted out of the city for a year.';
+
+UPDATE public.flatmate_seeker_posts s
+   SET title = v.title, budget_max = v.budget_max, updated_at = now()
+  FROM (VALUES
+ ('f1c7000c-0000-4000-8000-000000000003', 'Working professional, Baner or Balewadi', 28000),
+ ('f1c7000c-0000-4000-8000-000000000004', NULL, 22000),
+ ('f1c7000c-0000-4000-8000-000000000005', 'Women-only flat near EON IT Park', NULL),
+ ('f1c7000c-0000-4000-8000-000000000008', 'Quiet private room in Kothrud', 25000),
+ ('f1c7000c-0000-4000-8000-000000000009', 'Relocating from Bangalore in October', 26000)
+ ) AS v(id, title, budget_max)
+ WHERE s.id = v.id::uuid AND s.title IS NULL AND s.budget_max IS NULL;
 
 -- Dynamic move-in dates keep relative-date fixtures meaningful.
 UPDATE public.flatmate_seeker_posts
