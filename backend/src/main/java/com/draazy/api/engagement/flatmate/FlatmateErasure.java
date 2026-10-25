@@ -1,5 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
+import com.draazy.api.identity.user.User;
+import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.identity.user.erasure.AccountErased;
 import java.util.UUID;
 import org.springframework.context.event.EventListener;
@@ -16,16 +18,21 @@ class FlatmateErasure {
     private final FlatmateSeekerPostRepository posts;
     private final FlatmateRequestRepository requests;
     private final FlatmateGroupApplicationRepository applications;
+    private final FlatmateOwnerNoticeRepository ownerNotices;
+    private final UserRepository users;
 
     FlatmateErasure(FlatmateMembershipService membership, FlatmateRoomRepository rooms,
             FlatmateGroupRepository groups, FlatmateSeekerPostRepository posts,
-            FlatmateRequestRepository requests, FlatmateGroupApplicationRepository applications) {
+            FlatmateRequestRepository requests, FlatmateGroupApplicationRepository applications,
+            FlatmateOwnerNoticeRepository ownerNotices, UserRepository users) {
         this.membership = membership;
         this.rooms = rooms;
         this.groups = groups;
         this.posts = posts;
         this.requests = requests;
         this.applications = applications;
+        this.ownerNotices = ownerNotices;
+        this.users = users;
     }
 
     @EventListener
@@ -40,5 +47,8 @@ class FlatmateErasure {
         posts.findByUserIdAndArchivedFalse(userId).ifPresent(p -> p.archive(REASON));
         requests.deletePendingInvolving(userId);
         applications.deletePendingByApplicant(userId);
+        // The listener runs before the users row is pseudonymised, so the number is still readable here.
+        String mobile = users.findById(userId).map(User::getMobile).orElse(null);
+        ownerNotices.deleteForErasedAccount(userId, mobile);
     }
 }

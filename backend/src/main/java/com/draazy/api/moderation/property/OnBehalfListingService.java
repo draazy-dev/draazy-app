@@ -2,11 +2,13 @@ package com.draazy.api.moderation.property;
 
 import com.draazy.api.catalog.listing.ListingQuota;
 import com.draazy.api.catalog.listing.ListingService;
+import com.draazy.api.catalog.property.DealIntent;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
 import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.identity.user.UserService;
@@ -41,10 +43,13 @@ public class OnBehalfListingService {
      * makes on its own. */
     @Transactional
     public Property create(AuthPrincipal caller, OnBehalfListingRequest body) {
+        if (DealIntent.RENT.equals(body.listing().deal()) && body.listing().deposit() == null) {
+            throw new ValidationException("listing.deposit is required for a rent listing.");
+        }
         User owner = users.findByMobile(body.ownerMobile()).orElse(null);
         boolean provisioned = owner == null;
         if (provisioned) {
-            owner = userService.provisionForStaff(body.ownerMobile(), body.ownerName());
+            owner = userService.provisionUnverified(body.ownerMobile(), body.ownerName());
             audit.record(caller, "user.provision_on_behalf", "user", owner.getId().toString(),
                     "mobile", body.ownerMobile());
         }

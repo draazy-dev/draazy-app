@@ -28,6 +28,7 @@ public record ManagedPropertyDto(
         Integer dueDay,
         Map<String, Object> valuation,
         String publishedListingId,
+        String sourceRoomId,
         Instant createdAt,
         Instant updatedAt) {
 }

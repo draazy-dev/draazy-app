@@ -111,6 +111,12 @@ public class ManagedProperty extends AuditedEntity {
     @Column(name = "published_listing_id")
     private UUID publishedListingId;
 
+    @Column(name = "source_room_id", updatable = false)
+    private UUID sourceRoomId;
+
+    @Column(name = "address_fingerprint", updatable = false)
+    private String addressFingerprint;
+
     protected ManagedProperty() {
         // JPA
     }

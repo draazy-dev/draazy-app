@@ -87,7 +87,7 @@ export const roomHeadline = (form) => {
   return headlineOf('', [base, String(form.society || '').trim(), form.locality].filter(Boolean).join(', '));
 };
 
-export const persistListing = async ({ form, user, editId, editListing, photos }) => {
+export const persistListing = async ({ form, user, editId, editListing, photos, homeId }) => {
     const mob = (user && user.mobile) || '';
 
     // "Have I already listed this?" is asked of the server, which holds the caller's real listings;
@@ -262,7 +262,7 @@ export const persistListing = async ({ form, user, editId, editListing, photos }
       const payload = forTheWire(record, form, isRent, editListing?.address);
       saved = editId
         ? await saveListingFields(editId, editPayload(payload, form, editListing))
-        : await saveListing(payload);
+        : await saveListing(payload, homeId ? { homeId } : undefined);
     } catch (err) {
       if (err?.isValidation && Array.isArray(err.fields) && err.fields.length) {
         const mapped = mapServerFieldErrors(form, err.fields);

@@ -65,7 +65,8 @@ export const myListing = async (id, user) => (await provider()).myListing(id, us
 export const myListingCard = async (id) => (await provider()).myListingCard(id);
 
 /** Owner: create a listing. It enters the catalogue as `pending`. */
-export const addListing = async (listing) => (await provider()).addListing(listing);
+/** `homeId` publishes the owner's private home record as this listing, linking the two. */
+export const addListing = async (listing, opts) => (await provider()).addListing(listing, opts);
 
 /** `{ allowance, used }`: the free live slots and the live listings no pass covers. */
 export const listingSlots = async () => (await provider()).listingSlots();

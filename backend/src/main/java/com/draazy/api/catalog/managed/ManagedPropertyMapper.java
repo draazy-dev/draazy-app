@@ -30,6 +30,7 @@ public class ManagedPropertyMapper {
                 m.getDueDay(),
                 m.getValuation(),
                 Objects.toString(m.getPublishedListingId(), null),
+                Objects.toString(m.getSourceRoomId(), null),
                 m.getCreatedAt(),
                 m.getUpdatedAt());
     }

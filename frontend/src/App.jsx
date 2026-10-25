@@ -74,6 +74,7 @@ const ViewDocuments = lazyPage(() => import('./pages/consumer/ViewDocuments.jsx'
 const Messages = lazyPage(() => import('./pages/consumer/Messages.jsx'), 'flatmates', 'misc2');
 const Flatmates = lazyPage(() => import('./pages/consumer/Flatmates.jsx'), 'flatmates', 'owner', 'property', 'verify');
 const FlatmateDetail = lazyPage(() => import('./pages/consumer/FlatmateDetail.jsx'), 'flatmates', 'owner', 'property');
+const OwnerConfirm = lazyPage(() => import('./pages/consumer/OwnerConfirm.jsx'), 'flatmates');
 const Locality = lazyPage(() => import('./pages/consumer/Locality.jsx'), 'listings', 'locality');
 const RentBuyLanding = lazyPage(() => import('./pages/consumer/RentBuyLanding.jsx'), 'listings', 'owner', 'property', 'verify');
 const FlatmateLanding = lazyPage(() => import('./pages/consumer/FlatmateLanding.jsx'), 'flatmates', 'owner', 'property', 'verify');
@@ -122,7 +123,7 @@ const AdminTeam = lazyPage(() => import('./pages/admin/AdminTeam.jsx'), 'team');
 
 const OpsReferrals = lazy(() => import('./pages/ops/OpsReferrals.jsx'));
 const OpsRefunds = lazy(() => import('./pages/ops/OpsRefunds.jsx'));
-const OpsFlatmateReview = lazy(() => import('./pages/ops/OpsFlatmateReview.jsx'));
+const OpsFlatmateReview = lazyPage(() => import('./pages/ops/OpsFlatmateReview.jsx'), 'flatmates');
 const OpsIdentityReview = lazy(() => import('./pages/ops/OpsIdentityReview.jsx'));
 const OpsSupportQueue = lazy(() => import('./pages/ops/OpsSupportQueue.jsx'));
 const OpsDraftingDesk = lazy(() => import('./pages/ops/OpsDraftingDesk.jsx'));
@@ -215,6 +216,7 @@ const BACK_OFFICE_ROUTES = [{
     { index: true, element: <AdminDashboard /> },
     { path: 'runbooks', element: <AdminRunbooks /> },
     { path: 'runbooks/:slug', element: <AdminRunbooks /> },
+    { path: 'notifications', element: <Notifications staff /> },
     { path: 'kyc-review', element: <ModuleRoute moduleKey="kycReview"><OpsIdentityReview /></ModuleRoute> },
     { path: 'properties', element: <ModuleRoute moduleKey="properties"><AdminProperties /></ModuleRoute> },
     { path: 'analytics', element: <ModuleRoute moduleKey="analytics"><FlagRoute flag="analytics"><AdminAnalytics /></FlagRoute></ModuleRoute> },
@@ -288,6 +290,8 @@ export default function App() {
           <Route path="/signup" element={<AppFlagRoute flag="signupsEnabled"><Signup /></AppFlagRoute>} />
           <Route path="/staff-login" element={<StaffLogin />} />
           <Route path="/staff-invite" element={<StaffInvite />} />
+          {/* Public: the owner has no account; the fragment token is the credential. */}
+          <Route path="/owner-confirm" element={<OwnerConfirm />} />
           <Route path="/services" element={<Services />} />
           {/* Public service landing pages — anyone can browse; sign-in is enforced only at the
               "use the service" action (quote submit / generate / book) inside each page. */}

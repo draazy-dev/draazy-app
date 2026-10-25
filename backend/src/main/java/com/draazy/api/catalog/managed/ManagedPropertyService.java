@@ -260,6 +260,20 @@ public class ManagedPropertyService {
         return mapper.toDto(records.saveAndFlush(m));
     }
 
+    /** Publish through the full listing wizard's payload instead of the record's own thin facts, under the same
+     * lock; the normal owner create still owns pace, photos, quota and moderation. */
+    @Transactional
+    public Property publishWith(UUID ownerId, String id, ListingCreate body) {
+        ManagedProperty m = ownedRecordForUpdate(ownerId, id);
+        if (m.getPublishedListingId() != null) {
+            throw new ConflictException("This home is already listed.");
+        }
+        Property created = listingService.create(ownerId, body);
+        m.markPublished(created.getId());
+        records.saveAndFlush(m);
+        return created;
+    }
+
     // Row lock, so two concurrent publishes of one record cannot both see it unpublished.
     private ManagedProperty ownedRecordForUpdate(UUID ownerId, String id) {
         return Ids.parseUuid(id)
@@ -333,7 +347,7 @@ public class ManagedPropertyService {
         }
     }
 
-    private static String synthTitle(BigDecimal bhk, String type, String locality) {
+    static String synthTitle(BigDecimal bhk, String type, String locality) {
         String bhkLabel = "";
         if (bhk != null && bhk.signum() > 0) {
             int n = bhk.intValue();

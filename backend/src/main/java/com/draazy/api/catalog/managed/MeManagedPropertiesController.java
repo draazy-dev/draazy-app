@@ -1,5 +1,8 @@
 package com.draazy.api.catalog.managed;
 
+import com.draazy.api.catalog.listing.ListingCreate;
+import com.draazy.api.catalog.listing.ListingWriteResult;
+import com.draazy.api.catalog.property.PropertyMapper;
 import com.draazy.api.common.web.Routes;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.CurrentUser;
@@ -22,9 +25,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class MeManagedPropertiesController {
 
     private final ManagedPropertyService service;
+    private final PropertyMapper propertyMapper;
 
-    public MeManagedPropertiesController(ManagedPropertyService service) {
+    public MeManagedPropertiesController(ManagedPropertyService service, PropertyMapper propertyMapper) {
         this.service = service;
+        this.propertyMapper = propertyMapper;
     }
 
     @GetMapping(Routes.MeManagedProperties.BASE)
@@ -67,6 +72,14 @@ public class MeManagedPropertiesController {
     @PostMapping(Routes.MeManagedProperties.PUBLISH)
     public ManagedPropertyDto publish(@CurrentUser AuthPrincipal principal, @PathVariable String id) {
         return service.publish(principal.userId(), id);
+    }
+
+    /** The full listing wizard's payload, for a home whose facts were captured elsewhere. A repeat is a 409. */
+    @PostMapping(Routes.MeManagedProperties.LISTING)
+    @ResponseStatus(HttpStatus.CREATED)
+    public ListingWriteResult publishWith(@CurrentUser AuthPrincipal principal, @PathVariable String id,
+            @Valid @RequestBody ListingCreate body) {
+        return propertyMapper.toWriteResult(service.publishWith(principal.userId(), id, body));
     }
 
     /** {@code months} is a page size, so it is clamped rather than rejected. */

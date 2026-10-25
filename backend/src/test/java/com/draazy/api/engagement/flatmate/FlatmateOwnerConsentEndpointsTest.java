@@ -149,7 +149,7 @@ class FlatmateOwnerConsentEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"Replacement flatmate","locality":"Baner","rent":40000,
+                                {"title":"Replacement flatmate","locality":"Baner","rent":40000,"deposit":10000,
                                  "name":"Tenant","role":"tenant","consentMobile":"9830000404"}
                                 """))
                 .andExpect(status().isCreated())
@@ -165,7 +165,7 @@ class FlatmateOwnerConsentEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"Replacement flatmate","locality":"Baner","rent":40000,
+                                {"title":"Replacement flatmate","locality":"Baner","rent":40000,"deposit":10000,
                                  "name":"Optimist","role":"tenant","consentMobile":"9830000406",
                                  "ownerConsent":true}
                                 """))
@@ -243,7 +243,7 @@ class FlatmateOwnerConsentEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"Late consent","locality":"Baner","rent":40000,
+                                {"title":"Late consent","locality":"Baner","rent":40000,"deposit":10000,
                                  "name":"Latecomer","role":"tenant","consentMobile":"9830000414"}
                                 """))
                 .andExpect(status().isCreated())
@@ -270,7 +270,7 @@ class FlatmateOwnerConsentEndpointsTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, bearer(tenant))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"title":"Scoped consent","locality":"Baner","rent":40000,
+                                {"title":"Scoped consent","locality":"Baner","rent":40000,"deposit":10000,
                                  "name":"Scoped","role":"tenant","consentMobile":"9830000418"}
                                 """))
                 .andExpect(status().isCreated())

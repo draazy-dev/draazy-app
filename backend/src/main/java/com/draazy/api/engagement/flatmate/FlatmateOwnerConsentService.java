@@ -65,7 +65,7 @@ public class FlatmateOwnerConsentService {
             return false;
         }
         record(caller, mobile, otp, fingerprint);
-        applyConsentToLivePosts(caller, mobile, fingerprint);
+        applyConsentToLivePosts(caller.userId(), mobile, fingerprint);
         return true;
     }
 
@@ -78,18 +78,24 @@ public class FlatmateOwnerConsentService {
 
     /** Without this sweep the flag stays false and Ops cannot approve the post. Single-column updates in
      * id order, posts before reviews, so they neither overwrite a newer verdict nor deadlock the jobs. */
-    private void applyConsentToLivePosts(AuthPrincipal caller, String mobile, String fingerprint) {
+    private void applyConsentToLivePosts(UUID hostId, String mobile, String fingerprint) {
         List<UUID> roomIds = rooms.findByAddressFingerprintAndArchivedFalseOrderByIdAsc(fingerprint).stream()
-                .filter(room -> caller.userId().equals(room.getHostId()))
+                .filter(room -> hostId.equals(room.getHostId()))
                 .filter(room -> mobile.equals(room.getOwnerConsentMobile()))
                 .map(FlatmateRoom::getId).toList();
         List<UUID> groupIds = groups.findByAddressFingerprintAndArchivedFalseOrderByIdAsc(fingerprint).stream()
-                .filter(group -> caller.userId().equals(group.getHostId()))
+                .filter(group -> hostId.equals(group.getHostId()))
                 .filter(group -> mobile.equals(group.getOwnerConsentMobile()))
                 .map(FlatmateGroup::getId).toList();
         roomIds.forEach(rooms::markOwnerConsent);
         groupIds.forEach(groups::markOwnerConsent);
         Stream.concat(roomIds.stream(), groupIds.stream()).forEach(reviews::markOwnerConsent);
+    }
+
+    /** The owner tapped "I agree" on the WhatsApp link, so the link is the proof an OTP would otherwise be. */
+    void grantFromNotice(UUID hostId, String ownerMobile, String addressFingerprint) {
+        consents.insertIfAbsent(ownerMobile, hostId.toString(), addressFingerprint);
+        applyConsentToLivePosts(hostId, ownerMobile, addressFingerprint);
     }
 
     /** Canonicalise the owner's number so the self-check, the OTP and the stored row key off the

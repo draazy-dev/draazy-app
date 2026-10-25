@@ -40,12 +40,12 @@ class WhatsAppSendersTest {
 
     private static WhatsAppProperties props(String otpName, String otpLang, String idName, String idLang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                otpName, otpLang, idName, idLang, null, null);
+                otpName, otpLang, idName, idLang, null, null, null, null);
     }
 
     private static WhatsAppProperties digestProps(String name, String lang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                "login", "en_US", null, null, name, lang);
+                "login", "en_US", null, null, name, lang, null, null);
     }
 
     @SuppressWarnings("unchecked")

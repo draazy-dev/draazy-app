@@ -35,17 +35,25 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
     @Override
     public void sendIdentityDecision(String mobile, String line) {
         send(OPERATION, "Identity decision", "identity-template-name", props.identityTemplateName(),
-                props.identityTemplateLang(), mobile, line);
+                props.identityTemplateLang(), mobile, List.of(line));
     }
 
     @Override
     public boolean sendWaitingDigest(String mobile, String waiting) {
         return send(DecisionMessenger.WAITING_DIGEST, "Waiting digest", "digest-template-name",
-                props.digestTemplateName(), props.digestTemplateLang(), mobile, waiting);
+                props.digestTemplateName(), props.digestTemplateLang(), mobile, List.of(waiting));
+    }
+
+    /** Body parameters in order: {{1}} tenant first name, {{2}} place, {{3}} confirm link. */
+    @Override
+    public boolean sendOwnerNotice(String mobile, String tenantName, String place, String link) {
+        return send(DecisionMessenger.OWNER_NOTICE, "Owner notice", "owner-notice-template-name",
+                props.ownerNoticeTemplateName(), props.ownerNoticeTemplateLang(), mobile,
+                List.of(tenantName, place, link));
     }
 
     private boolean send(String operation, String what, String property, String template, String lang,
-            String mobile, String parameter) {
+            String mobile, List<String> parameters) {
         if (isBlank(template) || isBlank(lang)) {
             log.info("{} for {} not sent on WhatsApp: {} unset", what, MobileMask.mask(mobile), property);
             calls.record(ProviderCalls.WHATSAPP, operation, ProviderCalls.Outcome.SKIPPED, mobile, null,
@@ -62,7 +70,8 @@ class WhatsAppDecisionMessenger implements DecisionMessenger {
                         "language", Map.of("code", lang),
                         "components", List.of(
                                 Map.of("type", "body",
-                                        "parameters", List.of(Map.of("type", "text", "text", parameter))))));
+                                        "parameters", parameters.stream()
+                                                .map(p -> Map.of("type", "text", "text", p)).toList()))));
         try {
             calls.track(ProviderCalls.WHATSAPP, operation, mobile, null,
                     () -> client.post("/" + props.phoneNumberId() + "/messages", payload));

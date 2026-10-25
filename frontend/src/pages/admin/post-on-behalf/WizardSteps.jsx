@@ -79,7 +79,7 @@ export function OwnerStep({ form, set, errors, standing }) {
         {dupCount > 0 && <p className="mt-1.5 text-xs text-amber-300/90">⚠ This owner already has {dupCount} pending listing{dupCount > 1 ? 's' : ''}. You can still continue if this is a different property.</p>}
         {overage && <p data-testid="pob-plan-overage" className="mt-1.5 text-xs text-sky-300/90">This owner is over their plan — {overage.held} live listing{overage.held > 1 ? 's' : ''} on a plan that includes {overage.allowance}. You can still post; worth mentioning an upgrade on the call.</p>}
       </div>
-      <div><label htmlFor="pob-ownerNotes" className={label}>Internal Notes (optional)</label><textarea id="pob-ownerNotes" value={form.ownerNotes} maxLength={4000} onChange={(e) => set('ownerNotes', e.target.value)} placeholder="e.g. Owner contacted via WhatsApp, photos sent on chat..." rows={3} className={fld} /></div>
+      <div><label htmlFor="pob-ownerNotes" className={label}>Internal Notes</label><textarea id="pob-ownerNotes" value={form.ownerNotes} maxLength={4000} onChange={(e) => set('ownerNotes', e.target.value)} placeholder="e.g. Owner contacted via WhatsApp, photos sent on chat..." rows={3} className={fld} /></div>
     </div>
   );
 }
@@ -162,7 +162,7 @@ export function PricingStep({ form, set, errors }) {
       <div><label htmlFor="pob-price" className={label}>{rent ? 'Monthly Rent' : 'Expected Price'} *</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</span><input id="pob-price" inputMode="numeric" {...money('price')} placeholder={rent ? 'e.g. 25,000' : 'e.g. 85,00,000'} className={classNames(fld, 'pl-10', errors.price && errCls)} /></div>{errors.price ? <FieldError show>Enter the {rent ? 'monthly rent' : 'expected price'}.</FieldError> : moneyWords(form.price) && <p className="text-xs text-gray-400 mt-1.5 ml-1">{moneyWords(form.price)}</p>}</div>
       {rent && (
         <>
-          <div><label htmlFor="pob-deposit" className={label}>Security Deposit</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</span><input id="pob-deposit" inputMode="numeric" {...money('deposit')} placeholder="e.g. 50,000" className={classNames(fld, 'pl-10')} /></div>{moneyWords(form.deposit) && <p className="text-xs text-gray-400 mt-1.5 ml-1">{moneyWords(form.deposit)}</p>}<div className="flex flex-wrap gap-2 mt-2">{DEPOSIT_MONTHS[land ? 'land' : commercial ? 'commercial' : 'residential'].map((m) => <button key={m} type="button" onClick={() => setDepositMonths(m)} className="dz-chip">{m} month{m > 1 ? 's' : ''} rent</button>)}</div></div>
+          <div><label htmlFor="pob-deposit" className={label}>Security Deposit *</label><div className="relative"><span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-400 font-semibold text-sm">₹</span><input id="pob-deposit" inputMode="numeric" {...money('deposit')} placeholder="e.g. 50,000" className={classNames(fld, 'pl-10', errors.deposit && errCls)} /></div>{errors.deposit ? <FieldError show>Enter the security deposit (0 if none).</FieldError> : moneyWords(form.deposit) && <p className="text-xs text-gray-400 mt-1.5 ml-1">{moneyWords(form.deposit)}</p>}<div className="flex flex-wrap gap-2 mt-2">{DEPOSIT_MONTHS[land ? 'land' : commercial ? 'commercial' : 'residential'].map((m) => <button key={m} type="button" onClick={() => setDepositMonths(m)} className="dz-chip">{m} month{m > 1 ? 's' : ''} rent</button>)}</div></div>
           <div><label className={label}>Available From</label><AvailabilityField value={form.availableFrom} onChange={(v) => set('availableFrom', v)} ariaLabel="Available from date" className={fld} /></div>
         </>
       )}
@@ -191,7 +191,7 @@ export function PhotosStep({ form, set }) {
 
   return (
     <div className="space-y-5">
-      <p className="text-sm text-gray-400">Add photos received from the owner (optional). The owner can also upload directly from their claim link.</p>
+      <p className="text-sm text-gray-400">Add photos received from the owner. The owner can also upload directly from their claim link.</p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {form.photos.map((url, i) => (
           <div key={i} className="relative group rounded-xl overflow-hidden border border-white/10 aspect-[4/3]">

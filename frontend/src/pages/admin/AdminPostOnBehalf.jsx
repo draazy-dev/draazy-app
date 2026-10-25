@@ -112,6 +112,7 @@ export default function AdminPostOnBehalf() {
       if (!form.locality) err.locality = true;
     } else if (s === 3) {
       if (!form.price) err.price = true;
+      if (form.deal === 'rent' && form.deposit === '') err.deposit = true;
     }
     setErrors(err);
     return Object.keys(err).length === 0;

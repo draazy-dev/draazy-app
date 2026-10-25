@@ -10,7 +10,7 @@ export default function AmountInput({ value, onChange, className = '', maxDigits
         <input
           inputMode="numeric"
           value={formatIndian(value)}
-          onChange={(e) => onChange(e.target.value.replace(/\D/g, '').replace(/^0+/, '').slice(0, maxDigits))}
+          onChange={(e) => onChange(e.target.value.replace(/\D/g, '').replace(/^0+(?=\d)/, '').slice(0, maxDigits))}
           className={'field w-full rounded-xl pl-8 pr-3.5 py-2.5 text-sm' + className}
           {...rest}
         />
