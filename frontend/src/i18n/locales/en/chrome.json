@@ -60,6 +60,19 @@
     "later": "Not now",
     "dismiss": "Dismiss install prompt"
   },
+  "browserAlerts": {
+    "title": "Turn on browser notifications",
+    "body": "Draazy sends message and listing alerts through your browser. Allow notifications so you don’t miss a reply.",
+    "staffBody": "New queue work, SLA reminders and escalations arrive as browser notifications. Allow them so nothing waits on you.",
+    "blockedTitle": "Notifications are blocked",
+    "blockedBody": "To get Draazy alerts, allow notifications for this site from the icon beside the address bar.",
+    "cta": "Turn on",
+    "later": "Not now",
+    "ok": "Got it",
+    "enabled": "Browser notifications are on",
+    "pushFailed": "Notifications are on, but alerts while Draazy is closed could not be set up.",
+    "dismiss": "Dismiss notification prompt"
+  },
   "auth2": {
     "otpDigit": "OTP digit {{n}}"
   },

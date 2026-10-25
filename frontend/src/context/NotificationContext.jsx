@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { unreadCount as fetchUnreadCount } from '../services/notificationService.js';
+import { showBrowserAlert } from '../lib/browserAlerts.js';
 import { useAuth } from './AuthContext.jsx';
 import { useConversationUnread } from './ConversationContext.jsx';
 
@@ -29,10 +30,13 @@ export function NotificationProvider({ children }) {
   const lastRefreshAt = useRef(0);
   const streamUp = useRef(streamConnected);
   streamUp.current = streamConnected;
+  // null until the first read after sign-in, so the backlog a user signs in to never raises an alert.
+  const lastCount = useRef(null);
 
   const refresh = useCallback(async () => {
     lastRefreshAt.current = Date.now();
     if (!isIn) {
+      lastCount.current = null;
       setUnread(0);
       setStatus('ready');
       return 0;
@@ -40,6 +44,10 @@ export function NotificationProvider({ children }) {
     setStatus((s) => (s === 'ready' ? s : 'loading'));
     try {
       const n = await fetchUnreadCount();
+      if (lastCount.current !== null && n > lastCount.current) {
+        showBrowserAlert({ body: 'You have a new notification', url: '/notifications' });
+      }
+      lastCount.current = n;
       setUnread(n);
       setStatus('ready');
       return n;
