@@ -168,6 +168,11 @@ public class ErasureService {
                 .setParameter("id", subjectId)
                 .executeUpdate());
 
+        erased.put("user_living_style", entityManager
+                .createNativeQuery("delete from user_living_style where user_id = :id")
+                .setParameter("id", subjectId)
+                .executeUpdate());
+
         erased.put("identity_verifications", identity.erase(subjectId));
         erased.put("owner_kyc", entityManager
                 .createNativeQuery("""

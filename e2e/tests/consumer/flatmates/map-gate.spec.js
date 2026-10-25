@@ -24,7 +24,7 @@ test('map view opens on the focus gate, picking an area unlocks the bubbles, and
 
   await test.step('switching tabs re-gates the map', async () => {
     // Still in map view, but a new tab starts unfocused — the gate returns.
-    await page.getByRole('button', { name: /Team up/i }).first().click();
+    await page.locator('button[data-tab="people"]').click();
     await expect(page.getByRole('heading', { name: /Focus your map/i })).toBeVisible();
     await expect(page.locator('.map-pin')).toHaveCount(0);
   });

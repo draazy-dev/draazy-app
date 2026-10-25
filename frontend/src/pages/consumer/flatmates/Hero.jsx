@@ -13,7 +13,6 @@ export default function Hero({ user, isVerified, openVerify }) {
       <div aria-hidden="true" className="absolute inset-0" style={{ background: 'linear-gradient(90deg,rgb(var(--dz-c-ink) / .94) 0%,rgb(var(--dz-c-ink) / .78) 55%,rgb(var(--dz-c-ink) / .25) 100%)' }} />
       <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-5">
         <div className="max-w-2xl">
-          <span className="dz-tag bg-teal-500/20 text-teal-200 font-semibold mb-2.5"><Icon name="users-round" className="w-3.5 h-3.5" /> {t('flatmates.heroBadge')}</span>
           <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">{t('flatmates.heroTitle')} <span className="gradient-text">{t('flatmates.heroTitleAccent')}</span></h1>
           <p className="text-gray-300 text-sm sm:text-base mt-1.5 sm:mt-2 leading-relaxed line-clamp-2 sm:line-clamp-none">{t('flatmates.heroSubtitle')}</p>
 

@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.draazy.api.common.web.Routes;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 import org.assertj.core.api.Assertions;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
@@ -28,6 +29,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
     "draazy.security.rate-limit.writes-per-window=2",
     "draazy.security.rate-limit.locality-resolves-per-window=1",
     "draazy.security.rate-limit.property-reads-per-window=12",
+    "draazy.security.rate-limit.living-style-reads-per-window=3",
     "draazy.security.rate-limit.window-seconds=60",
 })
 @AutoConfigureMockMvc
@@ -99,6 +101,23 @@ class WriteRateLimitTest {
         mvc.perform(head(Routes.Properties.BASE).with(from("10.0.0.60")))
                 .andExpect(status().isTooManyRequests());
         mvc.perform(get(Routes.Properties.BASE).with(from("10.0.0.61"))).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("living-style reads are metered per caller whatever the listing id, and other routes are not")
+    void livingStyleReadsAreCapped() throws Exception {
+        String id = "00000000-0000-4000-8000-000000000000";
+        for (int i = 0; i < 3; i++) {
+            mvc.perform(get("/flatmates/room/" + id + "/living-style").with(from("10.0.0.70")))
+                    .andExpect(status().is(Matchers.not(429)));
+        }
+
+        mvc.perform(get("/flatmates/post/" + UUID.randomUUID() + "/living-style").with(from("10.0.0.70")))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(jsonPath("$.error").value("rate_limited"));
+        mvc.perform(get("/flatmates/room/" + id + "/living-style").with(from("10.0.0.71")))
+                .andExpect(status().is(Matchers.not(429)));
+        mvc.perform(get(Routes.Flatmates.FEED).with(from("10.0.0.70"))).andExpect(status().isOk());
     }
 
     @Test

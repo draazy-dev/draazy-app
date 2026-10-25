@@ -6,13 +6,13 @@ import { TAB_MOVE_IN } from './model.js';
 
 const EMPTY = { items: [], total: 0, verifiedTotal: 0, pageCount: 0 };
 
-/* Shared across mounts because `GET /flatmates/feed` is a public read: its answer cannot depend
- * on who is asking, and `me` only reorders it. */
+/* Shared across mounts. The rows are public, but a signed-in viewer's answer also carries their
+ * living-style `matches`, so the viewer is part of the key and decides whether the read is authenticated. */
 const cache = createSearchCache({ max: 30, ttl: 60_000 });
 
-const cacheKey = (tab, filters, page, size) => JSON.stringify([tab, filters, page, size]);
+const cacheKey = (viewer, tab, filters, page, size) => JSON.stringify([viewer, tab, filters, page, size]);
 
-export default function useFlatmatesSearch({ tab = TAB_MOVE_IN, filters, page = 0, size = 24 }) {
+export default function useFlatmatesSearch({ tab = TAB_MOVE_IN, filters, page = 0, size = 24, viewer = null }) {
   /* `loaded` means "answered at least once" and `status` cannot carry it: a tab count nobody has fetched yet must not
      render as `0`, which reads as "empty" at the one moment we do not know. */
   const [state, setState] = useState({
@@ -22,7 +22,7 @@ export default function useFlatmatesSearch({ tab = TAB_MOVE_IN, filters, page = 
 
   const latest = useRef(filters);
   latest.current = filters;
-  const key = JSON.stringify([tab, filters, page, size]);
+  const key = JSON.stringify([viewer, tab, filters, page, size]);
 
   /* Refinements need not return in the order they were sent; without this the board shows whichever finished last,
      which is how a "verified only, women" board displays the unfiltered set. */
@@ -45,8 +45,8 @@ export default function useFlatmatesSearch({ tab = TAB_MOVE_IN, filters, page = 
     setState((prev) => ({ ...prev, status: 'loading', error: null }));
 
     const run = (wireTab, wirePage, wireSize) => cache.read(
-      cacheKey(wireTab, f, wirePage, wireSize),
-      (signal) => feed(wireTab, f, wirePage, wireSize, { signal }),
+      cacheKey(viewer, wireTab, f, wirePage, wireSize),
+      (signal) => feed(wireTab, f, wirePage, wireSize, { signal, auth: viewer == null ? undefined : !!viewer }),
       { signal: ctl.signal, fresh },
     );
 
@@ -60,6 +60,7 @@ export default function useFlatmatesSearch({ tab = TAB_MOVE_IN, filters, page = 
           data: primary,
           tab,
           otherCount: primary.otherTabTotal ?? null,
+          tabTotals: primary.tabTotals ?? null,
           status: 'ready',
           error: null,
           loaded: true,
@@ -91,6 +92,8 @@ export default function useFlatmatesSearch({ tab = TAB_MOVE_IN, filters, page = 
   return {
     ...data,
     otherCount: sameTab ? state.otherCount : null,
+    // Kept across a tab switch: the strip's other badges would otherwise blink to "·" on every tap.
+    tabTotals: state.tabTotals ?? null,
     status: sameTab ? state.status : 'loading',
     error: state.error,
     loaded: sameTab && state.loaded,

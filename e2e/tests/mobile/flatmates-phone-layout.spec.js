@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { API, apiLogin, authHeaders, uploadedListingPhotos, signedInAs, uniqueMobile } from '../../helpers/liveAuth.js';
 import { ACTORS } from '../../fixtures/live.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../helpers/moderation.js';
+import { openFlatmates } from '../../helpers/app.js';
 
 /* Phone-only: the bottom-bar `+` that exists only below the desktop breakpoint, and the split
    modal's fit inside a narrow viewport. */
@@ -36,7 +37,7 @@ test('the bottom-bar + opens the posting sheet from a route that is not /flatmat
 
   await page.getByRole('button', { name: /Post Property/i }).click();
   await expect(sheet(page)).toBeVisible();
-  await expect(sheet(page).getByRole('button', { name: /I'm looking for a place/ })).toBeVisible();
+  await expect(sheet(page).getByRole('button', { name: /^Flatmates/ })).toBeVisible();
 });
 
 test('the split modal fits the phone, keeps its confirm reachable and closes on Escape', async ({ page }) => {
@@ -99,4 +100,13 @@ test('the split modal fits the phone, keeps its confirm reachable and closes on 
 
   await page.keyboard.press('Escape');
   await expect(modal).toBeHidden();
+});
+
+test('on a 360px phone all three board tabs show their full label', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await openFlatmates(page);
+  for (const key of ['move-in', 'people', 'teams']) {
+    const label = page.locator(`button[data-tab="${key}"] span.truncate`);
+    expect(await label.evaluate((el) => el.scrollWidth > el.clientWidth), `${key} label clipped`).toBe(false);
+  }
 });

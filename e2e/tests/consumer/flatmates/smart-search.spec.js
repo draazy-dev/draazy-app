@@ -42,7 +42,7 @@ test('each tab exposes its live result count to assistive tech', async ({ page }
 
   /* The visible count and accessible name must agree: stock a seeker cannot see never makes them switch tabs. */
   const cards = await page.locator('.sf-card').count();
-  await expect(page.getByRole('button', { name: `Move in now — ${cards} homes with a room available` })).toBeVisible();
+  await expect(page.getByRole('button', { name: `Rooms — ${cards} ${cards === 1 ? 'room' : 'rooms'} to move into` })).toBeVisible();
 });
 
 test('raising the budget from the empty state recovers matches', async ({ page }) => {
