@@ -3,7 +3,7 @@ import '../../../styles/routes/messages.css';
 import Button from '../../../components/ui/Button.jsx';
 import Icon from '../../../components/Icon.jsx';
 import { relTime } from '../../../lib/chatFormat.js';
-import { initialsOf, isPending, kindLabel, messageOf, remindState, stateLabel, stateTone } from './requestMeta.js';
+import { initialsOf, isGroupJoin, isPending, kindLabel, messageOf, remindState, shareLabel, stateLabel, stateTone } from './requestMeta.js';
 
 const ACCEPT_LABEL = {
   contact: 'Approve & chat',
@@ -30,11 +30,22 @@ function NoteLine({ note, onNote }) {
   );
 }
 
-function ReceivedActions({ item, busy, onDecide }) {
-  if (!isPending(item)) return null;
+function DecidedActions({ item, busy, onClear, onOpenChat }) {
   return (
     <div className="pc-req-actions">
-      <Button size="md" className="pc-req-btn" disabled={busy} onClick={() => onDecide(item, true)}>{ACCEPT_LABEL[item.kind]}</Button>
+      {onOpenChat ? <Button size="md" className="pc-req-btn" disabled={busy} onClick={() => onOpenChat(item)}>Open chat</Button> : null}
+      <button type="button" className="pc-req-clear" disabled={busy} onClick={onClear}>Clear</button>
+    </div>
+  );
+}
+
+function ReceivedActions({ item, busy, onDecide, onClear, onOpenChat, onChatFirst }) {
+  if (!isPending(item)) return <DecidedActions item={item} busy={busy} onClear={() => onClear(item, 'received')} onOpenChat={onOpenChat} />;
+  const vet = onChatFirst && isGroupJoin(item);
+  return (
+    <div className="pc-req-actions">
+      {vet ? <Button size="md" className="pc-req-btn" disabled={busy} onClick={() => onChatFirst(item)}>Chat first</Button> : null}
+      <Button size="md" variant={vet ? 'secondary' : 'primary'} className="pc-req-btn" disabled={busy} onClick={() => onDecide(item, true)}>{isGroupJoin(item) ? 'Accept' : ACCEPT_LABEL[item.kind]}</Button>
       <Button size="md" variant="secondary" className="pc-req-btn" disabled={busy} onClick={() => onDecide(item, false)}>Decline</Button>
       {item.kind === 'photo' && item.target?.id ? <Link to={`/list-property?edit=${item.target.id}&step=photos`} className="pc-req-clear">Add photos</Link> : null}
     </div>
@@ -42,14 +53,7 @@ function ReceivedActions({ item, busy, onDecide }) {
 }
 
 function SentActions({ item, busy, now, onRemind, onWithdraw, onClear, onOpenChat }) {
-  if (!isPending(item)) {
-    return (
-      <div className="pc-req-actions">
-        {onOpenChat ? <Button size="md" className="pc-req-btn" disabled={busy} onClick={() => onOpenChat(item)}>Open chat</Button> : null}
-        <button type="button" className="pc-req-clear" disabled={busy} onClick={() => onClear(item)}>Clear</button>
-      </div>
-    );
-  }
+  if (!isPending(item)) return <DecidedActions item={item} busy={busy} onClear={() => onClear(item)} onOpenChat={onOpenChat} />;
   const remind = remindState(item, now);
   return (
     <div className="pc-req-actions">
@@ -65,10 +69,11 @@ export function RequestActions({ item, box, ...handlers }) {
   return box === 'received' ? <ReceivedActions item={item} {...handlers} /> : <SentActions item={item} {...handlers} />;
 }
 
-export default function RequestCard({ item, box, now, busy, note, onNote, onDecide, onRemind, onWithdraw, onClear, onOpenChat }) {
+export default function RequestCard({ item, box, now, busy, note, onNote, onDecide, onRemind, onWithdraw, onClear, onOpenChat, onChatFirst }) {
   const name = item.party?.name || 'Someone';
-  const reminded = box === 'received' && (item.reminders?.count || 0) > 0;
+  const reminded = box === 'received' && isPending(item) && (item.reminders?.count || 0) > 0;
   const created = Date.parse(item.createdAt);
+  const share = shareLabel(item.share);
   return (
     <article
       className="pc-req"
@@ -95,15 +100,16 @@ export default function RequestCard({ item, box, now, busy, note, onNote, onDeci
               {box === 'sent' ? 'Sent' : 'Received'}
             </span>
             <span className="dz-tag dz-tag--muted" data-testid="request-kind">{kindLabel(item)}</span>
+            {share ? <span className="dz-tag border border-teal-400/25 bg-teal-400/10 font-semibold text-teal-200" data-testid="request-share">{share}</span> : null}
             {reminded ? <span className="dz-tag dz-tag--muted" data-testid="request-reminded">Reminded</span> : null}
-            {box === 'sent' ? <span className={`pc-req-pill ${stateTone(item)}`} data-testid="request-state">{stateLabel(item)}</span> : null}
+            {box === 'sent' || !isPending(item) ? <span className={`pc-req-pill ${stateTone(item)}`} data-testid="request-state">{stateLabel(item)}</span> : null}
           </div>
         </div>
       </div>
       <Target item={item} />
       <p className="pc-req-msg">{messageOf(item)}</p>
       {onNote ? <NoteLine note={note} onNote={() => onNote(item)} /> : null}
-      <RequestActions item={item} box={box} busy={busy} now={now} onDecide={onDecide} onRemind={onRemind} onWithdraw={onWithdraw} onClear={onClear} onOpenChat={onOpenChat} />
+      <RequestActions item={item} box={box} busy={busy} now={now} onDecide={onDecide} onRemind={onRemind} onWithdraw={onWithdraw} onClear={onClear} onOpenChat={onOpenChat} onChatFirst={onChatFirst} />
     </article>
   );
 }

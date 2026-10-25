@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import useAsyncList from '../../../hooks/useAsyncList.js';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
 import { listPropertiesByIds, searchListings } from '../../../services/propertyService.js';
@@ -6,6 +7,7 @@ import { listVisits, myVisitRequests, rescheduleVisit, updateVisitStatus } from 
 import { myContactRequests, respondToContactRequest } from '../../../services/contactService.js';
 import { listDocRequests, respondDocRequest } from '../../../services/documentService.js';
 import { decideGroupApplication, listMyGroupApplications, myRequests, decideRequest } from '../../../services/flatmateService.js';
+import { openFlatmateRequestConversation } from '../../../services/conversationService.js';
 import { myPhotoRequests, decidePhotoRequest } from '../../../services/photoRequestService.js';
 import {
   listMyPropertyReviews, getPropertyReview, markPropertyReviewRead, addPropertyReviewMessage,
@@ -57,6 +59,7 @@ async function loadFeed(withRecommended) {
    the mutation handlers. `ownsProperty` is undefined until /me/dashboard answers, null when unknown. */
 
 export function useDashboardData({ user, toast, ownsProperty }) {
+  const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [listingsLoaded, setListingsLoaded] = useState(false);
   // Every owner inbox is scoped to the caller's property listings, so a known non-owner skips them and their
@@ -252,6 +255,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   };
 
   const decideFlatmateReq = async (reqId, decision) => {
+    const groupJoin = flatmateReqs.find((r) => r.id === reqId)?.kind === 'group';
     return runBusy(`flatmate:${reqId}`, async () => {
       try {
         await decideRequest(reqId, decision);
@@ -260,7 +264,12 @@ export function useDashboardData({ user, toast, ownsProperty }) {
         await refreshFlatmateReqs();
         return false;
       }
-      toast(decision === 'accepted' ? 'Request accepted — connect in Messages.' : 'Request declined.', decision === 'accepted' ? 'success' : 'info');
+      if (decision === 'accepted' && !groupJoin) {
+        // Opening the thread puts it in both inboxes; if it fails, Messages still offers Open chat on the request.
+        await openFlatmateRequestConversation(reqId).catch(() => undefined);
+      }
+      const accepted = groupJoin ? 'Accepted — they\'re in your group now.' : 'Request accepted — connect in Messages.';
+      toast(decision === 'accepted' ? accepted : 'Request declined.', decision === 'accepted' ? 'success' : 'info');
       try {
         setFlatmateReqs(await myRequests());
       } catch {
@@ -269,6 +278,15 @@ export function useDashboardData({ user, toast, ownsProperty }) {
       return true;
     });
   };
+
+  const chatFlatmateReq = (reqId) => runBusy(`flatmate:${reqId}`, async () => {
+    try {
+      const conv = await openFlatmateRequestConversation(reqId);
+      navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
+    } catch (e) {
+      toast(e?.message || 'Could not open the chat. Please try again.', 'error');
+    }
+  });
 
   const mutateVisit = (id, patch) => {
     if (busyRef.current.has(`visit:${id}`)) return false;
@@ -422,7 +440,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     contactReqs, photoReqs, flatmateReqs, docReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
     apps, decideApp,
-    decideContact, decideDocReqs, decideFlatmateReq, decidePhotoReq, mutateVisit, openReview, sendReview,
+    decideContact, decideDocReqs, decideFlatmateReq, chatFlatmateReq, decidePhotoReq, mutateVisit, openReview, sendReview,
     busyIds, isBusy, refreshData, refreshRequests, setListings,
     // Load state, so the page can say "we couldn't load this" instead of rendering a plausible
     // dashboard for a user whose data never arrived.

@@ -39,7 +39,7 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private String locality;
 
-    /** {@code any} means open-join: a request against it is auto-accepted rather than queued. */
+    /** Who the group admits by gender; {@code any} is mixed. */
     @Column(name = "policy", nullable = false)
     @Setter
     private String policy = FlatmateVocabulary.POLICY_OPEN;
@@ -139,11 +139,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
     @Setter
     private Double lng;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "tags", nullable = false)
-    @Setter
-    private List<String> tags = new ArrayList<>();
-
     @Column(name = "note")
     @Setter
     private String note;
@@ -176,6 +171,9 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
 
     @Column(name = "furnishing")
     private String furnishing;
+
+    @Column(name = "parking")
+    private String parking;
 
     @Column(name = "move_in_by")
     private LocalDate moveInBy;
@@ -232,6 +230,7 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
         gatedOnly = p.gatedOnly();
         bachelors = p.bachelors();
         furnishing = p.furnishing();
+        parking = p.parking();
         moveInBy = p.moveInBy();
         deposit = null;
         noticePeriodDays = null;
@@ -254,6 +253,7 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
         gatedOnly = false;
         bachelors = false;
         furnishing = null;
+        parking = null;
         moveInBy = null;
     }
 
@@ -271,7 +271,7 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
             return null;
         }
         return new FlatmateGroupPreferences(List.copyOf(localities), List.copyOf(prefBhk), rentMin,
-                rent, depositMin, depositMax, gatedOnly, bachelors, furnishing, moveInBy);
+                rent, depositMin, depositMax, gatedOnly, bachelors, furnishing, parking, moveInBy);
     }
 
     void archive(String reason) {

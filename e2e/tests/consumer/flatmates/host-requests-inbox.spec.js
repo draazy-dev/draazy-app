@@ -11,7 +11,7 @@ const track = flatmateCleanup(test);
 
 async function newHost() {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Host' });
   return { mobile, accessToken };
 }
 
@@ -43,12 +43,11 @@ test.describe('Host flatmate requests inbox (live API)', () => {
     const host2 = await newHost();
     const seeker = await newHost();
 
-    // A restricted policy queues the join as pending; policy 'any' accepts it outright.
     const created = await fetch(`${API}/flatmates/groups`, {
       method: 'POST',
       headers: auth(host1.accessToken),
       body: JSON.stringify({
-        title: `Inbox owner ${Date.now().toString(36)}`, name: 'Host', locality: 'Baner', rent: 30000,
+        title: `Inbox owner ${Date.now().toString(36)}`, locality: 'Baner', rent: 30000, deposit: 50000,
         seats: 2, seatsOpen: 1, policy: 'women', role: 'tenant',
       }),
     });

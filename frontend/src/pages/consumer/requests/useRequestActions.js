@@ -8,7 +8,7 @@ import { decideGroupApplication, decideRequest } from '../../../services/flatmat
 import { decidePhotoRequest } from '../../../services/photoRequestService.js';
 import { remindRequest, removeRequest } from '../../../services/requestInboxService.js';
 import { updateVisitStatus } from '../../../services/visitService.js';
-import { isPending, requestKey, targetSlug } from './requestMeta.js';
+import { isGroupJoin, isPending, requestKey, targetSlug } from './requestMeta.js';
 
 const DECIDERS = {
   contact: (id, yes) => respondToContactRequest(id, yes ? 'approved' : 'declined'),
@@ -28,7 +28,10 @@ const DECIDED_TOAST = {
   document: ['Documents shared — view-only for this buyer.', 'Document request declined.'],
 };
 
+const GROUP_JOIN_TOAST = ['Accepted — they\'re in your group now.', 'Request declined.'];
+
 const FAILED = 'That did not go through. Please try again.';
+const NO_CHAT = 'Could not open the chat. Please try again.';
 
 async function approvedMobile(id) {
   const { items } = await myContactRequests();
@@ -56,23 +59,19 @@ export function useRequestActions({ inbox, toast, onChanged }) {
     }
   }, []);
 
-  const chatAfterApproval = useCallback(async (item) => {
-    try {
-      if (item.kind === 'flatmate') {
-        const conv = await openFlatmateRequestConversation(item.id);
-        navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
-        return;
-      }
-      const mobile = await approvedMobile(item.id);
-      if (!mobile) return;
-      await openChat({
-        mobile,
-        propertyId: item.target.id,
-        greeting: `Hi ${item.party?.name || 'there'}, thanks for your interest in ${item.target.title} on Draazy.`,
-      });
-    } catch {
-      /* the approval stands; the chat can be opened from Messages */
+  const chatWith = useCallback(async (item) => {
+    if (item.kind === 'flatmate') {
+      const conv = await openFlatmateRequestConversation(item.id);
+      navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
+      return;
     }
+    const mobile = await approvedMobile(item.id);
+    if (!mobile) throw new Error(NO_CHAT);
+    await openChat({
+      mobile,
+      propertyId: item.target.id,
+      greeting: `Hi ${item.party?.name || 'there'}, thanks for your interest in ${item.target.title} on Draazy.`,
+    });
   }, [navigate, openChat]);
 
   const decide = useCallback((item, yes) => guarded(item, async () => {
@@ -84,12 +83,16 @@ export function useRequestActions({ inbox, toast, onChanged }) {
       load('received', { quiet: true });
       return;
     }
-    removeItem('received', item);
-    toast(DECIDED_TOAST[item.kind][yes ? 0 : 1], yes ? 'success' : 'info');
+    const groupJoin = isGroupJoin(item);
+    patchItem('received', item, (it) => ({ ...it, state: yes ? 'accepted' : 'declined', decidedAt: new Date().toISOString() }));
+    toast((groupJoin ? GROUP_JOIN_TOAST : DECIDED_TOAST[item.kind])[yes ? 0 : 1], yes ? 'success' : 'info');
     onChanged?.();
-    if ((item.kind === 'contact' || item.kind === 'flatmate') && yes) await chatAfterApproval(item);
+    if ((item.kind === 'contact' || (item.kind === 'flatmate' && !groupJoin)) && yes) {
+      // The approval stands either way; the chat stays one tap away on the received card.
+      await chatWith(item).catch(() => undefined);
+    }
     load('received', { quiet: true });
-  }), [chatAfterApproval, guarded, load, onChanged, removeItem, toast]);
+  }), [chatWith, guarded, load, onChanged, patchItem, toast]);
 
   const remind = useCallback((item) => guarded(item, async () => {
     const applyNext = (res) => patchItem('sent', item, (it) => ({ ...it, reminders: { ...it.reminders, ...res } }));
@@ -107,13 +110,13 @@ export function useRequestActions({ inbox, toast, onChanged }) {
     }
   }), [guarded, load, patchItem, toast]);
 
-  const remove = useCallback((item) => guarded(item, async () => {
-    const withdrawing = isPending(item);
+  const remove = useCallback((item, box = 'sent') => guarded(item, async () => {
+    const withdrawing = box === 'sent' && isPending(item);
     try {
-      await removeRequest(item.kind, item.id);
+      await removeRequest(item.kind, item.id, box);
     } catch (e) {
       toast(e?.message || FAILED, 'error');
-      load('sent', { quiet: true });
+      load(box, { quiet: true });
       return;
     }
     if (withdrawing && item.kind === 'contact') {
@@ -125,9 +128,9 @@ export function useRequestActions({ inbox, toast, onChanged }) {
     }
     onChanged?.();
     if (withdrawing) patchItem('sent', item, (it) => ({ ...it, state: 'withdrawn' }));
-    else removeItem('sent', item);
+    else removeItem(box, item);
     if (withdrawing) toast('Request withdrawn', 'info');
-    load('sent', { quiet: true });
+    load(box, { quiet: true });
   }), [guarded, load, onChanged, patchItem, removeItem, toast]);
 
   // The accepted side may have no thread yet, e.g. the request was sent from another device.
@@ -142,9 +145,12 @@ export function useRequestActions({ inbox, toast, onChanged }) {
         });
       navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
     } catch (e) {
-      toast(e?.message || 'Could not open the chat. Please try again.', 'error');
+      toast(e?.message || NO_CHAT, 'error');
     }
   }), [guarded, navigate, toast]);
 
-  return { busy, decide, remind, remove, openAccepted };
+  const openReceived = useCallback((item) => guarded(item, () => chatWith(item)
+    .catch((e) => toast(e?.message || NO_CHAT, 'error'))), [chatWith, guarded, toast]);
+
+  return { busy, decide, remind, remove, openAccepted, openReceived };
 }

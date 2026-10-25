@@ -15,6 +15,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
+import com.draazy.api.support.IdentityCases;
 import com.draazy.api.support.UploadedPhotos;
 import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
@@ -58,29 +59,32 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
         u.setName(name);
         u.setMobileVerified(true);
         User saved = users.saveAndFlush(u);
+        IdentityCases.submitted(jdbc, saved.getId());
         createdActors.add(saved.getId().toString());
         return saved;
     }
 
     private String photoOf(User host) {
-        return hostPhotos.computeIfAbsent(host.getId(), UploadedPhotos::of);
+        return hostPhotos.computeIfAbsent(host.getId(),
+                id -> String.join("\",\"", UploadedPhotos.of(id), UploadedPhotos.of(id), UploadedPhotos.of(id)));
     }
 
     private String roomBody(User host, String locality, String society, long rentShare) {
         return withSocietyIds("""
                 {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                 "furnishing":"semi","locality":"%s","society":"%s","rentShare":%d,
+                 "locality":"%s","society":"%s","rentShare":%d,
                  "deposit":30000,"availableFrom":"2026-09-01","lookingFor":"any",
                  "foodPref":"any","photos":["%s"],
                  "hostRole":"owner",
-                 "note":"Sunny room, quiet building."}
-                """.formatted(locality, society, rentShare, photoOf(host)));
+                 "note":"Sunny room, quiet building.",%s,%s}
+                """.formatted(locality, society, rentShare, photoOf(host), FlatmateRoomFixture.BASICS,
+                FlatmateRoomFixture.DETAILS));
     }
 
     private String liveRoomBody(User host, String locality, String society, long rentShare) {
         return roomBody(host, locality, society, rentShare)
                 .replace("\"hostRole\":\"owner\"",
-                        "\"hostRole\":\"tenant\",\"agreementDeclared\":true,"
+                        "\"hostRole\":\"tenant\",\"ownerConsentMobile\":\"9890000001\",\"agreementDeclared\":true,"
                                 + agreementEvidence(host));
     }
 
@@ -89,8 +93,8 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
         // unpublished group cannot be joined: `findVisible` answers 404 for it.
             int seats, int seatsOpen) {
         return """
-                {"title":"%s","locality":"%s","policy":"%s","rent":40000,"agreement":true,
-                 "seats":%d,"seatsOpen":%d,"name":"Host","tags":["Vegetarian"],%s}
+                {"title":"%s","locality":"%s","policy":"%s","rent":40000,"deposit":10000,"agreement":true,
+                 "seats":%d,"seatsOpen":%d,"name":"Host",%s}
                 """.formatted(title, locality, policy, seats, seatsOpen,
                 agreementEvidence(host));
     }
@@ -239,6 +243,14 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
             mvc.perform(post(Routes.Flatmates.GROUP_JOIN, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(joiner)))
                     .andExpect(status().isCreated());
+            String requestId = jdbc.queryForObject(
+                    "select id::text from flatmate_requests where target_id = ?::uuid and requester_id = ?::uuid",
+                    String.class, id, joiner.getId().toString());
+            mvc.perform(patch(Routes.Flatmates.MY_REQUEST_BY_ID, requestId)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"decision\":\"accepted\"}"))
+                    .andExpect(status().isOk());
 
             // Seats move here and only here: PATCH .../seats adjusts how many of the existing seats
             // are open. Growing is fine.

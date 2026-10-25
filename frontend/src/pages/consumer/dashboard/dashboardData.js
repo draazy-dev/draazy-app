@@ -1,6 +1,7 @@
 /* Pure derivations for the consumer Dashboard. */
 import { parseWhen } from '../../../lib/visitWhen.js';
 import { getOwnerListingState } from '../../../components/listing/ListingStatusCard.jsx';
+import { shareLabel } from '../requests/requestMeta.js';
 
 const LEAD_KINDS = new Set(['contact', 'photo', 'doc', 'flatmate', 'app']);
 const OWNER_ROLES = new Set(['owner', 'host', 'listing_owner', 'property_owner']);
@@ -128,6 +129,7 @@ export function buildActionItems({
   decideDocReqs,
   decidePhotoReq,
   decideFlatmateReq,
+  chatFlatmateReq,
   mutateVisit,
   openReview,
   isBusy = () => false,
@@ -153,16 +155,18 @@ export function buildActionItems({
     });
     flatmateReqs.filter((r) => r.status === 'pending').forEach((r) => {
       const key = `flatmate:${r.id}`;
+      const chatFirst = r.kind === 'group' && { label: 'Chat first', icon: 'message-circle', onClick: () => chatFlatmateReq?.(r.id), disabled: busy(key) };
       actionItems.push({
         id: key, kind: 'flatmate', tone: 'teal', icon: r.kind === 'room' ? 'bed-double' : 'users-round',
-        title: `${r.requesterName || 'A seeker'} is interested`,
-        sub: r.targetTitle || r.locality || 'Flatmate request',
+        title: `${r.requesterName || 'A seeker'} ${r.kind === 'group' ? 'wants to join your group' : 'is interested'}`,
+        sub: [r.targetTitle || r.locality || 'Flatmate request', shareLabel(r.share)].filter(Boolean).join(' · '),
         at: r.requestedAt || null,
         busy: busy(key),
         actions: [
+          chatFirst,
           { label: 'Accept', icon: 'check', onClick: () => decideFlatmateReq?.(r.id, 'accepted'), disabled: busy(key) },
           { label: 'Decline', icon: 'x', variant: 'ghost', onClick: () => decideFlatmateReq?.(r.id, 'declined'), disabled: busy(key) },
-        ],
+        ].filter(Boolean),
       });
     });
     apps.filter((a) => a.status === 'pending').forEach((a) => {

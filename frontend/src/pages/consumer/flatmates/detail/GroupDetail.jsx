@@ -1,14 +1,15 @@
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router';
 import Icon from '../../../../components/Icon.jsx';
-import { inr, perHead, shareFloor, moneyRange, bhkText, groupListingsUrl, seatsLeft, policyAvatar, moveInLabel } from '../helpers.js';
-import { GroupBadges, GroupJoinButton } from '../GroupCard.jsx';
-import { DetailLayout, Identity, Sheet, Section, InfoRows, Tags, PriceCard, StickyAsk } from './parts.jsx';
-import HeaderActions from './HeaderActions.jsx';
+import { inr, perHead, shareFloor, moneyRange, bhkText, groupListingsUrl, seatsLeft, policyAvatar, moveInLabel, groupLocalities, mustHaves } from '../helpers.js';
+import { FLAT_PREF_LBL } from '../constants.js';
+import { MustHaveChips } from '../atoms.jsx';
+import { GroupBadges, GroupJoinButton, groupTrust } from '../GroupCard.jsx';
+import LivingStyleSection from '../livingStyle/LivingStyleSection.jsx';
+import { DetailLayout, Identity, TrustPanel, Sheet, Section, SpecGrid, TermsSection, PriceCard, StickyAsk } from './parts.jsx';
+import { ReportLink, TitleShare } from './DetailActions.jsx';
 import GroupChatLink from './GroupChatLink.jsx';
 
-const BILL_KEY = { included: 'billIncluded', shared: 'billShared', separate: 'billSeparate' };
-const FURN_KEY = { furnished: 'furnFurnished', semi: 'furnSemi', unfurnished: 'furnUnfurnished' };
 const CTA = 'inline-flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold whitespace-nowrap ';
 
 function MembershipCta({ g, status, onJoin, onLeave, onCancel }) {
@@ -26,20 +27,17 @@ function MembershipCta({ g, status, onJoin, onLeave, onCancel }) {
     </div>
   );
   if (status === 'declined') return <span className={CTA + 'flex-1 chip text-gray-400'}>{t('flatmates.notAccepted')}</span>;
-  return <GroupJoinButton g={g} joined={false} onJoin={onJoin} />;
+  return <GroupJoinButton g={g} onJoin={onJoin} />;
 }
 
 function WantedFlat({ p, canSearch }) {
   const { t } = useTranslation();
   return (
     <Section icon="search" title={t('flatmates.lookingForHeading')}>
-      <InfoRows items={[
-        [t('flatmates.groupLocalities'), p.localities.join(', ')],
-        [t('flatmates.groupBhk'), bhkText(p.bhk)],
-        [t('flatmates.groupFurnishing'), FURN_KEY[p.furnishing] && t('flatmates.' + FURN_KEY[p.furnishing])],
-        [t('flatmates.groupMoveInBy'), moveInLabel(p.moveInBy)],
-        [t('flatmates.gatedOnly'), p.gatedOnly && t('flatmates.yes')],
-        [t('flatmates.needsBachelors'), p.bachelors && t('flatmates.yes')],
+      <MustHaveChips items={mustHaves(p, t)} className="mb-3" />
+      <SpecGrid items={[
+        ['bed-double', t('flatmates.groupBhk'), bhkText(p.bhk)],
+        ['calendar', t('flatmates.groupMoveInBy'), moveInLabel(p.moveInBy)],
       ]} />
       {canSearch && (
         <Link to={groupListingsUrl(p)} className="mt-4 btn-teal inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl text-sm font-semibold text-white" data-testid="group-find-flats">
@@ -70,21 +68,25 @@ function Member({ m, policy, label, onRemove }) {
   );
 }
 
-export default function GroupDetail({ g, owned, myStatus, saved, onSave, onJoin, onLeave, onCancel, onRemoveMember, onReport, ownerPanel, back }) {
+export default function GroupDetail({ g, owned, myStatus, onJoin, onLeave, onCancel, onRemoveMember, onReport, ownerPanel }) {
   const { t } = useTranslation();
   const left = seatsLeft(g);
   const offPlatform = Math.max(0, g.seatsTotal - left - g.members.length);
-  const bill = (v) => BILL_KEY[v] && t('flatmates.' + BILL_KEY[v]);
   const p = g.preferences;
   const share = <>{p ? moneyRange(shareFloor(g), perHead(g), t) : inr(perHead(g))}<span className="text-gray-500 text-sm font-normal">{t('flatmates.perMonth')}</span></>;
   const cta = !owned && <MembershipCta g={g} status={myStatus} onJoin={onJoin} onLeave={onLeave} onCancel={onCancel} />;
 
   const header = (
-    <Identity
-      avatar={<div className={'w-12 h-12 rounded-2xl bg-gradient-to-br ' + policyAvatar(g.policy) + ' flex items-center justify-center text-white shrink-0'}><Icon name="users-round" className="w-6 h-6" /></div>}
-      title={g.title}
-      badges={<GroupBadges g={g} reviewStatus={g.reviewStatus} owned={owned} />}
-    />
+    <>
+      <Identity
+        avatar={<div className={'w-12 h-12 rounded-2xl bg-gradient-to-br ' + policyAvatar(g.policy) + ' flex items-center justify-center text-white shrink-0'}><Icon name="users-round" className="w-6 h-6" /></div>}
+        title={g.title}
+        action={<TitleShare text={g.title} />}
+        meta={<span className="inline-flex items-center gap-1"><Icon name="map-pin" className="w-3.5 h-3.5 text-teal-300 shrink-0" />{groupLocalities(g).join(', ')}</span>}
+        badges={<GroupBadges g={g} reviewStatus={g.reviewStatus} owned={owned} />}
+      />
+      <TrustPanel items={groupTrust(g, t)} />
+    </>
   );
 
   const aside = (
@@ -103,13 +105,13 @@ export default function GroupDetail({ g, owned, myStatus, saved, onSave, onJoin,
 
   return (
     <DetailLayout
-      back={back}
-      actions={<HeaderActions saved={saved} onSave={onSave} shareText={g.title} reportLabel={t('flatmates.ariaReportGroup')} onReport={!owned && (() => onReport({ id: g.id, title: g.title, ownerName: g.members?.[0]?.name || 'Group', kind: 'share' }))} />}
+      report={!owned && <ReportLink label={t('flatmates.ariaReportGroup')} onReport={() => onReport({ id: g.id, title: g.title, ownerName: g.members?.[0]?.name || 'Group', kind: 'share' })} />}
       header={header}
       aside={aside}
       sticky={cta && <StickyAsk price={share} label={t(p ? 'flatmates.budgetEach' : 'flatmates.yourShare')}>{cta}</StickyAsk>}
     >
       <Sheet>
+        {p && <WantedFlat p={p} canSearch={owned || myStatus === 'accepted'} />}
         <Section icon="users" title={t('flatmates.detailMembers')} aside={<span className="text-xs text-gray-400">{t('flatmates.detailMembersCount', { filled: g.seatsTotal - left, total: g.seatsTotal })}</span>}>
           <ul className="flex flex-wrap gap-x-2 gap-y-3">
             {g.members.map((m, k) => <Member key={m.id || k} m={m} policy={g.policy} label={t('flatmates.detailMember')} onRemove={owned && !m.host && m.id ? onRemoveMember : null} />)}
@@ -125,21 +127,17 @@ export default function GroupDetail({ g, owned, myStatus, saved, onSave, onJoin,
               </li>
             ))}
           </ul>
+          <div className="mt-4">
+            <SpecGrid items={[
+              ['users', t('flatmates.detailOpenTo'), FLAT_PREF_LBL[g.policy] || FLAT_PREF_LBL.any],
+              ['key-round', t('flatmates.detailListedBy'), !g.hunting && t(g.hostRole === 'owner' ? 'flatmates.flatOwner' : 'flatmates.currentTenant')],
+            ]} />
+          </div>
           {(owned || myStatus === 'accepted') && <div className="mt-4"><GroupChatLink groupId={g.id} /></div>}
         </Section>
-        {p && <WantedFlat p={p} canSearch={owned || myStatus === 'accepted'} />}
-        {[g.noticePeriodDays, g.lockInMonths, g.maintenanceBilling, g.electricityBilling].some((v) => v != null) && (
-          <Section icon="file-text" title={t('flatmates.termsHeading')}>
-            <InfoRows items={[
-              [t('flatmates.noticePeriod'), g.noticePeriodDays],
-              [t('flatmates.lockIn'), g.lockInMonths],
-              [t('flatmates.maintenanceBill'), bill(g.maintenanceBilling)],
-              [t('flatmates.electricityBill'), bill(g.electricityBilling)],
-            ]} />
-          </Section>
-        )}
-        {g.tags?.length > 0 && <Section icon="sparkles" title={t('flatmates.lifestyle')}><Tags items={g.tags} /></Section>}
         {g.note && <Section icon="message-square" title={t('flatmates.detailAbout')}><p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{g.note}</p></Section>}
+        <TermsSection item={g} />
+        <LivingStyleSection kind="group" id={g.id} owned={owned} />
       </Sheet>
     </DetailLayout>
   );

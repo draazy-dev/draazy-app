@@ -100,7 +100,7 @@ public class FlatmateSeekerService {
                 .orElseThrow(() -> NotFoundException.of("User"));
 
         FlatmateSeekerPost post = new FlatmateSeekerPost(
-                caller.userId(), body.name().strip(), body.budget());
+                caller.userId(), FlatmateVocabulary.profileName(author), body.budget());
         apply(post, body, author);
 
         // Snapshotted from the token, never the body: a client that could assert its own
@@ -120,11 +120,12 @@ public class FlatmateSeekerService {
         FlatmateSeekerPost post = posts.findLockedById(postId)
                 .filter(p -> !p.isArchived() && p.getUserId().equals(caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate post"));
-        FlatmateEditImpact impact = editRules.classify(post, body);
-        post.setName(body.name().strip());
-        post.setBudget(body.budget());
         User author = users.findById(caller.userId())
                 .orElseThrow(() -> NotFoundException.of("User"));
+        String name = FlatmateVocabulary.profileName(author);
+        FlatmateEditImpact impact = editRules.classify(post, body, name);
+        post.setName(name);
+        post.setBudget(body.budget());
         apply(post, body, author);
         post.setModStatus(post.getExpiry().revive(post.getModStatus()));
         post.getRecheck().settle(post.getModStatus(), impact.rechecked());
@@ -190,7 +191,7 @@ public class FlatmateSeekerService {
 
         try {
             requests.saveAndFlush(new FlatmateRequest(
-                    "flatmate", post.getId(), hostId, caller.userId(), "request", intent, body));
+                    "flatmate", post.getId(), hostId, caller.userId(), intent, body));
         } catch (DataIntegrityViolationException raced) {
 
             // Backstop for an isolation level that would carry a pre-lock snapshot past the
@@ -317,13 +318,16 @@ public class FlatmateSeekerService {
                 body.flatPref(), FlatmateVocabulary.FLAT_PREF, "any", "flat preference"));
         post.setRoomPref(FlatmateVocabulary.orDefault(
                 body.roomPref(), FlatmateVocabulary.ROOM_PREF, "any", "room preference"));
+        post.setFurnishing(FlatmateVocabulary.optional(body.furnishing(), FlatmateVocabulary.FURNISHING, "furnishing"));
+        post.setGatedOnly(Boolean.TRUE.equals(body.gatedOnly()));
+        post.setAttachedBath(Boolean.TRUE.equals(body.attachedBath()));
+        post.setParking(FlatmateVocabulary.optional(body.parking(), FlatmateVocabulary.PARKING, "parking"));
         post.setAge(body.age());
         post.setBudgetMax(budgetCeiling(body));
         post.setOccupation(FlatmateVocabulary.blankToNull(body.occupation()));
         post.setNote(FlatmateVocabulary.blankToNull(body.note()));
         post.setTitle(FlatmateVocabulary.blankToNull(body.title()));
         post.setLocalities(localities.canonicalNames(clean(body.localities()), post.getLocalities()));
-        post.setTags(clean(body.tags()));
         post.setMoveIn(FlatmateVocabulary.blankToNull(body.moveIn()));
         post.setMoveInAt(parseMoveIn(body.moveIn()));
         if (body.verifiedContactOnly() != null) {

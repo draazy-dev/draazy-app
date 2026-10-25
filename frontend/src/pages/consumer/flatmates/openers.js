@@ -6,6 +6,4 @@ export const SHARE_OPENER = {
 
 export const SEEKER_OPENER = "Hi! I'm interested in sharing a flat. Let's connect.";
 
-export const groupOpener = (g) => (g.policy === 'any'
-  ? "Hi! I'd love to join your flatmate group. When can I move in?"
-  : "Hi! I'd like to request a spot in your flatmate group — is it still open?");
+export const GROUP_OPENER = "Hi! I'd like to request a spot in your flatmate group — is it still open?";

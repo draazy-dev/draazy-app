@@ -17,10 +17,12 @@ class FlatmateRequestPartiesLookup implements FlatmateRequestParties {
     }
 
     @Override
-    public Optional<UUID> acceptedCounterparty(UUID requestId, UUID userId) {
+    public Optional<Pair> chattable(UUID requestId, UUID userId) {
         return requests.findById(requestId)
-                .filter(r -> FlatmateVocabulary.STATUS_ACCEPTED.equals(r.getStatus()))
                 .filter(r -> userId.equals(r.getRequesterId()) || userId.equals(r.getHostId()))
-                .map(r -> userId.equals(r.getHostId()) ? r.getRequesterId() : r.getHostId());
+                .filter(r -> FlatmateVocabulary.STATUS_ACCEPTED.equals(r.getStatus())
+                        || (r.isPending() && "group".equals(r.getKind()) && userId.equals(r.getHostId())))
+                .map(r -> new Pair(userId.equals(r.getHostId()) ? r.getRequesterId() : r.getHostId(),
+                        "flatmate".equals(r.getKind()) ? "post" : r.getKind(), r.getTargetId()));
     }
 }

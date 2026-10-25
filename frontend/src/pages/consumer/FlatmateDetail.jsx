@@ -18,7 +18,7 @@ import { useScrollReveal } from '../../lib/useScrollReveal.js';
 import { recordAskLocally, rememberAsk } from '../../lib/data/flatmates.js';
 import * as flatmateService from '../../services/flatmateService.js';
 import { inr, perHead, roomTitle, FLATMATE_IMG, FLATMATE_GROUP_IMG } from './flatmates/helpers.js';
-import { SHARE_OPENER, SEEKER_OPENER, groupOpener } from './flatmates/openers.js';
+import { SHARE_OPENER, SEEKER_OPENER, GROUP_OPENER } from './flatmates/openers.js';
 import { useGenderGate } from './flatmates/useGenderGate.jsx';
 
 const KINDS = ['group', 'room', 'post'];
@@ -26,11 +26,11 @@ const interestKey = (kind, id) => (kind === 'post' ? id : `${kind}-${id}`);
 
 function askFor(kind, item, share, gender) {
   if (kind === 'group') {
-    const message = groupOpener(item);
+    const message = GROUP_OPENER;
     return {
       send: () => flatmateService.joinGroup(item.id, { share: 'solo', message, gender }),
       thread: { propertyId: 'group-' + item.id, property: { title: item.title, price: inr(perHead(item)) + '/mo', loc: (item.locality || 'Pune') + ', Pune', img: FLATMATE_GROUP_IMG }, party: { name: item.title, avatar: (item.title || 'GR').slice(0, 2).toUpperCase() }, firstMessage: message },
-      sent: [item.policy === 'any' ? 'flatmates.joinedToast' : 'flatmates.requestJoinToast', { title: item.title }],
+      sent: ['flatmates.requestJoinToast', { title: item.title }],
       dup: ['flatmates.joinRequestAlreadyRecorded', { title: item.title }],
     };
   }
@@ -62,7 +62,6 @@ export default function FlatmateDetail() {
   const rootRef = useScrollReveal([]);
   const [state, setState] = useState({ status: 'loading' });
   const [myAsk, setMyAsk] = useState(null);
-  const [saved, setSaved] = useState(false);
   const [reportTarget, setReportTarget] = useState(null);
   const [verifyOpen, setVerifyOpen] = useState(false);
   const item = state.item;
@@ -86,12 +85,9 @@ export default function FlatmateDetail() {
     .then((row) => row || null), [kind, id]);
 
   useEffect(() => {
-    if (!signedInAs || !KINDS.includes(kind)) { setMyAsk(null); setSaved(false); return undefined; }
+    if (!signedInAs || !KINDS.includes(kind)) { setMyAsk(null); return undefined; }
     let alive = true;
     loadMine().then((s) => { if (alive) setMyAsk(s); }).catch(() => {});
-    flatmateService.listFlatmateSaveKeys()
-      .then((rows) => { if (alive) setSaved(rows.some((r) => r.kind === kind && r.id === id)); })
-      .catch(() => {});
     return () => { alive = false; };
   }, [signedInAs, kind, id, loadMine]);
 
@@ -129,7 +125,6 @@ export default function FlatmateDetail() {
     rememberAsk(user.mobile, interestKey(kind, id));
     recordAskLocally({ request: ask.thread });
     toast(t(...ask.sent));
-    if (kind === 'group' && target.policy === 'any') await load();
   };
 
   const onLeave = async () => {
@@ -170,34 +165,14 @@ export default function FlatmateDetail() {
     await load();
   };
 
-  const onSave = async (want) => {
-    // The resume asks for "saved": toggling a post the account had already saved would unsave it.
-    if (!user) { sendToSignIn('save', undefined, () => latest.current.onSave(true)); return; }
-    const next = want === true || !saved;
-    setSaved(next);
-    try {
-      if (next) await flatmateService.saveFlatmatePost(kind, id);
-      else await flatmateService.unsaveFlatmatePost(kind, id);
-      // Re-assert: the saved-key read that sign-in starts can land mid-write without this row.
-      setSaved(next);
-    } catch {
-      setSaved(!next);
-      toast(t('flatmates.saveFailed'), 'error');
-    }
-  };
-  const latest = useLatest({ onAsk, onSave });
+  const latest = useLatest({ onAsk });
 
-  const back = (
-    <Link to={kind === 'post' ? '/flatmates?view=team-up' : '/flatmates'} className="inline-flex items-center gap-1.5 min-h-[44px] -ml-2 px-2 rounded-xl text-sm text-gray-400 hover:text-white"><Icon name="arrow-left" className="w-4 h-4" /> {t('flatmates.detailBack')}</Link>
-  );
-  const viewProps = { owned, saved, onSave, back, onReport: setReportTarget, ownerPanel: owned && <OwnerPanel kind={kind} item={item} patch={patchItem} /> };
+  const viewProps = { owned, onReport: setReportTarget, ownerPanel: owned && <OwnerPanel kind={kind} item={item} patch={patchItem} /> };
 
   return (
     <div ref={rootRef} className="sf-page">
       <div className="pt-2 pb-28 sm:pt-4 lg:pt-6 lg:pb-24 min-h-[100dvh]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          {state.status !== 'ready' && <div className="mb-3">{back}</div>}
-
           {state.status === 'loading' && <div className="sf-card rounded-2xl h-72 animate-pulse" aria-busy="true" />}
 
           {state.status === 'missing' && (

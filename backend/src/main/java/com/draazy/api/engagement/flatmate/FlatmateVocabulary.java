@@ -1,6 +1,8 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.error.BadRequestException;
+import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.identity.user.User;
 import java.util.Set;
 
 public final class FlatmateVocabulary {
@@ -17,7 +19,7 @@ public final class FlatmateVocabulary {
 
     public static final Set<String> ROOM_PREF = Set.of("any", "private", "shared");
 
-    /** A group's join policy. {@code any} means open-join — requests auto-accept. */
+    /** Who a group admits by gender; {@code any} is mixed. Every join still waits for the host. */
     public static final Set<String> POLICY = Set.of("any", "women", "men");
 
     public static final Set<String> ROOM_KIND = Set.of("master", "bedroom", "living");
@@ -26,11 +28,15 @@ public final class FlatmateVocabulary {
 
     static final String ROOM_DOUBLE = "Shared room";
 
+    /** The {@code roomType} board facet; a room stores it as "Private room" / "Shared room". */
+    public static final Set<String> ROOM_TYPE_FACET = Set.of("private", "shared");
+
     public static final Set<String> ATTACHED_BATH = Set.of("attached", "shared");
 
     public static final Set<String> PRICE_BASIS = Set.of("room", "person");
 
     public static final Set<String> FURNISHING = Set.of("unfurnished", "semi", "furnished");
+    public static final Set<String> PARKING = Set.of("bike", "car");
 
     /** How a running bill sits against the quoted rent. Null is a fourth state the host never
      * stated. */
@@ -38,6 +44,9 @@ public final class FlatmateVocabulary {
 
     /** Bedrooms, as the room card spells them. {@code 4} means 4+, so the scale saturates there. */
     public static final Set<String> BHK = Set.of("1", "2", "3", "4");
+
+    /** Shortlist cap for a seeker post and a hunting group, on create, edit and the moderator desk. */
+    public static final int MAX_LOCALITIES = 3;
 
     /** Spelled as the card renders it. A row house is not an independent house to anyone shopping
      * for one, so they are separate tokens. */
@@ -62,7 +71,6 @@ public final class FlatmateVocabulary {
 
     public static final Set<String> SHARE_INTENT = Set.of("solo", "bring", "match");
 
-    public static final Set<String> REQUEST_ACTION = Set.of("request", "join");
 
     public static final Set<String> REQUEST_STATUS = Set.of("pending", "accepted", "declined");
 
@@ -79,11 +87,13 @@ public final class FlatmateVocabulary {
      * scheduled job. */
     public static final String STATUS_REJECTED = "rejected";
 
-    /** The two feed tabs, keyed on seeker intent rather than on our storage model. */
-    public static final Set<String> TAB = Set.of("move-in", "team-up");
+    /** {@code team-up} is the legacy union of {@code people} and {@code teams}, kept so old links resolve. */
+    public static final Set<String> TAB = Set.of("move-in", "team-up", "people", "teams");
 
     public static final String TAB_MOVE_IN = "move-in";
     public static final String TAB_TEAM_UP = "team-up";
+    public static final String TAB_PEOPLE = "people";
+    public static final String TAB_TEAMS = "teams";
 
     public static final String TIER_IDENTITY = "identity";
     public static final String TIER_TENANT = "tenant";
@@ -159,6 +169,15 @@ public final class FlatmateVocabulary {
 
     public static String blankToNull(String value) {
         return (value == null || value.isBlank()) ? null : value.strip();
+    }
+
+    /** Never from the request body: the profile name is the one identity verification can lock. */
+    static String profileName(User author) {
+        String name = blankToNull(author.getName());
+        if (name == null) {
+            throw new ValidationException("Add your name to your profile before posting.");
+        }
+        return name;
     }
 
     /** The literal {@code any} collapses to null too, since rows stating {@code any} are matched by
