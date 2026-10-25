@@ -113,7 +113,9 @@ test.describe('the owner shares documents from the Requests inbox', () => {
     expect((await patched).status(), 'the grant was refused').toBe(200);
 
     await expect(page.getByRole('alert')).toContainText(/Documents shared/i);
-    await expect(card).toHaveCount(0);
+    await page.getByTestId('requests-past-toggle').click();
+    await expect(card).toHaveAttribute('data-state', 'accepted');
+    await expect(card.getByTestId('request-state')).toHaveText('Granted');
 
     /* `sharedDocumentCount` counts files, not categories: it stays at zero if the grant matched no uploads. */
     const after = await ownerRow(request, reqId);
@@ -136,6 +138,7 @@ test.describe('the owner shares documents from the Requests inbox', () => {
     await signedInAs(page, buyerMobile);
     await page.goto('/dashboard?tab=leads');
     const card = page.getByTestId('request-card').filter({ hasText: 'Wants to see' });
+    await page.getByTestId('requests-past-toggle').click();
     await expect(card.getByTestId('request-state')).toHaveText('Granted');
   });
 });

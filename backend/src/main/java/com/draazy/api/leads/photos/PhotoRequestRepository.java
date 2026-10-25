@@ -30,7 +30,11 @@ public interface PhotoRequestRepository extends JpaRepository<PhotoRequest, UUID
             where pr.requesterId = :requesterId and (pr.status = 'pending' or pr.updatedAt >= :since)""")
     List<PhotoRequest> findSentSince(@Param("requesterId") UUID requesterId, @Param("since") Instant since);
 
-    List<PhotoRequest> findByPropertyIdInAndStatus(Collection<UUID> propertyIds, String status);
+    @Query("""
+            select pr from PhotoRequest pr
+            where pr.propertyId in :propertyIds and (pr.status = 'pending' or pr.updatedAt >= :since)""")
+    List<PhotoRequest> findReceivedSince(@Param("propertyIds") Collection<UUID> propertyIds,
+            @Param("since") Instant since);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select pr from PhotoRequest pr where pr.id = :id")

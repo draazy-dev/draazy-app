@@ -15,14 +15,46 @@ async function seed(page) {
 }
 
 test.describe('Mobile inbox + saved', () => {
-  test('Messages is full-screen and Saved tabs fit one row on mobile, with no console errors, while desktop keeps its footer', async ({ page, login }) => {
+  test('Messages keeps the bottom nav, with the composer above it and nothing scrolling the page', async ({ page, login }) => {
+    await seed(page);
+    await login.asBuyer();
+    await page.setViewportSize(MOBILE);
+    const nav = page.locator('nav.dz-bottom-nav');
+    const pageScrolls = () => page.evaluate(() => document.documentElement.scrollHeight > window.innerHeight + 1);
+
+    await page.goto('/messages');
+    await expect(page.locator('.pc-list-head h1')).toBeVisible();
+    await expect(nav).toBeVisible();
+    expect(await pageScrolls(), 'the list pane must end at the bar, not push the page').toBe(false);
+
+    await page.goto(`/messages?c=${THREAD}`);
+    const input = page.locator('.pc-input');
+    await expect(input).toBeVisible();
+    await expect(nav).toBeVisible();
+    const composer = await page.locator('.pc-composer').boundingBox();
+    const navBox = await nav.boundingBox();
+    expect(composer.y + composer.height, 'composer must sit above the bar').toBeLessThanOrEqual(navBox.y + 1);
+    expect(await pageScrolls()).toBe(false);
+
+    // Playwright cannot raise a soft keyboard; a focused field plus a shrunk viewport is the proxy.
+    await input.focus();
+    await page.setViewportSize({ width: MOBILE.width, height: MOBILE.height - 300 });
+    await expect(page.locator('html')).toHaveClass(/dz-kbd-open/);
+    await expect(nav).toBeHidden();
+    await expect.poll(async () => {
+      const box = await page.locator('.pc-composer').boundingBox();
+      return Math.abs(MOBILE.height - 300 - (box.y + box.height));
+    }, { message: 'with the bar gone the composer drops onto the keyboard' }).toBeLessThanOrEqual(1);
+  });
+
+  test('Messages is edge-to-edge and Saved tabs fit one row on mobile, with no console errors, while desktop keeps its footer', async ({ page, login }) => {
     test.slow();
     const errors = trackErrors(page);
     await seed(page);
     await login.asBuyer();
     await page.setViewportSize(MOBILE);
 
-    await test.step('Messages is full-screen on mobile: footer hidden, edge-to-edge, composer visible', async () => {
+    await test.step('Messages is edge-to-edge on mobile: footer hidden, composer visible', async () => {
       await page.goto(`/messages?c=${THREAD}`);
       await expect(page.locator('.pc-input')).toBeVisible();
       // Marketing footer is hidden on the messages route (mobile only).
@@ -38,7 +70,7 @@ test.describe('Mobile inbox + saved', () => {
       await page.goto('/saved');
       const tabs = page.locator('.saved-tabs .saved-tab');
       await expect(tabs).toHaveCount(4);
-      await expect(page.locator('.saved-tabs')).toContainText('Rooms');
+      await expect(page.locator('.saved-tabs')).toContainText('Flatmates');
       const tops = await tabs.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
       expect(new Set(tops).size).toBe(1);
     });

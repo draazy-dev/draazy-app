@@ -43,8 +43,8 @@ class FlatmateInterestSource implements RequestSource {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestView> received(UUID recipientId) {
-        return toViews(requests.findByHostIdAndStatus(recipientId, FlatmateVocabulary.STATUS_PENDING), true);
+    public List<RequestView> received(UUID recipientId, Instant since) {
+        return toViews(requests.findReceivedSince(recipientId, since), true);
     }
 
     @Override
@@ -76,7 +76,8 @@ class FlatmateInterestSource implements RequestSource {
             String state = row.getStatus();
             return new RequestView(row.getId(), kind(), state, row.getStatus(),
                     new Party(partyId, name, person != null && person.isVerified()), target, row.getMessage(), null,
-                    row.getRequestedAt(), PENDING.equals(state) ? null : row.getDecidedAt(), null, row.getHostId());
+                    row.getRequestedAt(), PENDING.equals(state) ? null : row.getDecidedAt(), null, row.getHostId(),
+                    row.getShare());
         }).toList();
     }
 

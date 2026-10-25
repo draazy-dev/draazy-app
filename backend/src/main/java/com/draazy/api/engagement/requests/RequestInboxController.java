@@ -46,8 +46,9 @@ public class RequestInboxController {
 
     @DeleteMapping(Routes.MeRequests.BY_ID)
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void remove(@CurrentUser AuthPrincipal principal, @PathVariable String kind, @PathVariable String id) {
-        inbox.remove(principal.userId(), kind, requestId(id));
+    public void remove(@CurrentUser AuthPrincipal principal, @PathVariable String kind, @PathVariable String id,
+            @RequestParam(defaultValue = RequestInboxService.SENT) String box) {
+        inbox.remove(principal.userId(), box, kind, requestId(id));
     }
 
     private static UUID requestId(String token) {

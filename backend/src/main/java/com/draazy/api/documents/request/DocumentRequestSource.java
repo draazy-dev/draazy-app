@@ -48,12 +48,12 @@ class DocumentRequestSource implements RequestSource {
 
     @Override
     @Transactional(readOnly = true)
-    public List<RequestView> received(UUID recipientId) {
+    public List<RequestView> received(UUID recipientId, Instant since) {
         List<UUID> owned = properties.findIdsByOwnerId(recipientId);
         if (owned.isEmpty()) {
             return List.of();
         }
-        List<DocumentRequest> rows = requests.findOpenForProperties(owned);
+        List<DocumentRequest> rows = requests.findReceivedSince(owned, since);
         Map<UUID, Property> listings = listingsOf(rows);
         Map<UUID, User> requesters = usersById(rows.stream().map(DocumentRequest::getRequesterId).toList());
         Set<UUID> verified = verifiedTenants.verifiedAmong(requesters.keySet());

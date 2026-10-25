@@ -7,6 +7,7 @@ import { detailPath } from '../flatmates/helpers.js';
 import { ThreadAvatar } from './Inbox.jsx';
 import MessageList from './MessageList.jsx';
 import PropChip from './PropChip.jsx';
+import { useTargetCard } from './useTargetCard.js';
 
 const quickReplies = (property) => [
   'Is it still available?',
@@ -69,6 +70,9 @@ export default function Thread({
   const showPrivacyHint = draft && !canCall && hasPrivateContact(draft);
   const replies = useMemo(() => quickReplies(active?.property).slice(0, 3), [active?.property]);
   const previewOpen = !!preview;
+  const flatmate = active && !active.group && !active.propertyId ? active.flatmate : null;
+  const flatmateCard = useTargetCard(flatmate?.kind, flatmate?.id);
+  const listingHref = active?.propertyId ? `/property/${active.propertyId}` : flatmate ? detailPath(flatmate.kind, flatmate.id) : null;
 
   useEffect(() => {
     if (!key) return;
@@ -189,11 +193,12 @@ export default function Thread({
               <div className="pc-head-actions">
                 {canCall ? <a href={`tel:+91${partyDigits}`} className="pc-hbtn" title={t('misc.msgCallTitle', { phone: fmtPhone(partyDigits) })} aria-label={t('misc.msgCallAria')}><Icon name="phone" className="w-5 h-5" /></a> : <button className="pc-hbtn" disabled title={t('misc.msgNumberLockedTitle')} aria-label={t('misc.msgNumberLockedAria')}><Icon name="phone-off" className="w-5 h-5" /></button>}
                 <button className="pc-hbtn" onClick={() => setMenu((v) => !v)} aria-label="Conversation actions"><Icon name="more-vertical" className="w-5 h-5" /></button>
-                {menu ? <div className="pc-menu"><Link to={`/property/${active.propertyId}`}>View listing</Link><button onClick={() => { setMenu(false); onState(active.id, { archived: !active.archived }); }}>{active.archived ? 'Unarchive' : 'Archive'}</button><button onClick={() => { setMenu(false); onState(active.id, { muted: !active.muted }); }}>{active.muted ? 'Unmute' : 'Mute'}</button><button onClick={() => { setMenu(false); onBlock(active.id, !active.blocked); }}>{active.blocked ? 'Unblock' : 'Block'}</button><button aria-label="Report this user" onClick={() => { setMenu(false); onReport(); }}>Report this user</button></div> : null}
+                {menu ? <div className="pc-menu">{listingHref ? <Link to={listingHref}>View listing</Link> : null}<button onClick={() => { setMenu(false); onState(active.id, { archived: !active.archived }); }}>{active.archived ? 'Unarchive' : 'Archive'}</button><button onClick={() => { setMenu(false); onState(active.id, { muted: !active.muted }); }}>{active.muted ? 'Unmute' : 'Mute'}</button><button onClick={() => { setMenu(false); onBlock(active.id, !active.blocked); }}>{active.blocked ? 'Unblock' : 'Block'}</button><button aria-label="Report this user" onClick={() => { setMenu(false); onReport(); }}>Report this user</button></div> : null}
               </div>
             )}
           </div>
           {!active.group && active.propertyId ? <PropChip t={t} propertyId={active.propertyId} property={active.property} /> : null}
+          {flatmateCard?.available !== undefined ? <PropChip t={t} propertyId={flatmate.id} href={listingHref} property={flatmateCard} canSchedule={false} /> : null}
         </div>
 
         <MessageList
@@ -207,6 +212,8 @@ export default function Thread({
         {offline ? <div className="pc-offline">You're offline ? messages send when you're back</div> : null}
         {active.staged ? <div className="pc-wait"><Icon name="clock" className="w-4 h-4" /> {t('misc.msgWaitingOwner')}</div> : active.blocked ? (
           <div className="pc-wait"><Icon name="ban" className="w-4 h-4" /> You blocked {active.party.name} ? <button type="button" onClick={() => onBlock(active.id, false)}>Unblock</button></div>
+        ) : active.listingDeleted ? (
+          <div className="pc-wait" role="status"><Icon name="ban" className="w-4 h-4" /> {t('misc.msgListingDeleted')}</div>
         ) : active.blockedYou ? (
           <div className="pc-wait" role="status"><Icon name="ban" className="w-4 h-4" /> {t('misc.msgCantMessage')}</div>
         ) : (

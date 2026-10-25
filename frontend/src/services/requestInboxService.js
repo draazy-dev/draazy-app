@@ -9,5 +9,5 @@ export const listRequests = async (box) => (await provider()).listRequests(box);
 /** Nudge the recipient. Resolves `{ count, lastAt, nextAt }`; a 409 `reminder_too_soon` carries `nextReminderAt`. */
 export const remindRequest = async (kind, id) => (await provider()).remindRequest(kind, id);
 
-/** Withdraws a pending request or clears a decided one from the sender's list. Idempotent. */
-export const removeRequest = async (kind, id) => (await provider()).removeRequest(kind, id);
+/** Box 'sent' (default) withdraws a pending request or clears a decided one; 'received' clears a decided one. */
+export const removeRequest = async (kind, id, box) => (await provider()).removeRequest(kind, id, box);

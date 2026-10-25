@@ -158,12 +158,15 @@ for you" (neutral discovery fallback, `approved.slice(0,6)`). The code is explic
 is never mislabeled as recently viewed.
 
 ### Requests (`requests/RequestsPanel.jsx`)
-Tab id `leads`, shown to every user. One list over both `/me/requests` boxes, received (open) first
-then sent, under type tabs: All, Number requests, Photo requests, Documents, Flatmate (visits show
-under All only; each tab counts received open items). Each card carries a Received / Sent chip, the
-requester's message and its actions. Received cards also carry owner-private notes and follow-up
-dates (`LeadSheet.jsx`, `/me/lead-notes`), which are never part of any consumer-visible payload. The
-old `/messages?tab=requests` links redirect here.
+Tab id `leads`, shown to every user. One list over both `/me/requests` boxes: open requests (received,
+then sent), with everything answered, withdrawn or expired folded behind "Show past requests (N)", the
+same toggle as read notifications. Type tabs: All, Number requests, Photo requests, Documents,
+Flatmate (visits show under All only; each tab counts received open items). Each card carries a
+Received / Sent chip, the requester's message and its actions. Received history (accepted, declined or
+expired in the last 90 days) keeps a status pill, Open chat for accepted number and flatmate requests,
+and Clear. Received cards also carry owner-private notes and follow-up dates (`LeadSheet.jsx`,
+`/me/lead-notes`), which are never part of any consumer-visible payload, so the history row is where a
+note stays reachable after the decision. The old `/messages?tab=requests` links redirect here.
 
 ### My Listings: type filter and letting a flat room by room
 - **Type filter:** My Listings is a mixed inventory (properties, flatmate rooms, flatmate requests,

@@ -37,9 +37,9 @@ public interface VisitRepository extends JpaRepository<Visit, UUID> {
 
     @Query("""
             select v from Visit v where v.propertyId in :propertyIds
-            and v.status = 'scheduled' and v.slot > :now""")
-    List<Visit> findOpenForProperties(@Param("propertyIds") java.util.Collection<UUID> propertyIds,
-                                      @Param("now") Instant now);
+            and ((v.status = 'scheduled' and v.slot > :now) or v.updatedAt >= :since)""")
+    List<Visit> findReceivedSince(@Param("propertyIds") java.util.Collection<UUID> propertyIds,
+                                  @Param("now") Instant now, @Param("since") Instant since);
 
     Optional<Visit> findByIdAndVisitorId(UUID id, UUID visitorId);
 

@@ -32,7 +32,10 @@ public interface FlatmateRequestRepository extends JpaRepository<FlatmateRequest
             where r.requesterId = :requesterId and (r.status = 'pending' or r.updatedAt >= :since)""")
     List<FlatmateRequest> findSentSince(@Param("requesterId") UUID requesterId, @Param("since") Instant since);
 
-    List<FlatmateRequest> findByHostIdAndStatus(UUID hostId, String status);
+    @Query("""
+            select r from FlatmateRequest r
+            where r.hostId = :hostId and (r.status = 'pending' or r.updatedAt >= :since)""")
+    List<FlatmateRequest> findReceivedSince(@Param("hostId") UUID hostId, @Param("since") Instant since);
 
     Optional<FlatmateRequest> findByIdAndRequesterId(UUID id, UUID requesterId);
 

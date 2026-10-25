@@ -28,6 +28,7 @@ export function toViewModel(c) {
     propertySlug: c.propertySlug ?? undefined,
     // A flatmate group's thread: many members, no counterparty and no listing.
     group,
+    flatmate: c.flatmateKind && c.flatmateTargetId ? { kind: c.flatmateKind, id: c.flatmateTargetId } : null,
 
     property: propertyOf(c, group),
 
@@ -54,6 +55,7 @@ export function toViewModel(c) {
     muted: !!c.muted,
     blocked: !!c.blocked,
     blockedYou: !!c.blockedYou,
+    listingDeleted: !!c.listingDeleted,
     awaitingReply: !!c.awaitingReply,
     messages,
   };

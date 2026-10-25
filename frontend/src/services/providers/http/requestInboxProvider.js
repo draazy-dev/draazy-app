@@ -1,6 +1,6 @@
 import { del, get, post } from '../../http.js';
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 const path = (kind, id) => `/me/requests/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`;
 
 export async function listRequests(box) {
@@ -12,6 +12,6 @@ export async function remindRequest(kind, id) {
   return post(`${path(kind, id)}/reminders`);
 }
 
-export async function removeRequest(kind, id) {
-  await del(path(kind, id));
+export async function removeRequest(kind, id, box = 'sent') {
+  await del(path(kind, id), { query: { box } });
 }
