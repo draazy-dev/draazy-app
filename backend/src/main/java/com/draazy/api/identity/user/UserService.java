@@ -34,9 +34,7 @@ public class UserService {
     public User updateMe(UUID userId, UserUpdate patch) {
         User user = liveUser(userId);
         if (patch.gender() != null) {
-            if (!patch.gender().equals(users.claimGender(userId, patch.gender()))) {
-                throw new ConflictException("Your gender is already set. Contact support to change it.");
-            }
+            applyGender(user, patch.gender(), Boolean.TRUE.equals(patch.changeGender()));
             entityManager.refresh(user);
         }
         if (patch.name() != null) {
@@ -74,6 +72,23 @@ public class UserService {
         return user;
     }
 
+    // Without `change` a gender already on file is a 409, so a first-pick prompt can never spend a change.
+    private void applyGender(User user, String wanted, boolean change) {
+        UUID id = user.getId();
+        if (wanted.equals(users.claimGender(id, wanted))) {
+            return;
+        }
+        if (!change) {
+            throw new ConflictException("Your gender is already set. Change it from your profile.");
+        }
+        // The re-read lets an overlapping double-submit of the same change succeed instead of 409ing.
+        if (users.changeGender(id, wanted, User.SELF_GENDER_CHANGES) == 0 && !wanted.equals(users.genderOf(id))) {
+            throw new ConflictException(user.isVerified()
+                    ? "Your gender was confirmed from your ID. Contact support to change it."
+                    : "You've used all your gender changes. Contact support to change it.");
+        }
+    }
+
     private User liveUser(UUID userId) {
         return users.findById(userId)
                 .filter(u -> !u.isArchived())
@@ -89,9 +104,9 @@ public class UserService {
         return users.saveAndFlush(created);
     }
 
-    // Phoned-in listings need an owner row, but an operator's word is not an OTP.
+    // An account made on someone's say-so rather than an OTP, so the number stays unverified until they sign in.
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public User provisionForStaff(String mobile, String name) {
+    public User provisionUnverified(String mobile, String name) {
         User created = new User(mobile, Roles.Wire.BUYER);
         if (name != null && !name.isBlank()) {
             created.setName(name.trim());

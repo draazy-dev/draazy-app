@@ -284,6 +284,17 @@ class ErasureCoverageTest extends AbstractApiTest {
         map.put("flatmate_rooms.address_fingerprint",
                 "A hash used to spot the same flat listed twice. Irreversible, and keyed to a "
                         + "property rather than a person.");
+        map.put("flatmate_owner_notices.address_fingerprint",
+                "As flatmate_rooms.address_fingerprint, copied onto the notice so a link stops "
+                        + "vouching for a flat the room no longer names. It names a property, not a person.");
+        map.put("managed_properties.address_fingerprint",
+                "As flatmate_rooms.address_fingerprint, kept on the owner's private home so one flat is "
+                        + "saved once. It names a property, not a person, and the record itself stays "
+                        + "with the owner's retained property records.");
+        map.put("flatmate_owner_notices.owner_mobile",
+                "The flat owner's number on a notice about somebody else's room. FlatmateErasure deletes "
+                        + "every notice the subject hosted or was addressed at, so any row left names a "
+                        + "third party's owner for a third party's post, not the subject.");
         map.put("flatmate_groups.address_fingerprint",
                 "As flatmate_rooms.address_fingerprint — a duplicate-detection hash of a flat.");
         map.put("flatmate_owner_consents.address_fingerprint",
@@ -315,6 +326,9 @@ class ErasureCoverageTest extends AbstractApiTest {
         map.put("users.verified_contact_only",
                 "An owner preference — accept contact requests only from L2-verified users. A "
                         + "boolean on a row that, post-erasure, names nobody.");
+        map.put("users.gender_changes",
+                "How many self-service gender edits were spent. A count, not the gender itself, "
+                        + "on a row that, post-erasure, names nobody.");
         map.put("flatmate_seeker_posts.verified_contact_only", "The same preference on a flatmate post.");
         map.put("notification_preferences.email",
                 "Matched on the column name, but it is a boolean channel switch — 'may we reach you "

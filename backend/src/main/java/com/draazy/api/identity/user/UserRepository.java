@@ -75,6 +75,14 @@ public interface UserRepository extends JpaRepository<User, UUID>, RoleSource {
         return claimGenderIfUnset(id, gender) == 1 ? gender : genderOf(id);
     }
 
+    // One statement so two concurrent saves cannot both spend the last change.
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update User u set u.gender = :gender, u.genderChanges = u.genderChanges + 1
+            where u.id = :id and u.gender is not null and u.gender <> :gender
+              and u.verified = false and u.genderChanges < :limit""")
+    int changeGender(@Param("id") UUID id, @Param("gender") String gender, @Param("limit") int limit);
+
     // Unpaged on purpose: used only by the last-administrator floor.
     @Query("select u from User u where u.role = :role and u.archived = false")
     List<User> findLiveByRole(@Param("role") String role);

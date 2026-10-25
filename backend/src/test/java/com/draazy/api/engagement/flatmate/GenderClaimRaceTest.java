@@ -52,7 +52,7 @@ class GenderClaimRaceTest {
     }
 
     private static UserUpdate gender(String value) {
-        return new UserUpdate(null, null, null, null, value, null, null, null, null);
+        return new UserUpdate(null, null, null, null, value, null, null, null, null, null);
     }
 
     @Test

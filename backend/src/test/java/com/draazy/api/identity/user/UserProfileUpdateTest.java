@@ -86,25 +86,58 @@ class UserProfileUpdateTest extends AbstractApiTest {
 
     private ResultActions patchGender(User user, String gender)
             throws Exception {
+        return patchGender(user, gender, false);
+    }
+
+    private ResultActions patchGender(User user, String gender, boolean change)
+            throws Exception {
         return mvc.perform(patch(Routes.Auth.ME)
                 .header(HttpHeaders.AUTHORIZATION, bearer(user))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"gender\":\"" + gender + "\"}"));
+                .content("{\"gender\":\"" + gender + "\"" + (change ? ",\"changeGender\":true" : "") + "}"));
     }
 
     @Test
-    @DisplayName("gender is set once by the user, then locked; the same value is a no-op")
-    void genderIsSetOnceThenLocked() throws Exception {
+    @DisplayName("gender can be changed twice after it is set, then locks; the same value is a free no-op")
+    void genderChangesAreCapped() throws Exception {
         User user = user("Asha", false);
 
         patchGender(user, "female").andExpect(status().isOk())
-                .andExpect(jsonPath("$.gender").value("female"));
-        mvc.perform(get(Routes.Auth.ME).header(HttpHeaders.AUTHORIZATION, bearer(user)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.gender").value("female"));
+                .andExpect(jsonPath("$.gender").value("female"))
+                .andExpect(jsonPath("$.genderChangesLeft").value(2));
+        patchGender(user, "female").andExpect(status().isOk())
+                .andExpect(jsonPath("$.genderChangesLeft").value(2));
         patchGender(user, "male").andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message", containsString("already set")));
-        patchGender(user, "female").andExpect(status().isOk());
+        patchGender(user, "male", true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.gender").value("male"))
+                .andExpect(jsonPath("$.genderChangesLeft").value(1));
+        patchGender(user, "female", true).andExpect(status().isOk())
+                .andExpect(jsonPath("$.genderChangesLeft").value(0));
+        mvc.perform(get(Routes.Auth.ME).header(HttpHeaders.AUTHORIZATION, bearer(user)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.gender").value("female"))
+                .andExpect(jsonPath("$.genderChangesLeft").value(0));
+        patchGender(user, "male", true).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("used all your gender changes")));
+        patchGender(user, "female", true).andExpect(status().isOk());
+
+        em.flush();
+        assertThat(jdbc.queryForObject("select gender from users where id = ?", String.class, user.getId()))
+                .isEqualTo("female");
+    }
+
+    @Test
+    @DisplayName("an ID-verified profile cannot change its gender from self-service")
+    void verifiedGenderIsLocked() throws Exception {
+        User user = user("Meera", true);
+        user.correctGender("female");
+        users.saveAndFlush(user);
+
+        mvc.perform(get(Routes.Auth.ME).header(HttpHeaders.AUTHORIZATION, bearer(user)))
+                .andExpect(jsonPath("$.genderChangesLeft").value(0));
+        patchGender(user, "male", true).andExpect(status().isConflict())
+                .andExpect(jsonPath("$.message", containsString("confirmed from your ID")));
 
         em.flush();
         assertThat(jdbc.queryForObject("select gender from users where id = ?", String.class, user.getId()))

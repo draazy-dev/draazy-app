@@ -28,7 +28,8 @@ public class SelfProfile {
                 ? List.copyOf(accountPermissions.effectiveFor(user.getRole(), user.getId()))
                 : null;
         return new SelfResponse(base.id(), base.name(), base.mobile(), base.email(), base.role(),
-                base.verified(), base.city(), user.getGender(), base.verifiedContactOnly(), base.hideNumber(),
+                base.verified(), base.city(), user.getGender(), user.genderChangesLeft(),
+                base.verifiedContactOnly(), base.hideNumber(),
                 base.shareActivityStatus(), base.shareReadReceipts(), base.listingsCount(), atoms,
                 desks);
     }

@@ -14,6 +14,8 @@ public record UserUpdate(
         String avatar,
         String city,
         @Pattern(regexp = "male|female") String gender,
+        // Opt-in to spend one of User.SELF_GENDER_CHANGES; only the profile form sends it.
+        Boolean changeGender,
         Boolean hideNumber,
         Boolean verifiedContactOnly,
         Boolean shareActivityStatus,
