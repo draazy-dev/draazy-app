@@ -12,11 +12,11 @@
       "launchedLead": "Draazy just launched in",
       "launchedTail": "— be the first to list your home, broker-free",
       "trustZeroBrokerage": "Zero brokerage",
-      "trustNoSpam": "Your number stays private — no spam calls",
+      "trustNoSpam": "No spam calls — from us or anyone else",
       "trustOwners": "Real owners, no brokers",
       "trustAssured": "Draazy Assured",
       "trustZeroBrokerageShort": "Zero brokerage",
-      "trustNoSpamShort": "Private number",
+      "trustNoSpamShort": "No spam calls",
       "trustOwnersShort": "Real owners",
       "trustAssuredShort": "Draazy Assured",
       "exploreMap": "Explore properties on map",
@@ -65,7 +65,6 @@
       "listings": "listings"
     },
     "featured": {
-      "verified": "Verified",
       "removeSaved": "Remove from saved",
       "saveProperty": "Save property",
       "perMonth": "/mo",
@@ -73,7 +72,7 @@
       "subtitle": "Handpicked properties across Pune",
       "viewAll": "View All",
       "viewAllProperties": "View all properties",
-      "verifiedProof": "{{listings}} verified homes · {{owners}} verified owners live now"
+      "verifiedProof": "{{listings}} verified properties · {{owners}} ID-verified owners live now"
     },
     "recent": {
       "eyebrow": "Pick up where you left off",
@@ -84,15 +83,19 @@
       "headingLead": "Can't afford a whole flat?",
       "headingHighlight": "Find a flatmate.",
       "body": "Post what you need, find seekers in your area and budget, and split the rent. Broker-free.",
-      "featVerified": "Verified seekers",
+      "featVerified": "ID-verified seekers",
       "featWomen": "Women-only filter",
       "featNoNumber": "No number sharing",
       "ctaFind": "Find a flatmate",
       "ctaPost": "Post your requirement",
-      "perMonthWhole": "/mo whole flat",
+      "wholeFlat": "Whole flat",
+      "flatIn": "{{flat}} in {{locality}}",
+      "anyFlatIn": "Flat in {{locality}}",
       "yourShare": "Your share",
+      "splitWays": "Split {{seats}} ways",
       "perMonth": "/mo",
-      "lookingForFlatmate": "looking for a flatmate in Pune"
+      "seeking_one": "person looking for a flatmate",
+      "seeking_other": "people looking for a flatmate"
     },
     "why": {
       "eyebrow": "Why Draazy",
@@ -123,7 +126,7 @@
       "q1": "Does Draazy charge any brokerage?",
       "a1": "No. Draazy is completely broker-free. You contact property owners in Pune directly, so there is no brokerage or commission to pay.",
       "q2": "How are owners and properties verified on Draazy?",
-      "a2": "An owner earns ID Verified Owner by photographing a government ID — Aadhaar, PAN or driving licence — with a live selfie, and a trained reviewer on our team decides the case. It is optional, so not every owner carries it. For Verified Property, Draazy checks an ownership document, the owner's government ID and photos of the property — it is not a search of the land registry. Many new projects also show their RERA registration.",
+      "a2": "An owner earns ID verified by photographing a government ID — Aadhaar, PAN or driving licence — with a live selfie, and a trained reviewer on our team decides the case. It is optional, so not every owner carries it. For Verified property, Draazy checks an ownership document, the owner's government ID and photos of the property — it is not a search of the land registry. A MahaRERA number, where shown, is shared by owner, check it on MahaRERA.",
       "q3": "Which areas of Pune does Draazy cover?",
       "a3": "Draazy covers Baner, Wakad, Hinjawadi, Kothrud, Koregaon Park, Viman Nagar, Hadapsar, Wagholi, Kalyani Nagar, Kharadi and more — for buying, renting and flat-sharing.",
       "q4": "Can I create a registered rent agreement online?",

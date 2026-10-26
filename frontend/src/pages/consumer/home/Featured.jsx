@@ -20,6 +20,13 @@ const specs = (p) => {
   return out.slice(0, 3);
 };
 
+// The API sends a card its first five photos; the cover leads so the tile opens on the same frame as before.
+const MAX_CARD_PHOTOS = 5;
+const cardPhotos = (p) => {
+  const photos = [...new Set([p.image || p.img, ...(p.gallery || [])].filter(Boolean))].slice(0, MAX_CARD_PHOTOS);
+  return photos.length ? photos : [''];
+};
+
 /* Guests are sent to sign-in; members toggle the saved store that the navbar heart-count reads. */
 function FeaturedCard({ p, priority = false }) {
   const { t } = useTranslation();
@@ -27,7 +34,14 @@ function FeaturedCard({ p, priority = false }) {
   const savedList = useSaved();
   const sendToSignIn = useSignInGate();
   const saved = savedList.has(p.id);
-  const image = p.image || p.img || '';
+  const photos = cardPhotos(p);
+  const [shown, setShown] = useState(0);
+  const verifiedLabel = [p.ownerVerified && t('property.verifiedOwner'), p.ownershipVerified && t('property.ownershipVerified')].filter(Boolean).join(' · ');
+
+  const onSwipe = (e) => {
+    const el = e.currentTarget;
+    if (el.clientWidth) setShown(Math.round(el.scrollLeft / el.clientWidth));
+  };
 
   const handleSave = (e) => {
     e.preventDefault();
@@ -39,11 +53,30 @@ function FeaturedCard({ p, priority = false }) {
   return (
     <Link to={propertyHref(p)} className="property-card list-reveal glass rounded-2xl overflow-hidden group cursor-pointer flex flex-col">
       <div className="card-img-wrap relative overflow-hidden" style={{ aspectRatio: '16/10' }}>
-        <PropertyImage src={image} sizes={CARD_SIZES} alt={p.title} width={600} height={400} className="w-full h-full object-cover" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : undefined} />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
-        <div className="absolute top-3 left-3 flex gap-1.5">
+        {/* Swipeable on a phone only, like the property gallery; above sm the tile shows its cover. Each slide clips
+            its own photo so the hover zoom cannot spill the next one into view. */}
+        <div onScroll={onSwipe} className="no-scrollbar flex w-full h-full overflow-x-auto overflow-y-hidden sm:overflow-hidden overscroll-x-contain snap-x snap-mandatory">
+          {photos.map((src, i) => (
+            <div key={src || i} className="snap-start snap-always shrink-0 w-full h-full overflow-hidden">
+              <PropertyImage
+                src={src}
+                sizes={CARD_SIZES}
+                alt={i === 0 ? p.title : ''}
+                width={600}
+                height={400}
+                draggable={false}
+                className="w-full h-full object-cover"
+                loading={priority && i === 0 ? 'eager' : 'lazy'}
+                fetchPriority={priority && i === 0 ? 'high' : undefined}
+              />
+            </div>
+          ))}
+        </div>
+        {/* Overlays let touches through, or a swipe starting on them would not reach the scroller. */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
+        <div className="pointer-events-none absolute top-3 left-3 flex gap-1.5">
           {(p.ownerVerified || p.ownershipVerified) && (
-            <span className="badge-verified-icon" role="img" aria-label={t('home.featured.verified')} title={t('home.featured.verified')}>
+            <span className="badge-verified-icon" role="img" aria-label={verifiedLabel} title={verifiedLabel}>
               <Icon name="shield-check" />
             </span>
           )}
@@ -58,9 +91,16 @@ function FeaturedCard({ p, priority = false }) {
         >
           <Icon name="heart" weight={saved ? 'fill' : 'regular'} className="w-6 h-6" />
         </button>
-        <div className="theme-dark absolute bottom-3 left-3">
+        <div className="theme-dark pointer-events-none absolute bottom-3 left-3">
           <span className="text-xl font-extrabold text-white tabular-nums" style={{ textShadow: '0 1px 4px rgb(var(--dz-c-black) / 0.6)' }}>{priceLabel(p)}</span>
         </div>
+        {photos.length > 1 ? (
+          <div data-card-dots="" aria-hidden="true" className="sm:hidden pointer-events-none absolute bottom-4 right-3 flex items-center gap-1.5">
+            {photos.map((_, d) => (
+              <span key={d} className={'block h-1.5 rounded-full shadow-[0_0_3px_rgb(var(--dz-c-black)/0.5)] transition-all ' + (d === shown ? 'w-4 bg-pure-white' : 'w-1.5 bg-pure-white/55')} />
+            ))}
+          </div>
+        ) : null}
       </div>
       <div className="flex flex-col flex-1 p-4 gap-1.5">
         <h3 className="font-semibold text-sm leading-snug text-white group-hover:text-teal-300 transition-colors line-clamp-2">{p.title}</h3>

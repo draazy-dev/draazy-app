@@ -9,10 +9,10 @@ export default function VerificationDisclaimer({ deal }) {
     <div className="rounded-xl border border-amber-500/25 p-4 flex items-start gap-3" style={{ background: 'rgb(var(--dz-c-amber-500) / .06)' }}>
       <Icon name="shield-alert" className="w-4 h-4 text-amber-300 flex-shrink-0 mt-0.5" />
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-white mb-1">What “Verified by Draazy” means — and what you must still check</p>
+        <p className="text-sm font-semibold text-white mb-1">What “Verified property” means — and what you must still check</p>
         <p className="text-xs text-slate-300 leading-relaxed">
-          A “Verified” tag means Draazy confirmed the owner’s identity and sighted the document the
-          owner provided. It is <span className="font-semibold text-amber-200">not</span> a certification of the document’s authenticity, legal validity{isRent ? '' : ', or of clear and marketable title'}.
+          A “Verified property” badge means Draazy sighted the document the owner provided, and “ID verified” means
+          Draazy reviewed the owner’s identity. Neither is a <span className="font-semibold text-amber-200">certification</span> of the document’s authenticity, legal validity{isRent ? '' : ', or of clear and marketable title'}.
         </p>
         <p className="text-xs text-slate-300 leading-relaxed mt-1.5">
           {isRent

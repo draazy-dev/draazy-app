@@ -43,7 +43,7 @@ Furnishing, parking, pet-friendly, lift, power backup, security, food preference
 
 - **Available from** — narrows rentals by when the owner says they are available
 - **Near a place** — uses a real place and a radius, instead of trusting locality boundaries
-- **Verification** — narrows to specific current [verification badges](/help/a/how-we-verify), such as ID verified owner, ownership verified or RERA
+- **Verification** — narrows to specific current [verification badges](/help/a/how-we-verify), such as ID verified or Verified property, or to listings where the owner shared a RERA number
 - **Security deposit** — filters rentals by stated deposit while keeping homes where the owner has not stated one
 
 The result count above the listings and the phone filter sheet update for the current search. If it falls to zero, remove the last constraint you added.
@@ -52,7 +52,7 @@ On a phone, open filters from the bottom filter button. Saving a search asks you
 
 ## Sorting
 
-The default **Relevance** sort scores each listing on featured placement, verification badges, MahaRERA registration, freshness and completeness. Featured placement is the highest-weighted term.
+The default **Relevance** sort scores each listing on featured placement, verification badges, an owner-shared MahaRERA number, freshness and completeness. Featured placement is the highest-weighted term.
 
 Pick a column order — price low-to-high, price high-to-low or price per sq ft — and the relevance score is switched off. **Newest** and **Verified first** are their own ranked orders. Switch to **Newest** while actively hunting; in a hot locality, being early matters more than being precise.
 

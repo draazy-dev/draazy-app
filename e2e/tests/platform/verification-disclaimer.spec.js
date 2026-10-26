@@ -1,7 +1,7 @@
 import { test, expect } from '../../fixtures/live.js';
 import { API } from '../../helpers/liveAuth.js';
 
-// "Verified by Draazy" legal scope + the due-diligence acknowledgement, against the live API.
+// "Verified property" legal scope + the due-diligence acknowledgement, against the live API.
 const SALE = 'p5021';
 const RENT = 'p5015';
 
@@ -19,7 +19,7 @@ test('the sale trust tab carries the verification-scope disclaimer and links to 
   await login.asBuyer();
   await openTrustTab(page, SALE);
 
-  await expect(page.getByText(/What .Verified by Draazy. means/i).first()).toBeVisible();
+  await expect(page.getByText(/What .Verified property. means/i).first()).toBeVisible();
   await expect(page.getByText(/independent legal due diligence/i).first()).toBeVisible();
   await expect(page.getByRole('link', { name: /Read the full Disclaimer/i }).first())
     .toHaveAttribute('href', '/disclaimer');
@@ -50,7 +50,7 @@ test('a rental shows the deal-appropriate notice and offers no document request'
   await login.asBuyer();
   await openTrustTab(page, RENT);
 
-  await expect(page.getByText(/What .Verified by Draazy. means/i).first()).toBeVisible();
+  await expect(page.getByText(/What .Verified property. means/i).first()).toBeVisible();
   await expect(page.getByText(/leave-.-license agreement/i).first()).toBeVisible();
   // Rentals have no title chain, so a request button would imply nonexistent papers.
   await expect(page.getByRole('button', { name: /Request to view documents/i })).toHaveCount(0);

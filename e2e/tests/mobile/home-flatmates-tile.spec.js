@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 /* Flatmates tile at 412 and 360: trust features stay on one line (nowrap, swipes at 360), CTAs stack
    full-width below `sm`, and the page gains no horizontal overflow. */
 
-const FEATURES = ['Verified seekers', 'Women-only filter', 'No number sharing'];
+const FEATURES = ['ID-verified seekers', 'Women-only filter', 'No number sharing'];
 
 async function gotoFlatmatesTile(page) {
   await page.goto('/');

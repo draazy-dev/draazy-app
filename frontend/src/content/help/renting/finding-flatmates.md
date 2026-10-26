@@ -4,23 +4,22 @@ slug: finding-flatmates
 category: renting
 audience: tenant
 order: 4
-updated: 2026-10-10
+updated: 2026-10-22
 summary: Move into a shared room, team up before you have a flat, or host a room — plus reviews, groups and chat.
 tags: [flatmates, sharing, roommate, badge, groups]
 ---
 
 [Flatmates](/flatmates) covers three situations: you have a room to fill, you want a room in someone's flat, or you want to team up with strangers to rent a whole flat together. Each room, group and seeker post has its own detail page.
 
-You only need to be signed in to post or to show interest. There is no identity gate here either — verification is a badge, not a door. The one exception is a request whose author ticked **Only let Verified Seekers express interest in my post**; you are asked to verify first.
+You only need to be signed in to post or to show interest. There is no identity gate here either — verification is a badge, not a door. The one exception is a request whose author ticked **Only let ID-verified people express interest in my post**; you are asked to verify first.
 
 ## Posting a room
 
-1. Tap **Post** on [Flatmates](/flatmates) and choose **A room in my place**.
-2. Say whether you **own this home** or are **a current tenant** replacing an outgoing flatmate.
-3. Add the flat and its location, and whether the room is **Single** (1 person) or **Double sharing** (up to 2). A shared room's rent is split equally between the people sharing it.
-4. State your preferences honestly — who the room is for, food preference and lifestyle tags such as non-smoker or early riser. Notice period, minimum stay and how bills are billed are optional.
-5. Add a headline, at least one photo and a note. The headline is yours, capped at 120 characters; the app can suggest one.
-6. Tap **Post & Find Flatmates**. People send interest; once you accept, you chat in Messages. Your number is not shown unless you share it.
+1. Tap **Post**, choose **Flatmates**, then **I have a room to fill**.
+2. **The room**: whether it is **Single** (1 person) or **Double sharing** (up to 2), the rent, deposit (type 0 if there is none), the date it is free and who it suits. A shared room's rent is split equally between the people sharing it.
+3. **The home**: find your society or building (it places the pin on the map), check the locality, then the BHK, how many people live there now and the furnishing. Say whether you **own this home** or are **a current tenant** replacing an outgoing flatmate. Fields marked * are required.
+4. **Photos & post**: add at least one photo, a headline and a note. The headline is yours, capped at 120 characters; the app can suggest one. **More details** is optional: washroom, floors, furniture, food preference, lifestyle tags, notice period, minimum stay and bills.
+5. Tap **Post & Find Flatmates**. People send interest; once you accept, you chat in Messages. Your number is not shown unless you share it.
 
 A room posted from this form waits for our team to read it before the public board shows it; flagged addresses wait too. You can still see and edit your post while it waits. Rooms made with **Let room by room** on your own verified whole-flat listing go live straight away, because the property has already passed listing review.
 
@@ -40,23 +39,31 @@ A tenant's claim to live in the flat can be rejected with a reason, and editing 
 
 ### If you are a sitting tenant
 
-As well as the agreement, you confirm the flat owner knows and agrees. Add the owner's mobile and they receive an OTP to approve; we can verify the agreement only after that. That turns "trust me, the owner is fine with it" into something we can actually point at.
+To post a room as a tenant, you confirm the flat owner knows and agrees, and give the owner's mobile. We send the owner a short WhatsApp message about Draazy and your post, with a link to say **Yes, I agree** or **I don't agree**. If they agree, the room shows that the owner confirmed it, and the flat is saved privately to a free Draazy account on the owner's number, where they can see your post and list the flat when they want; if they don't, the post comes down while our team checks it. You get a notification either way. The rent agreement is not needed to post: once the room is up, open your dashboard, tap **Get verified** on the room, and upload your **registered** agreement in **Documents**. Request a review there. Uploading alone does not grant a badge: once the owner has agreed, a person checks it before awarding the Verified property badge.
 
 > [!NOTE]
-> None of this is required to post. It changes how seriously people take your post, not whether you can make one.
+> Only post a room the owner has actually agreed to. A "no" from the owner takes the post down.
 
 ## Looking for a room
 
-Use the filters (budget, locality or near a place, move-in, who the room is for, sharing, lifestyle, verified only, attached washroom) or the smart search bar, and switch between List and Map. **Move in now** shows homes with a room; **Team up** shows people looking. Every listing shows who already lives there and what they are looking for. Tap **Send interest**; after the host accepts, the button becomes **Message owner** and opens Messages. **Save** keeps a post on your account, and an empty board offers **Create alert**.
+Use the filters (budget, locality or near a place, move-in, who the room is for, private or shared room, sharing, lifestyle, verified only, attached washroom) or the smart search bar, and switch between List and Map. Picking **Women** shows homes open to women, mixed ones included; tap **Women-only homes** to see only homes for women. On **Rooms** you can also ask for **Furnished** or **Semi-furnished** and a **Gated society**. **Rooms** shows rooms you can move into, **Flatmates** shows people who need a room, and **Teams** shows groups looking for a whole flat to rent together. Every listing shows who already lives there and what they are looking for. Tap **Send interest**; after the host accepts, the button becomes **Message owner** and opens Messages. **Save** keeps a post on your account, and an empty board offers **Create alert**.
 
 > [!TIP]
 > Ask to visit at the time you would normally be home. A flat that is quiet at 3 pm on a Wednesday tells you very little about weeknights.
 
+## Living style
+
+Answer a few quick questions about how you live: sleep times, cleanliness, guests, smoking, food, pets and the like. Skip any or all of them. Your answers are saved once on your profile and used when you post and when you search.
+
+Once you have answered at least three, cards show a **% match** with people who answered too, and **Best match** sorting puts them first. Nothing is hidden for a low match. Answers show on a post's detail page only to signed-in members who have answered at least three questions themselves, and only for the questions they also answered. Edit or clear them from **Find your flatmate vibe** on the board.
+
 ## Team up and groups
 
-If you do not have a flat yet, choose **Still looking for a flat**. A group can list up to three preferred localities, BHK, rent and deposit ranges, furnishing, move-in timing and whether bachelors are okay. It appears on **Team up** so people can form the household first. To be found without a group, choose **I'm looking for a place** then **Just me**: the request goes live straight away, and you can have one live at a time.
+If you do not have a flat yet, tap **Post**, choose **Flatmates**, then **Team up to rent a flat**. A group can list up to three preferred localities, BHK, rent and deposit ranges, furnishing, move-in timing and whether bachelors are okay. It appears on **Teams** so people can form the household first. To be found without a group, choose **I need a room** instead: the request goes live straight away, and you can have one live at a time.
 
-If you already have a flat, choose **I have a flat** and post the seats you want to fill. A group advertises how many seats it has and how many are still open, so nobody joins a flat that is already full. A group open to **Anyone** lets you **Join** instantly; **Women only** and **Men only** groups use **Request to join**, and the host accepts or declines each request.
+If you already have a flat with space in it, choose **I have a room to fill** instead. If you own the flat and have listed it on Draazy, link that listing and the room shows **Verified property**; if you rent through Draazy, link your tenancy to fill in the details.
+
+A group advertises how many seats it has and how many are still open, so nobody joins one that is already full. A group open to **Anyone** lets you **Join** instantly; **Women only** and **Men only** groups use **Request to join**, and the host accepts or declines each request.
 
 Members can leave, cancel a pending request, and the host can remove members. Group chat lives in [Messages](/messages). When a group is ready to apply to a whole-flat rental, the owner sees one application with the group name, the host and the number of members.
 

@@ -257,11 +257,11 @@ const DESKS = [
     check: (gets) => expect(gets.keys().filter((k) => /[?&]size=1(&|$)/.test(k))).toEqual([]),
   },
   {
-    name: 'flatmates reads one moderation queue for every kind and state',
+    name: 'flatmates reads one moderation queue for every kind and state, and no badge-claim list until the Badge requests tab opens',
     url: '/admin/flatmates',
     ready: /Flatmate/i,
-    once: ['/api/admin/flatmates/moderation', '/api/admin/group-applications', '/api/admin/flatmate-reviews'],
-    never: [],
+    once: ['/api/admin/flatmates/moderation', '/api/admin/group-applications'],
+    never: ['/api/admin/flatmate-reviews'],
     check: () => {},
   },
   {

@@ -5,12 +5,12 @@ category: trust-safety
 audience: everyone
 order: 1
 featured: true
-updated: 2026-10-10
+updated: 2026-10-22
 summary: Identity, listing, ownership and flatmate verification badges - what each proves and what it does not.
 tags: [verification, trust, kyc, badge, rera, ownership]
 ---
 
-Draazy uses separate badges for separate checks. A listing can be live with no badge, or carry identity, ownership and RERA signals together. Each badge is a meaningful signal, but none is a guarantee of ownership, condition or final terms - read on for exactly where the line is.
+Draazy uses separate badges for separate checks. A listing can be live with no badge, or carry identity and ownership badges together, plus a RERA number shared by the owner. Each badge is a meaningful signal, but none is a guarantee of ownership, condition or final terms - read on for exactly where the line is.
 
 ## Verification is a badge, not a gate
 
@@ -57,9 +57,9 @@ For a sale, always run an independent title check before paying anything. We off
 
 | Badge | Meaning |
 | --- | --- |
-| ID verified owner | The poster's ID and live selfie were reviewed and accepted |
-| Verified property | Ownership evidence was accepted and is still current |
-| RERA registered | The listing shows a MahaRERA registration number. The property page links it to the MahaRERA site so you can look it up yourself |
+| ID verified | The person's ID and live selfie were reviewed and accepted. Shown on owners, tenants and flatmate seekers |
+| Verified property | Ownership or tenancy evidence for the home was accepted and is still current. Also shown on flatmate rooms and groups |
+| RERA shared | A MahaRERA registration number shared by owner, check it on MahaRERA - the number links to its MahaRERA search result |
 | No badge | Nobody has submitted anything yet. Common and not suspicious - treat with normal caution. |
 
 A listing can carry several of these at once, and the search filters let you require any of them.

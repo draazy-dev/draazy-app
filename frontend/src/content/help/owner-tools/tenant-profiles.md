@@ -17,7 +17,7 @@ Tenants build a profile of their own — name, occupation, monthly income, who w
 | --- | --- |
 | Name | No — self-declared |
 | Mobile number | **Yes** — OTP at sign-up (shown on a number request once you accept it) |
-| **Serious Buyer** / **Verified tenant** tick | **Yes** — the tenant completed ID verification, checked by our team |
+| **Serious Buyer** / **ID verified** tick | **Yes** — the tenant completed ID verification, checked by our team |
 
 The tick appears on number requests, and beside the tenant's name on offers and close-the-deal requests. A tenant's occupation, income, household and previous landlord answers are **not** shown in your Requests inbox, and none of them is verified — ask for them yourself.
 

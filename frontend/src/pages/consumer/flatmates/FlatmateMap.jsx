@@ -4,7 +4,6 @@ import { APIProvider, Map, AdvancedMarker, InfoWindow } from '@vis.gl/react-goog
 import Icon from '../../../components/Icon.jsx';
 import { useLocalityCoords } from './useLocalityCoords.js';
 import { inr, seekerBudget, initials, avatarGrad, perHead, seatsLeft, allVerified, moveInLabel, roomTitle, seekerTitle, FLATMATE_IMG } from './helpers.js';
-import { TAB_MOVE_IN } from './model.js';
 import { GOOGLE_MAPS_API_KEY, GOOGLE_MAPS_MAP_ID, mapColorScheme } from '../../../lib/mapsConfig.js';
 import { getActiveCityGeo } from '../../../lib/geoConfig.js';
 import MapUnavailable from '../../../components/property/MapUnavailable.jsx';
@@ -21,7 +20,7 @@ const PREFIX = { group: 'g', room: 'r', seeker: 's' };
 function rowModel(item, t) {
   if (item.kind === 'room') {
     return {
-      prefix: 'r', title: roomTitle(item), verified: !!item.verified,
+      prefix: 'r', title: roomTitle(item), verified: !!item.verified, verifiedLabel: t('flatmates.verified'),
       meta: inr(item.budget) + t('flatmates.perMonth') + ' · ' + (item.roomType || item.flatType || t('flatmates.roomFallback')),
       thumb: item.img || item.cover || FLATMATE_IMG, avatarText: null, avatarGrad: 'from-teal-500 to-indigo-500',
     };
@@ -29,13 +28,13 @@ function rowModel(item, t) {
   if (item.kind === 'group') {
     const left = seatsLeft(item);
     return {
-      prefix: 'g', title: item.title, verified: allVerified(item),
+      prefix: 'g', title: item.title, verified: allVerified(item), verifiedLabel: t('flatmates.allVerified'),
       meta: inr(perHead(item)) + t('flatmates.perMonth') + ' · ' + (left > 0 ? t('flatmates.seatsLeft', { count: left }) : t('flatmates.full')),
       thumb: null, avatarText: null, avatarIcon: 'users-round', avatarGrad: 'from-indigo-500 to-teal-500',
     };
   }
   return {
-    prefix: 's', title: seekerTitle(item), verified: !!item.verified,
+    prefix: 's', title: seekerTitle(item), verified: !!item.verified, verifiedLabel: t('flatmates.verifiedSeeker'),
     meta: seekerBudget(item) + t('flatmates.perMonth') + ' · ' + moveInLabel(item.moveIn),
     thumb: null, avatarText: initials(item.name), avatarGrad: avatarGrad(item.gender),
   };
@@ -63,8 +62,8 @@ function PostRow({ item, saved, onSave, onInterest, onRoomInterest, onJoin, inte
       : full
         ? <button className="dz-sp-cta is-off" disabled><Icon name="lock" /> {t('flatmates.full')}</button>
         : interested
-          ? <button className="dz-sp-cta is-done" disabled><Icon name="check-check" /> {item.policy === 'any' ? t('flatmates.joined') : t('flatmates.sent')}</button>
-          : <button className="dz-sp-cta" onClick={() => onJoin(item)}><Icon name={item.policy === 'any' ? 'user-plus' : 'user-check'} /> {item.policy === 'any' ? t('flatmates.join') : t('flatmates.request')}</button>;
+          ? <button className="dz-sp-cta is-done" disabled><Icon name="check-check" /> {t('flatmates.sent')}</button>
+          : <button className="dz-sp-cta" onClick={() => onJoin(item)}><Icon name="user-check" /> {t('flatmates.request')}</button>;
   } else {
     action = interested
       ? <button className="dz-sp-cta is-done" disabled><Icon name="check-check" /> {t('flatmates.interested')}</button>
@@ -78,7 +77,7 @@ function PostRow({ item, saved, onSave, onInterest, onRoomInterest, onJoin, inte
           ? <img className="dz-sp-thumb" src={m.thumb} alt="" loading="lazy" />
           : <span className={'dz-sp-av bg-gradient-to-br ' + m.avatarGrad}>{m.avatarIcon ? <Icon name={m.avatarIcon} /> : m.avatarText}</span>}
         <span className="dz-sp-rowinfo">
-          <span className="dz-sp-rowtitle">{m.title}{m.verified ? <Icon name="shield-check" className="dz-sp-vtick" /> : null}</span>
+          <span className="dz-sp-rowtitle">{m.title}{m.verified ? <span role="img" aria-label={m.verifiedLabel} title={m.verifiedLabel} className="inline-flex shrink-0"><Icon name="shield-check" className="dz-sp-vtick" /></span> : null}</span>
           <span className="dz-sp-rowmeta">{m.meta}</span>
         </span>
         <Icon name="chevron-right" className="dz-sp-chev" />
@@ -108,14 +107,10 @@ function framing(items, localityCoords) {
   return { defaultCenter: getActiveCityGeo().center, defaultZoom: 11 };
 }
 
-function FlatmateMap({ items, tab, kindWord, onInterest, onRoomInterest, onJoin, onSave, saved, interestedFor, goToPosting }) {
+function FlatmateMap({ items, kindWord, onInterest, onRoomInterest, onJoin, onSave, saved, interestedFor, goToPosting }) {
   const { t } = useTranslation();
   const localityCoords = useLocalityCoords(Object.keys(items));
   const [openLoc, setOpenLoc] = useState(null);
-  // kindWord is 'homes' on the Move-in tab and 'flatmates' on Team up — the two
-  // tabs are the only sources, so there is no third case to handle.
-  const hereKey = kindWord === 'homes' ? 'homesHere' : 'flatmatesHere';
-  const prefix = tab === TAB_MOVE_IN ? 'r' : 's';
   const openList = openLoc && items[openLoc] ? items[openLoc] : null;
   const openPos = openLoc ? localityCoords[openLoc] : null;
   // Stable identity so vis.gl doesn't re-run setOptions on every render (same
@@ -163,14 +158,14 @@ function FlatmateMap({ items, tab, kindWord, onInterest, onRoomInterest, onJoin,
               <div className="dz-sp">
                 <div className="dz-sp-head">
                   <div className="dz-sp-title">{openLoc}</div>
-                  <div className="dz-sp-sub">{t(`flatmates.${hereKey}`, { count: openList.length })}</div>
+                  <div className="dz-sp-sub">{t(`flatmates.${kindWord}Here`, { count: openList.length })}</div>
                 </div>
                 <div className="dz-sp-list">
                   {openList.slice(0, MAX_ROWS).map((item) => (
                     <PostRow key={(PREFIX[item.kind] || 's') + ':' + item.id} item={item} saved={saved} onSave={onSave} onInterest={onInterest} onRoomInterest={onRoomInterest} onJoin={onJoin} interestedFor={interestedFor} goToPosting={goToPosting} locality={openLoc} />
                   ))}
                 </div>
-                <button type="button" className="dz-sp-all" onClick={() => goToPosting(prefix, null, openLoc)}>
+                <button type="button" className="dz-sp-all" onClick={() => goToPosting(null, null, openLoc)}>
                   {openList.length > MAX_ROWS ? t('flatmates.seeAllInLoc', { count: openList.length, loc: openLoc }) : t('flatmates.openInList', { loc: openLoc })}
                   <Icon name="arrow-right" />
                 </button>

@@ -6,7 +6,6 @@ import { getFlatmateDetail } from '../../../services/flatmateService.js';
 
 const META = {
   pending: ['clock', 'text-amber-300', 'agreementUnderReview', 'reviewInfoPending'],
-  approved: ['shield-check', 'text-emerald-300', 'agreementVerified', 'reviewInfoApproved'],
   rejected: ['shield-alert', 'text-rose-300', 'agreementNotVerified', 'reviewInfoRejected'],
 };
 

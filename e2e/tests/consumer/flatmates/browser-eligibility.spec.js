@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { API, apiLogin, signedInAsNew, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, apiLogin, signedInAsNew, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { liveListing, verifyOwnership } from '../../../helpers/referral.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
@@ -39,6 +41,7 @@ async function createRoom(token, society) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
+      ...(await roomBasics(token)),
       bhk: '2',
       roomType: 'Private room',
       attachedBath: 'attached',
@@ -51,7 +54,6 @@ async function createRoom(token, society) {
       lookingFor: 'any',
       foodPref: 'any',
       hostRole: 'tenant',
-      photos: await uploadedListingPhotos(token),
       ...(await tenantRoomAgreement(token)),
     }),
   });
@@ -64,7 +66,7 @@ async function createRoom(token, society) {
 
 async function openMoveIn(page) {
   await page.goto(`${BASE}/flatmates`);
-  await expect(page.getByRole('button', { name: /Move in now/i })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20_000 });
 }
 
 async function openFilters(page) {
@@ -73,18 +75,18 @@ async function openFilters(page) {
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
-test('an owner-tier group renders Owner-verified and Verified only removes a real unapproved tenant room', async ({ page }) => {
-  const { accessToken: ownerToken } = await apiLogin(ACTORS.owner);
-  const listings = await (await fetch(`${API}/me/listings?size=50`, { headers: auth(ownerToken) })).json();
-  const listing = listings.content.find((row) => row.status === 'approved');
-  expect(listing, 'the seeded owner needs an approved listing').toBeTruthy();
+test('an owner-tier group renders Verified property and Verified only removes a real unapproved tenant room', async ({ page }) => {
+  const ownerMobile = uniqueMobile();
+  const { accessToken: ownerToken } = await   apiLogin(ownerMobile, { name: 'Verified Owner' });
+  const listing = await liveListing(ownerMobile);
+  await verifyOwnership(ownerMobile, listing);
 
   const ownerTitle = uniqueTitle('owner');
   const ownerGroup = await createGroup(ownerToken, {
     title: ownerTitle,
-    name: 'Verified Owner',
     locality: listing.locality || 'Baner',
     rent: 42000,
+    deposit: 50000,
     seats: 2,
     seatsOpen: 1,
     policy: 'any',
@@ -103,7 +105,7 @@ test('an owner-tier group renders Owner-verified and Verified only removes a rea
   const identityCard = page.locator(`[data-sf-id="r:${identityRoom.id}"]`);
   await expect(ownerCard).toBeVisible({ timeout: 15_000 });
   await expect(identityCard).toBeVisible({ timeout: 15_000 });
-  await expect(ownerCard.getByRole('img', { name: 'Owner-verified', exact: true })).toBeVisible();
+  await expect(ownerCard.getByText('Verified property', { exact: true })).toBeVisible();
 
   await openFilters(page);
   await page.getByRole('button', { name: 'Verified only', exact: true }).click();

@@ -278,7 +278,7 @@ export default function Owner() {
                 <p className="text-gray-400 text-sm leading-relaxed">{t(owner.verified ? 'owner.aboutBody' : 'owner.aboutBodyUnverified', { name: owner.name })}</p>
                 <div className="flex flex-wrap gap-2 mt-4">
                   {/* Gated like the header pill, or the emerald badge would
-                      assert 'Verified Owner' where the teal one was withheld. */}
+                      assert 'ID verified' where the teal one was withheld. */}
                   {owner.verified ? <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-medium"><Icon name="user-check" className="w-3.5 h-3.5" /> {t('owner.badgeVerifiedOwner')}</span> : null}
                   {/* No 'Ownership Verified' pill: that is modelled per listing
                       (PropertySummary.ownershipVerified), with no owner-level claim to read. */}

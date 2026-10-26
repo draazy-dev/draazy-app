@@ -1,15 +1,16 @@
 import { test, expect, ACTORS, STAFF } from '../../../fixtures/live.js';
-import { API, E2E_OTP, apiLogin, authHeaders, uploadedListingPhotos, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, E2E_OTP, apiLogin, authHeaders, grantIdentityBadge, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
-import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { badgeChecks, tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { verifyOwnership } from '../../../helpers/referral.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const track = flatmateCleanup(test);
 
-const OWNER_BADGE = 'Owner-verified';
-const TENANT_BADGE = 'Tenant-verified';
+const PROPERTY_BADGE = 'Verified property';
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 
@@ -62,7 +63,7 @@ const roomBody = ({ society: name, hostRole = 'tenant', agreementDeclared = fals
 });
 
 async function roomPayload(token, spec) {
-  const body = await withSocietyId(token, { ...roomBody(spec), photos: await uploadedListingPhotos(token) });
+  const body = await withSocietyId(token, { ...(await roomBasics(token)), ...roomBody(spec) });
   return (body.hostRole || 'tenant') === 'tenant'
     ? { ...body, ...(await tenantRoomAgreement(token)), ...(body.ownerConsentMobile ? { ownerConsentMobile: body.ownerConsentMobile } : {}) }
     : body;
@@ -89,7 +90,8 @@ async function decideReview(roomId, decision) {
   const review = (queue.json.content || []).find((row) => row.roomId === roomId);
   expect(review, `room ${roomId} should be waiting in the verification queue`).toBeTruthy();
 
-  const decided = await api('PATCH', `/admin/flatmate-reviews/${review.id}`, staff, { decision });
+  const decided = await api('PATCH', `/admin/flatmate-reviews/${review.id}`, staff,
+    decision === 'approved' ? { decision, checks: badgeChecks() } : { decision });
   expect(decided.status, decided.text).toBe(200);
   return review;
 }
@@ -114,7 +116,7 @@ async function expectVerifiedOnly(roomId, name, present) {
 /** The board, narrowed to one society, with the lazy route resolved rather than merely requested. */
 async function openBoardOn(page, name) {
   await page.goto(`${BASE}/flatmates`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('button', { name: /Move in now/i }).first())
+  await expect(page.locator('button[data-tab="move-in"]'))
     .toBeVisible({ timeout: 30_000 });
   await page.getByPlaceholder(/^Try:/).fill(name);
 }
@@ -123,7 +125,9 @@ test.describe('Flatmate trust badges (live)', () => {
   test('an approved tenant claim badges the card, and editing the post takes the badge and the filter with it', async ({ page }) => {
     /* A second host at the same address. This one stakes no agreement, so its tier is the identity
        floor; it is queued only because two strangers now claim one flat. */
-    const { accessToken } = await apiLogin(uniqueMobile());
+    const host = uniqueMobile();
+    const { accessToken } = await apiLogin(host);
+    await grantIdentityBadge(host);
     const name = society('tenant badge');
     const ownerConsentMobile = await consentTo(accessToken, name);
     const spec = { society: name, hostRole: 'tenant', agreementDeclared: true,
@@ -140,7 +144,7 @@ test.describe('Flatmate trust badges (live)', () => {
     const card = page.locator(`[data-sf-id="r:${room.id}"]`);
     await openBoardOn(page, name);
     await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card.getByRole('img', { name: TENANT_BADGE, exact: true })).toBeVisible();
+    await expect(card.getByRole('img', { name: PROPERTY_BADGE, exact: true })).toBeVisible();
     // The edit reopens the review, because the yes was about facts it may have just changed.
     const moved = `${name} Annexe`;
     const edited = await api('PATCH', `/flatmates/rooms/${room.id}`, auth(accessToken),
@@ -152,7 +156,7 @@ test.describe('Flatmate trust badges (live)', () => {
 
     await openBoardOn(page, moved);
     await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card.getByRole('img', { name: TENANT_BADGE, exact: true })).toHaveCount(0);
+    await expect(card.getByRole('img', { name: PROPERTY_BADGE, exact: true })).toHaveCount(0);
   });
 
   test('clearing a contested address is not an agreement, so it mints no badge', async ({ page }) => {
@@ -177,12 +181,12 @@ test.describe('Flatmate trust badges (live)', () => {
     await openBoardOn(page, name);
     const card = page.locator(`[data-sf-id="r:${contested.id}"]`);
     await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card.getByRole('img', { name: TENANT_BADGE, exact: true })).toHaveCount(0);
-    await expect(card.getByRole('img', { name: OWNER_BADGE, exact: true })).toHaveCount(0);
+    await expect(card.getByRole('img', { name: PROPERTY_BADGE, exact: true })).toHaveCount(0);
   });
 
-  test('an owner letting a spare room in their own approved flat is badged without waiting for a queue', async ({ page }) => {
-    const { accessToken } = await apiLogin(uniqueMobile());
+  test('an owner letting a spare room in their own ownership-verified flat is badged without waiting for a queue', async ({ page }) => {
+    const owner = uniqueMobile();
+    const { accessToken } = await apiLogin(owner);
     const name = society('owner spare');
 
     const listing = await api('POST', '/me/listings', auth(accessToken), {
@@ -200,6 +204,9 @@ test.describe('Flatmate trust badges (live)', () => {
     const listingId = listing.json.id;
     const approved = await approveListingWithFetch(listingId, await authHeaders(ACTORS.admin));
     expect(approved.status, approved.text).toBe(200);
+    const unbadged = await postRoom(accessToken, { society: society('unbadged flat'), hostRole: 'owner', propertyId: listingId });
+    expect(unbadged.verificationTier, 'an approved listing without its Verified-owner badge lends no owner tier').toBe('identity');
+    await verifyOwnership(owner, { id: listingId });
 
     const room = await postRoom(accessToken, {
       society: name, hostRole: 'owner', propertyId: listingId,
@@ -215,7 +222,7 @@ test.describe('Flatmate trust badges (live)', () => {
     await openBoardOn(page, name);
     const card = page.locator(`[data-sf-id="r:${room.id}"]`);
     await expect(card).toBeVisible({ timeout: 15_000 });
-    await expect(card.getByRole('img', { name: OWNER_BADGE, exact: true })).toBeVisible();
+    await expect(card.getByRole('img', { name: PROPERTY_BADGE, exact: true })).toBeVisible();
     /* The id is checked, not trusted. Every seeker knows a listing id — it is in the URL of the
        listing's own page — so naming one must not be enough to inherit its owner's badge. */
     const stranger = await apiLogin(uniqueMobile());

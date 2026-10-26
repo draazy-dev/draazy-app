@@ -3,11 +3,11 @@ import Icon from '../../../components/Icon.jsx';
 
 // Seeded copy, not real events.
 const ITEMS = [
-  { icon: 'shield-check', text: 'New listing from a Verified owner in Hinjawadi', color: 'text-emerald-300' },
+  { icon: 'shield-check', text: 'New listing from an ID-verified owner in Hinjawadi', color: 'text-emerald-300' },
   { icon: 'heart', text: 'Someone just saved a 2 BHK in Baner', color: 'text-rose-300' },
   { icon: 'hand-coins', text: 'Zero-brokerage deal closed in Wakad', color: 'text-teal-300' },
   { icon: 'calendar-check', text: 'Visit scheduled for a 3 BHK in Kothrud', color: 'text-teal-300' },
-  { icon: 'badge-check', text: 'Owner verified in Viman Nagar', color: 'text-amber-300' },
+  { icon: 'badge-check', text: 'Owner got ID verified in Viman Nagar', color: 'text-amber-300' },
   { icon: 'home', text: 'New flat listed in Koregaon Park', color: 'text-emerald-300' },
 ];
 
