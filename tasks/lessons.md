@@ -117,6 +117,9 @@
 
 ## UI surfaces that lie
 
+- Room/flatmate badge evidence belongs after posting in Dashboard -> Documents, like property badges; keep rent agreement upload out of create/edit forms and never grant a badge on upload alone.
+- Saved heart totals must include property and flatmate saves; the mixed saved category is "Flatmates", not "Rooms". Keep sort sizing changes measurable against the prior width.
+- Saved-page fixes: assert compact right-aligned dropdown geometry, not just its shared class; click every saved post kind through to its detail page, not just the board.
 - **A locally computed answer renders a confident false negative forever** ("no duplicate clusters"); arithmetic on a creation date shown as history is fabrication.
 - **Removing a rail leaves the documents it fed**: a Rent Passport PDF headed "Verified" from tenant-typed figures is a forgery. Seal it; grep downstream artifacts for "verified".
 - **"Remove feature X" rarely means all of X's vocabulary**; restate the boundary to the user before deleting.
@@ -144,6 +147,8 @@
 ## Architecture and product judgement
 
 - **Draazy is owner-only: no brokers, builders or agent RERA numbers, anywhere.** Never offer, label, filter or store a non-owner poster type; anti-broker guardrails stay.
+- **A listing's RERA number is owner-shared, never Draazy-verified.** Buyer-facing copy may say only that the owner shared it and the buyer can check it on MahaRERA (link to its search result); the staff MahaRERA check stays internal and never reaches the buyer API or UI. Wording: "shared by owner, check it on MahaRERA" — no "Draazy does not verify" line either.
+- **Draazy does not verify societies.** No society copy may say verified, confirmed or RERA-registered; say only what Draazy holds (e.g. "Limited details").
 - **Two routes to one verdict are fine; two leaving the record saying different things are not.** The quiet route must write down that it ran and what it skipped.
 - **When closing a record a shortcut never opened, don't tidy the evidence**: leave unticked checklists, and don't create the record.
 - **Hoist preconditions the actor cannot fix before the first write** (a blank-locality refusal inside `publish` rolled back the reviewer's verdict).
@@ -168,7 +173,7 @@
 - **Never put non-ASCII in a `.ps1`** (ANSI read; `—` ends in a U+201D delimiter; error line is wrong). Check `Select-String -Pattern '[^\x00-\x7F]'`.
 - **The persistent shell mangles long `?`/`&` URLs and `@(...)` blocks**: write a `.ps1`. The edit tool matches raw bytes (use ASCII); concurrent edits to one file hit `EBUSY`.
 - **Backend is Java 25 (`C:\Program Files\Zulu\zulu-25`), Spring Boot 4.1**; `mvnw.cmd` is in `backend/`; local entry is `.\run-local.ps1 -Port 8099`.
-- **Local Postgres password is `postgres`; never prompt.** `$env:PGPASSWORD='postgres'; & 'C:\Program Files\PostgreSQL\13\bin\psql.exe' -U postgres -d <db> -P pager=off -v ON_ERROR_STOP=1 -c "..."` (psql not on PATH).
+- **Local Postgres password is `postgres`; never prompt.** `$env:PGPASSWORD='postgres'; & 'C:\Program Files\PostgreSQL\17\bin\psql.exe' -U postgres -d <db> -P pager=off -v ON_ERROR_STOP=1 -c "..."` (psql not on PATH).
 - **`max(version)` on `flyway_schema_history` is lexicographic**: use `max(version::int) where version ~ '^[0-9]+$'`.
 - **An e2e lane serves the bytecode it compiled at start**: a 422 on legal values means stale. Compare source `LastWriteTime` to `target-<lane>\classes` and the listener's `StartTime`; `Stop-Process`, rerun the lane script, poll `/api/actuator/health`.
 - **The dev DB `draazy` drifts stale versus `draazy_e2e`**: never conclude "no such column" from it; check `draazy_e2e` or the migration files.
@@ -210,3 +215,19 @@ hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 - **Form action rows on phones sit in flow at the end of the form, never sticky/floating**: the iOS keyboard shrinks only the visual viewport, so a sticky Back/Next bar drifts mid-screen over the fields (listing wizard `.lp-step-actions`).
 - **A new listing (and a staff-posted claim) needs 3 photos, 2 labelled with key rooms** (`MIN_PUBLISH_PHOTOS`, mirrored by `ListingCompleteness.MIN_PHOTOS`); never treat the one-photo floor as the listing standard.
 - Don't replace a familiar layout while moving features: the user wanted dashboard request-type tabs and the chat property photo panel kept; add new cues (Received/Sent chip) on top instead.
+- **Port 3322 belongs to the user's `run-dev.ps1` frontend**: never kill-and-reuse it for agent testing; start agent dev servers on another port (e.g. 3400+). e2e Maps testing uses `:1122` (UI, admitted by the Maps key) + `:1123` (backend), never 3322.
+- **Before waiting on "another session's" e2e run, probe `e2e\.shards\lock` once and run targeted specs only**: a `run-fast` process-name match can be your own wait loop; never fall back to the full suite.
+- **A persistent VS Code Playwright `test-server` is not proof an e2e run is active**: check the command line and shard-lock timestamp before attributing a run to another session (user, 2026-10-23).
+- **Posting forms: `*` on required fields, never the word "optional"** (user, 2026-10-23; reverses the earlier "no *, (optional) only" choice). Proof the badge needs (rent agreement) is asked for after posting, never on the posting form.
+- **Deposit is required on every posting form, and 0 is a valid answer** (user, 2026-10-23). A tenant room asks for the owner's mobile and WhatsApps the owner a one-tap agree/decline link.
+- **Draazy is pre-launch (under development) until the user says otherwise**: marketing copy must never claim live listings, users or availability; frame it as "building", "coming soon", "early access".
+- **Reddit: prioritise Pune subreddits** (r/Hinjewadi, r/PCMC, r/pune once karma allows); national subs only for Pune-specific threads. Keep comments short (3-5 lines).
+- **Never label things "optional" anywhere in the UI** (user, 2026-10-23): not in titles, hints, badges or blurbs. Anything not marked `*` is optional by default; say what the user gains instead.
+- **Don't duplicate an existing filter as a board chip** (user, 2026-10-23): the Women only chip was removed because Filters already has the gender choice.
+- Dashboard flatmate cards should use the same status/action grouping as property cards; every verification CTA must read visually as a button, not a loose text link.
+- Matching the property card means the complete side-by-side Share listing + full Get Verified badge label, including pending flatmate posts; do not silently hide Share based on publication status.
+- Flatmate detail pages carry no save heart (the tile owns save); share sits on the photo like the property page, and facts under the location are an icon grid, never one dot-separated line (user, 2026-10-24).
+- **Messages keeps the mobile bottom nav** (user, 2026-10-24): never hide the tab bar on a consumer route except auth; size bottom-pinned panes off `--dz-bottom-inset` instead.
+- Flatmate detail pages have no in-page back row (the app header has back) and report sits as a text link after the content, like the property page's Report listing (user, 2026-10-24).
+- Flatmate forms never ask a name: posts and groups show the profile name only, and an unnamed profile is blocked with an Add name link to the profile (user, 2026-10-24). The router package is `react-router`; importing `react-router-dom` breaks the whole lazy chunk.
+- Badge cleanup: only labels meaning a person's ID check or a home's ownership/tenancy check are badges to unify ("ID verified", "Verified property"); leave unrelated trust signals (Trust score, RERA shared, Owner consented, Verified resident) alone (user, 2026-10-25).
