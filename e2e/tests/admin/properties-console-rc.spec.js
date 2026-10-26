@@ -5,7 +5,7 @@ import { API, authHeaders, uploadedListingPhotos, uniqueMobile } from '../../hel
 import { approveListing, tickChecklist } from '../../helpers/moderation.js';
 
 const admin = () => authHeaders(ACTORS.admin);
-const BASE = { deal: 'rent', propertyType: 'Flat', price: 26000, city: 'Pune', bhk: 2, area: 780, locality: 'Baner' };
+const BASE = { deal: 'rent', propertyType: 'Flat', price: 26000, deposit: 52000, city: 'Pune', bhk: 2, area: 780, locality: 'Baner' };
 const searchBox = (page) => page.getByPlaceholder('Title, owner, mobile or ID');
 const rowFor = (page, title) => page.getByTestId('queue-row').filter({ has: page.getByRole('heading', { name: title }) });
 const tag = () => `${Date.now().toString(36)}${Math.floor(Math.random() * 1e4)}`;

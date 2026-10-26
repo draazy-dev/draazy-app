@@ -242,7 +242,7 @@ test('a split room carries the owner badge publicly; once someone moves in the f
     await seeker.goto(`${BASE}/flatmates?view=rooms`);
     const card = seeker.locator(`[data-sf-id="r:${room.id}"]`);
     await expect(card).toBeVisible({ timeout: 20_000 });
-    await expect(card.getByRole('img', { name: /Owner[- ]verified/i })).toBeVisible();
+    await expect(card.getByRole('img', { name: 'Verified property' })).toBeVisible();
     await seeker.close();
   });
 

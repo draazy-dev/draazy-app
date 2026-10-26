@@ -7,6 +7,7 @@ const CLEAN_CONSOLE_ON_A_MAP = new Set([
   'tests/consumer/account/dashboard-flatmate-edit.spec.js',
   'tests/consumer/flatmates/form-typography.spec.js',
   'tests/consumer/flatmates/room-wizard-tabs.spec.js',
+  'tests/consumer/property/infotips.spec.js',
   'tests/consumer/search/locality-intel.spec.js',
   'tests/managed-properties.spec.js',
   'tests/mobile/pull-to-refresh.spec.js',

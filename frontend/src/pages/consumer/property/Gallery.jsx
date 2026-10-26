@@ -45,14 +45,24 @@ export function Gallery({ gallery, active, setActive, title, p, setLightbox, req
   const onTouchStart = () => { dragging.current = true; };
   const onTouchEnd = () => { dragging.current = false; onScroll(); };
 
-  /* The lightbox, arrows, thumbnails and dots move `active` without touching the scroller, so the track
-     follows it here; instant, because a smooth scroll still in flight is cancelled by the next change. */
+  /* Lightbox/arrows/dots move `active` without the scroller, so the track follows instantly (a smooth scroll
+     gets cancelled by the next change); a resize re-snaps at the old offset, hence the width dependency. */
+  const [trackWidth, setTrackWidth] = useState(0);
+  const hasPhotos = count > 0;
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(() => setTrackWidth(el.clientWidth));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [hasPhotos]);
+
   useEffect(() => {
     const el = trackRef.current;
     if (!el || !el.clientWidth) return;
     const target = (ask ? count : active) * el.clientWidth;
     if (Math.abs(el.scrollLeft - target) > 1) el.scrollTo({ left: target, behavior: 'auto' });
-  }, [active, ask, count]);
+  }, [active, ask, count, trackWidth]);
 
   useEffect(() => () => clearTimeout(settle.current), []);
 

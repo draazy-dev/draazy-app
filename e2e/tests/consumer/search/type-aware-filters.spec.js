@@ -38,7 +38,10 @@ test('Filter groups follow the property type (Land, Commercial, Residential)', a
   });
 });
 
-const cardHrefs = (page) => cards(page).evaluateAll((els) => els.map((el) => el.getAttribute('href')));
+// Slug-less rows link as `/property/<words>-<uuid>` (listingSeo.propertyPath), so compare the listing key.
+const listingKey = (href) => href?.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)?.[0] ?? href?.replace('/property/', '');
+const cardHrefs = async (page) => (await cards(page).evaluateAll((els) => els.map((el) => el.getAttribute('href'))))
+  .map((href) => `/property/${listingKey(href)}`);
 const apiHrefs = async (request, params) => {
   const url = new URL(`${BASE}/api/properties`);
   Object.entries({ ...params, page: '0', size: '24', rank: 'relevance' }).forEach(([key, value]) => {

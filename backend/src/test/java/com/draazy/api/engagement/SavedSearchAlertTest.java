@@ -131,7 +131,7 @@ class SavedSearchAlertTest extends AbstractApiTest {
         assertThat(alertsFor(user)).isZero();
     }
 
-    // The sweep runs every thirty minutes; a daily alert must survive 48 of them without sending twice.
+    // The sweep runs hourly; a daily alert must survive 24 of them without sending twice.
     @ParameterizedTest(name = "{0}")
     @CsvSource(delimiter = '|', value = {
             "twenty minutes later it does not fire twice in a day | 20 | 1",

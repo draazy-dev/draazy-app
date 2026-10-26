@@ -122,7 +122,7 @@ public class FlatmateReview extends AuditedEntity {
         AgreementRegistration current = getAgreement();
         if (FlatmateVocabulary.STATUS_APPROVED.equals(decision)
                 && FlatmateVocabulary.TIER_TENANT.equals(tier) && current.getValidTill() == null) {
-            this.agreement = new AgreementRegistration(LocalDate.now().plusMonths(BADGE_MONTHS));
+            this.agreement = new AgreementRegistration(FlatmateReviewChecks.today().plusMonths(BADGE_MONTHS));
         }
     }
 

@@ -18,6 +18,7 @@ const BASE_LISTING = {
   deal: 'rent',
   propertyType: 'Flat',
   price: 24000,
+  deposit: 48000,
   city: 'Pune',
   bhk: 2,
   area: 720,

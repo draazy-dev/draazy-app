@@ -315,7 +315,8 @@ export default function EntitySearchCombobox({
                   role="option"
                   aria-selected={i === activeIdx}
                   className={'loc-sugg' + (i === activeIdx ? ' active' : '') + (row.kind === 'place' ? ' loc-sugg--stack' : '') + (typeof row.count === 'number' && row.count === 0 ? ' loc-sugg--empty' : '')}
-                  onMouseEnter={() => setActiveIdx(i)}
+                  // Arrow-key scrolling slides options under a still pointer; only real movement highlights.
+                  onMouseMove={(ev) => { if (ev.movementX || ev.movementY) setActiveIdx(i); }}
                   onClick={(ev) => { ev.stopPropagation(); pickRow(row); }}
                 >
                   <span className="flex items-center gap-2.5 min-w-0">

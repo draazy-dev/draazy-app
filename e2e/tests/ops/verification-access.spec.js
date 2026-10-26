@@ -85,7 +85,7 @@ test.describe('LIVE: who may read and who may decide a verification case', () =>
       ownerMobile: uniqueMobile(),
       ownerName: 'Zztest Maker Owner',
       listing: {
-        title: `Zztest maker-checker ${Date.now()}`, deal: 'rent', propertyType: 'Flat', price: 25000,
+        title: `Zztest maker-checker ${Date.now()}`, deal: 'rent', propertyType: 'Flat', price: 25000, deposit: 50000,
         bhk: 2, area: 800, locality: 'Baner', city: 'Pune', images: await uploadedListingPhotos(poster),
       },
     });

@@ -206,8 +206,8 @@ test('an admin page makes one light bell request, not three list reads', async (
   }
   expect(body.length, 'five slim rows per section, not five full admin rows').toBeLessThan(3_000);
 
-  await page.getByRole('button', { name: 'Notifications' }).click();
-  await page.getByRole('button', { name: 'Notifications' }).click();
+  await page.getByRole('button', { name: 'Notifications', exact: true }).click();
+  await page.getByRole('button', { name: 'Notifications', exact: true }).click();
   await page.waitForTimeout(500);
   expect(gets.timesPath('/api/admin/bell'), 'opening and closing the bell does not refetch it').toBe(1);
   expect(consoleErrors).toEqual([]);

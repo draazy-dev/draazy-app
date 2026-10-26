@@ -45,9 +45,9 @@ test('flatmate post forms use the property-posting text scale', async ({ page })
   ], '16px');
   await expectPlaceholderSize([seeker.locator('input[data-err="title"]'), seeker.locator('#fp-note')]);
   const livingStyle = seeker.getByTestId('ls-inline');
-  await expectStandardType(page, [
-    livingStyle.getByTestId('ls-questions').locator('li').first().getByRole('button').first(),
-  ], '14px');
+  const vibeAnswer = livingStyle.getByTestId('ls-questions').locator('li').first().getByRole('button').first();
+  await expectStandardType(page, [vibeAnswer], '13px');
+  await expect(vibeAnswer).toHaveCSS('font-weight', '500');
 
   await page.goto('/flatmates');
   await expect(page.locator('button[data-tab="move-in"]')).toBeVisible({ timeout: 20_000 });

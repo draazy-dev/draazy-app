@@ -90,13 +90,17 @@ test('a slow lookup does not overwrite what the visitor has already typed', asyn
 
 test('an unknown ref leaves the page as the plain support page rather than breaking it', async ({ page }) => {
   const errors = trackErrors(page);
+  const ref = '00000000-0000-4000-8000-000000000000';
+  const lookup = page.waitForResponse((r) => r.url().endsWith(`/api/properties/${ref}`));
 
-  await page.goto('/contact?ref=00000000-0000-4000-8000-000000000000');
+  await page.goto(`/contact?ref=${ref}`);
+  expect((await lookup).status()).toBe(404);
 
   await expect(page.locator('.glass-card', { hasText: 'Contact owner directly' })).toHaveCount(0);
   // The positive anchor: the support page itself still rendered. Without this the assertion above
   // would pass just as happily on a blank screen.
   await expect(page.getByRole('button', { name: 'Send enquiry', exact: true })).toBeVisible();
   await expect(page.locator('textarea').first()).toHaveValue('');
-  expect(errors).toEqual([]);
+  // Chromium logs the lookup's own 404; anything beyond it is a real error.
+  expect(errors).toEqual(['Failed to load resource: the server responded with a status of 404 (Not Found)']);
 });

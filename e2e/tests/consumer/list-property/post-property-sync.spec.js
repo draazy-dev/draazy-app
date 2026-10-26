@@ -47,6 +47,7 @@ test.describe('Post-property ↔ Post-on-behalf option sync', () => {
     await pickPlaceholderLocality(page, 'Baner');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
     await page.locator('input[inputmode="numeric"]').first().fill('24000');
+    await page.locator('#pob-deposit').fill('48000');
     await page.getByRole('button', { name: 'Next', exact: true }).click();
 
     const [created] = await Promise.all([

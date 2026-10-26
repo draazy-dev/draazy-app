@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { API, E2E_OTP, apiLogin, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
+import { API, E2E_OTP, apiLogin, fileIdentityCaseAs, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 /* `ownerConsent` is not client-settable (`FlatmateMapper.applyTo` drops it), so consent can only be
@@ -19,7 +19,9 @@ async function approve(id) {
 }
 
 // New flat-shares are room posts, so the owner-consent OTP form is only reached by editing a legacy group.
+// The agreement checkbox stays disabled until the host's ID is at least in review.
 async function openLegacyGroup(page, token, title) {
+  await fileIdentityCaseAs(`Bearer ${token}`);
   const res = await fetch(`${API}/flatmates/groups`, {
     method: 'POST',
     headers: auth(token),

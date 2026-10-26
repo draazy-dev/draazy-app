@@ -249,7 +249,7 @@ test.describe('Flatmates interactions', () => {
     expect(await outbox()).toMatchObject([{ kind: 'room', status: 'pending' }]);
   });
 
-  test('a seeker can withdraw an ask, and the door reopens', async () => {
+  test('a seeker can withdraw an ask, and the door reopens only after a cooldown', async () => {
     const host = await newSeeker();
     const seeker = await newSeeker();
     const room = await seedRoom(host.accessToken);
@@ -278,6 +278,9 @@ test.describe('Flatmates interactions', () => {
     // has to tell "you already took this back" apart from "that never existed".
     expect((await withdraw('room')).status).toBe(404);
 
-    expect((await ask()).status).toBe(201);
+    // A 7-day cooldown stops an immediate re-ask from re-notifying the host.
+    const reask = await ask();
+    expect(reask.status).toBe(409);
+    expect((await reask.json()).error).toBe('recently_withdrawn');
   });
 });

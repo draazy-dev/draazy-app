@@ -231,6 +231,10 @@ hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 - Flatmate detail pages have no in-page back row (the app header has back) and report sits as a text link after the content, like the property page's Report listing (user, 2026-10-24).
 - Flatmate forms never ask a name: posts and groups show the profile name only, and an unnamed profile is blocked with an Add name link to the profile (user, 2026-10-24). The router package is `react-router`; importing `react-router-dom` breaks the whole lazy chunk.
 - Badge cleanup: only labels meaning a person's ID check or a home's ownership/tenancy check are badges to unify ("ID verified", "Verified property"); leave unrelated trust signals (Trust score, RERA shared, Owner consented, Verified resident) alone (user, 2026-10-25).
+- A hover handler on a list the keyboard scrolls must ignore pointer-less events: `onMouseEnter` fires when arrow keys slide an option under a still cursor, so gate on `movementX/Y` (`EntitySearchCombobox`).
+- Home and other eager surfaces may only use eager i18n namespaces (`auth, chrome, common, help, home, misc1`); a lazy `property.*` key renders raw until a property page loads.
+- A red spec on a rule the product changed on purpose (re-ask cooldown, owner tier needs an ownership-verified listing, ID-in-review before the agreement checkbox) is fixed in the spec, after confirming the rule in the service, never by loosening the product.
+- A full e2e run must be launched detached (`mode=async, detach`) and the shard log, not the tool shell, is the progress source; an attached run dies with its session and leaves six shard JVMs holding ports.
 - Home summarises and routes; it does not duplicate an inbox. Decisions (Accept/Decline) live on the page that shows the full request, and Home's attention panel links there by type.
 - Flatmates Rooms tab lists room posts only (photos, flat info); a group never appears there, and Teams lists only teams still hunting.
 - A chip that is true of every card on a tab (e.g. "Looking for a flat" on Teams) is noise; cards show only facts that differ between items.

@@ -8,9 +8,11 @@ const bell = (page) => page.getByTestId('admin-notifications');
 test('an escalation leads the manager bell and files under Escalations, queue work under My work', async ({ page, login, consoleErrors }) => {
   const tag = `Zzsla ${letterTag(`${Date.now()}`)}`;
   const managerId = sql(`SELECT id FROM users WHERE mobile = '${ACTORS.manager}'`);
+  // Rows sharing type, link and day collapse into "N new …", so a per-run link keeps these two apart from the suite's.
+  const q = encodeURIComponent(tag);
   sql(`INSERT INTO notifications (user_id, type, title, body, read, link) VALUES
-    ('${managerId}', 'escalation.listing-review', '${tag} escalated', 'Oldest listing', false, '/admin/properties'),
-    ('${managerId}', 'queue.report', '${tag} new report', 'Property report', false, '/admin/reports')`);
+    ('${managerId}', 'escalation.listing-review', '${tag} escalated', 'Oldest listing', false, '/admin/properties?q=${q}'),
+    ('${managerId}', 'queue.report', '${tag} new report', 'Property report', false, '/admin/reports?q=${q}')`);
 
   await login.asManager();
   await page.goto('/admin');

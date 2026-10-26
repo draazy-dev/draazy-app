@@ -36,7 +36,7 @@ function FeaturedCard({ p, priority = false }) {
   const saved = savedList.has(p.id);
   const photos = cardPhotos(p);
   const [shown, setShown] = useState(0);
-  const verifiedLabel = [p.ownerVerified && t('property.verifiedOwner'), p.ownershipVerified && t('property.ownershipVerified')].filter(Boolean).join(' · ');
+  const verifiedLabel = [p.ownerVerified && t('home.featured.idVerified'), p.ownershipVerified && t('home.featured.verifiedProperty')].filter(Boolean).join(' · ');
 
   const onSwipe = (e) => {
     const el = e.currentTarget;

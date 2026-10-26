@@ -8,7 +8,6 @@ import com.draazy.api.common.trust.RegisteredTenancyLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -99,7 +98,7 @@ public class FlatmateTrustReconciler {
     @Transactional
     public int reconcileAgreementExpiry() {
         List<FlatmateReview> lapsed = new ArrayList<>();
-        for (FlatmateReview review : reviews.findLapsedApprovals(LocalDate.now())) {
+        for (FlatmateReview review : reviews.findLapsedApprovals(FlatmateReviewChecks.today())) {
             badges.lockWithPost(review);
             if (!FlatmateVocabulary.STATUS_APPROVED.equals(review.getStatus())) {
                 continue;
@@ -122,7 +121,7 @@ public class FlatmateTrustReconciler {
         for (FlatmateReview review : reviews.findConsentedTenantBacklog()) {
 
             // The same gate a moderator would face, plus the expiry a standing badge is swept for.
-            if (!review.badgeable() || review.getAgreement().expiredOn(LocalDate.now())) {
+            if (!review.badgeable() || review.getAgreement().expiredOn(FlatmateReviewChecks.today())) {
                 continue;
             }
             badges.lockWithPost(review);

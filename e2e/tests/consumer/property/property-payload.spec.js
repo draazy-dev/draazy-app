@@ -7,7 +7,8 @@ const COMPARE = ['id', 'slug', 'deal', 'propertyType', 'bhk', 'price', 'area', '
 
 const SIMILAR = ['id', 'slug', 'title', 'deal', 'propertyType', 'bhk', 'price', 'area', 'locality', 'city', 'coverImage',
   'reraId', 'ownerVerified', 'distanceKm'];
-const OFF_CARD = ['priceUnit', 'imageCount', 'images', 'societySlug', 'societyName', 'floor', 'totalFloors', 'ageYears',
+// Cards draw the society name as a decision field, so `societyName` is on the card.
+const OFF_CARD = ['priceUnit', 'imageCount', 'images', 'societySlug', 'floor', 'totalFloors', 'ageYears',
   'facing', 'qualityScore', 'freshness', 'lastConfirmedAt', 'owner', 'ownerId'];
 
 const isGet = (r, test) => r.request().method() === 'GET' && test(new URL(r.url()).pathname);

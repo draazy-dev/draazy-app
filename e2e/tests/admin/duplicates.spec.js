@@ -60,6 +60,7 @@ const ON_BEHALF_LISTING = {
   deal: 'rent',
   propertyType: 'apartment',
   price: 32000,
+  deposit: 64000,
   bhk: 2,
   locality: 'Kothrud',
   city: 'Pune',

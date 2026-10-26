@@ -9,9 +9,10 @@ test('a card and its detail page quote the same area and ₹/sq.ft', async ({ pa
   await page.goto('/listings?deal=buy&sort=newest');
   const cards = page.locator('main a[href^="/property/"]');
   await expect(cards.first()).toBeVisible();
-  const hrefs = [...new Set(await cards.evaluateAll((as) => as.map((a) => a.getAttribute('href'))))].slice(0, 6);
+  const hrefs = [...new Set(await cards.evaluateAll((as) => as.map((a) => a.getAttribute('href'))))];
   const quoted = [];
   for (const href of hrefs) {
+    if (quoted.length === 4) break;
     const text = (await page.locator(`main a[href="${href}"]`).first().innerText()).replace(/\s+/g, ' ');
     if (AREA.test(text) && PSF.test(text)) quoted.push({ href, area: text.match(AREA)[0], psf: text.match(PSF)[0] });
   }

@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { IGNORE as SHARED_IGNORE } from '../helpers/console.js';
 import { signedInAs, signedInAsNew, apiLogin, uniqueMobile, authHeaders, API } from '../helpers/liveAuth.js';
 import { roomBasics } from '../helpers/roomWizard.js';
+import { paidPack } from '../helpers/refunds.js';
 
 // OWNER has four listings, including one non-public row, to distinguish /me/listings from public search.
 const OWNER = { mobile: '9470744469', name: 'Meera Deshpande', total: 4, publiclyVisible: 3 };
@@ -64,6 +65,8 @@ async function seedPropertyReview(page, request) {
   // Prefer a completed visit to avoid changing another test's live fixture.
   let visit = usable.find((v) => v.status === 'completed') ?? usable[0];
   if (!visit) {
+    // A visit spends an owner contact, and the seeded reviewer's 30-day free window closed long ago.
+    await paidPack(CHATTER.mobile);
     const res = await request.post('/api/visits', {
       headers: as(chatter),
       data: {

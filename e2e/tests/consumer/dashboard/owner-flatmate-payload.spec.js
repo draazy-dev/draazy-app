@@ -6,7 +6,8 @@ import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
 const track = flatmateCleanup(test);
 
-const CARD_HIDDEN = ['members', 'ownerMobile', 'ownerName', 'ownerConsentMobile', 'addressFingerprint', 'flagForReview', 'verificationTier', 'reviewStatus', 'preferences'];
+// `verificationTier` and `reviewStatus` stay on the card: its Get verified button reads them.
+const CARD_HIDDEN = ['members', 'ownerMobile', 'ownerName', 'ownerConsentMobile', 'addressFingerprint', 'flagForReview', 'preferences'];
 
 async function newUser() {
   const mobile = uniqueMobile();

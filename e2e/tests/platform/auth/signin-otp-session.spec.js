@@ -323,10 +323,14 @@ test('a sign-out the server never hears about still ends the session here', asyn
     'no hint to clear — the rest of this test would pass vacuously').toBeTruthy();
 
   await page.route('**/api/auth/logout', (route) => route.abort('connectionfailed'));
-  await page.getByRole('button', { name: 'Account menu' }).click();
   // The navbar renders the desktop dropdown and the mobile drawer into the same tree, so the label
   // matches twice; only one of them is on screen at this viewport.
-  await page.getByRole('button', { name: 'Log out', exact: true }).and(page.locator(':visible')).click();
+  const logOut = page.getByRole('button', { name: 'Log out', exact: true }).and(page.locator(':visible'));
+  // The post-sign-in redirect can remount the navbar under an open menu, so reopen it if it closed.
+  await expect(async () => {
+    if (!(await logOut.isVisible())) await page.getByRole('button', { name: 'Account menu' }).click();
+    await logOut.click({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 
   await expect
     .poll(async () => (await context.cookies()).some((c) => c.name === 'draazy_session'),
