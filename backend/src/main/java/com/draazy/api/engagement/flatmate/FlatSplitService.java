@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.catalog.property.DealIntent;
+import com.draazy.api.catalog.property.OwnershipVerified;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyPublished;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -23,8 +24,8 @@ import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Letting a whole-flat rent listing room by room. The whole-flat listing keeps existing, the badge
- * is inherited from the parent's Ops approval, and split rooms track occupancy rather than seats. */
+/** Letting a whole-flat listing room by room: the listing stays, rooms inherit its approval and Verified
+ * owner badge, and split rooms track occupancy rather than seats. */
 @Service
 public class FlatSplitService {
 
@@ -81,10 +82,10 @@ public class FlatSplitService {
         validateRoomCount(parent, specs.size());
         validateOccupancy(body.maxOccupants(), specs.size());
 
-        // An owner splitting their own Ops-approved flat is exempt from the CAP but never from the
+        // An owner splitting their own approved, Verified-owner flat is exempt from the CAP but never from the
         // address dedupe -- two people claiming one flat is what the fingerprint exists to catch.
-        boolean approved = PropertyStatus.APPROVED.equals(parent.getStatus());
-        String tier = approved ? FlatmateVocabulary.TIER_OWNER : FlatmateVocabulary.TIER_IDENTITY;
+        boolean badged = standsAsOwnerTier(parent);
+        String tier = badged ? FlatmateVocabulary.TIER_OWNER : FlatmateVocabulary.TIER_IDENTITY;
         var address = new FlatmateGuardrails.Address(propertyId, null, parent.getLocality(), null);
         var eligibility = guardrails.evaluate(caller.userId(), tier, address);
         if (eligibility.blocked()) {
@@ -106,18 +107,36 @@ public class FlatSplitService {
         }
 
 
-        return new FlatSplitResult(created.size(), tier, !approved, eligibility.flagForReview(),
+        return new FlatSplitResult(created.size(), tier, !badged, eligibility.flagForReview(),
                 created);
     }
 
     @EventListener
     public void promoteOnApproval(PropertyPublished event) {
-        rooms.findByPropertyIdAndArchivedFalse(event.propertyId()).stream()
+        promoteIfStanding(event.propertyId());
+    }
+
+    @EventListener
+    public void promoteOnOwnershipVerified(OwnershipVerified event) {
+        promoteIfStanding(event.propertyId());
+    }
+
+    /** Both halves of the badge must hold, so whichever event arrives second does the promoting. */
+    private void promoteIfStanding(UUID propertyId) {
+        if (properties.findById(propertyId).filter(FlatSplitService::standsAsOwnerTier).isEmpty()) {
+            return;
+        }
+        rooms.findByPropertyIdAndArchivedFalse(propertyId).stream()
                 .filter(room -> FlatmateVocabulary.TIER_IDENTITY.equals(room.getVerificationTier()))
                 .forEach(room -> {
                     room.setVerificationTier(FlatmateVocabulary.TIER_OWNER);
                     rooms.save(room);
                 });
+    }
+
+    private static boolean standsAsOwnerTier(Property property) {
+        return PropertyStatus.APPROVED.equals(property.getStatus()) && !property.isArchived()
+                && property.isOwnershipVerified();
     }
 
     /** Refused once anyone has moved in: the occupancy ledger is the only record those people are

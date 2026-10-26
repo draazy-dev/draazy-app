@@ -1,5 +1,6 @@
 package com.draazy.api.moderation.verification;
 
+import com.draazy.api.catalog.property.OwnershipVerified;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyLifecycle;
 import com.draazy.api.catalog.property.PropertyRepository;
@@ -20,6 +21,7 @@ import com.draazy.api.documents.vault.DocumentMapper;
 import com.draazy.api.documents.vault.DocumentRepository;
 import com.draazy.api.documents.vault.DocumentSummary;
 import com.draazy.api.documents.vault.DocumentUrl;
+import com.draazy.api.identity.verification.IdentityVerificationService;
 import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.BackOfficePermissions;
@@ -28,6 +30,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,11 +54,16 @@ public class OwnershipVerificationService {
     private final OwnershipDocumentAccess documentAccess;
     private final Notifier notifier;
     private final ReferralTriggers referralTriggers;
+    private final ApplicationEventPublisher events;
+    private final IdentityVerificationService identity;
 
     public OwnershipVerificationService(OwnershipEvidenceRepository evidence,
             PropertyRepository properties, DocumentRepository documents, DocumentMapper documentMapper,
             AuditService audit, VerificationAnnouncer announcer, AccountPermissions permissions,
-            OwnershipDocumentAccess documentAccess, Notifier notifier, ReferralTriggers referralTriggers) {
+            OwnershipDocumentAccess documentAccess, Notifier notifier, ReferralTriggers referralTriggers,
+            ApplicationEventPublisher events, IdentityVerificationService identity) {
+        this.identity = identity;
+        this.events = events;
         this.evidence = evidence;
         this.properties = properties;
         this.documents = documents;
@@ -183,8 +191,9 @@ public class OwnershipVerificationService {
                 "owner", String.valueOf(property.getOwner().getId()));
         if (!wasVerified) {
             announcer.announceOwnershipVerified(property.getOwner().getId(), property.getId(), now);
-            notifier.notify(property.getOwner().getId(), "listing.badge_verified", "Your listing is Verified",
-                    PropertyLifecycle.label(property) + " now carries the Verified owner badge.", "/dashboard");
+            events.publishEvent(new OwnershipVerified(property.getId()));
+            notifier.notify(property.getOwner().getId(), "listing.badge_verified", "Your listing is a Verified property",
+                    PropertyLifecycle.label(property) + " now carries the Verified property badge.", "/dashboard");
         }
         return OwnershipGate.toResponse(property, rows, now, true);
     }
@@ -214,13 +223,16 @@ public class OwnershipVerificationService {
                 .orElseThrow(() -> NotFoundException.of("Property"));
         Instant now = Instant.now();
         if (property.isOwnershipVerifiedAt(now)) {
-            throw new ConflictException("already_verified", "This listing already has the Verified badge");
+            throw new ConflictException("already_verified", "This listing already has the Verified property badge");
         }
         if (property.isArchived() || !BADGE_STATUSES.contains(property.getStatus())) {
             throw new ConflictException("listing_not_open", "Only a live or under-review listing can ask for the badge");
         }
         if (documents.findByPropertyIdAndServiceRequestIdIsNullOrderByUploadedAtDesc(property.getId()).isEmpty()) {
             throw new ConflictException("documents_missing", "Upload the ownership documents first");
+        }
+        if (!identity.isSubmitted(actor.userId())) {
+            throw new ConflictException("identity_required", "Submit your ID verification first, then request the badge");
         }
         if (!property.isOwnershipRequested()) {
             property.requestOwnershipReview(now);
@@ -243,7 +255,7 @@ public class OwnershipVerificationService {
         audit.record(actor, "property.ownership.declined", "property", propertyId,
                 "reason", why, "owner", String.valueOf(property.getOwner().getId()));
         notifier.notify(property.getOwner().getId(), "listing.badge_declined",
-                "Verified badge not granted yet", why,
+                "Verified property badge not granted yet", why,
                 "/dashboard?tab=documents&prop=" + property.getId());
         return OwnershipGate.toResponse(property,
                 evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, true);

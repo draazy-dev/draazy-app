@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -14,7 +15,7 @@ import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.security.Roles;
 import com.draazy.api.support.AbstractApiTest;
-import com.draazy.api.support.UploadedPhotos;
+import com.draazy.api.support.IdentityCases;
 import com.jayway.jsonpath.JsonPath;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +51,7 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
         u.setName(name);
         u.setMobileVerified(true);
         User saved = users.saveAndFlush(u);
+        IdentityCases.submitted(jdbc, saved.getId());
         createdActors.add(saved.getId().toString());
         return saved;
     }
@@ -63,13 +65,13 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
                 "Registered Leave and Licence", "leave-and-licence.pdf",
                 "personal/" + host.getId() + "/" + UUID.randomUUID(), 184320L, "application/pdf"));
         String body = """
-                {"bhk":"2","roomType":"Private room","attachedBath":"attached","furnishing":"semi",
+                {"bhk":"2","roomType":"Private room","attachedBath":"attached",
                  "locality":"Baner","society":"%s","rentShare":15000,"deposit":30000,
                  "availableFrom":"2026-09-01","lookingFor":"any","foodPref":"any",
-                 "agreementDeclared":true,"photos":["%s","%s"],
-                 "note":"Sunny room.",%s}
-                """.formatted(society, UploadedPhotos.of(host.getId()), UploadedPhotos.of(host.getId()),
-                        FlatmateAgreementFixture.EVIDENCE)
+                 "agreementDeclared":true,"ownerConsentMobile":"9890000001",%s,
+                 "note":"Sunny room.",%s,%s,%s}
+                """.formatted(society, FlatmateRoomFixture.photos(host.getId()),
+                        FlatmateAgreementFixture.EVIDENCE, FlatmateRoomFixture.BASICS, FlatmateRoomFixture.DETAILS)
                 .replace("\"id\":\"agr-doc-1\"", "\"id\":\"" + doc.getId() + "\"");
         return idIn(mvc.perform(post(Routes.Flatmates.ROOMS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
@@ -86,7 +88,7 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
                         .content("""
                                 {"name":"%s","gender":"any","age":27,"budget":18000,
                                  "localities":["Baner"],"moveIn":"2026-09-01",
-                                 "flatPref":"any","roomPref":"private","tags":[],"note":"Quiet."}
+                                 "flatPref":"any","roomPref":"private","note":"Quiet."}
                                 """.formatted(name)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString());
@@ -123,7 +125,7 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
         List<Map<String, Object>> rows = JsonPath.read(list, "$.content[?(@.roomId == '" + roomId + "')]");
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).keySet()).containsExactlyInAnyOrder("id", "kind", "roomId", "groupId", "host",
-                "address", "tier", "flagForReview", "ownerConsent", "createdAt");
+                "hostVerified", "evidenceType", "address", "tier", "flagForReview", "ownerConsent", "createdAt");
         assertThat(rows.get(0)).containsEntry("host", "Slim Host").containsEntry("tier", "tenant");
 
         mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, roomId)
@@ -135,7 +137,7 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a queue card counts photos instead of listing them, and never names the author's id")
+    @DisplayName("a queue card counts photos and shows only the first, its price, and never the author's id")
     void moderationRowCountsPhotos() throws Exception {
         User host = user("9813000003", "Photo Host", Roles.Wire.BUYER);
         User staff = user("9813000004", "Mod", Roles.Wire.ADMIN);
@@ -148,14 +150,19 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
         List<Map<String, Object>> seeker = JsonPath.read(list, "$.content[?(@.id == '" + postId + "')]");
         assertThat(room).hasSize(1);
         assertThat(room.get(0).keySet()).containsExactlyInAnyOrder("id", "kind", "modStatus", "authorName",
-                "headline", "locality", "freeText", "photoCount", "recheckReason", "recheckRequestedAt",
-                "createdAt");
-        assertThat(room.get(0)).containsEntry("photoCount", 2).containsEntry("authorName", "Photo Host");
-        assertThat(seeker.get(0)).containsEntry("photoCount", 0);
+                "authorMobile", "headline", "locality", "freeText", "photoCount", "coverPhoto", "rent",
+                "recheckReason", "recheckRequestedAt", "createdAt");
+        assertThat(room.get(0)).containsEntry("photoCount", 3).containsEntry("authorName", "Photo Host")
+                .containsEntry("rent", 15000);
+        assertThat((String) room.get(0).get("coverPhoto")).isNotBlank();
+        assertThat(seeker.get(0)).containsEntry("photoCount", 0).containsEntry("coverPhoto", null)
+                .containsEntry("rent", 18000);
 
         mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, roomId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
-                .andExpect(jsonPath("$.item.photos.length()").value(2))
+                .andExpect(jsonPath("$.item.photos.length()").value(3))
+                .andExpect(jsonPath("$.item.photos[0]").value(room.get(0).get("coverPhoto")))
+                .andExpect(jsonPath("$.item.rent").value(15000))
                 .andExpect(jsonPath("$.item.authorId").doesNotExist());
     }
 
@@ -184,28 +191,52 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("the summary counts each tab's cards, a badge claim sharing its post's card once")
+    @DisplayName("a pending badge claim counts under badgeRequests, never under pending; the post it rides on counts once on its own tab")
     void summaryCountsCards() throws Exception {
         User host = user("9813000007", "Count Host", Roles.Wire.BUYER);
         User staff = user("9813000008", "Mod", Roles.Wire.ADMIN);
         String summary = Routes.Moderation.FLATMATE_MODERATION_SUMMARY;
         String before = read(summary, staff);
+        String dashBefore = read(Routes.Admin.DASHBOARD, staff);
 
         String roomId = createTenantRoom(host, "Count Court");
         String awaiting = read(summary, staff);
         assertThat(count(awaiting, "pending")).isEqualTo(count(before, "pending") + 1);
+        assertThat(count(awaiting, "badgeRequests")).isEqualTo(count(before, "badgeRequests") + 1);
+        assertThat(awaiting).doesNotContain("\"awaiting\"");
 
         moderate(staff, roomId, "approved");
         String published = read(summary, staff);
-        assertThat(count(published, "pending")).isEqualTo(count(before, "pending") + 1);
+        assertThat(count(published, "pending")).isEqualTo(count(before, "pending"));
+        assertThat(count(published, "badgeRequests")).isEqualTo(count(before, "badgeRequests") + 1);
         assertThat(count(published, "published")).isEqualTo(count(before, "published") + 1);
+        assertThat(count(read(Routes.Admin.DASHBOARD, staff), "flatmates.awaitingReview"))
+                .as("the dashboard tile still counts the open badge claim")
+                .isEqualTo(count(dashBefore, "flatmates.awaitingReview") + 1);
 
         moderate(staff, roomId, "removed");
         String hidden = read(summary, staff);
         assertThat(count(hidden, "published")).isEqualTo(count(before, "published"));
         assertThat(count(hidden, "hidden")).isEqualTo(count(before, "hidden") + 1);
+        assertThat(count(hidden, "badgeRequests")).isEqualTo(count(before, "badgeRequests") + 1);
 
         mvc.perform(get(summary).header(HttpHeaders.AUTHORIZATION, bearer(host)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("a badge claim stops counting once the host's post is deleted")
+    void deletedPostLeavesBadgeRequests() throws Exception {
+        User host = user("9813000013", "Withdraw Host", Roles.Wire.BUYER);
+        User staff = user("9813000014", "Mod", Roles.Wire.ADMIN);
+        String summary = Routes.Moderation.FLATMATE_MODERATION_SUMMARY;
+        long before = count(read(summary, staff), "badgeRequests");
+
+        String roomId = createTenantRoom(host, "Withdraw Court");
+        assertThat(count(read(summary, staff), "badgeRequests")).isEqualTo(before + 1);
+
+        mvc.perform(delete(Routes.Flatmates.ROOM_BY_ID, roomId).header(HttpHeaders.AUTHORIZATION, bearer(host)))
+                .andExpect(status().is2xxSuccessful());
+        assertThat(count(read(summary, staff), "badgeRequests")).isEqualTo(before);
     }
 }

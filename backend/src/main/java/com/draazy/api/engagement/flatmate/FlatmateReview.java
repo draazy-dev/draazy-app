@@ -1,6 +1,7 @@
 package com.draazy.api.engagement.flatmate;
 
 import com.draazy.api.common.persistence.AuditedEntity;
+import com.draazy.api.common.trust.OwnedDocumentLookup;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
@@ -60,6 +61,19 @@ public class FlatmateReview extends AuditedEntity {
         return agreement == null ? new AgreementRegistration() : agreement;
     }
 
+    /** {@code rent_agreement} or {@code electricity_bill}; null on rows that predate light bills. */
+    @Column(name = "evidence_type")
+    private String evidenceType;
+
+    @Column(name = "evidence_issued_on")
+    private LocalDate evidenceIssuedOn;
+
+    @Column(name = "name_matches")
+    private Boolean nameMatches;
+
+    @Column(name = "address_matches")
+    private Boolean addressMatches;
+
     @Column(name = "status", nullable = false)
     private String status = FlatmateVocabulary.STATUS_PENDING;
 
@@ -77,6 +91,15 @@ public class FlatmateReview extends AuditedEntity {
             String tier, boolean flagForReview, boolean ownerConsent,
             Map<String, Object> agreementDoc, AgreementRegistration agreement,
             UUID tenancyPropertyId) {
+        this(kind, roomId, groupId, hostId, address, tier, flagForReview, ownerConsent, agreementDoc,
+                agreement, tenancyPropertyId, null);
+    }
+
+    FlatmateReview(String kind, UUID roomId, UUID groupId, UUID hostId, String address,
+            String tier, boolean flagForReview, boolean ownerConsent,
+            Map<String, Object> agreementDoc, AgreementRegistration agreement,
+            UUID tenancyPropertyId, String evidenceType) {
+        this.evidenceType = evidenceType;
         this.kind = kind;
         this.roomId = roomId;
         this.groupId = groupId;
@@ -107,7 +130,7 @@ public class FlatmateReview extends AuditedEntity {
      * per target; clearing the verdict also drops the badge, which both feeds derive from it. */
     void reopenAfterEdit(String address, String tier, boolean flagForReview, boolean ownerConsent,
             Map<String, Object> agreementDoc, AgreementRegistration agreement,
-            UUID tenancyPropertyId) {
+            UUID tenancyPropertyId, String evidenceType) {
         this.address = address;
         this.tier = tier;
         this.flagForReview = flagForReview;
@@ -116,16 +139,58 @@ public class FlatmateReview extends AuditedEntity {
         if (!namesStoredFile(agreementDoc)) {
             this.agreementDoc = agreementDoc;
             this.agreement = agreement;
+            this.evidenceType = evidenceType;
         }
+        clearChecks();
         this.tenancyPropertyId = tenancyPropertyId;
         this.status = FlatmateVocabulary.STATUS_PENDING;
         this.reason = null;
         this.decidedBy = null;
     }
 
+    private void clearChecks() {
+        this.nameMatches = null;
+        this.addressMatches = null;
+        this.evidenceIssuedOn = null;
+    }
+
+    /** A dated badge request is a fresh claim, so only an undated edit keeps the stored file. */
     private boolean namesStoredFile(Map<String, Object> doc) {
         return doc != null && this.agreementDoc != null && doc.get("dataUrl") == null
+                && !doc.containsKey(AgreementPeriod.TILL)
                 && doc.get("id") != null && doc.get("id").equals(this.agreementDoc.get("id"));
+    }
+
+    /** The reviewer's own reading of the document, so the expiry is theirs to state rather than a default. */
+    void approveChecked(String why, UUID decider, FlatmateReviewChecks checks, LocalDate today) {
+        this.status = FlatmateVocabulary.STATUS_APPROVED;
+        this.reason = why;
+        this.decidedBy = decider;
+        this.nameMatches = checks.nameMatches();
+        this.addressMatches = checks.addressMatches();
+        this.evidenceIssuedOn = checks.issuedOn();
+        this.agreement = new AgreementRegistration(checks.badgeUntil(effectiveEvidenceType(), today));
+    }
+
+    /** Rows filed before light bills existed carry no type, and were always agreements. */
+    String effectiveEvidenceType() {
+        return evidenceType == null ? OwnedDocumentLookup.RENT_AGREEMENT : evidenceType;
+    }
+
+    /** Pulled in place so the host can re-request; the reason is what the host reads. */
+    void revoke(String why, UUID decider) {
+        this.status = FlatmateVocabulary.STATUS_REJECTED;
+        this.reason = why;
+        this.decidedBy = decider;
+    }
+
+    /** Back to the queue, flagged and with the reason on the row Ops reads; the badge goes with the verdict. */
+    void holdForReview(String why) {
+        this.flagForReview = true;
+        this.ownerConsent = false;
+        this.status = FlatmateVocabulary.STATUS_PENDING;
+        this.reason = why;
+        this.decidedBy = null;
     }
 
     /** One predicate for both {@code requireConsentToApprove} and the unsupervised
@@ -138,7 +203,7 @@ public class FlatmateReview extends AuditedEntity {
      * requires a reason on rejection; {@code decidedBy} stays null because no person decided. */
     void expire(LocalDate on) {
         this.status = FlatmateVocabulary.STATUS_REJECTED;
-        this.reason = "The agreement check behind your Tenant-verified badge lapsed on " + on
+        this.reason = "The agreement check behind your Verified property badge lapsed on " + on
                 + ". Upload your current agreement to get the badge back.";
         this.decidedBy = null;
     }

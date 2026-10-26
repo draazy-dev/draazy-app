@@ -2,15 +2,8 @@ package com.draazy.api.engagement.flatmate;
 
 import java.util.List;
 
-/**
- * Contract schema {@code FlatSplitResult}.
- *
- * @param tier    the tier the rooms were born at — {@code owner} only when Ops has already approved
- *                the parent listing
- * @param pending true when the parent is not yet approved, so the rooms start unbadged and will be
- *                promoted when it is
- * @param flagged true when a different host already claimed this address, so Ops will take a look
- */
+/** {@code tier} is {@code owner} only when the parent is approved and owner-badged; {@code pending}
+ * rooms start unbadged and are promoted when it is; {@code flagged} means another host claimed the address. */
 public record FlatSplitResult(
         int count,
         String tier,

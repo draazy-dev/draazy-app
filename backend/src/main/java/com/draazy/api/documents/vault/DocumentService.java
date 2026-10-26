@@ -144,8 +144,8 @@ public class DocumentService {
                 .orElseThrow(() -> NotFoundException.of("Document"));
         BadgeEvidenceLookup.Hold hold = badgeEvidence.holdOn(doc.getId());
         if (hold == BadgeEvidenceLookup.Hold.LIVE_BADGE) {
-            throw new ConflictException("This document is the evidence for your listing's Ownership"
-                    + " Verified badge and cannot be deleted while the badge stands. Ask support to"
+            throw new ConflictException("This document is the evidence for your listing's Verified"
+                    + " property badge and cannot be deleted while the badge stands. Ask support to"
                     + " withdraw the badge first.");
         }
         if (hold == BadgeEvidenceLookup.Hold.CITED) {

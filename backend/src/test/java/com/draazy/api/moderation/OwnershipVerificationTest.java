@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.draazy.api.catalog.property.OwnershipVerified;
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertyStatus;
@@ -31,12 +32,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 
 // Ownership gate: badge earned on evidence, expiry lapses derived (not swept) from the earliest
 // document relied on, and staff-who-are-also-landlords must not badge their own flat.
 @DisplayName("Ownership gate — earned on evidence, and lapsing with it")
+@RecordApplicationEvents
 class OwnershipVerificationTest extends AbstractApiTest {
 
+    @Autowired
+    ApplicationEvents events;
     @Autowired
     UserRepository users;
     @Autowired
@@ -146,6 +152,11 @@ class OwnershipVerificationTest extends AbstractApiTest {
         mvc.perform(get("/properties/" + listing.getId()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.ownershipVerified").value(true));
+
+        mvc.perform(post(ownership(listing)).header(HttpHeaders.AUTHORIZATION, staff))
+                .andExpect(status().isOk());
+        assertThat(events.stream(OwnershipVerified.class).map(OwnershipVerified::propertyId))
+                .containsExactly(listing.getId());
     }
 
     @Test
@@ -951,7 +962,7 @@ class OwnershipVerificationTest extends AbstractApiTest {
                         .header(HttpHeaders.AUTHORIZATION, owner))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message")
-                        .value(org.hamcrest.Matchers.containsString("Ownership")));
+                        .value(org.hamcrest.Matchers.containsString("Verified property")));
 
         assertThat(documents.findById(bill.getId())).isPresent();
 

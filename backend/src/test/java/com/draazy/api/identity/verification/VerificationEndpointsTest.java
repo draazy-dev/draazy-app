@@ -681,7 +681,7 @@ class VerificationEndpointsTest extends AbstractApiTest {
         assertThat(notificationsFor(u)).extracting(n -> n.get("type"))
                 .containsExactly("identity.approved", "identity.revoked");
         assertThat(notificationsFor(u).get(1)).satisfies(row -> {
-            assertThat(row.get("title")).isEqualTo("Verified badge withdrawn");
+            assertThat(row.get("title")).isEqualTo("ID verified badge withdrawn");
             assertThat(row.get("body")).isEqualTo("The approved document was disputed");
             assertThat(row.get("link")).isEqualTo("/verify-identity");
         });
