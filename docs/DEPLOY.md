@@ -338,7 +338,7 @@ Lines the backend sends:
 | Decision | `{{1}}` value |
 |---|---|
 | Rejected by a reviewer / stale pending | `Your Draazy identity verification could not be completed. Open the app to see the reason and retake your photos.` |
-| Revoked | `Your Draazy verified badge was withdrawn. Open the app to see the reason and submit again.` |
+| Revoked | `Your Draazy ID verified badge was withdrawn. Open the app to see the reason and submit again.` |
 
 Approvals and the automatic check's rejects send no WhatsApp (in-app only). If `WHATSAPP_ENABLED=false`,
 `LoggingDecisionMessenger` logs a mock send. If WhatsApp is enabled but the identity template name or
@@ -353,10 +353,24 @@ the same `WhatsAppDecisionMessenger`. Rules are in
 | Setting | Value |
 |---|---|
 | Meta category | `UTILITY`; **needs Meta approval before the name is set** |
-| Suggested body text | `You have {{1}} waiting for your reply on Draazy. Open the app to respond.` with `{{1}}` = `1 request` / `N requests` |
+| Suggested body text | `Update on your property listed on Draazy: you have {{1}} waiting for your reply. You can reply under Requests in the app.` with `{{1}}` = `1 request` / `N requests`; optional static URL button `View requests` → `https://draazy.com/messages?tab=requests` (no URL variable: the sender passes body parameters only) |
+| Suggested name | `draazy_requests_pending` (`draazy_waiting_digest` was moved to Marketing by Meta) |
 | Template name | `WHATSAPP_DIGEST_TEMPLATE_NAME`; blank means no digest is sent |
 | Language | `WHATSAPP_DIGEST_TEMPLATE_LANG`, default `en_US` |
 | Off switch | `draazy.jobs.waiting-digest.enabled=false` |
+
+**WhatsApp flat-owner notice template.** Sent when a tenant posts a flatmate room naming the owner's
+mobile; the owner taps a link to agree or decline (`/owner-confirm#<token>`).
+
+| Setting | Value |
+|---|---|
+| Meta category | `UTILITY`; **needs Meta approval before the name is set** |
+| Body parameters | `{{1}}` tenant first name, `{{2}}` place (society, locality), `{{3}}` confirm link |
+| Suggested name | `draazy_owner_room_notice` |
+| Suggested body text | `Hi, this is Draazy, Pune's broker-free property platform to rent, buy or sell homes and find flatmates. Your tenant {{1}} has posted a room in your flat at {{2}} to find a flatmate to share the rent. Your rental agreement with them does not change.` ⏎⏎ `Please tell us if you are okay with this: {{3}}` ⏎⏎ `If you were not expecting this message, you can ignore it.` |
+| Review samples | `Riya` / `Green Valley, Baner` / `https://draazy.com/owner-confirm#a1b2c3` |
+| Template name | `WHATSAPP_OWNER_NOTICE_TEMPLATE_NAME`; blank means no notice is sent |
+| Language | `WHATSAPP_OWNER_NOTICE_TEMPLATE_LANG`, default `en_US` |
 
 **Web push (VAPID).** `WebPushSender` is wired when `PUSH_VAPID_PRIVATE_KEY` is set; without it
 `LoggingPushSender` only logs. Generate a pair once with `npx web-push generate-vapid-keys` (base64url).
@@ -631,9 +645,9 @@ ShedLock is needed.
 
 | Group | Cron property (default) | Jobs |
 |---|---|---|
-| Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates` |
+| Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates`, `staff-sla` |
 | Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs) |
-| Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
+| Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `listing-content-purge`, `flatmate-owner-notice-purge`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
 | Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `tracked-rent-reminders`, `waiting-digest` |
 
 The app is always on, so the `@Scheduled` cron runs in-process at the times above with no external

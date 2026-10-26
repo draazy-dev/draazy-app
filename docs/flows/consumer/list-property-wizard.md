@@ -21,25 +21,33 @@
 - **Routes:** `/list-property` is public for a new draft and asks for OTP inside the wizard only when
   the owner reaches media/publish; `?edit=<id>` remains protected. Query params:
   - `edit=<listingId>` - edit an existing listing (never consumes quota; see section 5).
-  - `flatmate=1` - arrived from the app-wide `PostChooser` ("a room in my place") or from a room
-    card's Edit action. Pre-selects the flatmate track via `rentMode = 'flatmate'`; `hostRole` still
-    defaults to `owner` and the host picks owner/tenant on Step 1.
+  - `flatmate=1` - arrived from the app-wide `PostChooser` (Flatmates → "I have a room to fill") or from a room
+    card's Edit action. Pre-selects the flatmate track via `rentMode = 'flatmate'`, defaults `hostRole` to
+    `tenant`, and hides the Sale/Rent and whole/flatmate pickers. The room track uses the same four tabs as a
+    property (`LISTING_STEPS`): Details (home type, BHK, bathrooms, floor / total floors or a house's floor
+    count, occupants, room type, washroom, furnishing, what's fitted, who it suits) → Location (society picked
+    once above the map, which fills the pin and locality; flat / house no.) → Price (rent, deposit, move-in,
+    the always-visible terms with notice period and minimum stay required, host role and owner consent) →
+    Photos (at least 3, two of them labelled Living Room / Kitchen / Bedroom / Bathroom, as for a property;
+    headline, note, vibe). Required fields carry a `*` (`RequiredMark`); no posting form uses the word "optional".
+    Plain `/list-property` still offers "Find a flatmate" under Rent.
 - **Tiles / triggers:** "Post Property" nav/CTA, dashboard "Add listing", the bottom bar's raised
   `+` on mobile, and the Flatmates tab-row `Post` CTA on desktop (the two never both render - the
   bar is `lg:hidden` and `.sf-post-cta` is its exact complement). The last two open the same thing:
   the app-wide
   `PostChooser`, mounted once by `ConsumerLayout`, which asks "what do you want to post?" and routes
-  **two** of its branches into this wizard - *a property* to `/list-property` and *a room in my
-  place* to `?flatmate=1`, the second being a track through this form rather than a second form that
-  would relearn the same fields. Its remaining branch forks into "who's looking?" and stays on
-  Flatmates as a seeker request or a group.
+  **two** of its branches into this wizard - *a property* to `/list-property` and *a room to fill*
+  (under Flatmates) to `?flatmate=1`, the second being a track through this form rather than a second
+  form that would relearn the same fields. The other Flatmates choices stay on Flatmates as a seeker
+  request or a group.
 - **Source components:** `src/pages/consumer/ListProperty.jsx` (shell) + `list-property/*`:
   `useListProperty.js` (orchestrator), `PostSuccessSplitNudge.jsx` (post-success "let it room by room" offer), `ProgressMeter.jsx`,
   `StepNav.jsx`, `ListingPaywall.jsx`, `EditPolicyBanner.jsx`,
-  `PropertyDetailsStep.jsx` (shell -> `PropertyDetailsWhole.jsx` / `PropertyDetailsFlatmate.jsx`,
+  `PropertyDetailsStep.jsx` (shell -> `PropertyDetailsWhole.jsx` / `FlatmateRoomFields.jsx`,
   with `step1/*` field groups), `LocationStep.jsx`, `PricingStep.jsx`, `SocietySelect.jsx`,
   `PhotosDocumentsStep.jsx`,
-  `FlatmateFlow.jsx` (flatmate steps 2 & 3),
+  `FlatmateFlow.jsx` (flatmate steps 2-4, composed of `FlatmatePriceFields.jsx`, `FlatmateHostFields.jsx`
+  and `OptionalSection.jsx`; step 1 is `FlatmateRoomFields.jsx` + `FlatmateFlatFields.jsx`),
   plus `validation.js`, `submit.js`, `editPolicy.js`, `constants.js`, `initialForm.js`.
 
 ## 3. Actors & roles
@@ -49,7 +57,7 @@
   `src/pages/admin/AdminProperties.jsx` (three-fact checklist; see
   [`../admin/property-verification.md`](../admin/property-verification.md)).
 - **Floor (not a gate):** posting requires only being signed in (L1, `ProtectedRoute`) — there is
-  **no** identity or document gate on the form under ADR-019. The Verified owner badge is offered on
+  **no** identity or document gate on the form under ADR-019. The Verified property badge is offered on
   the success status card, never as a wall. See
   [`../../system/platform-architecture.md`](../../system/platform-architecture.md) §6.4 / ADR-019.
 
@@ -187,8 +195,9 @@ advance on any error (scrolling to the first error via `scrollToError`).
   PNG only. A photo under 480 px on its shorter side is refused at its tile with that reason. A dark
   or blurry photo still uploads but gets a one-line hint under its tile (`lib/uploads/photoLook.js`,
   read in the upload worker on a 480 px probe).
-  Existing media is not silently deleted on edit. Video uploading is hidden and does not contribute
-  to completion.
+  Existing media is not silently deleted on edit; a photo the owner removes is deleted from storage
+  after the save commits, unless another listing, room or avatar still shows it. Video uploading is
+  hidden and does not contribute to completion.
 - **Gallery.** The cover is the first photo: "Set as cover" jumps a photo to the front, and dragging
   reorders the rest (press and hold on touch so a swipe still scrolls; Space and the arrow keys on a
   keyboard). Up to three uploads run in parallel, and a tile whose decode or upload
@@ -201,7 +210,7 @@ advance on any error (scrolling to the first error via `scrollToError`).
 - **"Write it for me"** (`describe.js`) drafts a factual description from the answers already given;
   it asks before replacing a description the owner has typed. The description still passes the
   contact filter.
-- **Video walkthrough (optional).** An owner may paste a YouTube link; it is stored as the 11-character
+- **Video walkthrough.** An owner may paste a YouTube link; it is stored as the 11-character
   video id (`video`, server pattern `^[A-Za-z0-9_-]{11}$`) and any other URL is refused. The detail page
   plays it through a `youtube-nocookie.com` embed (`VideoWalkthrough.jsx`), which the CSP `frame-src`
   allows. Changing the video on a live listing queues a moderator re-check.
@@ -229,7 +238,7 @@ advance on any error (scrolling to the first error via `scrollToError`).
   from the listing status card's **Get Verified property badge**): the owner uploads one proof for
   the listing's type — rent flat: electricity bill, Index II, share certificate or property tax
   receipt; sale flat: Index II or share certificate; plot: 7/12, 8A or property card; farmland:
-  7/12 or 8A — then presses **Request Verified badge**. Aadhaar/PAN are never asked for. pdf-lib
+  7/12 or 8A — then presses **Request Verified property badge**. Aadhaar/PAN are never asked for. pdf-lib
   validates unsigned, unencrypted PDFs (1–100 pages), then optimizes object streams only when oversized.
   It does not flatten pages, rasterize text or guarantee every scanned PDF will fit. Signed PDFs,
   malformed files and outputs still above the limit are refused with visible guidance. See
@@ -361,7 +370,7 @@ commercialType, landUse, locality, deal` take the listing **off search** until r
 furnishing, possession, address, images, description, amenities, reraId, plottedProject, video`, a
 changed `societyId` or `electricityMeterNo`, a `carpetArea` change of ≥ 20 % and a pin moved
 > 500 m keep it **live with a re-check**. Changing `address`, `societyId` or `electricityMeterNo`
-also revokes the Verified owner badge. Everything else (title, deposit, maintenance, availability, floor,
+also revokes the Verified property badge. Everything else (title, deposit, maintenance, availability, floor,
 facing, age, tenants, pets, pincode, other form answers) publishes directly. Description, amenities,
 photos, video, address and RERA id are re-checked on purpose (anti bait-and-switch), not published
 instantly. The client tiers below only drive the owner's edit banner, whose copy lists these two sets.
@@ -384,16 +393,25 @@ Editing a **live** listing classifies every changed field into two tiers (`class
   (capped 20) records each edit's tier counts + price swing.
 
 ### Flatmate / room track (`submitFlatmate` -> `persistFlatmate`)
-- **Lean validation, two tiers.** Step advance uses `validateFlatmateStep1` (`bhk`, `roomType`) and
-  `validateFlatmateStep2` (`locality`, `society`, `rentShare` > 0, `availableFrom`) - note the
-  flatmate Step 2 does **not** require a map placement, unlike the whole-place track. `submitFlatmate`
-  re-checks all six before persisting. Photos are optional: a room with none is always held for
-  staff review (`FlatmateSupplyService` hands `flagged || photos.isEmpty()` to `FlatmatePublication`),
-  so it never goes live unreviewed.
+- **Per-tab validation.** Step advance uses `validateFlatmateRoom` (home type, `bhk`, `roomType`,
+  washroom, bathrooms, furnishing, floor / total floors or a house's floor count),
+  `validateFlatmateLocation` (society, map pin, locality, flat / house no.) and `validateFlatmatePricing`
+  (`rentShare` > 0, deposit, `availableFrom`, notice period 0-180 days, minimum stay 0-24 months, a
+  tenant host's owner consent and mobile, and an uploaded agreement only when the edit form's agreement
+  switch is on). `submitFlatmate` re-checks all three plus `validateStep3` (at least 3 photos, two
+  labelled with key rooms) and jumps to the first failing tab. An edit is held only to fields the saved
+  room already answered or the host changes, and skips the photo-label rule. The server mirrors this on
+  create only: `NewRoomRequirements` refuses a new room missing any of these basics or with fewer than
+  3 photos (422); a PATCH is not held to it, so older rooms stay editable. A room left with no photos
+  after an edit is still held for staff review (`FlatmateSupplyService` hands
+  `flagged || photos.isEmpty()` to `FlatmatePublication`).
 - **Host verification tier:** `hostRole` = `owner` or `tenant`. Owner -> tier `owner`. A tenant host
-  must upload the registered leave-and-licence agreement and confirm the owner agrees
-  (`ownerConsent: true`) before the room can be posted — the server refuses it otherwise (422 naming
-  `agreementDoc.id` / `ownerConsent`). The picker uploads the file to the host's document vault
+  must confirm the owner agrees (`ownerConsent: true`) before the room can be posted — the server
+  refuses it otherwise (422 naming `ownerConsent`). The registered leave-and-licence agreement is not
+  asked for on create: the step shows a one-line note, and the success screen offers **Add rent
+  agreement**, linking to the room's edit form at the price step (`roomEditHref(id)&step=3`). Only the
+  edit form shows the agreement switch and picker; an uploaded agreement lifts the tier to `tenant`
+  and queues the Ops check. The picker uploads the file to the host's document vault
   (`POST /me/documents/personal`) as it is chosen, so `agreementDoc.id` is a real vault document.
 - **Anti-broker guardrails (`evaluateHostEligibility`):** hard block on cap hit or same host
   re-claiming an address; soft flag when a different host already claimed the address (still posts,
@@ -642,6 +660,18 @@ an archived listing is the state the caller asked for, and a second click on a s
 should not be an error. The reason string is the server's, not the client's: there is one thing the
 route means, and a free-text field would only give a client somewhere to put a string nobody reads
 back.
+
+The owner's delete (`DELETE /me/listings/{id}`) is that archive plus a 30-day clock, and it is
+refused (`409 listing_has_open_work`) while the listing is under offer, an offer waits on the owner,
+a rental/sale confirmation is pending, or a paid service is in progress: deleting would strand
+someone else's money or answer. Pending contact requests come back to their seekers at once, and
+chats about the listing become read-only: an owner who deletes is done with it (renting it out is
+Finalize, not delete). When
+the clock runs out, the nightly `listing-content-purge` job clears the photos (from storage too),
+description, address, amenities and form details, and keeps the row with its locality, price, BHK
+and photo hashes, which is what deals, enquiries and duplicate detection still need. Until then
+only support can restore it; after it, restore is a `409 listing_content_purged`. Staff archiving
+an owner-deleted listing stops the clock, so a listing under review keeps its evidence.
 
 ### 9.6 Owner pause and resume, and the dashboard around them
 

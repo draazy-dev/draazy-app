@@ -15,11 +15,11 @@
   who protects buyers from fake, duplicate, or misrepresented listings; the owner is the counterparty
   who wants their property live.
 - **Job-to-be-done:** "Only publish listings that are real, owner-posted and not duplicates." For
-  the owner: "Get my property live — and, optionally, the Verified owner badge."
+  the owner: "Get my property live — and, optionally, the Verified property badge."
 - **Why it matters:** listing verification is Draazy's core **supply-quality** gate. A listing is
   invisible to buyers until a checker approves it, so this queue is the single choke point that
   decides platform supply quality. It gates the **listing**, not the owner's identity or documents —
-  posting itself is L1-only (ADR-019); the Verified owner badge is a separate
+  posting itself is L1-only (ADR-019); the Verified property badge is a separate
   ranking/trust signal. It is the reference implementation of the shared maker-checker pattern
   (see [`../../system/cross-cutting.md`](../../system/cross-cutting.md) section 2).
 
@@ -255,7 +255,7 @@ the owner-facing sentence together under a `PESSIMISTIC_WRITE` lock on the listi
 - Non-foundation edits that still change *which property this is* are stays-live re-checks too:
   `societyId`, `electricityMeterNo`, a `carpetArea` change of ≥ 20 %, and a pin moved > 500 m
   (reason `location`). `floor` and `pincode` apply without a re-check.
-- **The Verified owner badge is revoked** when `address`, `societyId` or `electricityMeterNo`
+- **The Verified property badge is revoked** when `address`, `societyId` or `electricityMeterNo`
   changes (as well as on a deal flip): the evidence proved a different address or meter.
 
 ## 6. Maker-checker / approval
@@ -517,7 +517,7 @@ Rationale relocated from `OwnershipVerificationService` Javadoc.
   taken together; a system where uploading the third file silently promotes a listing is one where
   nobody decided anything.
 - **A badge request is explicit, and rides the stays-live re-check, not a new queue.** Filing a paper
-  in the vault asks for nothing. The owner presses **Request Verified badge** in the Dashboard
+  in the vault asks for nothing. The owner presses **Request Verified property badge** in the Dashboard
   Document Vault (`POST /properties/{id}/verification/ownership/request`, owner-only; 409
   `already_verified`, `listing_not_open`, `documents_missing`; idempotent). That stamps
   `ownershipRequestedAt`, clears any earlier decline and calls `Property.requestOwnershipReview`.
@@ -552,6 +552,10 @@ Rationale relocated from `OwnershipVerificationService` Javadoc.
   the badge at the same moment would both read "not yet verified" and both announce, paying one
   referral credit twice. Taken on the shared loader so evidence writes serialise against a decision
   in flight as well.
+- **The grant publishes `OwnershipVerified`.** On the transition into verified only, so the
+  flatmate split-room promotion can lift identity-tier rooms to owner tier. Flatmate owner tier needs
+  an approved, unarchived listing that is currently ownership-verified; the reconciler demotes it when
+  the badge is revoked or lapses.
 
 ## Ownership evidence vocabulary
 
