@@ -141,7 +141,7 @@ public class AdminFlatmateAnalyticsService {
                 .getSingleResult();
         LocalDate to = LocalDate.now(PlatformTime.IST).plusDays(1);
         AdminAnalyticsFlatmates.Replies replies = replies(to.minusDays(GLANCE_DAYS), to);
-        return new AdminDashboard.Flatmates(moderation.moderationSummary().pending(), num(row[0]),
+        return new AdminDashboard.Flatmates(moderation.moderationSummary().awaiting(), num(row[0]),
                 replies.unansweredNow(), num(row[1]), num(row[2]), num(row[3]), num(row[4]), num(row[5]),
                 replies.replyRatePct(), replies.medianReplyHours());
     }

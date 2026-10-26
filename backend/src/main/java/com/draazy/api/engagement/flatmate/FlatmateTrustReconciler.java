@@ -80,12 +80,13 @@ public class FlatmateTrustReconciler {
         }
     }
 
-    /** {@code deriveTier}'s conditions minus ownership — the fingerprint records the flat, not who
-     * held it. An unparseable or dangling id fails closed. */
+    /** {@code deriveTier}'s conditions minus who owns it, since the fingerprint records the flat, not
+     * its holder. A lapsed or revoked Verified-owner badge fails like an unapproved listing. */
     private boolean listingStands(String fingerprint) {
         return Ids.parseUuid(fingerprint.substring(FlatmateGuardrails.PROPERTY_PREFIX.length()))
                 .flatMap(properties::findById)
                 .filter(p -> PropertyStatus.APPROVED.equals(p.getStatus()) && !p.isArchived())
+                .filter(Property::isOwnershipVerified)
                 .isPresent();
     }
 
@@ -132,8 +133,9 @@ public class FlatmateTrustReconciler {
             if (propertyId == null) {
                 continue;
             }
-            String mobile = users.findById(review.getHostId()).map(User::getMobile).orElse(null);
-            if (mobile == null || !agreements.hasRegisteredTenancy(propertyId, mobile)) {
+            User host = users.findById(review.getHostId()).orElse(null);
+            if (host == null || !host.isVerified() || host.getMobile() == null
+                    || !agreements.hasRegisteredTenancy(propertyId, host.getMobile())) {
                 continue;
             }
             review.decide(FlatmateVocabulary.STATUS_APPROVED,
@@ -141,7 +143,7 @@ public class FlatmateTrustReconciler {
                             + " flat.", null);
             badges.apply(review, true);
             notifier.notify(review.getHostId(), "flatmate.review.approved",
-                    "Your flatmate post is Tenant-verified",
+                    "Your flatmate post is now a Verified property",
                     "We matched it to the rent agreement we registered for you, so there was"
                             + " nothing left for our team to check.", FlatmateLinks.of(review));
             decided.add(review);

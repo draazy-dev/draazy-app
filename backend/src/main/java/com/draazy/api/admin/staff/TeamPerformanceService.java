@@ -77,7 +77,7 @@ class TeamPerformanceService {
         List<MyWorkResponse.Queue> queues = new ArrayList<>(repository.myQueues(functions));
         if (functions.contains(BackOfficeFunctions.FLATMATES)) {
             queues.add(new MyWorkResponse.Queue(BackOfficeFunctions.FLATMATES,
-                    flatmates.moderationSummary().pending(), null));
+                    flatmates.moderationSummary().awaiting(), null));
         }
         return new MyWorkResponse(days,
                 List.of(new MyWorkResponse.Me(stats.name, stats.functions, stats.handled, Map.copyOf(stats.byFunction))),

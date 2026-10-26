@@ -246,6 +246,9 @@ public final class Routes {
 
         public static final String PUBLISH = BASE + "/{id}/publish";
 
+        /** Publish with the full wizard's listing body; the record's own {@code /publish} sends its thin facts. */
+        public static final String LISTING = BASE + "/{id}/listing";
+
         public static final String RENT_RECEIPTS = BY_ID + "/rent-receipts";
 
         public static final String RENT_TRACKING = BY_ID + "/rent-tracking";
@@ -611,6 +614,9 @@ public final class Routes {
         public static final String NOTIFICATION_PREFERENCES = "/me/notification-preferences";
 
         public static final String PUSH_SUBSCRIPTIONS = "/me/push-subscriptions";
+
+        /** Authenticated — {@code GET}/{@code PUT} the caller's optional living-style answers. */
+        public static final String LIVING_STYLE = "/me/living-style";
     }
 
     public static final class Flatmates {
@@ -651,6 +657,9 @@ public final class Routes {
 
         public static final String FEED = "/flatmates/feed";
 
+        /** Authenticated — one listing author's living-style answers and how well they match the caller. */
+        public static final String LIVING_STYLE = "/flatmates/{kind}/{id}/living-style";
+
         /** {@code GET} public — rooms. {@code POST} authenticated — offer a spare room. */
         public static final String ROOMS = "/flatmates/rooms";
 
@@ -659,6 +668,9 @@ public final class Routes {
 
         /** Authenticated — reopen or close a seat. Seat-model rooms only. */
         public static final String ROOM_SEATS = ROOMS + "/{id}/seats";
+
+        /** Authenticated - the host files an agreement for the Verified property badge on a room already posted. */
+        public static final String ROOM_BADGE_REQUEST = ROOMS + "/{id}/badge-request";
 
         /** Authenticated — record how many people live in a room. Owner-split rooms only. */
         public static final String ROOM_OCCUPANTS = ROOMS + "/{id}/occupants";
@@ -669,6 +681,9 @@ public final class Routes {
         /** {@code GET} public — groups. {@code POST} authenticated — start one. */
         public static final String GROUPS = "/flatmates/groups";
 
+        /** Authenticated - the host of a flat-holding group files evidence for the Verified property badge. */
+        public static final String GROUP_BADGE_REQUEST = GROUPS + "/{id}/badge-request";
+
         /** Authenticated — remove a group I created. */
         public static final String GROUP_BY_ID = GROUPS + "/{id}";
 
@@ -677,7 +692,12 @@ public final class Routes {
 
         public static final String OWNER_CONSENT = "/flatmates/owner-consent";
 
-        /** Authenticated — ask to join. An open-policy group accepts outright. */
+        /** Public, token-scoped: the flat owner opens the WhatsApp link without an account. */
+        public static final String OWNER_NOTICE = "/flatmates/owner-notice";
+
+        public static final String OWNER_NOTICE_ANSWER = OWNER_NOTICE + "/answer";
+
+        /** Authenticated — ask to join; the host always decides. */
         public static final String GROUP_JOIN = GROUP_BY_ID + "/join";
 
         public static final String GROUP_MEMBERSHIP = GROUP_BY_ID + "/membership";
@@ -689,6 +709,12 @@ public final class Routes {
 
         /** Authenticated — the rooms the caller posted, moderation state and all. */
         public static final String MY_ROOMS = "/me/flatmate-rooms";
+
+        /** Authenticated — the flats the caller owns because a tenant's room in them was confirmed, rooms inside. */
+        public static final String OWNER_HOMES = "/me/owner-homes";
+
+        /** Authenticated — the wizard's starting answers for one of those flats. A stranger's id is a 404. */
+        public static final String OWNER_HOME_PREFILL = OWNER_HOMES + "/{managedId}/prefill";
 
         /** Authenticated — a formed group applies to an owner's whole-flat listing. */
         public static final String GROUP_APPLY = GROUP_BY_ID + "/apply";
@@ -1022,6 +1048,12 @@ public final class Routes {
         /** Ops — decide one host verification. A rejection must carry a reason. */
         public static final String FLATMATE_REVIEW_BY_ID = FLATMATE_REVIEWS + "/{id}";
 
+        /** Ops - a short-lived signed link to the document a pending or recently decided review rests on. */
+        public static final String FLATMATE_REVIEW_DOCUMENT_URL = FLATMATE_REVIEW_BY_ID + "/document-url";
+
+        /** Ops - withdraw an approved badge, with the reason the host will read. */
+        public static final String FLATMATE_REVIEW_REVOKE = FLATMATE_REVIEW_BY_ID + "/revoke";
+
 
         /** Under {@code /admin} rather than {@code /me} because every status past {@code draft} asserts
          * what a sub-registrar did, and the flatmate trust sweep reads that field as badge evidence. */
@@ -1139,6 +1171,7 @@ public final class Routes {
         public static final String ANALYTICS_SURFERS = "/admin/analytics/surfers";
 
         public static final String ANALYTICS_FUNNEL = "/admin/analytics/funnel";
+        public static final String ANALYTICS_FLATMATES = "/admin/analytics/flatmates";
 
         public static final String SUPPORT_TICKETS = "/admin/support-tickets";
 

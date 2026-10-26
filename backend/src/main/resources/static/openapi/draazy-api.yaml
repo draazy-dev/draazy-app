@@ -582,7 +582,7 @@ paths:
           schema: { type: boolean }
         - name: ownerVerified
           in: query
-          description: Restrict to listings whose owner holds the Verified badge. Only ever narrows.
+          description: Restrict to listings whose owner holds the ID verified badge. Only ever narrows.
           schema: { type: boolean }
         - name: ownershipVerified
           in: query
@@ -1338,7 +1338,7 @@ paths:
             Flags, geo policy, the city roster, Draazy's own prices, the listing policy, the
             Move-in Pack, the plan catalogue, the live listing counts by deal and category
             (`counts`, the home category tiles) and the whole-catalogue trust headlines
-            (`trustStats`), in one read. Every section answers every caller
+            (`trustStats`) and the home flatmate panel (`flatmatePulse`), in one read. Every section answers every caller
             identically, so the response is cached per instance and by the browser
             (`PublicReadCacheFilter`, cross-cutting.md §9). Each section projects one block of the
             admin-only settings document and nothing beside it: `fees`, `permissions`,
@@ -1603,6 +1603,14 @@ paths:
 
         A listing the caller does not own is a `404`, not a `403`: whether a stranger's listing id
         exists is not information this route owes an unrelated caller.
+
+
+        Refused with `409 listing_has_open_work` while the listing is under offer, has an offer
+        waiting on the owner, a pending rental/sale confirmation, or a paid service in progress.
+        Chats about the listing become read-only (`listingDeleted` on the conversation).
+        Thirty days after the delete, a nightly job clears the listing's photos (from storage too),
+        description, address and form details; the row keeps only what history needs. Until then
+        support can restore it.
       responses:
         '200':
           description: 'The archived listing — `id`, `status` and `archived: true`'
@@ -1610,6 +1618,12 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ListingWriteResult' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Something is still open on the listing (`listing_has_open_work`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: listing_has_open_work, message: An offer on this listing is waiting for your answer. Accept or decline it before deleting the listing., status: 409 }
   /me/listings/{id}/card:
     parameters:
       - { $ref: '#/components/parameters/PropertyId' }
@@ -1797,6 +1811,37 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ManagedProperty' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /me/managed-properties/{id}/listing:
+    parameters:
+      - { $ref: '#/components/parameters/PropertyId' }
+    post:
+      tags: [Listings]
+      summary: List a private home through the full listing wizard
+      description: >-
+        The same body and checks as `POST /me/listings` (pacing, photos, quota, moderation), and
+        the new listing is linked to this record in the same transaction. 404 (never 403) when the
+        record is not the caller's; 409 when it is already listed.
+      operationId: publishManagedPropertyWithListing
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ListingCreate' }
+      responses:
+        '201':
+          description: Created (status = pending) — identity and status, as `POST /me/listings`
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ListingWriteResult' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: This home is already listed.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /me/managed-properties/{id}/rent-tracking:
     parameters:
       - { $ref: '#/components/parameters/PropertyId' }
@@ -2378,6 +2423,11 @@ paths:
       responses:
         '200': { description: Restored (status reset to pending) }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: The owner deleted it more than 30 days ago and its content is gone (`listing_content_purged`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
   /properties/{id}/split:
     parameters: [ { $ref: '#/components/parameters/PropertyUuid' } ]
     post:
@@ -2697,7 +2747,7 @@ paths:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     patch:
       tags: [Moderation]
-      summary: Grant or withdraw the Verified badge by hand
+      summary: Grant or withdraw the ID verified badge by hand
       description: >-
         The badge is normally earned through the identity-review queue. This route exists for the
         people that funnel cannot reach — a company account, someone whose documents an
@@ -3020,7 +3070,7 @@ paths:
       operationId: withdrawIdentityVerification
       description: >
         DPDP consent withdrawal. Deletes the caller's identity case and captured images; if the
-        case was verified, the verified badge is withdrawn. Idempotent: no existing case still
+        case was verified, the Verified property badge is withdrawn. Idempotent: no existing case still
         returns 204.
       responses:
         '204': { description: Withdrawn, or there was no identity case to withdraw. }
@@ -3548,7 +3598,7 @@ paths:
       summary: Ownership evidence and gate status
       operationId: getOwnershipVerification
       description: >
-        The documentary case file behind the Ownership Verified badge, plus `missingKinds` — which
+        The documentary case file behind the Verified property badge, plus `missingKinds` — which
         of the facts the deal requires has no current document. A rental needs one of
         `address_proof` (a current electricity bill or property-tax receipt in the lister's name)
         or `title_proof` (Index II, share certificate, 7/12, 8A or Property Card); a sale needs
@@ -3567,7 +3617,7 @@ paths:
               schema: { $ref: '#/components/schemas/OwnershipVerification' }
     post:
       tags: [Moderation]
-      summary: Grant the Ownership Verified badge (staff)
+      summary: Grant the Verified property badge (staff)
       operationId: verifyOwnership
       description: >
         Accept the recorded evidence and grant the badge. Fails with 400 naming the missing facts if
@@ -3586,7 +3636,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
     delete:
       tags: [Moderation]
-      summary: Withdraw the Ownership Verified badge (staff)
+      summary: Withdraw the Verified property badge (staff)
       operationId: revokeOwnershipVerification
       description: >
         Withdraw a badge that should not have been granted — forged evidence, or a document that
@@ -3690,8 +3740,9 @@ paths:
         The owner asks for the badge from their document vault once the papers are uploaded. A live
         or paused listing joins the Re-check Queue and stays live; a pending one is already under
         review. Idempotent while a request is open; clears an earlier decline. 404 to anyone but the
-        owner; 409 when the badge is already held, the listing is not pending/live/paused, or the
-        vault holds no document for it.
+        owner; 409 when the badge is already held, the listing is not pending/live/paused, the vault
+        holds no document for it, or the owner never submitted an ID check (`identity_required`; an ID
+        still in review is enough).
       responses:
         '200':
           description: Requested
@@ -4701,6 +4752,14 @@ paths:
         vouch for the arrangement. The post itself is unaffected and stays live at `identity` tier.
 
 
+        Approving a `tenant` claim also needs the host to be ID verified (`verified` on the user) and
+        the reviewer's structured `checks`: the name and the address on the document match, plus the
+        document's date — `validTill` (after today) for a `rent_agreement`, `issuedOn` (not in the
+        future, at most 90 days old) for an `electricity_bill`. Anything missing is a single 422 that
+        names it. The badge runs to `min(validTill, today + 11 months)` for an agreement and to
+        `today + 11 months` for a bill, after which the sweep lapses it.
+
+
         A decided review is terminal: the same verdict again is an idempotent 200, a different one
         is a 409. A staffer may not decide the review of a post they authored or a group they belong
         to (403).
@@ -4709,7 +4768,7 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/DecisionRequest' }
+            schema: { $ref: '#/components/schemas/FlatmateReviewDecisionRequest' }
       responses:
         '200':
           description: Decided
@@ -4720,6 +4779,57 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { description: Already decided with a different verdict }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /admin/flatmate-reviews/{id}/document-url:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    get:
+      tags: [Moderation]
+      summary: Open the evidence document of a flatmate review
+      description: >
+        A short-lived signed link to the rent agreement or electricity bill the host filed, read from
+        the host's personal vault. Open while the review is pending and for 30 days after it is decided;
+        after that it is 403 `document_access_expired`. A staffer who authored the post or belongs to
+        the group is refused (403). Every open is audited as `flatmate.review.document.open`. Legacy
+        reviews that carry an inline `dataUrl` instead of a vault document answer 404 here and keep
+        serving the file in the review detail.
+      operationId: openFlatmateReviewDocument
+      responses:
+        '200':
+          description: Signed link
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateReviewDocumentUrl' }
+        '403': { description: Party to the post, or `document_access_expired` }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/flatmate-reviews/{id}/revoke:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Moderation]
+      summary: Revoke an approved Verified property badge
+      description: >
+        Turns an `approved` review into `rejected` with the given reason, removes the badge from the
+        post, tells the host and audits `flatmate.review.revoke`. The host may file fresh evidence.
+        A review that is not approved is 409 `not_approved`; a staffer who is a party to the post is
+        refused (403).
+      operationId: revokeFlatmateReview
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 300, description: Shown to the host. }
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateReview' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'The review is not approved (`not_approved`).' }
         '422': { $ref: '#/components/responses/ValidationError' }
   /admin/rent-agreements/{id}:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
@@ -4736,7 +4846,7 @@ paths:
 
 
         Ops-only, and that is the point: `registered` and `active` are read as evidence by the
-        flatmate trust sweep, which grants a host the Tenant-verified badge with no further human in
+        flatmate trust sweep, which grants a host the Verified property badge with no further human in
         the loop. So those two rungs need all of:
         a row produced by a completed rent-agreement service request, with the registered copy that
         request's final upload linked (the evidence — a typed link is no longer accepted);
@@ -4905,7 +5015,7 @@ paths:
                 localities:
                   type: [array, 'null']
                   minItems: 1
-                  maxItems: 10
+                  maxItems: 3
                   items: { type: string, maxLength: 80 }
                 moveIn: { type: [string, 'null'], format: date }
       responses:
@@ -5035,7 +5145,7 @@ paths:
         Requires only a signed-in mobile-OTP account (L1) — identity verification is **not**
         a prerequisite (ADR-019). Returns `401` if unauthenticated. Returns
         `403 verification_required` **only** when the target owner has opted into
-        "verified contact only" and the caller has no Verified badge (L2). Returns
+        "verified contact only" and the caller has no ID verified badge (L2). Returns
         `422 contact_quota_exhausted` when the caller has used every owner contact their free
         allowance, contact packs and referrals allow — see `GET /me/entitlements`. Returns `409 listing_not_live`
         when the listing is paused, rented or sold, and `404` when it is archived, not approved or its owner is suspended. A request counts against the allowance from the moment it is made until
@@ -5074,7 +5184,7 @@ paths:
               schema: { $ref: '#/components/schemas/Error' }
               example: { error: listing_not_live, message: This listing is not live right now, status: 409 }
         '403':
-          description: Owner accepts verified contacts only — earn the Verified badge to proceed.
+          description: Owner accepts verified contacts only — get ID verified to proceed.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -5217,9 +5327,11 @@ paths:
       operationId: myRequests
       description: >
         Every kind of request - contact, visit, photo, document, flatmate interest, group application - merged into
-        one list. `received` is what is waiting on the caller as the recipient (pending only, most recently
-        reminded first); `sent` is what the caller asked, pending first, plus anything decided in the last
-        30 days that the caller has not cleared. `party` is always the other side and never carries a mobile.
+        one list. `received` is what reached the caller as the recipient: pending first (most recently
+        reminded first), then anything accepted, declined or expired in the last 90 days that the caller has
+        not cleared; a withdrawn request never shows. `sent` is what the caller asked, pending first, plus
+        anything decided in the last 30 days that the caller has not cleared. `party` is always the other
+        side and never carries a mobile.
       parameters:
         - name: box
           in: query
@@ -5261,18 +5373,30 @@ paths:
       summary: Withdraw a pending request, or clear a decided one
       operationId: removeMyRequest
       description: >
-        Requester only. A pending request is withdrawn the way its own kind withdraws (a contact request
-        returns its credit; a visit is cancelled; a document request is marked withdrawn; a flatmate interest is deleted). A decided one is only
-        hidden from the caller's sent box. Repeating the call is a no-op. Someone else's request, or one that
-        does not exist, is `404`.
+        With `box=sent` (the default) the caller must be the requester. A pending request is withdrawn the way
+        its own kind withdraws (a contact request returns its credit; a visit is cancelled; a document request
+        is marked withdrawn; a flatmate interest is deleted). A decided one is only hidden from the caller's
+        sent box. With `box=received` the caller must be the recipient and the request must be decided; it is
+        only hidden from the caller's received box. Repeating the call is a no-op. Someone else's request, or
+        one that does not exist, is `404`.
+      parameters:
+        - name: box
+          in: query
+          schema: { type: string, enum: [received, sent], default: sent }
       responses:
         '204': { description: Withdrawn or cleared }
+        '400':
+          description: Unknown `box` (`invalid_box`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
           description: >
-            The recipient answered the request before the withdrawal landed, so it can no longer be withdrawn
-            (`conflict`, or `already_decided` for a flatmate interest).
+            Sent: the recipient answered the request before the withdrawal landed, so it can no longer be
+            withdrawn (`conflict`, or `already_decided` for a flatmate interest). Received: the request is
+            still pending, so it must be accepted or declined before it can be cleared.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }
@@ -5488,6 +5612,7 @@ paths:
         # A conversation the caller is not a participant in is a 404, not a
         # 403 -- confirming that a thread exists is itself the disclosure.
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
   /messages/{id}/photos:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
@@ -5519,6 +5644,7 @@ paths:
               schema: { $ref: '#/components/schemas/ConversationMessage' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '415': { $ref: '#/components/responses/UnsupportedMediaType' }
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
@@ -5610,11 +5736,13 @@ paths:
       - { name: requestId, in: path, required: true, schema: { type: string } }
     post:
       tags: [Leads & Contact]
-      summary: Open the chat an accepted flatmate request unlocks
+      summary: Open the chat between a flatmate host and requester
       operationId: openFlatmateRequestConversation
       description: >
         Finds or creates the pair thread between the requester and the host of an accepted flatmate
-        request. Anyone else, and either party while the request is pending or declined, gets `404`.
+        request. A group host may also open it while a join request is still pending, to vet the
+        requester before deciding; the requester can reply once it exists. Anyone else, the requester
+        while pending, and either party once declined gets `404`.
         No listing is attached, so both mobiles stay masked. Read, reply, attach and mark-read then use
         the ordinary `/messages/{id}` paths.
       responses:
@@ -5957,9 +6085,9 @@ paths:
   /tenant-profiles/verified:
     post:
       tags: [Rentals & Payments]
-      summary: Which of these people are verified tenants (batch badge)
+      summary: Which of these people are ID verified (batch badge)
       description: >
-        Which of these people hold the verified-tenant badge. Requires a relationship with each person -- a tenancy either way round, or an accepted contact
+        Which of these people hold the ID verified badge. Requires a relationship with each person -- a tenancy either way round, or an accepted contact
         request against one of the caller's listings -- and returns `false`, never an error or a
         reason, for every entry that does not qualify, is not registered, or holds no badge. The
         answer has the same length and order as `mobiles`, and each `mobile` is the string the
@@ -8791,8 +8919,14 @@ paths:
       summary: Flatmates feed (tab-aware, mixed)
       description: >
         One feed per tab. `move-in` returns rooms plus groups that already hold an address;
-        `team-up` returns solo seeker posts plus address-less groups. The list is sorted as one
+        `team-up` returns solo seeker posts plus address-less groups. `people` is the seeker half
+        of `team-up` on its own and `teams` is the hunting-group half. The list is sorted as one
         list — merging two pre-sorted lists would stack every room above every group.
+
+
+        A signed-in caller who has saved at least three living-style answers (`/me/living-style`)
+        also gets `matches` for the returned rows and a living-style term under `sort=match`. The
+        answers are read from the caller's token on the server, never from the request.
 
 
         All board facets are filtered, ordered, and paged by the server.
@@ -8838,15 +8972,25 @@ paths:
             `move-in` only. Takes the stored value, not the UI's boolean toggle: the column holds
             `attached` or `shared`, and sending `true` would filter on a word no row contains.
           schema: { type: string, enum: [attached, shared] }
+        - { name: strictGender, in: query, description: 'With `gender`: drops rows open to any gender (rooms and posts `any`, groups with an `any` policy). Ignored without `gender`.', schema: { type: boolean, default: false } }
+        - { name: roomType, in: query, description: '`move-in` rooms only match this type; `people` seekers match it or `any`; `teams` ignores it.', schema: { type: string, enum: [private, shared] } }
+        - { name: furnishing, in: query, description: '`move-in` rooms only.', schema: { type: string, enum: [furnished, semi, unfurnished] } }
+        - { name: gated, in: query, description: '`move-in` rooms in a gated community only. Any of attachedBath, roomType, furnishing or gated also drops housed groups from `move-in`.', schema: { type: boolean, default: false } }
         - { name: verifiedOnly, in: query, schema: { type: boolean, default: false } }
-        - name: habits
+        - name: vibe
           in: query
           description: >
-            Lifestyle tags, **AND'd** — a seeker naming two has stated two requirements. Matched by
-            jsonb containment, so the value is a bind parameter and never reaches SQL as text.
-            Capped at 12: each tag emits a predicate and a bind on both halves of the union, so the
-            list sizes the statement rather than just the work.
-          schema: { type: array, items: { type: string }, maxItems: 12 }
+            Living-style filter on the post author's `/me/living-style` answers: repeated tokens
+            `key:answer`, **OR** within a key (`vibe=pets:1&vibe=pets:2`) and **AND** across keys. Keys
+            are food, smoking, pets, drinks, visitors and sleep; answer is 0-2. An author who has not
+            answered a named key is excluded. Applies only to a signed-in caller with at least 3 answers
+            and only for keys the caller has answered too (a stranger never filters on an answer they
+            would not be shown);
+            other tokens, and every token from a guest, are ignored. A malformed token or an unknown
+            key is a 400. Answers are bind parameters.
+          schema:
+            type: array
+            items: { type: string, pattern: '^(food|smoking|pets|drinks|visitors|sleep):[0-2]$' }
         - name: moveInDays
           in: query
           description: >
@@ -8878,8 +9022,8 @@ paths:
           description: >
             `sort=match` only — the caller's own post's preferred localities. Compatibility is
             scored in SQL rather than over a downloaded page, so "best match" can order a result
-            set larger than the browser holds. Ignored under every other sort. Capped at 12, for
-            the reason given on `habits`.
+            set larger than the browser holds. Ignored under every other sort. Capped at 12: each
+            entry adds a predicate and a bind to both halves of the union.
           schema: { type: array, items: { type: string }, maxItems: 12 }
         - { name: meBudget, in: query, description: '`sort=match` only — the caller''s own budget.', schema: { type: integer, format: int64, minimum: 0 } }
         - { name: meGender, in: query, description: '`sort=match` only — the caller''s own gender.', schema: { type: string } }
@@ -8895,6 +9039,21 @@ paths:
                   - $ref: '#/components/schemas/SearchEnvelope'
                   - type: object
                     properties:
+                      tabElements:
+                        type: object
+                        description: Every tab's total under the same facets, for the tab labels.
+                        properties:
+                          move-in: { type: integer, format: int64 }
+                          people: { type: integer, format: int64 }
+                          teams: { type: integer, format: int64 }
+                      matches:
+                        type: object
+                        description: >
+                          Living-style match percentage (0-100) for rows on this page, keyed
+                          `room:<id>`, `group:<id>` or `post:<id>`. Only rows whose author shares
+                          at least three answers with the caller appear; the caller's own rows and
+                          every row for a guest or a caller without answers are omitted.
+                        additionalProperties: { type: integer, minimum: 0, maximum: 100 }
                       content:
                         type: array
                         items:
@@ -9070,6 +9229,47 @@ paths:
                       content:
                         type: array
                         items: { $ref: '#/components/schemas/FlatmateRoomCard' }
+  /me/owner-homes:
+    get:
+      tags: [Engagement]
+      summary: Flats I own through a confirmed flatmate room
+      operationId: listMyOwnerHomes
+      description: >
+        One item per private home the caller got by confirming a tenant's room (a managed record with
+        a source address), newest first, each with the live rooms tenants have posted in that flat.
+        A room appears only while the caller's number is its owner contact, the owner has confirmed it
+        and it is not withdrawn. Tenants are first-name only; no phone number or surname.
+      responses:
+        '200':
+          description: The caller's homes
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/OwnerHome' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /me/owner-homes/{managedId}/prefill:
+    parameters:
+      - name: managedId
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Engagement]
+      summary: The listing wizard's starting answers for one of my homes
+      operationId: getMyOwnerHomePrefill
+      description: >
+        Taken from the room that created the home, even if that room has since been withdrawn, and from
+        the record's own facts (locality, society, bhk, furnishing) once the room is gone; the rest is
+        null. 404 (never 403) for a record that is not the caller's or is not a flatmate home.
+      responses:
+        '200':
+          description: Wizard answers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OwnerHomePrefill' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /flatmates/rooms/{id}:
     parameters:
       - { $ref: '#/components/parameters/GenericId' }
@@ -9192,6 +9392,80 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FlatmateRoom' }
         '409': { description: This room has no seat model (`not_seat_based`) }
+  /flatmates/rooms/{id}/badge-request:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Engagement]
+      summary: Request the Verified property badge on a room already posted
+      description: >
+        Tenant-hosted rooms only. Files a rent agreement or an electricity bill naming the flat owner, from
+        the caller's personal document vault (category `Rent agreement` or `Electricity Bill`), for Ops
+        review without touching the room's moderation status or any other field. The caller's ID check
+        must be verified or in review (409 `identity_required` when never submitted); approval needs it
+        verified. Idempotent: repeating it for a pending or approved review
+        changes nothing, and a rejected review goes back to pending. Approval still needs the flat owner's
+        OTP consent.
+      operationId: requestRoomBadge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agreementDoc]
+              properties:
+                agreementDoc:
+                  type: object
+                  required: [id]
+                  properties:
+                    id: { type: string, format: uuid, description: A personal-vault Rent agreement or Electricity Bill document the caller owns. }
+                    validFrom: { type: string, format: date, description: 'Agreement start as the host reads it. Required for a rent agreement.' }
+                    validTill: { type: string, format: date, description: 'Agreement end, after validFrom and today. Required for a rent agreement; the reviewer confirms it.' }
+      responses:
+        '200':
+          description: The room with its review state. Host-only evidence and review details are available on the owned detail read.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateRoom' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'Room is split (split_room), not tenant-hosted (not_tenant_hosted) or the caller never submitted an ID check (identity_required).' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /flatmates/groups/{id}/badge-request:
+    parameters: [ { $ref: '#/components/parameters/GenericId' } ]
+    post:
+      tags: [Engagement]
+      summary: Request the Verified property badge on a flat-holding group
+      description: >
+        The host of a tenant-hosted group that already holds its flat. Same body, evidence rules and
+        idempotence as the room request. A group still hunting is 409 `hunting_group`; an owner-hosted one
+        is 409 `not_tenant_hosted`; a host who never submitted an ID check is 409 `identity_required`.
+      operationId: requestGroupBadge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [agreementDoc]
+              properties:
+                agreementDoc:
+                  type: object
+                  required: [id]
+                  properties:
+                    id: { type: string, format: uuid, description: A personal-vault Rent agreement or Electricity Bill document the caller owns. }
+                    validFrom: { type: string, format: date, description: 'Agreement start as the host reads it. Required for a rent agreement.' }
+                    validTill: { type: string, format: date, description: 'Agreement end, after validFrom and today. Required for a rent agreement; the reviewer confirms it.' }
+      responses:
+        '200':
+          description: The group with its review state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateGroup' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { description: 'hunting_group, not_tenant_hosted or identity_required.' }
+        '422': { $ref: '#/components/responses/ValidationError' }
   /flatmates/rooms/{id}/occupants:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     patch:
@@ -9366,6 +9640,83 @@ paths:
               example: { error: unauthorized, message: Incorrect OTP, status: 401, attemptsRemaining: 2 }
         '422': { $ref: '#/components/responses/ValidationError' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
+  /flatmates/owner-notice:
+    get:
+      tags: [Engagement]
+      summary: Read the WhatsApp notice a flat owner was sent about a tenant's room
+      description: >
+        Public but token-scoped. The `X-Owner-Notice-Token` header IS the authorisation: the owner has
+        no account and opens the link from WhatsApp (`/owner-confirm#<token>`, a fragment, so the
+        token never reaches a server log). Returns the tenant's first name and the room only, never
+        either phone number. A missing, unknown or expired token, a room that was archived, or a
+        room whose address or owner number changed since the notice, is the same 404.
+      security: []
+      operationId: getFlatmateOwnerNotice
+      parameters:
+        - name: X-Owner-Notice-Token
+          in: header
+          required: true
+          schema: { type: string }
+          description: Bearer credential for one notice. Do not log, store or forward.
+      responses:
+        '200':
+          description: The notice
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateOwnerNoticeView' }
+        '404':
+          description: This link is no longer valid.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+  /flatmates/owner-notice/answer:
+    post:
+      tags: [Engagement]
+      summary: The flat owner agrees or declines a tenant's room
+      description: >
+        Public but token-scoped, as `GET /flatmates/owner-notice`. `agree` records the owner's
+        consent for that tenant and flat (the room's `ownerConsent` becomes true, as after an OTP
+        consent), gives the owner an account when their number has none (unverified, until they sign
+        in) and saves the flat as a private home on it; that never fails the answer. `decline` takes
+        the room out of public view and puts it back in the moderation queue, flagged with the reason
+        "Owner said no on WhatsApp", and creates nothing. The tenant is told in the app either way.
+        The same answer twice is a 200 no-op; the opposite answer after one is recorded is a 409.
+      security: []
+      operationId: answerFlatmateOwnerNotice
+      parameters:
+        - name: X-Owner-Notice-Token
+          in: header
+          required: true
+          schema: { type: string }
+          description: Bearer credential for one notice. Do not log, store or forward.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answer]
+              properties:
+                answer: { type: string, enum: [agree, decline] }
+      responses:
+        '200':
+          description: The notice with its recorded status
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateOwnerNoticeView' }
+        '404':
+          description: This link is no longer valid.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '409':
+          description: You've already answered.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /flatmates/rooms/{id}/interest:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -9390,7 +9741,7 @@ paths:
     post:
       tags: [Engagement]
       summary: Ask to join a group
-      description: An open-policy group (`policy` = `any`) auto-accepts; every other policy creates a pending host-inbox request.
+      description: Always creates a pending host-inbox request, whatever the group's `policy`; the requester becomes a member only when the host accepts it (`PATCH /me/flatmate-requests/{id}`).
       operationId: flatmateGroupJoin
       requestBody:
         required: false
@@ -9399,7 +9750,7 @@ paths:
             schema: { $ref: '#/components/schemas/FlatmateInterestCreate' }
       responses:
         '201':
-          description: Joined or requested
+          description: Requested
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FlatmateRequest' }
@@ -9674,6 +10025,34 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/FlatmateInterestKey' }
+  /flatmates/{kind}/{id}/living-style:
+    parameters:
+      - name: kind
+        in: path
+        required: true
+        schema: { type: string, enum: [room, group, post] }
+      - { $ref: '#/components/parameters/GenericId' }
+    get:
+      tags: [Engagement]
+      summary: A listing author's living-style answers and the caller's match
+      description: >
+        Signed-in only, so the answers never reach the anonymous feed. Visible under the same rule
+        as the detail endpoints: a public listing, or one the caller authors; anything else is
+        404. **Reciprocal:** a caller who is not the author gets only the author's answers for keys
+        the caller has also answered, and `answers: {}` with a null `match` while the caller has
+        fewer than three answers. `match` is also null when the shared answers number fewer than
+        three, and for the author's own listing, which returns their full answers. Per-caller
+        rate limited (429).
+      operationId: getFlatmateLivingStyle
+      responses:
+        '200':
+          description: Answers and match
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FlatmateLivingStyle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /flatmates/{kind}/{id}/interest:
     parameters:
       - name: kind
@@ -9701,8 +10080,7 @@ paths:
 
         **Only while pending.** Once the host has answered, they have acted on it -- and on a group
         they may have given up a seat. That is a `409`, not a `403`: the row is the caller's, it is
-        its state that refuses. Restricting it this way also keeps auto-accepted joins (`policy:
-        any`) out of scope, so no seat ever has to be un-taken.
+        its state that refuses.
 
 
         **The rate-limit budget is not refunded.** The notification already went out; refunding it
@@ -9824,6 +10202,39 @@ paths:
       responses:
         '204': { description: Dismissed }
         '404': { $ref: '#/components/responses/NotFound' }
+  /me/living-style:
+    get:
+      tags: [Engagement]
+      summary: My living-style answers
+      description: Always 200; a user who has answered nothing gets an empty `answers` and a null `updatedAt`.
+      operationId: getLivingStyle
+      responses:
+        '200':
+          description: Answers
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LivingStyle' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    put:
+      tags: [Engagement]
+      summary: Replace my living-style answers
+      description: >
+        Replaces the whole set; any subset of the twelve keys may be answered. An unknown key, or a
+        value that is not an integer 0-2, is a 400. An empty `answers` deletes the stored row.
+      operationId: updateLivingStyle
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LivingStyleUpdate' }
+      responses:
+        '200':
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LivingStyle' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /me/notification-preferences:
     get:
       tags: [Engagement]
@@ -9910,7 +10321,7 @@ paths:
         holds the permission its standalone read requires, and absent - never empty - otherwise:
         `kpis`, `traffic` and `sla` need analytics, `listings` needs properties:read, `demand`
         needs enquiries:read, `tickets` needs tickets:read (and at least one desk), `owners`
-        needs users:read.
+        needs users:read, `flatmates` needs flatmates:read.
       responses:
         '200':
           description: The sections the caller may see
@@ -10036,6 +10447,25 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AdminAnalyticsFunnel' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /admin/analytics/flatmates:
+    get:
+      tags: [Admin & Analytics]
+      summary: Flatmate posts, requests, matches and host replies, per week
+      operationId: adminAnalyticsFlatmates
+      x-roles: [staff, admin]
+      description: >
+        Weekly throughput like the funnel (IST, weeks start Monday, zero-filled). A request is
+        answered when the host accepts or declines it; one still pending and younger than 48h is not
+        judged yet. `localities` is live now and ignores the window.
+      parameters:
+        - { name: days, in: query, schema: { type: integer, default: 90, minimum: 1, maximum: 365 }, description: Window length; echoed back in the response }
+      responses:
+        '200':
+          description: Flatmate activity for the window
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAnalyticsFlatmates' }
         '400': { $ref: '#/components/responses/BadRequest' }
   /admin/analytics/pricing:
     get:
@@ -10504,8 +10934,12 @@ paths:
   /admin/finance:
     get:
       tags: [Admin & Analytics]
-      summary: Platform finance overview (revenue, subscriptions)
+      summary: Finance overview - this month's money, the subscription book and what needs a decision
       operationId: adminFinance
+      description: >
+        Money is read from invoices (issued only once the gateway confirms payment) and credit notes
+        (issued on a refund). Subscriptions seeded or created without a payment are not money; they
+        still count towards `mrr` when active and paid-for.
       x-roles: [admin]
       responses:
         '200':
@@ -10516,39 +10950,19 @@ paths:
   /admin/finance/series:
     get:
       tags: [Admin & Analytics]
-      summary: Revenue per month, split by source
+      summary: Draazy's fees per month, split by source
       operationId: adminFinanceSeries
       # Finance guard, not the staff one: exposes the revenue mix.
       description: >
-        Monthly revenue for the finance console's stacked chart, oldest month first, ending with the
-        current (partial) month.
-
-
-        Every month in the window is returned, including months in which nothing was sold. A gap in
-        a bar chart is not a visible gap - the neighbouring bars simply move up - so an omitted
-        bucket reads as an unbroken run of trading months that did not happen.
-
-
-        `services` is always `0`, and that is a measurement rather than a missing field. The
-        marketplace takes no money through the gateway, so `service_orders.amount` is a quote and
-        not a receipt; the field is carried, and paired with `serviceOrdersCounted` on
-        `/admin/finance`, so the zero can say what it means instead of looking like a rendering
-        fault. The day the marketplace settles through the gateway this field carries a number and
-        the flag flips, with no shape change at either end.
-
-
-        Not a metric on `/admin/analytics`, which already serves a revenue series: that operation is
-        staff-visible and returns one total per bucket. Splitting it by source there would widen a
-        staff-readable response to carry the revenue mix, which is precisely what `/admin/finance`
-        is admin-only to prevent.
+        Monthly fees for the finance console's chart, oldest month first, ending with the current
+        (partial) month. Every month in the window is returned, including empty ones, because an
+        omitted bucket reads as trading months that did not happen. The current month's net equals
+        `month.net` on `/admin/finance`.
       x-roles: [admin]
       parameters:
         - name: months
           in: query
-          description: >
-            How many monthly buckets to return, counting back from and including the current month.
-            Capped at 60 so that a hand-typed range cannot become a grouped scan of every settled
-            payment since the platform opened.
+          description: How many monthly buckets to return, counting back from and including the current month.
           schema: { type: integer, minimum: 1, maximum: 60, default: 12 }
       responses:
         '200':
@@ -10562,43 +10976,22 @@ paths:
   /admin/finance/transactions:
     get:
       tags: [Admin & Analytics]
-      summary: The settlement ledger, paged
+      summary: The invoice and credit-note ledger, paged
       operationId: adminFinanceTransactions
       # Finance guard: lists every movement of money with the counterparty's name.
-      description: >
-        Every movement of money the platform can evidence: a paid subscription. Newest first.
-
-
-        Deliberately not a list of everything that happened commercially. A closed deal and a
-        service quote are business events with no receipt behind them, and a ledger that mixes the
-        two cannot be reconciled against a bank statement, which is the only thing it is for.
-
-
-        `amount` is **the platform's share**, never the gross. It is
-        never negative: there is no refund path, so a negative amount could only be a fabrication.
-
-
-        `status` is derived. The subscription status is not about settlement - a `cancelled`
-        subscription was still paid for - so the ledger reports the only question a finance reader
-        is asking, which is whether the money arrived. `refunded` is deliberately absent from that
-        vocabulary: offering a value no row can ever hold would contradict the `refundsMeasured`
-        disclosure two panels away.
+      description: Every invoice and credit note, newest first. Credit notes carry negative amounts.
       x-roles: [admin]
       parameters:
         - $ref: '#/components/parameters/BoardDays'
         - name: kind
           in: query
-          description: Narrow to one source. Omit for all.
-          schema: { type: string, enum: [subscription] }
-        - name: status
-          in: query
-          description: Narrow to one settlement state. Omit for all three.
-          schema: { type: string, enum: [paid, pending, failed] }
+          description: Narrow to one kind. Omit for all; an unknown kind is a 400.
+          schema: { type: string, enum: [subscription, service, refund] }
         - name: q
           in: query
           description: >
-            Case-insensitive substring of the counterparty's name. `%` and `_` are escaped, so an
-            operator searching for a name containing one is not silently running a wildcard.
+            Case-insensitive substring of the customer's name or the document number. `%` and `_`
+            are escaped, so they match literally.
           schema: { type: string }
         - { $ref: '#/components/parameters/Page' }
         - { $ref: '#/components/parameters/Size' }
@@ -11701,7 +12094,7 @@ components:
           type: boolean
           readOnly: true
           description: |
-            Whether this party carries the Verified Tenant badge. Server-computed, and optional
+            Whether this party carries the ID verified badge. Server-computed, and optional
             like every other property here: populated today on `Offer.from` and on the two
             `FinalizationRequest` parties, absent from the payloads that have no badge to show.
     # Distinct from Party: an under-offer party is off-platform, so it has no account, no `role`
@@ -11801,6 +12194,24 @@ components:
       properties:
         decision: { type: string, enum: [approve, reject] }
         note: { type: string }
+    FlatmateReviewDecisionRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision: { type: string, enum: [approved, rejected] }
+        note: { type: string, maxLength: 600, description: Required on `rejected`; shown to the host. }
+        checks:
+          type: object
+          description: What the reviewer confirmed. Required for approving a `tenant` claim; ignored otherwise.
+          properties:
+            nameMatches: { type: boolean, description: The name on the document is the host's ID-verified legal name (agreement) or the flat owner's (light bill). Must be true. }
+            addressMatches: { type: boolean, description: The document's address is the post's society, flat and locality. Must be true. }
+            validTill: { type: string, format: date, description: 'Agreement end date, after today. Required for `rent_agreement`.' }
+            issuedOn: { type: string, format: date, description: 'Bill date, not in the future and at most 90 days old. Required for `electricity_bill`.' }
+    FlatmateReviewDocumentUrl:
+      type: object
+      properties:
+        url: { type: string, description: Signed link that expires shortly. }
     PropertyVerificationDecisionRequest:
       type: object
       required: [decision]
@@ -12041,9 +12452,12 @@ components:
         propertyLocality: { type: [string, 'null'] }
         propertyCover: { type: [string, 'null'] }
         propertyAvailable: { type: boolean }
+        listingDeleted: { type: boolean, description: 'The owner deleted the listing; the thread is read-only and sends answer 409 `conversation_closed`' }
         groupId: { type: [string, 'null'] }
         groupTitle: { type: [string, 'null'] }
         memberCount: { type: [integer, 'null'] }
+        flatmateKind: { type: string, enum: [room, group, post], description: 'Direct thread opened from an accepted flatmate request: the kind of post it was about (the latest one, if several). Absent otherwise' }
+        flatmateTargetId: { type: string, description: 'Id of that room, group or seeker post; present exactly when flatmateKind is' }
         lastMessage: { type: [string, 'null'], description: Preview of the most recent message; null on an empty group thread }
         unread: { type: integer, description: Unread message count for the current user }
         updatedAt: { type: string, format: date-time }
@@ -12222,7 +12636,7 @@ components:
           description: Must be `staff`; administrators are bootstrapped once per environment.
         team: { $ref: '#/components/schemas/Team' }
         status: { type: string, enum: [active, suspended, archived] }
-        verified: { type: boolean, description: 'Opt-in identity Verified badge (L2, ADR-019) — not required to participate.' }
+        verified: { type: boolean, description: 'Opt-in ID verified badge (L2, ADR-019) — not required to participate.' }
         city: { type: string, example: Pune }
         mobileVerified: { type: boolean, description: Mobile-OTP (L1) — the floor for posting/enquiring/contacting. }
         verifiedContactOnly: { type: boolean, description: Owner preference — accept contact requests from verified (L2) users only. }
@@ -12347,7 +12761,8 @@ components:
         role: { $ref: '#/components/schemas/Role' }
         verified: { type: boolean }
         city: { type: string, example: Pune }
-        gender: { type: string, enum: [male, female], description: 'Set once by the user, then locked; the flatmates gender gate reads it. Absent until set. Staff correct it from the ID on identity approval.' }
+        gender: { type: string, enum: [male, female], description: 'Set by the user, then changeable genderChangesLeft more times; the flatmates gender gate reads it. Absent until set. Staff correct it from the ID on identity approval.' }
+        genderChangesLeft: { type: integer, minimum: 0, maximum: 2, description: 'Self-service gender changes still allowed after the first pick. 0 once spent or once the profile is ID-verified.' }
         verifiedContactOnly: { type: boolean }
         hideNumber: { type: boolean }
         shareActivityStatus: { type: boolean }
@@ -12396,6 +12811,7 @@ components:
         locality: { type: string }
         city: { type: string }
         coverImage: { type: string }
+        images: { type: array, maxItems: 5, items: { type: string } }
         ownerVerified: { type: boolean }
         ownershipVerified: { type: boolean }
     ListingWriteResult:
@@ -12584,7 +13000,8 @@ components:
         avatar: { type: string, format: uri }
         city: { type: string, description: 'Home city. The profile form has always sent this; the contract lacked it, so it was accepted and silently dropped (D20).' }
         hideNumber: { type: boolean, description: 'Owner preference - stay masked even after approving a contact request; reach me in-app instead. Not a second gate: approval still unlocks the conversation (D5).' }
-        gender: { type: string, enum: [male, female], description: 'Set once; the same value again is a no-op and a different one is 409 (contact support). The flatmates gender gate reads it.' }
+        gender: { type: string, enum: [male, female], description: 'The first pick is free and the same value again is a no-op. A different value is 409 unless changeGender is true, which spends one of 2 changes, then 409 (contact support); ID-verified profiles get 409. The flatmates gender gate reads it.' }
+        changeGender: { type: boolean, description: 'Opt in to spend a gender change. The flatmates first-pick prompt omits it, so a gender set on another device answers 409 instead of being overwritten.' }
         shareActivityStatus: { type: boolean, description: Share online/last-seen activity with message counterparties who also share theirs. }
         shareReadReceipts: { type: boolean, description: Share pair-thread read receipts with counterparties who also share theirs. }
 
@@ -12599,6 +13016,7 @@ components:
         propertyType: { $ref: '#/components/schemas/PropertyTypeLabel' }
         bhk: { type: number, example: 3 }
         price: { $ref: '#/components/schemas/Money' }
+        deposit: { $ref: '#/components/schemas/Money' }
         area: { type: number, example: 1180 }
         areaUnit:
           type: string
@@ -12637,6 +13055,14 @@ components:
             never key off it. Absent when the listing's locality could not be resolved to a curated
             locality (owner free-text that matched nothing); such listings are invisible to locality
             filters until curated during moderation.
+        societyName:
+          type: string
+          example: Skyline Heights
+          description: >-
+            The bound society's current catalogue name, derived on the server and absent when no
+            society is bound. Present even when the society has since been retired from the catalogue,
+            so the owner's edit form can still show what the listing is bound to; `societySlug` is
+            what routes to the society page.
         city: { type: string, example: Pune }
         lat: { type: number, format: double }
         lng: { type: number, format: double }
@@ -12658,6 +13084,7 @@ components:
           description: >
             This listing's ownership paperwork has been verified and has not expired. Independent of
             `ownerVerified` — either can be true alone.
+        reraId: { type: string }
         status: { $ref: '#/components/schemas/PropertyStatus' }
         dealStatus:
           type: string
@@ -12694,14 +13121,6 @@ components:
                 before D19 the client filled the gap by hashing the listing id into a society list,
                 which printed one real building's builder, tower count and occupancy under another
                 building's listing.
-            societyName:
-              type: string
-              example: Skyline Heights
-              description: >-
-                The bound society's current catalogue name, derived on the server and absent when no
-                society is bound. Present even when the society has since been retired from the catalogue,
-                so the owner's edit form can still show what the listing is bound to; `societySlug` is
-                what routes to the society page.
             lastConfirmedAt:
               type: string
               format: date-time
@@ -12754,7 +13173,6 @@ components:
                 tier is what decides tone and ranking. It is served rather than re-derived by each
                 client because it also governs whether a listing is shown at all, and a visibility rule
                 the browser evaluates is a rule anything reading the API directly does not have.
-            deposit: { $ref: '#/components/schemas/Money' }
             maintenance: { $ref: '#/components/schemas/Money' }
             negotiable: { type: boolean }
             ownership: { type: string, description: Owner-declared ownership type. }
@@ -12770,10 +13188,6 @@ components:
               type: array
               description: Furniture and appliances explicitly selected by the owner.
               items: { type: string }
-            reraId: { type: string }
-            reraChecked:
-              type: boolean
-              description: Present and true only when staff verified the RERA ID on MahaRERA; never says who checked.
             carpetArea: { type: number }
             builtUpArea: { type: number }
             superBuiltUpArea: { type: number }
@@ -14873,7 +15287,7 @@ components:
       properties:
         status: { type: string, enum: [owner, approved, pending, declined, expired, none], description: 'Gate state for this caller vs this listing: owner (viewer owns it), approved, pending, declined, expired (owner did not reply in time; the contact came back and asking again spends one), or none (no request yet).' }
         verifiedContactOnly: { type: boolean, description: True when the owner accepts verified contacts only — caller needs the L2 badge (ADR-019). }
-        verificationRequired: { type: boolean, description: True when this specific request is blocked pending the caller's Verified badge. }
+        verificationRequired: { type: boolean, description: True when this specific request is blocked pending the caller's ID verified badge. }
         ownerHidesNumber: { type: boolean, description: 'True when the owner has opted to stay masked even after approving. The client should offer chat instead of a call; approval still stands (D5).' }
     ContactRequestCreate:
       type: object
@@ -14939,6 +15353,7 @@ components:
             link: { type: [string, 'null'] }
         message: { type: [string, 'null'] }
         slot: { type: [string, 'null'], format: date-time, description: Visits only. }
+        share: { type: [string, 'null'], enum: [solo, bring, match, null], description: 'Flatmate only: alone, bringing one more person, or wants a room-sharer.' }
         createdAt: { type: string, format: date-time }
         decidedAt: { type: [string, 'null'], format: date-time }
         reminders: { $ref: '#/components/schemas/RequestReminderResponse' }
@@ -15294,6 +15709,7 @@ components:
         dueDay: { type: [integer, 'null'], description: Rent due day of month. }
         valuation: { type: [object, 'null'], additionalProperties: true, description: Opaque Rent-o-meter snapshot. }
         publishedListingId: { type: [string, 'null'], description: Id of the spawned listing once published. }
+        sourceRoomId: { type: [string, 'null'], readOnly: true, description: The flatmate room whose owner confirmation created this private home; null for a record the owner made themselves, or once that room is deleted. }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
     ManagedPropertyCreate:
@@ -16179,7 +16595,7 @@ components:
         status: { type: string, enum: [pending, qualified, held, rewarded, rejected, clawed-back] }
         track: { type: [string, 'null'], enum: [owner, seeker, null], description: Decided by whichever qualifying event came first. }
         risk: { type: string, enum: [low, medium, high] }
-        identityVerified: { type: boolean, description: The referred account held the Verified badge when the referral qualified. }
+        identityVerified: { type: boolean, description: The referred account held the ID verified badge when the referral qualified. }
         identityUnique: { type: boolean }
         sameDevice: { type: boolean }
         sameIp: { type: boolean }
@@ -16425,9 +16841,10 @@ components:
       description: >
         `move-in` = browse PLACES (rooms, plus groups that already hold a flat).
         `team-up` = browse PEOPLE (solo seekers, plus groups still hunting).
+        `people` = the seekers of `team-up` alone; `teams` = its hunting groups alone.
         Replaces the legacy flatmates/rooms/groups triple, which split by our storage
         model rather than by seeker intent.
-      enum: [move-in, team-up]
+      enum: [move-in, team-up, people, teams]
       default: move-in
     FlatmateTabLegacy:
       type: string
@@ -16437,6 +16854,37 @@ components:
         rooms -> move-in; flatmates | groups -> team-up.
       enum: [rooms, flatmates, groups]
       deprecated: true
+    LivingStyleAnswers:
+      type: object
+      description: >
+        Optional answers to the twelve living-style questions, each an integer 0-2 on an ordered
+        scale (0 strictest or quietest, 2 most relaxed). Keys are listed in question order.
+      propertyNames: { enum: [tidy, food, sleep, wfh, guests, visitors, smoking, drinks, pets, bills, family, quiet] }
+      additionalProperties: { type: integer, minimum: 0, maximum: 2 }
+      example: { tidy: 0, food: 1, sleep: 2 }
+    LivingStyle:
+      type: object
+      required: [answers, updatedAt]
+      properties:
+        answers: { $ref: '#/components/schemas/LivingStyleAnswers' }
+        updatedAt: { type: string, format: date-time, nullable: true }
+    LivingStyleUpdate:
+      type: object
+      required: [answers]
+      properties:
+        answers: { $ref: '#/components/schemas/LivingStyleAnswers' }
+    FlatmateLivingStyle:
+      type: object
+      required: [answers, match, common]
+      properties:
+        answers: { $ref: '#/components/schemas/LivingStyleAnswers' }
+        match:
+          type: integer
+          nullable: true
+          minimum: 0
+          maximum: 100
+          description: Per shared answer, 2 - |a - b| points; 100 x points / (2 x common). Null under three shared answers.
+        common: { type: integer, minimum: 0, maximum: 12, description: Answers both sides gave. }
     RoomKind:
       type: string
       description: >
@@ -16541,6 +16989,10 @@ components:
           description: >
             The author's images, in stored order. Always present; empty for a `post` or a `group`,
             neither of which has a photo column.
+        rent:
+          type: [integer, 'null']
+          format: int64
+          description: Monthly rent of a room or group; a seeker's budget ceiling (`budgetMax`, else `budget`).
         recheckReason:
           type: [string, 'null']
           description: >
@@ -16556,8 +17008,8 @@ components:
     FlatmateModerationRow:
       type: object
       description: >
-        One card of the flatmate moderation queue: `FlatmateModerationQueueItem` without the photo
-        URLs, which a card only counts, and which the popup reads from the detail.
+        One card of the flatmate moderation queue: `FlatmateModerationQueueItem` with only its first
+        photo as the card's thumbnail; the popup reads every photo from the detail.
       properties:
         id: { type: string, format: uuid }
         kind: { type: string, enum: [post, room, group] }
@@ -16568,13 +17020,16 @@ components:
         locality: { type: [string, 'null'] }
         freeText: { type: [string, 'null'] }
         photoCount: { type: integer, description: How many photos the author attached; 0 for a post or a group. }
+        coverPhoto: { type: [string, 'null'], description: The first photo; null when there is none. }
+        rent: { type: [integer, 'null'], format: int64, description: As on `FlatmateModerationQueueItem`. }
         recheckReason: { type: [string, 'null'] }
         recheckRequestedAt: { type: [string, 'null'], format: date-time }
         createdAt: { type: string, format: date-time }
     FlatmateModerationSummary:
       type: object
       properties:
-        pending: { type: integer, format: int64 }
+        pending: { type: integer, format: int64, description: Awaiting posts, re-checks and group applications; badge claims are not counted here. }
+        badgeRequests: { type: integer, format: int64, description: Open Verified-property claims, listed on the Badge requests tab. }
         published: { type: integer, format: int64 }
         hidden: { type: integer, format: int64 }
     FlatmateModerationDetail:
@@ -16601,6 +17056,10 @@ components:
             - $ref: '#/components/schemas/FlatmateReview'
             - type: 'null'
           description: The verification case, when the post claimed a tier that needs one.
+        livingStyle:
+          allOf:
+            - $ref: '#/components/schemas/LivingStyleAnswers'
+          description: The author's full living-style answers, in question order; empty when none. Staff see every answer.
     FlatmateSeekerPost:
       type: object
       description: >
@@ -16623,14 +17082,13 @@ components:
         moveIn: { $ref: '#/components/schemas/FlatmateMoveIn' }
         flatPref: { type: string, enum: [any, women, men], description: Who they want to share the flat with. }
         roomPref: { type: string, enum: [any, private, shared] }
-        tags:
-          type: array
-          description: Lifestyle habits; also the `habits` filter vocabulary.
-          items: { type: string }
-          example: [Vegetarian, Non-smoker]
+        furnishing: { type: [string, 'null'], enum: [unfurnished, semi, furnished, null], description: Furnishing the seeker needs; null means any. }
+        gatedOnly: { type: boolean, default: false, description: Only flats in a gated society. }
+        attachedBath: { type: boolean, default: false, description: Needs a room with its own bathroom. }
+        parking: { type: [string, 'null'], enum: [bike, car, null], description: Parking the seeker needs; null means none. }
         note: { type: string, maxLength: 600 }
         verifiedContactOnly: { type: boolean, default: false, description: Seeker-side of ADR-019 — only badged callers may express interest. }
-        verified: { type: boolean, description: Mirrors the seeker's L2 Verified badge at post time (ADR-009a). }
+        verified: { type: boolean, description: Mirrors the seeker's L2 ID verified badge at post time (ADR-009a). }
         modStatus: { $ref: '#/components/schemas/FlatmateModStatus' }
         mobile: { $ref: '#/components/schemas/Mobile' }
         lat: { type: [number, 'null'], format: double }
@@ -16656,32 +17114,34 @@ components:
         moveIn: { $ref: '#/components/schemas/FlatmateMoveIn' }
         flatPref: { type: string, enum: [any, women, men], description: Who they want to share the flat with. }
         roomPref: { type: string, enum: [any, private, shared] }
-        tags:
-          type: array
-          description: Lifestyle habits; also the `habits` filter vocabulary.
-          items: { type: string }
-          example: [Vegetarian, Non-smoker]
+        furnishing: { type: [string, 'null'], enum: [unfurnished, semi, furnished, null], description: Furnishing the seeker needs; null means any. }
+        gatedOnly: { type: boolean, default: false, description: Only flats in a gated society. }
+        attachedBath: { type: boolean, default: false, description: Needs a room with its own bathroom. }
+        parking: { type: [string, 'null'], enum: [bike, car, null], description: Parking the seeker needs; null means none. }
         note: { type: string, maxLength: 600 }
         verifiedContactOnly: { type: boolean, default: false, description: Seeker-side of ADR-019 — only badged callers may express interest. }
-        verified: { type: boolean, description: Mirrors the seeker's L2 Verified badge at post time (ADR-009a). }
+        verified: { type: boolean, description: Mirrors the seeker's L2 ID verified badge at post time (ADR-009a). }
         lat: { type: [number, 'null'], format: double }
         lng: { type: [number, 'null'], format: double }
         createdAt: { type: string, format: date-time }
     FlatmateSeekerPostCreate:
       type: object
-      required: [name, budget, localities]
+      required: [budget, localities]
+      description: The post's name is the poster's profile name, never sent; 422 when the profile has none.
       properties:
-        name: { type: string }
         gender: { type: string, enum: [any, male, female], default: any, description: What the poster picked, stored as given and never copied from the profile. A male/female value saves to an empty profile gender and is a 422 when it contradicts a set one. }
         age: { type: integer, minimum: 18 }
         occupation: { type: string }
         budget: { $ref: '#/components/schemas/Money' }
         budgetMax: { $ref: '#/components/schemas/FlatmateBudgetMax' }
-        localities: { type: array, minItems: 1, items: { type: string } }
+        localities: { type: array, minItems: 1, maxItems: 3, items: { type: string } }
         moveIn: { $ref: '#/components/schemas/FlatmateMoveIn' }
         flatPref: { type: string, enum: [any, women, men], default: any }
         roomPref: { type: string, enum: [any, private, shared], default: any }
-        tags: { type: array, items: { type: string } }
+        furnishing: { type: [string, 'null'], enum: [unfurnished, semi, furnished, null], description: Furnishing the seeker needs; null means any. }
+        gatedOnly: { type: boolean, default: false, description: Only flats in a gated society. }
+        attachedBath: { type: boolean, default: false, description: Needs a room with its own bathroom. }
+        parking: { type: [string, 'null'], enum: [bike, car, null], description: Parking the seeker needs; null means none. }
         note: { type: string, maxLength: 600 }
         verifiedContactOnly: { type: boolean, default: false }
         title: { type: [string, 'null'], maxLength: 120, description: The seeker's own headline. Blank clears it. }
@@ -16759,7 +17219,7 @@ components:
         maintenanceBilling: { $ref: '#/components/schemas/FlatmateBilling' }
         electricityBilling: { $ref: '#/components/schemas/FlatmateBilling' }
         occupancy: { $ref: '#/components/schemas/Occupancy' }
-        occupants: { type: integer, minimum: 0, maximum: 3, description: People actually living in THIS room. Emergent — tenants decide, the owner only records it. }
+        occupants: { type: integer, minimum: 0, maximum: 10, description: 'A split room: people actually living in THIS room (at most 3), emergent — tenants decide, the owner only records it. A spare room: how many people live in the whole flat today.' }
         maxOccupants: { type: integer, minimum: 1, default: 3, description: How many people may live in the whole FLAT (the society's rule) — the only ceiling the owner declares. }
         flatCommitted: { type: integer, readOnly: true, description: Derived — people moved into this flat across every sibling room. }
         flatMax: { type: [integer, 'null'], readOnly: true }
@@ -16786,7 +17246,6 @@ components:
         availableFrom: { type: [string, 'null'], format: date }
         gender: { type: string, enum: [any, male, female] }
         food: { type: string, enum: [any, veg, nonveg] }
-        tags: { type: array, items: { type: string } }
         note: { type: string, maxLength: 600 }
         cover: { type: [string, 'null'], format: uri, readOnly: true, description: 'Derived — the first of the room''s photos, the card thumbnail. The gallery itself stays on the detail read. Null when the host has not added one yet.' }
         owner: { type: string }
@@ -16827,7 +17286,7 @@ components:
         maintenanceBilling: { $ref: '#/components/schemas/FlatmateBilling' }
         electricityBilling: { $ref: '#/components/schemas/FlatmateBilling' }
         occupancy: { $ref: '#/components/schemas/Occupancy' }
-        occupants: { type: integer, minimum: 0, maximum: 3, description: People actually living in THIS room. Emergent — tenants decide, the owner only records it. }
+        occupants: { type: integer, minimum: 0, maximum: 10, description: 'A split room: people actually living in THIS room (at most 3), emergent — tenants decide, the owner only records it. A spare room: how many people live in the whole flat today.' }
         maxOccupants: { type: integer, minimum: 1, default: 3, description: How many people may live in the whole FLAT (the society's rule) — the only ceiling the owner declares. }
         flatCommitted: { type: integer, readOnly: true, description: Derived — people moved into this flat across every sibling room. }
         flatMax: { type: [integer, 'null'], readOnly: true }
@@ -16860,7 +17319,6 @@ components:
         availableFrom: { type: string, format: date }
         gender: { type: string, enum: [any, male, female] }
         food: { type: string, enum: [any, veg, nonveg] }
-        tags: { type: array, items: { type: string } }
         note: { type: string, maxLength: 600 }
         cover: { type: [string, 'null'], format: uri, readOnly: true, description: 'Derived — the first of `photos`, the card thumbnail. Null when the host has not added one yet.' }
         photos: { type: array, items: { type: string, format: uri } }
@@ -16899,10 +17357,90 @@ components:
           description: The stored agreement's `id`, `name`, `mime` and `size`, never its bytes. Sending the same `id` back without `dataUrl` keeps the stored file.
         agreementValidTill: { type: [string, 'null'], format: date }
         ownerConsentMobile: { type: [string, 'null'], description: Unmasked — the host typed it, and the edit form sends it back. }
+        attachedPropertyId: { type: [string, 'null'], format: uuid, description: 'The listing or tenancy flat this room claimed on create or edit. Not stored on the room, so the edit form sends it back as `propertyId` to keep the tier.' }
+        reviewReason: { type: [string, 'null'], description: Ops' reason when the badge review was rejected. Host-only. }
+        ownerConsentConfirmed: { type: [boolean, 'null'], description: Whether the flat owner's OTP consent is on file for the review; null with no review. Host-only. }
+    FlatmateOwnerNoticeView:
+      type: object
+      required: [tenantName, locality, roomType, rent, status, homeSaved]
+      description: What the flat owner sees on the confirm page. First name only; no phone numbers.
+      properties:
+        tenantName: { type: string, example: Asha, description: 'The tenant''s first name, or "Your tenant" when none is on file.' }
+        society: { type: [string, 'null'] }
+        locality: { type: string }
+        roomType: { type: string, enum: [Private room, Shared room] }
+        rent: { $ref: '#/components/schemas/Money' }
+        status: { type: string, enum: [sent, agreed, declined] }
+        homeSaved: { type: boolean, description: True when the owner agreed and this flat is saved as a private home on their account. }
+    OwnerHome:
+      type: object
+      required: [managedId, title, locality, rooms]
+      description: A flat the caller owns through a confirmed flatmate room, with the live rooms in it.
+      properties:
+        managedId: { type: string, description: The private managed record's id. }
+        publishedListingId: { type: [string, 'null'] }
+        title: { type: string }
+        society: { type: [string, 'null'] }
+        locality: { type: string }
+        bhk: { type: [number, 'null'] }
+        furnishing: { type: [string, 'null'], description: 'Managed vocabulary: unfurnished, semi-furnished, furnished.' }
+        rooms:
+          type: array
+          items:
+            type: object
+            required: [id, tenantFirstName]
+            properties:
+              id: { type: string }
+              title: { type: [string, 'null'] }
+              roomType: { type: string, enum: [Private room, Shared room] }
+              budget: { type: [integer, 'null'], format: int64 }
+              deposit: { type: [integer, 'null'], format: int64 }
+              status: { type: string }
+              modStatus: { type: string }
+              availableFrom: { type: [string, 'null'], format: date }
+              photo: { type: [string, 'null'], description: The first photo's URL. }
+              tenantFirstName: { type: string, description: 'First word of the host''s name, or "Your tenant".' }
+    OwnerHomePrefill:
+      type: object
+      required: [managedId]
+      description: >-
+        The listing wizard's starting answers in the wizard's own vocabulary (furnishing is
+        unfurnished | semi | furnished). Null means the source did not say.
+      properties:
+        managedId: { type: string }
+        homeTypeLabel: { type: [string, 'null'] }
+        bhk: { type: [string, 'null'] }
+        gatedCommunity: { type: [boolean, 'null'] }
+        furnishing: { type: [string, 'null'] }
+        facing: { type: [string, 'null'] }
+        overlooking: { type: [string, 'null'] }
+        locality: { type: [string, 'null'] }
+        localitySlug: { type: [string, 'null'] }
+        society: { type: [string, 'null'] }
+        societyId: { type: [string, 'null'], format: uuid }
+        flatNumber: { type: [string, 'null'] }
+        lat: { type: [number, 'null'] }
+        lng: { type: [number, 'null'] }
+        floor: { type: [string, 'null'] }
+        totalFloors: { type: [integer, 'null'] }
+        floorsInHouse: { type: [integer, 'null'] }
+        bathrooms: { type: [integer, 'null'] }
+        balconies: { type: [integer, 'null'] }
+        furniture: { type: [array, 'null'], items: { type: string } }
+        tower: { type: [string, 'null'] }
+        street: { type: [string, 'null'] }
+        landmark: { type: [string, 'null'] }
+        pincode: { type: [string, 'null'] }
     FlatmateRoomCreate:
       type: object
-      required: [bhk, roomType, locality, rentShare, availableFrom]
-      description: Single spare-room post from the list-property flatmate flow. The required set mirrors `submitFlatmate` validation.
+      required: [bhk, roomType, locality, rentShare, deposit, availableFrom]
+      description: >-
+        Single spare-room post from the list-property flatmate flow. The required set mirrors
+        `submitFlatmate` validation. A create (POST) must also carry `homeTypeLabel`, `attachedBath`,
+        `furnishing`, `flatNumber`, `noticePeriodDays`, `lockInMonths`, `details.bathrooms`,
+        `details.floor` and `details.totalFloors` for a Flat (`details.floorsInHouse` otherwise), and at
+        least 3 photos, or it is refused with `422`. A PATCH is not held to these, so rooms posted
+        before they were required stay editable.
       properties:
         homeTypeLabel: { type: [string, 'null'], enum: [Flat, Independent House, Villa, Row House, null], description: 'What the building is, as the room card renders it. Null is "the host did not say", which is a different answer from any of the four.' }
         bhk: { type: string, enum: ['1', '2', '3', '4'] }
@@ -16923,8 +17461,8 @@ components:
         society: { type: string, deprecated: true, description: Ignored; the room's society text is derived from `societyId`. }
         flatNumber: { type: string, maxLength: 40 }
         rentShare: { $ref: '#/components/schemas/Money' }
-        deposit: { $ref: '#/components/schemas/Money' }
-        occupants: { type: integer, minimum: 0, maximum: 3, description: How many people live in the flat today. A spare room is one vacancy in a flat somebody already lives in, and this is the seeker's first question about it. }
+        deposit: { allOf: [ { $ref: '#/components/schemas/Money' } ], description: 'Required; 0 means no deposit.' }
+        occupants: { type: integer, minimum: 0, maximum: 10, description: How many people live in the flat today. A spare room is one vacancy in a flat somebody already lives in, and this is the seeker's first question about it. A split room clamps it to the people in that room (at most 3). }
         maxOccupants: { type: integer, minimum: 1, maximum: 6, default: 3, description: The society's cap on the whole flat. }
         noticePeriodDays: { $ref: '#/components/schemas/FlatmateNoticePeriodDays' }
         lockInMonths: { $ref: '#/components/schemas/FlatmateLockInMonths' }
@@ -16933,17 +17471,18 @@ components:
         availableFrom: { type: string, format: date }
         lookingFor: { type: string, enum: [any, male, female] }
         foodPref: { type: string, enum: [any, veg, nonveg] }
-        lifestyle: { type: array, items: { type: string } }
         hostRole: { $ref: '#/components/schemas/HostRole' }
-        propertyId: { type: string, description: 'Only honoured when hostRole is `owner`; must be an Ops-approved listing to earn the owner tier. Read for the tier and the address fingerprint, never stored on the room — a spare room holds one seat, and a room cannot be both seat-based and a split of a flat.' }
-        agreementDeclared: { type: boolean }
+        propertyId: { type: string, description: 'For an owner, earns the owner tier only when it is their own Ops-approved listing; for a tenant, the flat of their Draazy tenancy, filed with the review so Ops can match the registered agreement. Never stored on the room — a spare room holds seats, and a room cannot be both seat-based and a split of a flat.' }
+        agreementDeclared: { type: boolean, description: 'Files the agreement for the Verified property badge; 409 `identity_required` unless the host''s ID check is verified or in review.' }
         agreementDoc: { $ref: '#/components/schemas/AgreementDoc' }
         ownerConsentMobile:
           $ref: '#/components/schemas/Mobile'
           description: >
-            The flat owner's number, used only to look their consent up. Sending it asserts
-            nothing: consent is recorded against an OTP the owner types at
-            `POST /flatmates/owner-consent`, and the server re-derives the flag from that record on
+            The flat owner's number. Required (422 otherwise) when the host is a tenant, and it
+            cannot be the caller's own number. Sending it asserts nothing: consent is recorded
+            against an OTP the owner types at `POST /flatmates/owner-consent` or by the owner
+            tapping Agree on the WhatsApp notice the server sends them (see
+            `GET /flatmates/owner-notice`), and the server re-derives the flag from that record on
             every create and every edit.
         ownerConsent:
           type: boolean
@@ -16978,6 +17517,20 @@ components:
           oneOf:
             - { $ref: '#/components/schemas/FlatmateVerification' }
             - { type: 'null' }
+        specs:
+          description: A room's flat and furniture answers from the wizard. Null on groups and posts, and on a room without wizard answers. Tower, street, landmark and pincode are never sent here.
+          oneOf:
+            - { $ref: '#/components/schemas/FlatmateRoomSpecs' }
+            - { type: 'null' }
+    FlatmateRoomSpecs:
+      type: object
+      properties:
+        floor: { type: [string, 'null'], pattern: '^(Ground|[1-9]|[1-4][0-9]|50)$' }
+        totalFloors: { type: [integer, 'null'], minimum: 1, maximum: 50 }
+        floorsInHouse: { type: [integer, 'null'], minimum: 1, maximum: 4 }
+        bathrooms: { type: [integer, 'null'], minimum: 1, maximum: 4 }
+        balconies: { type: [integer, 'null'], minimum: 0, maximum: 3 }
+        furniture: { type: [array, 'null'], maxItems: 40, items: { type: string, maxLength: 60 } }
     FlatmateVerification:
       type: object
       required: [status, ownerConsent]
@@ -16994,7 +17547,7 @@ components:
         id: { type: string, example: g1 }
         title: { type: string }
         locality: { type: string }
-        policy: { type: string, enum: [any, women, men], description: '`any` means open-join — a request is auto-accepted.' }
+        policy: { type: string, enum: [any, women, men], description: 'Who the group admits by gender; `any` is mixed. Every join waits for the host to accept.' }
         rent: { $ref: '#/components/schemas/Money', description: Whole-flat rent. }
         deposit: { $ref: '#/components/schemas/Money' }
         noticePeriodDays: { $ref: '#/components/schemas/FlatmateNoticePeriodDays' }
@@ -17024,7 +17577,6 @@ components:
         addressFingerprint: { type: string }
         flagForReview: { type: boolean }
         modStatus: { $ref: '#/components/schemas/FlatmateModStatus' }
-        tags: { type: array, items: { type: string } }
         note: { type: string, maxLength: 600 }
         ownerName: { type: string }
         ownerMobile: { $ref: '#/components/schemas/Mobile' }
@@ -17046,7 +17598,7 @@ components:
         id: { type: string, example: g1 }
         title: { type: string }
         locality: { type: string }
-        policy: { type: string, enum: [any, women, men], description: '`any` means open-join — a request is auto-accepted.' }
+        policy: { type: string, enum: [any, women, men], description: 'Who the group admits by gender; `any` is mixed. Every join waits for the host to accept.' }
         rent: { $ref: '#/components/schemas/Money', description: Whole-flat rent. }
         deposit: { $ref: '#/components/schemas/Money' }
         noticePeriodDays: { $ref: '#/components/schemas/FlatmateNoticePeriodDays' }
@@ -17071,38 +17623,37 @@ components:
         agreementDeclared: { type: boolean }
         ownerConsent: { type: boolean, description: True once the flat's owner confirmed the replacement search via OTP — turning "trust me" into an auditable consent record. The fact is public; the number behind it is not. }
         reviewStatus: { type: [string, 'null'], enum: [pending, approved, rejected, null], description: 'Ops verdict on the host claim to the flat — see FlatmateReview. Null when nothing was submitted; `pending` withholds the tier badge and says so, `approved` grants it and lets the group survive the Verified-only filter.' }
-        tags: { type: array, items: { type: string } }
         note: { type: string, maxLength: 600 }
         ownerName: { type: string }
         createdAt: { type: string, format: date-time }
         preferences: { $ref: '#/components/schemas/FlatmateGroupPreferences' }
     FlatmateGroupCreate:
       type: object
-      required: [title, name]
+      required: [title]
       description: >
         With `preferences` the group is still looking for a flat: `locality`, `rent`, the deposit,
         the terms and every trust input (`role`, `propertyId`, agreement, consent) are ignored, since
         there is no flat to describe. Without it, `locality` and `rent` are required (422 otherwise).
+        The creator joins as the first member under their profile name; 422 when the profile has
+        none.
       properties:
         title: { type: string }
         locality: { type: string, maxLength: 80, description: Where the flat is. Required for a group with a flat — a substituted default would invent a fact about a flat nobody named. }
         localitySlug: { type: string, maxLength: 80, description: 'The picked live locality; wins over `locality`. A retired one passes only if the record already has it.' }
         policy: { type: string, enum: [any, women, men], default: women }
         rent: { $ref: '#/components/schemas/Money' }
-        deposit: { $ref: '#/components/schemas/Money' }
+        deposit: { allOf: [ { $ref: '#/components/schemas/Money' } ], description: 'Required (422) for a group with a flat; 0 means no deposit.' }
         noticePeriodDays: { $ref: '#/components/schemas/FlatmateNoticePeriodDays' }
         lockInMonths: { $ref: '#/components/schemas/FlatmateLockInMonths' }
         maintenanceBilling: { $ref: '#/components/schemas/FlatmateBilling' }
         electricityBilling: { $ref: '#/components/schemas/FlatmateBilling' }
         seats: { type: integer, minimum: 1, maximum: 12, default: 2 }
         seatsOpen: { type: integer, minimum: 0, maximum: 12, default: 1 }
-        name: { type: string, description: The creator's display name — becomes the first member. }
         role: { $ref: '#/components/schemas/HostRole' }
         propertyId: { type: string, description: Only honoured when role is `owner`; must be an Ops-approved listing to earn the owner tier. }
         agreement: { type: boolean }
         agreementDoc: { $ref: '#/components/schemas/AgreementDoc' }
         consentMobile: { $ref: '#/components/schemas/Mobile' }
-        tags: { type: array, items: { type: string } }
         note: { type: string, maxLength: 600 }
         preferences: { $ref: '#/components/schemas/FlatmateGroupPreferences' }
     FlatmateGroupPreferences:
@@ -17112,17 +17663,18 @@ components:
         yet; null on a group that holds or is filling one. Ranges rather than figures, because the
         flat is not chosen. `rentMax` is also the group's `rent`, so `perHead` is the top of the
         per-head budget.
-      required: [localities, rentMax]
+      required: [localities, rentMax, depositMax]
       properties:
         localities: { type: array, minItems: 1, maxItems: 3, items: { type: string, maxLength: 80 }, description: The shortlist, in the group's order. The first is also `locality`. }
         bhk: { type: array, maxItems: 4, items: { type: string, enum: ['1', '2', '3', '4'] }, description: 'Flat sizes the group would take; `4` means 4 or more. Empty means any.' }
         rentMin: { $ref: '#/components/schemas/Money' }
         rentMax: { $ref: '#/components/schemas/Money' }
         depositMin: { $ref: '#/components/schemas/Money' }
-        depositMax: { $ref: '#/components/schemas/Money' }
+        depositMax: { allOf: [ { $ref: '#/components/schemas/Money' } ], description: 'Required; 0 means no deposit.' }
         gatedOnly: { type: boolean, default: false, description: Only flats in a gated society. }
         bachelors: { type: boolean, default: false, description: 'The group is bachelors, so it needs a flat that allows them — the commonest refusal in Pune rentals.' }
         furnishing: { type: [string, 'null'], enum: [unfurnished, semi, furnished, null] }
+        parking: { type: [string, 'null'], enum: [bike, car, null], description: Parking the group needs; null means none. }
         moveInBy: { type: [string, 'null'], format: date, description: When the group wants to move in by. }
     AgreementDoc:
       type: object
@@ -17130,17 +17682,18 @@ components:
         A tenant's uploaded rent agreement — the artifact Ops verifies. Images and PDFs only.
         Files over 3 MB are recorded present-but-not-stored so Ops can still ask for the original.
       properties:
-        id: { type: string, description: Opaque upload/document id for the registered agreement. Required for tenant-hosted room creation. }
+        id: { type: string, description: Opaque upload/document id for the registered agreement. Required whenever the agreement is declared. }
         name: { type: string, maxLength: 200 }
         size: { type: integer, minimum: 0 }
         mime: { type: string, enum: ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'] }
         dataUrl: { type: [string, 'null'], description: 'Base64 data URL for a stored document. Null whenever the file was not stored — over the 3 MB cap (`tooLarge: true`), or unreadable — so null does not imply `tooLarge`.' }
         tooLarge: { type: boolean, default: false }
+        type: { type: string, enum: [rent_agreement, electricity_bill], description: 'Set when the document came from the personal vault: which of the two evidence kinds it is.' }
     AgreementValidTill:
       type: [string, 'null']
       format: date
       description: >
-        Legacy. When set, the nightly sweep withdraws the tenant badge after this date. Null on
+        Legacy. When set, the nightly sweep withdraws the Verified property badge after this date. Null on
         every new post, and null means nothing expires.
     FlatSplitRequest:
       type: object
@@ -17201,6 +17754,9 @@ components:
         modStatus: { type: string }
         status: { type: string }
         createdAt: { type: string, format: date-time }
+        hostRole: { type: string, enum: [owner, tenant] }
+        verificationTier: { type: string, enum: [identity, tenant, owner] }
+        reviewStatus: { type: [string, 'null'], enum: [pending, approved, rejected, null], description: The badge review's state; null when no review is filed. }
     FlatmateGroupCard:
       type: object
       description: >
@@ -17218,6 +17774,10 @@ components:
         propertyId: { type: [string, 'null'], format: uuid }
         modStatus: { type: string }
         createdAt: { type: string, format: date-time }
+        hostRole: { type: string, enum: [owner, tenant] }
+        hunting: { type: boolean, description: Still looking for a flat, so there is no home to verify. }
+        verificationTier: { type: string, enum: [identity, tenant, owner] }
+        reviewStatus: { type: [string, 'null'], enum: [pending, approved, rejected, null], description: The badge review's state; null when no review is filed. }
     FlatmateRequest:
       type: object
       description: >
@@ -17226,7 +17786,7 @@ components:
       properties:
         id: { type: string }
         kind: { type: string, enum: [flatmate, room, group] }
-        action: { type: string, enum: [request, join], description: '`request` needs host approval; `join` is an open-policy group (already joined, informational).' }
+        action: { type: string, enum: [request, join], description: 'Always `request` (needs host approval); `join` appears only on legacy rows from the retired auto-join.' }
         share: { $ref: '#/components/schemas/ShareIntent' }
         targetId: { type: string }
         targetTitle: { type: string }
@@ -17256,6 +17816,7 @@ components:
           type: [string, 'null']
           example: '9876543210'
           description: In full — back-office only.
+        hostVerified: { type: boolean, description: The host has completed ID verification. Required to approve a `tenant` claim. }
         address: { type: string }
         tier: { $ref: '#/components/schemas/VerificationTier' }
         flagForReview: { type: boolean, description: Contested address — a DIFFERENT host already claimed it. Fuzzy match, so flag-not-block. }
@@ -17266,6 +17827,10 @@ components:
             service derives it from the consent table on every create and every edit. Approving a
             `tenant` review while this is false is refused with 422.
         agreementDoc: { $ref: '#/components/schemas/AgreementDoc' }
+        evidenceType: { type: [string, 'null'], enum: [rent_agreement, electricity_bill, null], description: What the host filed. Null on reviews that predate light bills, which are read as `rent_agreement`. }
+        evidenceIssuedOn: { type: [string, 'null'], format: date, description: The bill date the reviewer recorded. }
+        nameMatches: { type: [boolean, 'null'], description: The reviewer's name check; cleared when the host files again. }
+        addressMatches: { type: [boolean, 'null'], description: The reviewer's address check; cleared when the host files again. }
         agreementValidTill: { $ref: '#/components/schemas/AgreementValidTill' }
         status: { type: string, enum: [pending, approved, rejected] }
         reason: { type: string, description: Required on reject; shown to the host. }
@@ -17283,6 +17848,8 @@ components:
         groupId: { type: [string, 'null'] }
         host: { type: string }
         hostMobile: { type: [string, 'null'], description: In full }
+        hostVerified: { type: boolean }
+        evidenceType: { type: [string, 'null'], enum: [rent_agreement, electricity_bill, null] }
         address: { type: string }
         tier: { $ref: '#/components/schemas/VerificationTier' }
         flagForReview: { type: boolean }
@@ -17302,8 +17869,15 @@ components:
         gender: { type: string, enum: [male, female] }
         sharing: { type: string, description: '`team-up` only — group size.' }
         attachedBath: { type: boolean, description: '`move-in` only.' }
+        strictGender: { type: boolean, description: 'With `gender`: excludes rows open to any gender.' }
+        roomType: { type: string, enum: [private, shared], description: '`move-in` rooms and `people` seekers; `teams` ignores it.' }
+        furnishing: { type: string, enum: [furnished, semi, unfurnished], description: '`move-in` only.' }
+        gated: { type: boolean, description: '`move-in` only.' }
         verifiedOnly: { type: boolean }
-        habits: { type: array, items: { type: string } }
+        vibe:
+          type: array
+          description: Living-style tokens, same grammar and semantics as the feed `vibe` parameter; the alert owner's own answers play the caller.
+          items: { type: string, pattern: '^(food|smoking|pets|drinks|visitors|sleep):[0-2]$' }
         label: { type: string, readOnly: true, description: Short human summary, e.g. 'Move in now · Baner · Verified'. }
     GroupApplication:
       type: object
@@ -17462,6 +18036,33 @@ components:
           description: >
             Distinct owners, counted by the database. Counting rows client-side made two listings
             from one owner read as two verified owners.
+    FlatmatePulse:
+      type: object
+      description: >
+        The home flatmate panel, counted from the same public rows the flatmate board lists.
+      required: [seeking, initials]
+      properties:
+        seeking:
+          type: integer
+          minimum: 0
+          description: Live seeker posts plus groups still hunting — the board's "team-up" tab total.
+        initials:
+          type: array
+          maxItems: 3
+          description: The newest of those seekers, newest first; ones without a name are skipped.
+          items: { type: string }
+        split:
+          type: object
+          description: The newest live group that has its flat. Absent when there is none.
+          required: [locality, rent, seats, share]
+          properties:
+            locality: { type: string }
+            bhk:
+              type: number
+              description: Absent unless the flat is a listing that states one.
+            rent: { type: integer, minimum: 1, description: Whole-flat rent per month. }
+            seats: { type: integer, minimum: 2 }
+            share: { type: integer, minimum: 0, description: 'round(rent / seats), per month.' }
     PropertyCounts:
       type: object
       required: [counts]
@@ -17738,7 +18339,7 @@ components:
           description: Null when there is no note. A cleared note is null, never an empty string.
     Bootstrap:
       type: object
-      required: [flags, geo, cities, pricing, listingPolicy, movePack, plans, counts, trustStats]
+      required: [flags, geo, cities, pricing, listingPolicy, movePack, plans, counts, trustStats, flatmatePulse]
       properties:
         flags:
           type: object
@@ -17756,6 +18357,7 @@ components:
           items: { $ref: '#/components/schemas/Plan' }
         counts: { $ref: '#/components/schemas/PropertyCounts' }
         trustStats: { $ref: '#/components/schemas/TrustStats' }
+        flatmatePulse: { $ref: '#/components/schemas/FlatmatePulse' }
         legal: { $ref: '#/components/schemas/LegalNotices' }
     MeBootstrap:
       type: object
@@ -18076,6 +18678,7 @@ components:
             ticketPickup: { $ref: '#/components/schemas/AdminSlaGlanceTrack' }
             ticketDelivery: { $ref: '#/components/schemas/AdminSlaGlanceTrack' }
             conciergeToLive: { $ref: '#/components/schemas/AdminSlaGlanceTrack' }
+            flatmateReview: { $ref: '#/components/schemas/AdminSlaGlanceTrack' }
         listings:
           type: object
           description: Whole-set counts over non-archived listings, plus the five that have waited longest.
@@ -18084,7 +18687,7 @@ components:
             flagged: { type: integer }
             followUp:
               type: integer
-              description: Pending for over 48 hours, or staff-posted and not yet confirmed by the owner.
+              description: Live listings not confirmed as available in over 14 days; the admin Follow-up tab's count.
             oldestPending:
               type: array
               items:
@@ -18120,6 +18723,22 @@ components:
                   detail: { type: string }
                   status: { type: string }
         owners: { type: integer, description: Non-archived owner accounts. }
+        flatmates:
+          type: object
+          description: >
+            Live counts are public, unarchived posts now. The reply figures cover requests sent in the
+            last 30 days and are null when none could be judged.
+          properties:
+            awaitingReview: { type: integer, description: Cards on the flatmate moderation desk's pending tab. }
+            openReports: { type: integer, description: Undecided reports against flatmate posts. }
+            unansweredRequests: { type: integer, description: Requests a host has left pending past 48h. }
+            liveRooms: { type: integer }
+            liveGroups: { type: integer }
+            activeSeekers: { type: integer }
+            newSeekers7d: { type: integer, description: Live seeker posts created in the last 7 days. }
+            matches30d: { type: integer, description: Requests and group applications accepted in the last 30 days. }
+            replyRatePct: { type: [integer, 'null'] }
+            medianReplyHours: { type: [number, 'null'] }
     AdminSlaGlanceTrack:
       type: object
       properties:
@@ -18197,7 +18816,7 @@ components:
             - { type: 'null' }
           # Null for staff, populated for admin: this endpoint is [staff, admin] but /admin/finance
           # is [admin] only, so serving staff a revenue figure here contradicts the next operation.
-          description: Platform revenue over the last 30 days. **Null for staff** - admin only.
+          description: Draazy's net fees over the last 30 days (invoices less credit notes, pass-through excluded). **Null for staff** - admin only.
     AdminAnalyticsTraffic:
       type: object
       description: Arrivals for one window, from Draazy's own page-view table.
@@ -18297,6 +18916,46 @@ components:
               contacts: { type: integer, format: int64, description: Contact requests sent }
               visits: { type: integer, format: int64, description: Visits booked }
               deals: { type: integer, format: int64, description: Deals closed }
+    AdminAnalyticsFlatmates:
+      type: object
+      description: Flatmate throughput per IST week, host replies over the window, and live supply against demand by locality.
+      required: [days, from, to, weeks, replies, localities]
+      properties:
+        days: { type: integer }
+        from: { type: string, format: date, description: First IST day included }
+        to: { type: string, format: date, description: First IST day excluded }
+        weeks:
+          type: array
+          items:
+            type: object
+            required: [week, rooms, groups, seekers, requests, matches, replyRatePct]
+            properties:
+              week: { type: string, format: date, description: The Monday the week starts on }
+              rooms: { type: integer, format: int64, description: Rooms posted, including ones later withdrawn or rejected }
+              groups: { type: integer, format: int64 }
+              seekers: { type: integer, format: int64, description: Seeker posts made }
+              requests: { type: integer, format: int64, description: Requests sent to a host; open-group joins are not requests }
+              matches: { type: integer, format: int64, description: Requests and group applications accepted that week }
+              replyRatePct: { type: [integer, 'null'], description: Requests sent that week answered within 48h; null when none is old enough to judge }
+        replies:
+          type: object
+          required: [sent, replyRatePct, acceptRatePct, medianReplyHours, unansweredNow]
+          properties:
+            sent: { type: integer, format: int64 }
+            replyRatePct: { type: [integer, 'null'], description: 'Of requests sent in the window that are answered or older than 48h, the share answered within 48h.' }
+            acceptRatePct: { type: [integer, 'null'], description: Of answered requests, the share accepted. }
+            medianReplyHours: { type: [number, 'null'] }
+            unansweredNow: { type: integer, format: int64, description: Requests pending past 48h right now; unwindowed. }
+        localities:
+          type: array
+          description: Live now and unwindowed, largest demand-over-supply gap first, at most 20.
+          items:
+            type: object
+            required: [locality, supply, demand]
+            properties:
+              locality: { type: string }
+              supply: { type: integer, format: int64, description: Live rooms and non-hunting groups in the locality }
+              demand: { type: integer, format: int64, description: Live seeker posts and hunting groups naming the locality }
     AdminAnalyticsSurfers:
       type: object
       description: The anonymous-to-signed-in funnel for one window.
@@ -18393,6 +19052,12 @@ components:
             A staff-posted listing's creation to the first status change that put it live --
             specifically to `approved`, not merely to the first decision. One bounced back for a
             missing document and approved a week later went live on the second row.
+        flatmateReview:
+          allOf: [{ $ref: '#/components/schemas/SlaTrack' }]
+          description: >
+            A flatmate room, group or seeker post's creation to its first moderation decision out of
+            `pending`; a later takedown of a live post is not review turnaround. Outstanding counts
+            pending posts from creation and open re-checks from the edit that raised them. Target 24h.
     SlaTrack:
       type: object
       description: >
@@ -18676,58 +19341,13 @@ components:
     AdminFinance:
       type: object
       properties:
-        revenue: { $ref: '#/components/schemas/Money' }
-        refunds: { $ref: '#/components/schemas/Money' }
-        breakdown:
-          type: array
-          items:
-            type: object
-            properties:
-              source: { type: string, example: subscriptions }
-              amount: { $ref: '#/components/schemas/Money' }
-        refundsMeasured:
-          type: boolean
-          description: Whether `refunds` counts anything. **False today** - no refund path exists.
-        serviceOrdersCounted:
-          type: boolean
-          description: Whether `revenue` includes the services marketplace. **False today** - `service_orders.amount` is a quote, not a receipt.
         mrr:
           allOf:
             - $ref: '#/components/schemas/Money'
             - description: >
-                Monthly run rate of the **active** subscription book, normalised so a yearly plan
-                contributes a twelfth and a quarterly plan a third.
-
-
-                Forward-looking, and therefore not a slice of `revenue`, which is historical: a
-                cancelled subscription earned what it earned and will bill nothing more. That is
-                also why this counts `status = 'active'` where the revenue figures count
-                `status <> 'pending'`.
-
-
-                Zero-rupee plans are excluded by price rather than by name, so a promotional free
-                plan is handled correctly the day it is created.
-        monthRevenue:
-          allOf:
-            - $ref: '#/components/schemas/Money'
-            - description: >
-                Revenue inside the current Indian calendar month. Served rather than left to the
-                client to sum out of the series, because two definitions of "this month" drift at
-                every month boundary and in every time zone.
-        users:
-          type: integer
-          format: int64
-          description: Everyone with an account, archived rows excluded. The denominator of ARPU.
-        payingUsers:
-          type: integer
-          format: int64
-          description: >
-            Distinct people who paid the platform anything this month. The denominator of ARPPU.
-
-
-            Both denominators are reported because they answer different questions, and a console
-            showing one of them under an unqualified label invites the reader to assume it is the
-            other.
+                Monthly run rate of the **active** paid subscription book, normalised so a yearly
+                plan contributes a twelfth and a quarterly plan a third. Forward-looking, so not a
+                slice of `month`.
         plans:
           type: array
           description: The active subscription book itemised. Sums to `mrr` by construction.
@@ -18747,26 +19367,50 @@ components:
                 allOf:
                   - $ref: '#/components/schemas/Money'
                   - description: What these subscriptions contribute to `mrr`.
+        month:
+          type: object
+          description: >
+            The current Indian calendar month, read from invoices and credit notes. Always
+            `collected - refunded - passThrough = net`.
+          properties:
+            collected: { $ref: '#/components/schemas/Money' }
+            refunded: { $ref: '#/components/schemas/Money' }
+            passThrough:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+                - description: Stamp duty and registration collected for the government, net of any refunded.
+            net:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+                - description: Draazy's own fees less refunded fees. Can be negative.
+            payments: { type: integer, format: int64, description: Invoices issued this month. }
+        attention:
+          type: object
+          description: Money waiting on a staff decision, as counts and rupee totals.
+          properties:
+            refundRequests: { type: integer, format: int64, description: Subscription refund requests pending review. }
+            refundRequestAmount: { $ref: '#/components/schemas/Money' }
+            serviceRefunds: { type: integer, format: int64, description: Service-request refunds requested and not yet decided. }
+            serviceRefundAmount: { $ref: '#/components/schemas/Money' }
+            openDisputes: { type: integer, format: int64, description: Open gateway payment disputes. }
+            openDisputeAmount: { $ref: '#/components/schemas/Money' }
     AdminFinanceSeriesPoint:
       type: object
-      description: One month of revenue, split by source.
+      description: One month of Draazy's fees, split by source.
       properties:
         month:
           type: string
           format: date
-          description: >
-            The first day of the bucket, on the Indian calendar. The whole month is the value; the
-            day is only how a month is spelled as a date.
-        subscriptions:
-          allOf:
-            - $ref: '#/components/schemas/Money'
-            - description: Plan prices, counted when the payment reference proves an order settled.
+          description: The first day of the bucket, on the Indian calendar.
+        subscriptions: { $ref: '#/components/schemas/Money' }
         services:
           allOf:
             - $ref: '#/components/schemas/Money'
-            - description: >
-                **Always `0`.** A measurement, not a missing field - see the operation description
-                and the `serviceOrdersCounted` disclosure on `/admin/finance`.
+            - description: Fees on paid service requests and their amendments; pass-through excluded.
+        refunds:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+            - description: Fees given back on credit notes, as a positive figure. Net is `subscriptions + services - refunds`.
     AdminProviderHealth:
       type: object
       properties:
@@ -18812,36 +19456,30 @@ components:
         createdAt: { type: string, format: date-time }
     AdminFinanceTransaction:
       type: object
-      description: One movement of money the platform can evidence.
+      description: One invoice or credit note.
       properties:
         id:
           type: string
           format: uuid
-          description: >
-            The source row in `subscriptions`. Not synthesised and not
-            prefixed, so a figure on this screen is traceable to the record that produced it.
-        date:
-          type: string
-          format: date
-          description: >
-            When the money moved, on the Indian calendar. For an unsettled row this is when it was
-            billed or begun - the row is on the ledger because it is expected, and a null date would
-            sort it out of the view that exists to chase it.
+          description: The `invoices` or `credit_notes` row, so a figure on this screen is traceable to its document.
+        date: { type: string, format: date, description: When the document was issued, on the Indian calendar. }
+        number: { type: string, example: INV-FY2627-000123, description: The invoice or credit-note number. }
         party:
           type: string
           description: >
-            The counterparty's name. **Never a mobile number**: `/admin/enquiries` exists for the
-            case where an operator needs to reach somebody, and it audits the reveal. A finance
-            ledger has no reason to carry contact details at all.
-        kind: { type: string, enum: [subscription] }
+            The customer's name. **Never a mobile number**: `/admin/enquiries` exists for the case
+            where an operator needs to reach somebody, and it audits the reveal.
+        kind: { type: string, enum: [subscription, service, refund] }
         amount:
           allOf:
             - $ref: '#/components/schemas/Money'
-            - description: The platform's share, never the gross. Never negative.
-        status:
-          type: string
-          enum: [paid, pending, failed]
-          description: Settlement, derived. See the operation description for why `refunded` is absent.
+            - description: The gross the customer paid; negative for a credit note.
+        fee:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+            - description: >
+                Draazy's own fee inside `amount` (the taxable value); negative for a credit note. The
+                rest is stamp duty and registration passed on to the government.
     AdminSettings:
       type: object
       description: Platform configuration document (SSOT for fees, feature flags and RBAC).

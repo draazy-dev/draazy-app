@@ -6,7 +6,6 @@ import com.draazy.api.common.error.BadRequestException;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
-import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.identity.user.User;
@@ -39,7 +38,6 @@ public class FlatmateModerationService {
     private final FlatmateGroupRepository groups;
     private final FlatmateSeekerPostRepository posts;
     private final UserRepository users;
-    private final FlatmateBadges badges;
     private final GroupApplicationHydrator applicationHydrator;
     private final Notifier notifier;
     private final AuditService audit;
@@ -49,7 +47,7 @@ public class FlatmateModerationService {
     public FlatmateModerationService(FlatmateReviewRepository reviews,
             FlatmateGroupApplicationRepository applications, FlatmateRoomRepository rooms,
             FlatmateGroupRepository groups, FlatmateSeekerPostRepository posts,
-            UserRepository users, FlatmateBadges badges,
+            UserRepository users,
             GroupApplicationHydrator applicationHydrator,
             Notifier notifier, AuditService audit, PropertyRepository properties,
             RateLimitLock locks) {
@@ -59,72 +57,11 @@ public class FlatmateModerationService {
         this.groups = groups;
         this.posts = posts;
         this.users = users;
-        this.badges = badges;
         this.applicationHydrator = applicationHydrator;
         this.notifier = notifier;
         this.audit = audit;
         this.properties = properties;
         this.locks = locks;
-    }
-
-    /** Both filters run in the query rather than being re-applied in Java, which paging would turn
-     * into short pages and a wrong {@code totalElements}. */
-    @Transactional(readOnly = true)
-    public Page<FlatmateReviewRow> queue(String status, Boolean flagged, Pageable pageable) {
-        String filter = FlatmateVocabulary.optional(
-                status, FlatmateVocabulary.REVIEW_STATUS, "status");
-
-        Page<FlatmateReviewRepository.QueueRow> page = reviews.findForQueue(filter, flagged, pageable);
-
-        Map<UUID, User> hosts = peopleOf(
-                page.getContent().stream().map(FlatmateReviewRepository.QueueRow::getHostId).toList());
-
-        return page.map(r -> FlatmateReviewRow.of(r, hosts.get(r.getHostId())));
-    }
-
-    /** Approving is the only path by which a tenant-tier post earns a badge, so it additionally
-     * requires the owner's OTP-backed consent — see {@link #requireConsentToApprove}. */
-    @Transactional
-    public FlatmateReviewDto decideReview(AuthPrincipal caller, UUID reviewId, String status,
-            String reason) {
-        String verdict = FlatmateVocabulary.require(
-                status == null ? "" : status.strip(),
-                Set.of("approved", "rejected"), "status");
-        String why = FlatmateVocabulary.blankToNull(reason);
-        if ("rejected".equals(verdict) && why == null) {
-            throw new BadRequestException(
-                    "A rejection needs a reason — the host is always told why.");
-        }
-
-        FlatmateReview review = reviews.findById(reviewId)
-                .orElseThrow(() -> NotFoundException.of("Flatmate review"));
-        badges.lockWithPost(review);
-        requireNotParty(caller, badges.partiesOf(review));
-        if (verdict.equals(review.getStatus())) {
-            return reviewDto(review);
-        }
-        if (!FlatmateVocabulary.STATUS_PENDING.equals(review.getStatus())) {
-            throw new ConflictException(
-                    "This badge review is already decided. It reopens when the host edits the post.");
-        }
-        requireConsentToApprove(review, verdict);
-        review.decide(verdict, why, caller.userId());
-        reviews.saveAndFlush(review);
-
-        boolean approved = "approved".equals(verdict);
-        badges.apply(review, approved);
-        tellHost(review, approved, why);
-
-        audit.record(caller, "flatmate.review." + verdict, "flatmateReview",
-                review.getId().toString(), "host", review.getHostId().toString(), "note", why);
-        return reviewDto(review);
-    }
-
-    private FlatmateReviewDto reviewDto(FlatmateReview review) {
-        User host = users.findById(review.getHostId()).orElse(null);
-        return FlatmateReviewDto.of(review,
-                host == null ? null : host.getName(),
-                host == null ? null : host.getMobile());
     }
 
     /** Staff accounts are separate user rows, so this catches the one identity acting as maker and checker. */
@@ -199,8 +136,8 @@ public class FlatmateModerationService {
     private static final List<String> HIDDEN = List.of("flagged", "removed", "rejected",
             FlatmateVocabulary.MOD_EXPIRED);
 
-    /** One card per awaiting post or application, and one per badge claim whose post is not itself
-     * awaiting — the same cards the pending tab builds from its three lists. */
+    /** One card per awaiting post or application on Pending; badge claims are counted apart, as the
+     * Badge requests tab lists them on their own. */
     @Transactional(readOnly = true)
     public FlatmateModerationSummary moderationSummary() {
         List<String> pending = List.of(FlatmateVocabulary.MOD_PENDING);
@@ -210,9 +147,9 @@ public class FlatmateModerationService {
                 + rooms.countByRecheckRequestedAtNotNullAndArchivedFalse()
                 + groups.countByModStatusInAndArchivedFalse(pending)
                 + groups.countByRecheckRequestedAtNotNullAndArchivedFalse()
-                + reviews.countBadgeOnlyPending()
                 + applications.countByModStatusIn(pending);
-        return new FlatmateModerationSummary(awaiting, decided(PUBLISHED), decided(HIDDEN));
+        return new FlatmateModerationSummary(awaiting, reviews.countPendingClaims(),
+                decided(PUBLISHED), decided(HIDDEN));
     }
 
     private long decided(List<String> states) {
@@ -406,30 +343,5 @@ public class FlatmateModerationService {
         audit.record(caller, "flatmate.groupApplication.moderate", "flatmateGroupApplication",
                 application.getId().toString(), "from", before, "modStatus", verdict, "note", why);
         return applicationHydrator.hydrateOneForStaff(application);
-    }
-
-    /** A sub-let without the owner's written consent is a ground for eviction under the Maharashtra
-     * Rent Control Act 1999, so the badge is withheld — 422, because nothing about the caller fixes it. */
-    private static void requireConsentToApprove(FlatmateReview review, String verdict) {
-        boolean grantsBadge = FlatmateVocabulary.STATUS_APPROVED.equals(verdict)
-                && FlatmateVocabulary.TIER_TENANT.equals(review.getTier());
-        if (!grantsBadge || review.badgeable()) {
-            return;
-        }
-        throw new ValidationException(
-                "The flat's owner has not confirmed this sub-let, so the Tenant-verified badge"
-                        + " cannot be granted. Ask the host to send the owner a consent OTP;"
-                        + " the row will say Consent verified once it is done.");
-    }
-
-    private void tellHost(FlatmateReview review, boolean approved, String reason) {
-        notifier.notify(
-                review.getHostId(),
-                "flatmate.review." + (approved ? "approved" : "rejected"),
-                approved ? "Your flatmate post is verified" : "We could not verify your flatmate post",
-                approved
-                        ? "Thanks — we have checked your agreement and your post now shows as verified."
-                        : "We could not verify your post. " + reason,
-                FlatmateLinks.of(review));
     }
 }

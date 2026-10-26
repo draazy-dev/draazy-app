@@ -19,6 +19,7 @@ import com.draazy.api.common.trust.OwnedDocumentLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
+import com.draazy.api.identity.verification.IdentityVerificationService;
 import com.draazy.api.security.AuthPrincipal;
 import java.time.Duration;
 import java.time.Instant;
@@ -77,6 +78,8 @@ public class FlatmateSupplyService {
     private final ListingPhotoSources photoSources;
     private final FlatmateGenderGate genderGate;
     private final FlatmateInterestLedger ledger;
+    private final FlatmateOwnerNoticeService ownerNotice;
+    private final IdentityVerificationService identity;
 
     public FlatmateSupplyService(FlatmateRoomRepository rooms, FlatmateGroupRepository groups,
             FlatmateRequestRepository requests,
@@ -89,7 +92,10 @@ public class FlatmateSupplyService {
             FlatmateReviewStatuses reviewStatuses, FlatmateEditRules editRules,
             OwnedDocumentLookup ownedDocuments, FlatmateMembershipService membership,
             LocalityBinding localities, ListingPhotoSources photoSources, FlatmateGenderGate genderGate,
-            FlatmateInterestLedger ledger) {
+            FlatmateInterestLedger ledger, FlatmateOwnerNoticeService ownerNotice,
+            IdentityVerificationService identity) {
+        this.identity = identity;
+        this.ownerNotice = ownerNotice;
         this.genderGate = genderGate;
         this.ledger = ledger;
         this.rooms = rooms;
@@ -116,13 +122,14 @@ public class FlatmateSupplyService {
     @Transactional
     public FlatmateRoomDto createRoom(AuthPrincipal caller, FlatmateRoomCreateRequest body) {
         photoSources.requireUploaded(body.photos(), List.of(), List.of(caller.userId()));
+        NewRoomRequirements.check(body);
         String hostRole = FlatmateVocabulary.orDefault(
                 body.hostRole(), FlatmateVocabulary.HOST_ROLE, "tenant", "host role");
         boolean declared = declaresAgreement(caller.userId(), body.agreementDeclared(), body.agreementDoc());
         UUID claimedFlat = Ids.parseUuid(body.propertyId()).orElse(null);
 
         String tier = deriveTier(caller, hostRole, claimedFlat, declared);
-        requireTenantRoomProof(hostRole, tier, body);
+        requireTenantOwnerConsent(caller, hostRole, tier, body);
         String societyName = societyReference.nameOf(body.societyId());
         String locality = localities.canonicalName(body.localitySlug(), body.locality());
         var address = new FlatmateGuardrails.Address(
@@ -160,10 +167,11 @@ public class FlatmateSupplyService {
         applyOccupancy(body, room);
 
         FlatmateRoom saved = rooms.saveAndFlush(room);
+        ownerNotice.noticeIfNeeded(saved);
         publication.enqueueReviewIfNeeded(caller, "room", saved.getId(), null, tier,
                 eligibility.flagForReview(),
                 addressLabel(saved.getSociety(), saved.getLocality()),
-                claimOf(body, saved.isOwnerConsent()));
+                claimOf(caller, body, saved.isOwnerConsent()));
         return mapper.toDto(saved, ownView(caller, saved, saved.getOccupants()));
     }
 
@@ -222,7 +230,7 @@ public class FlatmateSupplyService {
         if (noSpaceFor(room, "bring".equals(intent) ? 2 : 1)) {
             throw FlatmateConflicts.roomFull("This room is full right now.");
         }
-        record(caller, "room", room.getId(), room.getHostId(), "request", intent,
+        record(caller, "room", room.getId(), room.getHostId(), intent,
                 roomPitch(message, intent), "your room in " + room.getLocality());
     }
 
@@ -236,6 +244,9 @@ public class FlatmateSupplyService {
 
     @Transactional
     public FlatmateGroupDto createGroup(AuthPrincipal caller, FlatmateGroupCreateRequest body) {
+        User host = users.findById(caller.userId())
+                .orElseThrow(() -> NotFoundException.of("User"));
+        String hostName = FlatmateVocabulary.profileName(host);
         FlatmateGroupClaim claim = FlatmateGroupClaim.of(body,
                 () -> declaresAgreement(caller.userId(), body.agreement(), body.agreementDoc()),
                 localities::canonicalNames, localities::canonicalName);
@@ -277,15 +288,14 @@ public class FlatmateSupplyService {
         // Only honoured when the tier actually came out as owner — see deriveTier.
         group.setPropertyId(FlatmateVocabulary.TIER_OWNER.equals(tier) ? propertyId : null);
 
-        group.addMember(new FlatmateGroupMember(
-                body.name().strip(), caller.userId(), caller.verified()));
+        group.addMember(new FlatmateGroupMember(hostName, caller.userId(), caller.verified()));
         clampOpenSeats(group);
 
         FlatmateGroup saved = groups.saveAndFlush(group);
         publication.enqueueReviewIfNeeded(caller, "group", null, saved.getId(), tier,
                 eligibility.flagForReview(),
                 addressLabel(null, saved.getLocality()),
-                claimOf(body, saved.isOwnerConsent()));
+                claimOf(caller, body, saved.isOwnerConsent()));
         return mapper.toDto(saved, ownParty(caller));
     }
 
@@ -308,7 +318,7 @@ public class FlatmateSupplyService {
         boolean declared = declaresAgreement(caller.userId(), body.agreementDeclared(), body.agreementDoc());
         UUID claimedFlat = Ids.parseUuid(body.propertyId()).orElse(null);
         String tier = deriveTier(caller, hostRole, claimedFlat, declared);
-        requireTenantRoomProof(hostRole, tier, body);
+        requireTenantOwnerConsent(caller, hostRole, tier, body);
 
         SocietyReference.Binding society = societyReference.rebind(
                 room.getSocietyId(), room.getSociety(), body.societyId());
@@ -340,10 +350,11 @@ public class FlatmateSupplyService {
         applyOccupancy(body, room);
 
         FlatmateRoom saved = rooms.saveAndFlush(room);
+        ownerNotice.noticeIfNeeded(saved);
         publication.enqueueReviewIfNeeded(caller, "room", saved.getId(), null, tier,
                 saved.isFlagForReview(),
                 addressLabel(saved.getSociety(), saved.getLocality()),
-                claimOf(body, saved.isOwnerConsent()));
+                claimOf(caller, body, saved.isOwnerConsent()));
         return mapper.toDto(saved, ownView(caller, saved, saved.getOccupants()));
     }
 
@@ -361,7 +372,9 @@ public class FlatmateSupplyService {
             room.setMaxOccupants(body.maxOccupants());
         }
         if (body.occupants() != null) {
-            room.setOccupants(Math.min(body.occupants(), room.getMaxOccupants()));
+            room.setOccupants(room.isSplitRoom()
+                    ? Math.min(body.occupants(), Math.min(MAX_PER_ROOM, room.getMaxOccupants()))
+                    : body.occupants());
         }
     }
 
@@ -414,7 +427,7 @@ public class FlatmateSupplyService {
         publication.enqueueReviewIfNeeded(caller, "group", null, saved.getId(), tier,
                 saved.isFlagForReview(),
                 addressLabel(null, saved.getLocality()),
-                claimOf(body, saved.isOwnerConsent()));
+                claimOf(caller, body, saved.isOwnerConsent()));
         return mapper.toDto(saved, ownParty(caller));
     }
 
@@ -458,8 +471,8 @@ public class FlatmateSupplyService {
         return mapper.toDto(groups.saveAndFlush(group), ownParty(caller));
     }
 
-    /** Open-policy auto-accepts; every other policy files a pending request. Both produce an inbox
-     * row for the host. */
+    /** Always a pending request, whatever the group's gender policy: nobody joins until the host
+     * has vetted them and accepted. */
     @Transactional
     public FlatmateRequestDto join(AuthPrincipal caller, UUID groupId, String share, String message,
             String gender) {
@@ -470,50 +483,36 @@ public class FlatmateSupplyService {
         }
         genderGate.admitToGroup(caller.userId(), group.getPolicy(), gender);
 
-        int seats = group.openSeats();
-        if (seats <= 0) {
+        if (group.openSeats() <= 0) {
             throw FlatmateConflicts.groupFull("This group is full.");
         }
         String intent = FlatmateVocabulary.orDefault(
                 share, FlatmateVocabulary.SHARE_INTENT, "solo", "share intent");
-        boolean open = FlatmateVocabulary.POLICY_OPEN.equals(group.getPolicy());
 
-        FlatmateRequest saved = record(caller, "group", group.getId(), group.getHostId(),
-                open ? "join" : "request", intent,
+        FlatmateRequest saved = record(caller, "group", group.getId(), group.getHostId(), intent,
                 FlatmateVocabulary.blankToNull(message) == null
                         ? "Hi! I'd like to join this group." : message.strip(),
                 group.getTitle());
 
-        if (open) {
-
-            // Auto-accepted, so the seat is genuinely taken and the member is real.
-            User joiner = users.findById(caller.userId())
-                    .orElseThrow(() -> NotFoundException.of("User"));
-
-            group.addMember(new FlatmateGroupMember(
-                    FlatmateVocabulary.blankToNull(joiner.getName()),
-                    joiner.getId(), caller.verified()));
-            group.setSeatsOpen(seats - 1);
-            groups.saveAndFlush(group);
-        }
         User requester = users.findById(caller.userId()).orElse(null);
         return FlatmateRequestDto.of(saved, group.getTitle(), group.getLocality(),
                 requester == null ? null : requester.getName(),
                 requester == null ? null : requester.getMobile());
     }
 
-    /** The one place a verification tier is decided: owner requires ownership plus Ops approval,
-     * tenant is a claim, identity is the floor. */
+    /** The one place a verification tier is decided: owner requires the caller's own approved listing that carries the
+     * Verified property badge, tenant is a claim, identity is the floor. */
     private String deriveTier(AuthPrincipal caller, String hostRole, UUID propertyId,
             boolean agreementDeclared) {
         if (FlatmateVocabulary.ROLE_OWNER.equals(hostRole) && propertyId != null) {
             Optional<Property> parent = properties.findById(propertyId);
-            boolean ownsApproved = parent
+            boolean ownsBadgedListing = parent
                     .filter(p -> p.getOwner() != null
                             && p.getOwner().getId().equals(caller.userId()))
                     .filter(p -> PropertyStatus.APPROVED.equals(p.getStatus()) && !p.isArchived())
+                    .filter(Property::isOwnershipVerified)
                     .isPresent();
-            if (ownsApproved) {
+            if (ownsBadgedListing) {
                 return FlatmateVocabulary.TIER_OWNER;
             }
         }
@@ -535,23 +534,28 @@ public class FlatmateSupplyService {
             throw new ValidationException(
                     "agreementDoc.id must reference an uploaded agreement document you own.");
         }
+        if (!identity.isSubmitted(hostId)) {
+            throw new ConflictException(FlatmateConflicts.IDENTITY_REQUIRED,
+                    "Submit your ID verification first, then attach the agreement for the Verified property badge.");
+        }
         return true;
     }
 
-    private static void requireTenantRoomProof(String hostRole, String tier,
+    private void requireTenantOwnerConsent(AuthPrincipal caller, String hostRole, String tier,
             FlatmateRoomCreateRequest body) {
         if (!FlatmateVocabulary.ROLE_TENANT.equals(FlatmateVocabulary.blankToNull(hostRole))
                 || FlatmateVocabulary.TIER_OWNER.equals(tier)) {
             return;
         }
-        if (!Boolean.TRUE.equals(body.agreementDeclared())) {
-            throw new ValidationException(
-                    "agreementDeclared must be true for a tenant-hosted flatmate room.");
-        }
         if (!Boolean.TRUE.equals(body.ownerConsent())) {
             throw new ValidationException(
                     "ownerConsent must be true for a tenant-hosted flatmate room.");
         }
+        if (FlatmateVocabulary.blankToNull(body.ownerConsentMobile()) == null) {
+            throw new ValidationException(
+                    "ownerConsentMobile is required for a tenant-hosted flatmate room.");
+        }
+        consentService.normalise(caller, body.ownerConsentMobile());
     }
 
     private boolean ownedAgreementDocument(UUID hostId, String documentId) {
@@ -580,26 +584,33 @@ public class FlatmateSupplyService {
 
     /** {@code ownerConsent} comes from the saved row, never the request, so the value filed with Ops
      * is the one {@link FlatmateOwnerConsentService#settleRoomConsent} derived. */
-    private static FlatmatePublication.AgreementClaim claimOf(FlatmateRoomCreateRequest body,
-            boolean ownerConsent) {
+    private FlatmatePublication.AgreementClaim claimOf(AuthPrincipal caller,
+            FlatmateRoomCreateRequest body, boolean ownerConsent) {
         return new FlatmatePublication.AgreementClaim(body.agreementDoc(),
                 new AgreementRegistration(), ownerConsent,
-                Ids.parseUuid(body.propertyId()).orElse(null));
+                Ids.parseUuid(body.propertyId()).orElse(null),
+                evidenceTypeOf(caller.userId(), body.agreementDoc()));
     }
 
-    private static FlatmatePublication.AgreementClaim claimOf(FlatmateGroupCreateRequest body,
-            boolean ownerConsent) {
+    private FlatmatePublication.AgreementClaim claimOf(AuthPrincipal caller,
+            FlatmateGroupCreateRequest body, boolean ownerConsent) {
         if (body.hunting()) {
             return new FlatmatePublication.AgreementClaim(null,
-                    new AgreementRegistration(), false, null);
+                    new AgreementRegistration(), false, null, null);
         }
         return new FlatmatePublication.AgreementClaim(body.agreementDoc(),
                 new AgreementRegistration(), ownerConsent,
-                Ids.parseUuid(body.propertyId()).orElse(null));
+                Ids.parseUuid(body.propertyId()).orElse(null),
+                evidenceTypeOf(caller.userId(), body.agreementDoc()));
+    }
+
+    private String evidenceTypeOf(UUID hostId, Map<String, Object> document) {
+        return Ids.parseUuid(agreementDocId(document))
+                .flatMap(id -> ownedDocuments.flatEvidenceType(hostId, id)).orElse(null);
     }
 
     private FlatmateRequest record(AuthPrincipal caller, String kind, UUID targetId, UUID hostId,
-            String action, String intent, String message, String targetLabel) {
+            String intent, String message, String targetLabel) {
         String body = message == null || message.length() <= MAX_MESSAGE
                 ? message : message.substring(0, MAX_MESSAGE);
 
@@ -625,7 +636,7 @@ public class FlatmateSupplyService {
         FlatmateRequest saved;
         try {
             saved = requests.saveAndFlush(new FlatmateRequest(
-                    kind, targetId, hostId, caller.userId(), action, intent, body));
+                    kind, targetId, hostId, caller.userId(), intent, body));
         } catch (DataIntegrityViolationException raced) {
 
             // V27's unique index is the backstop for repeatable-read sessions; only that index is translated to 409 —
