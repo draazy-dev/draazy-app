@@ -4,6 +4,10 @@ import Loading from '../../../components/ui/Loading.jsx';
 
 export const fmtDate = (ms) => (ms ? new Date(ms).toLocaleDateString('en-IN') : '—');
 
+const CLAIM_BASIS = { tenant: 'tenant evidence', owner: 'owner listing' };
+
+export const claimLabel = (tier) => ['Verified property', CLAIM_BASIS[tier]].filter(Boolean).join(' · ');
+
 export function Block({ icon: Icon, title, children, className, aside }) {
   return (
     <section className={classNames('rounded-2xl border border-white/10 bg-white/[0.03] p-4', className)}>

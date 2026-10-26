@@ -1,11 +1,12 @@
 import { expect, test } from '../../fixtures/live.js';
-import { API, E2E_OTP, apiLogin, uniqueMobile, uploadedListingPhotos } from '../../helpers/liveAuth.js';
+import { API, E2E_OTP, apiLogin, uniqueMobile } from '../../helpers/liveAuth.js';
 import { tenantRoomAgreement } from '../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../helpers/roomWizard.js';
 import { withSocietyId } from '../../helpers/liveSociety.js';
 
-const REVIEW_KEYS = ['id', 'kind', 'roomId', 'groupId', 'host', 'hostMobile', 'address', 'tier', 'flagForReview', 'ownerConsent', 'createdAt'];
+const REVIEW_KEYS = ['id', 'kind', 'roomId', 'groupId', 'host', 'hostMobile', 'hostVerified', 'evidenceType', 'address', 'tier', 'flagForReview', 'ownerConsent', 'createdAt'];
 const QUEUE_KEYS = ['id', 'kind', 'modStatus', 'authorName', 'authorMobile', 'headline', 'locality', 'freeText', 'photoCount',
-  'recheckReason', 'recheckRequestedAt', 'createdAt'];
+  'coverPhoto', 'rent', 'recheckReason', 'recheckRequestedAt', 'createdAt'];
 const DESK = /\/api\/admin\/(flatmate-reviews|flatmates\/moderation(\/summary)?|flatmates\/[^/]+)$/;
 
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -24,6 +25,7 @@ async function seedTenantRoom(host, society) {
     await post('/flatmates/owner-consent', accessToken, payload);
   }
   return post('/flatmates/rooms', accessToken, {
+    ...(await roomBasics(accessToken)),
     bhk: '2',
     roomType: 'Private room',
     attachedBath: 'attached',
@@ -35,7 +37,6 @@ async function seedTenantRoom(host, society) {
     availableFrom: '2026-12-01',
     lookingFor: 'any',
     foodPref: 'any',
-    photos: await uploadedListingPhotos(accessToken, 2),
     note: 'Quiet building, sunny room.',
     hostRole: 'tenant',
     ...(await tenantRoomAgreement(accessToken)),
@@ -59,21 +60,18 @@ test("the flatmate desk reads slim cards with the host's full mobile and true ta
   await page.goto('/ops/flatmate-review');
   await expect(page.getByTestId('flatmate-queue-card').filter({ hasText: society }).first().getByTestId('author-mobile')).toContainText(host.mobile);
 
-  const reviews = calls.find((c) => c.pathname.endsWith('/flatmate-reviews'));
-  expect(reviews.body.content.length).toBeGreaterThan(0);
-  for (const row of reviews.body.content) expect(Object.keys(row).filter((k) => !REVIEW_KEYS.includes(k))).toEqual([]);
-  expect(JSON.stringify(reviews.body)).not.toMatch(/agreementDoc|dataUrl|agreementValidTill/);
-  expect(reviews.body.content.find((r) => r.roomId === room.id)?.hostMobile).toBe(host.mobile);
+  expect(calls.some((c) => c.pathname.endsWith('/flatmate-reviews')), 'Pending does not read the badge-claim list').toBe(false);
 
   const queue = calls.find((c) => c.pathname.endsWith('/flatmates/moderation'));
   expect(queue.body.content.length).toBeLessThanOrEqual(100);
   for (const row of queue.body.content) expect(Object.keys(row).filter((k) => !QUEUE_KEYS.includes(k))).toEqual([]);
-  expect(queue.body.content.find((r) => r.id === room.id).photoCount).toBe(2);
+  expect(queue.body.content.find((r) => r.id === room.id).photoCount).toBe(3);
   expect(queue.body.content.find((r) => r.id === room.id).authorMobile).toBe(host.mobile);
 
   const summaries = calls.filter((c) => c.pathname.endsWith('/moderation/summary'));
   expect(summaries).toHaveLength(1);
   await expect(page.getByTestId('fm-count-pending')).toHaveText(String(summaries[0].body.pending));
+  await expect(page.getByTestId('fm-count-badge')).toHaveText(String(summaries[0].body.badgeRequests));
   await expect(page.getByTestId('fm-count-published')).toHaveText(String(summaries[0].body.published));
 
   const before = calls.length;
@@ -85,5 +83,13 @@ test("the flatmate desk reads slim cards with the host's full mobile and true ta
   expect(opened).toHaveLength(1);
   expect(opened[0].pathname).toContain(room.id);
   expect(opened[0].body.review.agreementDoc.dataUrl).toBeTruthy();
-  expect(consoleErrors).toEqual([]);
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+
+  await page.getByRole('tablist', { name: 'Flatmate queues' }).getByRole('tab', { name: 'Badge requests' }).click();
+  await expect(page.getByTestId('flatmate-queue-card').filter({ hasText: society }).first().getByTestId('author-mobile')).toContainText(host.mobile);
+  const reviews = calls.find((c) => c.pathname.endsWith('/flatmate-reviews'));
+  expect(reviews.body.content.length).toBeGreaterThan(0);
+  for (const row of reviews.body.content) expect(Object.keys(row).filter((k) => !REVIEW_KEYS.includes(k))).toEqual([]);
+  expect(JSON.stringify(reviews.body)).not.toMatch(/agreementDoc|dataUrl|agreementValidTill/);
+  expect(reviews.body.content.find((r) => r.roomId === room.id)?.hostMobile).toBe(host.mobile);  expect(consoleErrors).toEqual([]);
 });

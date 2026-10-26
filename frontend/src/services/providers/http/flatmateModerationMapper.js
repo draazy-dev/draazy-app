@@ -39,6 +39,14 @@ export function toReviewViewModel(row) {
     agreementDoc: doc,
     agreementViewable: !!doc?.dataUrl,
     agreementTooLarge: !!doc?.tooLarge,
+    // A personal-vault file, opened through the audited signed-URL endpoint rather than inline.
+    vaultDocId: doc?.dataUrl ? null : text(doc?.id),
+    // `rent_agreement` | `electricity_bill`.
+    evidenceType: text(row?.evidenceType) || (doc ? 'rent_agreement' : null),
+    evidenceIssuedOn: text(row?.evidenceIssuedOn),
+    nameMatches: row?.nameMatches ?? null,
+    addressMatches: row?.addressMatches ?? null,
+    hostVerified: !!row?.hostVerified,
     // The sub-registrar's particulars, which is what the desk can check against the IGR portal.
     // Not masked: a registration number is a public record.
     agreementValidTill: text(row?.agreementValidTill),
@@ -61,6 +69,7 @@ export function toReviewRowViewModel(row) {
     hostMobile: text(row?.hostMobile),
     address: text(row?.address),
     tier: row?.tier || 'identity',
+    evidenceType: text(row?.evidenceType) || null,
     flagForReview: !!row?.flagForReview,
     ownerConsent: !!row?.ownerConsent,
     createdAt: epoch(row?.createdAt),
@@ -81,8 +90,11 @@ export function toModerationRowViewModel(row) {
     headline: text(row?.headline),
     locality: text(row?.locality),
     freeText: text(row?.freeText),
-    // A card counts a room's pictures; the popup's `item` lists them (`toModerationItemViewModel`).
+    // A card counts a room's pictures and shows the first; the popup's `item` lists them (`toModerationItemViewModel`).
     photoCount: Number(row?.photoCount) || 0,
+    coverPhoto: httpUrl(row?.coverPhoto),
+    // A room or group's monthly rent; a seeker's budget ceiling.
+    rent: row?.rent ?? null,
     // Which fields were edited after approval, and when — null when nothing is awaiting a re-read.
     recheckReason: text(row?.recheckReason),
     recheckRequestedAt: epoch(row?.recheckRequestedAt),
@@ -99,6 +111,7 @@ export const toModerationItemViewModel = (item) => ({
 /** What each tab's label shows. */
 export const toModerationSummaryViewModel = (res) => ({
   pending: Number(res?.pending) || 0,
+  badgeRequests: Number(res?.badgeRequests) || 0,
   published: Number(res?.published) || 0,
   hidden: Number(res?.hidden) || 0,
 });
