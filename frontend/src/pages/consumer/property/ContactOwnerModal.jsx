@@ -42,7 +42,7 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
   const status = gate.status;
   const ownerHides = status === 'approved' && gate.ownerHidesNumber;
   const revealed = status === 'owner' || (status === 'approved' && !ownerHides);
-  const { identityVerified, anyVerified, roleAndVerification } = ownerVerificationMeta(p, t);
+  const { anyVerified, roleAndVerification } = ownerVerificationMeta(p, t);
   const { verified: seekerVerified, loading: verifying } = useVerification();
   const panelRef = useModalDialog(true, onClose);
   const ownerDialable = dialableMobile(ownerMobile);
@@ -212,12 +212,6 @@ export function ContactOwnerModal({ p, isIn, onClose, toast }) {
           </div>
         </div>
 
-        {/* A claim about how fast a *person* replies, so it hangs on the person's badge alone. */}
-        {identityVerified && (
-          <div className="-mt-2 mb-4 flex items-center gap-1.5 text-[11px] text-emerald-300/90">
-            <Icon name="zap" className="w-3.5 h-3.5" /> {t('property.verifiedRespondsFaster')}
-          </div>
-        )}
         <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4 mb-4">
           {revealed ? (
             <>

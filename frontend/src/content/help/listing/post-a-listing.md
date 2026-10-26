@@ -50,7 +50,7 @@ Then review and publish. Your listing goes into review and the status card shows
 
 Verification is what makes tenants trust the listing enough to call — it is not required to post. To earn it:
 
-- Tap the listing's **Get Verified property badge** button once it is live or under review. It opens your **Document Vault** for that listing: upload one ownership paper, then tap **Request Verified badge**
+- Tap the listing's **Get Verified property badge** button once it is live or under review. It opens your **Document Vault** for that listing: upload one ownership paper, then tap **Request Verified property badge**
 - For a rental, use a light bill, Index II, society share certificate or property tax receipt. For a sale, use Index II or the society share certificate
 - Ensure the address matches the document
 

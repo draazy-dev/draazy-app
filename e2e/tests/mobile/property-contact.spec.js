@@ -128,7 +128,7 @@ test.describe('Mobile property contact', () => {
     await expect(panel.getByRole('button', { name: /request number/i })).toBeVisible();
     await expect(panel.getByTestId('contacts-left'), 'the free-contact countdown comes with it').toBeVisible();
     await expect(panel.getByRole('link', { name: /profile/i })).toBeVisible();
-    await expect(panel.getByRole('link', { name: /verified tenant/i })).toBeVisible();
+    await expect(panel.getByRole('link', { name: /ID verified/i })).toBeVisible();
 
     await page.locator('.dz-modal-x').first().click();
     await expect(panel).toHaveCount(0);

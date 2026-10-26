@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
-import { API, E2E_OTP, apiLogin, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
+import { API, E2E_OTP, apiLogin, grantIdentityBadge, signedInAs, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
-import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { badgeChecks, tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
+import { roomBasics } from '../../../helpers/roomWizard.js';
 import { withSocietyId } from '../../../helpers/liveSociety.js';
 /* `reviewStatus` is joined onto the feed rows server-side (`FlatmateReviewStatuses`), so every row
    here is created over HTTP and published through real moderation — the two gates are independent. */
@@ -48,7 +49,7 @@ async function createGroup(token, body) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
-      locality: 'Baner', rent: 40000, seats: 3, seatsOpen: 1, policy: 'any', name: 'Review Host',
+      locality: 'Baner', rent: 40000, deposit: 50000, seats: 3, seatsOpen: 1, policy: 'any',
       ...body,
       ...(body.agreementDoc ? { agreementDoc: (await tenantRoomAgreement(token)).agreementDoc } : {}),
     }),
@@ -68,9 +69,10 @@ async function createRoom(token, body) {
     method: 'POST',
     headers: auth(token),
     body: JSON.stringify({
+      ...(await roomBasics(token)),
       bhk: '2', roomType: 'Private room', attachedBath: 'attached', furnishing: 'semi',
       locality: 'Baner', rentShare: 15000, deposit: 30000, availableFrom: '2026-12-01',
-      lookingFor: 'any', foodPref: 'any', photos: await uploadedListingPhotos(token),
+      lookingFor: 'any', foodPref: 'any',
       ...(await withSocietyId(token, payload)),
     }),
   });
@@ -94,7 +96,7 @@ async function decide(target, decision, note = 'e2e verdict') {
   const response = await fetch(`${API}/admin/flatmate-reviews/${row.id}`, {
     method: 'PATCH',
     headers: auth(token),
-    body: JSON.stringify({ decision, note }),
+    body: JSON.stringify({ decision, note, ...(decision === 'approved' ? { checks: badgeChecks() } : {}) }),
   });
   const decided = await response.json();
   expect(response.status, JSON.stringify(decided)).toBe(200);
@@ -108,7 +110,7 @@ async function tapChip(page, chip) {
 }
 async function openTeamUp(page) {
   await page.goto(`${BASE}/flatmates`);
-  const tab = page.getByRole('button', { name: /Team up/i }).first();
+  const tab = page.locator('button[data-tab="teams"]');
   await expect(tab).toBeVisible({ timeout: 20_000 });
   await tab.click();
 }
@@ -130,10 +132,11 @@ async function openFilters(page) {
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
 }
 
-test('a tenant group waits on Ops without the badge it asked for, then an approval turns it Tenant-verified', async ({ page }) => {
+test('a tenant group waits on Ops without the badge it asked for, then an approval turns it into a Verified property', async ({ page }) => {
   test.slow();
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Review Host' });
+  await grantIdentityBadge(mobile);
   const title = `Live approved verdict ${stamp()} in Baner`;
   const consentMobile = await consentTo(accessToken, { title, locality: 'Baner' });
   const group = await createGroup(accessToken, {
@@ -147,22 +150,21 @@ test('a tenant group waits on Ops without the badge it asked for, then an approv
     await openDetail(page, 'group', group.id);
 
     await expect(card.getByText('Agreement under review', { exact: true })).toBeVisible();
-    await expect(card.getByText('Tenant-verified', { exact: true })).toHaveCount(0);
+    await expect(card.getByText('Verified property', { exact: true })).toHaveCount(0);
   });
 
-  await test.step('an Ops approval turns the same group into Tenant-verified', async () => {
+  await test.step('an Ops approval turns the same group into a Verified property', async () => {
     await decide(group.id, 'approved');
 
     await openDetail(page, 'group', group.id);
-    await expect(card.getByText('Tenant-verified', { exact: true })).toBeVisible();
-    await expect(card.getByText('Agreement verified', { exact: true })).toBeVisible();
+    await expect(card.getByText('Verified property', { exact: true })).toBeVisible();
     await expect(card.getByText('Agreement under review', { exact: true })).toHaveCount(0);
   });
 });
 
-test('a rejected group stays on the board, says the agreement was not verified, and gives the host the reason', async ({ page }) => {
+test('a rejected group stays on the board, says it is not a verified property yet, and gives the host the reason', async ({ page }) => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Review Host' });
   const group = await createGroup(accessToken, {
     title: `Live rejected verdict ${stamp()} in Baner`, role: 'tenant', agreement: true, ...REGISTERED,
   });
@@ -172,18 +174,20 @@ test('a rejected group stays on the board, says the agreement was not verified, 
   await signedInAs(page, mobile);
   await openDetail(page, 'group', group.id);
   const card = page.locator('main');
-  await expect(card.getByText('Agreement not verified', { exact: true })).toBeVisible();
-  await expect(card.getByText('Tenant-verified', { exact: true })).toHaveCount(0);
+  await expect(card.getByText('Not a verified property yet', { exact: true })).toBeVisible();
+  await expect(card.getByText('Verified property', { exact: true })).toHaveCount(0);
 
-  await tapChip(page, page.getByRole('button', { name: 'Agreement not verified' }).first());
+  await tapChip(page, page.getByRole('button', { name: 'Not a verified property yet' }).first());
   const tip = page.getByRole('tooltip');
   await expect(tip).toContainText('Registration number does not match the document');
   await expect(tip).toContainText('Edit your post to fix it');
 });
 test('"Verified only" keeps the approved tenant group and drops the one still waiting', async ({ page }) => {
   const viewer = uniqueMobile();
-  const { accessToken: approvedToken } = await apiLogin(uniqueMobile());
-  const { accessToken: pendingToken } = await apiLogin(uniqueMobile());
+  const approvedHost = uniqueMobile();
+  const { accessToken: approvedToken } = await apiLogin(approvedHost, { name: 'Review Host' });
+  await grantIdentityBadge(approvedHost);
+  const { accessToken: pendingToken } = await apiLogin(uniqueMobile(), { name: 'Review Host' });
 
   const approvedTitle = `Live filter approved ${stamp()} in Baner`;
   const consentMobile = await consentTo(approvedToken, { title: approvedTitle, locality: 'Baner' });
@@ -212,7 +216,9 @@ test('"Verified only" keeps the approved tenant group and drops the one still wa
 
 test('the same verdict drives a room card, and the room filter with it', async ({ page }) => {
   const viewer = uniqueMobile();
-  const { accessToken: tenantToken } = await apiLogin(uniqueMobile());
+  const tenantHost = uniqueMobile();
+  const { accessToken: tenantToken } = await apiLogin(tenantHost);
+  await grantIdentityBadge(tenantHost);
   const { accessToken: plainToken } = await apiLogin(uniqueMobile());
   const society = `Review Claim Villa ${stamp()}`;
   const ownerConsentMobile = await consentTo(tenantToken, { society, locality: 'Baner' });
@@ -235,7 +241,7 @@ test('the same verdict drives a room card, and the room filter with it', async (
 
   await openRooms(page);
   const claimedCard = page.locator(`[data-sf-id="r:${claimed.id}"]`);
-  await expect(claimedCard.getByRole('img', { name: 'Tenant-verified', exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect(claimedCard.getByRole('img', { name: 'Verified property', exact: true })).toBeVisible({ timeout: 15_000 });
 
   await openFilters(page);
   await page.getByRole('button', { name: 'Verified only', exact: true }).click();
@@ -245,7 +251,7 @@ test('the same verdict drives a room card, and the room filter with it', async (
 
 test('a post nobody had to review carries neither a badge nor a review chip', async ({ page }) => {
   const mobile = uniqueMobile();
-  const { accessToken } = await apiLogin(mobile);
+  const { accessToken } = await apiLogin(mobile, { name: 'Review Host' });
   const title = `Live no claim ${stamp()} in Baner`;
   const group = await createGroup(accessToken, { title, role: 'tenant' });
   expect(group.verificationTier).toBe('identity');
@@ -255,7 +261,7 @@ test('a post nobody had to review carries neither a badge nor a review chip', as
   const card = page.locator('main');
   await expect(card.getByText(title).first()).toBeVisible({ timeout: 15_000 });
   await expect(card.getByText('Agreement under review', { exact: true })).toHaveCount(0);
-  await expect(card.getByText(/Tenant-verified|Owner-verified/)).toHaveCount(0);
+  await expect(card.getByText('Verified property')).toHaveCount(0);
 });
 
 test('tapping the agreement chip explains it in place, without the host detail', async ({ page }) => {

@@ -20,26 +20,30 @@ test.beforeEach(async ({ page }) => {
   await seedConsent(page);
 });
 
-test('the RERA registration is the API reraId and opens MahaRERA verification, and a listing without one makes no RERA claim', async ({ page }) => {
+test('the RERA ID is the API reraId, worded as owner-shared and linked to its MahaRERA search, and a listing without one makes no RERA claim', async ({ page }) => {
   test.slow();
 
-  await test.step('RERA registration uses the API reraId and opens MahaRERA verification', async () => {
+  await test.step('the owner-shared RERA ID opens its MahaRERA search result', async () => {
     const detail = await get(`/properties/${RERA_LISTING}`);
     expect(detail.reraId, `${RERA_LISTING} must carry a real RERA id on the wire`).toMatch(/^P\d{11}$/);
+    expect(detail.reraChecked, 'the staff check must not reach the buyer').toBeUndefined();
+    const searchUrl = `https://maharera.maharashtra.gov.in/projects-search-result?project_name=${detail.reraId}`;
 
     await page.goto(`/property/${RERA_LISTING}`, { waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 20000 });
 
-    const linkName = new RegExp(`MahaRERA:\\s*${detail.reraId}`);
-    const headerLink = page.locator('main').getByRole('link', { name: linkName }).first();
+    const headerLink = page.locator('main').getByRole('link', { name: new RegExp(`RERA shared:\\s*${detail.reraId}`) });
     await expect(headerLink).toBeVisible();
-    await expect(headerLink).toHaveAttribute('href', 'https://maharera.maharashtra.gov.in/');
+    await expect(headerLink).toHaveAttribute('href', searchUrl);
     await expect(headerLink).toHaveAttribute('target', '_blank');
     await expect(headerLink).toHaveAttribute('rel', /noopener/);
-    await expect(page.locator('main')).not.toContainText(/RERA approved/i);
+    await expect(page.locator('main')).not.toContainText(/RERA (approved|registered|verified|checked)/i);
 
     await page.getByRole('tab', { name: /Verification & Docs/i }).click();
-    await expect(page.locator('main').getByRole('link', { name: linkName })).toHaveCount(2);
+    const shared = page.getByTestId('rera-shared');
+    await expect(shared).toContainText('Shared by owner, check it on MahaRERA');
+    await expect(shared.getByRole('link', { name: new RegExp(`MahaRERA:\\s*${detail.reraId}`) })).toHaveAttribute('href', searchUrl);
+    await expect(page.locator('main')).not.toContainText(/RERA (approved|registered|verified|checked)/i);
   });
 
   await test.step('a listing without reraId renders no RERA registration claim', async () => {
@@ -64,7 +68,7 @@ test('listing cards and map drawer avoid fabricated Draazy verification and conn
   await page.goto('/listings?deal=buy&loc=baner', { waitUntil: 'domcontentloaded' });
   const card = page.locator(`a[href="/property/${RERA_LISTING}"]`).first();
   await expect(card).toBeVisible({ timeout: 20000 });
-  await expect(card.locator('[aria-label*="ID verified owner"]')).toHaveCount(1);
+  await expect(card.locator('[aria-label*="ID verified"]')).toHaveCount(1);
   await expect(card).not.toContainText('Verified Draazy');
 
   const fixture = rows.find((p) => p.slug === MAP_LISTING);

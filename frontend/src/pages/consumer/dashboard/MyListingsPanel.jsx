@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { usePricing } from '../../../context/PricingContext';
@@ -6,7 +6,7 @@ import Select from '../../../components/ui/Select.jsx';
 import Icon from '../../../components/Icon.jsx';
 import RefundGuarantee from '../../../components/billing/RefundGuarantee.jsx';
 import { confirmListingFresh, takeListingDown, pauseListing, resumeListing, myListingCard } from '../../../services/propertyService.js';
-import { deleteGroup, deletePost, deleteRoom, renewFlatmate, splitProperty, unsplitProperty } from '../../../services/flatmateService.js';
+import { deleteGroup, deletePost, deleteRoom, getOwnerHomes, renewFlatmate, splitProperty, unsplitProperty } from '../../../services/flatmateService.js';
 import { closeDeal, reopenDeal, reserveDeal } from '../../../services/dealService.js';
 import { composeOwnerProperties } from '../../../lib/data/ownerProperties.js';
 import { referralShareUrlNow } from '../../../lib/referralShare.js';
@@ -21,6 +21,7 @@ import { Card, SectionHead } from './components.jsx';
 import AttentionBanner from './myListings/AttentionBanner.jsx';
 import EmptyState from './myListings/EmptyState.jsx';
 import PrivateListingCard from './myListings/PrivateListingCard.jsx';
+import HomeRooms from './myListings/HomeRooms.jsx';
 import ListingCard from './myListings/ListingCard.jsx';
 import FinalizeDealModal from './myListings/FinalizeDealModal.jsx';
 import RelistModal from './myListings/RelistModal.jsx';
@@ -32,11 +33,38 @@ import { useFlatmateEditing } from './myListings/useFlatmateEditing.jsx';
 /* Posts, groups, rooms and properties can share an id, so the kind is part of a row's identity. */
 const rowKey = (l) => `${l.flatmateGroup ? 'group' : l.flatmatePost ? 'post' : l.flatmate ? 'room' : 'property'}:${l.uuid || l.id}`;
 
+const NO_HOMES = { byManaged: new Map(), byListing: new Map() };
+
+/* Read only for an owner with a home saved from a tenant's room post, so other owners pay no request. */
+function useOwnerHomes(managed) {
+  const [homes, setHomes] = useState(NO_HOMES);
+  const homeKey = managed.filter((m) => m.sourceRoomId).map((m) => `${m.id}:${m.publishedListingId}`).join(',');
+  useEffect(() => {
+    if (!homeKey) {
+      setHomes(NO_HOMES);
+      return undefined;
+    }
+    let live = true;
+    getOwnerHomes()
+      .then((rows) => {
+        if (!live) return;
+        setHomes({
+          byManaged: new Map(rows.map((h) => [h.managedId, h])),
+          byListing: new Map(rows.filter((h) => h.publishedListingId).map((h) => [String(h.publishedListingId), h])),
+        });
+      })
+      .catch(() => { if (live) setHomes(NO_HOMES); });
+    return () => { live = false; };
+  }, [homeKey]);
+  return homes;
+}
+
 export default function MyListingsPanel({ listings, listingsLoaded, setListings, managed = [], onManagedChanged, user, toast, openReview, reviewsByProp, onChanged }) {
   usePrefetchReferralCode();
   const { t } = useTranslation();
   const { fee } = usePricing();
   const listingsState = useMemo(() => composeOwnerProperties(listings, managed), [listings, managed]);
+  const homes = useOwnerHomes(managed);
   const [showDealModal, setShowDealModal] = useState(null);
   const [ask, setAsk] = useState(null);
   const confirmAction = (opts) => new Promise((resolve) => setAsk({ ...opts, resolve }));
@@ -230,7 +258,7 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
     const unbadged = (created?.rooms || []).some((r) => !r.verified);
     toast(
       unbadged
-        ? `${count} room${count > 1 ? 's' : ''} listed — they'll show as owner-verified once this property is approved.`
+        ? `${count} room${count > 1 ? 's' : ''} listed — they'll show as Verified property once this property is approved.`
         : `${count} room${count > 1 ? 's' : ''} listed in Flatmates`,
       'success',
     );
@@ -448,35 +476,42 @@ export default function MyListingsPanel({ listings, listingsLoaded, setListings,
                 <PrivateListingCard
                   key={l.id}
                   l={l}
+                  home={homes.byManaged.get(l.managedId)}
                   onPublish={handlePublish}
                   onDelete={handleDelete}
                 />
               ) : (
-                <ListingCard
-                  key={l.id}
-                  l={l}
-                  split={splitOf(l)}
-                  review={reviewsByProp?.get(l.id) || null}
-                  navigate={navigate}
-                  openReview={openReview}
-                  onConfirmFresh={handleConfirmFresh}
-                  onReopen={(row) => (row.deal === 'rent' ? setRelist({ listing: row, date: istToday() }) : handleReopen(row))}
-                  onMarkUnderOffer={handleMarkUnderOffer}
-                  onFinalize={setShowDealModal}
-                  onDelete={handleDelete}
-                  onSplit={setSplitTarget}
-                  onUnsplit={handleUnsplit}
-                  onPause={handlePause}
-                  onResume={handleResume}
-                  onShare={handleShare}
-                  onOpenTools={handleOpenTools}
-                  onEditGroup={flatmateEditing.editGroup}
-                  onEditPost={flatmateEditing.editPost}
-                  onRenew={handleRenew}
-                  quota={quota}
-                  passPrice={fee('listingPass')}
-                  t={t}
-                />
+                <Fragment key={l.id}>
+                  <ListingCard
+                    l={l}
+                    split={splitOf(l)}
+                    review={reviewsByProp?.get(l.id) || null}
+                    navigate={navigate}
+                    openReview={openReview}
+                    onConfirmFresh={handleConfirmFresh}
+                    onReopen={(row) => (row.deal === 'rent' ? setRelist({ listing: row, date: istToday() }) : handleReopen(row))}
+                    onMarkUnderOffer={handleMarkUnderOffer}
+                    onFinalize={setShowDealModal}
+                    onDelete={handleDelete}
+                    onSplit={setSplitTarget}
+                    onUnsplit={handleUnsplit}
+                    onPause={handlePause}
+                    onResume={handleResume}
+                    onShare={handleShare}
+                    onOpenTools={handleOpenTools}
+                    onEditGroup={flatmateEditing.editGroup}
+                    onEditPost={flatmateEditing.editPost}
+                    onRenew={handleRenew}
+                    quota={quota}
+                    passPrice={fee('listingPass')}
+                    t={t}
+                  />
+                  {homes.byListing.get(String(l.uuid || l.id))?.rooms?.length > 0 && (
+                    <div className="rounded-xl bg-white/[0.03] overflow-hidden">
+                      <HomeRooms rooms={homes.byListing.get(String(l.uuid || l.id)).rooms} />
+                    </div>
+                  )}
+                </Fragment>
               )
             ))}
           </div>

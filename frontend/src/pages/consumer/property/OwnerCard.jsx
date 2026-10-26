@@ -16,7 +16,7 @@ export function OwnerCard({ p, isIn, toast, contactApproved, contactStatus, owne
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { identityVerified, anyVerified, roleAndVerification } = ownerVerificationMeta(p, t);
+  const { anyVerified, roleAndVerification } = ownerVerificationMeta(p, t);
   const isOwnerViewer = isIn && digits(ownerMob) && digits(ownerMob) === digits(user?.mobile);
   const openChat = async (event) => {
     event.preventDefault();
@@ -61,12 +61,6 @@ export function OwnerCard({ p, isIn, toast, contactApproved, contactStatus, owne
         </div>
       )}
 
-      {/* A claim about how fast a *person* replies, so it hangs on the person's badge alone. */}
-      {identityVerified && (
-        <div className="mb-3 -mt-1 flex items-center gap-1.5 text-[11px] text-emerald-300/90">
-          <Icon name="zap" className="w-3.5 h-3.5" /> {t('property.verifiedRespondsFaster')}
-        </div>
-      )}
       <div className="flex gap-2">
         {isOwnerViewer ? (
           <div className="hidden lg:flex flex-1">

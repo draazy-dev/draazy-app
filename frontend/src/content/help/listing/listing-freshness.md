@@ -36,10 +36,10 @@ Tenants abandon a platform after two or three wasted calls on properties that ar
 On the default **Relevance** sort, listings are scored. In descending order of weight:
 
 1. **Featured placement** — given for a limited time (shown on the [Plans page](/plans)) after your listing's ownership is verified, then it ends; it outranks everything below it
-2. **ID verified owner** — ID and selfie reviewed by our trust team
+2. **ID verified** — ID and selfie reviewed by our trust team
 3. **Verified property** — ownership documents seen, and still current
 4. **Freshness** — Active, then Ageing, then Stale. Dormant listings are hidden from search.
-5. **RERA registered** — a valid registration number on the project
+5. **RERA number** — a MahaRERA registration number shared by owner, check it on MahaRERA
 6. **Completeness** — photos, description, key details and amenities
 
 Every term except the first is free and within your control, and no amount of completeness substitutes for a verification. Visibility is not something you buy — see [Plans explained](/help/a/plans-explained).
@@ -51,6 +51,8 @@ Switching the sort to **Newest** or a price order turns all of this off — incl
 Use **Pause** when you are temporarily not taking enquiries. A paused listing is hidden from search and does not count toward your free live listing, and its direct link can still resolve for someone who already has it.
 
 Use **Resume** when you are ready again. It returns a paused live listing to search without a new moderation decision, unless an edit already queued a re-check.
+
+Use **Take down** when you are done with the listing for good. Buyers stop seeing it, pending contact requests go back to the buyers, chats about it close, and after 30 days its photos and details are deleted. You can't take it down while a deal, offer, confirmation or paid service on it is still open. Changed your mind within 30 days? Contact support.
 
 ## When you rent it out
 

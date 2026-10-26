@@ -1,5 +1,5 @@
 import { uploadPersonalDocument } from '../../../services/documentService.js';
-import { MOVE_LBL } from './constants.js';
+import { MOVE_LBL, FURN_KEY } from './constants.js';
 import { headlineOf } from '../../../lib/headline.js';
 import { slugOfName } from '../../../lib/searchEntities.js';
 
@@ -36,9 +36,18 @@ const groupListingsUrl = (p) => {
   if (p.depositMax) q.set('deposit', `${p.depositMin || 0}-${p.depositMax}`);
   if (p.furnishing) q.set('furn', p.furnishing);
   if (p.bachelors) q.set('tenants', 'bachelors');
-  if (p.gatedOnly) q.set('amen', 'security');
+  const amen = [p.gatedOnly && 'security', p.parking && 'parking'].filter(Boolean);
+  if (amen.length) q.set('amen', amen.join(','));
   return `/listings?${q}`;
 };
+// What the flat must have, for a seeker post or a Team up group's preferences; unset means any.
+const mustHaves = (p, t) => [
+  ['sofa', FURN_KEY[p.furnishing] && t('flatmates.' + FURN_KEY[p.furnishing])],
+  ['building-2', p.gatedOnly && t('flatmates.gatedOnly')],
+  ['bath', p.attachedBath && t('flatmates.mustAttachedBath')],
+  ['parking-circle', p.parking && t('flatmates.parking_' + p.parking)],
+  ['users', p.bachelors && t('flatmates.detailBachelorsOk')],
+].filter(([, label]) => label);
 const groupLocalities = (g) => (g.localities?.length ? g.localities : [g.locality].filter(Boolean));
 const maxOpenSeats = (g) => Math.max(0, g.seatsTotal - (g.members?.length || 0));
 const MAX_GROUP_SEATS = 12;
@@ -59,8 +68,8 @@ const replacementTitle = ({ bhk, locality } = {}) => {
 // Identity is the floor (the Aadhaar gate) and earns no badge; only these two tiers carry
 // extra proof — an Ops-verified property, or a sitting tenant's registered agreement.
 const HOST_TIERS = {
-  owner: { label: 'Owner-verified', icon: 'badge-check', cls: 'text-emerald-300' },
-  tenant: { label: 'Tenant-verified', icon: 'file-check', cls: 'text-teal-300' },
+  owner: { label: 'Verified property', icon: 'badge-check', cls: 'text-emerald-300' },
+  tenant: { label: 'Verified property', icon: 'badge-check', cls: 'text-emerald-300' },
 };
 const hostTierMeta = (item) => (item && HOST_TIERS[item.verificationTier]) || null;
 // Tenant tier is a self-claim, so its badge waits for Ops approval; owner tier rides on
@@ -153,11 +162,11 @@ const readLocalAgreement = (file) => new Promise((resolve) => {
   reader.onerror = () => resolve({ ...meta, dataUrl: null });
   reader.readAsDataURL(file);
 });
-const readAgreementDoc = async (file) => {
+const readAgreementDoc = async (file, category = 'Rent agreement') => {
   if (!file || !AGREEMENT_MIME_RE.test(file.type || '')) return null;
   const [local, stored] = await Promise.all([
     readLocalAgreement(file),
-    uploadPersonalDocument({ category: 'Rent agreement', file }),
+    uploadPersonalDocument({ category, file }),
   ]);
   return { ...local, id: stored.id };
 };
@@ -256,4 +265,4 @@ const terms = (f) => ({
   ...(f.electricityBilling ? { electricityBilling: f.electricityBilling } : {}),
 });
 
-export { inr, avatarGrad, initials, genderLabel, genderPref, foodLabel, perHead, shareFloor, moneyRange, seekerBudget, bhkText, groupLocalities, groupListingsUrl, maxOpenSeats, MAX_GROUP_SEATS, seatCeiling, seatsLeft, allVerified, policyAvatar, replacementTitle, hostTierMeta, showHostBadge, hostVerifiedFor, matchFor, isFresh, moveInLabel, isDateVal, todayIso, moveInByForm, moveInByWire, readAgreementDoc, hasAgreementEvidence, toSavedCard, numeric, terms, FLATMATE_IMG, FLATMATE_GROUP_IMG, withCoords };
+export { inr, avatarGrad, initials, genderLabel, genderPref, foodLabel, perHead, shareFloor, moneyRange, seekerBudget, bhkText, mustHaves, groupLocalities, groupListingsUrl, maxOpenSeats, MAX_GROUP_SEATS, seatCeiling, seatsLeft, allVerified, policyAvatar, replacementTitle, hostTierMeta, showHostBadge, hostVerifiedFor, matchFor, isFresh, moveInLabel, isDateVal, todayIso, moveInByForm, moveInByWire, readAgreementDoc, hasAgreementEvidence, toSavedCard, numeric, terms, FLATMATE_IMG, FLATMATE_GROUP_IMG, withCoords };

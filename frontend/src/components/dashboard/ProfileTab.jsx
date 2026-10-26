@@ -16,10 +16,12 @@ import {
 import {
   getNotificationPreferences,
   registerPushSubscription,
-  unregisterPushSubscription,
   updateNotificationPreferences,
   NOTIFICATION_PREFERENCE_DEFAULTS,
 } from '../../services/notificationService.js';
+import {
+  alertPermission, alertsSupported, browserAlertsOn, currentPushSubscription, disableBrowserAlerts, enableBrowserAlerts,
+} from '../../lib/browserAlerts.js';
 import { exportMyData, requestErasure, myErasureRequests } from '../../services/authService.js';
 import { myTenantProfile } from '../../services/rentService.js';
 
@@ -87,13 +89,6 @@ const PendingChip = ({ label, title, onClick }) => {
 };
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const VAPID_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-
-function vapidBytes(key) {
-  const padded = `${key}${'='.repeat((4 - (key.length % 4)) % 4)}`;
-  const raw = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from([...raw].map((ch) => ch.charCodeAt(0)));
-}
 
 export default function ProfileTab({ user, update, toast, isOwner }) {
   const { logout } = useAuth();
@@ -112,8 +107,9 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
     shareActivityStatus: user?.shareActivityStatus !== false,
     shareReadReceipts: user?.shareReadReceipts !== false,
   };
-  const pushAvailable = Boolean(VAPID_KEY) && typeof window !== 'undefined' && 'PushManager' in window && 'Notification' in window && 'serviceWorker' in navigator;
-  const [pushEnabled, setPushEnabled] = useState(false);
+  const alertsAvailable = alertsSupported();
+  const [permission, setPermission] = useState(alertPermission);
+  const [alertsOn, setAlertsOn] = useState(browserAlertsOn);
   const [pushBusy, setPushBusy] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   const [delText, setDelText] = useState('');
@@ -124,7 +120,14 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   const [identityOpen, setIdentityOpen] = useState(false);
   const { verified: identityVerified } = useVerification();
   const nameLocked = Boolean(identityVerified);
-  const genderLocked = Boolean(user?.gender);
+  const genderLeft = user?.genderChangesLeft ?? 0;
+  const genderLocked = Boolean(user?.gender) && genderLeft === 0;
+  const genderPick = form.gender || user?.gender || '';
+  const genderDirty = !genderLocked && genderPick !== (user?.gender || '');
+  const genderHint = !user?.gender ? (genderLeft ? `You can change it ${genderLeft} times after saving.` : "You can't change it after saving.")
+    : !genderLocked ? `You can change it ${genderLeft} more ${genderLeft === 1 ? 'time' : 'times'}.`
+      : identityVerified ? 'Confirmed from your ID. Contact support to change it.'
+        : 'No changes left. Contact support to change it.';
   /* Preferences are account-level, so the panel shows what the platform will honour on whatever device is asking. */
 
   useEffect(() => {
@@ -136,17 +139,10 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
   }, []);
 
   useEffect(() => {
-    if (!pushAvailable) return undefined;
-    let alive = true;
-    navigator.serviceWorker.getRegistration('/sw.js')
-      .then((reg) => reg?.pushManager?.getSubscription())
-      .then((sub) => {
-        if (sub) registerPushSubscription(sub.toJSON()).catch(() => {});
-        if (alive) setPushEnabled(!!sub);
-      })
+    currentPushSubscription()
+      .then((sub) => { if (sub) registerPushSubscription(sub.toJSON()).catch(() => {}); })
       .catch(() => {});
-    return () => { alive = false; };
-  }, [pushAvailable]);
+  }, []);
 
   const fld = 'field w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-gray-500';
   /* The score is the server's — the person it describes cannot be the one who computes it. */
@@ -173,7 +169,8 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
     if (!nameLocked && !isValidName(name)) { toast("Name can only have letters, spaces and . ' - (2 to 80 characters)", 'error'); return; }
     if (email && !EMAIL_RE.test(email)) { toast('Enter a valid email address', 'error'); return; }
     try {
-      await update({ ...(nameLocked ? {} : { name }), email, city: form.city, ...(!genderLocked && form.gender ? { gender: form.gender } : {}) });
+      await update({ ...(nameLocked ? {} : { name }), email, city: form.city, ...(genderDirty ? { gender: genderPick, changeGender: Boolean(user?.gender) } : {}) });
+      setForm((f) => ({ ...f, gender: '' }));
       toast('Profile saved', 'success');
     } catch (err) {
       toast(err?.code === 'NAME_LOCKED_WHILE_VERIFIED' ? 'Name is locked while verified.' : err?.message || 'Could not save your profile. Please try again.', 'error');
@@ -185,7 +182,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
     (!nameLocked && form.name.trim() !== (user?.name || '').trim()) ||
     form.email.trim() !== (user?.email || '').trim() ||
     form.city !== (user?.city || 'Pune') ||
-    (!genderLocked && form.gender !== '');
+    genderDirty;
   /* Optimistic, then reconciled from the write's response; a failure rolls the control back rather than leaving a
      switch showing a state the server never accepted. */
 
@@ -216,38 +213,28 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
     }
   };
 
-  /* The right of access, answered by the system of record: the server's document is downloaded verbatim, exclusions
-     and all, so a subject is told what was left out. */
-  const changePush = async (enabled) => {
-    if (!pushAvailable || pushBusy) return;
+  const changeAlerts = async (enabled) => {
+    if (pushBusy) return;
     setPushBusy(true);
     try {
       if (enabled) {
-        const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
-        if (permission !== 'granted') throw new Error('Notifications are blocked for this browser.');
-        // Production's Workbox /sw.js imports push-sw.js; dev has no Workbox worker, so register the push one directly.
-        const reg = await navigator.serviceWorker.register(import.meta.env.DEV ? '/push-sw.js' : '/sw.js');
-        const sub = await reg.pushManager.getSubscription()
-          || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: vapidBytes(VAPID_KEY) });
-        await registerPushSubscription(sub.toJSON());
-        setPushEnabled(true);
-        toast('Message alerts enabled on this device', 'success');
+        await enableBrowserAlerts();
+        toast('Browser notifications enabled on this device', 'success');
       } else {
-        const reg = await navigator.serviceWorker.getRegistration('/sw.js');
-        const sub = await reg?.pushManager?.getSubscription();
-        const endpoint = sub?.endpoint;
-        if (sub) await sub.unsubscribe();
-        if (endpoint) await unregisterPushSubscription(endpoint);
-        setPushEnabled(false);
-        toast('Message alerts disabled on this device', 'success');
+        await disableBrowserAlerts();
+        toast('Browser notifications disabled on this device', 'success');
       }
     } catch (err) {
-      toast(err?.message || 'Could not update message alerts on this device.', 'error');
+      toast(err?.message || 'Could not update browser notifications on this device.', 'error');
     } finally {
+      setPermission(alertPermission());
+      setAlertsOn(browserAlertsOn());
       setPushBusy(false);
     }
   };
 
+  /* The right of access, answered by the system of record: the server's document is downloaded verbatim, exclusions
+     and all, so a subject is told what was left out. */
   const [exporting, setExporting] = useState(false);
   const downloadData = async () => {
     if (exporting) return;
@@ -326,27 +313,25 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           <label className="text-sm"><span className="mb-1.5 block text-gray-400">City</span><input value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={fld} /></label>
           <div className="text-sm">
             <span className="mb-1.5 block text-gray-400">Gender</span>
-            <NativeSelect value={genderLocked ? user.gender : form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })} disabled={genderLocked} aria-label="Gender">
-              <option value="">Not set</option>
+            <NativeSelect value={genderPick} onChange={(e) => setForm({ ...form, gender: e.target.value })} disabled={genderLocked} aria-label="Gender">
+              {user?.gender ? null : <option value="">Not set</option>}
               <option value="female">Female</option>
               <option value="male">Male</option>
             </NativeSelect>
-            <p className="mt-1 text-[11px] text-gray-500">{genderLocked ? 'Set once. Contact support to change it.' : "Set once. You can't change it later."}</p>
+            <p className="mt-1 text-[11px] text-gray-500">{genderHint}</p>
           </div>
         </div>
         <button onClick={save} disabled={!dirty} className="dz-control dz-control--action mt-5 px-5 gap-2 disabled:opacity-40 disabled:cursor-not-allowed"><Icon name="save" className="w-4 h-4" /> Save changes</button>
 
-        <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.03] p-4 sm:flex sm:items-center sm:justify-between sm:gap-4" data-testid="badge-card">
           <div className="flex items-start gap-3 min-w-0">
             <Icon name="shield-check" className={(identityVerified ? 'text-emerald-400' : 'text-amber-400') + ' w-5 h-5 flex-shrink-0 mt-0.5'} />
-            <div className="min-w-0">
-              <p className="text-sm text-white font-medium">Verified badge</p>
-              <p className="text-xs text-gray-500 mt-0.5">{identityVerified ? 'Your identity has been reviewed and verified. The badge builds trust and lifts your ranking.' : 'Optional: verify your identity with a document and selfie review to earn the Verified badge. You can do this anytime.'}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-white font-medium">ID verified badge{identityVerified && <span className="ml-2 text-xs font-semibold text-emerald-300">· Active</span>}</p>
+              <p className="text-xs text-gray-500 mt-1">{identityVerified ? 'Builds trust and lifts your ranking.' : "Show owners and flatmates you're genuine."}</p>
             </div>
           </div>
-          {identityVerified
-            ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-300 flex-shrink-0"><Icon name="badge-check" className="w-4 h-4" /> Verified</span>
-            : <button onClick={() => setIdentityOpen(true)} className="dz-control dz-control--action gap-2 flex-shrink-0"><Icon name="shield-check" className="w-4 h-4" /> Verify identity</button>}
+          {identityVerified ? null : <button onClick={() => setIdentityOpen(true)} className="dz-control dz-control--action justify-center gap-2 mt-3 w-full min-h-[44px] sm:mt-0 sm:w-auto flex-shrink-0"><Icon name="shield-check" className="w-4 h-4" /> Verify identity</button>}
         </div>
       </Card>
 
@@ -379,9 +364,19 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           ))}
         </div>
         <div className="mt-3 border-t border-white/5 pt-3 space-y-3">
-          {pushAvailable ? (
-            <PrefRow title="Message alerts on this device" desc="Shows a generic Draazy alert without names or message text.">
-              <Switch checked={pushEnabled} disabled={pushBusy} onChange={changePush} label="Message alerts on this device" />
+          {alertsAvailable ? (
+            <PrefRow
+              title="Browser notifications"
+              desc={permission === 'denied'
+                ? 'Blocked in this browser. Allow notifications for this site from the icon beside the address bar.'
+                : 'Draazy alerts you through your browser. No names or message text are shown.'}
+            >
+              <Switch
+                checked={alertsOn}
+                disabled={pushBusy || permission === 'denied'}
+                onChange={changeAlerts}
+                label="Browser notifications"
+              />
             </PrefRow>
           ) : null}
           <PrefRow title="Quiet hours" desc="Pause non-urgent match & price alerts overnight.">

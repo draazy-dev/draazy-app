@@ -225,7 +225,7 @@ export function parseSmartQuery(raw, { current, localities, locNameBySlug }) {
   if (isRent && pets) parts.push('Pet-friendly');
   if (!isRent && readyM) parts.push('Ready to Move');
   else if (!isRent && ucM) parts.push('Under Construction');
-  if (verifiedOwner) parts.push('Verified owner');
+  if (verifiedOwner) parts.push('ID verified');
 
   const q = rest.split(/\s+/).filter((w) => w && !FILLER.has(w)).join(' ');
   return { next, deal, parts, q };

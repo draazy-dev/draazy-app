@@ -5,8 +5,9 @@ import Select from '../../../components/ui/Select.jsx';
 import { isPubliclyVisible } from '../../../lib/data/flatmates.js';
 import { seekerBudget, detailPath, seekerTitle, roomTitle, inr, perHead, groupLocalities } from './helpers.js';
 import MyPostsStrip from '../../../components/MyPostsStrip.jsx';
-import { TAB_MOVE_IN, hasAddress, bestPerPersonRent } from './model.js';
-import { buildFlatmateAlertRecord, flatmateCriteriaChips } from './alertCriteria.js';
+import { TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS, TAB_ICON, hasAddress, bestPerPersonRent } from './model.js';
+import ActiveFilterChips from '../../../components/ui/ActiveFilterChips.jsx';
+import flatmateActiveChips from './activeChips.js';
 import SeekerCard from './SeekerCard.jsx';
 import RoomCard from './RoomCard.jsx';
 import GroupCard from './GroupCard.jsx';
@@ -14,7 +15,7 @@ import Empty from './Empty.jsx';
 import FlatmateAlertCard from './FlatmateAlertCard.jsx';
 import { flatmateSortOptions } from './FilterBar.jsx';
 
-export default function Results({ tab, myPost, myRooms = [], myGroups = [], activeList = [], total = 0, verifiedTotal = 0, page = 0, pageCount = 0, onGoToPage, loaded = true, searching = false, otherCount = 0, onSwitchTab, saved, onSave, ownsGroup, ownsRoom, filtersActive, onClearFilters, onPost, filters, toast, activeFilterCount = 0, raiseHint, onRaiseBudget, feedFailed = false, feedError, onRetryFeeds, sortMode, onSort }) {
+export default function Results({ tab, myPost, myRooms = [], myGroups = [], activeList = [], total = 0, verifiedTotal = 0, page = 0, pageCount = 0, onGoToPage, loaded = true, searching = false, otherCount = 0, otherTab, onSwitchTab, saved, onSave, ownsGroup, ownsRoom, filtersActive, onClearFilters, onPost, filters, toast, activeFilterCount = 0, raiseHint, onRaiseBudget, feedFailed = false, feedError, onRetryFeeds, sortMode, onSort, setF, budgetLbl }) {
   const { t } = useTranslation();
   const isMoveIn = tab === TAB_MOVE_IN;
   const showLoadError = feedFailed && activeList.length === 0;
@@ -23,8 +24,7 @@ export default function Results({ tab, myPost, myRooms = [], myGroups = [], acti
   // claim that there are none, and neither state knows that.
   const showAlert = loaded && !showLoadError && (total === 0 || activeFilterCount >= 2);
 
-  /* Both counts come from the SERVER and describe the whole result set. */
-  const emptyChips = filtersActive ? flatmateCriteriaChips(buildFlatmateAlertRecord(filters, tab)).slice(1) : [];
+  const chips = flatmateActiveChips(filters, tab, t, budgetLbl, setF);
 
   const renderCard = (item, i) => {
     if (item.kind === 'room') {
@@ -39,9 +39,9 @@ export default function Results({ tab, myPost, myRooms = [], myGroups = [], acti
 
   const status = (item) => t(isPubliclyVisible(item) ? 'common.myPostsLive' : item.modStatus === 'pending' ? 'common.myPostsInReview' : item.modStatus === 'expired' ? 'common.myPostsExpired' : 'flatmates.detailNotPublic');
   const mine = [
-    ...(!isMoveIn && myPost ? [{ id: 's:' + myPost.id, to: detailPath('post', myPost.id), pending: !isPubliclyVisible(myPost), label: isPubliclyVisible(myPost) ? t('flatmates.yourLiveRequest') : myPost.modStatus === 'expired' ? t('flatmates.yourRequestExpired') : t('flatmates.yourRequestInReview'), title: seekerTitle(myPost), sub: [seekerBudget(myPost) + t('flatmates.perMonth'), (myPost.localities || []).join(', ')].join(' · ') }] : []),
+    ...(tab === TAB_PEOPLE && myPost ? [{ id: 's:' + myPost.id, to: detailPath('post', myPost.id), pending: !isPubliclyVisible(myPost), label: isPubliclyVisible(myPost) ? t('flatmates.yourLiveRequest') : myPost.modStatus === 'expired' ? t('flatmates.yourRequestExpired') : t('flatmates.yourRequestInReview'), title: seekerTitle(myPost), sub: [seekerBudget(myPost) + t('flatmates.perMonth'), (myPost.localities || []).join(', ')].join(' · ') }] : []),
     ...(isMoveIn ? myRooms.filter((r) => r.status !== 'archived').map((r) => ({ id: 'r:' + r.id, to: detailPath('room', r.id), pending: !isPubliclyVisible(r), label: t('flatmates.yourListing') + ' · ' + status(r), title: roomTitle(r), sub: [inr(bestPerPersonRent(r)) + t('flatmates.perMonth'), r.localities?.[0] || r.locality].filter(Boolean).join(' · ') })) : []),
-    ...myGroups.filter((g) => hasAddress(g) === isMoveIn).map((g) => ({ id: 'g:' + g.id, to: detailPath('group', g.id), pending: !isPubliclyVisible(g), label: t('flatmates.yourGroup') + ' · ' + status(g), title: g.title, sub: [inr(perHead(g)) + t('flatmates.perMonth'), groupLocalities(g).join(', ')].filter(Boolean).join(' · ') })),
+    ...myGroups.filter((g) => (hasAddress(g) ? isMoveIn : tab === TAB_TEAMS)).map((g) => ({ id: 'g:' + g.id, to: detailPath('group', g.id), pending: !isPubliclyVisible(g), label: t('flatmates.yourGroup') + ' · ' + status(g), title: g.title, sub: [inr(perHead(g)) + t('flatmates.perMonth'), groupLocalities(g).join(', ')].filter(Boolean).join(' · ') })),
   ];
 
   return (
@@ -55,14 +55,22 @@ export default function Results({ tab, myPost, myRooms = [], myGroups = [], acti
           {showLoadError ? t('flatmates.countUnavailable') : !loaded ? t('flatmates.countLoading') : (
             <>
               <span className="text-white font-semibold">{total}</span>{' '}
-              {isMoveIn ? t('flatmates.homesAvailable', { count: total }) : t('flatmates.peopleLooking', { count: total })}
-              {verifiedTotal > 0 && <> · <span className="text-emerald-300 font-semibold">{t('flatmates.nVerified', { count: verifiedTotal })}</span></>}
+              {t(`flatmates.count_${tab}`, { count: total })}
+              {verifiedTotal > 0 && <> · <span className="text-emerald-300 font-semibold">{t(tab === TAB_PEOPLE ? 'flatmates.nIdVerified' : 'flatmates.nVerified', { count: verifiedTotal })}</span></>}
             </>
           )}
         </p>
 
         {onSort && <div className="lg:hidden flex shrink-0"><Select value={sortMode} onChange={onSort} options={flatmateSortOptions(t)} className="dz-dd-sort" ariaLabel={t('flatmates.ariaSortPosts')} /></div>}
       </div>
+
+      <ActiveFilterChips
+        chips={chips}
+        onClearAll={onClearFilters}
+        heading={t('flatmates.activeFilters')}
+        removeLabel={(label) => t('flatmates.removeFilter', { label })}
+        clearAllLabel={t('flatmates.clearAllLower')}
+      />
 
       {showLoadError ? (
         <LoadError message={t('flatmates.loadError')} error={feedError} onRetry={onRetryFeeds} />
@@ -77,20 +85,18 @@ export default function Results({ tab, myPost, myRooms = [], myGroups = [], acti
         <div className="py-16 text-center text-sm text-gray-500">{t('flatmates.countLoading')}</div>
       ) : (
         <Empty
-          icon={isMoveIn ? 'door-open' : 'users-round'}
-          title={filtersActive ? (isMoveIn ? t('flatmates.noHomesMatch') : t('flatmates.noFlatmatesMatch')) : (isMoveIn ? t('flatmates.noHomesYet') : t('flatmates.noFlatmatesYet'))}
-          text={isMoveIn ? t('flatmates.emptyMoveInText') : t('flatmates.emptyTeamUpText')}
+          icon={TAB_ICON[tab]}
+          title={t(filtersActive ? `flatmates.noMatch_${tab}` : `flatmates.noneYet_${tab}`)}
+          text={t(`flatmates.emptyText_${tab}`)}
           primary={{ label: t('flatmates.postCta'), icon: 'plus', onClick: onPost }}
           rescue={otherCount > 0 ? {
             count: otherCount,
-            text: isMoveIn ? t('flatmates.rescueToTeamUp', { count: otherCount }) : t('flatmates.rescueToMoveIn', { count: otherCount }),
-            label: isMoveIn ? t('flatmates.tabTeamUp') : t('flatmates.tabMoveIn'),
+            text: t(`flatmates.rescueTo_${otherTab}`, { count: otherCount }),
+            label: t(`flatmates.tab_${otherTab}`),
             onClick: onSwitchTab,
           } : null}
           filtersActive={filtersActive}
           onClearFilters={onClearFilters}
-          chips={emptyChips}
-          query={filters.q}
           hint={raiseHint}
           onRaiseBudget={onRaiseBudget}
         />
