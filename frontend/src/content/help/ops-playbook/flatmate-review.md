@@ -18,8 +18,8 @@ modules: [flatmates]
 
 **Monitor**
 
-- **Pending** tab count, newest first.
-- Card chips: **Awaiting publish**, **Edited since review**, **Live ? not yet reviewed**, **Badge claim**, **Owner consent missing**, **Contested address**.
+- **Pending** tab count, newest first; **Badge requests** tab count, oldest first.
+- Card chips: **Awaiting publish**, **Edited since review**, **Live ? not yet reviewed**, **Verified property · tenant evidence** / **owner listing** (Badge requests only), **Owner consent missing**, **Contested address**.
 - The "first 100 of each list" note ? decide some cards to see the rest.
 - **Published** tab ? new group applications go live on submission.
 
@@ -27,7 +27,7 @@ modules: [flatmates]
 
 - Clear **Pending**: **Publish**, **Hide for review** or **Remove**.
 - Read the changed fields on **Edited since review** cards, then **Looks fine** or choose another decision.
-- Decide badge claims: **Approve badge**, or **Reject badge** with a reason. Never approve a tenant badge without **Owner consent**.
+- Clear **Badge requests**: **Approve Verified property**, or **Reject Verified property** with a reason. Never approve a tenant badge without **Owner consent**.
 - Scan new group applications under **Published**: **Clear** or **Remove**.
 
 ## Desk and access
@@ -40,11 +40,12 @@ The desk is merged: publication moderation, badge verification, edit re-checks, 
 
 | Tab | Sources |
 | --- | --- |
-| **Pending** | Pending publication rows, edit re-check rows, pending badge claims, and group applications held for review |
+| **Pending** | Pending publication rows, edit re-check rows, and group applications held for review |
+| **Badge requests** | Open Verified property claims only, oldest first. A room awaiting publish that also claims the badge shows here and on Pending, one decision each |
 | **Published** | `approved` and legacy `live` moderation rows, plus live and cleared applications |
 | **Hidden & removed** | `flagged`, `removed`, and `rejected` moderation rows |
 
-Filter by **All / Room / Group / Seeker post**, search title, author, or locality. Every tab lists newest first, and each card shows when the item was created or last updated. Each source is capped at 100 rows; when capped, decide visible rows to reveal more.
+Filter by **All / Room / Group / Seeker post**, search title, author, or locality. Every tab lists newest first except **Badge requests**, which lists oldest first, and each card shows when the item was created or last updated. Each source is capped at 100 rows; when capped, decide visible rows to reveal more.
 
 ## Card signals
 
@@ -53,7 +54,7 @@ Filter by **All / Room / Group / Seeker post**, search title, author, or localit
 | **Awaiting publish** | The post is not public yet |
 | **Live · not yet reviewed** | A flatless post (seeker post, or a group still looking for a flat) self-published and still needs a scan |
 | **Edited since review** | A public item changed after review |
-| **Badge claim · tenant / owner / identity** | The host trust claim has a review row |
+| **Verified property · tenant evidence / owner listing** | The host is asking for the Verified property badge (Badge requests tab) |
 | **Owner consent missing** | Tenant-tier badge cannot be approved yet |
 | **Contested address** | Address guardrails flagged the claim |
 | **Group application** | This is application moderation, not owner acceptance |
@@ -77,12 +78,12 @@ Publication does not grant a trust badge. Use it only to decide whether the city
 
 ## Badge decisions
 
-Use **Badge verification** only for the host trust claim:
+Use **Verified property badge** only for the host trust claim:
 
 | Button | Effect |
 | --- | --- |
-| **Approve badge** | Sets the review `approved` and applies the host badge |
-| **Reject badge** | Sets the review `rejected`; a reason is required and shown to the host |
+| **Approve Verified property** | Sets the review `approved` and applies the host badge |
+| **Reject Verified property** | Sets the review `rejected`; a reason is required and shown to the host |
 
 For tenant-tier claims, approval is refused until owner consent is recorded. The row must show **Owner consent** before approval. Rejection withholds the badge only; it does not take the post down.
 
@@ -121,7 +122,7 @@ Never describe a moderation removal as the owner declining the applicant.
 
 - Never approve a tenant badge without owner consent
 - Never use **Publish** as a badge approval
-- Never use **Reject badge** to hide a public post
+- Never use **Reject Verified property** to hide a public post
 - Never decide an owner's group-application acceptance
 - Never ignore an edit re-check on a live post
 - Never treat `live` and `approved` as different public outcomes

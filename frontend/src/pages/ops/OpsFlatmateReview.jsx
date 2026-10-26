@@ -10,12 +10,14 @@ import FlatmateReviewModal from './flatmate/FlatmateReviewModal.jsx';
 
 const EMPTY = {
   pending: 'Nothing waiting — every flatmate post has been reviewed ✅',
+  badge: 'No badge requests waiting ✅',
   published: 'Nothing published yet.',
   hidden: 'Nothing hidden or removed.',
 };
 
 const NOTES = {
-  pending: 'Open only: posts awaiting publish, edits since review, badge claims and group applications. An item leaves once you decide it. Newest first.',
+  pending: 'Open only: posts awaiting publish, edits since review and group applications. An item leaves once you decide it. Newest first.',
+  badge: 'Open only: hosts asking for the Verified property badge. Check the evidence in the review; a request leaves once you approve or decline it. Oldest first.',
   published: 'Everything the city can see, plus cleared group applications. Open one to hide or remove it. Newest first.',
   hidden: 'Flagged, removed, rejected and expired posts. Open one to read why, or publish it again. Newest first.',
 };
@@ -75,7 +77,7 @@ export default function OpsFlatmateReview() {
         tabs={QUEUE_TABS.map((t) => ({
           key: t.id,
           label: t.label,
-          count: ready && loaded.counts ? String(loaded.counts[t.id])
+          count: ready && loaded.counts ? String(loaded.counts[t.countKey || t.id])
             : t.id === tab && ready ? `${loaded.items.length}${loaded.truncated ? '+' : ''}` : null,
         }))}
       />
@@ -103,7 +105,7 @@ export default function OpsFlatmateReview() {
 
         {queue.status === 'ready' && queue.items.length ? (
           <ul className="space-y-3 p-3">
-            {queue.items.map((e) => <FlatmateQueueCard key={e.key} entry={e} onReview={setOpen} />)}
+            {queue.items.map((e) => <FlatmateQueueCard key={e.key} entry={e} pending={tab === 'pending' || tab === 'badge'} onReview={setOpen} />)}
           </ul>
         ) : null}
       </QueuePanel>

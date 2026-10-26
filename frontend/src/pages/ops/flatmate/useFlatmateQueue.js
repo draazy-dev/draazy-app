@@ -6,6 +6,8 @@ import {
   listGroupApplications,
 } from '../../../services/flatmateService.js';
 
+import { claimLabel } from './board.jsx';
+
 const KINDS = ['post', 'room', 'group'];
 const PUBLISHED = ['approved', 'live'];
 const HIDDEN = ['flagged', 'removed', 'rejected', 'expired'];
@@ -14,6 +16,7 @@ const SOURCE_SIZE = 100;
 
 export const QUEUE_TABS = [
   { id: 'pending', label: 'Pending' },
+  { id: 'badge', label: 'Badge requests', countKey: 'badgeRequests' },
   { id: 'published', label: 'Published' },
   { id: 'hidden', label: 'Hidden & removed' },
 ];
@@ -23,9 +26,11 @@ function sourcesFor(tab) {
   if (tab === 'pending') {
     return [
       { type: 'moderation', load: () => listFlatmateModeration({ kind: KINDS, modStatus: ['pending', 'recheck'], size }) },
-      { type: 'badge', load: () => listFlatmateReviews({ status: 'pending', size }) },
       { type: 'application', load: () => listGroupApplications({ modStatus: 'pending', sort: 'createdAt,asc', size }) },
     ];
+  }
+  if (tab === 'badge') {
+    return [{ type: 'badge', load: () => listFlatmateReviews({ status: 'pending', size }) }];
   }
   const modStatus = tab === 'published' ? PUBLISHED : HIDDEN;
   return [
@@ -44,6 +49,8 @@ const fromPost = (row) => ({
   createdAt: row.createdAt,
   modStatus: row.modStatus,
   photoCount: row.photoCount,
+  coverPhoto: row.coverPhoto,
+  rent: row.rent,
   snippet: row.freeText,
 });
 
@@ -52,7 +59,7 @@ const recheckLabel = (reason) => ((reason || '').split(', ').includes('new post'
   ? 'Live · not yet reviewed' : 'Edited since review');
 
 const badgeReasons = (review) => [
-  `Badge claim · ${review.tier}`,
+  claimLabel(review.tier),
   ...(review.flagForReview ? ['Contested address'] : []),
   ...(review.tier === 'tenant' && !review.ownerConsent ? ['Owner consent missing'] : []),
 ];
@@ -78,30 +85,19 @@ const keyOf = (type, row) => {
   return row.id;
 };
 
-const earliest = (a, b) => (a == null ? b : b == null ? a : Math.min(a, b));
-const latest = (a, b) => (a == null ? b : b == null ? a : Math.max(a, b));
-
-/* A room can be awaiting publish and claiming a badge at once. It gets one card with both
-   reasons, not two cards that each hide half of what the reviewer must decide. */
-export function mergeQueue(results) {
+/* The badge queue is an SLA queue, so the oldest claim leads; every other tab leads with the newest. */
+export function buildQueue(results, tab) {
   const byKey = new Map();
   results.forEach(({ type, page }) => page.items.forEach((row) => {
     const key = keyOf(type, row);
-    const prev = byKey.get(key) || { key, reasons: [] };
     const patch = entryPatch(type, row);
-    byKey.set(key, {
-      ...prev,
-      ...patch,
-      reasons: [...new Set([...prev.reasons, ...patch.reasons])],
-      since: earliest(prev.since, patch.since),
-      latestAt: latest(prev.latestAt, patch.since),
-    });
+    byKey.set(key, { key, ...patch, latestAt: patch.since });
   }));
-  const items = [...byKey.values()].sort((a, b) => (b.since || 0) - (a.since || 0));
+  const direction = tab === 'badge' ? 1 : -1;
+  const items = [...byKey.values()].sort((a, b) => direction * ((a.since || 0) - (b.since || 0)));
   const truncated = results.some(({ page }) => page.total > page.items.length);
   return { items, truncated };
 }
-
 /* One failed source fails the whole tab: a queue missing a third of its rows would read as
    "nothing to do" when the truth is "the read did not work". */
 export default function useFlatmateQueue(tab) {
@@ -117,7 +113,7 @@ export default function useFlatmateQueue(tab) {
     const counts = getFlatmateModerationSummary().catch(() => null);
     Promise.all([Promise.all(sources.map((s) => s.load().then((page) => ({ type: s.type, page })))), counts])
       .then(([results, summary]) => {
-        if (alive) setState({ status: 'ready', ...mergeQueue(results), counts: summary, error: '' });
+        if (alive) setState({ status: 'ready', ...buildQueue(results, tab), counts: summary, error: '' });
       })
       .catch((e) => {
         if (alive) setState({ status: 'error', items: [], truncated: false, counts: null, error: e.message || 'Could not read this queue.' });

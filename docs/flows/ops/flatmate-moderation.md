@@ -30,15 +30,20 @@
 - **Route:** `/ops/flatmate-review`, inside the back-office guard. Nav entry "Flatmate"
   (`AdminLayout.jsx`).
 - **Source components:**
-  - `src/pages/ops/OpsFlatmateReview.jsx` - the page: three tabs (Pending / Published / Hidden &
-    removed) over one card list, and the popup.
-  - `src/pages/ops/flatmate/useFlatmateQueue.js` - fans out to every source a tab covers and merges
-    them into one list keyed by post id (a badge claim keys on its room/group id), so one flat is
-    one card with every reason it is waiting.
+  - `src/pages/ops/OpsFlatmateReview.jsx` - the page: four tabs (Pending / Badge requests / Published
+    / Hidden & removed) over one card list, and the popup.
+  - `src/pages/ops/flatmate/useFlatmateQueue.js` - fans out to every source a tab covers and builds
+    one list keyed by post id (a badge claim keys on its room/group id). **Pending** is moderation
+    rows plus group applications; **Badge requests** is only the open Verified property claims
+    (`GET /admin/flatmate-reviews?status=pending`), oldest first, since it is an SLA queue; the
+    other tabs are newest first. A room awaiting publish that also claims the badge shows once in
+    each tab, one decision per tab.
   - `src/pages/ops/flatmate/FlatmateQueueCard.jsx` - the card: type, headline, reason chips, Review.
   - `src/pages/ops/flatmate/FlatmateReviewModal.jsx` + `review-modal/` - the popup. `PostDetails`
-    (photos, free text, details, host), `BadgeSection` (verification axis), `DecisionSection`
-    (publication axis, including "Looks fine" for a re-check).
+    (photos, free text, details, host), `BadgeRequestBanner` ("Host is seeking the Verified property
+    badge", the claim basis and when it was requested; shown when the popup opens from a Badge
+    requests card), `BadgeSection` (verification axis), `DecisionSection` (publication axis,
+    including "Looks fine" for a re-check).
   - `src/pages/ops/flatmate/board.jsx` - `Tabs`, `QueueState`, `Block`, `fmtDate`.
   - `src/services/flatmateService.js` -> `providers/http/flatmateProvider.js` ->
     `flatmateModerationMapper.js`.
@@ -91,13 +96,42 @@ The desk writes `mod_status` and leaves `status` exactly where it found it.
 the flat is the claim the review exists to check, and a self-declared owner is checked by the
 ownership flow instead.
 
+**Verified property** is the flat's badge, and posting never needs it (badge, never a gate). It is earned
+two ways:
+
+- **Tenant-hosted room, or tenant-hosted group that holds its flat** (not hunting, not a split room):
+  the host has submitted their ID (verified or still in review; otherwise 409 `identity_required`
+  when requesting or attaching an agreement to a group), and approval needs it verified (422, and the
+  auto-approval sweep skips them). The host files a **rent agreement with its `validFrom`/`validTill`
+  period** or an **electricity bill naming the flat
+  owner** from their personal vault (categories `Rent agreement` / `Electricity Bill`) via
+  `POST /flatmates/rooms/{id}/badge-request` or `/flatmates/groups/{id}/badge-request`, and the flat
+  owner consents (OTP or WhatsApp notice). The stated period is shown to staff and prefills their
+  end-date check; the badge expiry still comes from the staff-entered date. The consumer picks the
+  post in Dashboard → Documents → Property docs, alongside their listings.
+- **Owner-hosted room or group:** owner tier only when it links to the caller's own property that is
+  approved, not archived and currently carries the owner's **ID verified** badge. An approved but un-badged
+  listing gets the identity tier. A split room inherits its parent's badge; the `OwnershipVerified`
+  event (published when ownership is granted) promotes identity-tier split rooms and groups, and the
+  reconciler demotes them again when the badge is revoked or lapses.
+
+Staff open the filed document with `GET /admin/flatmate-reviews/{id}/document-url` (signed link;
+pending, or 30 days after the decision, else 403 `document_access_expired`; audited
+`flatmate.review.document.open`; a party to the post is refused).
+
+Approving a tenant claim needs the reviewer's `checks`: `nameMatches` and `addressMatches` true, plus
+`validTill` (agreement, after today) or `issuedOn` (bill, not future, at most 90 days old). Otherwise
+422 naming what is missing. The badge runs to `min(validTill, today + 11 months)` for an agreement and
+`today + 11 months` for a bill; the expiry sweep lapses it. The checks are stored on the review and
+cleared when the host files again or edits the post.
+
 Tabs: Pending, **Contested address** (`status=pending&flagged=true`), **Ops-verified**, Rejected,
 All. "Contested address" rather than "Flagged", because that is what the flag means - two hosts
 claiming the same flat - and a desk reading a generic word invents its own meaning for it.
 
 ### 5.3 A rejection must carry a reason
 The desk refuses a blank one ("Add a clear reason before rejecting") and
-`FlatmateModerationService.decideReview` refuses it again: *"A rejection needs a reason - the host is
+`FlatmateBadgeReviewService.decideReview` refuses it again: *"A rejection needs a reason - the host is
 always told why."* Two guards for one rule, because the client one is a courtesy and the server one
 is the rule. A host told "no" without being told why cannot fix anything, and will simply post again.
 
@@ -169,7 +203,7 @@ verification:  pending --approve--> approved (badge granted)
                pending --reject(reason)--> rejected
 
 verification:  approved/rejected --other verdict--> 409 (terminal)
-
+               approved --revoke(reason)--> rejected  (badge removed, host told; 409 not_approved otherwise)
 moderation:    pending --Publish--> approved (public)
                pending --Flag(note)--> flagged
                pending --Remove(note)--> removed
@@ -191,6 +225,10 @@ application:   mod_status live --Clear/Flag(note)/Remove(note)--> approved/flagg
   backlog is clear".
 - **A decided row leaves its tab.** Every assertion about the *result* of a decision has to follow
   the row to where it went - that is queue behaviour, not a bug.
+- **Tab counts.** `GET /admin/flatmates/moderation/summary` returns `pending` (awaiting posts,
+  re-checks and group applications - badge claims are not in it), `badgeRequests` (every open claim
+  on a post that is still on the board, the same rows the Badge requests tab lists), `published`
+  and `hidden`. The tab id `badge` reads `badgeRequests`.
 - **`Badge` is a translation layer.** `pending` renders as **Under Review**. Consult
   `components/ui/Badge.jsx` before asserting a status word anywhere near this desk.
 - **Size:** each tab reads up to 100 rows per source (the API's page ceiling). Past that the count
@@ -226,8 +264,9 @@ This is an **intentional extension**, not drift.
 ---
 
 ## 11. Test coverage
-- `e2e/tests/ops/flatmate-moderation.spec.js` - 9 tests: the three-tab layout, every decision taken
-  through the popup, plus the retired `/admin/flatmates` route, live.
+- `e2e/tests/ops/flatmate-moderation.spec.js` - 10 tests: the four-tab layout, a tenant claim living
+  on Badge requests (with its banner) and not on Pending, every decision taken through the popup,
+  plus the retired `/admin/flatmates` route, live.
 - `e2e/tests/ops/flatmate-review.spec.js` - 1 test: the offline panel, which is the only claim that
   has to be checked with the API unreachable. The three consumer-facing verification cues moved to
   `e2e/tests/consumer/flatmates/review-status.spec.js`, where each label is earned through a
