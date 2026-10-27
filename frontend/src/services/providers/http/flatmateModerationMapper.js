@@ -36,6 +36,9 @@ export function toReviewViewModel(row) {
     // True when a different host already claimed this address. Not a verdict, a reason to look.
     flagForReview: !!row?.flagForReview,
     ownerConsent: !!row?.ownerConsent,
+    ownerConsentMobile: text(row?.ownerConsentMobile),
+    ownerConsentAccount: text(row?.ownerConsentAccount),
+    ownerConsentAccountVerified: !!row?.ownerConsentAccountVerified,
     agreementDoc: doc,
     agreementViewable: !!doc?.dataUrl,
     agreementTooLarge: !!doc?.tooLarge,

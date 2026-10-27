@@ -59,7 +59,7 @@ class FlatmateModerationDetails {
                 .ownerViews(List.of(room), nameOf(host), mobileOf(host)).get(room.getId());
         return new FlatmateModerationDetailDto(
                 FlatmateModerationQueueDto.of(room, host), mapper.toDto(room, view), null,
-                null, reviewOf(review, host), styleOf(room.getHostId()));
+                null, reviewOf(review, host, room.getOwnerConsentMobile()), styleOf(room.getHostId()));
     }
 
     private FlatmateModerationDetailDto ofGroup(FlatmateGroup group) {
@@ -69,7 +69,7 @@ class FlatmateModerationDetails {
                 mobileOf(host), review == null ? null : review.getStatus());
         return new FlatmateModerationDetailDto(
                 FlatmateModerationQueueDto.of(group, host), null, mapper.toDto(group, view),
-                null, reviewOf(review, host), styleOf(group.getHostId()));
+                null, reviewOf(review, host, group.getOwnerConsentMobile()), styleOf(group.getHostId()));
     }
 
     /** Staff see every answer: the stranger rule protects members from each other, not from review. */
@@ -77,9 +77,10 @@ class FlatmateModerationDetails {
         return authorId == null ? Map.of() : LivingStyleCatalogue.ordered(livingStyle.answersOf(authorId));
     }
 
-    private static FlatmateReviewDto reviewOf(FlatmateReview review, User host) {
+    private FlatmateReviewDto reviewOf(FlatmateReview review, User host, String ownerMobile) {
         return review == null ? null
-                : FlatmateReviewDto.of(review, host);
+                : FlatmateReviewDto.of(review, host, ownerMobile,
+                        ownerMobile == null ? null : users.findByMobileAndArchivedFalse(ownerMobile).orElse(null));
     }
 
     private User user(UUID id) {

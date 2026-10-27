@@ -149,6 +149,8 @@ jobs:
           CASHFREE_SECRET_KEY: ${{ secrets.SANDBOX_CASHFREE_SECRET_KEY }}
           ZEPTOMAIL_API_KEY: ${{ secrets.SANDBOX_ZEPTOMAIL_API_KEY }}
           WHATSAPP_ACCESS_TOKEN: ${{ secrets.SANDBOX_WHATSAPP_ACCESS_TOKEN }}
+          WHATSAPP_APP_SECRET: ${{ secrets.SANDBOX_WHATSAPP_APP_SECRET }}
+          WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${{ secrets.SANDBOX_WHATSAPP_WEBHOOK_VERIFY_TOKEN }}
           TURNSTILE_SECRET_KEY: ${{ secrets.SANDBOX_TURNSTILE_SECRET_KEY }}
           R2_ENDPOINT: ${{ vars.SANDBOX_R2_ENDPOINT }}
           R2_BUCKET_PRIVATE: ${{ vars.SANDBOX_R2_BUCKET_PRIVATE }}
@@ -169,7 +171,8 @@ jobs:
           for name in $required; do
             [ -n "${!name}" ] || { echo "::error::$name is empty." >&2; exit 1; }
           done
-          vars=$(printf '${%s} ' $required BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_MOBILE BOOTSTRAP_ADMIN_RECOVER)
+          vars=$(printf '${%s} ' $required BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_MOBILE BOOTSTRAP_ADMIN_RECOVER \
+            WHATSAPP_APP_SECRET WHATSAPP_WEBHOOK_VERIFY_TOKEN)
           envsubst "$vars" < backend/deploy/do-app-sandbox.yaml > "$RUNNER_TEMP/app.yaml"
 
       - uses: digitalocean/action-doctl@v2

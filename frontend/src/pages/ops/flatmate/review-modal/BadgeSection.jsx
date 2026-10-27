@@ -16,6 +16,8 @@ const BILL = 'electricity_bill';
 const BILL_MAX_AGE_DAYS = 90;
 const isoDay = (d) => d.toLocaleDateString('en-CA');
 const daysAgo = (n) => isoDay(new Date(Date.now() - n * 86_400_000));
+// The server resolves the account from the mobile, so an account always comes with one.
+const ownerLabel = (r) => (r.ownerConsentAccount ? `${r.ownerConsentAccount} (${r.ownerConsentMobile})` : r.ownerConsentMobile || 'the owner');
 
 function EvidenceChip({ review: r }) {
   const { toast } = useToast();
@@ -75,7 +77,7 @@ function TenantChecklist({ review: r, busy, onApprove }) {
     <div className="mt-3 space-y-2" data-testid="badge-checklist">
       <Tick testId="check-name" checked={nameMatches} onChange={setNameMatches}
         label={bill ? 'Bill is in the owner’s name' : `Agreement names ${r.host || 'the host'}`}
-        hint={bill ? 'The name on the bill matches the owner who gave consent.' : 'Same name as on their verified ID.'} />
+        hint={bill ? `The consent OTP went to ${ownerLabel(r)}; the bill must name the same person.` : 'Same name as on their verified ID.'} />
       <Tick testId="check-address" checked={addressMatches} onChange={setAddressMatches}
         label="Address matches this flat" hint={r.address || 'Compare with the address above.'} />
       <label className="block text-sm text-gray-300">
@@ -143,6 +145,15 @@ export default function BadgeSection({ review: r, busy, onDecide, onRevoke }) {
         <dd className="break-words text-gray-100">{r.address || '—'}</dd>
         <dt className="text-gray-400">Claimed by</dt>
         <dd className="text-gray-100">{r.host || '—'} <span className="text-gray-400">{r.hostMobile || ''}</span> · {fmtDate(r.createdAt)}</dd>
+        {r.ownerConsentMobile ? (
+          <>
+            <dt className="text-gray-400">Owner</dt>
+            <dd className="text-gray-100" data-testid="owner-consent-account">
+              {r.ownerConsentAccount || 'No Draazy account'} <span className="text-gray-400">{r.ownerConsentMobile}</span>
+              {r.ownerConsentAccountVerified ? ' · ID verified' : ''}
+            </dd>
+          </>
+        ) : null}
         {!pending && tenant ? (
           <>
             <dt className="text-gray-400">Checks</dt>

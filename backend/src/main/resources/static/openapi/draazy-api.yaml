@@ -3435,6 +3435,50 @@ paths:
             schema: { $ref: '#/components/schemas/PaymentWebhook' }
       responses:
         '200': { description: Acknowledged (always 200 on receipt) }
+  /webhooks/whatsapp:
+    get:
+      tags: [Engagement]
+      summary: WhatsApp webhook subscribe handshake (Meta → backend)
+      operationId: whatsappWebhookSubscribe
+      security: []
+      description: >
+        Meta's one-off verification when the callback URL is saved. Echoes `hub.challenge` as
+        text only when `hub.mode` is `subscribe` and `hub.verify_token` matches
+        `WHATSAPP_WEBHOOK_VERIFY_TOKEN`. Answers 404 while the webhook is unconfigured.
+      parameters:
+        - { name: hub.mode, in: query, required: true, schema: { type: string } }
+        - { name: hub.verify_token, in: query, required: true, schema: { type: string } }
+        - { name: hub.challenge, in: query, required: true, schema: { type: string, pattern: '^[A-Za-z0-9_-]{1,64}$' } }
+      responses:
+        '200':
+          description: The challenge, echoed
+          content:
+            text/plain:
+              schema: { type: string }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Engagement]
+      summary: WhatsApp webhook (Meta → backend)
+      operationId: whatsappWebhook
+      security: []
+      description: >
+        Server-to-server callback from the WhatsApp Cloud API, trusted only when
+        `X-Hub-Signature-256` is the HMAC-SHA256 of the raw body under the app secret. A reply
+        that is exactly STOP (or UNSUBSCRIBE, CANCEL…) opts that number out of every non-OTP
+        WhatsApp message; START opts it back in, ordered by Meta's message timestamp. A `failed`
+        delivery status is recorded in the provider ledger. A forged signature is only logged, and
+        answered 200 like an unreadable body; a failure to store an opt-out answers 500 so Meta retries.
+      parameters:
+        - { name: X-Hub-Signature-256, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: true }
+      responses:
+        '200': { description: Acknowledged }
+        '404': { $ref: '#/components/responses/NotFound' }
   /properties/{id}/verification:
     parameters: [ { $ref: '#/components/parameters/PropertyId' } ]
     get:
@@ -17828,6 +17872,16 @@ components:
             True only once the flat's owner confirmed by OTP. Never client-asserted: the supply
             service derives it from the consent table on every create and every edit. Approving a
             `tenant` review while this is false is refused with 422.
+        ownerConsentMobile:
+          type: [string, 'null']
+          example: '9876543210'
+          description: The number the owner consent OTP goes to. In full — back-office only.
+        ownerConsentAccount:
+          type: [string, 'null']
+          description: >
+            Name on the Draazy account registered to `ownerConsentMobile`; null when there is none. The OTP
+            proves only possession of the number, so this is what the reviewer compares with a light bill.
+        ownerConsentAccountVerified: { type: boolean, description: That account has completed ID verification. }
         agreementDoc: { $ref: '#/components/schemas/AgreementDoc' }
         evidenceType: { type: [string, 'null'], enum: [rent_agreement, electricity_bill, null], description: What the host filed. Null on reviews that predate light bills, which are read as `rent_agreement`. }
         evidenceIssuedOn: { type: [string, 'null'], format: date, description: The bill date the reviewer recorded. }

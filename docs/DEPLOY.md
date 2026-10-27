@@ -364,13 +364,35 @@ mobile; the owner taps a link to agree or decline (`/owner-confirm#<token>`).
 
 | Setting | Value |
 |---|---|
-| Meta category | `UTILITY`; **needs Meta approval before the name is set** |
+| Meta category | `UTILITY`; approved 2026-10-27 as `draazy_owner_room_notice` (en_US) |
 | Body parameters | `{{1}}` tenant first name, `{{2}}` place (society, locality), `{{3}}` confirm link |
 | Suggested name | `draazy_owner_room_notice` |
 | Suggested body text | `Hi, this is Draazy, Pune's broker-free property platform to rent, buy or sell homes and find flatmates. Your tenant {{1}} has posted a room in your flat at {{2}} to find a flatmate to share the rent. Your rental agreement with them does not change.` ⏎⏎ `Please tell us if you are okay with this: {{3}}` ⏎⏎ `If you were not expecting this message, you can ignore it.` |
 | Review samples | `Riya` / `Green Valley, Baner` / `https://draazy.com/owner-confirm#a1b2c3` |
-| Template name | `WHATSAPP_OWNER_NOTICE_TEMPLATE_NAME`; blank means no notice is sent |
+| Template name | `WHATSAPP_OWNER_NOTICE_TEMPLATE_NAME` (sandbox sets it in `do-app-sandbox.yaml`); blank means no notice is sent |
 | Language | `WHATSAPP_OWNER_NOTICE_TEMPLATE_LANG`, default `en_US` |
+| Platform budget | `draazy.flatmates.owner-notices-per-hour`, default `30` across every host; over it a room posts without a notice |
+| Sending number | `WHATSAPP_OWNER_NOTICE_PHONE_NUMBER_ID`, optional; blank sends from `WHATSAPP_PHONE_NUMBER_ID` |
+
+Owners whose account has WhatsApp turned off, and any number that replied STOP, get no notice.
+
+Owner notices go to numbers a tenant typed, so they draw more blocks and spam reports than any other
+template. A second number on the same WABA keeps those off the login number's quality rating. It does not
+add capacity: since October 2025 Meta's messaging limit is shared by every number in the business portfolio.
+
+**WhatsApp webhook (STOP replies and failed deliveries).** Optional, but set it before WhatsApp
+messages anyone beyond OTPs. A reply of exactly STOP (or UNSUBSCRIBE, CANCEL…) opts that number out of
+every non-OTP template; START opts it back in. A `failed` delivery lands in the provider call log as
+`whatsapp delivery`. Without the webhook, boot logs a warning and STOP is not honoured.
+
+| Setting | Value |
+|---|---|
+| Callback URL (Meta App ▸ WhatsApp ▸ Configuration) | `https://<host>/api/webhooks/whatsapp`, subscribed to the `messages` field |
+| `WHATSAPP_APP_SECRET` | Meta App ▸ Settings ▸ Basic ▸ App secret (`SANDBOX_WHATSAPP_APP_SECRET`); signs every callback |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | 16+ random characters you choose, typed into Meta too (`SANDBOX_WHATSAPP_WEBHOOK_VERIFY_TOKEN`) |
+
+Set both or neither: one without the other, or a token under 16 characters, fails the boot. Unset, the
+route answers 404. Meta delivers real callbacks only to a published app (Draazy's is, since 2026-10-27).
 
 **Web push (VAPID).** `WebPushSender` is wired when `PUSH_VAPID_PRIVATE_KEY` is set; without it
 `LoggingPushSender` only logs. Generate a pair once with `npx web-push generate-vapid-keys` (base64url).

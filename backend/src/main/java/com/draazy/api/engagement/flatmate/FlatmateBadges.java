@@ -37,6 +37,14 @@ class FlatmateBadges {
                 .map(FlatmateGroup::parties).orElseGet(() -> new UUID[] {review.getHostId()});
     }
 
+    String ownerMobileOf(FlatmateReview review) {
+        if (review.getRoomId() != null) {
+            return rooms.findById(review.getRoomId()).map(FlatmateRoom::getOwnerConsentMobile).orElse(null);
+        }
+        return Optional.ofNullable(review.getGroupId()).flatMap(groups::findById)
+                .map(FlatmateGroup::getOwnerConsentMobile).orElse(null);
+    }
+
     /** {@link #stillClaimed} stops a stale review deciding a post edited since. Only an approval
      * clears {@code flagForReview} — only that verdict read the rival address claim and dismissed it. */
     void apply(FlatmateReview review, boolean approved) {

@@ -18,7 +18,13 @@ public record WhatsAppProperties(
         String digestTemplateName,
         String digestTemplateLang,
         String ownerNoticeTemplateName,
-        String ownerNoticeTemplateLang) {
+        String ownerNoticeTemplateLang,
+        String ownerNoticePhoneNumberId) {
+
+    public String ownerNoticeSender() {
+        return ownerNoticePhoneNumberId == null || ownerNoticePhoneNumberId.isBlank()
+                ? phoneNumberId : ownerNoticePhoneNumberId;
+    }
 
     // Redact the bearer token; accidental logging would require rotation.
     @Override
@@ -36,6 +42,7 @@ public record WhatsAppProperties(
                 + ", digestTemplateName=" + digestTemplateName
                 + ", digestTemplateLang=" + digestTemplateLang
                 + ", ownerNoticeTemplateName=" + ownerNoticeTemplateName
-                + ", ownerNoticeTemplateLang=" + ownerNoticeTemplateLang + "]";
+                + ", ownerNoticeTemplateLang=" + ownerNoticeTemplateLang
+                + ", ownerNoticePhoneNumberId=" + ownerNoticePhoneNumberId + "]";
     }
 }

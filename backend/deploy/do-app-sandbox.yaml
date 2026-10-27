@@ -122,6 +122,14 @@ services:
         value: draazy_login_otp
       - key: WHATSAPP_IDENTITY_TEMPLATE_NAME
         value: draazy_identity_decision
+      - key: WHATSAPP_OWNER_NOTICE_TEMPLATE_NAME
+        value: draazy_owner_room_notice
+      - key: WHATSAPP_APP_SECRET
+        type: SECRET
+        value: "${WHATSAPP_APP_SECRET}"
+      - key: WHATSAPP_WEBHOOK_VERIFY_TOKEN
+        type: SECRET
+        value: "${WHATSAPP_WEBHOOK_VERIFY_TOKEN}"
       - key: TURNSTILE_ENABLED
         value: "true"
       - key: TURNSTILE_SECRET_KEY

@@ -4,6 +4,7 @@ import com.draazy.api.common.audit.AuditService;
 import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
+import com.draazy.api.common.persistence.RateLimitLock;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.identity.auth.Tokens;
@@ -33,6 +34,7 @@ public class FlatmateOwnerNoticeService {
     static final Duration CAP_WINDOW = Duration.ofHours(24);
     static final int MAX_PER_HOST = 5;
     static final int MAX_PER_OWNER = 3;
+    static final Duration PLATFORM_WINDOW = Duration.ofHours(1);
 
     static final String INVALID_LINK = "This link is no longer valid.";
     static final String DECLINED_REASON = "Owner said no on WhatsApp";
@@ -49,13 +51,16 @@ public class FlatmateOwnerNoticeService {
     private final AuditService audit;
     private final FlatmateOwnerHomeProvisioner homes;
     private final Notifier notifier;
+    private final RateLimitLock locks;
     private final String baseUrl;
+    private final int maxPerHour;
 
     public FlatmateOwnerNoticeService(FlatmateOwnerNoticeRepository notices,
             FlatmateOwnerConsentService consents, FlatmateRoomRepository rooms,
             FlatmateReviewRepository reviews, UserRepository users, DecisionMessenger messenger,
-            AuditService audit, FlatmateOwnerHomeProvisioner homes, Notifier notifier,
-            @Value("${draazy.app.base-url}") String baseUrl) {
+            AuditService audit, FlatmateOwnerHomeProvisioner homes, Notifier notifier, RateLimitLock locks,
+            @Value("${draazy.app.base-url}") String baseUrl,
+            @Value("${draazy.flatmates.owner-notices-per-hour:30}") int maxPerHour) {
         this.notices = notices;
         this.consents = consents;
         this.rooms = rooms;
@@ -65,7 +70,9 @@ public class FlatmateOwnerNoticeService {
         this.audit = audit;
         this.homes = homes;
         this.notifier = notifier;
+        this.locks = locks;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        this.maxPerHour = maxPerHour;
     }
 
     /** Old links answer 404 anyway; this only stops the table keeping an owner's number for ever. */
@@ -77,9 +84,12 @@ public class FlatmateOwnerNoticeService {
     /** Never fails the post: a capped or unsendable notice only means the owner is not messaged. */
     @Transactional
     public void noticeIfNeeded(FlatmateRoom room) {
-        if (!needsNotice(room)
-                || notices.existsByRoomIdAndOwnerMobileAndAddressFingerprint(
-                        room.getId(), room.getOwnerConsentMobile(), room.getAddressFingerprint())) {
+        if (!needsNotice(room)) {
+            return;
+        }
+        locks.holdUntilCommit(RateLimitLock.Limit.OWNER_NOTICE, "all");
+        if (notices.existsByRoomIdAndOwnerMobileAndAddressFingerprint(
+                room.getId(), room.getOwnerConsentMobile(), room.getAddressFingerprint())) {
             return;
         }
         Instant since = Instant.now().minus(CAP_WINDOW);
@@ -87,6 +97,17 @@ public class FlatmateOwnerNoticeService {
                 || notices.countByOwnerMobileAndCreatedAtAfter(room.getOwnerConsentMobile(), since)
                         >= MAX_PER_OWNER) {
             log.info("Owner notice for {} skipped: send cap reached", MobileMask.mask(room.getOwnerConsentMobile()));
+            return;
+        }
+        // Throwaway accounts each get MAX_PER_HOST, so only a platform budget bounds the paid sends.
+        if (notices.countByCreatedAtAfter(Instant.now().minus(PLATFORM_WINDOW)) >= maxPerHour) {
+            log.warn("Owner notice for {} skipped: the platform's {} an hour are spent",
+                    MobileMask.mask(room.getOwnerConsentMobile()), maxPerHour);
+            return;
+        }
+        if (ownerTurnedWhatsAppOff(room.getOwnerConsentMobile())) {
+            log.info("Owner notice for {} skipped: WhatsApp is off in their settings",
+                    MobileMask.mask(room.getOwnerConsentMobile()));
             return;
         }
         String token = Tokens.randomToken();
@@ -98,6 +119,10 @@ public class FlatmateOwnerNoticeService {
         String place = placeOf(room);
         String link = baseUrl + "/owner-confirm#" + token;
         afterCommit(() -> dispatch(mobile, tenant, place, link));
+    }
+
+    private boolean ownerTurnedWhatsAppOff(String mobile) {
+        return users.findByMobile(mobile).filter(owner -> !notifier.allowsWhatsapp(owner.getId())).isPresent();
     }
 
     private static boolean needsNotice(FlatmateRoom room) {

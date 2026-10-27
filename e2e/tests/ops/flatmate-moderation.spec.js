@@ -79,7 +79,7 @@ async function seedTenantRoom(host, society, agreementDoc = undefined, extra = {
     ...extra,
     ownerConsentMobile,
   });
-  return { room, accessToken, photos };
+  return { room, accessToken, photos, ownerConsentMobile };
 }
 
 async function seedSeekerPost(host, freeText) {
@@ -305,7 +305,8 @@ test.describe('Ops → flatmate desk (live)', () => {
     const host = { mobile: uniqueMobile(), name: 'Bill Host' };
     await grantIdentityBadge(host.mobile);
     const society = `Bill Court ${stamp()}`;
-    const { room, accessToken } = await seedTenantRoom(host, society, undefined, { agreementDeclared: false, agreementDoc: null });
+    const { room, accessToken, ownerConsentMobile } = await seedTenantRoom(host, society, undefined, { agreementDeclared: false, agreementDoc: null });
+    await apiLogin(ownerConsentMobile, { name: 'Sunita Owner' });
     const form = new FormData();
     form.set('category', 'Electricity Bill');
     form.set('file', new Blob([Buffer.from(AGREEMENT_PDF.split(',')[1], 'base64')], { type: 'application/pdf' }), 'bill.pdf');
@@ -322,6 +323,8 @@ test.describe('Ops → flatmate desk (live)', () => {
     expect((await opened).status(), 'staff read the vault file through the signed, audited link').toBe(200);
     await (await popup).close();
     await expect(badge).toContainText('Bill is in the owner’s name');
+    await expect(badge.getByTestId('owner-consent-account'), 'the desk sees who holds the consent number').toContainText(`Sunita Owner ${ownerConsentMobile}`);
+    await expect(badge).toContainText(`The consent OTP went to Sunita Owner (${ownerConsentMobile})`);
 
     await badge.getByTestId('check-name').check();
     await badge.getByTestId('check-address').check();

@@ -77,7 +77,9 @@ class AuthorizationCoverageTest extends AbstractApiTest {
             "POST /client-errors",
             "POST /help/feedback",
             // Signature-verified in the handler, and always 200 so Cashfree does not retry a refusal.
-            "POST /webhooks/cashfree/payment");
+            "POST /webhooks/cashfree/payment",
+            // Meta's handshake checks the verify token and each callback its signature; both 404 until configured.
+            "GET /webhooks/whatsapp", "POST /webhooks/whatsapp");
 
     @Autowired
     @Qualifier("requestMappingHandlerMapping")

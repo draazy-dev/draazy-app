@@ -160,7 +160,8 @@ public class SecurityConfig {
                                 Routes.Documents.SHARED_URL).permitAll()
 
                         .requestMatchers(HttpMethod.POST,
-                                Routes.Webhooks.CASHFREE_PAYMENT).permitAll()
+                                Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP).permitAll()
+                        .requestMatchers(HttpMethod.GET, Routes.Webhooks.WHATSAPP).permitAll()
 
                         .requestMatchers("/", "/favicon.ico",
  "/docs", "/docs/**", "/swagger-ui/**", "/webjars/**",
