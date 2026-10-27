@@ -108,12 +108,6 @@ async function tapChip(page, chip) {
   await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   await chip.click();
 }
-async function openTeamUp(page) {
-  await page.goto(`${BASE}/flatmates`);
-  const tab = page.locator('button[data-tab="teams"]');
-  await expect(tab).toBeVisible({ timeout: 20_000 });
-  await tab.click();
-}
 
 async function openRooms(page) {
   await page.goto(`${BASE}/flatmates?view=rooms`);
@@ -162,7 +156,7 @@ test('a tenant group waits on Ops without the badge it asked for, then an approv
   });
 });
 
-test('a rejected group stays on the board, says it is not a verified property yet, and gives the host the reason', async ({ page }) => {
+test('a rejected group says it is not a verified property yet, and gives the host the reason', async ({ page }) => {
   const mobile = uniqueMobile();
   const { accessToken } = await apiLogin(mobile, { name: 'Review Host' });
   const group = await createGroup(accessToken, {
@@ -182,28 +176,28 @@ test('a rejected group stays on the board, says it is not a verified property ye
   await expect(tip).toContainText('Registration number does not match the document');
   await expect(tip).toContainText('Edit your post to fix it');
 });
-test('"Verified only" keeps the approved tenant group and drops the one still waiting', async ({ page }) => {
+test('"Verified only" keeps the approved tenant room and drops the one still waiting', async ({ page }) => {
   const viewer = uniqueMobile();
   const approvedHost = uniqueMobile();
   const { accessToken: approvedToken } = await apiLogin(approvedHost, { name: 'Review Host' });
   await grantIdentityBadge(approvedHost);
   const { accessToken: pendingToken } = await apiLogin(uniqueMobile(), { name: 'Review Host' });
 
-  const approvedTitle = `Live filter approved ${stamp()} in Baner`;
-  const consentMobile = await consentTo(approvedToken, { title: approvedTitle, locality: 'Baner' });
-  const approved = await createGroup(approvedToken, {
-    title: approvedTitle, role: 'tenant', agreement: true, consentMobile, ...REGISTERED,
+  const society = `Live filter approved ${stamp()}`;
+  const ownerConsentMobile = await consentTo(approvedToken, { society, locality: 'Baner' });
+  const approved = await createRoom(approvedToken, {
+    society, hostRole: 'tenant', agreementDeclared: true, ownerConsentMobile, ownerConsent: true, ...REGISTERED,
   });
   // The one still waiting needs no consent: it is never approved, so the gate never applies.
-  const pending = await createGroup(pendingToken, {
-    title: `Live filter pending ${stamp()} in Baner`, role: 'tenant', agreement: true, ...REGISTERED,
+  const pending = await createRoom(pendingToken, {
+    society: `Live filter pending ${stamp()}`, hostRole: 'tenant', agreementDeclared: true, ...REGISTERED,
   });
   await decide(approved.id, 'approved');
 
   await signedInAs(page, viewer);
-  await openTeamUp(page);
-  const approvedCard = page.locator(`[data-sf-id="g:${approved.id}"]`);
-  const pendingCard = page.locator(`[data-sf-id="g:${pending.id}"]`);
+  await openRooms(page);
+  const approvedCard = page.locator(`[data-sf-id="r:${approved.id}"]`);
+  const pendingCard = page.locator(`[data-sf-id="r:${pending.id}"]`);
   // Both present first: an all-absent assertion would also pass if the board were empty.
   await expect(approvedCard).toBeVisible({ timeout: 15_000 });
   await expect(pendingCard).toBeVisible();

@@ -31,7 +31,6 @@ export function GroupBadges({ g, reviewStatus, myPost, owned }) {
       {left <= 0
         ? <span className="dz-tag chip text-amber-300">{tr('flatmates.full')}</span>
         : <span className="dz-tag badge-seeker font-bold text-white">{tr('flatmates.seatsLeft', { count: left })}</span>}
-      {g.hunting && <span className="dz-tag chip font-bold text-sky-300"><Icon name="search" className="w-2.5 h-2.5" /> {tr('flatmates.lookingForFlat')}</span>}
       <ReviewChip status={reviewStatus} kind="group" id={g.id} owned={owned} />
       <MatchPill match={groupMatch(g, myPost)} />
       <Fresh item={g} />
@@ -85,7 +84,6 @@ function GroupCard({ g, i, saved, onSave, anchorId, myPost }) {
       <div className="mt-3"><SeatMeter g={g} /></div>
       <Facts items={[
         policyFact(g.policy, tr),
-        ['search', p && tr('flatmates.lookingForFlat')],
         ['bed', p && bhkText(p.bhk)],
         ['calendar-check', p?.moveInBy && moveInLabel(p.moveInBy)],
       ]} />

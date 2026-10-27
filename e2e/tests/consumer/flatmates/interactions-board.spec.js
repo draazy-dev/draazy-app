@@ -84,9 +84,7 @@ async function seedGroup(hostToken, over = {}) {
     headers: auth(hostToken),
     body: JSON.stringify({
       title: `Group ${Number(uniqueMobile()).toString(36)}`,
-      locality: 'Baner',
-      rent: 30000,
-      deposit: 50000,
+      preferences: { localities: ['Baner'], rentMax: 30000, depositMax: 50000, gatedOnly: false, bachelors: false },
       seats: 3,
       seatsOpen: 2,
       policy: 'any',
@@ -178,7 +176,7 @@ test.describe('Flatmates board', () => {
     const group = await seedGroup(host.accessToken, { title: TITLE });
     const seeker = await newSeeker();
     await signedInAs(page, seeker.mobile);
-    await page.goto(`${BASE}/flatmates?view=groups`);
+    await page.goto(`${BASE}/flatmates?view=teams`);
     // Scope to the seeded card because the shared feed makes the first report button nondeterministic.
     const card = page.locator('.sf-card').filter({ hasText: TITLE }).first();
     await card.waitFor({ state: 'visible', timeout: 15000 });

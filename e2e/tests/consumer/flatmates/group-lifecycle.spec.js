@@ -57,8 +57,8 @@ async function otherHostsGroup(title) {
     method: 'POST',
     headers: auth(accessToken),
     body: JSON.stringify({
-      title, locality: 'Baner', rent: 40000, deposit: 50000,
-      seats: 3, seatsOpen: 1, policy: 'any', role: 'tenant',
+      title, seats: 3, seatsOpen: 1, policy: 'any',
+      preferences: { localities: ['Baner'], rentMax: 40000, depositMax: 50000, gatedOnly: false, bachelors: false },
     }),
   });
   expect(res.status).toBe(201);
@@ -67,7 +67,7 @@ async function otherHostsGroup(title) {
   await approve(group.id);
   return group;
 }
-/* A group has no address, so it sorts into the Teams tab — but creation returns the host to the default
+/* A team still hunting sorts into the Teams tab — but creation returns the host to the default
    Rooms tab, where the card genuinely is not. */
 
 async function switchToTeamUp(page) {

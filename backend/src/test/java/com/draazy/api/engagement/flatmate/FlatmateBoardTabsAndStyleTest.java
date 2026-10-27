@@ -32,12 +32,13 @@ class FlatmateBoardTabsAndStyleTest extends FlatmateStyleFixtures {
     }
 
     @Test
-    @DisplayName("people lists seeker posts only, teams hunting groups only, and tabElements counts all three")
+    @DisplayName("move-in lists rooms only, people seeker posts only, teams hunting groups only; a settled group is on no tab")
     void tabsSplitTheTeamUpSupply() throws Exception {
         String room = room(person("9840000001"));
         String postA = seekerPost(person("9840000002"));
         String postB = seekerPost(person("9840000003"));
         String team = group(person("9840000004"));
+        String settled = settledGroup(person("9840000005"));
 
         String people = body(feed("people"));
         assertThat(ids(people)).containsExactlyInAnyOrder(postA, postB);
@@ -50,9 +51,18 @@ class FlatmateBoardTabsAndStyleTest extends FlatmateStyleFixtures {
 
         Map<String, Integer> expected = Map.of("move-in", 1, "people", 2, "teams", 1);
         for (String tab : List.of("move-in", "people", "teams", "team-up")) {
+            assertThat(ids(body(feed(tab)))).as(tab).doesNotContain(settled);
             Map<String, Integer> counts = JsonPath.read(body(feed(tab)), "$.tabElements");
             assertThat(counts).as(tab).isEqualTo(expected);
         }
+    }
+
+    /** A group that already shares a flat, with no Draazy listing behind it. */
+    private String settledGroup(User host) throws Exception {
+        return approved("flatmate_groups", create(Routes.Flatmates.GROUPS, host, """
+                {"title":"Seat in our flat","locality":"%s","policy":"any","rent":40000,"deposit":10000,
+                 "seats":3,"seatsOpen":1,"name":"Host"}
+                """.formatted(TOWN)));
     }
 
     @Test

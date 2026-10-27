@@ -216,14 +216,17 @@ test('the shortlist holds rooms and groups together, newest save first', async (
   const society = `Zztest Mixed ${stamp()}`;
   const title = `Zztest Mixed group ${stamp()} in Baner`;
   const room = await createRoom(hostAuth.accessToken, { society });
-  const group = await createGroup(hostAuth.accessToken, { title });
+  const group = await createGroup(hostAuth.accessToken, {
+    title, hunting: true,
+    preferences: { localities: ['Baner'], rentMax: 45000, depositMax: 90000, gatedOnly: false, bachelors: false },
+  });
 
   await signedInAs(page, seeker);
   await openRooms(page);
   await cardFor(page, society).locator('.save-btn').click();
   await expect(cardFor(page, society).locator('.save-btn')).toHaveClass(/saved/, { timeout: 10_000 });
 
-  await page.goto(`${BASE}/flatmates?view=groups`);
+  await page.goto(`${BASE}/flatmates?view=teams`);
   const groupCard = page.locator('.sf-card').filter({ hasText: title }).first();
   await expect(groupCard).toBeVisible({ timeout: 20_000 });
   await groupCard.locator('.save-btn').click();

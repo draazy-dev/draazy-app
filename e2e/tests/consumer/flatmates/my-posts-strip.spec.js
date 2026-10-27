@@ -1,7 +1,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, apiLogin, authHeaders, signedInAs, uniqueMobile, uploadedListingPhotos } from '../../../helpers/liveAuth.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
-import { approveListingWithFetch, rejectListingWithFetch } from '../../../helpers/moderation.js';
+import { rejectListingWithFetch } from '../../../helpers/moderation.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const auth = (token) => ({ 'content-type': 'application/json', authorization: `Bearer ${token}` });
@@ -46,9 +46,11 @@ test('teams and flatmates: own posts sit in the strip, capped at two with a View
     gender: 'female', age: 26, occupation: 'Engineer', budget: 16000,
     localities: ['Baner'], moveIn: '2026-12-01', flatPref: 'any', roomPref: 'private', note: 'Strip test',
   });
-  const first = await group(accessToken, `Strip group A ${stamp()}`);
-  const second = await group(accessToken, `Strip group B ${stamp()}`);
-  const third = await group(accessToken, `Strip group C ${stamp()}`);
+  const hunt = { locality: undefined, rent: undefined, deposit: undefined,
+    preferences: { localities: ['Baner'], rentMax: 45000, depositMax: 90000, gatedOnly: false, bachelors: false } };
+  const first = await group(accessToken, `Strip group A ${stamp()}`, hunt);
+  const second = await group(accessToken, `Strip group B ${stamp()}`, hunt);
+  const third = await group(accessToken, `Strip group C ${stamp()}`, hunt);
 
   await signedInAs(page, mobile);
   await page.goto(`${BASE}/flatmates?view=teams`);
@@ -72,28 +74,22 @@ test('teams and flatmates: own posts sit in the strip, capped at two with a View
   await expect(page).toHaveURL(new RegExp(`/flatmates/post/${post.id}$`));
 });
 
-test('move in: a group tied to the host\'s flat appears in the move-in strip only', async ({ page }) => {
+test('a settled team sits in neither strip: Rooms shows only rooms, Teams only hunting teams', async ({ page }) => {
   const mobile = uniqueMobile();
   const { accessToken } = await apiLogin(mobile, { name: 'Strip Host' });
-  const listing = await rentListing(accessToken, `Zztest strip flat ${stamp()}`);
-  expect((await approveListingWithFetch(listing.id, await authHeaders(ACTORS.admin))).status).toBe(200);
-  try {
-    const title = `Strip flat group ${stamp()}`;
-    const g = await group(accessToken, title, { propertyId: listing.id, role: 'owner' });
-    expect(g.propertyId, 'the group must be tied to the host\'s flat').toBe(listing.id);
+  const settled = await group(accessToken, `Strip flat group ${stamp()}`);
+  const hunting = await group(accessToken, `Strip hunting group ${stamp()}`, { locality: undefined, rent: undefined, deposit: undefined,
+    preferences: { localities: ['Baner'], rentMax: 45000, depositMax: 90000, gatedOnly: false, bachelors: false } });
+  const tileFor = (g) => strip(page).locator(`a[href="/flatmates/group/${g.id}"]`);
 
-    await signedInAs(page, mobile);
-    await page.goto(`${BASE}/flatmates?view=move-in`);
-    const tile = strip(page).locator(`a[href="/flatmates/group/${g.id}"]`);
-    await expect(tile).toBeVisible({ timeout: 20_000 });
-    await expect(tile).toContainText(title);
+  await signedInAs(page, mobile);
+  await page.goto(`${BASE}/flatmates?view=teams`);
+  await expect(tileFor(hunting)).toBeVisible({ timeout: 20_000 });
+  await expect(tileFor(settled)).toHaveCount(0);
 
-    await page.locator('button[data-tab="teams"]').click();
-    await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 20_000 });
-    await expect(strip(page).locator(`a[href="/flatmates/group/${g.id}"]`)).toHaveCount(0);
-  } finally {
-    await dropListing(listing.id);
-  }
+  await page.locator('button[data-tab="move-in"]').click();
+  await expect(page.locator('[data-sf-id^="r:"]').first()).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('a[href^="/flatmates/group/"]')).toHaveCount(0);
 });
 
 test('board tiles carry no action buttons beyond save', async ({ page }) => {

@@ -386,9 +386,6 @@ INSERT INTO public.flatmate_seeker_posts (id, user_id, name, budget, localities,
 INSERT INTO public.flatmate_seeker_posts (id, user_id, name, budget, localities, note, verified, mod_status, created_at, updated_at) VALUES ('f1c7000c-0000-4000-8000-000000000003', '3ad0171b-3206-53e2-b6dc-732bf4e1b44c', 'Meera Deshpande', 22000, '["Baner","Balewadi"]'::jsonb, 'Architect, working from a Balewadi studio. Looking for a calm flat with people who keep regular hours.', true, 'approved', '2026-08-06 09:20:00+05:30', '2026-08-06 09:20:00+05:30')
     ON CONFLICT DO NOTHING;
 
-INSERT INTO public.flatmate_groups (id, host_id, title, locality, rent, seats_total, seats_open, host_role, note, mod_status, created_at, updated_at) VALUES ('f1c7000d-0000-4000-8000-000000000001', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Two seats in a 3 BHK, Kharadi', 'Kharadi', 42000, 3, 1, 'tenant', 'Lease starts next month, split three ways.', 'approved', '2026-08-06 09:20:00+05:30', '2026-08-06 09:20:00+05:30')
-    ON CONFLICT DO NOTHING;
-
 -- `owner_verified` mirrors each owner's identity badge.
 UPDATE public.properties p
    SET owner_verified = u.verified
@@ -569,20 +566,6 @@ VALUES
  ('f1c7000c-0000-4000-8000-000000000006', 'f1c70000-0000-4000-8000-000000000023', 'Pooja Shah', 'female', 25, 'Marketing Lead', 17000, '["Wakad"]', '15', 'women', 'any', 'Relocating to Pune this month. Need a 2BHK flatmate - easy-going and tidy.', false, false, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
  ('f1c7000c-0000-4000-8000-000000000007', 'f1c70000-0000-4000-8000-000000000024', 'Karan Malhotra', 'male', 23, 'QA Engineer', 14000, '["Hadapsar"]', '30', 'any', 'shared', 'Fresh grad sharing a 2BHK to keep rent low. Open to a shared room.', false, false, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
  ('f1c7000c-0000-4000-8000-000000000008', 'f1c70000-0000-4000-8000-000000000025', 'Nikhil Rane', 'male', 29, 'Product Manager', 21000, '["Kothrud"]', '60', 'men', 'private', 'Lease ends in two months, planning ahead. Private room in Kothrud preferred.', false, true, 'approved', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30')
-    ON CONFLICT DO NOTHING;
-
-
-INSERT INTO public.flatmate_groups
-    (id, host_id, title, locality, policy, rent, seats_total, seats_open, host_role, verification_tier,
-     agreement_declared, owner_consent, flag_for_review, mod_status, note, archived, created_at, updated_at)
-VALUES
- ('f1c7000d-0000-4000-8000-000000000002', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', '2 girls need 1 more for a 2 BHK, Baner', 'Baner', 'women', 34000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', 'Working professionals, non-smokers. Move-in within a month.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000003', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Two seats open in a 3 BHK, Hinjawadi', 'Hinjawadi', 'any', 45000, 4, 2, 'tenant', 'identity', false, false, false, 'approved', 'Walkable to Phase 1. Two rooms free from next month.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000004', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'One seat in a 2 BHK, Wakad', 'Wakad', 'men', 28000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', 'Quiet flat, two of us work early shifts.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000005', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Sharing a 3 BHK near Magarpatta, Hadapsar', 'Hadapsar', 'any', 39000, 4, 2, 'tenant', 'identity', false, false, false, 'approved', 'Veg kitchen. Close to the Magarpatta gate.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000006', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Last seat in a 2 BHK, Kothrud', 'Kothrud', 'any', 26000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', 'Long-term flat, one room opening up.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000007', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'One seat in a 2 BHK, Aundh', 'Aundh', 'any', 31000, 3, 1, 'tenant', 'identity', false, false, false, 'approved', 'Near ITI Road. One room free from the 1st.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000d-0000-4000-8000-000000000008', 'f619aa88-84ed-50ce-9a07-abb7712afa9d', 'Two seats in a 3 BHK, Balewadi', 'Balewadi', 'women', 36000, 4, 2, 'tenant', 'identity', false, false, false, 'approved', 'Close to the sports complex. Two rooms open.', false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30')
     ON CONFLICT DO NOTHING;
 
 -- Residential rent/plot anchors. Every locality here is load-bearing against
@@ -1208,7 +1191,6 @@ VALUES
   '["https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=800&q=70"]',
   '2026-09-02 12:00:00+05:30', '2026-09-02 12:00:00+05:30'),
 
- -- Keep Aundh free of rooms so the empty move-in state remains available.
  ('f1c7000b-0000-4000-8000-000000000009', 'f1c70000-0000-4000-8000-000000000031',
   'Shared room', 'shared', 7500, 15000, 1, 1,
   'tenant', 'identity', false, 'approved',
@@ -1268,44 +1250,114 @@ VALUES
   '2026-09-05 10:00:00+05:30', '2026-09-05 10:00:00+05:30')
     ON CONFLICT DO NOTHING;
 
--- Groups have no property or society because move-in supply is represented by rooms.
+-- Every listed group is a team still hunting for a flat; a spare seat in a flat someone already has is a room.
+-- Databases seeded when these were housed groups are converted in place, so their requests and saves still resolve.
 INSERT INTO public.flatmate_groups
-    (id, host_id, property_id, title, locality, policy, rent, seats_total, seats_open,
-     host_role, verification_tier, agreement_declared, owner_consent, owner_consent_mobile,
-     mod_status, note, created_at, updated_at)
+    (id, host_id, title, locality, localities, policy, rent, rent_min, seats_total, seats_open,
+     host_role, verification_tier, agreement_declared, owner_consent, owner_consent_mobile, mod_status,
+     hunting, pref_bhk, deposit_min, deposit_max, gated_only, bachelors, furnishing, move_in_by,
+     note, created_at, updated_at)
 VALUES
- ('f1c7000d-0000-4000-8000-000000000009', 'f1c70000-0000-4000-8000-000000000010',
-  NULL,
-  'Owner-let 2 BHK in Wakad, one seat left', 'Wakad', 'any', 24000, 2, 1,
-  'owner', 'owner', true, false, NULL, 'live',
-  'I own the flat and live in Mumbai. One tenant already in, looking for one more on the same agreement.',
-  '2026-09-05 11:00:00+05:30', '2026-09-05 11:00:00+05:30'),
+ ('f1c7000d-0000-4000-8000-000000000001', 'f619aa88-84ed-50ce-9a07-abb7712afa9d',
+  'Two of us want a 3 BHK in Kharadi, need a third', 'Kharadi', '["Kharadi", "Viman Nagar"]', 'any', 42000, 33000, 3, 1,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '["3"]', NULL, 120000, false, true, 'semi', current_date + 30,
+  'Our current lease ends next month. Split three ways it stays near 14k each.',
+  '2026-08-06 09:20:00+05:30', '2026-08-06 09:20:00+05:30'),
+
+ ('f1c7000d-0000-4000-8000-000000000002', 'f619aa88-84ed-50ce-9a07-abb7712afa9d',
+  '2 girls looking for a 2 BHK in Baner, need 1 more', 'Baner', '["Baner", "Balewadi"]', 'women', 34000, 28000, 3, 1,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '["2"]', NULL, 100000, true, true, 'furnished', current_date + 30,
+  'Working professionals, non-smokers. We want to sign within a month.',
+  '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+
+ ('f1c7000d-0000-4000-8000-000000000003', 'f619aa88-84ed-50ce-9a07-abb7712afa9d',
+  'Team of four for a 3 BHK in Hinjawadi, two seats left', 'Hinjawadi', '["Hinjawadi"]', 'any', 45000, 36000, 4, 2,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '["3"]', NULL, 135000, false, true, NULL, NULL,
+  'Walkable to Phase 1 is the one must-have. Two of us are in, two seats left.',
+  '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+
+ ('f1c7000d-0000-4000-8000-000000000004', 'f619aa88-84ed-50ce-9a07-abb7712afa9d',
+  'Two working guys need a third for a 2 BHK in Wakad', 'Wakad', '["Wakad", "Pimple Saudagar"]', 'men', 28000, 22000, 3, 1,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '["2"]', NULL, 90000, false, true, 'semi', current_date + 45,
+  'Looking for a quiet flat. Two of us work early shifts.',
+  '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+
+ ('f1c7000d-0000-4000-8000-000000000005', 'f619aa88-84ed-50ce-9a07-abb7712afa9d',
+  'Team of four for a 3 BHK near Magarpatta, two seats left', 'Hadapsar', '["Hadapsar"]', 'any', 39000, NULL, 4, 2,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '["3"]', NULL, 120000, true, false, NULL, NULL,
+  'Veg kitchen. Close to the Magarpatta gate is all we ask.',
+  '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+
+ ('f1c7000d-0000-4000-8000-000000000006', 'f619aa88-84ed-50ce-9a07-abb7712afa9d',
+  'Looking for one more to rent a 2 BHK in Kothrud', 'Kothrud', '["Kothrud"]', 'any', 26000, 20000, 3, 1,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '["2"]', NULL, 80000, false, false, 'unfurnished', current_date + 60,
+  'Planning long term, so we would rather wait for the right flat than rush.',
+  '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+
+ ('f1c7000d-0000-4000-8000-000000000007', 'f619aa88-84ed-50ce-9a07-abb7712afa9d',
+  'Need one more to rent a flat in Aundh', 'Aundh', '["Aundh", "Baner"]', 'any', 31000, NULL, 3, 1,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '[]', NULL, NULL, false, false, NULL, NULL,
+  'Near ITI Road ideally. Open on size and furnishing if the rent works.',
+  '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
+
+ ('f1c7000d-0000-4000-8000-000000000008', 'f619aa88-84ed-50ce-9a07-abb7712afa9d',
+  'Girls'' team for a 3 BHK in Balewadi, two seats left', 'Balewadi', '["Balewadi", "Baner"]', 'women', 36000, 30000, 4, 2,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '["3"]', NULL, 110000, true, true, 'furnished', current_date + 30,
+  'Close to the sports complex. Two of us are confirmed.',
+  '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
 
  ('f1c7000d-0000-4000-8000-000000000010', 'f1c70000-0000-4000-8000-000000000031',
-  NULL, 'Full 3 BHK in Kharadi, waitlist only', 'Kharadi', 'women', 39000, 3, 0,
+  'Team complete, hunting a 3 BHK in Kharadi', 'Kharadi', '["Kharadi"]', 'women', 39000, 33000, 3, 0,
   'tenant', 'identity', false, false, NULL, 'approved',
-  'All three of us are settled in. Leaving this up so people can put their name down for March.',
+  true, '["3"]', NULL, 120000, true, true, 'semi', current_date + 45,
+  'All three of us are in. Owners with a 3 BHK near EON IT Park, send us your flat.',
   '2026-09-04 15:20:00+05:30', '2026-09-04 15:20:00+05:30'),
 
  -- Keep the Baner women-only group above the ₹10,000 per-head search ceiling.
  ('f1c7000d-0000-4000-8000-000000000011', 'f1c70000-0000-4000-8000-000000000032',
-  NULL, 'Non-smokers 3 BHK in Baner, one seat', 'Baner', 'women', 33000, 3, 1,
-  'tenant', 'tenant', true, true, '9820011223', 'approved',
-  'Landlord has agreed in writing to a replacement on the existing agreement, so no fresh deposit.',
+  'Non-smokers looking for a 3 BHK in Baner, one seat left', 'Baner', '["Baner"]', 'women', 33000, NULL, 3, 1,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  true, '["3"]', NULL, 100000, true, true, 'semi', current_date + 30,
+  'Two non-smokers, both in tech. Looking for a third before we sign.',
   '2026-09-03 09:40:00+05:30', '2026-09-03 09:40:00+05:30'),
 
  ('f1c7000d-0000-4000-8000-000000000012', 'f1c70000-0000-4000-8000-000000000033',
-  NULL, 'Two seats in a 3 BHK, Kothrud', 'Kothrud', 'men', 30000, 3, 2,
+  'Two seats in our team for a 3 BHK in Kothrud', 'Kothrud', '["Kothrud"]', 'men', 30000, 24000, 3, 2,
   'tenant', 'identity', false, false, NULL, 'pending',
-  'Two of us moving out at the end of the month, so two seats going together or separately.',
+  true, '["3"]', NULL, NULL, false, false, NULL, current_date + 60,
+  'One of us is set. Looking for two more before we start visits.',
   '2026-09-07 20:00:00+05:30', '2026-09-07 20:00:00+05:30'),
 
  ('f1c7000d-0000-4000-8000-000000000013', 'f1c70000-0000-4000-8000-000000000034',
-  NULL, 'Girls 3 BHK share in Viman Nagar', 'Viman Nagar', 'women', 32000, 3, 1,
+  'Two aviation girls need a third for a 2 BHK in Viman Nagar', 'Viman Nagar', '["Viman Nagar"]', 'women', 32000, 26000, 3, 1,
   'tenant', 'identity', false, false, NULL, 'approved',
-  'Two of us here already, both in aviation. Looking for one more, preferably veg.',
+  true, '["2"]', 60000, 100000, true, true, 'furnished', current_date + 30,
+  'Both of us fly out of Pune, so near the airport. Preferably veg.',
   '2026-09-02 17:00:00+05:30', '2026-09-02 17:00:00+05:30')
-    ON CONFLICT DO NOTHING;
+    ON CONFLICT (id) DO UPDATE
+   SET title = EXCLUDED.title, locality = EXCLUDED.locality, localities = EXCLUDED.localities,
+       rent = EXCLUDED.rent, rent_min = EXCLUDED.rent_min, note = EXCLUDED.note,
+       verification_tier = EXCLUDED.verification_tier, agreement_declared = false,
+       owner_consent = false, owner_consent_mobile = NULL, property_id = NULL,
+       hunting = true, pref_bhk = EXCLUDED.pref_bhk, deposit_min = EXCLUDED.deposit_min,
+       deposit_max = EXCLUDED.deposit_max, gated_only = EXCLUDED.gated_only, bachelors = EXCLUDED.bachelors,
+       furnishing = EXCLUDED.furnishing, move_in_by = EXCLUDED.move_in_by,
+       deposit = NULL, notice_period_days = NULL, lock_in_months = NULL,
+       maintenance_billing = NULL, electricity_billing = NULL, updated_at = now()
+ WHERE NOT flatmate_groups.hunting;
+
+-- Owners list rooms, not teams; databases seeded before that rule still hold this owner-hosted group.
+UPDATE public.flatmate_groups
+   SET archived = true, archived_at = now(), archive_reason = 'owners list rooms, not teams'
+ WHERE id = 'f1c7000d-0000-4000-8000-000000000009' AND NOT archived;
 
 -- Demo tenant-tier rows stand for posts a moderator has approved; V75 pulled them back where they were seeded live.
 UPDATE public.flatmate_rooms SET mod_status = 'approved'
@@ -1313,9 +1365,8 @@ UPDATE public.flatmate_rooms SET mod_status = 'approved'
 UPDATE public.flatmate_groups SET mod_status = 'approved'
  WHERE id = 'f1c7000d-0000-4000-8000-000000000011' AND mod_status = 'pending';
 
--- The search reads `localities` for every group, so a housed group must list its one locality there.
-UPDATE public.flatmate_groups SET localities = jsonb_build_array(locality)
- WHERE NOT hunting AND localities = '[]'::jsonb;
+-- A hunting team has no landlord to vouch for, so no tenant-tier review may point at one.
+DELETE FROM public.flatmate_reviews WHERE id = 'f1c70010-0000-4000-8000-000000000003';
 
 -- Room details answer every field the room form asks; a few rows leave facing / title / furniture unstated on purpose.
 UPDATE public.flatmate_rooms r
@@ -1380,26 +1431,6 @@ UPDATE public.flatmate_rooms r
  ) AS v(id, title, flat_number, details, facing, overlooking, np, li, mb, eb, photos)
  WHERE r.id = v.id::uuid AND r.details IS NULL;
 
--- Terms on every housed group but Aundh (the unstated case); Baner's replacement seat has no fresh deposit.
-UPDATE public.flatmate_groups g
-   SET deposit = v.deposit, notice_period_days = v.np, lock_in_months = v.li,
-       maintenance_billing = v.mb, electricity_billing = v.eb, updated_at = now()
-  FROM (VALUES
- ('f1c7000d-0000-4000-8000-000000000001', 84000, 30, 0, 'shared', 'shared'),
- ('f1c7000d-0000-4000-8000-000000000002', 68000, 30, 3, 'included', 'shared'),
- ('f1c7000d-0000-4000-8000-000000000003', 90000, 60, 6, 'separate', 'separate'),
- ('f1c7000d-0000-4000-8000-000000000004', 56000, 30, 0, 'included', 'included'),
- ('f1c7000d-0000-4000-8000-000000000005', 78000, 15, 1, 'shared', 'separate'),
- ('f1c7000d-0000-4000-8000-000000000006', 52000, 30, 0, 'included', 'shared'),
- ('f1c7000d-0000-4000-8000-000000000008', 72000, 45, 3, 'shared', 'shared'),
- ('f1c7000d-0000-4000-8000-000000000009', 48000, 60, 11, 'included', 'separate'),
- ('f1c7000d-0000-4000-8000-000000000010', 78000, 30, 0, 'shared', 'shared'),
- ('f1c7000d-0000-4000-8000-000000000011', 0, 30, 0, 'included', 'shared'),
- ('f1c7000d-0000-4000-8000-000000000012', 60000, 30, 2, 'shared', 'separate'),
- ('f1c7000d-0000-4000-8000-000000000013', 64000, 30, 3, 'included', 'shared')
- ) AS v(id, deposit, np, li, mb, eb)
- WHERE g.id = v.id::uuid AND g.deposit IS NULL AND g.notice_period_days IS NULL;
-
 -- The only Villa and Row House rooms; the villa is tenant-hosted with the owner's consent on record.
 INSERT INTO public.flatmate_rooms
     (id, host_id, room_type, attached_bath, budget, deposit, seats_total, seats_open,
@@ -1432,7 +1463,38 @@ VALUES
   '2026-09-06 18:00:00+05:30', '2026-09-06 18:00:00+05:30')
     ON CONFLICT DO NOTHING;
 
--- Hunting groups have no flat yet: one states every preference, the other only where and how much.
+-- The villa owner's consent, keyed on the flat's fingerprint; upserted because older databases tie this id to a group.
+INSERT INTO public.flatmate_owner_consents
+    (id, owner_mobile, granted_by, group_id, address_fingerprint, granted_at, created_at, updated_at)
+VALUES
+ ('f1c70012-0000-4000-8000-000000000001', '9822045678', 'f1c70000-0000-4000-8000-000000000041', NULL,
+  'addr:ivy estate villas|bavdhan',
+  '2026-09-07 10:20:00+05:30', '2026-09-07 10:20:00+05:30', '2026-09-07 10:20:00+05:30')
+    ON CONFLICT (id) DO UPDATE
+   SET owner_mobile = EXCLUDED.owner_mobile, granted_by = EXCLUDED.granted_by, group_id = NULL,
+       address_fingerprint = EXCLUDED.address_fingerprint, granted_at = EXCLUDED.granted_at, updated_at = now();
+
+INSERT INTO public.flatmate_rooms
+    (id, host_id, room_type, attached_bath, budget, deposit, seats_total, seats_open,
+     host_role, verification_tier, agreement_declared, owner_consent, owner_consent_mobile, mod_status,
+     title, society, flat_number, locality, localities, lat, lng, bhk, flat_type, home_type_label,
+     gated_community, furnishing, move_in, available_from, gender, food, note, photos,
+     details, facing, overlooking, notice_period_days, lock_in_months, maintenance_billing, electricity_billing,
+     created_at, updated_at)
+VALUES
+ ('f1c7000b-0000-4000-8000-000000000016', 'f1c70000-0000-4000-8000-000000000036',
+  'Private room', 'shared', 15500, 31000, 1, 1,
+  'tenant', 'identity', false, false, NULL, 'approved',
+  'Spare room in a 2 BHK off ITI Road', 'Sai Vihar', 'B-304', 'Aundh', '["Aundh"]', 18.5602, 73.8077, '2', '2 BHK', 'Flat',
+  true, 'semi', '30', DATE '2026-10-01', 'any', 'any',
+  'My flatmate is moving to Bengaluru, so her room is free from the 1st. I work in Aundh and keep regular hours.',
+  '["https://images.unsplash.com/photo-1616594039964-ae9021a400a0?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?auto=format&fit=crop&w=800&q=70", "https://images.unsplash.com/photo-1556909212-d5b604d0c90d?auto=format&fit=crop&w=800&q=70"]',
+  '{"floor": "3", "totalFloors": 7, "bathrooms": 2, "balconies": 1, "furniture": ["Bed", "Wardrobe", "Fans", "Geyser", "Refrigerator"], "tower": "B", "street": "ITI Road", "landmark": "Near Aundh Gaon bus stop", "pincode": "411007"}',
+  'East', 'Garden', 30, 2, 'included', 'shared',
+  '2026-09-06 16:00:00+05:30', '2026-09-06 16:00:00+05:30')
+    ON CONFLICT DO NOTHING;
+
+-- These two teams bracket the preference form: one states every field, the other only where and how much.
 INSERT INTO public.flatmate_groups
     (id, host_id, property_id, title, locality, localities, policy, rent, rent_min, seats_total, seats_open,
      host_role, verification_tier, agreement_declared, owner_consent, owner_consent_mobile, mod_status,
@@ -1461,14 +1523,6 @@ VALUES
  ('f1c7000e-0000-4000-8000-000000000018', 'f1c7000d-0000-4000-8000-000000000015', 'f1c70000-0000-4000-8000-000000000040', 'Neha Kapoor', 'NK', true, '2026-09-05 19:30:00+05:30', '2026-09-05 19:30:00+05:30')
     ON CONFLICT DO NOTHING;
 
--- Consent rows retain the landlord approval audit trail for tenant-hosted groups.
-INSERT INTO public.flatmate_owner_consents (id, owner_mobile, granted_by, group_id, granted_at, created_at, updated_at)
-VALUES
- ('f1c70012-0000-4000-8000-000000000001', '9820011223', 'f1c70000-0000-4000-8000-000000000032',
-  'f1c7000d-0000-4000-8000-000000000011',
-  '2026-09-03 09:35:00+05:30', '2026-09-03 09:35:00+05:30', '2026-09-03 09:35:00+05:30')
-    ON CONFLICT DO NOTHING;
-
 -- Members cover named, linked, and unnamed occupied seats without placeholder identities.
 INSERT INTO public.flatmate_group_members (id, group_id, user_id, name, initials, verified, created_at, updated_at)
 VALUES
@@ -1482,7 +1536,6 @@ VALUES
  ('f1c7000e-0000-4000-8000-000000000008', 'f1c7000d-0000-4000-8000-000000000006', NULL,                                   'Ananya',         'A',  false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
  ('f1c7000e-0000-4000-8000-000000000009', 'f1c7000d-0000-4000-8000-000000000007', '3ad0171b-3206-53e2-b6dc-732bf4e1b44c', 'Meera Deshpande','MD', true,  '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
  ('f1c7000e-0000-4000-8000-000000000010', 'f1c7000d-0000-4000-8000-000000000008', NULL,                                   NULL,             NULL, false, '2026-08-01 10:00:00+05:30', '2026-08-01 10:00:00+05:30'),
- ('f1c7000e-0000-4000-8000-000000000011', 'f1c7000d-0000-4000-8000-000000000009', 'f1c70000-0000-4000-8000-000000000003', 'Arjun Rao',      'AR', false, '2026-09-05 11:00:00+05:30', '2026-09-05 11:00:00+05:30'),
  ('f1c7000e-0000-4000-8000-000000000012', 'f1c7000d-0000-4000-8000-000000000010', 'f1c70000-0000-4000-8000-000000000023', 'Pooja Shah',     'PS', false, '2026-09-04 15:20:00+05:30', '2026-09-04 15:20:00+05:30'),
  ('f1c7000e-0000-4000-8000-000000000013', 'f1c7000d-0000-4000-8000-000000000010', NULL,                                   'Sanika',         'S',  false, '2026-09-04 15:20:00+05:30', '2026-09-04 15:20:00+05:30'),
  ('f1c7000e-0000-4000-8000-000000000014', 'f1c7000d-0000-4000-8000-000000000011', 'f1c70000-0000-4000-8000-000000000002', 'Priya Nair',     'PN', false, '2026-09-03 09:40:00+05:30', '2026-09-03 09:40:00+05:30'),
@@ -1503,12 +1556,7 @@ VALUES
  ('f1c70010-0000-4000-8000-000000000002', 'room', 'f1c7000b-0000-4000-8000-000000000006', NULL,
   'f1c70000-0000-4000-8000-000000000034', 'Rohan Iris, Wakad', 'tenant', false, false,
   '{"kind": "rent_agreement", "pages": 3}', 'pending', NULL, NULL,
-  '2026-09-03 08:20:00+05:30', '2026-09-03 08:20:00+05:30'),
-
- ('f1c70010-0000-4000-8000-000000000003', 'group', NULL, 'f1c7000d-0000-4000-8000-000000000011',
-  'f1c70000-0000-4000-8000-000000000032', 'Sr 42, Baner', 'tenant', false, true,
-  '{"kind": "owner_consent_note", "pages": 1}', 'pending', NULL, NULL,
-  '2026-09-03 09:45:00+05:30', '2026-09-03 09:45:00+05:30')
+  '2026-09-03 08:20:00+05:30', '2026-09-03 08:20:00+05:30')
     ON CONFLICT DO NOTHING;
 
 -- Requests cover each host decision state and preserve its timestamp constraint.
@@ -1542,7 +1590,7 @@ INSERT INTO public.flatmate_group_applications
 VALUES
  ('f1c70011-0000-4000-8000-000000000001', 'f1c70000-0000-4000-8000-000000005121',
   'f1c7000d-0000-4000-8000-000000000004', 'f1c70000-0000-4000-8000-000000000010',
-  'pending', 'live', 'My 2 BHK in Wakad is free from October if the four of you want to move together.',
+  'pending', 'live', 'My 2 BHK in Wakad is free from October if the three of you want to move in together.',
   NULL, '2026-09-06 09:00:00+05:30', '2026-09-06 09:00:00+05:30'),
 
  ('f1c70011-0000-4000-8000-000000000002', 'f1c70000-0000-4000-8000-000000005122',

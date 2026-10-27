@@ -86,17 +86,19 @@
 The page used to split by record type - **Flatmates / Rooms / Groups** - which asked the user to
 learn our storage model. It now splits by the one question a seeker can always answer instantly:
 
-> **"Is there an address yet?"**
+> **"Is there a flat yet?"**
 
-- **`move-in` ("Move in now")** - you browse **places**: rooms, plus any group that already holds a
-  flat. Priced, dated, visitable.
+- **`move-in` ("Move in now")** - you browse **places**: rooms only. Priced, dated, visitable, with
+  the photos and flat details a room post carries.
 - **`team-up` ("Team up")** - you browse **`people`**: solo seekers, plus groups still hunting. You
   form a household first.
 
-`tabOf(item)` decides: a room is always `move-in`; a group is `move-in` only when `hasAddress` (it
-carries a `propertyId` or a `society`), else `team-up`; a seeker post is always `team-up`. Each feed
+A room is always `move-in`; a seeker post is always `team-up`; a group lists only while it is
+`hunting` (the server filters on that flag). A legacy group that already has its flat lists on no tab
+but stays readable by link: a place to move into is a room post. Owners never host a group (409
+`owner_lists_rooms`); an owner letting a flat room by room lists rooms. `team-up`
 is therefore a **mixed** list and is re-sorted **as one list** - merging two pre-sorted lists would
-stack every room above every group regardless of the chosen sort. `Results.renderCard` dispatches on
+stack every seeker above every group regardless of the chosen sort. `Results.renderCard` dispatches on
 `item.kind` (`room` | `group` | `seeker`).
 
 Legacy `?view=` values are kept as read aliases (`normalizeTab`): `rooms -> move-in`,
@@ -285,7 +287,8 @@ Dashboard -> My Listings ("Let room by room"), and confirmed in `SplitFlatModal`
   tier `identity`, no property, no declaration — nothing to attest yet — and stores `rent` = the
   ceiling (so `per_head` keeps answering the budget filter and sort), `locality` = the first
   shortlisted locality, `deposit` = null. It always lands on **Team up**.
-- The card shows "Looking for a flat", a per-head budget range and "N BHK · N sharing"; the detail
+- The card shows a per-head budget range and "N BHK · N sharing", with no "Looking for a flat"
+  chip since every listed team is hunting; the detail
   page adds "The flat we're looking for" and, for the owner and accepted members, **"Find flats for
   us"** — a `/listings?deal=rent&loc=…&bhks=…&rent=lo-hi&deposit=lo-hi&furn=…&tenants=bachelors`
   search (`groupListingsUrl`; gated maps to `amen=security`, listings having no gated facet).

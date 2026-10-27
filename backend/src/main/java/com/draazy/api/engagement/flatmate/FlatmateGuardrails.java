@@ -55,6 +55,18 @@ public class FlatmateGuardrails {
                 fingerprint, reason);
     }
 
+    /** Full posts drop out of the cap, so reopening one must pass it like a new post. Ask before
+     * changing the post: a dirty entity is auto-flushed into the count. */
+    public boolean capBlocksReopen(UUID hostId, String tier) {
+        return evaluate(hostId, tier, null).overCap();
+    }
+
+    public static RuntimeException reopenRefused() {
+        return new FlatmateSupplyService.HostBlockedException(new HostEligibility(true, true, false, false,
+                null, "You already have " + MAX_ACTIVE_HOST_POSTS
+                        + " live flatmate posts. Close one before reopening this."));
+    }
+
     /** Ordered by how much the identifier is worth: listing id, then society+locality, then
      * title+locality. Normalised hard because these are strings people typed. */
     public String fingerprint(Address address) {

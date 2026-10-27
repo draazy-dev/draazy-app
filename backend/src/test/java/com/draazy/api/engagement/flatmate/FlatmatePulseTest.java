@@ -46,19 +46,24 @@ class FlatmatePulseTest extends AbstractApiTest {
         assertThat(after.initials()).hasSizeLessThanOrEqualTo(FlatmatePulse.FACES).first().isEqualTo("RS");
     }
 
+    private void group(User host, String title, String locality, long rent, int seats, String bhk, boolean hunting,
+            UUID propertyId, String modStatus, int minutesAhead) {
+        jdbc.update("insert into flatmate_groups (host_id, title, locality, rent, seats_total, seats_open, pref_bhk,"
+                + " hunting, property_id, mod_status, created_at)"
+                + " values (?, ?, ?, ?, ?, 1, ?::jsonb, ?, ?, ?, now() + (? * interval '1 minute'))",
+                host.getId(), title, locality, rent, seats, bhk, hunting, propertyId, modStatus, minutesAhead);
+    }
+
     @Test
-    void theSplitIsTheNewestLiveGroupWithItsFlat() {
+    @DisplayName("the split is the newest live hunting team with an open seat, its one flat size and its budget")
+    void theSplitIsTheNewestLiveHuntingTeam() {
         User host = user("9877731003");
-        Property flat = new Property(host, "Pulse flat " + UUID.randomUUID(), "rent", "apartment", 36000L, "Aundh",
-                "Pune");
-        UUID flatId = properties.saveAndFlush(flat).getId();
-        jdbc.update("update properties set bhk = 2 where id = ?", flatId);
-        jdbc.update("insert into flatmate_groups (host_id, title, locality, rent, seats_total, property_id,"
-                + " mod_status, created_at) values (?, 'Pulse group', 'Aundh', 36000, 3, ?, 'live',"
-                + " now() + interval '1 minute')", host.getId(), flatId);
-        jdbc.update("insert into flatmate_groups (host_id, title, locality, rent, seats_total, property_id,"
-                + " mod_status, created_at) values (?, 'Pending group', 'Baner', 50000, 2, ?, 'pending',"
-                + " now() + interval '2 minutes')", host.getId(), flatId);
+        UUID flatId = properties.saveAndFlush(new Property(host, "Pulse flat " + UUID.randomUUID(), "rent",
+                "apartment", 36000L, "Aundh", "Pune")).getId();
+        group(host, "Pulse team", "Aundh", 36000, 3, "[\"2\"]", true, null, "live", 1);
+        group(host, "Pending team", "Baner", 50000, 2, "[]", true, null, "pending", 2);
+        group(host, "Settled group", "Wakad", 45000, 4, "[]", false, flatId, "live", 3);
+        group(host, "Lone hunter", "Kothrud", 20000, 1, "[]", true, null, "live", 4);
 
         FlatmatePulse.Split split = pulse.pulse().split();
 
@@ -68,5 +73,17 @@ class FlatmatePulseTest extends AbstractApiTest {
         assertThat(split.rent()).isEqualTo(36000);
         assertThat(split.seats()).isEqualTo(3);
         assertThat(split.share()).isEqualTo(12000);
+    }
+
+    @Test
+    @DisplayName("a team open to several flat sizes names none")
+    void severalFlatSizesLeaveTheBhkOut() {
+        group(user("9877731005"), "Flexible team", "Aundh", 36000, 3, "[\"2\",\"3\"]", true, null, "live", 1);
+
+        FlatmatePulse.Split split = pulse.pulse().split();
+
+        assertThat(split).isNotNull();
+        assertThat(split.locality()).isEqualTo("Aundh");
+        assertThat(split.bhk()).isNull();
     }
 }

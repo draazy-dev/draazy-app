@@ -46,7 +46,7 @@ To post a room as a tenant, you confirm the flat owner knows and agrees, and giv
 
 ## Looking for a room
 
-Use the filters (budget, locality or near a place, move-in, who the room is for, private or shared room, sharing, lifestyle, verified only, attached washroom) or the smart search bar, and switch between List and Map. Picking **Women** shows homes open to women, mixed ones included; tap **Women-only homes** to see only homes for women. On **Rooms** you can also ask for **Furnished** or **Semi-furnished** and a **Gated society**. **Rooms** shows rooms you can move into, **Flatmates** shows people who need a room, and **Teams** shows groups looking for a whole flat to rent together. Every listing shows who already lives there and what they are looking for. Tap **Send interest**; after the host accepts, the button becomes **Message owner** and opens Messages. **Save** keeps a post on your account, and an empty board offers **Create alert**.
+Use the filters (budget, locality or near a place, move-in, who the room is for, private or shared room, sharing, lifestyle, verified only, attached washroom) or the smart search bar, and switch between List and Map. Picking **Women** shows homes open to women, mixed ones included; tap **Women-only homes** to see only homes for women. On **Rooms** you can also ask for **Furnished** or **Semi-furnished** and a **Gated society**. **Rooms** shows rooms and open seats in flats you can move into, **Flatmates** shows people who need a room, and **Teams** shows groups looking for a whole flat to rent together. Every listing shows who already lives there and what they are looking for. Tap **Send interest**; after the host accepts, the button becomes **Message owner** and opens Messages. **Save** keeps a post on your account, and an empty board offers **Create alert**.
 
 > [!TIP]
 > Ask to visit at the time you would normally be home. A flat that is quiet at 3 pm on a Wednesday tells you very little about weeknights.
@@ -63,7 +63,7 @@ If you do not have a flat yet, tap **Post**, choose **Flatmates**, then **Team u
 
 If you already have a flat with space in it, choose **I have a room to fill** instead. If you own the flat and have listed it on Draazy, link that listing and the room shows **Verified property**; if you rent through Draazy, link your tenancy to fill in the details.
 
-A group advertises how many seats it has and how many are still open, so nobody joins one that is already full. A group open to **Anyone** lets you **Join** instantly; **Women only** and **Men only** groups use **Request to join**, and the host accepts or declines each request.
+A group advertises how many seats it has and how many are still open, so nobody joins one that is already full. A full group drops off the board until a seat opens again; anyone with its link still sees it, marked full. A group open to **Anyone** lets you **Join** instantly; **Women only** and **Men only** groups use **Request to join**, and the host accepts or declines each request.
 
 Members can leave, cancel a pending request, and the host can remove members. Group chat lives in [Messages](/messages). When a group is ready to apply to a whole-flat rental, the owner sees one application with the group name, the host and the number of members.
 

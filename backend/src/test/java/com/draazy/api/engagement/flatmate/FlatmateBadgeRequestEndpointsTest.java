@@ -495,7 +495,9 @@ class FlatmateBadgeRequestEndpointsTest extends AbstractApiTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("hunting_group"));
 
-        String owned = postGroup(ownerHost, "owner");
+        String owned = postGroup(ownerHost, "tenant");
+        jdbc.update("update flatmate_groups set host_role = 'owner' where id = ?::uuid", owned);
+        entityManager.clear();
         requestGroup(ownerHost, owned, doc(ownerHost, "Rent agreement"))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.error").value("not_tenant_hosted"));

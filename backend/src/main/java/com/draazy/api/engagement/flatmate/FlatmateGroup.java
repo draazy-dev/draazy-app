@@ -292,12 +292,6 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
         return recheck;
     }
 
-    /** A parent listing is the only way a group can express an address — naming a society it has no
-     * listing for is a claim, not a place. */
-    public boolean hasAddress() {
-        return propertyId != null;
-    }
-
     public int maxOpenSeats() {
         return Math.max(0, seatsTotal - members.size());
     }
@@ -306,4 +300,8 @@ public class FlatmateGroup extends AuditedEntity implements FlatmateSupplyPost {
         int max = maxOpenSeats();
         return seatsOpen == null ? max : Math.max(0, Math.min(max, seatsOpen));
     }
+
+    /** {@link #openSeats()} {@code > 0} as native SQL over alias {@code g}; the two must agree. */
+    public static final String HAS_OPEN_SEAT_SQL = " and (g.seats_open is null or g.seats_open > 0)"
+            + " and g.seats_total > (select count(*) from flatmate_group_members gm where gm.group_id = g.id)";
 }

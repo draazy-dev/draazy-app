@@ -25,13 +25,10 @@ async function createGroup(token, title) {
     headers: auth(token),
     body: JSON.stringify({
       title,
-      locality: 'Baner',
-      rent: 25000,
-      deposit: 50000,
       seats: 3,
       seatsOpen: 2,
       policy: 'any',
-      role: 'tenant',
+      preferences: { localities: ['Baner'], rentMax: 25000, depositMax: 50000, gatedOnly: false, bachelors: false },
     }),
   });
   const body = await res.text();

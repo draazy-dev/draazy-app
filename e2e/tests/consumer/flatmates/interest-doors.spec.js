@@ -217,6 +217,8 @@ test.describe('Flatmate interest doors (live)', () => {
 
     await expect(door(page, /^Request to join$/i)).toHaveCount(0, { timeout: 10_000 });
     await expect(door(page, /Group full/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('group-full-notice')).toContainText('This team is full right now.');
+    await expect(page.getByTestId('group-full-see-open')).toHaveAttribute('href', '/flatmates?view=teams&loc=Baner');
   });
 
   test('an ordinary failure rolls the door back instead of leaving it claiming success', async ({ page }) => {

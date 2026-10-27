@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import Icon from '../../../../components/Icon.jsx';
 import { inr, perHead, shareFloor, moneyRange, bhkText, groupListingsUrl, seatsLeft, policyAvatar, moveInLabel, groupLocalities, mustHaves } from '../helpers.js';
 import { FLAT_PREF_LBL } from '../constants.js';
+import { TAB_TEAMS } from '../model.js';
 import { MustHaveChips } from '../atoms.jsx';
 import { GroupBadges, GroupJoinButton, groupTrust } from '../GroupCard.jsx';
 import LivingStyleSection from '../livingStyle/LivingStyleSection.jsx';
@@ -68,6 +69,22 @@ function Member({ m, policy, label, onRemove }) {
   );
 }
 
+function FullNotice({ g, owned }) {
+  const { t } = useTranslation();
+  const loc = groupLocalities(g)[0];
+  return (
+    <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-sm text-amber-200" data-testid="group-full-notice">
+      <Icon name="lock" className="w-4 h-4 shrink-0" aria-hidden="true" />
+      {owned ? t('flatmates.teamFullHostNotice') : t('flatmates.teamFullNotice')}
+      {!owned && (
+        <Link to={'/flatmates?view=' + TAB_TEAMS + (loc ? '&loc=' + encodeURIComponent(loc) : '')} className="font-semibold text-teal-300 underline underline-offset-2" data-testid="group-full-see-open">
+          {t('flatmates.teamFullSeeOpen')}
+        </Link>
+      )}
+    </p>
+  );
+}
+
 export default function GroupDetail({ g, owned, myStatus, onJoin, onLeave, onCancel, onRemoveMember, onReport, ownerPanel }) {
   const { t } = useTranslation();
   const left = seatsLeft(g);
@@ -85,6 +102,7 @@ export default function GroupDetail({ g, owned, myStatus, onJoin, onLeave, onCan
         meta={<span className="inline-flex items-center gap-1"><Icon name="map-pin" className="w-3.5 h-3.5 text-teal-300 shrink-0" />{groupLocalities(g).join(', ')}</span>}
         badges={<GroupBadges g={g} reviewStatus={g.reviewStatus} owned={owned} />}
       />
+      {left <= 0 && myStatus !== 'accepted' && <FullNotice g={g} owned={owned} />}
       <TrustPanel items={groupTrust(g, t)} />
     </>
   );

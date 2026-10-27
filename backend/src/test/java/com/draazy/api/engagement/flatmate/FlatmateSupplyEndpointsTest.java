@@ -39,6 +39,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.ResultActions;
 
 // A cap a client enforces is a suggestion, so Guardrails proves the anti-broker cap and the address
 // dedupe hold in the process that inserts, and Tiers that a tier is derived.
@@ -317,16 +318,32 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         return publish("flatmate_groups", idOf(json));
     }
 
+    private static String huntingGroupBody(String title, String locality, String policy, long rentMax,
+            int seats, int seatsOpen, String name) {
+        return """
+                {"title":"%s","policy":"%s","seats":%d,"seatsOpen":%d,"name":"%s",
+                 "preferences":{"localities":["%s"],"rentMax":%d,"depositMax":100000,
+                   "gatedOnly":false,"bachelors":false}}
+                """.formatted(title, policy, seats, seatsOpen, name, locality, rentMax);
+    }
+
     private String publishOpenGroup(User host, String title, String locality, int rent, int seats,
             int seatsOpen)
             throws Exception {
         String json = mvc.perform(post(Routes.Flatmates.GROUPS)
                         .header(HttpHeaders.AUTHORIZATION, bearer(host))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"title":"%s","locality":"%s","policy":"any","rent":%d,"deposit":10000,
-                                 "seats":%d,"seatsOpen":%d,"name":"%s"}
-                                """.formatted(title, locality, rent, seats, seatsOpen, host.getName())))
+                        .content(huntingGroupBody(title, locality, "any", rent, seats, seatsOpen, host.getName())))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return publish("flatmate_groups", idOf(json));
+    }
+
+    private String createHuntingGroup(User host, String title, String locality) throws Exception {
+        String json = mvc.perform(post(Routes.Flatmates.GROUPS)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(huntingGroupBody(title, locality, "women", 40000, 3, 1, "Host")))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString();
         return publish("flatmate_groups", idOf(json));
@@ -504,11 +521,11 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         }
 
         @Test
-        @DisplayName("a client cannot award itself the owner tier by asking for it")
-        void tierIsDerivedNotAccepted() throws Exception {
+        @DisplayName("an owner cannot post a team; owners list rooms")
+        void ownerCannotPostATeam() throws Exception {
             User host = user("9820000010", "Claimant");
 
-            String json = mvc.perform(post(Routes.Flatmates.GROUPS)
+            mvc.perform(post(Routes.Flatmates.GROUPS)
                             .header(HttpHeaders.AUTHORIZATION, bearer(host))
                             .contentType(MediaType.APPLICATION_JSON)
                             .content("""
@@ -516,10 +533,10 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                                      "name":"Claimant","role":"owner",
                                      "propertyId":"11111111-1111-1111-1111-111111111111"}
                                     """))
-                    .andExpect(status().isCreated())
-                    .andExpect(jsonPath("$.verificationTier").value("identity"))
-                    .andReturn().getResponse().getContentAsString();
-            assertThat(json).doesNotContain("\"verificationTier\":\"owner\"");
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.error").value("owner_lists_rooms"));
+            assertThat(jdbc.queryForObject("select count(*) from flatmate_groups where host_id = ?",
+                    Integer.class, host.getId())).isZero();
         }
 
         @Test
@@ -892,7 +909,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
 
             publish("flatmate_groups", id);
 
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "Kothrud"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "teams").param("locality", "Kothrud"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].members.length()").value(2))
 
@@ -910,9 +927,9 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         @DisplayName("per-head rent is derived from the whole-flat rent, so it cannot drift")
         void perHeadIsDerived() throws Exception {
             User host = user("9820000034", "MathsHost");
-            createGroup(host, "Split three ways", "Baner");
+            createHuntingGroup(host, "Split three ways", "Baner");
 
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "Baner"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "teams").param("locality", "Baner"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].rent").value(40000))
                     .andExpect(jsonPath("$.content[0].perHead").value(40000 / 3));
@@ -963,7 +980,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             jdbc.update("update flatmate_groups set seats_open = 4 where id = ?::uuid", id);
             publish("flatmate_groups", id);
             entityManager.clear();
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "Aundh"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "teams").param("locality", "Aundh"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content[0].seatsOpen").value(2));
         }
@@ -1000,6 +1017,76 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     "select count(*) from flatmate_requests where kind = 'group' and target_id = ?::uuid",
                     Integer.class, id);
             assertThat(rows).isZero();
+        }
+
+        @Test
+        @DisplayName("a full group leaves the board and comes back when a seat opens, but stays readable by id")
+        void fullGroupLeavesTheBoardUntilASeatOpens() throws Exception {
+            User host = user("9820990101", "FullBoardHost");
+            String id = createHuntingGroup(host, "Full in Aundh", "Aundh");
+
+            setGroupSeats(host, id, 0).andExpect(status().isOk());
+            publish("flatmate_groups", id);
+
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "teams").param("locality", "Aundh"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.id == '%s')]".formatted(id)).isEmpty());
+            mvc.perform(get(Routes.Flatmates.GROUP_BY_ID, id))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.item.seatsOpen").value(0));
+
+            setGroupSeats(host, id, 1).andExpect(status().isOk());
+            publish("flatmate_groups", id);
+
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "teams").param("locality", "Aundh"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.content[?(@.id == '%s')]".formatted(id)).isNotEmpty());
+        }
+
+        @Test
+        @DisplayName("a full post frees a cap slot, and reopening it over the cap is host_capped")
+        void fullPostFreesACapSlotButReopeningRespectsTheCap() throws Exception {
+            User host = user("9820990102", "CapReopenHost");
+            String id = createGroup(host, "Soon full in Kothrud", "Kothrud");
+            setGroupSeats(host, id, 0).andExpect(status().isOk());
+            String roomId = createRoom(host, "Kothrud", "Cap Towers D");
+            setRoomSeats(host, roomId, 0).andExpect(status().isOk());
+
+            createRoom(host, "Kothrud", "Cap Towers A");
+            createRoom(host, "Kothrud", "Cap Towers B");
+            createRoom(host, "Kothrud", "Cap Towers C");
+
+            setRoomSeats(host, roomId, 1)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message", Matchers.endsWith("(host_capped)")));
+            setGroupSeats(host, id, 1)
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message", Matchers.endsWith("(host_capped)")));
+            mvc.perform(patch(Routes.Flatmates.GROUP_BY_ID, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(groupBody("Soon full in Kothrud", "Kothrud")))
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.message", Matchers.endsWith("(host_capped)")));
+            entityManager.clear();
+            assertThat(groupSeatsOpen(id)).isZero();
+        }
+
+        private ResultActions setGroupSeats(User host, String id, int seatsOpen) throws Exception {
+            return setSeats(Routes.Flatmates.GROUP_SEATS, host, id, seatsOpen);
+        }
+
+        private ResultActions setRoomSeats(User host, String id, int seatsOpen) throws Exception {
+            return setSeats(Routes.Flatmates.ROOM_SEATS, host, id, seatsOpen);
+        }
+
+        private ResultActions setSeats(String route, User host, String id, int seatsOpen) throws Exception {
+            ResultActions result = mvc.perform(patch(route, id)
+                    .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"seatsOpen\":" + seatsOpen + "}"));
+            entityManager.clear();
+            return result;
         }
     }
 
@@ -1563,10 +1650,32 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             return publish("flatmate_groups", idOf(json));
         }
 
-        private void decide(User ops, String groupId, String decision) throws Exception {
-            String reviewId = jdbc.queryForObject(
-                    "select id::text from flatmate_reviews where group_id = ?::uuid",
-                    String.class, groupId);
+        private String tenantClaimRoom(User host, String society, String locality) throws Exception {
+            String json = mvc.perform(post(Routes.Flatmates.ROOMS)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(host))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(withSocietyIds("""
+                                    {"bhk":"2","roomType":"Private room","attachedBath":"attached","locality":"%s",
+                                     "society":"%s","rentShare":15000,"deposit":30000,
+                                     "hostRole":"tenant","agreementDeclared":true,%s,
+                                     "photos":["%s"],"ownerConsentMobile":"%s",%s,%s}
+                                    """.formatted(locality, society, agreementEvidence(host), photoOf(host),
+                                    recordOwnerConsent(host, null, society, locality), FlatmateRoomFixture.BASICS,
+                                    FlatmateRoomFixture.DETAILS))))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.verificationTier").value("tenant"))
+                    .andReturn().getResponse().getContentAsString();
+            return publish("flatmate_rooms", idOf(json));
+        }
+
+        private String reviewOf(String subjectId) {
+            return jdbc.queryForObject(
+                    "select id::text from flatmate_reviews where ?::uuid in (room_id, group_id)",
+                    String.class, subjectId);
+        }
+
+        private void decide(User ops, String subjectId, String decision) throws Exception {
+            String reviewId = reviewOf(subjectId);
             mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, reviewId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(ops))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -1578,16 +1687,16 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         @DisplayName("a pending claim is on the wire as pending, and the badge filter drops it")
         void pendingIsVisibleAndFiltered() throws Exception {
             User host = user("9820000070", "Waiting", Roles.Wire.BUYER, false);
-            String id = tenantClaimGroup(host, "Awaiting Ops", "VerdictTownA");
+            String id = tenantClaimRoom(host, "Awaiting Ops", "VerdictTownA");
 
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "VerdictTownA"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "VerdictTownA"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
                     .andExpect(jsonPath("$.content[0].id").value(id))
 
                     .andExpect(jsonPath("$.content[0].reviewStatus").value("pending"));
 
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up")
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in")
                             .param("locality", "VerdictTownA").param("verifiedOnly", "true"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
@@ -1598,11 +1707,11 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         void approvedSurvivesTheFilter() throws Exception {
             User host = user("9820000071", "Approved");
             User ops = user("9820000072", "Ops3", Roles.Wire.STAFF);
-            String id = tenantClaimGroup(host, "Ops said yes", "VerdictTownB");
+            String id = tenantClaimRoom(host, "Ops said yes", "VerdictTownB");
 
             decide(ops, id, "approved");
 
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up")
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in")
                             .param("locality", "VerdictTownB").param("verifiedOnly", "true"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
@@ -1615,11 +1724,9 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         void rejectedIsListedButUnverified() throws Exception {
             User host = user("9820000073", "Rejected", Roles.Wire.BUYER, false);
             User ops = user("9820000074", "Ops4", Roles.Wire.STAFF);
-            String id = tenantClaimGroup(host, "Ops said no", "VerdictTownC");
+            String id = tenantClaimRoom(host, "Ops said no", "VerdictTownC");
 
-            String reviewId = jdbc.queryForObject(
-                    "select id::text from flatmate_reviews where group_id = ?::uuid",
-                    String.class, id);
+            String reviewId = reviewOf(id);
             mvc.perform(patch(Routes.Moderation.FLATMATE_REVIEW_BY_ID, reviewId)
                             .header(HttpHeaders.AUTHORIZATION, bearer(ops))
                             .contentType(MediaType.APPLICATION_JSON)
@@ -1632,12 +1739,12 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
                     .containsEntry("title", "We could not verify your flatmate post")
                     .hasEntrySatisfying("body", b -> assertThat((String) b).contains("Illegible agreement"));
 
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "VerdictTownC"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "VerdictTownC"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
                     .andExpect(jsonPath("$.content[0].reviewStatus").value("rejected"));
 
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up")
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in")
                             .param("locality", "VerdictTownC").param("verifiedOnly", "true"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(0)));
@@ -1667,10 +1774,10 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         @DisplayName("a post nobody had to review carries no verdict at all")
         void noClaimMeansNoVerdict() throws Exception {
             User host = user("9820000077", "No claim");
-            createGroup(host, "Just a group", "VerdictTownE");
+            createRoom(host, "VerdictTownE", "Plain Heights");
 
             // Not "pending": there is nothing queued, and saying pending would invent a promise.
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up").param("locality", "VerdictTownE"))
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "move-in").param("locality", "VerdictTownE"))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.content", Matchers.hasSize(1)))
                     .andExpect(jsonPath("$.content[0].reviewStatus").doesNotExist());
@@ -1708,10 +1815,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
         }
 
         private String facetGroupBody(String title, String locality, String policy, long rent) {
-            return """
-                    {"title":"%s","locality":"%s","policy":"%s","rent":%d,"deposit":10000,
-                     "seats":3,"seatsOpen":1,"name":"Host"}
-                    """.formatted(title, locality, policy, rent);
+            return huntingGroupBody(title, locality, policy, rent, 3, 1, "Host");
         }
 
         private void createFacetGroup(User host, String title, String locality, String policy,
@@ -1764,7 +1868,7 @@ class FlatmateSupplyEndpointsTest extends AbstractApiTest {
             createFacetGroup(host, "Mid", "RentFacetTown", "any", 40000);
             createFacetGroup(host, "Pricey", "RentFacetTown", "any", 60000);
 
-            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "team-up")
+            mvc.perform(get(Routes.Flatmates.FEED).param("tab", "teams")
                             .param("locality", "RentFacetTown")
                             .param("minBudget", "10000").param("maxBudget", "15000"))
                     .andExpect(status().isOk())
