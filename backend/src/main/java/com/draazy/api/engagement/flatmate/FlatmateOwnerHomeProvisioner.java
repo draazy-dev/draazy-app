@@ -38,8 +38,8 @@ class FlatmateOwnerHomeProvisioner {
         this.audit = audit;
     }
 
-    /** The account is made in its own transaction and the home insert is on-conflict-do-nothing, so a retry or a race
-     * cannot fail the answer. Other errors are logged; one inside the insert would still abort the answer. */
+    /** The account is made in its own transaction and the home insert rolls back to a savepoint on a database error,
+     * so a failure here is logged and the answer stands. */
     void saveHome(FlatmateOwnerNotice notice, FlatmateRoom room) {
         try {
             Optional<User> owner = ownerOf(notice);

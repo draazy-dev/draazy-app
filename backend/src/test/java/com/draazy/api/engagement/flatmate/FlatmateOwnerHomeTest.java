@@ -38,8 +38,11 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @DisplayName("Flatmates — an owner who confirms a room gets an account, a private home, and a way to list it")
 class FlatmateOwnerHomeTest extends AbstractApiTest {
@@ -59,6 +62,9 @@ class FlatmateOwnerHomeTest extends AbstractApiTest {
 
     @PersistenceContext
     EntityManager em;
+
+    @Autowired
+    PlatformTransactionManager transactions;
 
     @MockitoBean
     DecisionMessenger messenger;
@@ -476,6 +482,45 @@ class FlatmateOwnerHomeTest extends AbstractApiTest {
                 .andExpect(status().isNotFound());
         assertThat(jdbc.queryForObject("select count(*) from properties where owner_id = ?", Integer.class,
                 stranger.getId())).isZero();
+    }
+
+    @Test
+    @DisplayName("a database error inside the home insert is logged and the owner's answer still stands")
+    void aFailingHomeInsertDoesNotUndoTheAnswer() throws Exception {
+        String owner = ownerMobile(30);
+        String roomId = postRoom(host(30, "Asha Rao"), owner);
+        jdbc.update("alter table managed_properties add constraint zz_refuse_notice_heights "
+                + "check (society is distinct from 'Notice Heights') not valid");
+
+        answer(tokensSentTo(owner).getFirst(), "agree")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("agreed"))
+                .andExpect(jsonPath("$.homeSaved").value(false));
+
+        assertThat(consentGranted(roomId)).isTrue();
+        assertThat(homesOfOwnerWith(owner)).isEmpty();
+        assertThat(new TransactionTemplate(transactions).execute(TransactionStatus::isRollbackOnly))
+                .as("the failed insert must not doom the transaction that carries the answer").isFalse();
+    }
+
+    @Test
+    @DisplayName("publishing through the wizard is only for a flatmate owner home, not any private record")
+    void publishWithRefusesARecordThatIsNotAFlatmateHome() throws Exception {
+        User owner = existingOwner(31);
+        UUID recordId = jdbc.queryForObject("""
+                insert into managed_properties (owner_id, title, deal, property_type, price, locality)
+                values (?, 'My flat', 'rent', 'flat', 0, 'Baner') returning id
+                """, UUID.class, owner.getId());
+
+        mvc.perform(post(Routes.MeManagedProperties.BASE + "/" + recordId + "/listing")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Sunny 2 BHK\",\"deal\":\"rent\",\"propertyType\":\"apartment\","
+                                + "\"price\":25000,\"locality\":\"Baner\",\"city\":\"Pune\"," + listingImages(owner)
+                                + "}"))
+                .andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("select count(*) from properties where owner_id = ?", Integer.class,
+                owner.getId())).isZero();
     }
 
     @Test
