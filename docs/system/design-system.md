@@ -277,20 +277,22 @@ floating controls on the same corner intercept each other's taps.
 
 The ConnectivityBanner at 1450 is the one rung on that ladder that is *top* chrome, deliberately. The
 bottom edge of a phone viewport already carries five fixed layers, and a sixth at 360px would sit on
-the floating tab bar or its raised centre FAB; docked to `--dz-top-inset` it cannot cover either,
+the floating tab bar or its raised active bubble; docked to `--dz-top-inset` it cannot cover either,
 structurally rather than by promise. It outranks the cookie card because a first-visit consent prompt
 must never be the reason a dropped connection goes unexplained, and sits under blocking modals
 because a dialog already owns the screen while it is up.
 
-The tab bar is a floating capsule rather than an edge-to-edge bar because an edge-to-edge bar reads as
-a wall while a detached capsule reads as a control sitting on the page — which is what lets the page
-scroll visibly under and around it. The material is one blur plus one `saturate()` boost plus a light
-inset top edge, not a stack of decorations: `saturate()` is what stops the blur turning the app's teal
-into grey mud. Its fill is tinted with `--indigo-1`/teal rather than neutral grey so it reads as Draazy
-chrome next to the teal Post button, and the alphas (0.74/0.86) are set by the worst case — a gallery
-or a reel can put near-white imagery directly behind it, and a lighter fill left the labels on
-mid-grey. Without `backdrop-filter` (Firefox Android, older WebViews) the capsule falls back to an
-opaque fill; a translucent one there is just unreadable text over content.
+The tab bar floats 12px off the screen edges rather than running edge to edge, so the page reads as
+scrolling under a control instead of ending at a wall. It is an opaque `--bottom-nav-solid` bar with
+12px corners and a drop shadow; the active tab is marked by a notch cut into the bar's top edge with a
+teal bubble rising through it, and both slide together to the next slot. The notch is a CSS mask on
+`.dz-bottom-nav__bg::before` driven by two registered custom properties (`--dz-nav-i`, the slot index,
+and `--dz-notch-y`, the notch depth) so they animate instead of flipping; the shadow is a
+`drop-shadow()` on the unmasked parent because a filter on the masked layer is cut away with it. Post
+is a plain tab in the centre slot: tapping it slides the notch there first, then opens the chooser. On
+routes owning no slot the notch closes in place, so the next tab slides from there rather than from 0.
+In landscape phones the 44px bar has no room for a raised bubble, so the bubble sits inside the bar and
+the notch stays closed.
 
 ### Top chrome: `--dz-nav-h`, `--dz-top-inset`, hide-on-scroll
 `--dz-nav-h` is the only place the top bar's height is written down: the row, every page's top
@@ -387,15 +389,14 @@ the fold) and `.dz-sticky-cta`, which is genuinely `fixed` and docks at `--dz-bo
 keyboard, so a sticky row there floated mid-screen over the fields being typed into.
 
 ### Mobile bottom nav + the floating-glass material
-The primary wayfinding surface on phones is a floating capsule, not an edge-to-edge bar: an
-edge-to-edge bar reads as a wall, a detached capsule reads as a control sitting on the page. The
-material is one blur + one saturation boost + a light inset top edge, tinted with the app's own
-indigo/teal — `saturate()` is what stops the blur turning the brand teal into grey mud. Alphas are set
-by the worst case (near-white gallery imagery behind the bar), not the pretty one. Both users of the
-material (`.dz-bottom-nav`, `.filter-fab`) share the same `left` inset so they sit on one vertical
-edge, and both carry an opaque `@supports not (backdrop-filter)` fallback for Firefox Android and old
-WebViews. Height is owned by `--dz-bottom-nav-h` **only** — an inline `style` on the element would
-desync every widget that positions against `--dz-bottom-inset`.
+The primary wayfinding surface on phones is the floating notched bar described under Bottom chrome.
+The floating-glass material — one blur + one saturation boost + a light inset top edge, tinted with
+the app's own indigo/teal (`saturate()` is what stops the blur turning the brand teal into grey mud) —
+is now used by `.filter-fab` alone. Its alphas are set by the worst case (near-white gallery imagery
+behind it), not the pretty one, and it carries an opaque `@supports not (backdrop-filter)` fallback
+for Firefox Android and old WebViews. `.filter-fab` shares the bar's `left` inset so the two sit on
+one vertical edge. Bar height is owned by `--dz-bottom-nav-h` **only** — an inline `style` on the
+element would desync every widget that positions against `--dz-bottom-inset`.
 
 ### Home-screen install nudge is two mechanisms, not one
 `InstallPrompt.jsx` promotes adding Draazy to the home screen, and the platform split is real
@@ -471,7 +472,7 @@ hits the hidden one first.
 ### Reduced motion is a first-class state
 Decorative motion is cut under `prefers-reduced-motion: reduce`, and the app additionally honours a
 user-toggled "Reduce motion" setting mirroring the OS one. What survives is the half that carries
-information: the bottom-nav indicator keeps its opacity fade but loses its travel; the filter FAB
+information: the bottom-nav notch and bubble jump to the active slot without sliding; the filter FAB
 keeps its shadow drop but loses the press scale; sheets keep a short opacity transition instead of the
 slide. When cutting motion, ask which half of the effect reports state.
 
