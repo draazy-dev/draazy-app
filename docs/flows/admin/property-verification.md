@@ -516,6 +516,9 @@ Rationale relocated from `OwnershipVerificationService` Javadoc.
 - **Recording evidence never grants the badge.** The gate is a judgement about a set of documents
   taken together; a system where uploading the third file silently promotes a listing is one where
   nobody decided anything.
+- **The badge needs the owner's ID verified first**, as for flatmate hosts. Grant answers 409
+  `owner_identity_unverified` until the owner's identity is approved; every ownership case response
+  carries `ownerIdVerified`, and the panel disables Grant with "Owner ID pending" while it is false.
 - **A badge request is explicit, and rides the stays-live re-check, not a new queue.** Filing a paper
   in the vault asks for nothing. The owner presses **Request Verified property badge** in the Dashboard
   Document Vault (`POST /properties/{id}/verification/ownership/request`, owner-only; 409

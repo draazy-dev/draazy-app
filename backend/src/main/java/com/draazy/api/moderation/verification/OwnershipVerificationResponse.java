@@ -13,7 +13,8 @@ public record OwnershipVerificationResponse(
         List<Evidence> evidence,
         Instant requestedAt,
         Instant declinedAt,
-        String declinedReason) {
+        String declinedReason,
+        boolean ownerIdVerified) {
 
     // Expired rows stay because the case file is a history, not a snapshot.
     public record Evidence(

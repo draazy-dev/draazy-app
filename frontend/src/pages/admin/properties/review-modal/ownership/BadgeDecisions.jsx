@@ -5,17 +5,21 @@ import { missingEvidenceId } from './vocabulary.js';
 export default function BadgeDecisions({
   id, verification, pending, canDecide, reason, setReason, onGrant, onWithdraw,
 }) {
-  const blocked = verification.missingKinds.length > 0;
+  const missingEvidence = verification.missingKinds.length > 0;
+  const ownerIdPending = verification.ownerIdVerified === false;
+  const blocked = missingEvidence || ownerIdPending;
   if (!verification.verified) {
     return (
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <button type="button" disabled={Boolean(pending) || !canDecide || blocked}
-          aria-describedby={blocked ? missingEvidenceId(id) : undefined}
+          aria-describedby={missingEvidence ? missingEvidenceId(id) : ownerIdPending ? `${id}-owner-id` : undefined}
           className="dz-btn dz-btn-success" onClick={onGrant}>
           {pending === 'grant' ? 'Granting ownership verification…' : 'Grant ownership verification'}
         </button>
-        <p className={blocked ? 'text-xs text-amber-200' : 'text-xs text-gray-500'}>
-          {blocked ? 'Record the missing evidence first.' : 'Every visitor sees the badge on the public listing.'}
+        <p id={`${id}-owner-id`} className={blocked ? 'text-xs text-amber-200' : 'text-xs text-gray-500'}>
+          {missingEvidence ? 'Record the missing evidence first.'
+            : ownerIdPending ? "Owner ID pending: verify the owner's ID first."
+              : 'Every visitor sees the badge on the public listing.'}
         </p>
       </div>
     );

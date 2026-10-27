@@ -69,6 +69,7 @@ class OwnershipVerificationTest extends AbstractApiTest {
         // A staff account is keyed in the permission map by its desk, and one with no desk is refused
         // outright. Which desk is immaterial here — the seeded document grants all six the same set.
         if (Roles.Wire.STAFF.equals(role)) u.setTeam(Teams.RENTAL);
+        u.setVerified(Roles.Wire.OWNER.equals(role));
         User saved = users.saveAndFlush(u);
         if (Roles.Wire.STAFF.equals(role)) {
             jdbc.update("""
@@ -514,6 +515,32 @@ class OwnershipVerificationTest extends AbstractApiTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(evidenceBody("index_ii", Instant.now().plus(2, ChronoUnit.DAYS))))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("the badge waits for the owner's ID to be approved, and the staff view says so")
+    void theBadgeNeedsAnApprovedOwnerId() throws Exception {
+        User owner = user("9820000631", Roles.Wire.OWNER);
+        owner.setVerified(false);
+        users.saveAndFlush(owner);
+        Property listing = listing(owner, "buy");
+        String staff = bearer(user("9820000632", Roles.Wire.STAFF));
+        record(listing, staff, "index_ii", Instant.now().minus(5, ChronoUnit.DAYS));
+
+        mvc.perform(get(ownership(listing)).header(HttpHeaders.AUTHORIZATION, staff))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.ownerIdVerified").value(false));
+        mvc.perform(post(ownership(listing)).header(HttpHeaders.AUTHORIZATION, staff))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("owner_identity_unverified"));
+
+        owner.setVerified(true);
+        users.saveAndFlush(owner);
+        mvc.perform(get(ownership(listing)).header(HttpHeaders.AUTHORIZATION, staff))
+                .andExpect(jsonPath("$.ownerIdVerified").value(true));
+        mvc.perform(post(ownership(listing)).header(HttpHeaders.AUTHORIZATION, staff))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.verified").value(true));
     }
 
     @Test

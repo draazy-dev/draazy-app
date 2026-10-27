@@ -292,6 +292,8 @@ class ModerationRecordTest extends AbstractApiTest {
     @DisplayName("granting the ownership badge tells the owner")
     void badgeGrantNotifiesTheOwner() throws Exception {
         User owner = user("9891200020", "owner");
+        owner.setVerified(true);
+        users.saveAndFlush(owner);
         User staff = user("9891200021", "staff");
         Property listing = listing(owner, "buy");
         String ownership = "/properties/" + listing.getId() + "/verification/ownership";

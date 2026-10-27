@@ -15155,6 +15155,7 @@ components:
         requestedAt: { type: [string, 'null'], format: date-time, description: 'The owner asked for the badge from their document vault; cleared by a grant or a decline.' }
         declinedAt: { type: [string, 'null'], format: date-time, description: 'Staff answered the last request without granting the badge.' }
         declinedReason: { type: [string, 'null'], description: 'What the owner must fix before asking again.' }
+        ownerIdVerified: { type: boolean, description: "The owner's ID is approved. Grant answers 409 owner_identity_unverified until it is." }
 
     OwnershipEvidence:
       type: object

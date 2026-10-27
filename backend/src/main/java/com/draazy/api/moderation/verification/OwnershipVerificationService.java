@@ -82,7 +82,7 @@ public class OwnershipVerificationService {
         Property property = participantProperty(actor, propertyId);
         return OwnershipGate.toResponse(property,
                 evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()),
-                Instant.now(), reviews(actor));
+                Instant.now(), reviews(actor), ownerIdVerified(property));
     }
 
     // Reviewer-only and audited; the files' signed URLs are minted one at a time by documentUrl.
@@ -168,7 +168,7 @@ public class OwnershipVerificationService {
                 "documentId", saved.getDocumentId() == null ? null : saved.getDocumentId().toString(),
                 "issuedOn", issuedOn.toString());
         return OwnershipGate.toResponse(property,
-                evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, true);
+                evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, true, ownerIdVerified(property));
     }
 
     // Announces only on transition into verified state.
@@ -181,6 +181,9 @@ public class OwnershipVerificationService {
         if (!gate.missing().isEmpty()) {
             throw new BadRequestException("ownership evidence is incomplete: missing "
                     + String.join(", ", gate.missing()));
+        }
+        if (!ownerIdVerified(property)) {
+            throw new ConflictException("owner_identity_unverified", "Verify the owner's ID first");
         }
 
         boolean wasVerified = property.isOwnershipVerifiedAt(now);
@@ -195,7 +198,7 @@ public class OwnershipVerificationService {
             notifier.notify(property.getOwner().getId(), "listing.badge_verified", "Your listing is a Verified property",
                     PropertyLifecycle.label(property) + " now carries the Verified property badge.", "/dashboard");
         }
-        return OwnershipGate.toResponse(property, rows, now, true);
+        return OwnershipGate.toResponse(property, rows, now, true, true);
     }
 
     // Evidence rows survive revocation because they are the investigation.
@@ -212,7 +215,7 @@ public class OwnershipVerificationService {
             referralTriggers.ownershipRevoked(property.getId());
         }
         return OwnershipGate.toResponse(property,
-                evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, true);
+                evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, true, ownerIdVerified(property));
     }
 
     @Transactional
@@ -239,7 +242,7 @@ public class OwnershipVerificationService {
             audit.record(actor, "property.ownership.requested", "property", propertyId);
         }
         return OwnershipGate.toResponse(property,
-                evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, false);
+                evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, false, ownerIdVerified(property));
     }
 
     @Transactional
@@ -258,7 +261,11 @@ public class OwnershipVerificationService {
                 "Verified property badge not granted yet", why,
                 "/dashboard?tab=documents&prop=" + property.getId());
         return OwnershipGate.toResponse(property,
-                evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, true);
+                evidence.findByPropertyIdOrderByIssuedAtDesc(property.getId()), now, true, ownerIdVerified(property));
+    }
+
+    private boolean ownerIdVerified(Property property) {
+        return identity.isApproved(property.getOwner().getId());
     }
 
     private static void requireReason(String reason) {
