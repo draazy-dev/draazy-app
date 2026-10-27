@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import { digits, fmtPhone, isFullMobile } from '../../../lib/contact.js';
@@ -9,11 +9,6 @@ import MessageList from './MessageList.jsx';
 import PropChip from './PropChip.jsx';
 import { useTargetCard } from './useTargetCard.js';
 
-const quickReplies = (property) => [
-  'Is it still available?',
-  'Can I visit this Saturday?',
-  property?.deal === 'rent' ? "What's the final rent?" : "What's the final price?",
-];
 const draftKey = (userId, threadId) => `dzMsgDraft:${userId || 'anon'}:${threadId}`;
 const finePointer = () => typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
 const hasPrivateContact = (text) =>
@@ -53,6 +48,7 @@ export default function Thread({
   userId,
   offline,
   sendError,
+  replies = [],
 }) {
   const [menu, setMenu] = useState(false);
   const [replyTo, setReplyTo] = useState(null);
@@ -66,9 +62,8 @@ export default function Thread({
   const canCall = isFullMobile(mobile);
   const partyDigits = digits(mobile);
   const key = active ? draftKey(userId, active.id) : '';
-  const showQuick = active && active.youAre === 'buyer' && !active.staged && !active.blocked && (!active.messages.length || active.messages.at(-1)?.from === 'them');
+  const showQuick = replies.length > 0 && !draft.trim();
   const showPrivacyHint = draft && !canCall && hasPrivateContact(draft);
-  const replies = useMemo(() => quickReplies(active?.property).slice(0, 3), [active?.property]);
   const previewOpen = !!preview;
   const flatmate = active && !active.group && !active.propertyId ? active.flatmate : null;
   const flatmateCard = useTargetCard(flatmate?.kind, flatmate?.id);
