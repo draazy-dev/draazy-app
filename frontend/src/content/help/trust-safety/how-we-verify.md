@@ -57,7 +57,7 @@ For a sale, always run an independent title check before paying anything. We off
 
 | Badge | Meaning |
 | --- | --- |
-| ID verified | The person's ID and live selfie were reviewed and accepted. Shown on owners, tenants and flatmate seekers |
+| KYC done | The person's ID and live selfie were reviewed and accepted. Shown on owners, tenants and flatmate seekers |
 | Verified property | Ownership or tenancy evidence for the home was accepted and is still current. Also shown on flatmate rooms and groups |
 | RERA shared | A MahaRERA registration number shared by owner, check it on MahaRERA - the number links to its MahaRERA search result |
 | No badge | Nobody has submitted anything yet. Common and not suspicious - treat with normal caution. |

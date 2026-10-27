@@ -14,7 +14,7 @@ const openBoard = async (page) => {
 const hero = (page) => page.locator('.sf-hero').first();
 const onCaptureRoute = (page) => expect(page).toHaveURL(/\/verify-identity/);
 
-const verifiedBadge = (page) => hero(page).getByText('ID verified', { exact: true });
+const verifiedBadge = (page) => hero(page).getByText('KYC done', { exact: true });
 
 test.describe('Flatmates seeker verification entry point (live)', () => {
   test('the hero CTA hands an unverified seeker to the identity funnel, and declining leaves them on the board', async ({ page }) => {

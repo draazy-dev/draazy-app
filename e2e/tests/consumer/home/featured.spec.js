@@ -18,8 +18,9 @@ test('Featured rail shows real properties, and a card opens its details page dir
   await cards.first().waitFor({ timeout: 10000 });
   expect(await cards.count()).toBeGreaterThan(0);
 
-  // Tiles carry the verified symbol (icon only) — no "Featured"/"Verified" text tags.
-  await expect(page.locator('section span[title="Verified"]').first()).toBeVisible();
+  // Tiles carry the verified symbol (icon only), named after one of the two badges.
+  await expect(page.locator('section span.badge-verified-icon[role="img"]').first())
+    .toHaveAttribute('title', /KYC done|Verified property/);
 
   expect(errors, `console errors: ${errors.join('\n')}`).toHaveLength(0);
 

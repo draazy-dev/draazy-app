@@ -76,7 +76,7 @@ Act quickly. The first few hours matter.
 
 ## How Draazy helps
 
-On Draazy you contact owners directly. Owners who complete our online KYC, a government ID and a live selfie reviewed by our staff, carry an ID verified badge. Ownership papers earn a separate badge. Neither badge certifies legal title, so still do the checks above. [See how verification works](/how-verification-works).
+On Draazy you contact owners directly. Owners who complete our online KYC, a government ID and a live selfie reviewed by our staff, carry a KYC done badge. Ownership papers earn a separate badge. Neither badge certifies legal title, so still do the checks above. [See how verification works](/how-verification-works).
 
 We never collect rent, deposits or token amounts on behalf of owners, and we never ask for money over WhatsApp. If anyone asks you to pay a "Draazy fee" outside the app, it is a scam. Read [how we verify owners and listings](/help/a/how-we-verify) and [Spotting a rental scam](/help/a/spot-a-scam), and [report a listing](/help/a/report-a-listing) if something feels wrong.
 

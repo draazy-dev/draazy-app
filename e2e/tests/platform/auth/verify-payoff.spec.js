@@ -5,7 +5,7 @@ import { API, authHeaders, uploadedListingPhotos, signedInAsNew } from '../../..
 const VERIFIED_OWNER = 'p5021';
 const UNVERIFIED_OWNER = 'p5007';
 
-const identityBadge = (scope) => scope.getByRole('img', { name: 'ID verified', exact: true });
+const identityBadge = (scope) => scope.getByRole('img', { name: 'KYC done', exact: true });
 
 // Scope to the owner card because other parts of the detail page also carry trust copy.
 const ownerCard = (page) => page.locator('a[href^="/owner/"]').first();
@@ -13,14 +13,14 @@ const ownerCard = (page) => page.locator('a[href^="/owner/"]').first();
 test('a verified owner\'s listing carries the trust signal a buyer can see', async ({ page }) => {
   await page.goto(`/property/${VERIFIED_OWNER}`);
 
-  await expect(ownerCard(page).getByText('ID verified')).toBeVisible();
+  await expect(ownerCard(page).getByText('KYC done')).toBeVisible();
 });
 
 test('an ownership-badged listing without identity verification does not claim ID verification', async ({ page }) => {
   await page.goto(`/property/${UNVERIFIED_OWNER}`);
 
   await expect(ownerCard(page).getByText('Verified property')).toBeVisible();
-  await expect(ownerCard(page).getByText('ID verified')).toHaveCount(0);
+  await expect(ownerCard(page).getByText('KYC done')).toHaveCount(0);
 });
 
 test('the search results badge the verified owner and not the unverified one', async ({ page }) => {

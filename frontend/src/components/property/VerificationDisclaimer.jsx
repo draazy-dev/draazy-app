@@ -11,7 +11,7 @@ export default function VerificationDisclaimer({ deal }) {
       <div className="min-w-0">
         <p className="text-sm font-semibold text-white mb-1">What “Verified property” means — and what you must still check</p>
         <p className="text-xs text-slate-300 leading-relaxed">
-          A “Verified property” badge means Draazy sighted the document the owner provided, and “ID verified” means
+          A “Verified property” badge means Draazy sighted the document the owner provided, and “KYC done” means
           Draazy reviewed the owner’s identity. Neither is a <span className="font-semibold text-amber-200">certification</span> of the document’s authenticity, legal validity{isRent ? '' : ', or of clear and marketable title'}.
         </p>
         <p className="text-xs text-slate-300 leading-relaxed mt-1.5">
