@@ -1,8 +1,15 @@
 package com.draazy.api.catalog.photo;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 
 import com.draazy.api.catalog.property.PhotoHash;
+import com.draazy.api.common.error.RateLimitedException;
 import com.draazy.api.provider.FileStorage;
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -24,7 +31,7 @@ class PhotoServiceTest {
     @Test
     void storesStrippedBytes() {
         CapturingStorage storage = new CapturingStorage();
-        PhotoService service = new PhotoService(storage, new PhotoKeys("test-secret"));
+        PhotoService service = service(storage);
         byte[] jpeg = jpeg(
                 segment(0xE1, "Exif\0\0GPS=home".getBytes(StandardCharsets.ISO_8859_1)),
                 segment(0xDA, new byte[] {0, 0}),
@@ -43,7 +50,7 @@ class PhotoServiceTest {
     @Test
     void aDecodableUploadCarriesItsServerComputedHashInTheKey() throws Exception {
         CapturingStorage storage = new CapturingStorage();
-        PhotoService service = new PhotoService(storage, new PhotoKeys("test-secret"));
+        PhotoService service = service(storage);
         byte[] png = encode(scene(800, 600), "png");
 
         PhotoDto dto = service.upload(UUID.randomUUID(),
@@ -63,7 +70,7 @@ class PhotoServiceTest {
         CapturingStorage storage = new CapturingStorage();
         byte[] jpeg = jpeg(segment(0xDA, new byte[] {0, 0}), new byte[] {1, 2, 3, (byte) 0xFF, (byte) 0xD9});
 
-        PhotoDto dto = new PhotoService(storage, new PhotoKeys("test-secret")).upload(UUID.randomUUID(),
+        PhotoDto dto = service(storage).upload(UUID.randomUUID(),
                 new MockMultipartFile("file", "room.jpg", "image/jpeg", jpeg));
 
         assertThat(PhotoHash.fromGallery(List.of(dto.url()))).isEmpty();
@@ -75,7 +82,7 @@ class PhotoServiceTest {
         CapturingStorage storage = new CapturingStorage();
         byte[] png = encode(scene(2400, 1600), "png");
 
-        PhotoDto dto = new PhotoService(storage, new PhotoKeys("test-secret")).upload(UUID.randomUUID(),
+        PhotoDto dto = service(storage).upload(UUID.randomUUID(),
                 new MockMultipartFile("file", "room.png", "image/png", png));
 
         String original = storage.key;
@@ -93,7 +100,7 @@ class PhotoServiceTest {
     void aCopyIsNeverWiderThanTheOriginal() throws Exception {
         CapturingStorage storage = new CapturingStorage();
 
-        new PhotoService(storage, new PhotoKeys("test-secret")).upload(UUID.randomUUID(),
+        service(storage).upload(UUID.randomUUID(),
                 new MockMultipartFile("file", "room.png", "image/png", encode(scene(600, 400), "png")));
 
         assertThat(widthOf(storage.stored.get(storage.key + ".w960.jpg"))).isEqualTo(600);
@@ -108,7 +115,7 @@ class PhotoServiceTest {
     void aTallNarrowPhotoIsSubsampledOnBothAxesButKeepsItsShape() throws Exception {
         CapturingStorage storage = new CapturingStorage();
 
-        new PhotoService(storage, new PhotoKeys("test-secret")).upload(UUID.randomUUID(),
+        service(storage).upload(UUID.randomUUID(),
                 new MockMultipartFile("file", "tower.png", "image/png", encode(scene(1200, 9000), "png")));
 
         BufferedImage card = ImageIO.read(new ByteArrayInputStream(storage.stored.get(storage.key + ".w480.jpg")));
@@ -141,6 +148,34 @@ class PhotoServiceTest {
                 null)))
                 .containsExactly("00ff00ff00ff00ff");
         assertThat(PhotoHash.fromGallery(null)).isNull();
+    }
+
+    @Test
+    void anUploadOverTheDailyCapStoresNothing() {
+        CapturingStorage storage = new CapturingStorage();
+        PhotoUploadQuota quota = mock(PhotoUploadQuota.class);
+        doThrow(new RateLimitedException("cap", 60)).when(quota).reserve(any(), anyString());
+
+        assertThatThrownBy(() -> new PhotoService(storage, new PhotoKeys("test-secret"), quota).upload(
+                UUID.randomUUID(), new MockMultipartFile("file", "room.png", "image/png", encode(scene(600, 400), "png"))))
+                .isInstanceOf(RateLimitedException.class);
+        assertThat(storage.stored).isEmpty();
+    }
+
+    @Test
+    void theQuotaRecordsTheExactKeyTheOriginalIsStoredUnder() throws Exception {
+        CapturingStorage storage = new CapturingStorage();
+        PhotoUploadQuota quota = mock(PhotoUploadQuota.class);
+        UUID owner = UUID.randomUUID();
+
+        new PhotoService(storage, new PhotoKeys("test-secret"), quota).upload(owner,
+                new MockMultipartFile("file", "room.png", "image/png", encode(scene(600, 400), "png")));
+
+        verify(quota).reserve(owner, storage.key);
+    }
+
+    private static PhotoService service(FileStorage storage) {
+        return new PhotoService(storage, new PhotoKeys("test-secret"), mock(PhotoUploadQuota.class));
     }
 
     private static BufferedImage scene(int w, int h) {
@@ -198,11 +233,6 @@ class PhotoServiceTest {
 
         @Override
         public void store(String key, byte[] content, String contentType) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String signedUploadUrl(String key) {
             throw new UnsupportedOperationException();
         }
 

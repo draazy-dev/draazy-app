@@ -647,7 +647,7 @@ ShedLock is needed.
 |---|---|---|
 | Frequent | `draazy.jobs.frequent.cron` (`0 */15 * * * *`) | `abandoned-checkouts`, `pass-refunds`, `listing-duplicates`, `staff-sla` |
 | Hourly | `draazy.jobs.hourly.cron` (`0 5 * * * *`) | `subscription-expiry`, `saved-search-counts`, `page-view-rollup`, `flatmate-post-expiry` (public reads don't check `active_until`, so a lapsed post shows until it runs) |
-| Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `listing-content-purge`, `flatmate-owner-notice-purge`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
+| Nightly, 00:00 | `draazy.jobs.nightly.cron` (`0 0 0 * * *`) | silent cleanup: `refresh-tokens`, `referral-signal-retention`, `co-fill-invite-retention`, `service-request-identity-retention`, `notification-retention`, `page-view-retention`, `error-event-retention`, `audit-log-retention`, `provider-call-retention`, `listing-content-purge`, `photo-upload-sweep`, `flatmate-owner-notice-purge`, `identity-image-purge`, `identity-delete-retry`, `identity-conflict-retention` |
 | Daytime, 10:00 | `draazy.jobs.daytime.cron` (`0 0 10 * * *`) | anything that messages a user: `identity-pending-expiry`, `contact-returns`, `referral-holds`, `needs-info`, `flatmate-owner-tier`, `flatmate-agreement-expiry`, `flatmate-draazy-agreements`, `flatmate-post-reminders`, `renewal-reminders`, `tracked-rent-reminders`, `waiting-digest` |
 
 The app is always on, so the `@Scheduled` cron runs in-process at the times above with no external
@@ -744,13 +744,14 @@ API's CORS config. On the public bucket → **Settings** → **CORS policy**:
 
 ```json
 [{ "AllowedOrigins": ["https://sandbox.draazy.com"],
-   "AllowedMethods": ["GET", "PUT"],
+   "AllowedMethods": ["GET"],
    "AllowedHeaders": ["*"],
    "MaxAgeSeconds": 3600 }]
 ```
 
 Without it the browser-side perceptual hashing fails at the canvas read (§3.2) and nothing surfaces as a
-CORS error, so it reads as a flaky uploader. **Checkpoint:** after §6.4, upload a listing photo and reload
+CORS error, so it reads as a flaky uploader. `GET` only: photos are uploaded through `POST /me/photos`, so
+no browser ever writes to a bucket. **Checkpoint:** after §6.4, upload a listing photo and reload
 the listing; it must render from the public bucket URL.
 
 ### 6.3 DigitalOcean account and GitHub environments

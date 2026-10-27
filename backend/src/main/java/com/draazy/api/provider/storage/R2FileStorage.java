@@ -19,7 +19,6 @@ import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
-import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 // Documents and photos go to separate buckets, making the seam's boundary real.
 @Component
@@ -82,15 +81,6 @@ class R2FileStorage implements FileStorage, DisposableBean {
                         .contentType(contentType)
                         .build(),
                 RequestBody.fromBytes(content));
-    }
-
-    @Override
-    public String signedUploadUrl(String key) {
-        PutObjectPresignRequest req = PutObjectPresignRequest.builder()
-                .signatureDuration(URL_TTL)
-                .putObjectRequest(PutObjectRequest.builder().bucket(privateBucket).key(key).build())
-                .build();
-        return presigner.presignPutObject(req).url().toString();
     }
 
     @Override

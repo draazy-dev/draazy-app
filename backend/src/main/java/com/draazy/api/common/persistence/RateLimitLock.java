@@ -38,7 +38,12 @@ public class RateLimitLock {
 
         REPORT_CREATE(11),
 
-        REQUEST_REMINDER(12);
+        REQUEST_REMINDER(12),
+
+        PHOTO_UPLOAD(13),
+
+        /** One key for every owner notice: the platform-wide cap has no narrower key, and notices are rare. */
+        OWNER_NOTICE(14);
 
         private final int namespace;
 

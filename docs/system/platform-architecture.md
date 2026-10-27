@@ -283,7 +283,7 @@ graph TB
     PAGES -.signed GET.-> R2
     PAGES -.map + autocomplete.-> MAPS
     RUN --> DB
-    RUN -->|pre-signed PUT| R2
+    RUN -->|server-side PUT| R2
     RUN --> FCM
     RUN --> WA
     RUN --> MAIL
@@ -409,8 +409,8 @@ flowchart LR
 
     U -->|HTTPS| DOMAIN
     U --> EPH
-    U -->|pre-signed PUT| PUB
-    U -->|pre-signed PUT| PRIV
+    DOMAIN -->|validated, metadata-stripped PUT| PUB
+    DOMAIN -->|validated PUT| PRIV
     EPH -.verify.-> SMS
     PRIV -->|reviewer reads the image<br/>hash + last four only| PII
     DOMAIN -.amount.-> PAY
@@ -903,24 +903,27 @@ support surprise.
   **private** storage (PII).
 - **Ratified store.** Cloudflare R2 (ADR-005) - 10 GB free, **zero egress**, S3-compatible.
 - **Upload path.**
-  - **A. Pre-signed PUT (direct-to-R2, chosen)** - API issues a short-lived signed URL; the browser
-    uploads **straight to R2**. The API never touches the bytes -> saves API compute/bandwidth and
-    avoids request-size caps (vital for reels).
-  - B. Proxy through the API - simpler, but burns compute/bandwidth and hits the request-size cap.
-- **Access model.** **Split buckets**: listing **photos -> public bucket via CDN** (cacheable);
-  **Identity captures & property documents -> private bucket**, served only via **short-lived signed GET** after an
-  authz check.
-- **Image processing.** Client-side compress + a few sizes on upload for MVP ($0); add Cloudflare
-  Images / on-the-fly transforms later.
-- **Recommendation (ratified).** Pre-signed direct-to-R2 behind the `StorageClient` seam (mock = local
-  disk in dev); split public/private buckets; validate content-type + size server-side when issuing the
-  signed URL; strip EXIF; defer malware scanning.
-- **Security.** Private docs never public; signed URLs short-lived + scoped; authz checked before
-  issuing; EXIF stripped; MIME/size allow-list.
-- **Performance.** Direct upload offloads the API; CDN caches photos at edge; zero egress cost.
+  - A. Pre-signed PUT (direct-to-R2) - the browser uploads straight to R2. Saves API bandwidth, but the
+    server never sees the bytes, so it cannot check them before they are public.
+  - **B. Proxy through the API (built)** - `POST /me/photos` and the document endpoints take multipart
+    uploads, check magic bytes, size and dimensions, strip metadata, hash the photo and write the card
+    copies, then store with the API's own R2 key. The browser holds no R2 credential or signed write URL,
+    and the 1 MB photo cap keeps the compute small.
+- **Access model.** **Split buckets**: listing **photos -> public bucket via CDN** (cacheable, world-readable,
+  never browser-writable); **Identity captures & property documents -> private bucket**, served only via
+  **short-lived signed GET** after an authz check.
+- **Abuse limits.** At most 100 photo uploads per account per rolling 24 hours (`photo_uploads`, counted
+  under an advisory lock). The nightly `photo-upload-sweep` deletes an upload that no listing, flatmate
+  room or avatar shows 7 days after it was made, which bounds what an abandoned draft can leave behind.
+- **Image processing.** Client-side compress; server writes 480 px and 960 px JPEG card copies.
+- **Recommendation (ratified).** Proxy through the API behind the `FileStorage` seam (mock = local disk in
+  dev); split public/private buckets; strip EXIF; defer malware scanning.
+- **Security.** Private docs never public; signed GETs short-lived + scoped; authz checked before
+  issuing; EXIF stripped; MIME/size allow-list; R2 CORS allows `GET` only.
+- **Performance.** CDN caches photos at edge; zero egress cost.
 - **Cost.** $0 within 10 GB; R2 zero-egress avoids the classic S3 bandwidth bill.
-- **Future scale.** Cloudflare Images/transforms; reel transcoding via a job/queue; per-user quotas.
-- **Score - Performance 9 | Security 8 | Cost 9 | Ops simplicity 8.**
+- **Future scale.** Cloudflare Images/transforms; reel transcoding via a job/queue.
+- **Score - Performance 8 | Security 9 | Cost 9 | Ops simplicity 8.**
 ### 6.8 Payments
 
 - **Purpose.** Collect plan subscriptions, paid service requests and amendments. It once also
@@ -1056,7 +1059,7 @@ support surprise.
 | ADR-010 | Notification channels + delivery | WhatsApp: Meta Cloud API direct vs BSP (Twilio/Gupshup); Email: Brevo/Resend; In-app: Postgres table; delivery: inline vs transactional outbox | Meta WhatsApp Cloud API direct + Brevo email + Postgres in-app, all behind `NotifierClient` seam, with a transactional outbox | Free tiers; low lock-in (direct APIs); outbox guarantees delivery across restarts and redeploys; seam keeps vendors swappable | Adds `notifications`/`outbox` tables + drainer job; WhatsApp needs Meta business account + template approval |
 | ADR-011 | Background jobs | A: external scheduler -> internal endpoint; B: GitHub Actions cron; C: always-on container + native @Scheduled | Option C - always-on single container with in-process `@Scheduled` | Fires on time with no external trigger, no warming ping and no cold starts; no cost beyond the compute already paid | `JobRunner` runs every job in four IST cron groups (every 15 min, hourly, 00:00 cleanup, 10:00 user-facing), each group under a Postgres advisory lock (`JobRunScheduler`) so a second instance never double-sends (no ShedLock), each job behind `draazy.jobs.<name>.enabled`. No internal jobs endpoint; see DEPLOY.md §5 |
 | ADR-012 | Search strategy | **PostgreSQL** (indexes + `tsvector` + `pg_trgm` + PostGIS); Meilisearch/Typesense; OpenSearch/Elastic; Algolia | PostgreSQL behind a search seam | Domain is structured filters + geo, not free-text relevance; Places handles autocomplete; $0, one datastore, no sync lag | Add PostGIS for map radius; keyset pagination; swap to Meilisearch/Typesense (via outbox/CDC) when relevance/volume grows |
-| ADR-013 | Media storage + upload path | Pre-signed direct-to-R2 vs proxy-through-API; single vs split buckets | Pre-signed direct-to-R2 (S3-compatible) behind `StorageClient` seam; split public (photos/CDN) + private (KYC/docs, signed GET) | Offloads bytes from the API; zero-egress R2; PII stays private with short-lived scoped URLs | Client-side resize at MVP; EXIF strip + MIME/size allow-list; malware scan + transcoding deferred |
+| ADR-013 | Media storage + upload path | Pre-signed direct-to-R2 vs proxy-through-API; single vs split buckets | **Proxy through the API** (multipart to `/me/photos` and the document endpoints) behind the `FileStorage` seam; split public (photos/CDN) + private (KYC/docs, signed GET) | The server must see the bytes before they are world-readable (magic bytes, metadata strip, hash, card copies); the browser holds no R2 write credential; zero-egress R2; PII stays private with short-lived scoped URLs | 1 MB photo cap; 100 photo uploads per account per 24 h; unattached uploads swept after 7 days; R2 CORS `GET` only; malware scan + transcoding deferred |
 | ADR-014 | Payment gateway + rent-fund scope | Razorpay; Cashfree; PhonePe PG; PayU; Stripe. Rent: fee-only vs move funds (Route/escrow). UPI: aggregator (Route A) vs direct collection (Route B) | Razorpay behind `PaymentClient` seam; **fee-only at MVP**, rent settles off-platform; **Route A (aggregator) now, Route B UPI-direct as documented cost-reduction upgrade** | No gateway has a free usage tier, but all are ₹0 fixed + pay-per-txn (fits $0-until-revenue); zero-MDR does NOT make UPI free through an aggregator (their service fee applies); Route A's webhooks/reconciliation are worth more than the tiny MVP-volume fee | **Provider superseded by ADR-017 (Cashfree primary; Razorpay = fallback)** - fee-only scope, Route A/B and seam design unchanged; server-side verify + idempotent webhooks + audit; confirm live per-txn rates before signing |
 | ADR-015 | Cache + rate limiting + abuse | Defer Redis (CDN + Postgres + in-process + Cloudflare edge) vs Upstash Redis from day one | Defer dedicated Redis; CDN + Postgres cache-at-write + in-process caching; Cloudflare edge WAF/rate-limit/Turnstile + Postgres OTP counters | Caching capability stays at $0 without a new server; shared-cache benefit marginal at MVP volume; add Redis only when measured | Behind `Cache`/`RateLimiter` seam; Upstash Redis is the upgrade for cross-instance cache + distributed limits |
 | ADR-016 | Operational foundation | GitHub environment secrets vs a cloud secret store; GitHub Actions; App Platform logs/alerts + in-app error log vs Sentry; DR: provider backups only vs + scheduled pg_dump->R2 | GitHub environment secrets + GitHub Actions + App Platform Runtime Logs/alerts + in-app `error_event` log + uptime checks; **DR = managed-database backups + scheduled pg_dump->R2** | All free; pg_dump->R2 gives portable off-provider insurance, and the dev database has no backups | RPO ~24h / RTO hours at MVP; audit in Postgres; upgrade to PITR + tracing + canary later |
@@ -1092,7 +1095,7 @@ record that answers *who approved this* after the fact.
 - **A-Q16 -> Login-OTP channel = WhatsApp `AUTHENTICATION` template via Meta Cloud API direct, WhatsApp-only with no SMS fallback, behind the existing `OtpSender` seam; DLT/TRAI drops off the critical path (ADR-020).**
 - **A-Q8 -> Background jobs = always-on container + in-process @Scheduled under Postgres advisory locks (ADR-011).**
 - **A-Q9 -> Search = PostgreSQL (indexes + FTS + pg_trgm + PostGIS) behind a swap seam (ADR-012).**
-- **A-Q10 -> Media = pre-signed direct-to-R2, split public/private buckets, `StorageClient` seam (ADR-013).**
+- **A-Q10 -> Media = uploads proxied through the API, split public/private buckets, `FileStorage` seam (ADR-013).**
 - **A-Q11 -> Payments = Cashfree PG (Razorpay = fallback), fee-only at MVP (rent off-platform), `PaymentClient` seam (ADR-014, ADR-017).**
 - **A-Q14 -> Provider consolidation = Cashfree primary for Payments now, Payouts later behind a `PayoutClient` seam; prod 2FA via RSA public-key signature (ADR-017, ADR-018). Identity verification left the vendor entirely (ADR-009).**
 - **A-Q12 -> Cache/limits = defer Redis; CDN + Postgres + in-process + Cloudflare edge; Upstash later (ADR-015).**

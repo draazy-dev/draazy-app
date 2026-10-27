@@ -228,11 +228,6 @@ class IdentityFilePurgeAfterCommitTest {
         }
 
         @Override
-        public String signedUploadUrl(String key) {
-            return key;
-        }
-
-        @Override
         public String signedDownloadUrl(String key) {
             return key;
         }

@@ -19,10 +19,12 @@ public class PhotoService {
 
     private final FileStorage storage;
     private final PhotoKeys keys;
+    private final PhotoUploadQuota quota;
 
-    public PhotoService(FileStorage storage, PhotoKeys keys) {
+    public PhotoService(FileStorage storage, PhotoKeys keys, PhotoUploadQuota quota) {
         this.storage = storage;
         this.keys = keys;
+        this.quota = quota;
     }
 
     public PhotoDto upload(UUID ownerId, MultipartFile file) {
@@ -41,6 +43,7 @@ public class PhotoService {
         if (hash != null) {
             key += "-" + PhotoHash.toHex(hash);
         }
+        quota.reserve(ownerId, key);
         storeVariants(key, bytes);
         return new PhotoDto(storage.storePublic(key, bytes, type));
     }
