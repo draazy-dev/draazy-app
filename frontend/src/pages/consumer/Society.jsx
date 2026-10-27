@@ -78,7 +78,7 @@ export default function Society() {
             {soc._generic ? null : <button onClick={toggleComposer} className="btn-outline !h-11 sm:!h-9 !px-3 text-sm"><Icon name={myReview ? 'pencil' : 'star'} className="w-4 h-4 mr-1.5" /> {t(myReview ? 'common.editReview' : 'society.review')}</button>}
             {/* Label collapses below sm (three pills overflow 360px); aria-label
                 names it, and min-width stands in for the missing text width. */}
-            <button onClick={shareSociety} aria-label={t('society.share')} className="btn-outline !h-11 sm:!h-9 !px-3 !min-w-[44px] sm:!min-w-0 justify-center text-sm"><Icon name="share-2" className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">{t('society.share')}</span></button>
+            <button onClick={shareSociety} aria-label={t('society.share')} className="btn-outline !h-11 sm:!h-9 !px-3 !min-w-[44px] sm:!min-w-0 justify-center text-sm"><Icon name="share-network" className="w-4 h-4 sm:mr-1.5" /> <span className="hidden sm:inline">{t('society.share')}</span></button>
           </div>
           <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-8">
             <div className="flex flex-wrap items-center gap-2 mb-2">

@@ -103,8 +103,8 @@ public interface PropertyMapper {
     @Mapping(target = "recheckRequestedAt", expression = OWN_SIDE + "property.getRecheckRequestedAt() : null)")
     @Mapping(target = "archived", expression = OWN_SIDE + "(Boolean) property.isArchived() : null)")
     @Mapping(target = "featured", expression = OWN_SIDE + "(Boolean) property.isFeatured() : null)")
-    @Mapping(target = "qualityScore",
-            expression = "java(property.getQualityScore() == null ? null : property.getQualityScore().intValue())")
+    @Mapping(target = "qualityScore", expression = OWN_SIDE
+            + "(property.getQualityScore() == null ? null : property.getQualityScore().intValue()) : null)")
     @Mapping(target = "societyId",
             expression = OWN_SIDE + "(property.getSocietyId() == null ? null : property.getSocietyId().toString()) : null)")
     @Mapping(target = "pincode", expression = OWN_SIDE + "property.getPincode() : null)")

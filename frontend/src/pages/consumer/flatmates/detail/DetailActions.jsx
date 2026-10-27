@@ -30,7 +30,7 @@ export function TitleShare({ text }) {
   const share = useShare(text);
   return (
     <button type="button" onClick={() => void share()} aria-label={t('flatmates.detailShare')} className="seg w-11 h-11 shrink-0 rounded-xl text-gray-300 inline-flex items-center justify-center cursor-pointer">
-      <Icon name="share-2" className="w-4 h-4" aria-hidden="true" />
+      <Icon name="share-network" className="w-4 h-4" aria-hidden="true" />
     </button>
   );
 }

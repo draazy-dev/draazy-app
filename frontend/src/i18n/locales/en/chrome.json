@@ -32,8 +32,6 @@
     "selectPlaceholder": "Select…",
     "searchPlaceholder": "Search…",
     "pickerCancel": "Cancel",
-    "qualityScore": "Quality Score",
-    "listingQuality": "Listing quality: {{score}}/100",
     "qualityShort": "Quality: {{score}}/100",
     "qualityExcellent": "Excellent",
     "qualityGood": "Good",

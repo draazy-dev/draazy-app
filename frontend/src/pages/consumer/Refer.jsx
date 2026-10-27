@@ -129,7 +129,7 @@ export default function Refer() {
             <div className={`grid grid-cols-1 gap-3 ${canNativeShare ? 'sm:grid-cols-2' : ''}`}>
               {canNativeShare && (
                 <button onClick={shareNative} className="btn-teal px-4 py-3 min-h-[44px] rounded-xl font-semibold inline-flex items-center justify-center gap-2">
-                  <Icon name="share-2" className="w-4 h-4" /> {t('misc1.referShare')}
+                  <Icon name="share-network" className="w-4 h-4" /> {t('misc1.referShare')}
                 </button>
               )}
               <button onClick={shareWA} aria-label={t('misc1.referWhatsApp')} className={`px-4 py-3 min-h-[44px] rounded-xl font-semibold inline-flex items-center justify-center gap-2 transition-colors ${canNativeShare ? 'border border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10' : 'btn-teal'}`}>

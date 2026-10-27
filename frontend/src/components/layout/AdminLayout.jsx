@@ -47,6 +47,8 @@ function AdminLayoutInner() {
   const pageModule = currentModule?.key;
   const pageRunbook = pageModule && runbooksFor(articles, user).find((a) => a.modules?.includes(pageModule));
   const runbookHref = portalPath(user, pageRunbook ? `/admin/runbooks/${pageRunbook.slug}` : '/admin/runbooks');
+  const canPostOnBehalf = hasPermission(user, 'postOnBehalf:write');
+  const goFromDrawer = (to) => { setOpen(false); navigate(to); };
 
   const doLogout = () => {
     logout();
@@ -99,6 +101,17 @@ function AdminLayoutInner() {
             <X className="h-5 w-5" />
           </button>
         </div>
+        {/* The phone top bar has no room for these two; the desktop bar carries them from lg up. */}
+        {canPostOnBehalf ? (
+          <div className="space-y-1 border-b border-white/10 px-3 pb-3 lg:hidden">
+            <button type="button" onClick={() => goFromDrawer(portalPath(user, '/admin/post-on-behalf'))} className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-teal-500/30 bg-teal-500/10 px-3 text-sm font-medium text-teal-300 transition hover:bg-teal-500/20">
+              <UserPlus className="h-4 w-4" /> Post on Behalf
+            </button>
+            <button type="button" onClick={() => goFromDrawer('/')} className="flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 text-sm text-gray-300 transition hover:bg-white/5 hover:text-white">
+              <ExternalLink className="h-4 w-4" /> View live site
+            </button>
+          </div>
+        ) : null}
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 pt-2 pb-[calc(0.5rem+var(--dz-safe-b))]">
           {nav.filter((m) => !m.group).map(navLink)}
           {navGroups.map((g) => {
@@ -151,7 +164,7 @@ function AdminLayoutInner() {
 
             <AdminTopbarTools />
 
-            {hasPermission(user, 'postOnBehalf:write') ? (
+            {canPostOnBehalf ? (
               <div className="hidden items-center gap-1.5 ml-auto lg:flex">
                 <button onClick={() => navigate(portalPath(user, '/admin/post-on-behalf'))} className="flex items-center gap-1.5 rounded-lg border border-teal-500/30 bg-teal-500/10 px-3 py-1.5 text-xs font-medium text-teal-300 hover:bg-teal-500/20 transition">
                   <UserPlus className="h-3.5 w-3.5" /> Post on Behalf

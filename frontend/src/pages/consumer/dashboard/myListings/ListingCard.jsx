@@ -198,7 +198,7 @@ export default function ListingCard({
               </div>
               <div className="flex items-center gap-1 sm:shrink-0">
                 {onShare && (
-                  <ListingStatusAction action={{ kind: 'button', onClick: () => onShare(l, viewHref), icon: 'share-2', label: t('owner.listingStatus.actions.share') }} />
+                  <ListingStatusAction action={{ kind: 'button', onClick: () => onShare(l, viewHref), icon: 'share-network', label: t('owner.listingStatus.actions.share') }} />
                 )}
                 {(tenantRoom || tenantGroup) && (
                   <ListingStatusAction

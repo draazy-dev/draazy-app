@@ -617,16 +617,16 @@ class PropertiesEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void publicDetailCarriesTheServerQualityScore() throws Exception {
+    void publicDetailWithholdsTheQualityScore() throws Exception {
         Property p = save(owner("9810000096"), "Scored", "rent", "apartment", new BigDecimal("2"), 25000, "Kothrud", "approved", false);
         em.flush();
         em.clear();
-        Property stored = properties.findById(p.getId()).orElseThrow();
+        assertThat(properties.findById(p.getId()).orElseThrow().getQualityScore()).isNotNull();
         em.clear();
 
         mvc.perform(get("/properties/" + p.getId()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.qualityScore").value(stored.getQualityScore().intValue()));
+                .andExpect(jsonPath("$.qualityScore").doesNotExist());
     }
 
     @Test
