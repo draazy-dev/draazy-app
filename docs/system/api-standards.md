@@ -91,6 +91,7 @@ Rules:
 | Failed `If-Match` precondition | `412` | `Error` |
 | Semantic validation failure (bean validation) | `422` | `ValidationProblem` |
 | Rate limited | `429` | `Error` + `Retry-After` |
+| A provider we depend on is down (e.g. the OTP send) | `503` | `Error`, + `Retry-After` when a retry can help |
 | Uncaught | `500` | `Error` (no internals leaked) |
 
 Note the deliberate split: **`400` = can't parse**, **`422` = parsed but invalid**. Auth failures stay

@@ -210,7 +210,8 @@ export default function InlineOtpSheet({ open, reason = 'contact', title: titleT
                     1: <Link to="/terms" className="text-teal-400 hover:text-teal-300" />,
                     3: <Link to="/privacy" className="text-teal-400 hover:text-teal-300" />,
                   }}
-                />
+                />{' '}
+                {t('auth.whatsappNotice')}
               </p>
             </>
           ) : (

@@ -167,12 +167,6 @@ public class OtpService {
     @Transactional(noRollbackFor = {RateLimitedException.class,
             OtpSender.DeliveryFailedException.class})
     public void sendCode(String mobile, String purpose, UUID requestedBy) {
-        sendCode(mobile, purpose, requestedBy, null);
-    }
-
-    @Transactional(noRollbackFor = {RateLimitedException.class,
-            OtpSender.DeliveryFailedException.class})
-    public void sendCode(String mobile, String purpose, UUID requestedBy, OtpSender.Context context) {
         budget.enforce(mobile, purpose, requestedBy);
 
         // Two keys, never both set. Everything after this line is identical either way, so a suite
@@ -186,7 +180,7 @@ public class OtpService {
 
         // Nothing is caught here on purpose: a delivery failure arrives already named and spared
         // from rollback, so the row survives and the attempt spends its slot.
-        sender.send(mobile, code, context);
+        sender.send(mobile, code);
     }
 
     /** Validate {@code code} against the newest unconsumed login OTP and consume it on success. The

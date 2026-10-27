@@ -260,6 +260,8 @@ environment secret **`SANDBOX_TURNSTILE_SECRET_KEY`** and its site key as the re
 **`VITE_TURNSTILE_SITE_KEY`**. The deploy stops before anything ships while either is empty, because the
 API would refuse every sign-in from a bundle without the widget. Sign in once by hand after the first
 rollout: the health check cannot catch a mismatched key pair or a widget missing the sandbox hostname.
+Turnstile is not optional here: with `WHATSAPP_ENABLED=true` the `sandbox` and `prod` profiles refuse to
+boot while `TURNSTILE_ENABLED` is false.
 
 ### 3.2 The public photo bucket must send `Access-Control-Allow-Origin`
 
@@ -899,10 +901,11 @@ Run §9.3 against `https://sandbox.draazy.com`, then the cookie test in §9.3 an
   credentials (ADR-020: `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_OTP_TEMPLATE_NAME`,
   `WHATSAPP_OTP_TEMPLATE_LANG`) before the first useful deploy. The token must be a **System User** token;
   the one the App Dashboard offers expires in 24 hours. **Before turning the flag on, add a spend cap on the
-  Meta billing account**: `OtpService` throttles per *recipient*, so walking thousands of valid-looking
+  Meta billing account** and set `TURNSTILE_ENABLED=true` (boot refuses WhatsApp on `prod`/`sandbox`
+  without it): `OtpService` throttles per *recipient*, so walking thousands of valid-looking
   numbers gets a fresh budget for each one. On WhatsApp that is worse than a bill — sends to non-WhatsApp
   numbers drag the sending number's quality rating down, which cuts the daily messaging limit and takes
-  sign-in itself offline days later.
+  sign-in itself offline days later. A failed send answers `503` with `Retry-After: 60`.
 - **Backups.** The dev database is a lightweight, single-node database; do not rely on it for recovery. A
   scheduled logical dump to R2 is the stopgap until the database is upgraded to a Managed Database.
 - **The anonymous rate limiter is bypassable until `INTERNAL_PROXIES` is set (§4).** Not a boot failure and

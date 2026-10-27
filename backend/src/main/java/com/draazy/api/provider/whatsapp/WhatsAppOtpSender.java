@@ -3,7 +3,6 @@ package com.draazy.api.provider.whatsapp;
 import com.draazy.api.provider.OtpSender;
 import com.draazy.api.provider.ProviderCalls;
 import jakarta.annotation.PostConstruct;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -45,39 +44,28 @@ class WhatsAppOtpSender implements OtpSender {
     // The code appears twice in the payload, and both are required.
     @Override
     public void send(String mobile, String code) {
-        sendTemplate(mobile, props.otpTemplateName(), props.otpTemplateLang(),
-                List.of(code), true);
-    }
-
-    private void sendTemplate(String mobile, String templateName, String templateLang,
-            List<String> bodyParams, boolean copyCodeButton) {
-        List<Map<String, Object>> components = new ArrayList<>();
-        components.add(Map.of("type", "body",
-                "parameters", bodyParams.stream()
-                        .map(value -> Map.of("type", "text", "text", value))
-                        .toList()));
-        if (copyCodeButton) {
-            components.add(Map.of("type", "button",
-                                        "sub_type", "url",
-                                        "index", "0",
-                    "parameters", List.of(Map.of("type", "text",
-                            "text", bodyParams.getFirst()))));
-        }
+        List<Map<String, Object>> components = List.of(
+                Map.of("type", "body",
+                        "parameters", List.of(Map.of("type", "text", "text", code))),
+                Map.of("type", "button",
+                        "sub_type", "url",
+                        "index", "0",
+                        "parameters", List.of(Map.of("type", "text", "text", code))));
         Map<String, Object> payload = Map.of(
                 "messaging_product", "whatsapp",
                 "recipient_type", "individual",
                 "to", COUNTRY_CODE + mobile,
                 "type", "template",
                 "template", Map.of(
-                        "name", templateName,
-                        "language", Map.of("code", templateLang),
+                        "name", props.otpTemplateName(),
+                        "language", Map.of("code", props.otpTemplateLang()),
                         "components", components));
 
         try {
             calls.track(ProviderCalls.WHATSAPP, OPERATION, mobile, null,
                     () -> client.post("/" + props.phoneNumberId() + "/messages", payload));
         } catch (WhatsAppClient.WhatsAppException e) {
-            throw new DeliveryFailedException("WhatsApp could not deliver the code.", e);
+            throw new DeliveryFailedException("We couldn't send your code on WhatsApp. Please try again in a minute.", e);
         }
     }
 

@@ -2,9 +2,14 @@ package com.draazy.api.identity.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.draazy.api.common.error.RateLimitedException;
 import com.draazy.api.common.error.UnauthorizedException;
+import com.draazy.api.common.web.Routes;
 import com.draazy.api.identity.auth.OtpCaptureConfig.CapturingOtpSender;
 import com.draazy.api.identity.auth.OtpCaptureConfig.OuterTransaction;
 import com.draazy.api.provider.OtpSender;
@@ -15,12 +20,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.web.servlet.MockMvc;
 
-/**
- * Not {@code @Transactional} on purpose: a rolled-back harness masks the bug, since the attempt and
- * send rows must outlive a thrown 401 or delivery failure. It clears its own mobile to stay rerunnable.
- */
+// Not @Transactional: a rolled-back harness hides the bug, as the send rows must outlive a thrown 401 or failed send.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(OtpCaptureConfig.class)
@@ -36,6 +41,8 @@ class OtpServiceDurabilityTest {
     OuterTransaction outer;
     @Autowired
     JdbcTemplate jdbc;
+    @Autowired
+    MockMvc mvc;
 
     @BeforeEach
     @AfterEach
@@ -44,10 +51,7 @@ class OtpServiceDurabilityTest {
         otp.failNext = false;
     }
 
-    /**
-     * The budget is derived from rows, so a rolled-back delivery failure would refund the slot and
-     * leave a chosen number rung on demand. See docs/flows/consumer/auth.md.
-     */
+    // A rolled-back failure would refund the slot and leave a chosen number rung on demand (see auth.md).
     @Test
     void aFailedDeliveryStillSpendsTheSendBudget() {
         otp.failNext = true;
@@ -60,10 +64,7 @@ class OtpServiceDurabilityTest {
         assertThat(rows).isEqualTo(1);
     }
 
-    /**
-     * {@code noRollbackFor} is per-advice, so the rule must be repeated on every method that can own
-     * the transaction — a case the sibling test above structurally cannot see.
-     */
+    // noRollbackFor is per-advice, so every method that can own the transaction must repeat it.
     @Test
     void aFailedDeliverySpendsTheBudgetEvenWhenAnOuterTransactionOwnsIt() {
         otp.failNext = true;
@@ -74,6 +75,17 @@ class OtpServiceDurabilityTest {
         Integer rows = jdbc.queryForObject(
                 "select count(*) from otp_codes where mobile = ?", Integer.class, MOBILE);
         assertThat(rows).isEqualTo(1);
+    }
+
+    @Test
+    void aFailedDeliveryIsA503ThatSaysWhenToRetry() throws Exception {
+        otp.failNext = true;
+
+        mvc.perform(post(Routes.Auth.LOGIN).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"mobile\":\"" + MOBILE + "\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string(HttpHeaders.RETRY_AFTER, "60"))
+                .andExpect(jsonPath("$.status").value(503));
     }
 
     @Test

@@ -46,12 +46,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<ApiError> handleApi(ApiException ex) {
         HttpHeaders headers = new HttpHeaders();
-        Integer retryAfterSeconds = null;
-        if (ex instanceof RateLimitedException rate) {
-            headers.add(HttpHeaders.RETRY_AFTER, String.valueOf(rate.getRetryAfterSeconds()));
+        Integer retryAfterSeconds = ex instanceof RateLimitedException rate ? Integer.valueOf(rate.getRetryAfterSeconds())
+                : ex instanceof ServiceUnavailableException down ? down.getRetryAfterSeconds() : null;
+        if (retryAfterSeconds != null) {
+            headers.add(HttpHeaders.RETRY_AFTER, String.valueOf(retryAfterSeconds));
             // Also in the body: no CORS response header is exposed, so a cross-origin browser
             // cannot read the header (docs/system/api-standards.md §4.1).
-            retryAfterSeconds = rate.getRetryAfterSeconds();
         }
         Integer attemptsRemaining =
                 ex instanceof OtpIncorrectException otp ? otp.getAttemptsRemaining() : null;
