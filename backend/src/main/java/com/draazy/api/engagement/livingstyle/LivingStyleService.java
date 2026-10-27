@@ -6,15 +6,18 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /** Self-scoped like notification preferences: the caller never names a user id. */
 @Service
 public class LivingStyleService {
 
     private final UserLivingStyleRepository rows;
+    private final ObjectMapper json;
 
-    public LivingStyleService(UserLivingStyleRepository rows) {
+    public LivingStyleService(UserLivingStyleRepository rows, ObjectMapper json) {
         this.rows = rows;
+        this.json = json;
     }
 
     @Transactional(readOnly = true)
@@ -31,13 +34,8 @@ public class LivingStyleService {
             rows.flush();
             return LivingStyleDto.EMPTY;
         }
-        UserLivingStyle row = rows.findById(userId).orElse(null);
-        if (row == null) {
-            row = new UserLivingStyle(userId, answers);
-        } else {
-            row.replace(answers);
-        }
-        return LivingStyleDto.of(rows.saveAndFlush(row));
+        rows.upsert(userId, json.writeValueAsString(answers));
+        return LivingStyleDto.of(rows.findById(userId).orElseThrow());
     }
 
     @Transactional(readOnly = true)

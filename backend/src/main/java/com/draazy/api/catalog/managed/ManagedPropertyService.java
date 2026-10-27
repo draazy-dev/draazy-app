@@ -265,6 +265,9 @@ public class ManagedPropertyService {
     @Transactional
     public Property publishWith(UUID ownerId, String id, ListingCreate body) {
         ManagedProperty m = ownedRecordForUpdate(ownerId, id);
+        if (m.getAddressFingerprint() == null) {
+            throw NotFoundException.of("Managed property");
+        }
         if (m.getPublishedListingId() != null) {
             throw new ConflictException("This home is already listed.");
         }
