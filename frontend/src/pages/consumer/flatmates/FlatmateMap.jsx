@@ -11,6 +11,8 @@ import ErrorBoundary from '../../../components/ErrorBoundary.jsx';
 
 const MAX_ROWS = 3;
 const IW_OFFSET = [0, -22];
+// A price marker stands taller than a bubble: its tail puts the anchor 7px below the pill.
+const PRICE_IW_OFFSET = [0, -42];
 
 // stable identity so vis.gl doesn't re-run setOptions each render
 const PREFIX = { group: 'g', room: 'r', seeker: 's' };
@@ -90,8 +92,8 @@ function PostRow({ item, saved, onSave, onInterest, onRoomInterest, onJoin, inte
   );
 }
 
-function framing(items, localityCoords) {
-  const pts = Object.keys(items).map((l) => localityCoords[l]).filter(Boolean);
+function framing(spots) {
+  const pts = spots.map((s) => s.pos);
   if (pts.length >= 2) {
     const lats = pts.map((p) => p[0]);
     const lngs = pts.map((p) => p[1]);
@@ -107,15 +109,45 @@ function framing(items, localityCoords) {
   return { defaultCenter: getActiveCityGeo().center, defaultZoom: 11 };
 }
 
+const priceLabel = (rent) => '₹' + Math.round(rent / 1000) + 'k';
+
+/* Rooms sit on the host's pin (split rooms share their flat's), else their locality centre as the
+   radius search does; seekers and teams have no address, so they stay one bubble per locality. */
+function toSpots(items, localityCoords) {
+  const spots = {};
+  const seen = new Set();
+  Object.entries(items).forEach(([loc, list]) => {
+    list.forEach((item) => {
+      const exact = item.kind === 'room' && item.lat != null && item.lng != null;
+      const pos = exact ? [item.lat, item.lng] : localityCoords[loc];
+      const id = (PREFIX[item.kind] || 's') + ':' + item.id;
+      if (!pos || seen.has(id)) return;
+      seen.add(id);
+      const key = item.kind === 'room' ? 'pin:' + pos.join(',') : 'loc:' + loc;
+      spots[key] = spots[key] || { key, pos, locality: loc, room: item.kind === 'room', items: [] };
+      spots[key].items.push(item);
+    });
+  });
+  return Object.values(spots);
+}
+
+function SpotMarker({ spot }) {
+  const only = spot.items[0];
+  if (spot.room && spot.items.length === 1 && only.budget > 0) {
+    return <div className="price-marker" data-fm-pin="room">{priceLabel(only.budget)}</div>;
+  }
+  return <div className="map-pin" data-fm-pin={spot.room ? 'room' : 'area'}>{spot.items.length}</div>;
+}
+
 function FlatmateMap({ items, kindWord, onInterest, onRoomInterest, onJoin, onSave, saved, interestedFor, goToPosting }) {
   const { t } = useTranslation();
   const localityCoords = useLocalityCoords(Object.keys(items));
-  const [openLoc, setOpenLoc] = useState(null);
-  const openList = openLoc && items[openLoc] ? items[openLoc] : null;
-  const openPos = openLoc ? localityCoords[openLoc] : null;
+  const spots = useMemo(() => toSpots(items, localityCoords), [items, localityCoords]);
+  const [openKey, setOpenKey] = useState(null);
+  const open = openKey ? spots.find((s) => s.key === openKey) : null;
   // Stable identity so vis.gl doesn't re-run setOptions on every render (same
   // reason IW_OFFSET is hoisted) — framing() builds a fresh bounds/center object.
-  const frame = useMemo(() => framing(items, localityCoords), [items, localityCoords]);
+  const frame = useMemo(() => framing(spots), [spots]);
   if (!GOOGLE_MAPS_API_KEY) return <MapUnavailable style={{ height: 460 }} />;
   return (
     <ErrorBoundary scope="flatmate-map" fallback={<MapUnavailable style={{ height: 460 }} />}>
@@ -134,39 +166,35 @@ function FlatmateMap({ items, kindWord, onInterest, onRoomInterest, onJoin, onSa
           fullscreenControl={false}
           style={{ width: '100%', height: '100%' }}
         >
-          {Object.keys(items).map((l) => {
-            const pos = localityCoords[l];
-            if (!pos) return null;
-            return (
-              <AdvancedMarker
-                key={l}
-                position={{ lat: pos[0], lng: pos[1] }}
-                onClick={() => setOpenLoc((cur) => (cur === l ? null : l))}
-              >
-                <div className="map-pin">{items[l].length}</div>
-              </AdvancedMarker>
-            );
-          })}
-          {openList && openPos ? (
+          {spots.map((spot) => (
+            <AdvancedMarker
+              key={spot.key}
+              position={{ lat: spot.pos[0], lng: spot.pos[1] }}
+              onClick={() => setOpenKey((cur) => (cur === spot.key ? null : spot.key))}
+            >
+              <SpotMarker spot={spot} />
+            </AdvancedMarker>
+          ))}
+          {open ? (
             <InfoWindow
-              position={{ lat: openPos[0], lng: openPos[1] }}
-              pixelOffset={IW_OFFSET}
+              position={{ lat: open.pos[0], lng: open.pos[1] }}
+              pixelOffset={open.room ? PRICE_IW_OFFSET : IW_OFFSET}
               headerDisabled
-              onClose={() => setOpenLoc(null)}
+              onClose={() => setOpenKey(null)}
               className="dz-gm-iw dz-gm-iw-share"
             >
               <div className="dz-sp">
                 <div className="dz-sp-head">
-                  <div className="dz-sp-title">{openLoc}</div>
-                  <div className="dz-sp-sub">{t(`flatmates.${kindWord}Here`, { count: openList.length })}</div>
+                  <div className="dz-sp-title">{open.locality}</div>
+                  <div className="dz-sp-sub">{t(`flatmates.${kindWord}Here`, { count: open.items.length })}</div>
                 </div>
                 <div className="dz-sp-list">
-                  {openList.slice(0, MAX_ROWS).map((item) => (
-                    <PostRow key={(PREFIX[item.kind] || 's') + ':' + item.id} item={item} saved={saved} onSave={onSave} onInterest={onInterest} onRoomInterest={onRoomInterest} onJoin={onJoin} interestedFor={interestedFor} goToPosting={goToPosting} locality={openLoc} />
+                  {open.items.slice(0, MAX_ROWS).map((item) => (
+                    <PostRow key={(PREFIX[item.kind] || 's') + ':' + item.id} item={item} saved={saved} onSave={onSave} onInterest={onInterest} onRoomInterest={onRoomInterest} onJoin={onJoin} interestedFor={interestedFor} goToPosting={goToPosting} locality={open.locality} />
                   ))}
                 </div>
-                <button type="button" className="dz-sp-all" onClick={() => goToPosting(null, null, openLoc)}>
-                  {openList.length > MAX_ROWS ? t('flatmates.seeAllInLoc', { count: openList.length, loc: openLoc }) : t('flatmates.openInList', { loc: openLoc })}
+                <button type="button" className="dz-sp-all" onClick={() => goToPosting(null, null, open.locality)}>
+                  {open.items.length > MAX_ROWS ? t('flatmates.seeAllInLoc', { count: open.items.length, loc: open.locality }) : t('flatmates.openInList', { loc: open.locality })}
                   <Icon name="arrow-right" />
                 </button>
               </div>

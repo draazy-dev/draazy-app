@@ -38,7 +38,7 @@ const PAGE_SIZE = 24;
 /* 100 is the server's ceiling (`spring.data.web.pageable.max-page-size`) and asking for more is silently clamped,
    which would leave the "showing the first N" note quoting pins never drawn. */
 const MAP_MARKER_CAP = 100;
-const MAP_MAX_AREAS = 5;
+const MAP_MAX_AREAS = 3;
 const LAST_LISTINGS_SEARCH_KEY = 'draazy.listings.lastSearch.v1';
 
 /* Localities are created on demand, so only the words no other rule claimed are looked up; the query is then parsed

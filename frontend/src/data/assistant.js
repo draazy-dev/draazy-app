@@ -46,7 +46,7 @@ export const KB = [
     id: 'search',
     keywords: ['search', 'find', 'buy', 'rent', 'browse', 'listings', 'flats', 'apartment', 'home', 'house', 'property', 'smart', 'filter', 'filters', 'bhk', 'budget', 'locality', 'area', 'map'],
     q: 'How do I search for a property?',
-    a: "Open Listings and pick Buy or Rent. Type plain English like “2 BHK under 40k in Baner, ready to move” and we turn it into filters — or set BHK, budget, furnishing and possession yourself; each option shows how many homes match. On the map, focus up to 5 localities to see their pins. Your filters live in the link, so you can share or bookmark a search.",
+    a: "Open Listings and pick Buy or Rent. Type plain English like “2 BHK under 40k in Baner, ready to move” and we turn it into filters — or set BHK, budget, furnishing and possession yourself; each option shows how many homes match. On the map, focus up to 3 localities to see their pins. Your filters live in the link, so you can share or bookmark a search.",
     actions: [
       { label: 'Open Listings', to: '/listings', icon: 'search' },
       { label: 'View on map', to: '/listings?view=map', icon: 'map-pin' },

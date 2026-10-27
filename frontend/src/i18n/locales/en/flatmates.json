@@ -488,7 +488,7 @@
     "noKindFocused": "No {{kind}} in the focused areas",
     "widenRadius": "Try a wider radius or another place.",
     "widenBudgetArea": "Try a wider budget or another area.",
-    "mapInfo": "Tap a bubble to see {{kind}} there.",
+    "mapInfo": "Tap a pin to see {{kind}} there.",
     "nearChip": "Near {{label}} · {{radius}} {{unit}}",
     "activeFilters": "Active filters:",
     "removeFilter": "Remove filter {{label}}",

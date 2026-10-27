@@ -228,7 +228,7 @@ implementation details:
 Search has no persistent record; the "state" is the filter object + view + sort + page, all mirrored
 to the URL:
 ```
-grid (default) <-> list <-> map(gated: needs 1..5 focused localities)
+grid (default) <-> list <-> map(gated: needs 1..3 focused localities)
    ^ any filter/sort/text change -> page resets to 1
    ^ deal switch -> INITIAL(deal), sort=relevance, page=1
 ```
