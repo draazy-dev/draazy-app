@@ -17,10 +17,12 @@ public class UserService {
 
     private final UserRepository users;
     private final EntityManager entityManager;
+    private final PersonNames personNames;
 
-    public UserService(UserRepository users, EntityManager entityManager) {
+    public UserService(UserRepository users, EntityManager entityManager, PersonNames personNames) {
         this.users = users;
         this.entityManager = entityManager;
+        this.personNames = personNames;
     }
 
     /** The current user's live profile, or {@code 401} if the account is gone/archived. */
@@ -109,7 +111,7 @@ public class UserService {
     public User provisionUnverified(String mobile, String name) {
         User created = new User(mobile, Roles.Wire.BUYER);
         if (name != null && !name.isBlank()) {
-            created.setName(name.trim());
+            created.setName(personNames.require(name));
         }
         created.setLastActive(Instant.now());
         return users.saveAndFlush(created);

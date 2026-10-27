@@ -12,6 +12,7 @@ import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.persistence.ConstraintViolations;
 import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.OwnerBadgeSink;
+import com.draazy.api.identity.user.PersonNames;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.provider.DecisionMessenger;
@@ -52,10 +53,12 @@ public class IdentityReviewService {
     private final AuditService audit;
     private final Clock clock;
     private final IdentityReviewReadService read;
+    private final PersonNames personNames;
 
     public IdentityReviewService(IdentityVerificationRepository verifications, UserRepository users,
             IdentityHasher hasher, OwnerBadgeSink ownerBadge, Notifier notifier,
-            DecisionMessenger decisionMessenger, AuditService audit, Clock clock, IdentityReviewReadService read) {
+            DecisionMessenger decisionMessenger, AuditService audit, Clock clock, IdentityReviewReadService read,
+            PersonNames personNames) {
         this.verifications = verifications;
         this.users = users;
         this.hasher = hasher;
@@ -65,6 +68,7 @@ public class IdentityReviewService {
         this.audit = audit;
         this.clock = clock;
         this.read = read;
+        this.personNames = personNames;
     }
 
     @Transactional(readOnly = true)
@@ -110,6 +114,8 @@ public class IdentityReviewService {
         }
         Instant now = Instant.now(clock);
         String legalName = normaliseName(body.name());
+        // Joiners are legitimate in Indic legal names but are not letters to the self-service rule.
+        personNames.require(legalName.replace("\u200C", "").replace("\u200D", ""));
         v.setIdentityHash(hash);
         v.setDocLast4(IdentityNumbers.last4(canonical));
         v.setHolderName(legalName);

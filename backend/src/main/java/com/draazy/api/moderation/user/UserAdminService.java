@@ -14,6 +14,7 @@ import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.identity.auth.RefreshTokenService;
 import com.draazy.api.identity.auth.StaffInviteService;
 import com.draazy.api.identity.auth.StaffSignInService;
+import com.draazy.api.identity.user.PersonNames;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserMapper;
 import com.draazy.api.identity.user.UserRepository;
@@ -54,6 +55,7 @@ public class UserAdminService {
     private final AccountPermissions accountPermissions;
     private final ObjectMapper objectMapper;
     private final IdentityVerificationService identity;
+    private final PersonNames personNames;
     private final String baseUrl;
 
     /** Lookup and the back-office wire projection, shared with {@link UserModerationService}. */
@@ -65,7 +67,7 @@ public class UserAdminService {
             StaffSignInService staffSignIn, RefreshTokenService refreshTokens,
             BackOfficeUserView view, AdminActionNotifier adminNotifications, StaffInviteMailer inviteMailer,
             BackOfficeGrantRepository grants, AccountPermissions accountPermissions,
-            ObjectMapper objectMapper, IdentityVerificationService identity,
+            ObjectMapper objectMapper, IdentityVerificationService identity, PersonNames personNames,
             @Value("${draazy.app.base-url}") String baseUrl) {
         this.users = users;
         this.mapper = mapper;
@@ -81,6 +83,7 @@ public class UserAdminService {
         this.accountPermissions = accountPermissions;
         this.objectMapper = objectMapper;
         this.identity = identity;
+        this.personNames = personNames;
         this.baseUrl = baseUrl.replaceAll("/+$", "");
     }
 
@@ -161,7 +164,7 @@ public class UserAdminService {
         String previousEmail = user.getEmail();
         boolean nameChanged = false;
         if (name != null && !name.isBlank()) {
-            String nextName = name.trim();
+            String nextName = personNames.require(name);
             nameChanged = !nextName.equals(previousName);
             if (nameChanged && (user.isVerified() || nameLocked)) {
                 throw new ConflictException(ErrorCodes.NAME_LOCKED_WHILE_VERIFIED,
