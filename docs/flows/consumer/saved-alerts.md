@@ -69,6 +69,9 @@ Links go to [`../../system/data-model.md`](../../system/data-model.md).
 - The Saved page uses one segmented row: All / Buy / Rent / Rooms. Its header count is split into
   homes and rooms, and the Alerts row below the tabs links to `/dashboard#alerts` with active/new
   counts. Guests see it only if alerts exist.
+- One order only, newest save first, with no sort control. All merges `/me/saved` and
+  `/me/flatmate-saves` on the `savedAt` each row carries, so a room saved between two homes sits
+  between them.
 - Guest copy is honest: "Sign in to keep your shortlist on every device." It does not promise local
   saved hearts or price-drop watchers.
 - **Swipe to remove (mobile only):** a saved card can be swiped left to remove (`useSwipeDismiss`,

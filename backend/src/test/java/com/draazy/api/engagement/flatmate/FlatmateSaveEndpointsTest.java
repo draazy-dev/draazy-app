@@ -141,6 +141,9 @@ class FlatmateSaveEndpointsTest extends AbstractApiTest {
                     .andExpect(jsonPath("$.content[0].id").value(roomId))
                     .andExpect(jsonPath("$.content[0].society").value("Zztest Heights"))
                     .andExpect(jsonPath("$.content[0].budget").value(15000))
+                    // Saved interleaves these with property saves by this timestamp.
+                    .andExpect(jsonPath("$.content[0].savedAt").isNotEmpty())
+                    .andExpect(jsonPath("$.content[0].card").doesNotExist())
                     // A shortlist is a browsing aid, not an introduction: the card is the anonymous one.
                     .andExpect(jsonPath("$.content[0].ownerMobile").doesNotExist());
         }
