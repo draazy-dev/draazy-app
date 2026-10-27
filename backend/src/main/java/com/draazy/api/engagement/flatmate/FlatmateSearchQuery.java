@@ -134,11 +134,6 @@ public record FlatmateSearchQuery(
                 meLocalities, meBudget, meGender, viewer, strictGender, roomType, furnishing, gated);
     }
 
-    /** A housed group cannot answer any of these, so while one is set it drops out of the move-in tab. */
-    public boolean roomOnly() {
-        return attachedBath != null || roomType != null || furnishing != null || gated;
-    }
-
     /** A centre without a radius (or vice versa) narrows nothing; mirrors {@code ListingFacets.hasNearPoint}. */
     public boolean hasNearPoint() {
         return nearLat != null && nearLng != null && nearRadiusKm != null && nearRadiusKm > 0;

@@ -3,6 +3,7 @@ package com.draazy.api.engagement.search;
 import com.draazy.api.catalog.property.ListingFacets;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.catalog.property.PropertySearchQuery;
+import com.draazy.api.engagement.flatmate.FlatmateGroup;
 import com.draazy.api.engagement.livingstyle.LivingStyleService;
 import com.draazy.api.engagement.livingstyle.VibeFilter;
 import jakarta.persistence.EntityManager;
@@ -117,11 +118,10 @@ class SavedSearchMatcher {
         String tab = java.util.Objects.requireNonNullElse(text(criteria, "tab"), "move-in");
         String matches = "select count(*) from (" + switch (tab) {
             case "people" -> postSelect(criteria, params, baseline, vibe);
-            case "teams" -> groupSelect(criteria, params, baseline, false, vibe);
+            case "teams" -> groupSelect(criteria, params, baseline, vibe);
             case "team-up" -> postSelect(criteria, params, baseline, vibe)
-                    + " union all " + groupSelect(criteria, params, baseline, false, vibe);
-            default -> roomSelect(criteria, params, baseline, vibe)
-                    + " union all " + groupSelect(criteria, params, baseline, true, vibe);
+                    + " union all " + groupSelect(criteria, params, baseline, vibe);
+            default -> roomSelect(criteria, params, baseline, vibe);
         } + ") x";
         Query query = em.createNativeQuery(matches);
         params.forEach(query::setParameter);
@@ -182,17 +182,15 @@ class SavedSearchMatcher {
     }
 
     private static String groupSelect(Map<String, Object> criteria, Map<String, Object> params,
-            Instant baseline, boolean housed, Vibe vibe) {
+            Instant baseline, Vibe vibe) {
         StringBuilder sql = new StringBuilder("""
                 select g.id
                 from flatmate_groups g
                 where g.archived = false and g.mod_status in (:publicStatuses)
                   and not exists (select 1 from users u where u.id = g.host_id and (u.status <> 'active' or u.archived))
                 """);
-        sql.append(housed ? " and g.property_id is not null" : " and g.property_id is null");
-        if (housed && roomOnly(criteria)) {
-            sql.append(" and false");
-        }
+        sql.append(FlatmateGroup.HAS_OPEN_SEAT_SQL);
+        sql.append(" and g.hunting");
         commonFlatmateFilters(sql, "g", criteria, params, baseline, vibe);
         Long min = longValue(criteria, "budgetMin");
         Long max = longValue(criteria, "budget");
@@ -294,14 +292,6 @@ class SavedSearchMatcher {
         String gender = text(criteria, "gender");
         return Boolean.TRUE.equals(booleanValue(criteria, "strictGender"))
                 && ("male".equals(gender) || "female".equals(gender));
-    }
-
-    /** A housed group cannot answer these, so an alert carrying one must not count it (same rule as the board). */
-    private static boolean roomOnly(Map<String, Object> criteria) {
-        return Boolean.TRUE.equals(booleanValue(criteria, "attachedBath"))
-                || facet(criteria, "roomType", ROOM_TYPES) != null
-                || facet(criteria, "furnishing", FURNISHINGS) != null
-                || Boolean.TRUE.equals(booleanValue(criteria, "gated"));
     }
 
     private static String facet(Map<String, Object> criteria, String key, java.util.Set<String> allowed) {

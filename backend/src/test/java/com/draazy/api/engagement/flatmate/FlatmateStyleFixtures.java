@@ -55,7 +55,7 @@ abstract class FlatmateStyleFixtures extends AbstractApiTest {
         jdbc.update("insert into user_living_style (user_id, answers) values (?, ?::jsonb)", who.getId(), json);
     }
 
-    private String create(String route, User author, String body) throws Exception {
+    String create(String route, User author, String body) throws Exception {
         String json = mvc.perform(post(route)
                         .header(HttpHeaders.AUTHORIZATION, bearer(author))
                         .contentType(MediaType.APPLICATION_JSON)
@@ -78,8 +78,9 @@ abstract class FlatmateStyleFixtures extends AbstractApiTest {
 
     String group(User host) throws Exception {
         return approved("flatmate_groups", create(Routes.Flatmates.GROUPS, host, """
-                {"title":"Style trio","locality":"%s","policy":"any","rent":40000,"deposit":10000,
-                 "seats":3,"seatsOpen":1,"name":"Host"}
+                {"title":"Style trio","policy":"any","seats":3,"seatsOpen":1,"name":"Host",
+                 "preferences":{"localities":["%s"],"rentMax":40000,"depositMax":100000,
+                   "gatedOnly":false,"bachelors":false}}
                 """.formatted(TOWN)));
     }
 

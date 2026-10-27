@@ -75,9 +75,10 @@ test.describe('LIVE: a group still looking for a flat', () => {
     await stranger.goto(`${origin}/flatmates?view=teams`);
     const card = stranger.locator('.sf-card', { hasText: title });
     await expect(card).toBeVisible({ timeout: 20_000 });
-    for (const fact of ['Baner, Wakad', 'Looking for a flat', 'Immediately', '2 / 3 BHK']) {
+    for (const fact of ['Baner, Wakad', 'Immediately', '2 / 3 BHK']) {
       await expect(card.getByText(fact, { exact: true })).toBeVisible();
     }
+    await expect(card.getByText('Looking for a flat', { exact: true }), 'every team on Teams is hunting, so the card does not say so').toHaveCount(0);
     await expect(card.getByText(/₹15,000 – ₹22,500/)).toBeVisible();
     await expect(card.getByTestId('must-haves').getByRole('listitem'), 'the must-haves show on the board card').toHaveText(['Semi-furnished', 'Gated society only', 'Car parking', 'Bachelors allowed']);
 

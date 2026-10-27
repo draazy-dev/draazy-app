@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, uniqueMobile } from '../../../helpers/liveAuth.js';
-import { ACTORS } from '../../../fixtures/live.js';
 import { flatmateCleanup } from '../../../helpers/flatmateCleanup.js';
 import { tenantRoomAgreement } from '../../../helpers/flatmateAgreement.js';
 import { liveListing, verifyOwnership } from '../../../helpers/referral.js';
@@ -92,47 +91,18 @@ test.describe('Flatmate host eligibility tiers', () => {
     });
   });
 
-  test('naming a property you do not own does not buy the owner tier', async ({ page }) => {
-    const host = await newHost();
-
-    const { accessToken: ownerToken } = await apiLogin(ACTORS.owner);
-    const mine = await (await fetch(`${API}/me/listings?size=50`, {
-      headers: auth(ownerToken),
-    })).json();
-    const someoneElses = mine.content.find((l) => l.status === 'approved');
-    expect(someoneElses, 'the seeded owner needs one approved listing').toBeTruthy();
-
-    const { status, body: group } = await createGroup(host.accessToken, {
-      role: 'owner', propertyId: someoneElses.id,
-    });
-
-    expect(status).toBe(201);
-    expect(group.verificationTier).toBe('identity');
-    expect(group.propertyId ?? null).toBeNull();
-  });
-
-  test('an owner who names their own approved listing earns the owner tier only once its ownership is verified', async () => {
+  test('a team cannot be hosted as owner, even by the verified owner of the flat', async () => {
     const ownerMobile = uniqueMobile();
     const { accessToken: ownerToken } = await apiLogin(ownerMobile, { name: 'Asha K' });
     const approved = await liveListing(ownerMobile);
-
-    const unbadged = await createGroup(ownerToken, { role: 'owner', propertyId: approved.id, locality: 'Baner' });
-    expect(unbadged.body.verificationTier, 'approval alone proves the listing, not who owns the flat').toBe('identity');
-
     await verifyOwnership(ownerMobile, approved);
-    const { status, body: group } = await createGroup(ownerToken, {
-      role: 'owner', propertyId: approved.id, locality: approved.locality ?? 'Baner',
-    });
+    const stranger = await newHost();
 
-    expect(status).toBe(201);
-    expect(group.verificationTier).toBe('owner');
-    expect(group.propertyId).toBe(approved.id);
-    expect(group.hostRole).toBe('owner');
-    // Tidy up: an owner-tier group is exempt from the three-post cap, but leaving it live would
-    // still change what later runs see in the Baner feed.
-    await fetch(`${API}/flatmates/groups/${group.id}`, {
-      method: 'DELETE', headers: auth(ownerToken),
-    });
+    for (const token of [ownerToken, stranger.accessToken]) {
+      const { status, body } = await createGroup(token, { role: 'owner', propertyId: approved.id, locality: 'Baner' });
+      expect(status).toBe(409);
+      expect(body.error).toBe('owner_lists_rooms');
+    }
   });
 
   test('the tier survives seat changes', async ({ page }) => {

@@ -57,16 +57,6 @@ export const occupancyOf = (item) => {
   return committed > 0 ? OCCUPANCY_FILLING : OCCUPANCY_EMPTY;
 };
 
-/* A group only counts as a place once it is attached to one — otherwise it is a set of people still hunting, which is
-   the same decision as a solo seeker. */
-export const hasAddress = (item) => !!(item && (item.propertyId || item.society));
-export const tabOf = (item) => {
-  if (!item) return TAB_PEOPLE;
-  if (item.kind === 'room') return TAB_MOVE_IN;
-  if (item.kind === 'group') return hasAddress(item) ? TAB_MOVE_IN : TAB_TEAMS;
-  return TAB_PEOPLE;
-};
-
 export const asKind = (kind) => (item) => ({ ...item, kind });
 
 /* 'room' — an owner splitting a flat prices each ROOM. */

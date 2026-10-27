@@ -52,7 +52,8 @@ class FlatmateBoardFacetsTest extends FlatmateStyleFixtures {
         UUID flat = properties.saveAndFlush(new Property(host, "Facet flat " + UUID.randomUUID(), "rent",
                 "apartment", 36000L, TOWN, "Pune")).getId();
         housed = group(host);
-        jdbc.update("update flatmate_groups set property_id = ?, policy = 'any' where id = ?::uuid", flat, housed);
+        jdbc.update("update flatmate_groups set property_id = ?, hunting = false, policy = 'any' where id = ?::uuid",
+                flat, housed);
         em.clear();
     }
 
@@ -91,17 +92,20 @@ class FlatmateBoardFacetsTest extends FlatmateStyleFixtures {
     }
 
     @Test
-    @DisplayName("without any facet the move-in tab holds rooms and the housed group")
+    @DisplayName("without any facet the move-in tab holds rooms only, and the housed group is on no tab")
     void baseline() throws Exception {
         assertThat(ids("move-in")).containsExactlyInAnyOrder(
-                anyPrivateFurnishedGated, femalePrivateSemi, maleSharedBare, housed);
+                anyPrivateFurnishedGated, femalePrivateSemi, maleSharedBare);
+        for (String tab : new String[] {"move-in", "people", "teams", "team-up"}) {
+            assertThat(ids(tab)).as(tab).doesNotContain(housed);
+        }
     }
 
     @Test
     @DisplayName("gender alone keeps rows open to anyone; strictGender drops them on every kind")
     void strictGender() throws Exception {
         assertThat(ids("move-in", "gender", "female")).containsExactlyInAnyOrder(
-                anyPrivateFurnishedGated, femalePrivateSemi, housed);
+                anyPrivateFurnishedGated, femalePrivateSemi);
         assertThat(ids("move-in", "gender", "female", "strictGender", "true"))
                 .containsExactly(femalePrivateSemi);
 
@@ -117,11 +121,11 @@ class FlatmateBoardFacetsTest extends FlatmateStyleFixtures {
     @Test
     @DisplayName("strictGender without a named gender, or with an unknown value, filters nothing")
     void strictGenderNeedsAGender() throws Exception {
-        assertThat(ids("move-in", "strictGender", "true")).hasSize(4);
+        assertThat(ids("move-in", "strictGender", "true")).hasSize(3);
         assertThat(ids("move-in", "gender", "any", "strictGender", "true"))
                 .containsExactlyInAnyOrderElementsOf(ids("move-in", "gender", "any"));
         assertThat(ids("move-in", "gender", "female", "strictGender", "yes"))
-                .containsExactlyInAnyOrder(anyPrivateFurnishedGated, femalePrivateSemi, housed);
+                .containsExactlyInAnyOrder(anyPrivateFurnishedGated, femalePrivateSemi);
     }
 
     @Test
@@ -137,7 +141,7 @@ class FlatmateBoardFacetsTest extends FlatmateStyleFixtures {
                 .containsExactlyInAnyOrder(postAny, postFemaleShared, postMaleAny);
 
         assertThat(ids("teams", "roomType", "private")).containsExactlyInAnyOrder(teamAny, teamWomen);
-        assertThat(ids("move-in", "roomType", "dorm")).hasSize(4);
+        assertThat(ids("move-in", "roomType", "dorm")).hasSize(3);
     }
 
     @Test
@@ -147,20 +151,16 @@ class FlatmateBoardFacetsTest extends FlatmateStyleFixtures {
         assertThat(ids("move-in", "furnishing", "semi")).containsExactly(femalePrivateSemi);
         assertThat(ids("move-in", "furnishing", "unfurnished")).containsExactly(maleSharedBare);
         assertThat(ids("move-in", "gated", "true")).containsExactly(anyPrivateFurnishedGated);
-        assertThat(ids("move-in", "furnishing", "luxury")).hasSize(4);
-        assertThat(ids("move-in", "gated", "maybe")).hasSize(4);
-        assertThat(ids("move-in", "gated", "false")).hasSize(4);
+        assertThat(ids("move-in", "furnishing", "luxury")).hasSize(3);
+        assertThat(ids("move-in", "gated", "maybe")).hasSize(3);
+        assertThat(ids("move-in", "gated", "false")).hasSize(3);
         assertThat(ids("move-in", "roomType", "private", "furnishing", "furnished", "gated", "true"))
                 .containsExactly(anyPrivateFurnishedGated);
     }
 
     @Test
-    @DisplayName("any room-only facet drops housed groups from move-in, and leaves people and teams alone")
-    void housedGroupsLeaveWhenARoomFacetIsSet() throws Exception {
-        for (String[] facet : new String[][] {{"attachedBath", "attached"}, {"roomType", "private"},
-                {"furnishing", "furnished"}, {"gated", "true"}}) {
-            assertThat(ids("move-in", facet)).as(facet[0]).doesNotContain(housed);
-        }
+    @DisplayName("room-only facets narrow move-in and leave people and teams alone")
+    void roomFacetsLeavePeopleAndTeamsAlone() throws Exception {
         assertThat(ids("move-in", "attachedBath", "attached")).contains(anyPrivateFurnishedGated);
 
         assertThat(ids("people", "attachedBath", "attached", "gated", "true", "furnishing", "semi")).hasSize(4);

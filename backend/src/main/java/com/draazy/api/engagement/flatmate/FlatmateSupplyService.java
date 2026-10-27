@@ -188,6 +188,10 @@ public class FlatmateSupplyService {
             throw new BadRequestException(
                     "Seats open must be between 0 and " + room.getSeatsTotal() + ".");
         }
+        if (seatsOpen > 0 && isFull(room)
+                && guardrails.capBlocksReopen(caller.userId(), room.getVerificationTier())) {
+            throw FlatmateGuardrails.reopenRefused();
+        }
         room.setSeatsOpen(seatsOpen);
         FlatmateRoom saved = rooms.saveAndFlush(room);
         return mapper.toDto(saved, ownView(caller, saved, committedInFlat(saved)));
@@ -250,6 +254,7 @@ public class FlatmateSupplyService {
         FlatmateGroupClaim claim = FlatmateGroupClaim.of(body,
                 () -> declaresAgreement(caller.userId(), body.agreement(), body.agreementDoc()),
                 localities::canonicalNames, localities::canonicalName);
+        refuseOwnerGroup(claim.hostRole());
         String hostRole = claim.hostRole();
         boolean declared = claim.declared();
         UUID propertyId = claim.propertyId();
@@ -327,6 +332,7 @@ public class FlatmateSupplyService {
 
         // Before applyTo, which is the only moment the stored values still exist to compare against.
         FlatmateEditImpact impact = editRules.classify(room, body);
+        boolean reopenBlocked = isFull(room) && guardrails.capBlocksReopen(caller.userId(), tier);
         mapper.applyTo(body, room);
         room.setSocietyId(society.id());
         room.setSociety(societyName);
@@ -339,6 +345,9 @@ public class FlatmateSupplyService {
 
         room.setBudget(body.rentShare());
         applyRoomPlaces(room);
+        if (reopenBlocked && !isFull(room)) {
+            throw FlatmateGuardrails.reopenRefused();
+        }
 
         publication.reapplyAfterEdit(caller, tier, impact, room,
                 new FlatmateGuardrails.Address(ownedFlat(tier, claimedFlat), societyName,
@@ -356,6 +365,10 @@ public class FlatmateSupplyService {
                 addressLabel(saved.getSociety(), saved.getLocality()),
                 claimOf(caller, body, saved.isOwnerConsent()));
         return mapper.toDto(saved, ownView(caller, saved, saved.getOccupants()));
+    }
+
+    private static boolean isFull(FlatmateRoom room) {
+        return room.getSeatsOpen() != null && room.getSeatsOpen() <= 0;
     }
 
     private static void applyRoomPlaces(FlatmateRoom room) {
@@ -389,11 +402,15 @@ public class FlatmateSupplyService {
                 () -> declaresAgreement(caller.userId(), body.agreement(), body.agreementDoc()),
                 names -> localities.canonicalNames(names, group.getLocalities()),
                 (slug, name) -> localities.canonicalName(slug, name, group.getLocalities()));
+        if (!FlatmateVocabulary.ROLE_OWNER.equals(group.getHostRole())) {
+            refuseOwnerGroup(claim.hostRole());
+        }
         String hostRole = claim.hostRole();
         boolean declared = claim.declared();
         UUID propertyId = claim.propertyId();
         String tier = deriveTier(caller, hostRole, propertyId, declared);
         String locality = claim.locality();
+        boolean reopenBlocked = group.openSeats() == 0 && guardrails.capBlocksReopen(caller.userId(), tier);
 
         FlatmateEditImpact impact = editRules.classify(group, body, locality,
                 mapper.seatsOrTwo(body.seats()));
@@ -408,6 +425,9 @@ public class FlatmateSupplyService {
         }
         rejectMoreOpenSeatsThanSeats(group);
         clampOpenSeats(group);
+        if (reopenBlocked && group.openSeats() > 0) {
+            throw FlatmateGuardrails.reopenRefused();
+        }
 
         publication.reapplyAfterEdit(caller, tier, impact, group,
                 new FlatmateGuardrails.Address(
@@ -463,6 +483,10 @@ public class FlatmateSupplyService {
             throw new BadRequestException("Seats open must be between 0 and " + max
                     + " — a group shares between at most " + FlatmateGroup.MAX_SEATS + " people.");
         }
+        if (seatsOpen > 0 && group.openSeats() == 0
+                && guardrails.capBlocksReopen(caller.userId(), group.getVerificationTier())) {
+            throw FlatmateGuardrails.reopenRefused();
+        }
         if (taken + seatsOpen != group.getSeatsTotal()) {
             group.setSeatsTotal(taken + seatsOpen);
             group.getRecheck().settle(group.getModStatus(), List.of("seats"));
@@ -498,6 +522,15 @@ public class FlatmateSupplyService {
         return FlatmateRequestDto.of(saved, group.getTitle(), group.getLocality(),
                 requester == null ? null : requester.getName(),
                 requester == null ? null : requester.getMobile());
+    }
+
+    /** A group is people renting a flat together; an owner letting one lists its rooms instead. Older
+     * owner-hosted groups stay editable. */
+    private static void refuseOwnerGroup(String hostRole) {
+        if (FlatmateVocabulary.ROLE_OWNER.equals(hostRole)) {
+            throw new ConflictException("owner_lists_rooms",
+                    "Owners list each room on its own. Use List a room instead of starting a team.");
+        }
     }
 
     /** The one place a verification tier is decided: owner requires the caller's own approved listing that carries the

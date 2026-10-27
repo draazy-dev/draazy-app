@@ -9003,10 +9003,12 @@ paths:
       tags: [Engagement]
       summary: Flatmates feed (tab-aware, mixed)
       description: >
-        One feed per tab. `move-in` returns rooms plus groups that already hold an address;
-        `team-up` returns solo seeker posts plus address-less groups. `people` is the seeker half
-        of `team-up` on its own and `teams` is the hunting-group half. The list is sorted as one
-        list — merging two pre-sorted lists would stack every room above every group.
+        One feed per tab. `move-in` returns rooms only; `team-up` returns solo seeker posts plus
+        groups still hunting. `people` is the seeker half of `team-up` on its own and `teams` is the
+        hunting-group half. A group that already has its flat lists on no tab but stays readable by
+        id. The list is sorted as one list — merging two pre-sorted lists would stack every seeker
+        above every group. A group with
+        no open seat is left out; it comes back when a seat opens, and stays readable by id.
 
 
         A signed-in caller who has saved at least three living-style answers (`/me/living-style`)
@@ -9476,7 +9478,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/FlatmateRoom' }
-        '409': { description: This room has no seat model (`not_seat_based`) }
+        '409': { description: "This room has no seat model (`not_seat_based`), or reopening a full room would put the host over the live-post cap (`host_capped`)" }
   /flatmates/rooms/{id}/badge-request:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
     post:
@@ -9580,7 +9582,10 @@ paths:
     post:
       tags: [Engagement]
       summary: Create a flatmate group
-      description: L1 signed-in. The verification tier is derived server-side from role + proof; the client can never self-assign a host badge.
+      description: >
+        L1 signed-in. The verification tier is derived server-side from role + proof; the client can
+        never self-assign a host badge. `role: owner` is 409 `owner_lists_rooms`: an owner letting a
+        flat lists its rooms (`createFlatmateRoom`), a group is people renting together.
       operationId: createFlatmateGroup
       requestBody:
         required: true
@@ -9594,7 +9599,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/FlatmateGroup' }
         '409':
-          description: Blocked by the host-eligibility guardrails
+          description: Blocked by the host-eligibility guardrails, or `owner_lists_rooms` (Error shape)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/HostEligibility' }
@@ -9653,6 +9658,13 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: >
+            `owner_lists_rooms` when a group not already owner-hosted switches to `role: owner`, or
+            `host_capped` when reopening a full group would exceed the live-post cap
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
         '422': { $ref: '#/components/responses/ValidationError' }
   /flatmates/groups/{id}/seats:
     parameters: [ { $ref: '#/components/parameters/GenericId' } ]
@@ -9678,6 +9690,7 @@ paths:
               schema: { $ref: '#/components/schemas/FlatmateGroup' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Reopening a full group would put the host over the live-post cap (`host_capped`) }
   /flatmates/owner-consent:
     post:
       tags: [Engagement]
@@ -16920,12 +16933,12 @@ components:
             Amenities:    { type: number }
             Connectivity: { type: number }
           additionalProperties: false
-    # Two feeds, split by the one question a seeker can always answer: is there an address yet?
+    # Two feeds, split by the one question a seeker can always answer: is there a flat yet?
     # Behavioural spec: docs/flows/consumer/flatmates.md
     FlatmateTab:
       type: string
       description: >
-        `move-in` = browse PLACES (rooms, plus groups that already hold a flat).
+        `move-in` = browse PLACES (rooms only).
         `team-up` = browse PEOPLE (solo seekers, plus groups still hunting).
         `people` = the seekers of `team-up` alone; `teams` = its hunting groups alone.
         Replaces the legacy flatmates/rooms/groups triple, which split by our storage
@@ -17627,8 +17640,9 @@ components:
     FlatmateGroup:
       type: object
       description: >
-        People teaming up. A group with an address (`propertyId` / `society`) sorts into
-        `move-in`; an address-less group is a set of people still hunting and sorts into `team-up`.
+        People teaming up to rent a flat. Only a group still hunting lists, under `team-up` /
+        `teams`; one that has its flat (`hunting: false`) lists on no tab but stays readable by id,
+        because a place to move into is a room.
       properties:
         id: { type: string, example: g1 }
         title: { type: string }
@@ -18149,14 +18163,14 @@ components:
           items: { type: string }
         split:
           type: object
-          description: The newest live group that has its flat. Absent when there is none.
+          description: The newest live team still hunting with more than one seat. Absent when there is none.
           required: [locality, rent, seats, share]
           properties:
             locality: { type: string }
             bhk:
               type: number
-              description: Absent unless the flat is a listing that states one.
-            rent: { type: integer, minimum: 1, description: Whole-flat rent per month. }
+              description: Absent unless the team wants exactly one flat size.
+            rent: { type: integer, minimum: 1, description: The team's whole-flat budget per month. }
             seats: { type: integer, minimum: 2 }
             share: { type: integer, minimum: 0, description: 'round(rent / seats), per month.' }
     PropertyCounts:

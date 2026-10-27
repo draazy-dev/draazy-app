@@ -45,6 +45,7 @@ public interface FlatmateGroupRepository extends JpaRepository<FlatmateGroup, UU
             select count(g) from FlatmateGroup g
             where g.hostId = :hostId and g.archived = false
               and g.verificationTier <> 'owner'
+              and (g.seatsOpen is null or g.seatsOpen > 0) and g.seatsTotal > size(g.members)
             """)
     long countCappedByHost(@Param("hostId") UUID hostId);
 

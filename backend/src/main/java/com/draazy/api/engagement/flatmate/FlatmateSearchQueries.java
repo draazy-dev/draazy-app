@@ -84,16 +84,17 @@ public class FlatmateSearchQueries {
         return countOnly(matchesCte(facets, params), params).total();
     }
 
-    /** The newest public group that has its flat — the board's own rows, so the panel cannot show a split the
-     * feed would hide. */
+    /** The newest team on the Teams tab, priced by its whole-flat budget — the board's own rows, so the panel
+     * cannot show a split the feed would hide. */
     public FlatmatePulse.Split newestSplit() {
         Map<String, Object> params = new HashMap<>();
         Query query = em.createNativeQuery("""
-                select g.locality, p.bhk, g.rent, g.seats_total, g.per_head
+                select g.locality,
+                       case when jsonb_array_length(g.pref_bhk) = 1 then g.pref_bhk ->> 0 end,
+                       g.rent, g.seats_total, g.per_head
                 from flatmate_groups g
-                left join properties p on p.id = g.property_id
-                """ + publicRows("g", "host_id", params) + SEP + """
-                and g.property_id is not null and g.seats_total > 1
+                """ + publicRows("g", "host_id", params) + FlatmateGroup.HAS_OPEN_SEAT_SQL + SEP + """
+                and g.hunting and g.seats_total > 1
                 order by g.created_at desc, g.id desc
                 limit 1
                 """);
@@ -207,13 +208,12 @@ public class FlatmateSearchQueries {
     private static String matchesCte(FlatmateSearchQuery f, Map<String, Object> params) {
         if (f.movingIn()) {
             return roomLedgerCte() + ", matches as (\n"
-                    + roomSelect(f, params) + "\nunion all\n" + groupSelect(f, params, true)
-                    + "\n)\n";
+                    + roomSelect(f, params) + "\n)\n";
         }
         String body = switch (f.tab()) {
             case FlatmateVocabulary.TAB_PEOPLE -> postSelect(f, params);
-            case FlatmateVocabulary.TAB_TEAMS -> groupSelect(f, params, false);
-            default -> postSelect(f, params) + "\nunion all\n" + groupSelect(f, params, false);
+            case FlatmateVocabulary.TAB_TEAMS -> groupSelect(f, params);
+            default -> postSelect(f, params) + "\nunion all\n" + groupSelect(f, params);
         };
         return "with matches as (\n" + body + "\n)\n";
     }
@@ -348,10 +348,9 @@ public class FlatmateSearchQueries {
                                      where gm.group_id = g.id and gm.verified = false)))""";
     }
 
-    /** The address is a predicate rather than two tables, because the same row moves between tabs
-     * as its search progresses. */
-    private static String groupSelect(FlatmateSearchQuery f, Map<String, Object> params,
-            boolean housed) {
+    /** Only hunting teams list. A legacy group that has its flat stays readable by link but off the board:
+     * a place to move into is a room post, with the photos and flat details a group never carries. */
+    private static String groupSelect(FlatmateSearchQuery f, Map<String, Object> params) {
         StringBuilder sql = new StringBuilder("""
                 select 'group' as kind, g.id as id, g.created_at as created_at,
                 """);
@@ -365,11 +364,8 @@ public class FlatmateSearchQueries {
                        g.host_id as author_id
                 from flatmate_groups g
                 """);
-        sql.append(publicRows("g", "host_id", params)).append('\n');
-        sql.append(housed ? " and g.property_id is not null" : " and g.property_id is null");
-        if (housed && f.roomOnly()) {
-            sql.append(" and false");
-        }
+        sql.append(publicRows("g", "host_id", params)).append(FlatmateGroup.HAS_OPEN_SEAT_SQL).append('\n');
+        sql.append(" and g.hunting");
 
         if (f.locality() != null) {
             sql.append(" and exists (select 1 from jsonb_array_elements_text(g.localities) as l(v)"

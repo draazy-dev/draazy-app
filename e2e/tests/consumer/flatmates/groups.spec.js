@@ -31,6 +31,12 @@ const groupBody = (over = {}) => ({
 });
 
 const track = flatmateCleanup(test);
+const hunt = (locality, over = {}) => ({
+  locality: undefined, rent: undefined, deposit: undefined,
+  preferences: { localities: [locality], rentMax: 45000, depositMax: 90000, gatedOnly: false, bachelors: false },
+  ...over,
+});
+const inArea = (g, locality) => (g.preferences?.localities || []).some((l) => l.toLowerCase() === locality);
 
 async function createGroup(token, over = {}) {
   const res = await fetch(`${API}/flatmates/groups`, {
@@ -88,12 +94,15 @@ test.describe('Flatmate groups', () => {
       expect(mine.content.some((g) => g.id === created.id)).toBe(true);
     });
 
-    await test.step('the public feed shows the group only once it is published', async () => {
+    await test.step('the public feed shows a team only once it is published', async () => {
       // `findMine` is deliberately unfiltered by moderation status and the public feed is not, so
       // this pair is what stops moderation looking like a failed submit to the author.
-      const feed = await (await fetch(`${API}/flatmates/feed?tab=team-up&locality=Kothrud&size=100`)).json();
-      const isPublic = ['live', 'approved'].includes(created.modStatus);
-      expect(feed.content.some((g) => g.id === created.id)).toBe(isPublic);
+      const { body: team } = await createGroup(host.accessToken, hunt('Kothrud'));
+      const onTeams = async () => (await (await fetch(`${API}/flatmates/feed?tab=teams&locality=Kothrud&size=100`)).json())
+        .content.some((g) => g.id === team.id);
+      expect(await onTeams()).toBe(['live', 'approved'].includes(team.modStatus));
+      await approve(team.id);
+      expect(await onTeams()).toBe(true);
     });
   });
 
@@ -144,51 +153,52 @@ test.describe('Flatmate groups', () => {
     expect(afterRes.status).toBe(201);
   });
 
-  test('the public team-up feed is open, carries no host mobile, and filters and pages', async () => {
+  test('the public teams feed is open, carries no host mobile, and filters and pages', async () => {
     await test.step('the feed answers without a token and carries no host mobile', async () => {
       const host = await newHost();
-      const { status } = await createGroup(host.accessToken, {
-        locality: 'Baner', rent: 25000, seats: 2, seatsOpen: 1,
-      });
+      const { status, body } = await createGroup(host.accessToken, hunt('Baner', { seats: 2, seatsOpen: 1 }));
       expect(status).toBe(201);
+      await approve(body.id);
 
-      const feedRes = await fetch(`${API}/flatmates/feed?tab=team-up&locality=Baner`);
+      const feedRes = await fetch(`${API}/flatmates/feed?tab=teams&locality=Baner&size=100`);
       expect(feedRes.status).toBe(200);
       const feed = await feedRes.json();
-      expect(Array.isArray(feed.content)).toBe(true);
+      expect(feed.content.some((g) => g.id === body.id)).toBe(true);
 
       for (const g of feed.content) expect(g.ownerMobile).toBeUndefined();
     });
 
     await test.step('filter by locality', async () => {
       const host = await newHost();
-      await createGroup(host.accessToken, { locality: 'Kothrud' });
+      const { body } = await createGroup(host.accessToken, hunt('Kothrud'));
+      await approve(body.id);
 
-      const res = await fetch(`${API}/flatmates/feed?tab=team-up&locality=Kothrud&size=100`);
+      const res = await fetch(`${API}/flatmates/feed?tab=teams&locality=Kothrud&size=100`);
       expect(res.status).toBe(200);
-      const data = await res.json();
+      const groups = (await res.json()).content;
+      expect(groups.some((g) => g.id === body.id)).toBe(true);
       // Matched case-insensitively by the query, so compare the same way.
-      const groups = data.content.filter((row) => row.seatsTotal !== undefined);
-      expect(groups.every((g) => g.locality.toLowerCase() === 'kothrud')).toBe(true);
+      expect(groups.every((g) => inArea(g, 'kothrud'))).toBe(true);
     });
 
     await test.step('a gender filter keeps the open groups too', async () => {
       const women = await newHost();
-      await createGroup(women.accessToken, { policy: 'women', locality: 'Aundh' });
+      const { body: womenOnly } = await createGroup(women.accessToken, hunt('Aundh', { policy: 'women' }));
       const open = await newHost();
-      await createGroup(open.accessToken, { policy: 'any', locality: 'Aundh' });
+      const { body: anyone } = await createGroup(open.accessToken, hunt('Aundh', { policy: 'any' }));
+      await approve(womenOnly.id);
+      await approve(anyone.id);
 
-      const res = await fetch(`${API}/flatmates/feed?tab=team-up&gender=female&locality=Aundh&size=100`);
+      const res = await fetch(`${API}/flatmates/feed?tab=teams&gender=female&locality=Aundh&size=100`);
       expect(res.status).toBe(200);
-      const data = await res.json();
-      const groups = data.content.filter((row) => row.seatsTotal !== undefined);
+      const groups = (await res.json()).content;
 
       expect(groups.every((g) => g.policy === 'women' || g.policy === 'any')).toBe(true);
-      expect(groups.some((g) => g.policy === 'any')).toBe(true);
+      expect(groups.map((g) => g.id)).toEqual(expect.arrayContaining([womenOnly.id, anyone.id]));
     });
 
-    await test.step('pagination of the team-up feed', async () => {
-      const firstPageRes = await fetch(`${API}/flatmates/feed?tab=team-up&size=5&page=0`);
+    await test.step('pagination of the teams feed', async () => {
+      const firstPageRes = await fetch(`${API}/flatmates/feed?tab=teams&size=5&page=0`);
       expect(firstPageRes.status).toBe(200);
       const firstPage = await firstPageRes.json();
 
@@ -288,7 +298,11 @@ test.describe('Flatmate groups', () => {
 
   test('host removes their group and it leaves both the feed and their own list', async ({ page }) => {
     const host = await newHost();
-    const { body: group } = await createGroup(host.accessToken, { locality: 'Wakad' });
+    const { body: group } = await createGroup(host.accessToken, hunt('Wakad'));
+    await approve(group.id);
+    const onFeed = async () => (await (await fetch(`${API}/flatmates/feed?tab=teams&locality=Wakad&size=100`)).json())
+      .content.some((g) => g.id === group.id);
+    expect(await onFeed(), 'positive control: a live group is on the feed').toBe(true);
 
     const del = await fetch(`${API}/flatmates/groups/${group.id}`, {
       method: 'DELETE',
@@ -296,13 +310,53 @@ test.describe('Flatmate groups', () => {
     });
     expect(del.status).toBe(204);
 
-    const feed = await (await fetch(`${API}/flatmates/feed?tab=team-up&locality=Wakad&size=100`)).json();
-    expect(feed.content.some((g) => g.id === group.id)).toBe(false);
+    expect(await onFeed()).toBe(false);
     // Archived rather than unpublished, so it is gone from the host's list as well. Asserting
     // only the feed would pass equally for a group that had merely been held for moderation.
     const mine = await (await fetch(`${API}/me/flatmate-groups`, {
       headers: auth(host.accessToken),
     })).json();
     expect(mine.content.some((g) => g.id === group.id)).toBe(false);
+  });
+
+  test('a full group leaves the public feed but stays readable by id, and returns when a seat opens', async () => {
+    const host = await newHost();
+    const { body: group } = await createGroup(host.accessToken, hunt('Wakad', { seats: 3, seatsOpen: 1 }));
+    await approve(group.id);
+    const onFeed = async () => (await (await fetch(`${API}/flatmates/feed?tab=teams&locality=Wakad&size=100`)).json())
+      .content.some((g) => g.id === group.id);
+    const setSeats = (seatsOpen) => fetch(`${API}/flatmates/groups/${group.id}/seats`, {
+      method: 'PATCH', headers: auth(host.accessToken), body: JSON.stringify({ seatsOpen }),
+    });
+
+    expect(await onFeed(), 'positive control: an open group is on the feed').toBe(true);
+
+    expect((await setSeats(0)).status).toBe(200);
+    expect(await onFeed()).toBe(false);
+    const detail = await fetch(`${API}/flatmates/groups/${group.id}`);
+    expect(detail.status).toBe(200);
+    expect((await detail.json()).item.seatsOpen).toBe(0);
+
+    expect((await setSeats(1)).status).toBe(200);
+    expect(await onFeed()).toBe(true);
+  });
+
+  test('a team still hunting lists under Teams; one that has its flat lists nowhere but stays readable by id', async () => {
+    const settledHost = await newHost();
+    const { body: settled } = await createGroup(settledHost.accessToken, { locality: 'Wakad', seats: 3, seatsOpen: 1 });
+    await approve(settled.id);
+    const huntingHost = await newHost();
+    const { status, body: hunting } = await createGroup(huntingHost.accessToken, hunt('Wakad'));
+    expect(status, JSON.stringify(hunting)).toBe(201);
+    await approve(hunting.id);
+    const ids = async (tab) => (await (await fetch(`${API}/flatmates/feed?tab=${tab}&locality=Wakad&size=100`)).json())
+      .content.map((g) => g.id);
+
+    const [moveIn, teams] = [await ids('move-in'), await ids('teams')];
+    expect(teams).toContain(hunting.id);
+    expect(teams).not.toContain(settled.id);
+    expect(moveIn).not.toContain(settled.id);
+    expect(moveIn).not.toContain(hunting.id);
+    expect((await fetch(`${API}/flatmates/groups/${settled.id}`)).status).toBe(200);
   });
 });

@@ -5,13 +5,13 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /** {@code initials} are the newest seekers' (names are already public on the feed); {@code split} is null when no
- * live group has its flat yet. */
+ * team is hunting on the board. */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record FlatmatePulse(long seeking, List<String> initials, Split split) {
 
     public static final int FACES = 3;
 
-    /** {@code bhk} is null unless the group's flat is linked to a listing that states one. */
+    /** {@code rent} is the team's whole-flat budget; {@code bhk} is null unless the team wants exactly one size. */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Split(String locality, BigDecimal bhk, long rent, int seats, long share) {
     }

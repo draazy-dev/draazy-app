@@ -477,7 +477,7 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("people counts seeker posts only, teams counts hunting groups only")
+    @DisplayName("people counts seeker posts only, teams counts hunting groups only, move-in counts neither, and a settled group is on no tab")
     void peopleAndTeamsTabsAreCountedSeparately() {
         User user = owner("9820600031");
         seedLocality();
@@ -486,9 +486,11 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
                 values (?, 'Tabs Seeker', 'any', 15000, '[\"D227 Flatmate Town\"]'::jsonb, 'approved')
                 """, user.getId());
         jdbc.update("""
-                insert into flatmate_groups (host_id, title, locality, localities, rent, seats_total, seats_open, mod_status)
-                values (?, 'Tabs Team', 'D227 Flatmate Town', '[\"D227 Flatmate Town\"]'::jsonb, 30000, 3, 1, 'approved')
-                """, user.getId());
+                insert into flatmate_groups (host_id, title, locality, localities, rent, seats_total, seats_open, mod_status,
+                    hunting)
+                values (?, 'Tabs Team', 'D227 Flatmate Town', '[\"D227 Flatmate Town\"]'::jsonb, 30000, 3, 1, 'approved', true),
+                       (?, 'Settled Team', 'D227 Flatmate Town', '[\"D227 Flatmate Town\"]'::jsonb, 30000, 3, 1, 'approved', false)
+                """, user.getId(), user.getId());
         em.flush();
         em.clear();
 
@@ -499,6 +501,24 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
                             Map.of("tab", row[0], "locality", "D227 Flatmate Town"), null, null));
             assertThat(created.matchCount()).as((String) row[0]).isEqualTo(row[1]);
         }
+    }
+
+    @Test
+    @DisplayName("a team with no open seat is not a match, exactly as the board hides it")
+    void fullTeamIsNotAMatch() {
+        User user = owner("9820600032");
+        seedLocality();
+        jdbc.update("""
+                insert into flatmate_groups (host_id, title, locality, localities, rent, seats_total, seats_open, mod_status,
+                    hunting)
+                values (?, 'Full Team', 'D227 Flatmate Town', '[\"D227 Flatmate Town\"]'::jsonb, 30000, 3, 0, 'approved', true)
+                """, user.getId());
+        em.flush();
+        em.clear();
+
+        assertThat(flatmateCount("9820600033", board("teams"))).isZero();
+        jdbc.update("update flatmate_groups set seats_open = 1 where host_id = ?", user.getId());
+        assertThat(flatmateCount("9820600034", board("teams"))).isEqualTo(1);
     }
 
     private long flatmateCount(String mobile, Map<String, Object> criteria) {
@@ -539,7 +559,7 @@ class SavedSearchMatchCountTest extends AbstractApiTest {
         }
         for (String policy : new String[] {"any", "women"}) {
             jdbc.update("insert into flatmate_groups (host_id, title, locality, localities, rent, seats_total,"
-                    + " seats_open, policy, mod_status) values (?, 'Team', ?, ?::jsonb, 30000, 3, 1, ?, 'approved')",
+                    + " seats_open, policy, mod_status, hunting) values (?, 'Team', ?, ?::jsonb, 30000, 3, 1, ?, 'approved', true)",
                     host.getId(), place, "[\"" + place + "\"]", policy);
         }
         em.flush();

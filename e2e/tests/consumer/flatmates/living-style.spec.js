@@ -77,10 +77,10 @@ test.describe('LIVE: flatmates living style', () => {
     await signedInAs(page, '9876500002');
     await openFlatmates(page);
     await expect(flatmateTab(page, 'move-in')).toHaveAttribute('aria-current', 'page');
-    const chips = page.locator('.sf-card [data-testid="style-match"]');
+    const chips = page.locator('[data-sf-id^="r:"] [data-testid="style-match"]');
     await expect(chips.first()).toBeVisible({ timeout: 20_000 });
     const belowPhoto = await chips.evaluateAll((els) => els.map((el) => {
-      const photo = el.closest('.sf-card').querySelector('img');
+      const photo = el.closest('[data-sf-id]').querySelector('img');
       return el.getBoundingClientRect().top >= photo.getBoundingClientRect().bottom;
     }));
     expect(belowPhoto.every(Boolean), 'no match chip sits on a room photo').toBe(true);

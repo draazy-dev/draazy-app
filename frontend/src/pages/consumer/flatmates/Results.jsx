@@ -5,7 +5,7 @@ import Select from '../../../components/ui/Select.jsx';
 import { isPubliclyVisible } from '../../../lib/data/flatmates.js';
 import { seekerBudget, detailPath, seekerTitle, roomTitle, inr, perHead, groupLocalities } from './helpers.js';
 import MyPostsStrip from '../../../components/MyPostsStrip.jsx';
-import { TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS, TAB_ICON, hasAddress, bestPerPersonRent } from './model.js';
+import { TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS, TAB_ICON, bestPerPersonRent } from './model.js';
 import ActiveFilterChips from '../../../components/ui/ActiveFilterChips.jsx';
 import flatmateActiveChips from './activeChips.js';
 import SeekerCard from './SeekerCard.jsx';
@@ -41,7 +41,7 @@ export default function Results({ tab, myPost, myRooms = [], myGroups = [], acti
   const mine = [
     ...(tab === TAB_PEOPLE && myPost ? [{ id: 's:' + myPost.id, to: detailPath('post', myPost.id), pending: !isPubliclyVisible(myPost), label: isPubliclyVisible(myPost) ? t('flatmates.yourLiveRequest') : myPost.modStatus === 'expired' ? t('flatmates.yourRequestExpired') : t('flatmates.yourRequestInReview'), title: seekerTitle(myPost), sub: [seekerBudget(myPost) + t('flatmates.perMonth'), (myPost.localities || []).join(', ')].join(' · ') }] : []),
     ...(isMoveIn ? myRooms.filter((r) => r.status !== 'archived').map((r) => ({ id: 'r:' + r.id, to: detailPath('room', r.id), pending: !isPubliclyVisible(r), label: t('flatmates.yourListing') + ' · ' + status(r), title: roomTitle(r), sub: [inr(bestPerPersonRent(r)) + t('flatmates.perMonth'), r.localities?.[0] || r.locality].filter(Boolean).join(' · ') })) : []),
-    ...myGroups.filter((g) => (hasAddress(g) ? isMoveIn : tab === TAB_TEAMS)).map((g) => ({ id: 'g:' + g.id, to: detailPath('group', g.id), pending: !isPubliclyVisible(g), label: t('flatmates.yourGroup') + ' · ' + status(g), title: g.title, sub: [inr(perHead(g)) + t('flatmates.perMonth'), groupLocalities(g).join(', ')].filter(Boolean).join(' · ') })),
+    ...(tab === TAB_TEAMS ? myGroups.filter((g) => g.hunting) : []).map((g) => ({ id: 'g:' + g.id, to: detailPath('group', g.id), pending: !isPubliclyVisible(g), label: t('flatmates.yourGroup') + ' · ' + status(g), title: g.title, sub: [inr(perHead(g)) + t('flatmates.perMonth'), groupLocalities(g).join(', ')].filter(Boolean).join(' · ') })),
   ];
 
   return (
@@ -56,7 +56,7 @@ export default function Results({ tab, myPost, myRooms = [], myGroups = [], acti
             <>
               <span className="text-white font-semibold">{total}</span>{' '}
               {t(`flatmates.count_${tab}`, { count: total })}
-              {verifiedTotal > 0 && <> · <span className="text-emerald-300 font-semibold">{t(tab === TAB_PEOPLE ? 'flatmates.nIdVerified' : 'flatmates.nVerified', { count: verifiedTotal })}</span></>}
+              {verifiedTotal > 0 && <> · <span className="text-emerald-300 font-semibold">{t(isMoveIn ? 'flatmates.nVerified' : 'flatmates.nIdVerified', { count: verifiedTotal })}</span></>}
             </>
           )}
         </p>

@@ -20,7 +20,7 @@ async function feed(tab, params = {}) {
 const FILTERS = [
   ['gender=female', { gender: 'female' }, (it) => (kindOf(it) === 'group' ? ['women', 'any'].includes(it.policy) : ['female', 'any'].includes(it.gender))],
   ['gender=male', { gender: 'male' }, (it) => (kindOf(it) === 'group' ? ['men', 'any'].includes(it.policy) : ['male', 'any'].includes(it.gender))],
-  ['locality=Baner', { locality: 'Baner' }, (it) => [it.locality, ...(it.localities || [])].some((l) => lower(l) === 'baner')],
+  ['locality=Baner', { locality: 'Baner' }, (it) => [it.locality, ...(it.localities || []), ...(it.preferences?.localities || [])].some((l) => lower(l) === 'baner')],
   ['minBudget=15000', { minBudget: 15000 }, (it) => (kindOf(it) === 'room' ? null : (kindOf(it) === 'group' ? it.perHead : it.budget) >= 15000)],
   ['maxBudget=12000', { maxBudget: 12000 }, (it) => (kindOf(it) === 'post' ? it.budget <= 12000 : null)],
   ['moveInDays=0', { moveInDays: 0 }, (it) => (kindOf(it) === 'room' ? !it.availableFrom || it.availableFrom <= today : null)],
