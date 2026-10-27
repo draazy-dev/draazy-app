@@ -11,7 +11,7 @@ tags: [flatmates, sharing, roommate, badge, groups]
 
 [Flatmates](/flatmates) covers three situations: you have a room to fill, you want a room in someone's flat, or you want to team up with strangers to rent a whole flat together. Each room, group and seeker post has its own detail page.
 
-You only need to be signed in to post or to show interest. There is no identity gate here either — verification is a badge, not a door. The one exception is a request whose author ticked **Only let ID-verified people express interest in my post**; you are asked to verify first.
+You only need to be signed in to post or to show interest. There is no identity gate here either — verification is a badge, not a door. The one exception is a request whose author ticked **Only let KYC-done people express interest in my post**; you are asked to verify first.
 
 ## Posting a room
 

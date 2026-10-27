@@ -4,7 +4,7 @@
     "notFoundBody": "This profile may have been removed or the link is incorrect.",
     "browseListings": "Browse listings",
 
-    "verifiedOwner": "ID verified",
+    "verifiedOwner": "KYC done",
     "zeroBrokerage": "Zero Brokerage",
     "roleLine": "Property Owner · Direct dealing, no middlemen",
     "reviewCount_one": "({{count}} review)",
@@ -20,9 +20,9 @@
     "statVerified": "Verified properties",
 
     "aboutTitle": "About the Owner",
-    "aboutBody": "{{name}} is an ID verified owner listing directly on Draazy. No brokers, no commission — you deal with the owner directly from enquiry to handover.",
+    "aboutBody": "{{name}} is a KYC-done owner listing directly on Draazy. No brokers, no commission — you deal with the owner directly from enquiry to handover.",
     "aboutBodyUnverified": "{{name}} lists directly on Draazy. No brokers, no commission — you deal with the owner directly from enquiry to handover.",
-    "badgeVerifiedOwner": "ID verified",
+    "badgeVerifiedOwner": "KYC done",
     "badgeNumberProtected": "Number Protected",
 
     "listingsTitle": "Properties by this Owner",
@@ -55,7 +55,7 @@
     "scheduleVisit": "Schedule a Visit",
     "visit": "Visit",
 
-    "toastVerificationRequired": "This owner accepts ID-verified contacts only. Get ID verified from your profile to reach them.",
+    "toastVerificationRequired": "This owner only accepts contacts with KYC done. Get your KYC done from your profile to reach them.",
     "toastUnavailable": "Owner contact is unavailable for this listing right now. Please try again later.",
     "toastRequestSent": "Request sent — you'll get the number once the owner approves.",
     "toastApproved": "Owner has shared their number with you.",

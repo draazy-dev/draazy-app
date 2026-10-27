@@ -146,7 +146,7 @@ public class IdentityReviewService {
                 reviewer == null ? null : reviewer.userId(), listings);
 
         UUID userId = user.getId();
-        notifier.notify(userId, "identity.approved", "You're ID verified",
+        notifier.notify(userId, "identity.approved", "Your KYC is done",
                 "Your identity has been confirmed. Your profile name now matches your ID: " + legalName,
                 VERIFIED_BADGE_LINK);
         recordUserNameAudit(reviewer, userId, oldName, legalName, v.getId());
@@ -225,9 +225,9 @@ public class IdentityReviewService {
         log.info("identity revoked user={} reviewer={} listingsCleared={}", user.getId(), reviewer.userId(), listings);
         UUID userId = user.getId();
         String mobile = user.getMobile();
-        notifier.notify(userId, "identity.revoked", "ID verified badge withdrawn", reason, "/verify-identity");
+        notifier.notify(userId, "identity.revoked", "KYC done badge withdrawn", reason, "/verify-identity");
         sendWhatsapp(userId, mobile,
-                "Your Draazy ID verified badge was withdrawn. Open the app to see the reason and submit again.");
+                "Your Draazy KYC done badge was withdrawn. Open the app to see the reason and submit again.");
         recordAudit(reviewer, "identity.verification.revoked", v,
                 "reason", reason, "userId", v.getUserId().toString());
         return read.currentReview(reviewer, v);

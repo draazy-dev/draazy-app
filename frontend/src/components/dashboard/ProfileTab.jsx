@@ -327,7 +327,7 @@ export default function ProfileTab({ user, update, toast, isOwner }) {
           <div className="flex items-start gap-3 min-w-0">
             <Icon name="shield-check" className={(identityVerified ? 'text-emerald-400' : 'text-amber-400') + ' w-5 h-5 flex-shrink-0 mt-0.5'} />
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-white font-medium">ID verified badge{identityVerified && <span className="ml-2 text-xs font-semibold text-emerald-300">· Active</span>}</p>
+              <p className="text-sm text-white font-medium">KYC done badge{identityVerified && <span className="ml-2 text-xs font-semibold text-emerald-300">· Active</span>}</p>
               <p className="text-xs text-gray-500 mt-1">{identityVerified ? 'Builds trust and lifts your ranking.' : "Show owners and flatmates you're genuine."}</p>
             </div>
           </div>

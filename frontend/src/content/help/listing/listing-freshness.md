@@ -36,7 +36,7 @@ Tenants abandon a platform after two or three wasted calls on properties that ar
 On the default **Relevance** sort, listings are scored. In descending order of weight:
 
 1. **Featured placement** — given for a limited time (shown on the [Plans page](/plans)) after your listing's ownership is verified, then it ends; it outranks everything below it
-2. **ID verified** — ID and selfie reviewed by our trust team
+2. **KYC done** — ID and selfie reviewed by our trust team
 3. **Verified property** — ownership documents seen, and still current
 4. **Freshness** — Active, then Ageing, then Stale. Dormant listings are hidden from search.
 5. **RERA number** — a MahaRERA registration number shared by owner, check it on MahaRERA

@@ -78,7 +78,7 @@ export const KB = [
     id: 'verification',
     keywords: ['verify', 'verified', 'verification', 'trust', 'genuine', 'fake', 'scam', 'safe', 'aadhaar', 'pan', 'badge', 'document', 'authentic', 'rera', 'selfie', 'kyc'],
     q: 'How are owners and listings verified?',
-    a: "Every listing is checked by our team before it goes live: real photos, not a duplicate, details that add up. Owners can also earn a Verified property badge with an ownership proof such as an electricity bill or society share certificate; changing the address, society or price later removes it until it's re-checked. Anyone can get the ID verified badge by photographing a government ID with a live selfie — a person on our team decides, never a machine, and the images are deleted 7 days after the decision. Badges are optional trust signals, never a requirement to browse, post or contact.",
+    a: "Every listing is checked by our team before it goes live: real photos, not a duplicate, details that add up. Owners can also earn a Verified property badge with an ownership proof such as an electricity bill or society share certificate; changing the address, society or price later removes it until it's re-checked. Anyone can get the KYC done badge by photographing a government ID with a live selfie — a person on our team decides, never a machine, and the images are deleted 7 days after the decision. Badges are optional trust signals, never a requirement to browse, post or contact.",
     actions: [
       { label: 'Verify identity', to: '/verify-identity', icon: 'shield-check' },
       { label: 'How verification works', to: '/how-verification-works', icon: 'shield-check' },

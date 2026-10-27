@@ -16,7 +16,7 @@ export const OPTION_INFO = {
 
   'tag.readyToMove': { title: 'Ready to Move', body: 'Construction is complete — you can occupy the home right after the paperwork, with no waiting period.' },
   'tag.underConstruction': { title: 'Under Construction', body: 'Still being built. Usually cheaper and paid in stages, but you wait for possession and take on completion risk.' },
-  'tag.verifiedOwner': { title: 'ID verified', body: "The lister photographed a government ID and took a live selfie, and a reviewer on our team approved it — so you're dealing with a genuine person, not an anonymous broker." },
+  'tag.verifiedOwner': { title: 'KYC done', body: "The lister photographed a government ID and took a live selfie, and a reviewer on our team approved it — so you're dealing with a genuine person, not an anonymous broker." },
   'tag.ownershipVerified': { title: 'Verified property', body: 'Draazy has seen documents linking this person to the property, reducing the risk of fake or duplicate listings.' },
   'tag.furnishing': { title: 'Furnishing', body: 'Unfurnished, Semi-furnished (usually wardrobes and fittings) or Furnished (adds beds, sofa and appliances).' },
   'tag.zeroBrokerage': { title: 'Zero brokerage', body: 'Draazy charges no commission on this deal. You talk to the owner directly, so there is no agent fee — typically one to two months of rent, or 1–2% of a sale price — on top of what you agree with them.' },
@@ -43,7 +43,7 @@ export const OPTION_INFO = {
   'rent.notice': { title: 'Notice period', body: 'How much advance notice either side must give before ending the tenancy — typically one month.' },
   'rent.tenants': { title: 'Preferred tenants', body: 'Who the owner is open to renting to — family, bachelors or company lease. It sets expectations before you enquire.' },
 
-  'verification.owner': { title: 'ID verified', body: "The lister's government ID and live selfie were reviewed and approved by our team — you're dealing with a real, contactable person." },
+  'verification.owner': { title: 'KYC done', body: "The lister's government ID and live selfie were reviewed and approved by our team — you're dealing with a real, contactable person." },
   'verification.ownership': { title: 'Verified property', body: 'Documents linking this person to the property have been checked, lowering the risk of a fraudulent listing.' },
   'verification.docs': { title: 'Document-backed', body: 'The owner has uploaded genuine property papers a serious buyer or their lawyer can verify before booking.' },
 

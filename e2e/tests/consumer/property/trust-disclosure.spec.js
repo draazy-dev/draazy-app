@@ -68,7 +68,7 @@ test('listing cards and map drawer avoid fabricated Draazy verification and conn
   await page.goto('/listings?deal=buy&loc=baner', { waitUntil: 'domcontentloaded' });
   const card = page.locator(`a[href="/property/${RERA_LISTING}"]`).first();
   await expect(card).toBeVisible({ timeout: 20000 });
-  await expect(card.locator('[aria-label*="ID verified"]')).toHaveCount(1);
+  await expect(card.locator('[aria-label*="KYC done"]')).toHaveCount(1);
   await expect(card).not.toContainText('Verified Draazy');
 
   const fixture = rows.find((p) => p.slug === MAP_LISTING);

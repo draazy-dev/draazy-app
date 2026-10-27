@@ -69,7 +69,7 @@ test('the mobile-first identity route submits a PAN case and later shows the rej
   await page.setViewportSize({ width: 390, height: 844 });
 
   await page.goto('/verify-identity');
-  await expect(page.getByRole('heading', { name: 'Get ID verified', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Get KYC done', exact: true })).toBeVisible();
   await expect(page.getByTestId(/^verify-doc-tile-/)).toHaveCount(4);
   await expect(page.getByTestId('verify-doc-tile-voter_id')).toHaveCount(0);
   await expect(page.getByText(/unlimited/i)).toHaveCount(0);
@@ -109,7 +109,7 @@ test('the mobile-first identity route submits a PAN case and later shows the rej
   // Retry must pass through consent, not jump to the document picker: `consented` is component
   // state, and a reload skipping the checkbox submits consent=false, which the server refuses.
   await page.getByRole('button', { name: 'Try again', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Get ID verified', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Get KYC done', exact: true })).toBeVisible();
   await expect(page.getByRole('checkbox')).not.toBeChecked();
 });
 
@@ -212,7 +212,7 @@ test('status handles revoked, not_reviewed and withdraw', async ({ page, login, 
 
   await page.getByTestId('verify-withdraw-link').click();
   await page.getByTestId('verify-withdraw-confirm').click();
-  await expect(page.getByRole('heading', { name: 'Get ID verified', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Get KYC done', exact: true })).toBeVisible();
   expect(deletes).toBe(1);
 });
 

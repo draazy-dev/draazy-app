@@ -27,16 +27,16 @@
       "hint": "On a phone already? Allow camera access and reopen this page."
     },
     "start": {
-      "title": "Get ID verified",
-      "body": "ID verified owners get more replies.",
+      "title": "Get KYC done",
+      "body": "KYC-done owners get more replies.",
       "docsLabel": "Choose identity document",
       "consentTitle": "Consent",
       "consent": {
         "line1": "We collect ID photo + selfie.",
-        "line2": "ID verified badge only; staff review.",
+        "line2": "KYC done badge only; staff review.",
         "line3": "Images delete 7 days after decision. Withdraw here anytime."
       },
-      "agree": "I agree to identity review for the ID verified badge.",
+      "agree": "I agree to identity review for the KYC done badge.",
       "cta": "Start capture"
     },
     "capture": {
@@ -110,15 +110,15 @@
     "status": {
       "pendingTitle": "In review",
       "pendingBody": "We will update the badge after review.",
-      "verifiedTitle": "ID verified",
+      "verifiedTitle": "KYC done",
       "verifiedBody": "Your badge is live.",
       "verifiedAs": "Verified as {{name}}",
       "rejectedTitle": "Needs attention",
       "rejectedBody": "Retake only if needed.",
       "revokedTitle": "Badge removed",
-      "revokedBody": "Your ID verified badge is no longer active.",
-      "noneTitle": "Get ID verified",
-      "noneBody": "ID verified owners get more replies.",
+      "revokedBody": "Your KYC done badge is no longer active.",
+      "noneTitle": "Get KYC done",
+      "noneBody": "KYC-done owners get more replies.",
       "removedLabel": "Badge removed",
       "removedBody": "Your badge was removed.",
       "needsAttention": "Needs attention",

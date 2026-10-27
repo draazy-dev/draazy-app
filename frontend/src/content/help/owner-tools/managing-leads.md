@@ -32,7 +32,7 @@ You do not see a tenant's occupation, income or household answers — only their
 
 - **Move-in date** — if it is three months out and you need someone next week, say so immediately rather than going quiet
 - **Household composition** — matches or does not match what the flat suits
-- **Verified tick** — an ID-verified tenant is worth more of your time
+- **Verified tick** — a KYC-done tenant is worth more of your time
 
 ## Notes and follow-ups
 

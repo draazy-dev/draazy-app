@@ -128,7 +128,7 @@ export default function BadgeSection({ review: r, busy, onDecide, onRevoke }) {
         </span>
         <EvidenceChip review={r} />
         {r.hostVerified ? (
-          <span className={OK} data-testid="host-id-verified"><IdCard className="h-3 w-3" />ID verified</span>
+          <span className={OK} data-testid="host-id-verified"><IdCard className="h-3 w-3" />KYC done</span>
         ) : tenant ? (
           <span className={WARN} data-testid="host-id-missing"><IdCard className="h-3 w-3" />ID not verified</span>
         ) : null}

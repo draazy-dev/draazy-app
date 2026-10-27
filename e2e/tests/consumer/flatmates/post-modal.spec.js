@@ -202,9 +202,9 @@ test.describe('post-request form on a phone', () => {
     expect(pillBox.y, 'the pill sits inside the dropdown field').toBeGreaterThanOrEqual(fieldBox.y);
     expect(pillBox.y + pillBox.height).toBeLessThanOrEqual(fieldBox.y + fieldBox.height);
 
-    const note = page.locator('label', { hasText: 'ID-verified people' });
+    const note = page.locator('label', { hasText: 'KYC-done people' });
     await page.getByTestId('seeker-more-details').locator('summary').click();
-    await expect(note).toHaveText('Only let ID-verified people express interest in my post');
+    await expect(note).toHaveText('Only let KYC-done people express interest in my post');
     expect((await note.boundingBox()).height).toBeLessThan(64);
   });
 });

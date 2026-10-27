@@ -10,7 +10,7 @@ test('toggling a verification filter keeps the /listings sheet visible', async (
 
   const sheet = page.locator('.filter-panel');
   await sheet.getByRole('button', { name: /^Verification/ }).click();
-  await sheet.getByText('ID verified', { exact: true }).click();
+  await sheet.getByText('KYC done', { exact: true }).click();
 
   await expect(page).toHaveURL(/[?&]v=owner/);
   await expect(sheet.getByRole('button', { name: /close filters/i })).toBeInViewport();

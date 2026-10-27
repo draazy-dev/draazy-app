@@ -20,7 +20,7 @@ export default function Disclaimer() {
       <h2>2. Property information accuracy</h2>
       <ul>
         <li>Listing details (price, area, amenities, photos, possession date) are provided by property owners and are not independently verified by Draazy unless explicitly marked as "Verified".</li>
-        <li>A "Verified property" or "ID verified" badge — and any per-document "Verified" badge — means only that Draazy reviewed the owner's identity and sighted the document the owner provided. It is <strong>not</strong> a certification of that document's authenticity or legal validity, nor a confirmation of clear, marketable, or dispute-free title.</li>
+        <li>A "Verified property" or "KYC done" badge — and any per-document "Verified" badge — means only that Draazy reviewed the owner's identity and sighted the document the owner provided. It is <strong>not</strong> a certification of that document's authenticity or legal validity, nor a confirmation of clear, marketable, or dispute-free title.</li>
         <li>Users must conduct their own due diligence — including title search, encumbrance certificate check, approved building plan verification, and physical inspection — and consult a qualified lawyer before entering into any transaction or paying any advance.</li>
       </ul>
 

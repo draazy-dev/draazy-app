@@ -64,7 +64,7 @@ A workable template:
 > Hi, I'm interested in your 2 BHK in Baner. I work at a product company in Hinjawadi, moving with my wife, and we're looking to shift by 15 August. The rent and deposit work for us. Could we visit this weekend — Saturday morning or Sunday afternoon?
 
 > [!TIP]
-> Owners see only your name, a masked mobile number and a Serious Buyer badge if you are ID-verified. Your [tenant profile](/tenant-profile) is not shared, so use a short first message to say who will live in the home.
+> Owners see only your name, a masked mobile number and a Serious Buyer badge if your KYC is done. Your [tenant profile](/tenant-profile) is not shared, so use a short first message to say who will live in the home.
 
 ## If the request stays pending
 

@@ -30,7 +30,7 @@
     "yr": "yr",
     "beds": "Beds",
     "deposit": "Deposit",
-    "verifOwner": "ID verified",
+    "verifOwner": "KYC done",
     "verifOwnership": "Verified property",
     "verifRera": "RERA shared",
     "chipNear": "Near {{label}} · {{radius}} {{unit}}",
