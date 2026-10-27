@@ -63,7 +63,8 @@ export const isToday = (at) => dayKey(at) === dayKey(Date.now());
 export function collapseNotifications(rows) {
   const groups = new Map();
   rows.forEach((n) => {
-    const key = `${n.type}|${safeNotificationLink(n.link)}|${dayKey(n.at)}`;
+    // The server's own type, so a contact and a photo request sharing a link and a UI type stay separate rows.
+    const key = `${n.wireType ?? n.type}|${safeNotificationLink(n.link)}|${dayKey(n.at)}`;
     const existing = groups.get(key);
     if (!existing) {
       groups.set(key, { ...n, ids: [n.id], count: 1 });

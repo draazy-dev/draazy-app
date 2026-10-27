@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { openMessageStream, unreadCount as fetchUnreadCount } from '../services/conversationService.js';
+import { listRequests } from '../services/requestInboxService.js';
 import { getAppFlags } from '../services/settingsService.js';
 import { browserAlertsOn } from '../lib/browserAlerts.js';
+import { CONNECTION_KINDS, isPending } from '../pages/consumer/requests/requestMeta.js';
 import { useAuth } from './AuthContext.jsx';
 
 /* The chat badge count, held once for the whole app because the answer is a network call and a
@@ -11,6 +13,7 @@ const ConversationContext = createContext(null);
 export function ConversationProvider({ children }) {
   const { isIn } = useAuth();
   const [unread, setUnread] = useState(0);
+  const [pendingRequests, setPendingRequests] = useState(0);
   const [streamConnected, setStreamConnected] = useState(false);
   const [messagingEnabled, setMessagingEnabled] = useState(true);
   const subscribers = useRef(new Set());
@@ -31,6 +34,24 @@ export function ConversationProvider({ children }) {
       return 0;
     }
   }, [isIn]);
+
+  // Only the request kinds the Messages inbox lists, so the badge never counts something it cannot show.
+  const refreshRequests = useCallback(async () => {
+    if (!isIn) {
+      setPendingRequests(0);
+      return;
+    }
+    try {
+      const items = await listRequests('received');
+      setPendingRequests(items.filter((it) => CONNECTION_KINDS.has(it.kind) && isPending(it)).length);
+    } catch {
+      setPendingRequests(0);
+    }
+  }, [isIn]);
+
+  useEffect(() => {
+    refreshRequests();
+  }, [refreshRequests]);
 
   useEffect(() => {
     let alive = true;
@@ -53,6 +74,7 @@ export function ConversationProvider({ children }) {
       if (document.hidden || Date.now() - last < 1000) return;
       last = Date.now();
       refresh();
+      refreshRequests();
     };
     window.addEventListener('storage', onChange);
     window.addEventListener('focus', onChange);
@@ -64,7 +86,7 @@ export function ConversationProvider({ children }) {
       window.removeEventListener('online', onChange);
       document.removeEventListener('visibilitychange', onChange);
     };
-  }, [isIn, refresh]);
+  }, [isIn, refresh, refreshRequests]);
 
   useEffect(() => {
     let alive = true;
@@ -107,6 +129,8 @@ export function ConversationProvider({ children }) {
         },
         onEvent: (event) => {
           if (event.type === 'message') refresh();
+          // A new request reaches the host as a notification; there is no request event on this stream.
+          if (event.type === 'notification') refreshRequests();
           subscribers.current.forEach((fn) => fn(event));
         },
       }).catch((err) => {
@@ -131,9 +155,12 @@ export function ConversationProvider({ children }) {
       controller?.abort();
       document.removeEventListener('visibilitychange', visible);
     };
-  }, [isIn, messagingEnabled, refresh]);
+  }, [isIn, messagingEnabled, refresh, refreshRequests]);
 
-  const value = useMemo(() => ({ unread, refresh, subscribe, streamConnected }), [unread, refresh, subscribe, streamConnected]);
+  const value = useMemo(
+    () => ({ unread, pendingRequests, refresh, refreshRequests, subscribe, streamConnected }),
+    [unread, pendingRequests, refresh, refreshRequests, subscribe, streamConnected],
+  );
   return <ConversationContext.Provider value={value}>{children}</ConversationContext.Provider>;
 }
 

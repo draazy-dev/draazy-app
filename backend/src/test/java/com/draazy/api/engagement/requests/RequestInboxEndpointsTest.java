@@ -91,6 +91,18 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
                 + "and status = 'pending'", UUID.class, buyer.getId(), p.getId());
     }
 
+    private UUID offer(User buyer, Property p, long amount) throws Exception {
+        as(buyer, post(Routes.Offers.BASE).content("{\"propertyId\":\"" + p.getId() + "\",\"amount\":" + amount
+                + ",\"message\":\"Can move in soon\"}")).andExpect(status().isCreated());
+        return jdbc.queryForObject("select id from offers where from_user_id = ? and property_id = ?",
+                UUID.class, buyer.getId(), p.getId());
+    }
+
+    private void respondOffer(User caller, UUID id, String body) throws Exception {
+        as(caller, post(Routes.Offers.RESPOND.replace("{id}", id.toString())).content(body))
+                .andExpect(status().is2xxSuccessful());
+    }
+
     private String lastNotificationLink(User u, String type) {
         return jdbc.queryForObject("select link from notifications where user_id = ? and type = ? "
                 + "order by created_at desc limit 1", String.class, u.getId(), type);
@@ -546,6 +558,58 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void offer_isPendingForTheOwnerUntilTheyCounter_andTheBuyerCanWithdrawIt() throws Exception {
+        User owner = user("9830000070", "owner");
+        User buyer = user("9830000071", "buyer");
+        UUID id = offer(buyer, listing(owner, "Offer flat"), 24000);
+
+        as(owner, get(Routes.MeRequests.BASE + "?box=received"))
+                .andExpect(jsonPath("$.content[0].kind").value("offer"))
+                .andExpect(jsonPath("$.content[0].state").value("pending"))
+                .andExpect(jsonPath("$.content[0].message").value("Offered \u20b924,000. Can move in soon"))
+                .andExpect(jsonPath("$.content[0].party.name").value("Person 9830000071"))
+                .andExpect(jsonPath("$.content[0].target.title").value("Offer flat"));
+        as(buyer, get(Routes.MeRequests.BASE + "?box=sent"))
+                .andExpect(jsonPath("$.content[0].state").value("pending"))
+                .andExpect(jsonPath("$.content[0].party.name").value("Person 9830000070"));
+
+        respondOffer(owner, id, "{\"action\":\"counter\",\"counterAmount\":24500}");
+        as(owner, get(Routes.MeRequests.BASE + "?box=received"))
+                .andExpect(jsonPath("$.content[0].state").value("countered"))
+                .andExpect(jsonPath("$.content[0].message").value("You countered at \u20b924,500. Can move in soon"));
+        as(buyer, get(Routes.MeRequests.BASE + "?box=sent"))
+                .andExpect(jsonPath("$.content[0].state").value("countered"))
+                .andExpect(jsonPath("$.content[0].message").value("Owner countered at \u20b924,500. Can move in soon"));
+
+        respondOffer(buyer, id, "{\"action\":\"counter\",\"counterAmount\":24200}");
+        as(owner, get(Routes.MeRequests.BASE + "?box=received"))
+                .andExpect(jsonPath("$.content[0].state").value("pending"))
+                .andExpect(jsonPath("$.content[0].message").value("Countered at \u20b924,200. Can move in soon"));
+
+        as(buyer, delete(url("offer", id))).andExpect(status().isNoContent());
+        assertThat(statusOf("offers", id)).isEqualTo("withdrawn");
+        as(owner, get(Routes.MeRequests.BASE + "?box=received")).andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    @Test
+    void acceptedOffer_readsAsAgreed_andCanNoLongerBeWithdrawn() throws Exception {
+        User owner = user("9830000072", "owner");
+        User buyer = user("9830000073", "buyer");
+        UUID id = offer(buyer, listing(owner, "Agreed flat"), 24000);
+        respondOffer(owner, id, "{\"action\":\"accept\"}");
+
+        as(buyer, get(Routes.MeRequests.BASE + "?box=sent"))
+                .andExpect(jsonPath("$.content[0].state").value("accepted"))
+                .andExpect(jsonPath("$.content[0].message").value("Agreed at \u20b924,000. Can move in soon"))
+                .andExpect(jsonPath("$.content[0].decidedAt").isNotEmpty());
+        assertThatThrownBy(() -> sources.of("offer").withdraw(buyer.getId(), id))
+                .isInstanceOf(ConflictException.class);
+        assertThat(statusOf("offers", id)).isEqualTo("accepted");
+        as(owner, delete(url("offer", id) + "?box=received")).andExpect(status().isNoContent());
+        as(owner, get(Routes.MeRequests.BASE + "?box=received")).andExpect(jsonPath("$.content.length()").value(0));
+    }
+
+    @Test
     void withdrawingADocumentRequest_theOwnerAnsweredFirst_isAConflict() throws Exception {
         User owner = user("9830000047", "owner");
         User buyer = user("9830000048", "buyer");
@@ -571,7 +635,7 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
     }
 
     @Test
-    void reminder_onAContactRequest_linksToItsConversationEntry() throws Exception {
+    void reminder_onAContactRequest_linksToTheRequestInbox() throws Exception {
         User owner = user("9830000051", "owner");
         User buyer = user("9830000052", "buyer");
         UUID id = contactRequest(buyer, listing(owner, "Nudge contact"), null);
@@ -579,7 +643,7 @@ class RequestInboxEndpointsTest extends AbstractApiTest {
 
         as(buyer, post(remindUrl("contact", id))).andExpect(status().isCreated());
 
-        assertThat(lastNotificationLink(owner, "request.reminder")).isEqualTo("/messages?c=request:contact:" + id);
+        assertThat(lastNotificationLink(owner, "request.reminder")).isEqualTo("/dashboard?tab=leads&box=received");
     }
     @Test
     void receivedBox_keepsDecidedRequestsBelowOpenOnes_forNinetyDays() throws Exception {

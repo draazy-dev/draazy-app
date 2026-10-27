@@ -133,7 +133,7 @@ class FlatmateApplicationEndpointsTest extends AbstractApiTest {
                     .containsEntry("type", "flatmate.groupApplication.received")
                     .containsEntry("title", "A group applied to your flat")
                     .containsEntry("body", "Three of us for a 3BHK would like to rent 3BHK in Kothrud.")
-                    .containsEntry("link", "/dashboard");
+                    .containsEntry("link", "/dashboard?tab=leads&box=received");
             assertThat(jdbc.queryForObject(
                     "select count(*) from notifications where user_id = ?", Long.class, host.getId()))
                     .isZero();

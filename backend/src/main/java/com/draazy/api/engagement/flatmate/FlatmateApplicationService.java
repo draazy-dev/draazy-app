@@ -116,7 +116,7 @@ public class FlatmateApplicationService {
             notifier.notify(listing.getOwner().getId(), "flatmate.groupApplication.received",
                     "A group applied to your flat",
                     group.getTitle() + " would like to rent " + listing.getTitle() + ".",
-                    "/dashboard");
+                    Notifier.REQUEST_INBOX);
         }
 
         return hydrator.hydrateOne(saved);

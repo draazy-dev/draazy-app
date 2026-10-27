@@ -5422,7 +5422,7 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [contact, visit, photo, document, flatmate, group] }
+        schema: { type: string, enum: [contact, visit, photo, document, flatmate, group, offer] }
       - name: id
         in: path
         required: true
@@ -5464,7 +5464,7 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [contact, visit, photo, document, flatmate, group] }
+        schema: { type: string, enum: [contact, visit, photo, document, flatmate, group, offer] }
       - name: id
         in: path
         required: true
@@ -15395,8 +15395,8 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid, description: The underlying request row. }
-        kind: { type: string, enum: [contact, visit, photo, document, flatmate, group] }
-        state: { type: string, enum: [pending, accepted, declined, expired, withdrawn] }
+        kind: { type: string, enum: [contact, visit, photo, document, flatmate, group, offer] }
+        state: { type: string, enum: [pending, accepted, declined, expired, withdrawn, countered], description: 'countered: an offer whose latest amount came from the owner, so the buyer answers next.' }
         status: { type: string, description: 'The kind''s own status, e.g. scheduled, confirmed, resolved, approved.' }
         party:
           type: object

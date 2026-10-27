@@ -4,6 +4,9 @@ import java.util.UUID;
 
 public interface Notifier {
 
+    /** Where every "someone is asking you for something" notification lands, so the recipient can act on it. */
+    String REQUEST_INBOX = "/dashboard?tab=leads&box=received";
+
     void notify(UUID userId, String type, String title, String body, String link);
 
     default void markRead(UUID userId, String type, String link) {

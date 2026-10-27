@@ -661,7 +661,7 @@ public class FlatmateSupplyService {
                 "flatmate." + kind + ".interest",
                 (requesterName == null ? "Someone" : requesterName) + " is interested in " + targetLabel,
                 "Open your request inbox to review their interest.",
-                FlatmateLinks.of(kind, targetId));
+                Notifier.REQUEST_INBOX);
         return saved;
     }
 

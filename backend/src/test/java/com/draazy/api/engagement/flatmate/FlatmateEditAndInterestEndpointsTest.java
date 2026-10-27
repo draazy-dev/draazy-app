@@ -456,9 +456,10 @@ class FlatmateEditAndInterestEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isCreated());
 
             Map<String, Object> notification = jdbc.queryForMap("""
-                    select title, body from notifications
+                    select title, body, link from notifications
                      where user_id = ? and type = 'flatmate.room.interest'
                     """, host.getId());
+            assertThat(notification.get("link")).isEqualTo("/dashboard?tab=leads&box=received");
             assertThat((String) notification.get("title")).doesNotContainPattern("\\b\\d{10}\\b");
             assertThat((String) notification.get("body")).doesNotContainPattern("\\b\\d{10}\\b");
         }

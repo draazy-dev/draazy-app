@@ -303,8 +303,9 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                     .andExpect(status().isCreated());
 
             Map<String, Object> notification = jdbc.queryForMap(
-                    "select title, body from notifications where user_id = ?::uuid and type = 'flatmate.interest'",
+                    "select title, body, link from notifications where user_id = ?::uuid and type = 'flatmate.interest'",
                     host.getId().toString());
+            assertThat(notification.get("link")).isEqualTo("/dashboard?tab=leads&box=received");
             assertThat((String) notification.get("title"))
                     .contains("Jay")
                     .doesNotContainPattern("\\b\\d{10}\\b");
