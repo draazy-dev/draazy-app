@@ -12,6 +12,7 @@ import com.draazy.api.billing.referral.ReferralSignalRetention;
 import com.draazy.api.catalog.listing.ListingContentPurge;
 import com.draazy.api.catalog.listing.ListingDuplicateSweep;
 import com.draazy.api.catalog.managed.TrackedRentService;
+import com.draazy.api.catalog.photo.PhotoUploadSweep;
 import com.draazy.api.common.PlatformTime;
 import com.draazy.api.common.audit.AuditLogRetention;
 import com.draazy.api.common.log.ErrorEventRetention;
@@ -146,6 +147,11 @@ class JobCatalog {
     @Bean
     ScheduledJob listingContentPurgeJob(ListingContentPurge purge) {
         return new ScheduledJob("listing-content-purge", NIGHTLY, drain(() -> purge.purgeDue(Instant.now())));
+    }
+
+    @Bean
+    ScheduledJob photoUploadSweepJob(PhotoUploadSweep sweep) {
+        return new ScheduledJob("photo-upload-sweep", NIGHTLY, drain(() -> sweep.sweep(Instant.now())));
     }
 
     @Bean

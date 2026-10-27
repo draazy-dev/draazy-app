@@ -6388,7 +6388,8 @@ paths:
         before sending it. Metadata (EXIF, XMP, IPTC, comments, APP3/APP11, MPF) and anything after
         the image's end marker are removed before storage, and a file that cannot be parsed to its end
         marker is refused 415. Uploaded bytes must be strictly
-        smaller than 1000000 bytes. Self-scoped; no `x-roles`.
+        smaller than 1000000 bytes. At most 100 uploads per account in any 24 hours (429 after). An
+        upload no listing, room or avatar shows 7 days later is deleted. Self-scoped; no `x-roles`.
       operationId: uploadPhoto
       requestBody:
         required: true
@@ -6411,6 +6412,7 @@ paths:
                   url: { type: string, format: uri }
         '413': { description: Payload too large }
         '415': { description: Unsupported media type }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
   /me/documents/requests:
     get:
       tags: [Documents]

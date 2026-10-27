@@ -69,6 +69,10 @@ public interface PropertyRepository
                 select 1 from users where avatar = :url)""")
     boolean photoUsedElsewhere(@Param("id") UUID id, @Param("url") String url);
 
+    default boolean photoShownAnywhere(String url) {
+        return photoUsedElsewhere(new UUID(0L, 0L), url);
+    }
+
     /** What stops the owner deleting this listing, or null. Accepted offers are covered by
      * the deal or confirmation they lead to. */
     @Query(nativeQuery = true, value = """

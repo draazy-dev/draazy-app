@@ -12,9 +12,6 @@ public interface FileStorage {
 
     void store(String key, byte[] content, String contentType);
 
-    /** A time-limited URL the client can PUT to (private bucket). */
-    String signedUploadUrl(String key);
-
     /** A time-limited URL the client can GET from (private bucket). */
     String signedDownloadUrl(String key);
 
@@ -37,8 +34,6 @@ public interface FileStorage {
         havingValue = "false", matchIfMissing = true)
 class MockFileStorage implements FileStorage {
 
-    private static final String BASE = "https://mock.storage.local/";
-
     private final DevObjectStore objects;
 
     MockFileStorage(DevObjectStore objects) {
@@ -48,11 +43,6 @@ class MockFileStorage implements FileStorage {
     @Override
     public void store(String key, byte[] content, String contentType) {
         objects.store(key, content, contentType);
-    }
-
-    @Override
-    public String signedUploadUrl(String key) {
-        return BASE + key + "?op=put&sig=dev";
     }
 
     @Override
@@ -95,11 +85,6 @@ class ObjectStoreFileStorage implements FileStorage {
 
     @Override
     public void store(String key, byte[] content, String contentType) {
-        throw new UnsupportedOperationException("Object storage not configured for prod yet");
-    }
-
-    @Override
-    public String signedUploadUrl(String key) {
         throw new UnsupportedOperationException("Object storage not configured for prod yet");
     }
 

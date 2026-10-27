@@ -88,7 +88,9 @@ class UploadPolicyEndpointsTest {
                 mock(com.draazy.api.common.trust.UnsubmittedRequestLookup.class));
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
                 new AuthPrincipal(OWNER, "owner", null, true, false), null, List.of()));
-        mvc = MockMvcBuilders.standaloneSetup(new MePhotosController(new PhotoService(storage, new com.draazy.api.catalog.photo.PhotoKeys("test-secret"))),
+        mvc = MockMvcBuilders.standaloneSetup(new MePhotosController(new PhotoService(storage,
+                                new com.draazy.api.catalog.photo.PhotoKeys("test-secret"),
+                                mock(com.draazy.api.catalog.photo.PhotoUploadQuota.class))),
                         new MeDocumentsController(service))
                 .setCustomArgumentResolvers(new AuthenticationPrincipalArgumentResolver())
                 .setControllerAdvice(new GlobalExceptionHandler())
