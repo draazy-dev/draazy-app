@@ -33,14 +33,13 @@ import useListingLocation from './useListingLocation';
 import useRoomEdit, { useHomePrefill } from './useRoomEdit';
 import { LISTING_STEPS } from './StepNav.jsx';
 import { track } from '../../../lib/pmf.js';
+import { DRAFT_OWNER_KEY, adoptSharedDraft, draftKeyFor } from './draftSlots.js';
 
 const LIST_PROPERTY_DRAFT_PREFIX = 'dzDraft:list-property';
 const LEGACY_LIST_PROPERTY_DRAFT_KEY = `${LIST_PROPERTY_DRAFT_PREFIX}:v2`;
 const DRAFT_STEP_KEY = '__currentStep';
 const DRAFT_PHOTOS_KEY = '__photos';
-const DRAFT_OWNER_KEY = '__owner';
 const DRAFT_RENT_MODE_KEY = '__rentMode';
-const LIST_PROPERTY_DRAFT_KEY = `${LIST_PROPERTY_DRAFT_PREFIX}:v3`;
 const dealPreset = (searchParams, flatmateMode, editId) => {
   if (editId) return '';
   const deal = searchParams.get('deal');
@@ -138,6 +137,7 @@ export default function useListProperty() {
   }, [editId, editRoomId, authLoading, user]);
 
   const [form, setForm] = useState(() => initialForEntry(searchParams, flatmateMode, editId));
+  const entryForm = useRef(form);
   // Async geocodes must read the latest form rather than an older render closure.
   const formRef = useRef(form);
   const skipLeaveGuard = useRef(false);
@@ -147,13 +147,16 @@ export default function useListProperty() {
 
   const ownerMobile = user?.mobile || '';
   const media = useListingMedia({ setErrors });
-  const { photos, setPhotos } = media;
+  const { photos, setPhotos, restorePhotos } = media;
   const ownerId = ownerDraftId(user);
-  const initialOwnerId = useRef(ownerId);
   const previousOwnerId = useRef(ownerId);
   const expiredOwnerId = useRef('');
+  const draftable = !editId && !editRoomId && !homeId;
+  // Runs before the draft hook's first restore, so a draft left in the shared slot by this owner is found.
+  const [draftOwner, setDraftOwner] = useState(() => { if (draftable) adoptSharedDraft(ownerId); return ownerId; });
+  const keepWorkOnRestore = useRef(false);
   const signedIn = !!ownerId;
-  const draftEnabled = !editId && !editRoomId && !homeId && !authLoading;
+  const draftEnabled = draftable && !authLoading;
   const writeStepParam = useCallback((step, { replace = false, pushedFrom } = {}) => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -216,16 +219,19 @@ export default function useListProperty() {
     return legacyView ? { ...restored, facing: '', overlooking: restored.overlooking || legacyView } : restored;
   }), []);
   const restoreDraftExtras = useCallback((saved) => {
+    if (keepWorkOnRestore.current) {
+      keepWorkOnRestore.current = false;
+      return null;
+    }
     const savedFields = { ...saved };
     delete savedFields.__documents;
     const {
       [DRAFT_STEP_KEY]: savedStep, [DRAFT_PHOTOS_KEY]: savedPhotos, [DRAFT_OWNER_KEY]: savedOwner,
       [DRAFT_RENT_MODE_KEY]: savedRentMode, ...fields
     } = savedFields;
-    if (!savedOwner && ownerId && initialOwnerId.current !== '') return null;
     if (savedOwner && savedOwner !== ownerId) return null;
     const restoredPhotos = durablePhotos(savedPhotos);
-    if (restoredPhotos.length) setPhotos(restoredPhotos);
+    if (restoredPhotos.length) restorePhotos(restoredPhotos);
     const roomDraft = !editId && (flatmateMode || savedRentMode === 'flatmate');
     if (roomDraft) setRentMode('flatmate');
     const step = Math.min(parseStep(savedStep), LISTING_STEPS.length);
@@ -234,19 +240,19 @@ export default function useListProperty() {
     // must not strand the user outside the room flow.
     const roomFields = roomDraft ? { ...fields, deal: 'rent' } : fields;
     return roomFields.locality && !roomFields.localitySlug ? { ...roomFields, locality: '', localitySlug: '' } : roomFields;
-  }, [editId, flatmateMode, ownerId, setPhotos, writeStepParam]);
+  }, [editId, flatmateMode, ownerId, restorePhotos, writeStepParam]);
   const draftForm = useMemo(() => ({
     ...form,
     [DRAFT_STEP_KEY]: currentStep,
     [DRAFT_PHOTOS_KEY]: durablePhotos(photos),
-    [DRAFT_OWNER_KEY]: ownerId,
+    [DRAFT_OWNER_KEY]: draftOwner,
     [DRAFT_RENT_MODE_KEY]: rentMode,
-  }), [currentStep, form, ownerId, photos, rentMode]);
+  }), [currentStep, draftOwner, form, photos, rentMode]);
   useEffect(() => {
     if (editId) return;
     try { localStorage.removeItem(LEGACY_LIST_PROPERTY_DRAFT_KEY); } catch {}
   }, [editId]);
-  const { clear: clearFormDraft, discard: discardFormDraft, flush: flushFormDraft, startFresh } = useFormDraft(LIST_PROPERTY_DRAFT_KEY, draftForm, restoreDraft, {
+  const { clear: clearFormDraft, flush: flushFormDraft, startFresh } = useFormDraft(draftKeyFor(draftOwner), draftForm, restoreDraft, {
     enabled: draftEnabled,
     omit: ['agreementDeclared', 'agreementDoc', 'hostRole', 'ownerConsentMobile', 'ownerConsent', 'attachedPropertyId'],
     onRestore: restoreDraftExtras,
@@ -264,13 +270,22 @@ export default function useListProperty() {
     if (ownerId) expiredOwnerId.current = '';
     /* An expired session keeps the listing for the same owner signing back in. */
     if (expired && (!ownerId || ownerId === expired)) return;
-    if (!previous && !expired) return;
+    if (!previous && !expired) {
+      const working = form !== entryForm.current || photos.length > 0;
+      if (draftable) adoptSharedDraft(ownerId, { guestWork: working });
+      keepWorkOnRestore.current = working;
+      setDraftOwner(ownerId);
+      return;
+    }
+    flushFormDraft();
+    keepWorkOnRestore.current = false;
+    setDraftOwner(ownerId);
     dupSeq.current += 1;
-    discardFormDraft();
     media.resetMedia();
     const fresh = initialForEntry(searchParams, flatmateMode, editId);
     setForm(fresh);
     formRef.current = fresh;
+    entryForm.current = fresh;
     setCurrentStep(1);
     setRentMode(flatmateMode && !editId ? 'flatmate' : 'whole');
     setShowSuccess(false);
@@ -289,7 +304,7 @@ export default function useListProperty() {
     setDupPending(false);
     setQuota({ used: 0, allowance: null });
     writeStepParam(1, { replace: true });
-  }, [discardFormDraft, editId, flatmateMode, media, ownerId, writeStepParam]);
+  }, [draftable, editId, flatmateMode, flushFormDraft, form, media, ownerId, photos.length, writeStepParam]);
   const [draftHydrated, setDraftHydrated] = useState(false);
   useEffect(() => { if (draftEnabled) setDraftHydrated(true); }, [draftEnabled]);
   const requestAuthPrompt = useCallback(() => {

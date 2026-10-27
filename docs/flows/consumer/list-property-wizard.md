@@ -250,14 +250,18 @@ advance on any error (scrolling to the first error via `scrollToError`).
   corresponding library/codec sources and integration source under `/third-party/uploads/`.
 
 ### Draft vs submit
-- **New-post draft only:** `useFormDraft` autosaves the form to `dzDraft:list-property:v3`, stamped
-  with its owner (`__owner`); a draft left by another account is never restored, and logout clears
-  every `dzDraft:*` key. The draft carries the step, the room mode and durable photo URLs.
+- **New-post draft only:** `useFormDraft` autosaves a guest's form to `dzDraft:list-property:v3` and a
+  signed-in owner's to `dzDraft:list-property:v3:<owner id>` (`draftSlots.js`), each stamped with its owner
+  (`__owner`). Another account on the same device therefore neither sees nor overwrites it; work a guest
+  typed before signing in moves into their slot, and logout clears every `dzDraft:*` key. The draft
+  carries the step, the room mode and durable photo URLs. The server deletes an upload that no listing,
+  room or avatar shows 7 days after it was made (`photo-upload-sweep`), so restore loads each photo and
+  drops the ones that fail, with an "expired, add it again" note on the photo step.
   A restore banner + "start fresh" let the owner resume or wipe. There is no server draft
   status. The suffix is part of the contract — consent and agreement fields are `omit`ted on write, and
   `omit` cannot reach a draft an older build already wrote, so a shape change renames the key (the
-  `:v2` key is removed on load). Specs seed it through `LIST_PROPERTY_DRAFT_KEY` rather than
-  retyping the literal.
+  `:v2` key is removed on load). Specs seed the guest slot through `LIST_PROPERTY_DRAFT_KEY` (an owner-stamped
+  seed moves into that owner's slot on load) and read through `readListPropertyDraft`.
   Edits never restore, autosave or clear this draft, including after a successful save. Resetting
   an edit reloads the saved server snapshot, leaving the separate new-post draft untouched.
 - **Saved edit readiness:** `GET /me/listings/{id}` is owner-scoped. The form becomes ready only

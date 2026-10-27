@@ -192,6 +192,7 @@ export function useFormDraft(key, form, setForm, { debounce = 400, ignore = ['na
   useEffect(() => {
     if (!enabled || restoredKey.current === key) return;
     restoredKey.current = key;
+    cleared.current = false;
     try {
       const parsed = JSON.parse(localStorage.getItem(key));
       // Drafts written before a field joined `omit` still hold it on disk.

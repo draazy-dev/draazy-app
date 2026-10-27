@@ -2,7 +2,7 @@
 // assert the opposite of what the sibling `no-gate` spec proves.
 import { test, expect } from '../../../fixtures/live.js';
 import { signedInAsNew } from '../../../helpers/liveAuth.js';
-import { pickFloors, LIST_PROPERTY_DRAFT_KEY, readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
+import { pickFloors, readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { pickLocality } from '../../../helpers/locality.js';
 
@@ -166,7 +166,7 @@ test('Start over asks for confirmation, can be cancelled, and then clears the fo
     /* The autosave is debounced and the read below goes through `page.evaluate`, which does not retry. Polling
        the draft waits for the write itself rather than for a duration somebody timed the debounce at once. */
     await expect
-      .poll(async () => readListPropertyDraft(page))
+      .poll(() => readListPropertyDraft(page))
       .toContain('1050');
 
     await page.locator('.lp-reset').click();
@@ -267,7 +267,7 @@ test('a current-location pin is placed, and the pin is still placed after a relo
   const placed = await confirmation.textContent();
   // The autosave is debounced and `evaluate` does not retry, so poll for the write itself.
   await expect
-    .poll(async () => page.evaluate((key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY))
+    .poll(() => readListPropertyDraft(page))
     .toContain('"pinPlaced":true');
 
   await page.reload();
