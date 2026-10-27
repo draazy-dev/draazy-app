@@ -74,6 +74,7 @@
         "confirm": "Confirm your listing",
         "live": "Live",
         "notApproved": "Not approved",
+        "changesNeeded": "Changes needed",
         "underReview": "Under review",
         "paused": "Paused",
         "sold": "Sold",
@@ -100,6 +101,7 @@
         "fixNow": "Fix now",
         "share": "Share listing",
         "contactSupport": "Contact support",
+        "editResubmit": "Edit & resubmit",
         "supportMessages": "Messages from Draazy Support",
         "confirm": "Review & confirm",
         "reportWrong": "Something's wrong"

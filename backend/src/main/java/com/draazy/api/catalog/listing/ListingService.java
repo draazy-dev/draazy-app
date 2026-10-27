@@ -66,13 +66,15 @@ public class ListingService {
     private final PlatformSettings settings;
     private final ListingSubmissionGuard submissions;
     private final ListingPhotoFiles photoFiles;
+    private final RejectionAppeal rejectionAppeal;
 
     public ListingService(PropertyRepository properties, UserRepository users,
             LocalityBinding localities, ListingEditRules editRules, PropertyMapper propertyMapper,
             PropertyLifecycle propertyLifecycle, ListingCaseNotes caseNotes, ListingDuplicateProbe duplicates,
             ListingQuota quota, RateLimitLock locks, ListingPhotoSources photoSources,
             PhotoLimit photoLimit, PlatformSettings settings, ListingSubmissionGuard submissions,
-            ListingPhotoFiles photoFiles) {
+            ListingPhotoFiles photoFiles, RejectionAppeal rejectionAppeal) {
+        this.rejectionAppeal = rejectionAppeal;
         this.properties = properties;
         this.submissions = submissions;
         this.photoFiles = photoFiles;
@@ -236,7 +238,9 @@ public class ListingService {
     public Property update(AuthPrincipal actor, String idOrSlug, ListingUpdate in) {
         Property p = resolveOwnedForWrite(actor.userId(), idOrSlug)
                 .orElseThrow(() -> NotFoundException.of("Listing"));
-        if (p.isArchived() || NOT_EDITABLE.contains(p.getStatus())) {
+        boolean resubmitting = PropertyStatus.REJECTED.equals(p.getStatus()) && !p.isArchived()
+                && rejectionAppeal.mayResubmit(p.getId());
+        if (p.isArchived() || (NOT_EDITABLE.contains(p.getStatus()) && !resubmitting)) {
             throw new ConflictException(ErrorCodes.LISTING_NOT_EDITABLE,
                     "This listing is closed and can no longer be edited.");
         }
@@ -250,7 +254,12 @@ public class ListingService {
         EditImpact impact = editRules.apply(p, in);
         duplicates.reindex(p);
         boolean photosMoved = duplicates.reindexPhotos(p, PhotoHash.fromGallery(in.images()));
-        if (answeringInfoRequest && !p.isArchived()) {
+        if (resubmitting) {
+            propertyLifecycle.reenterPending(actor, p);
+            p.recordResubmission();
+            caseNotes.post(p.getId(), p.getDeal(),
+                    "Thanks \u2014 your changes have gone back to our review desk.");
+        } else if (answeringInfoRequest && !p.isArchived()) {
             propertyLifecycle.reenterPending(actor, p);
             p.provideInfo();
             caseNotes.post(p.getId(), p.getDeal(),

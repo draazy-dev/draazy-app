@@ -219,7 +219,7 @@ class ModerationRecordTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a rejection names the listing, links to it and keeps the note apart from the finality line")
+    @DisplayName("a rejection names the listing, links to it and keeps the note apart from the resubmit line")
     void rejectionNoticeNamesTheListing() throws Exception {
         User owner = user("9891200011", "owner");
         User staff = user("9891200012", "staff");
@@ -230,14 +230,14 @@ class ModerationRecordTest extends AbstractApiTest {
 
         Map<String, Object> told = notices(owner, "listing.rejected").get(0);
         String body = (String) told.get("body");
-        assertThat(body).contains("2BHK in Baner").contains("Rent is wrong\nThis decision is final.");
+        assertThat(body).contains("2BHK in Baner").contains("Rent is wrong\nEdit the listing and resubmit it for review.");
         assertThat(told.get("link")).isEqualTo("/dashboard?review=" + listing.getId());
         mvc.perform(get("/properties/{id}/verification", listing.getId())
                         .header(HttpHeaders.AUTHORIZATION, bearer(owner)))
                 .andExpect(jsonPath("$.messages[0].body").value(
                         "\u26D4 Your property could not be approved.\nReason: "
                                 + "The listing contains inaccurate details. Rent is wrong\n"
-                                + "This decision is final. The listing cannot be resubmitted."))
+                                + "Edit the listing and resubmit it for review."))
                 .andExpect(jsonPath("$.progress.step").value("submitted"));
     }
 

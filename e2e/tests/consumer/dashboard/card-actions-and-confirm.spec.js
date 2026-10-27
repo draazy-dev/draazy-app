@@ -130,6 +130,28 @@ test('a rejected card offers no Edit, since the server refuses edits on it', asy
   await expect(page.getByTestId('listing-status-card').first()).toBeVisible();
   await expect(page.getByRole('link', { name: 'Edit', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Edit', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('progress-tracker')).toContainText('Not approved');
+  await expect(page.getByRole('link', { name: 'Contact support', exact: true })).toBeVisible();
+});
+
+test('a fixable rejection reads Changes needed, and an edit sends the listing back to review', async ({ page, request }) => {
+  const me = await ownerWithLiveListing(request);
+  const rejected = await rejectListing(request, me.id, await authHeaders(ACTORS.admin), { reasonCode: 'wrong_details', reason: 'The carpet area looks wrong.' });
+  expect(rejected.status()).toBe(200);
+  await signedInAs(page, me.mobile);
+  await page.goto('/dashboard#listings');
+  const tracker = page.getByTestId('progress-tracker');
+  await expect(tracker).toHaveAttribute('data-blocked', 'rejected');
+  await expect(tracker).toContainText('Changes needed');
+  await expect(page.getByTestId('edit-resubmit')).toHaveAttribute('href', new RegExp(`/list-property\\?edit=${me.id}`));
+
+  const edited = await api('PATCH', `/me/listings/${me.id}`, me.headers, { description: 'Corrected the carpet area after review.' });
+  expect(edited.status).toBe(200);
+  expect(edited.body.status).toBe('pending');
+  await page.reload();
+  await expect(page.getByTestId('edit-resubmit')).toHaveCount(0);
+  await expect(page.getByTestId('progress-tracker')).not.toHaveAttribute('data-blocked', /./);
+  await expect(page.getByTestId('progress-tracker')).toContainText('In review');
 });
 
 test('Take down asks in the app, not the browser, and Cancel keeps the listing', async ({ page, request }) => {

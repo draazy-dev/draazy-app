@@ -4,6 +4,7 @@ export const REVIEW_REASONS = [
     label: 'Photos not real',
     ownerMessage: 'Please add clear photos of the actual property.',
     rejectionMessage: 'The photos do not appear to be authentic.',
+    resubmittable: true,
   },
   {
     code: 'duplicate',
@@ -22,24 +23,28 @@ export const REVIEW_REASONS = [
     label: 'Wrong details',
     ownerMessage: 'Please correct the listing details.',
     rejectionMessage: 'The listing contains inaccurate details.',
+    resubmittable: true,
   },
   {
     code: 'locality_unclear',
     label: 'Locality unclear',
     ownerMessage: 'Please clarify the exact locality.',
     rejectionMessage: 'The property locality could not be verified.',
+    resubmittable: true,
   },
   {
     code: 'document_unreadable',
     label: 'Document unreadable',
     ownerMessage: 'Please upload a readable document.',
     rejectionMessage: 'Ownership documents could not be verified.',
+    resubmittable: true,
   },
   {
     code: 'name_mismatch',
     label: 'Name mismatch',
     ownerMessage: 'Please explain the name mismatch.',
     rejectionMessage: 'Ownership documents show an unverified name mismatch.',
+    resubmittable: true,
   },
   {
     code: 'rera_not_found',
@@ -63,11 +68,16 @@ export const REVIEW_REASONS = [
 
 export const REVIEW_REASON_BY_CODE = Object.fromEntries(REVIEW_REASONS.map((reason) => [reason.code, reason]));
 
+const FINAL_LINE = '\nThis decision is final. The listing cannot be resubmitted.';
+const RESUBMIT_LINE = '\nEdit the listing and resubmit it for review.';
+
+export const isResubmittableReason = (code) => Boolean(REVIEW_REASON_BY_CODE[code]?.resubmittable);
+
 export const ownerMessagePreview = (decision, reasonCode, note = '') => {
   const reason = REVIEW_REASON_BY_CODE[reasonCode] || REVIEW_REASON_BY_CODE.other;
   const extra = note.trim() ? ` ${note.trim()}` : '';
   if (decision === 'reject') {
-    return `\u26D4 Your property could not be approved.\nReason: ${reason.rejectionMessage}${extra}\nThis decision is final. The listing cannot be resubmitted.`;
+    return `\u26D4 Your property could not be approved.\nReason: ${reason.rejectionMessage}${extra}${reason.resubmittable ? RESUBMIT_LINE : FINAL_LINE}`;
   }
   return `${reason.ownerMessage}${extra}`;
 };

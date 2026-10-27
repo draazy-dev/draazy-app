@@ -1,6 +1,6 @@
 import Icon from '../../../../components/Icon.jsx';
 import PropertyImage from '../../../../components/ui/PropertyImage.jsx';
-import ListingStatusCard, { getOwnerListingStatusMeta, ListingStatusAction } from '../../../../components/listing/ListingStatusCard.jsx';
+import ListingStatusCard, { getOwnerListingStatusMeta, ListingStatusAction, mayResubmit } from '../../../../components/listing/ListingStatusCard.jsx';
 import { fmtINR, fmtNum, fmtDate } from '../../../../lib/format.js';
 import { onlySeeksOwnershipBadge } from '../../../../lib/recheckFields.js';
 import { qualityTips, qualityColor } from '../../../../lib/qualityScore.js';
@@ -39,9 +39,11 @@ export default function ListingCard({
   ].filter(Boolean).join(' · ');
   const hasReview = !closed && !reserved && !!review;
   const ownerStatusMeta = !l.flatmate && !closed && !reserved ? getOwnerListingStatusMeta(l, review, t) : null;
-  const finalRejected = ownerStatusMeta?.state === 'rejected';
+  const resubmittable = mayResubmit(ownerStatusMeta?.state, review);
+  const finalRejected = ownerStatusMeta?.state === 'rejected' && !resubmittable;
   // The server refuses an edit on these with 409 listing_not_editable.
-  const editLocked = !l.flatmate && (closed || l.archived || ['sold', 'rented', 'rejected', 'archived'].includes(l.status));
+  const editLocked = !l.flatmate && (closed || l.archived || ['sold', 'rented', 'archived'].includes(l.status)
+    || (l.status === 'rejected' && !resubmittable));
   const statusPill = ownerStatusMeta ? null : {
     label: STATUS_LABEL[displayStatus] || displayStatus,
     cls: LISTING_STATUS_CLS[displayStatus] || 'bg-white/10 text-gray-300',
