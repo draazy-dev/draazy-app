@@ -164,7 +164,7 @@ test.describe('Chat with the owner from a listing', () => {
     await expect(page.getByText(/Waiting for the owner to accept/i)).toHaveCount(0);
   });
 
-  test('an approved buyer with no thread yet gets one when tapping "Chat with Owner", and the owner sees no buyer quick replies', async ({ page, browser }) => {
+  test('an approved buyer with no thread yet gets one when tapping "Chat with Owner", and the owner gets owner-side quick replies', async ({ page, browser }) => {
     const { owner, id } = await fixture();
     const buyer = await actor('Zztest Fresh Browser Buyer');
     await openTheGate(buyer, owner, id);
@@ -184,7 +184,9 @@ test.describe('Chat with the owner from a listing', () => {
     await signedInAs(ownerPage, owner.mobile);
     await ownerPage.goto(`/messages?c=${threads.body.content[0].id}`);
     await expect(ownerPage.locator('.pc-input')).toBeVisible({ timeout: 20000 });
-    await expect(ownerPage.locator('.pc-quick-chip')).toHaveCount(0);
+    const ownerChips = ownerPage.locator('.pc-quick-chip');
+    await expect(ownerChips.filter({ hasText: "Yes, it's still available" })).toBeVisible({ timeout: 20000 });
+    await expect(ownerChips.filter({ hasText: /^Is it still available\?$/ })).toHaveCount(0);
     await ownerPage.context().close();
   });
 

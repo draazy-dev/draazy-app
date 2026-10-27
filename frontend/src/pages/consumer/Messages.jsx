@@ -22,6 +22,7 @@ import { useConversationUnread } from '../../context/ConversationContext.jsx';
 import Inbox from './messages/Inbox.jsx';
 import RequestThread from './messages/RequestThread.jsx';
 import Thread from './messages/Thread.jsx';
+import { quickReplies } from './messages/quickReplies.js';
 import { useRequestThreads } from './messages/useRequestThreads.js';
 import { targetSlug } from './requests/requestMeta.js';
 import { useRequestActions } from './requests/useRequestActions.js';
@@ -480,6 +481,7 @@ export default function Messages() {
               onState={changeState}
               onBlock={block}
               onReport={() => setReportOpen(true)}
+              replies={quickReplies(active, requestInbox.boxes)}
             />
           )}
         </div>

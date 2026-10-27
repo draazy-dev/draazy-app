@@ -283,9 +283,14 @@ test.describe('Flatmate interest doors (live)', () => {
     await expect(input).toBeVisible({ timeout: 15_000 });
     await expect(page.getByTestId('chat-propchip').getByRole('link', { name: 'View listing' })).toHaveAttribute('href', `/flatmates/room/${room.id}`);
     await expect(page.getByText('Photos coming soon')).toHaveCount(0);
+    const chips = page.locator('.pc-quick-chip');
+    await expect(chips.filter({ hasText: 'Is the room still available?' })).toBeVisible({ timeout: 15_000 });
+    await expect(chips.filter({ hasText: /final (price|rent)/i })).toHaveCount(0);
     await input.fill('Can I see the room on Saturday?');
+    await expect(chips, 'typing hides the ready-made replies').toHaveCount(0);
     await input.press('Enter');
     await expect(page.locator('.pc-bubble.me').last()).toContainText('Can I see the room on Saturday?');
+    await expect(chips, 'they are for opening the chat only').toHaveCount(0);
 
     const threadId = new URL(page.url()).searchParams.get('c');
     const hostSide = await (await fetch(`${API}/messages/flatmate-requests/${request.id}`, { method: 'POST', headers: auth(host.accessToken), body: '{}' })).json();
