@@ -13,6 +13,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.draazy.api.catalog.property.Property;
 import com.draazy.api.catalog.property.PropertyRepository;
 import com.draazy.api.common.web.Routes;
+import com.draazy.api.deals.offer.Offer;
+import com.draazy.api.deals.offer.OfferRepository;
+import com.draazy.api.deals.offer.OfferStatuses;
 import com.draazy.api.deals.visit.Visit;
 import com.draazy.api.deals.visit.VisitRepository;
 import com.draazy.api.deals.visit.VisitStatuses;
@@ -48,6 +51,8 @@ class ConversationEndpointsTest extends AbstractApiTest {
     ConversationRepository conversations;
     @Autowired
     VisitRepository visits;
+    @Autowired
+    OfferRepository offers;
 
     @Nested
     @DisplayName("the relationship guard")
@@ -182,6 +187,80 @@ class ConversationEndpointsTest extends AbstractApiTest {
             start(visitor, owner, p, 200);
             start(owner, visitor, other, 403);
             start(owner, visitor, null, 403);
+        }
+
+        @Test
+        @DisplayName("an offer the owner accepted opens the listing thread both ways; a live one does not")
+        void acceptedOfferMayMessage() throws Exception {
+            User owner = user("9830000903", Roles.Wire.OWNER, "Owner Offer");
+            User buyer = user("9830000904", Roles.Wire.BUYER, "Buyer Offer");
+            Property p = listing(owner);
+            Offer offer = offers.saveAndFlush(new Offer(p.getId(), buyer.getId(), 24000L, null, null));
+
+            start(owner, buyer, p, 403);
+
+            offer.setStatus(OfferStatuses.ACCEPTED);
+            offers.saveAndFlush(offer);
+            start(owner, buyer, p, 201);
+            start(buyer, owner, p, 200);
+        }
+    }
+
+    @Nested
+    @DisplayName("opening from a visit or offer request")
+    class LeadRequest {
+
+        private org.springframework.test.web.servlet.ResultActions open(User caller, String kind, Object id)
+                throws Exception {
+            return mvc.perform(post(Routes.Conversations.LEAD_REQUEST, kind, id.toString())
+                    .header(HttpHeaders.AUTHORIZATION, bearer(caller)));
+        }
+
+        @Test
+        @DisplayName("a confirmed visit opens one listing thread for both sides, without sending a message")
+        void confirmedVisitOpensTheThread() throws Exception {
+            User owner = user("9830000905", Roles.Wire.OWNER, "Owner Lead Visit");
+            User visitor = user("9830000906", Roles.Wire.BUYER, "Visitor Lead");
+            User stranger = user("9830000907", Roles.Wire.BUYER, "Stranger Lead");
+            Property p = listing(owner);
+            Visit visit = visits.saveAndFlush(new Visit(p.getId(), visitor.getId(),
+                    Instant.now().plus(2, ChronoUnit.DAYS), null, null));
+
+            open(owner, "visit", visit.getId()).andExpect(status().isNotFound());
+
+            visit.setStatus(VisitStatuses.CONFIRMED);
+            visits.saveAndFlush(visit);
+            String thread = id(open(owner, "visit", visit.getId()).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.propertyId").value(p.getId().toString()))
+                    .andExpect(jsonPath("$.counterpartyName").value("Visitor Lead"))
+                    .andReturn().getResponse().getContentAsString());
+            open(visitor, "visit", visit.getId()).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(thread));
+            open(stranger, "visit", visit.getId()).andExpect(status().isNotFound());
+            open(owner, "contact", visit.getId()).andExpect(status().isNotFound());
+            open(owner, "visit", "not-a-uuid").andExpect(status().isNotFound());
+            assertThat(jdbc.queryForObject("select count(*) from messages where conversation_id = ?::uuid",
+                    Long.class, thread)).isZero();
+        }
+
+        @Test
+        @DisplayName("an accepted offer opens the thread; a pending or declined one does not")
+        void acceptedOfferOpensTheThread() throws Exception {
+            User owner = user("9830000908", Roles.Wire.OWNER, "Owner Lead Offer");
+            User buyer = user("9830000909", Roles.Wire.BUYER, "Buyer Lead Offer");
+            Property p = listing(owner);
+            Offer offer = offers.saveAndFlush(new Offer(p.getId(), buyer.getId(), 24000L, null, null));
+
+            open(buyer, "offer", offer.getId()).andExpect(status().isNotFound());
+            offer.setStatus(OfferStatuses.DECLINED);
+            offers.saveAndFlush(offer);
+            open(owner, "offer", offer.getId()).andExpect(status().isNotFound());
+
+            offer.setStatus(OfferStatuses.ACCEPTED);
+            offers.saveAndFlush(offer);
+            open(buyer, "offer", offer.getId()).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.counterpartyName").value("Owner Lead Offer"));
+            open(owner, "offer", offer.getId()).andExpect(status().isOk());
         }
     }
 

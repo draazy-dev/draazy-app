@@ -7,8 +7,8 @@ import com.draazy.api.common.error.ForbiddenException;
 import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.persistence.ConstraintViolations;
 import com.draazy.api.common.trust.FlatmateRequestParties;
+import com.draazy.api.common.trust.LeadIntroductions;
 import com.draazy.api.common.trust.MobileMask;
-import com.draazy.api.common.trust.VisitUsageLookup;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
@@ -48,7 +48,7 @@ public class ConversationOpeningService {
     private final PropertyRepository properties;
     private final ContactRequestRepository contactRequests;
     private final FlatmateRequestParties flatmateRequests;
-    private final VisitUsageLookup visits;
+    private final List<LeadIntroductions> introductions;
     private final AuditService audit;
 
     // The thread itself, for the one thing opening cannot do alone: put the caller's first message in it.
@@ -59,7 +59,7 @@ public class ConversationOpeningService {
     public ConversationOpeningService(ConversationRepository conversations,
             ConversationMapper mapper, UserRepository users, PropertyRepository properties,
             ContactRequestRepository contactRequests, FlatmateRequestParties flatmateRequests,
-            VisitUsageLookup visits, AuditService audit,
+            List<LeadIntroductions> introductions, AuditService audit,
             ConversationService thread, PlatformTransactionManager transactionManager) {
         this.conversations = conversations;
         this.mapper = mapper;
@@ -67,7 +67,7 @@ public class ConversationOpeningService {
         this.properties = properties;
         this.contactRequests = contactRequests;
         this.flatmateRequests = flatmateRequests;
-        this.visits = visits;
+        this.introductions = List.copyOf(introductions);
         this.audit = audit;
         this.thread = thread;
         this.transactions = new TransactionTemplate(transactionManager);
@@ -82,6 +82,28 @@ public class ConversationOpeningService {
                 .flatMap(id -> flatmateRequests.chattable(id, caller.userId()))
                 .orElseThrow(() -> NotFoundException.of("Flatmate chat"));
         return retryingPairRace(caller, () -> findOrCreatePair(caller, pair));
+    }
+
+    public ConversationDto openForLeadRequest(AuthPrincipal caller, String kind, String requestId) {
+        LeadIntroductions.Pair pair = introductions.stream().filter(lead -> lead.kind().equals(kind)).findFirst()
+                .flatMap(lead -> Ids.parseUuid(requestId).flatMap(id -> lead.chattable(id, caller.userId())))
+                .filter(this::stillReachable)
+                .orElseThrow(() -> NotFoundException.of("Request chat"));
+        return retryingPairRace(caller, () -> findOrCreateListingPair(caller, pair));
+    }
+
+    private boolean stillReachable(LeadIntroductions.Pair pair) {
+        return properties.findById(pair.propertyId()).filter(p -> !p.isOwnerSuspended()).isPresent()
+                && users.findById(pair.counterparty()).filter(u -> !u.isArchived()).isPresent();
+    }
+
+    private ConversationDto findOrCreateListingPair(AuthPrincipal caller, LeadIntroductions.Pair pair) {
+        UUID me = caller.userId();
+        UUID them = pair.counterparty();
+        boolean ordered = Conversation.ordersFirst(me, them);
+        Conversation conversation = conversations.findPair(ordered ? me : them, ordered ? them : me, pair.propertyId())
+                .orElseGet(() -> conversations.saveAndFlush(new Conversation(me, them, pair.propertyId(), null)));
+        return mapper.toSummaries(List.of(conversation), me).getFirst();
     }
 
     private <T> T retryingPairRace(AuthPrincipal caller, Supplier<T> attempt) {
@@ -183,8 +205,8 @@ public class ConversationOpeningService {
         return new Started(mapper.toDetail(conversation, me), existing.isEmpty());
     }
 
-    // Consent is per listing: an approved contact request, or a visit the owner confirmed. A thread without a
-    // listing is only for staff or an owner writing to someone who has an approved request on one of their listings.
+    // Consent is per listing: an approved contact request, a confirmed visit or an accepted offer. A thread without
+    // a listing is only for staff or an owner writing to someone who has an approved request on one of their listings.
     private boolean related(AuthPrincipal caller, UUID counterpartyId, Property listing) {
         if (Roles.isBackOffice(caller.role())) {
             return true;
@@ -196,7 +218,7 @@ public class ConversationOpeningService {
         UUID requester = listing.getOwner().getId().equals(caller.userId()) ? counterpartyId : caller.userId();
         return contactRequests.existsByRequesterIdAndPropertyIdAndStatus(
                 requester, listing.getId(), ContactRequestStatuses.APPROVED)
-                || visits.ownerConfirmed(requester, listing.getId());
+                || introductions.stream().anyMatch(lead -> lead.introduces(requester, listing.getId()));
     }
 
     // The relationship guard still runs later; this lookup proves nothing alone.

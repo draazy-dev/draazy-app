@@ -12,6 +12,8 @@ const RECEIVED_HINT = {
   contact: 'Approving shares your number and opens the chat.',
   flatmate: 'Accepting opens the chat.',
   group: 'Accepting adds them to your group.',
+  visit: 'Confirming opens the chat.',
+  offer: 'Accepting opens the chat. To counter, open the listing.',
 };
 const GROUP_JOIN_HINT = { received: 'Chat first to check the vibe. Accepting adds them to your group.', sent: 'The host may message you before deciding.' };
 

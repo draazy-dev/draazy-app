@@ -27,6 +27,9 @@ export const openGroupConversation = async (groupId) => (await provider()).openG
 /** The pair thread an accepted flatmate request unlocks, created on first open. */
 export const openFlatmateRequestConversation = async (requestId) => (await provider()).openFlatmateRequestConversation(requestId);
 
+/** The listing thread a confirmed visit or accepted offer unlocks, created on first open. */
+export const openLeadRequestConversation = async (kind, requestId) => (await provider()).openLeadRequestConversation(kind, requestId);
+
 /** Mark the caller's side of a thread read. Idempotent on both providers. */
 export const markConversationRead = async (id) => (await provider()).markConversationRead(id);
 

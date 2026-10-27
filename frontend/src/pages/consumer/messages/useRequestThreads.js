@@ -3,10 +3,11 @@ import { CONNECTION_KINDS, initialsOf, isPending, messageOf, threadId } from '..
 import { useRequestsInbox } from '../requests/useRequestsInbox.js';
 
 const STATE_LINE = {
-  accepted: (name) => `${name} accepted your request`,
+  accepted: (name, box) => (box === 'sent' ? `${name} accepted your request` : `You accepted ${name}'s request`),
   declined: () => 'Request declined',
   expired: () => 'This request expired',
   withdrawn: () => 'You withdrew this request',
+  countered: (name, box) => (box === 'sent' ? `${name} sent a counter-offer` : 'Waiting for their answer to your counter'),
 };
 
 // Once accepted, the live chat replaces the request thread; it only stays as a way in when no chat exists yet.
@@ -28,12 +29,12 @@ function toThread(item, box) {
     at: line ? decidedAt : at,
     messages: [
       { id: 'request', from: box === 'sent' ? 'me' : 'them', text: messageOf(item), at },
-      ...(line ? [{ id: 'state', type: 'system', text: line(name), at: decidedAt }] : []),
+      ...(line ? [{ id: 'state', type: 'system', text: line(name, box), at: decidedAt }] : []),
     ],
   };
 }
 
-/** Contact, flatmate and group requests shown as locked chat threads, built from the requests feed. */
+/** Connection requests (see CONNECTION_KINDS) shown as locked chat threads, built from the requests feed. */
 export function useRequestThreads(convs) {
   const inbox = useRequestsInbox();
   const { received, sent } = inbox.boxes;

@@ -365,6 +365,8 @@ public final class Routes {
         public static final String FLATMATE_GROUP = BASE + "/flatmate-groups/{groupId}";
 
         public static final String FLATMATE_REQUEST = BASE + "/flatmate-requests/{requestId}";
+
+        public static final String LEAD_REQUEST = BASE + "/requests/{kind}/{requestId}";
     }
 
     public static final class SupportTickets {

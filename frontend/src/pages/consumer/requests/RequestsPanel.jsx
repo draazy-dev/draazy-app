@@ -17,9 +17,11 @@ const TABS = [
   { key: 'photos', label: 'Photo requests', icon: 'image', kinds: ['photo'], empty: 'No photo requests yet.' },
   { key: 'documents', label: 'Documents', icon: 'folder-check', kinds: ['document'], empty: 'No document requests yet.' },
   { key: 'flatmate', label: 'Flatmate', icon: 'users', kinds: ['flatmate', 'group'], empty: 'No flatmate requests yet.' },
+  { key: 'visits', label: 'Visits', icon: 'calendar-check', kinds: ['visit'], empty: 'No visit requests yet.' },
+  { key: 'offers', label: 'Offers', icon: 'hand-coins', kinds: ['offer'], empty: 'No offers yet.' },
 ];
 
-const CHAT_KINDS = new Set(['contact', 'flatmate']);
+const CHAT_KINDS = new Set(['contact', 'flatmate', 'visit', 'offer']);
 
 const inTab = (tab, row) => !tab.kinds || tab.kinds.includes(row.item.kind);
 

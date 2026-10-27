@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useConversationUnread } from '../../../context/ConversationContext.jsx';
 import { useOpenChat } from '../../../lib/useOpenChat.js';
 import { myContactRequests, respondToContactRequest } from '../../../services/contactService.js';
-import { dropPendingChat, openFlatmateRequestConversation, startConversation } from '../../../services/conversationService.js';
+import { dropPendingChat, openFlatmateRequestConversation, openLeadRequestConversation, startConversation } from '../../../services/conversationService.js';
+import { respondOffer } from '../../../services/dealService.js';
 import { respondDocRequest } from '../../../services/documentService.js';
 import { decideGroupApplication, decideRequest } from '../../../services/flatmateService.js';
 import { decidePhotoRequest } from '../../../services/photoRequestService.js';
@@ -17,18 +19,26 @@ const DECIDERS = {
   flatmate: (id, yes) => decideRequest(id, yes ? 'accepted' : 'declined'),
   group: (id, yes) => decideGroupApplication(id, yes ? 'accepted' : 'declined'),
   document: (id, yes) => respondDocRequest(null, id, yes ? 'granted' : 'declined'),
+  offer: (id, yes) => respondOffer(id, yes ? 'accept' : 'decline', null, { isOwner: true }),
 };
 
 const DECIDED_TOAST = {
   contact: ['Accepted — you can chat now and see their number.', 'Request declined.'],
-  visit: ['Visit confirmed.', 'Visit declined.'],
+  visit: ['Visit confirmed — your chat is open.', 'Visit declined.'],
   photo: ['Marked done — the buyer has been told your new photos are up.', 'Declined — the buyer has been told there are no more photos coming.'],
   flatmate: ['Request accepted — your chat is open.', 'Request declined.'],
   group: ['Group application accepted.', 'Group application declined.'],
   document: ['Documents shared — view-only for this buyer.', 'Document request declined.'],
+  offer: ['Offer accepted — your chat is open.', 'Offer declined.'],
 };
 
 const GROUP_JOIN_TOAST = ['Accepted — they\'re in your group now.', 'Request declined.'];
+
+/** Kinds whose own endpoint opens the thread, so no first message has to be sent to create it. */
+const hasOwnThread = (item) => ['flatmate', 'visit', 'offer'].includes(item.kind);
+const openOwnThread = (item) => (item.kind === 'flatmate'
+  ? openFlatmateRequestConversation(item.id)
+  : openLeadRequestConversation(item.kind, item.id));
 
 const FAILED = 'That did not go through. Please try again.';
 const NO_CHAT = 'Could not open the chat. Please try again.';
@@ -42,6 +52,7 @@ async function approvedMobile(id) {
 export function useRequestActions({ inbox, toast, onChanged }) {
   const navigate = useNavigate();
   const openChat = useOpenChat(toast);
+  const { refreshRequests } = useConversationUnread();
   const inFlight = useRef(new Set());
   const [busy, setBusy] = useState(() => new Set());
   const { load, patchItem, removeItem } = inbox;
@@ -60,8 +71,8 @@ export function useRequestActions({ inbox, toast, onChanged }) {
   }, []);
 
   const chatWith = useCallback(async (item) => {
-    if (item.kind === 'flatmate') {
-      const conv = await openFlatmateRequestConversation(item.id);
+    if (hasOwnThread(item)) {
+      const conv = await openOwnThread(item);
       navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
       return;
     }
@@ -87,12 +98,13 @@ export function useRequestActions({ inbox, toast, onChanged }) {
     patchItem('received', item, (it) => ({ ...it, state: yes ? 'accepted' : 'declined', decidedAt: new Date().toISOString() }));
     toast((groupJoin ? GROUP_JOIN_TOAST : DECIDED_TOAST[item.kind])[yes ? 0 : 1], yes ? 'success' : 'info');
     onChanged?.();
-    if ((item.kind === 'contact' || (item.kind === 'flatmate' && !groupJoin)) && yes) {
+    refreshRequests();
+    if (yes && !groupJoin && (item.kind === 'contact' || hasOwnThread(item))) {
       // The approval stands either way; the chat stays one tap away on the received card.
       await chatWith(item).catch(() => undefined);
     }
     load('received', { quiet: true });
-  }), [chatWith, guarded, load, onChanged, patchItem, toast]);
+  }), [chatWith, guarded, load, onChanged, patchItem, refreshRequests, toast]);
 
   const remind = useCallback((item) => guarded(item, async () => {
     const applyNext = (res) => patchItem('sent', item, (it) => ({ ...it, reminders: { ...it.reminders, ...res } }));
@@ -136,8 +148,8 @@ export function useRequestActions({ inbox, toast, onChanged }) {
   // The accepted side may have no thread yet, e.g. the request was sent from another device.
   const openAccepted = useCallback((item) => guarded(item, async () => {
     try {
-      const conv = item.kind === 'flatmate'
-        ? await openFlatmateRequestConversation(item.id)
+      const conv = hasOwnThread(item)
+        ? await openOwnThread(item)
         : await startConversation({
           propertyId: item.target.id,
           firstMessage: `Hi, I'm interested in "${item.target.title || 'your listing'}" on Draazy. Is it still available?`,

@@ -7,11 +7,12 @@ import { initialsOf, isGroupJoin, isPending, kindLabel, messageOf, remindState, 
 
 const ACCEPT_LABEL = {
   contact: 'Approve & chat',
-  visit: 'Confirm',
+  visit: 'Confirm & chat',
   photo: 'Photos added',
   flatmate: 'Accept & chat',
   group: 'Accept',
   document: 'Share',
+  offer: 'Accept & chat',
 };
 
 export function Target({ item }) {
@@ -48,11 +49,15 @@ function ReceivedActions({ item, busy, onDecide, onClear, onOpenChat, onChatFirs
       <Button size="md" variant={vet ? 'secondary' : 'primary'} className="pc-req-btn" disabled={busy} onClick={() => onDecide(item, true)}>{isGroupJoin(item) ? 'Accept' : ACCEPT_LABEL[item.kind]}</Button>
       <Button size="md" variant="secondary" className="pc-req-btn" disabled={busy} onClick={() => onDecide(item, false)}>Decline</Button>
       {item.kind === 'photo' && item.target?.id ? <Link to={`/list-property?edit=${item.target.id}&step=photos`} className="pc-req-clear">Add photos</Link> : null}
+      {item.kind === 'offer' && item.target?.link ? <Link to={item.target.link} className="pc-req-clear" data-testid="request-counter">Counter</Link> : null}
     </div>
   );
 }
 
 function SentActions({ item, busy, now, onRemind, onWithdraw, onClear, onOpenChat }) {
+  if (item.state === 'countered' && item.target?.link) {
+    return <div className="pc-req-actions"><Button size="md" className="pc-req-btn" to={item.target.link} data-testid="request-respond">Respond</Button></div>;
+  }
   if (!isPending(item)) return <DecidedActions item={item} busy={busy} onClear={() => onClear(item)} onOpenChat={onOpenChat} />;
   const remind = remindState(item, now);
   return (
