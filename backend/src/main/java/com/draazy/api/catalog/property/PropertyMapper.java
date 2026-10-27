@@ -10,6 +10,7 @@ import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.common.trust.OutreachCounts;
 import com.draazy.api.common.trust.PrivateFieldVisibility;
 import com.draazy.api.identity.user.User;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -49,7 +50,7 @@ public interface PropertyMapper {
 
     @Mapping(target = "coverImage", expression = COVER)
     @Mapping(target = "available", expression = "java(property.isPubliclyVisible())")
-    SavedCard toSaved(Property property);
+    SavedCard toSaved(Property property, Instant savedAt);
 
     @Mapping(target = "coverImage", expression = COVER)
     @Mapping(target = "progress", expression = "java(ListingProgress.of(property, false))")

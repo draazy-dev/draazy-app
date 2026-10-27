@@ -501,9 +501,10 @@ export async function listFlatmateSaves({ page = 0, size = MAX_PAGE_SIZE } = {})
   const { items, ...rest } = unwrapPage(res, { page, size });
   return {
     items: items.map((r) => {
-      if (r?.roomType || r?.roomKind) return toRoomViewModel(r);
-      if (r?.members || r?.seatsTotal != null) return toGroupViewModel(r);
-      return toSeekerPostViewModel(r);
+      const toCard = r?.roomType || r?.roomKind ? toRoomViewModel
+        : r?.members || r?.seatsTotal != null ? toGroupViewModel
+          : toSeekerPostViewModel;
+      return { ...toCard(r), savedAt: r?.savedAt };
     }),
     ...rest,
   };

@@ -5,6 +5,8 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
 import com.draazy.api.identity.user.UserStatuses;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -148,9 +150,16 @@ public class FlatmateSaveService {
         Map<UUID, String> verdicts = reviewStatuses.forGroups(groupById.values());
 
         return window.stream()
-                .map(row -> card(row, roomById, groupById, postById, roomViews, names, verdicts))
+                .map(row -> {
+                    Object card = card(row, roomById, groupById, postById, roomViews, names, verdicts);
+                    return card == null ? null : (Object) new SavedFlatmateCard(card, row.getSavedAt());
+                })
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    /** The feed card unchanged plus {@code savedAt}, so Saved can interleave these with property saves. */
+    public record SavedFlatmateCard(@JsonUnwrapped Object card, Instant savedAt) {
     }
 
     private Object card(FlatmateSaveRepository.SaveRow row, Map<UUID, FlatmateRoom> roomById,

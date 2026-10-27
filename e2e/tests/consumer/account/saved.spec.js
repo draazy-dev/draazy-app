@@ -141,7 +141,7 @@ test('remove stages an undo without telling the server, then commits the unsave 
   expect(deletes[0], 'the browser unsaved a different property than the one the server dropped').toContain(removed);
 });
 
-test('saved controls use scrolling underline tabs, themed sorting and direct delete on phone and desktop', async ({ page, consoleErrors }) => {
+test('saved controls use scrolling underline tabs, newest-first order with no sort control, and direct delete on phone and desktop', async ({ page, consoleErrors }) => {
   const { mobile, headers } = await actor();
   const { buy, rent } = await pickListings();
   const listings = [...buy, ...rent];
@@ -163,38 +163,8 @@ test('saved controls use scrolling underline tabs, themed sorting and direct del
     await expect(tabs.first()).toHaveClass(/dz-detail-tab.*is-active/);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 
-    const sort = page.getByRole('button', { name: 'Sort by', exact: true });
-    await expect(sort).toHaveClass(/dz-dropdown__trigger/);
-    const sortBox = await sort.boundingBox();
-    const naturalWidth = await sort.evaluate((el) => {
-      const clone = el.parentElement.cloneNode(true);
-      clone.style.width = 'max-content';
-      clone.style.position = 'absolute';
-      clone.style.visibility = 'hidden';
-      el.parentElement.parentElement.append(clone);
-      const width = clone.getBoundingClientRect().width;
-      clone.remove();
-      return width;
-    });
-    expect(sortBox.width / naturalWidth).toBeCloseTo(1.5, 1);
-    const rowBox = await sort.locator('..').locator('..').boundingBox();
-    expect(sortBox.width).toBeLessThan(290);
-    expect(Math.abs(sortBox.x + sortBox.width - rowBox.x - rowBox.width)).toBeLessThan(2);
-    for (const [label, descending] of [['Price: Low to High', false], ['Price: High to Low', true]]) {
-      await sort.click();
-      const menu = page.getByRole('listbox', { name: 'Sort by', exact: true });
-      await expect(menu).not.toHaveClass(/dz-dropdown__menu--sheet/);
-      const menuBox = await menu.boundingBox();
-      expect(menuBox.width).toBeLessThan(300);
-      await page.getByRole('option', { name: label, exact: true }).click();
-      await expect(sort).toContainText(label);
-      const titles = await cards.locator('h3').allTextContents();
-      expect(titles).toEqual(expect.arrayContaining(listings.map((p) => p.title)));
-      const priceByTitle = new Map(listings.map((p) => [p.title, p.price]));
-      const prices = titles.map((title) => priceByTitle.get(title));
-      const expected = listings.map((p) => p.price).sort((a, b) => descending ? b - a : a - b);
-      expect(prices).toEqual(expected);
-    }
+    await expect(page.getByRole('button', { name: 'Sort by', exact: true })).toHaveCount(0);
+    expect(await cards.locator('h3').allTextContents(), 'the newest save leads').toEqual(listings.map((p) => p.title).reverse());
 
     const remove = cards.first().getByRole('button', { name: 'Remove from saved', exact: true });
     await expect(remove).toBeVisible();
@@ -204,6 +174,27 @@ test('saved controls use scrolling underline tabs, themed sorting and direct del
     await undo.click();
     await expect(cards).toHaveCount(4);
   }
+  expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
+});
+
+test('All interleaves property and flatmate saves by when each was saved, newest first', async ({ page, consoleErrors }) => {
+  const { mobile, headers } = await actor();
+  const { buy, rent } = await pickListings();
+  const feed = await (await fetch(`${API}/flatmates/feed?tab=move-in&size=1`)).json();
+  const roomId = feed.content?.[0]?.id;
+  expect(roomId, 'the seed has no public room to shortlist').toBeTruthy();
+
+  await shortlist(headers, [buy[0]]);
+  const put = await api(`/me/flatmate-saves/room/${roomId}`, headers, { method: 'PUT' });
+  expect(put.status).toBe(204);
+  await shortlist(headers, [rent[0]]);
+
+  await openSaved(page, mobile);
+  const titles = page.getByTestId('saved-card').locator('h3');
+  await expect(titles).toHaveCount(3);
+  const [newest, middle, oldest] = await titles.allTextContents();
+  expect([newest, oldest], 'property saves were not ordered by save time').toEqual([rent[0].title, buy[0].title]);
+  expect([buy[0].title, rent[0].title], 'the room save was not placed between the two property saves').not.toContain(middle);
   expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
 });
 
@@ -340,7 +331,7 @@ test('shows the empty state when the account has nothing saved', async ({ page }
   await expect(page.locator('.saved-tabs .saved-tab')).toHaveCount(0);
 });
 
-const SAVED_CARD_KEYS = ['id', 'slug', 'title', 'deal', 'propertyType', 'bhk', 'price', 'area', 'locality', 'coverImage', 'available'];
+const SAVED_CARD_KEYS = ['id', 'slug', 'title', 'deal', 'propertyType', 'bhk', 'price', 'area', 'locality', 'coverImage', 'available', 'savedAt'];
 
 test('the shortlist reads slim cards once, and alert rows carry no mobile', async ({ page }) => {
   const { mobile, headers } = await actor();

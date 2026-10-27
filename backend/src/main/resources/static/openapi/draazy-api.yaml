@@ -8699,10 +8699,14 @@ paths:
                       content:
                         type: array
                         items:
-                          oneOf:
-                            - $ref: '#/components/schemas/FlatmateSeekerFeed'
-                            - $ref: '#/components/schemas/FlatmateRoomFeed'
-                            - $ref: '#/components/schemas/FlatmateGroupFeed'
+                          allOf:
+                            - oneOf:
+                                - $ref: '#/components/schemas/FlatmateSeekerFeed'
+                                - $ref: '#/components/schemas/FlatmateRoomFeed'
+                                - $ref: '#/components/schemas/FlatmateGroupFeed'
+                            - type: object
+                              properties:
+                                savedAt: { type: string, format: date-time, description: When the caller shortlisted it. }
   /me/flatmate-saves/keys:
     get:
       tags: [Engagement]
@@ -12985,6 +12989,7 @@ components:
         locality: { type: string }
         coverImage: { type: string }
         available: { type: boolean }
+        savedAt: { type: string, format: date-time, description: When the caller shortlisted it. }
     FollowedSociety:
       type: object
       required: [slug, name, listingCount]

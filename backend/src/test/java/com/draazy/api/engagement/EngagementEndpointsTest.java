@@ -84,7 +84,8 @@ class EngagementEndpointsTest extends AbstractApiTest {
                 .andExpect(jsonPath("$.content.length()").value(1))
                 .andExpect(jsonPath("$.totalElements").value(1))
                 .andExpect(jsonPath("$.content[0].id").value(p.getId().toString()))
-                .andExpect(jsonPath("$.content[0].title").value("Test flat"));
+                .andExpect(jsonPath("$.content[0].title").value("Test flat"))
+                .andExpect(jsonPath("$.content[0].savedAt").isNotEmpty());
     }
 
     @Test

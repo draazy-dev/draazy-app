@@ -7,7 +7,7 @@ export async function listSaved({ page = 0, size = 20 } = {}) {
   const res = await get('/me/saved', { page, size });
   // `total` is `totalElements` — the whole shortlist, not this page.
   const { items, ...rest } = unwrapPage(res, { page, size });
-  return { items: items.map((r) => ({ ...toViewModel(r), available: r.available !== false })), ...rest };
+  return { items: items.map((r) => ({ ...toViewModel(r), available: r.available !== false, savedAt: r.savedAt })), ...rest };
 }
 
 export async function listSavedKeys() {

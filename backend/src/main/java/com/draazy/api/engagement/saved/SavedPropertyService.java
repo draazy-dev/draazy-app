@@ -33,18 +33,19 @@ public class SavedPropertyService {
     /** Saved-order is restored after {@code findAllById}, which does not guarantee it. */
     @Transactional(readOnly = true)
     public Page<SavedCard> listSaved(UUID userId, Pageable pageable) {
-        Page<UUID> ids = savedPropertyRepo.findSavedPropertyIds(userId, pageable);
-        if (ids.isEmpty()) {
-            return new PageImpl<>(List.of(), ids.getPageable(), ids.getTotalElements());
+        Page<SavedPropertyRepository.SavedRow> rows = savedPropertyRepo.findSavedRows(userId, pageable);
+        if (rows.isEmpty()) {
+            return new PageImpl<>(List.of(), rows.getPageable(), rows.getTotalElements());
         }
-        List<Property> props = propertyRepo.findAllById(ids.getContent());
+        List<Property> props = propertyRepo.findAllById(
+                rows.getContent().stream().map(SavedPropertyRepository.SavedRow::getPropertyId).toList());
         Map<UUID, Property> byId = new LinkedHashMap<>();
         props.forEach(p -> byId.put(p.getId(), p));
-        List<SavedCard> content = ids.getContent().stream()
-                .filter(byId::containsKey)
-                .map(id -> propertyMapper.toSaved(byId.get(id)))
+        List<SavedCard> content = rows.getContent().stream()
+                .filter(row -> byId.containsKey(row.getPropertyId()))
+                .map(row -> propertyMapper.toSaved(byId.get(row.getPropertyId()), row.getSavedAt()))
                 .toList();
-        return new PageImpl<>(content, ids.getPageable(), ids.getTotalElements());
+        return new PageImpl<>(content, rows.getPageable(), rows.getTotalElements());
     }
 
     /** The whole shortlist as keys: the shell needs every heart, so this is unpaged. */

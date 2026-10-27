@@ -1,10 +1,9 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import Icon from '../../components/Icon.jsx';
 import PropertyImage from '../../components/ui/PropertyImage.jsx';
 import HScroll from '../../components/ui/HScroll.jsx';
-import Select from '../../components/ui/Select.jsx';
 import { CARD_SIZES } from '../../lib/imgSrcSet.js';
 import { useSavedItems } from '../../context/SavedContext.jsx';
 import { useSavedSearches } from '../../context/SavedSearchContext.jsx';
@@ -26,13 +25,15 @@ const CATEGORIES = [
   { key: 'flatmates', label: 'Flatmates', labelKey: 'catFlatmatesShort', icon: 'users-round' },
 ];
 
-const SORTS = [['newest', 'Newest', 'sortNewest'], ['price-desc', 'Price: High to Low', 'sortPriceHigh'], ['price-asc', 'Price: Low to High', 'sortPriceLow']];
 /* How long a swiped-away card stays undoable before the removal commits. */
 const UNDO_WINDOW_MS = 8000;
 
 async function readFlatmateSaves() {
   const page = await flatmateService.listFlatmateSaves();
-  return (page?.items || []).map(toSavedCard).filter(Boolean);
+  return (page?.items || []).flatMap((item) => {
+    const card = toSavedCard(item);
+    return card ? [{ ...card, savedAt: item.savedAt }] : [];
+  });
 }
 
 export default function Saved() {
@@ -42,8 +43,6 @@ export default function Saved() {
   const sendToSignIn = useSignInGate();
   const [mounted, setMounted] = useState(false);
   const [tab, setTab] = useState('all');
-  const [sort, setSort] = useState('newest');
-  const sortRef = useRef(null);
   const [removing, setRemoving] = useState(() => new Set());
   const [pendingRemoval, setPendingRemoval] = useState(() => new Map());
   const [alerting, setAlerting] = useState(() => new Set());
@@ -76,6 +75,7 @@ export default function Saved() {
       bhk: p.bhk || (p.bhkNum ? `${p.bhkNum} BHK` : ''),
       area: p.area ? `${p.area.toLocaleString('en-IN')} sq.ft.` : '',
       img: p.image || p.img || null,
+      savedAt: p.savedAt,
       fromStore: true,
     };
   }), [savedList.items]);
@@ -218,7 +218,9 @@ export default function Saved() {
 
   const allCards = useMemo(() => {
     const existingIds = new Set(cards.map((c) => c.id));
-    return [...cards, ...dynamicSaved.filter((d) => !existingIds.has(d.id))];
+    const at = (c) => Date.parse(c.savedAt) || 0;
+    // Newest save first across both sources; the page offers no other order.
+    return [...cards, ...dynamicSaved.filter((d) => !existingIds.has(d.id))].sort((a, b) => at(b) - at(a));
   }, [cards, dynamicSaved]);
 
   const counts = useMemo(() => {
@@ -227,15 +229,10 @@ export default function Saved() {
     return m;
   }, [allCards]);
   const catLabel = useCallback((c) => (c ? tr('saved.' + c.labelKey, { defaultValue: c.label }) : ''), [tr]);
-  const items = useMemo(() => {
-    const filtered = tab === 'all' ? allCards : allCards.filter((c) => c.cat === tab);
-    // Rows arrive newest-saved first, so "newest" keeps that order.
-    return [...filtered].sort((a, b) => {
-      if (sort === 'newest') return 0;
-      const diff = (a.priceNum || 0) - (b.priceNum || 0);
-      return sort === 'price-asc' ? diff : -diff;
-    });
-  }, [allCards, tab, sort]);
+  const items = useMemo(
+    () => (tab === 'all' ? allCards : allCards.filter((c) => c.cat === tab)),
+    [allCards, tab],
+  );
 
   const summaryParts = useMemo(() => {
     const homes = counts.buy + counts.rent;
@@ -248,14 +245,6 @@ export default function Saved() {
 
   const isLoading = savedList.status === 'loading';
   const isError = savedList.status === 'error';
-
-  useLayoutEffect(() => {
-    const trigger = sortRef.current;
-    if (!trigger) return;
-    const dropdown = trigger.parentElement;
-    dropdown.style.width = 'max-content';
-    dropdown.style.width = `${trigger.getBoundingClientRect().width * 1.5}px`;
-  }, [sort, tr, items.length, isLoading, isError]);
 
   return (
     <div ref={ptr.ref} className="saved-page">
@@ -328,21 +317,6 @@ export default function Saved() {
               </HScroll>
 
               <AlertsRow searches={savedSearches.searches} status={savedSearches.status} isIn={isIn} />
-
-              {items.length > 0 && (
-                <div className={'flex items-center justify-end gap-2 mb-4 sm:mb-6 fade-in' + (mounted ? ' visible' : '')}>
-                  <Icon name="sliders-horizontal" className="h-4 w-4 text-teal-400" />
-                  <Select
-                    ref={sortRef}
-                    value={sort}
-                    onChange={setSort}
-                    ariaLabel={tr('saved.sortBy')}
-                    options={SORTS.map(([value, label, tk]) => ({ value, label: tr('saved.' + tk, { defaultValue: label }) }))}
-                    size="sm"
-                    anchored
-                  />
-                </div>
-              )}
 
               {items.length > 0 ? (
                 <div key={tab} className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-6 lg:grid-cols-3 lg:gap-8">
