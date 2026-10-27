@@ -146,6 +146,12 @@ public class ConversationsController {
         return opening.openForFlatmateRequest(principal, requestId);
     }
 
+    @PostMapping(Routes.Conversations.LEAD_REQUEST)
+    public ConversationDto openForLeadRequest(@CurrentUser AuthPrincipal principal,
+            @PathVariable String kind, @PathVariable String requestId) {
+        return opening.openForLeadRequest(principal, kind, requestId);
+    }
+
     public record MessageCreate(@NotBlank @Size(max = 4000) String body,
             @Size(max = 120) String clientId, String replyToId) {
     }

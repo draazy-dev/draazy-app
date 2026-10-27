@@ -5811,6 +5811,26 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Conversation' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /messages/requests/{kind}/{requestId}:
+    parameters:
+      - { name: kind, in: path, required: true, schema: { type: string, enum: [visit, offer] } }
+      - { name: requestId, in: path, required: true, schema: { type: string } }
+    post:
+      tags: [Leads & Contact]
+      summary: Open the chat between a listing owner and a visitor or buyer they said yes to
+      operationId: openLeadRequestConversation
+      description: >
+        Finds or creates the listing thread between the owner and the visitor of a confirmed visit, or
+        the buyer of an accepted offer. Either party may open it; anyone else, an undecided or declined
+        request, a suspended listing or an archived counterparty gets `404`. No message is sent. Read,
+        reply, attach and mark-read then use the ordinary `/messages/{id}` paths.
+      responses:
+        '200':
+          description: The listing thread, without messages
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Conversation' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /me/finalization-requests:
     get:
       tags: [Leads & Contact]

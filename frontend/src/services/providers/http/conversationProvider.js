@@ -93,6 +93,10 @@ export async function openFlatmateRequestConversation(requestId) {
   return toViewModel(await post(`/messages/flatmate-requests/${encodeURIComponent(requestId)}`, {}));
 }
 
+export async function openLeadRequestConversation(kind, requestId) {
+  return toViewModel(await post(`/messages/requests/${encodeURIComponent(kind)}/${encodeURIComponent(requestId)}`, {}));
+}
+
 export async function markConversationRead(id) {
   if (String(id).startsWith('staged:')) return;
   await post(`/messages/${encodeURIComponent(id)}/read`, {});

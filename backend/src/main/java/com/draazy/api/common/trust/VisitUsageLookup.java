@@ -12,7 +12,4 @@ public interface VisitUsageLookup {
 
     /** Every visit except one cancelled before the owner confirmed it; a scheduled one awaits the owner's reply. */
     List<Booking> countedBookings(UUID visitorId);
-
-    /** Sticky once the owner has confirmed any slot: a later reschedule or cancel does not un-introduce the pair. */
-    boolean ownerConfirmed(UUID visitorId, UUID propertyId);
 }
