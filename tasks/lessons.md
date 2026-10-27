@@ -231,3 +231,7 @@ hunks with `git apply --cached <partial.patch>`, commit, drop the variable, then
 - Flatmate detail pages have no in-page back row (the app header has back) and report sits as a text link after the content, like the property page's Report listing (user, 2026-10-24).
 - Flatmate forms never ask a name: posts and groups show the profile name only, and an unnamed profile is blocked with an Add name link to the profile (user, 2026-10-24). The router package is `react-router`; importing `react-router-dom` breaks the whole lazy chunk.
 - Badge cleanup: only labels meaning a person's ID check or a home's ownership/tenancy check are badges to unify ("ID verified", "Verified property"); leave unrelated trust signals (Trust score, RERA shared, Owner consented, Verified resident) alone (user, 2026-10-25).
+- Home summarises and routes; it does not duplicate an inbox. Decisions (Accept/Decline) live on the page that shows the full request, and Home's attention panel links there by type.
+- Flatmates Rooms tab lists room posts only (photos, flat info); a group never appears there, and Teams lists only teams still hunting.
+- A chip that is true of every card on a tab (e.g. "Looking for a flat" on Teams) is noise; cards show only facts that differ between items.
+- Reels: keep the whole phone in frame (zoom <= 1.274 at base 1.35), logo animation only in the outro, every voice line a complete impactful sentence, and <= 30 s (shorten the weakest line).

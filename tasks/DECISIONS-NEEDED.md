@@ -55,3 +55,18 @@ Nothing.
 | 333 | Owner renting a spare room without a Draazy listing | Lists the flat as a property and earns its Verified-owner badge; the room inherits it |
 | 334 | Flatmate publish checklist | Rooms and flat-holding groups need the 3 property ticks before Publish; seeker and hunting-group posts stay live-first, reviewed after |
 | 335 | Flatmate Needs info | Yes: reason code, post stays pending, host replies in the Support thread or edits |
+| 339 | Flatmate "Shared vibes" on cards + 3 Home tiles with live counts | Build both |
+| 340 | Flatmate must-haves | Build all: seeker "See matching rooms" link, room parking, stay length + room amenities |
+| 341 | Fully-taken rooms | Off board/map/counts/alerts like full groups; readable by link with a "Room taken" notice |
+| 342 | A member leaving reopens a full group past the 3-post cap | Allowed; the cap blocks host-initiated reopens only |
+| 343 | Offers on Home "Needs your attention" | Yes, one row like the other request types |
+| 344 | Visit confirm on the dashboard Visits tab | Opens the chat, as Confirm in Messages does |
+| 348 | Staff alerts | Claim-aware KYC reminders (claimer while the claim is live, else everyone), alerts clear on resolve, staff help article |
+| 349 | Failed R2 deletes on purge | Retried nightly from a pending-deletes table |
+| 350 | Rent manager vs deal-closed tenancy | Linked: a closed rental on a listing published from a managed property fills its tenant, rent and start date |
+| 351 | Requests inbox paging | In memory until a user nears ~500 requests; ARIA tabs now |
+| 352 | Staffer moderating their own second, unlinked account | Accepted residual risk until accounts are linked by mobile/KYC |
+| 355 | Flaky Maps e2e | Stub Places/Geocode with recorded responses; one real-Maps smoke spec stays on shard 1 |
+| 356 | City selector, SMS, 1.5/2.5 BHK | Deferred, no date |
+| 357 | SSE multi-node, vault/camera race, in-app-only photo takedown notice | Waiting by design; Zoho/Meta delivery webhooks get built |
+| 358 | Tenant flatmate groups that already have a flat (API-legal, UI cannot create) | Migrate them into rooms with a one-off migration, then refuse new ones in the API |
