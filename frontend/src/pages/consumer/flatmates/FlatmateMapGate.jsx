@@ -8,7 +8,6 @@ import NearPlaceField from './NearPlaceField.jsx';
 export default function FlatmateMapGate({ areas, maxAreas, onShow, onSwitchList, kindWord, filters, setF, filtersActive, onClearFilters }) {
   const { t } = useTranslation();
   const [draft, setDraft] = useState([]);
-  const countByName = new Map(areas.map((a) => [a.name, a.count]));
 
   const pickArea = (loc) => setDraft((prev) => (prev.includes(loc.name) || prev.length >= maxAreas ? prev : [...prev, loc.name]));
   const removeArea = (name) => setDraft((prev) => prev.filter((n) => n !== name));
@@ -43,7 +42,6 @@ export default function FlatmateMapGate({ areas, maxAreas, onShow, onSwitchList,
                     className="dz-chip dz-chip--accent dz-chip--sm hover:bg-rose-500/15 hover:border-rose-400/40 hover:text-rose-200"
                   >
                     {name}
-                    <span className="text-gray-500">{countByName.get(name) || 0}</span>
                     <Icon name="x" />
                   </button>
                 ))}

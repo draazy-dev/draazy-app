@@ -20,7 +20,7 @@ import { useGenderGate } from './useGenderGate.jsx';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
 
 export { emptyFilters };
-export const MAP_MAX_AREAS = 5;
+export const MAP_MAX_AREAS = 3;
 const DETAIL_KIND = { r: 'room', g: 'group', s: 'post' };
 
 /* The provider drops moderated rows from the public board but not the owner's dashboard; the size matches

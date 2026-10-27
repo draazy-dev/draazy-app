@@ -6,8 +6,11 @@ const openMap = async (page, url) => {
   await page.goto(url);
   await page.getByRole('button', { name: 'Map' }).click();
   await focusFlatmateMap(page, ['Baner']);
-  await page.locator('.map-pin').first().waitFor({ timeout: 20000 });
-  await page.locator('.map-pin').first().click();
+  // Room pins sit where hosts dropped them and can overlap; Enter on the marker is not hit-tested.
+  const marker = page.locator('gmp-advanced-marker', { has: page.locator('[data-fm-pin]') }).first();
+  await marker.waitFor({ timeout: 20000 });
+  await marker.focus();
+  await marker.press('Enter');
   await page.locator('.dz-sp-row').first().waitFor({ timeout: 10000 });
 };
 

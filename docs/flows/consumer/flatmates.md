@@ -433,12 +433,16 @@ The single decision point every supply path calls - group create, single-room po
 - `tabMeta` runs values through `normalizeTab`, so an alert saved before the redesign is labelled
   correctly instead of mislabelled.
 
-### Map gate (`FlatmateMapGate`, `MAP_MAX_AREAS = 5`)
-- The map view stays legible by asking the user to focus on up to 5 areas first (mirrors the Listings
+### Map gate (`FlatmateMapGate`, `MAP_MAX_AREAS = 3`)
+- The map view stays legible by asking the user to focus on up to 3 areas first (mirrors the Listings
   map gate). Only areas that actually hold matching posts are offered, ranked by count, so a pick
   never dead-ends. A single active locality filter is carried into the focus on entry. A proximity
   search already narrows by radius, so `filters.near` bypasses the gate entirely.
-
+- **Placement.** A room is drawn at the pin its host dropped (`flatmate_rooms.lat/lng`); sibling rooms
+  of one flat share that pin, so they share one marker. A lone priced room shows its rent, like the
+  property map; a shared pin shows a count. Seekers and teams name areas, not an address, so they stay
+  one count bubble per locality centre, and a room with no stored pin falls back to that centre too.
+- The active-filter chips sit above the gate and the map, as they do above the list.
 ### Contact gating (expressing interest)
 - **Flatmate interest (`onInterest`):** requires sign-in (else the in-page sign-in sheet, which re-runs the interest).
   Blocked if already interested (`hasInterest`). If the seeker set `verifiedContactOnly` and the
