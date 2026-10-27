@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { test, expect, ACTORS } from '../fixtures/live.js';
-import { API, authHeaders, seedConsent, uniqueMobile } from '../helpers/liveAuth.js';
+import { API, authHeaders, grantIdentityBadge, seedConsent, uniqueMobile } from '../helpers/liveAuth.js';
 import { approveListing, rejectListing } from '../helpers/moderation.js';
 import { pickDate } from '../helpers/datePicker.helper.js';
 
@@ -25,9 +25,10 @@ test.afterEach(async ({ request }) => {
   created = [];
 });
 
-async function seedListing(request, deal = 'rent') {
+async function seedListing(request, deal = 'rent', { idVerified = true } = {}) {
   const mobile = uniqueMobile();
   const headers = await authHeaders(mobile);
+  if (idVerified) await grantIdentityBadge(mobile);
   const photo = await request.post(`${API}/me/photos`, {
     headers: { authorization: headers.authorization },
     multipart: { file: { name: 'ownership-review-room.png', mimeType: 'image/png', buffer: PNG } },
@@ -228,6 +229,20 @@ test('sale: a bill and supporting sale deed cannot replace title proof, but 7/12
   const response = await granted;
   expect(response.status()).toBe(200);
   expect(await response.json()).toMatchObject({ verified: true });
+});
+
+test('complete evidence still cannot earn the badge until the owner ID is verified', async ({ page, request, login }) => {
+  const listing = await seedListing(request, 'rent', { idVerified: false });
+  const bill = await uploadDocument(request, listing, 'Electricity Bill', 'unverified-owner-msedcl.pdf');
+  await login.asAdmin();
+  const panel = await openCase(page, listing);
+  const evidence = await recordDocument(page, listing, bill, 'Electricity bill');
+  expect(evidence).toMatchObject({ verified: false, missingKinds: [], ownerIdVerified: false });
+  await expect(panel.getByRole('button', { name: 'Grant ownership verification', exact: true })).toBeDisabled();
+  await expect(panel.getByText("Owner ID pending: verify the owner's ID first.", { exact: true })).toBeVisible();
+  const refused = await request.post(`${API}${ownershipPath(listing.id)}`, { headers: await authHeaders(ACTORS.admin) });
+  expect(refused.status()).toBe(409);
+  expect((await refused.json()).error).toBe('owner_identity_unverified');
 });
 
 test('a verified rental changed to a sale needs a fresh badge decision but can still be published', async ({ page, request, login }) => {

@@ -61,7 +61,7 @@ final class OwnershipGate {
 
     // Owners see facts and currency only; doc ids and subject names are staff-only DPDP data.
     static OwnershipVerificationResponse toResponse(Property property,
-            List<OwnershipEvidence> rows, Instant now, boolean staffView) {
+            List<OwnershipEvidence> rows, Instant now, boolean staffView, boolean ownerIdVerified) {
         List<OwnershipVerificationResponse.Evidence> wire = rows.stream()
                 .map(row -> new OwnershipVerificationResponse.Evidence(
                         row.getId().toString(),
@@ -82,6 +82,7 @@ final class OwnershipGate {
                 wire,
                 property.getOwnershipRequestedAt(),
                 property.getOwnershipDeclinedAt(),
-                property.getOwnershipDeclinedReason());
+                property.getOwnershipDeclinedReason(),
+                ownerIdVerified);
     }
 }

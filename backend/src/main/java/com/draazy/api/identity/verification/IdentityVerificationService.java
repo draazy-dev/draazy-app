@@ -104,6 +104,12 @@ public class IdentityVerificationService {
                 .orElse(false);
     }
 
+    /** Approved, not merely submitted. Seeded and staff-granted accounts carry the user flag without a case row. */
+    @Transactional(readOnly = true)
+    public boolean isApproved(UUID userId) {
+        return users.findById(userId).map(User::isVerified).orElse(false) || isVerified(userId);
+    }
+
     /** KYC verified or in review is enough to file a verification request; approval waits for verified.
      * Seeded accounts carry the user flag without a case row. */
     @Transactional(readOnly = true)
