@@ -275,7 +275,7 @@ public class DocumentRequestService {
                         (buyer == null || buyer.getName() == null || buyer.getName().isBlank()
                                 ? "Someone" : buyer.getName())
                                 + " asked to see documents for " + property.getTitle() + ".",
-                        "/dashboard?tab=leads&box=received");
+                        Notifier.REQUEST_INBOX);
             }
         } catch (DataIntegrityViolationException concurrentDuplicate) {
 

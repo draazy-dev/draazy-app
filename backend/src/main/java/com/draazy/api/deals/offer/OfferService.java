@@ -9,6 +9,7 @@ import com.draazy.api.common.error.NotFoundException;
 import com.draazy.api.common.error.ValidationException;
 import com.draazy.api.common.trust.ContactVisibility;
 import com.draazy.api.common.trust.Notifier;
+import com.draazy.api.common.trust.RequestSource;
 import com.draazy.api.common.web.Ids;
 import com.draazy.api.deals.deal.DealRepository;
 import com.draazy.api.finance.tenancy.TenantProfileService;
@@ -109,8 +110,8 @@ public class OfferService {
                     "New offer on " + property.getTitle(),
                     (buyer == null || buyer.getName() == null || buyer.getName().isBlank()
                             ? "Someone" : buyer.getName())
-                            + " offered " + Notifier.rupees(offer.getAmount()) + ". Open the listing to respond.",
-                    "/property/" + propertyId);
+                            + " offered " + Notifier.rupees(offer.getAmount()) + ". Open your requests to respond.",
+                    Notifier.REQUEST_INBOX);
         }
 
         // Visibility goes through the same rule as the list reads; a hand-picked value drifts if the rule changes.
@@ -184,10 +185,23 @@ public class OfferService {
                         "The owner declined your offer on " + title + "."};
                 default -> new String[] {"New counter-offer on " + title,
                         (isOwner ? "The owner" : "The buyer") + " countered at "
-                                + Notifier.rupees(offer.getAmount()) + ". Open the listing to respond."};
+                                + Notifier.rupees(offer.getAmount()) + (isOwner ? ". Open the listing to respond."
+                                : ". Open your requests to respond.")};
             };
-            notifier.notify(other, "offer." + targetStatus, note[0], note[1], "/property/" + property.getId());
+            String link = isOwner ? "/property/" + property.getId() : Notifier.REQUEST_INBOX;
+            notifier.notify(other, "offer." + targetStatus, note[0], note[1], link);
         }
+    }
+
+    @Transactional
+    public void withdraw(UUID callerId, UUID offerId) {
+        Offer offer = offers.findById(offerId).filter(o -> callerId.equals(o.getFromUserId()))
+                .orElseThrow(() -> NotFoundException.of("Offer"));
+        if (!OfferStatuses.canTransition(offer.getStatus(), OfferStatuses.WITHDRAWN)) {
+            throw RequestSource.alreadyAnswered();
+        }
+        offer.setStatus(OfferStatuses.WITHDRAWN);
+        offers.save(offer);
     }
 
     /** Paged like {@code offersOnMine} so both sides of the offer book return the same shape. */

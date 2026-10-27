@@ -408,7 +408,7 @@ public class FlatmateSeekerService {
                 "flatmate.interest",
                 requester.getName() + " is interested in teaming up",
                 "Open your request inbox to review their interest.",
-                FlatmateLinks.of("post", post.getId()));
+                Notifier.REQUEST_INBOX);
         notifier.notify(
                 requester.getId(),
                 "flatmate.interest.sent",

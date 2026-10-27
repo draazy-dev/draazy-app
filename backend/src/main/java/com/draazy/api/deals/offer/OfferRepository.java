@@ -1,6 +1,8 @@
 package com.draazy.api.deals.offer;
 
+import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -27,4 +29,18 @@ public interface OfferRepository extends JpaRepository<Offer, UUID> {
 
     Optional<Offer> findFirstByFromUserIdAndPropertyIdAndStatusOrderByCreatedAtDesc(
             UUID fromUserId, UUID propertyId, String status);
+
+    boolean existsByFromUserIdAndPropertyIdAndStatus(UUID fromUserId, UUID propertyId, String status);
+
+    /** Live offers the buyer made, plus any that moved since {@code since}. */
+    @Query("""
+            select o from Offer o where o.fromUserId = :buyerId
+            and (o.status in ('pending', 'countered') or o.updatedAt >= :since)""")
+    List<Offer> findSentSince(@Param("buyerId") UUID buyerId, @Param("since") Instant since);
+
+    /** Live offers on these listings, plus any that moved since {@code since}. */
+    @Query("""
+            select o from Offer o where o.propertyId in :propertyIds
+            and (o.status in ('pending', 'countered') or o.updatedAt >= :since)""")
+    List<Offer> findReceivedSince(@Param("propertyIds") Collection<UUID> propertyIds, @Param("since") Instant since);
 }

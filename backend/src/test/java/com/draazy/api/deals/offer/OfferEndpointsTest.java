@@ -432,7 +432,7 @@ class OfferEndpointsTest extends AbstractApiTest {
 
         assertThat(notificationsFor(owner)).singleElement().satisfies(row -> {
             assertThat(row.get("type")).isEqualTo("offer.received");
-            assertThat(row.get("link")).isEqualTo("/property/" + p.getId());
+            assertThat(row.get("link")).isEqualTo("/dashboard?tab=leads&box=received");
             assertThat((String) row.get("title")).contains("Offer notify test");
             assertThat((String) row.get("body")).contains("\u20b941,00,000");
             // D5/Q2: the amount and the buyer's display name are fair game, the mobile is not.
@@ -474,6 +474,8 @@ class OfferEndpointsTest extends AbstractApiTest {
 
         assertThat(notificationsFor(owner)).extracting(row -> row.get("type"))
                 .containsExactlyInAnyOrder("offer.received", "offer.countered");
+        assertThat(notificationsFor(owner)).extracting(row -> row.get("link"))
+                .containsOnly("/dashboard?tab=leads&box=received");
         assertThat(notificationsFor(buyer)).hasSize(1);
     }
 

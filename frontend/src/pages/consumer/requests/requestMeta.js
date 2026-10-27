@@ -5,12 +5,13 @@ const KIND_LABEL = {
   flatmate: 'Flatmate',
   group: 'Group application',
   document: 'Documents',
+  offer: 'Price offer',
 };
 
 /** Kinds that connect two people, so they also show as a request thread in Messages. */
-export const CONNECTION_KINDS = new Set(['contact', 'flatmate', 'group']);
+export const CONNECTION_KINDS = new Set(['contact', 'flatmate', 'group', 'visit', 'offer']);
 
-const ACCEPTED_LABEL = { contact: 'Approved', visit: 'Confirmed', document: 'Granted' };
+const ACCEPTED_LABEL = { contact: 'Approved', visit: 'Confirmed', document: 'Granted', offer: 'Agreed' };
 
 const STATE_LABEL = {
   pending: 'Pending',
@@ -18,6 +19,7 @@ const STATE_LABEL = {
   declined: 'Declined',
   expired: 'Expired',
   withdrawn: 'Withdrawn',
+  countered: 'Countered',
 };
 
 const DEFAULT_MESSAGE = {
@@ -27,6 +29,7 @@ const DEFAULT_MESSAGE = {
   flatmate: (title) => `Would like to connect about ${title}.`,
   group: (title) => `Would like to connect about ${title}.`,
   document: (title) => `Would like to see the papers for ${title}.`,
+  offer: (title) => `Made an offer on ${title}.`,
 };
 
 export const requestKey = (item) => `${item.kind}:${item.id}`;
@@ -56,7 +59,7 @@ export const isGroupJoin = (item) => item.kind === 'flatmate' && item.target?.ty
 
 export const stateLabel = (item) => (item.state === 'accepted' && ACCEPTED_LABEL[item.kind]) || STATE_LABEL[item.state] || item.state;
 
-const STATE_TONE = { pending: 'pend', accepted: 'ok', declined: 'no', expired: 'muted', withdrawn: 'muted' };
+const STATE_TONE = { pending: 'pend', countered: 'pend', accepted: 'ok', declined: 'no', expired: 'muted', withdrawn: 'muted' };
 
 export const stateTone = (item) => STATE_TONE[item.state] || 'muted';
 

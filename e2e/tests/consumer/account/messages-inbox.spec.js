@@ -377,18 +377,23 @@ test.describe('Messages inbox — request threads (live API)', () => {
     return ((await res.json()).content ?? []).find((n) => n.type === 'contact.received' && n.body?.includes(buyerName))?.link;
   };
 
-  test('a contact request notification carries the request thread link', async ({ request }) => {
+  test('a contact request notification links to the dashboard request inbox', async ({ request }) => {
     const buyer = await actor(request, `Notify Link Buyer ${letterTag()}`);
-    const requestId = await askForContact(request, buyer);
-    expect(await ownerNotificationLink(request, buyer.name)).toBe(`/messages?c=request:contact:${requestId}`);
+    await askForContact(request, buyer);
+    expect(await ownerNotificationLink(request, buyer.name)).toBe('/dashboard?tab=leads&box=received');
   });
 
-  test('tapping a contact request notification opens the request thread', async ({ page, request }) => {
+  test('tapping a contact request notification opens the dashboard Requests with that request to decide', async ({ page, request }) => {
     const buyer = await actor(request, `Notify Tap Buyer ${letterTag()}`);
-    const requestId = await askForContact(request, buyer);
+    await askForContact(request, buyer);
     await signedInAs(page, ACTORS.owner);
     await page.goto('/notifications');
-    await expect(page.locator(`a[href="/messages?c=request:contact:${requestId}"]`)).toBeVisible({ timeout: 20000 });
+    // Same-day contact requests collapse into one row, so the row is found by its link rather than this buyer's name.
+    await page.locator('.notif a[href="/dashboard?tab=leads&box=received"]').first().click();
+    await expect(page).toHaveURL(/\/dashboard\?tab=leads/);
+    const card = page.getByTestId('request-card').filter({ hasText: buyer.name });
+    await expect(card).toBeVisible({ timeout: 20000 });
+    await expect(card).toHaveAttribute('data-kind', 'contact');
   });
   test('?openProp selects the live chat even when the chat list loads after the sent requests', async ({ page, request }) => {
     const buyer = await actor(request, `Slow List Buyer ${letterTag()}`);

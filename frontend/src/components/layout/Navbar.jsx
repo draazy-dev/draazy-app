@@ -26,7 +26,7 @@ export default function Navbar() {
   const { flagEnabled } = useAppFlags();
   const { count: compareCount } = useCompare();
   const saved = useSaved();
-  const { unread: chatUnread } = useConversationUnread();
+  const { unread: chatUnread, pendingRequests } = useConversationUnread();
   const light = useIsLightTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -49,6 +49,8 @@ export default function Navbar() {
   const acctDrawerRef = useRef(null);
   const savedCount = isIn ? saved.totalCount : 0;
   const chatBadge = isIn ? chatUnread : 0;
+  const requestBadge = isIn ? pendingRequests : 0;
+  const messagesLabel = requestBadge > 0 ? `Messages, ${requestBadge} pending ${requestBadge === 1 ? 'request' : 'requests'}` : 'Messages';
 
   const path = location.pathname.toLowerCase();
   const dealParam = new URLSearchParams(location.search).get('deal');
@@ -326,9 +328,11 @@ export default function Navbar() {
                 </Link>
                 <NotificationBell />
                 {flagEnabled('inAppMessaging') && (
-                  <Link to="/messages" className="dz-topbar__action tap-target tap-extend relative inline-flex items-center justify-center p-2 rounded-xl hover:bg-white/5 transition-all duration-300 group" title="Messages" aria-label="Messages">
+                  <Link to="/messages" className="dz-topbar__action tap-target tap-extend relative inline-flex items-center justify-center p-2 rounded-xl hover:bg-white/5 transition-all duration-300 group" title={messagesLabel} aria-label={messagesLabel}>
                     <Icon name="message-square" className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
-                    {chatBadge > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 bg-gradient-to-br from-teal-500 to-teal-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-teal-500/30">{chatBadge > 99 ? '99+' : chatBadge}</span>}
+                    {requestBadge > 0 ? (
+                      <span data-testid="messages-request-badge" className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 bg-gradient-to-br from-orange-500 to-orange-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-orange-500/30">{requestBadge > 99 ? '99+' : requestBadge}</span>
+                    ) : chatBadge > 0 && <span className="absolute -top-0.5 -right-0.5 min-w-5 h-5 px-1 bg-gradient-to-br from-teal-500 to-teal-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-teal-500/30">{chatBadge > 99 ? '99+' : chatBadge}</span>}
                   </Link>
                 )}
                 <div className="relative -mr-4 sm:mr-0" ref={acctRef}>
