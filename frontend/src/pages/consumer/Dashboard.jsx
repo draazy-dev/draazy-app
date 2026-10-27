@@ -85,10 +85,9 @@ export default function Dashboard() {
     listings, listingsLoaded, visits, recent, recommended, alertMatches,
     contactReqs, photoReqs, flatmateReqs, docReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
-    apps, decideApp,
-    decideContact, decideDocReqs, decideFlatmateReq, chatFlatmateReq, decidePhotoReq, mutateVisit, openReview, sendReview,
+    apps, mutateVisit, openReview, sendReview,
     dataStatus, dataError, retryData,
-    isBusy, refreshData, refreshRequests, setListings,
+    refreshData, refreshRequests, setListings,
   } = useDashboardData({ user, toast, ownsProperty: caps.ownsProperty });
   /* "My Rental" shows for buyers/tenants and anyone with a finalised tenancy, not a pure owner; a pending co-fill
      invite also belongs there so an invited tenant always has a place to act. */
@@ -160,8 +159,7 @@ export default function Dashboard() {
   const scheduledVisits = useMemo(() => visits.filter((v) => v.status === 'scheduled'), [visits]);
   const actionItems = buildActionItems({
     isOwner, contactReqs, apps, photoReqs, pendingDocGroups, listings, reviewsByProp,
-    scheduledVisits, flatmateReqs, userId: user?.id, openReview, isBusy,
-    decideContact, decideApp, go, decideDocReqs, decidePhotoReq, decideFlatmateReq, chatFlatmateReq, mutateVisit, navigate,
+    scheduledVisits, flatmateReqs, userId: user?.id, openReview, go,
   });
   // Badge counts only items genuinely waiting on the owner, matching the Requests panel's
   // "Waiting on you"; an already-contactable enquiry needs no accept/decline decision.
@@ -189,7 +187,7 @@ export default function Dashboard() {
       case 'activity':
         return <ActivityPanel key={'act:' + (sub || '')} initialSub={sub} recent={recent} />;
       case 'leads':
-        return <Card className="p-3 sm:p-5"><RequestsPanel onChanged={refreshRequests} /></Card>;
+        return <Card className="p-3 sm:p-5"><RequestsPanel key={'leads:' + (sub || '')} initialTab={sub} onChanged={refreshRequests} /></Card>;
       case 'finances':
         return <FinancesTab user={user} listings={listings} toast={toast} isOwner={isOwner} showRental={showRental} />;
       case 'documents':

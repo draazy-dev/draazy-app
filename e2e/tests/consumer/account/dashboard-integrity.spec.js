@@ -94,6 +94,10 @@ test('Action Center count, Requests rows and nav badge agree for mixed pending l
   const actionCenter = page.getByTestId('action-center');
   await expect(actionCenter).toBeVisible({ timeout: 20000 });
   await expect(actionCenter.getByText('3 pending')).toBeVisible();
+  await expect(actionCenter.getByTestId('action-item')).toHaveCount(3);
+  for (const group of ['numbers', 'photos', 'documents']) {
+    await expect(actionCenter.locator(`[data-group="${group}"] [data-testid="action-count"]`)).toHaveText('1');
+  }
   await expect(page.locator('aside button', { hasText: 'Requests' }).first()).toContainText('3');
 
   await page.locator('aside button', { hasText: 'Requests' }).first().click();
@@ -119,7 +123,8 @@ test('more than 20 pending contact requests all appear in the Requests panel, ne
   await page.goto('/dashboard');
   const actionCenter = page.getByTestId('action-center');
   await expect(actionCenter.getByText('21 pending')).toBeVisible({ timeout: 30000 });
-  await expect(page.getByTestId('action-item').first()).toContainText(names[0]);
+  await expect(page.getByTestId('action-item')).toHaveCount(1);
+  await expect(page.getByTestId('action-item')).toContainText(`${names[0]} and 20 others`);
 
   await page.goto('/dashboard#leads');
   const rows = page.getByTestId('request-card').filter({ hasText: /Zztest Old Contact/ });
@@ -145,13 +150,13 @@ test('double-tapping Accept sends one successful contact decision', async ({ pag
   });
 
   await signedInAs(page, owner.mobile);
-  await page.goto('/dashboard');
-  const accept = page.getByTestId('action-item').filter({ hasText: 'Zztest Double Buyer' }).getByRole('button', { name: 'Accept' });
+  await page.goto('/dashboard#leads-numbers');
+  const accept = page.getByTestId('request-card').filter({ hasText: 'Zztest Double Buyer' }).getByRole('button', { name: 'Approve & chat' });
   await accept.evaluate((button) => { button.click(); button.click(); });
   await expect(page.getByText('Accepted — you can chat now and see their number.')).toBeVisible();
   expect(successfulPatches).toHaveLength(1);
 
-  await page.locator('aside button', { hasText: 'Requests' }).first().click();
+  await page.goto('/dashboard#leads');
   await expect(page.getByTestId('requests-panel')).toBeVisible();
   await page.getByTestId('requests-past-toggle').click();
   await expect(page.getByTestId('request-card').filter({ hasText: 'Zztest Double Buyer' })).toHaveAttribute('data-state', 'accepted');

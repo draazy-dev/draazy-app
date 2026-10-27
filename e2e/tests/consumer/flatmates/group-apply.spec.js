@@ -96,12 +96,15 @@ test.describe('Flatmates → a group applies for a whole flat (live)', () => {
     await login.asOwner();
     await page.goto('/dashboard');
 
-    const item = page.getByTestId('action-item').filter({ hasText: title });
-    await expect(item).toContainText(`Group wants to rent ${flat.title}`);
-    await item.getByRole('button', { name: 'Accept' }).click();
+    await page.locator('[data-testid="action-item"][data-group="flatmate"]').click();
+    await expect(page).toHaveURL(/#leads-flatmate$/);
+    await expect(page.getByRole('tab', { name: /^Flatmate/ })).toHaveAttribute('aria-selected', 'true');
+    // Newest first, so a pending leftover from an earlier failed run cannot be picked over this one.
+    const card = page.locator('[data-testid="request-card"][data-kind="group"][data-state="pending"]')
+      .filter({ hasText: host.name }).filter({ hasText: flat.title }).first();
+    await card.getByRole('button', { name: 'Accept' }).click();
 
     await expect(page.getByText('Group application accepted')).toBeVisible();
-    await expect(page.getByTestId('action-item').filter({ hasText: title })).toHaveCount(0);
     // The owner wrote `status`; `modStatus` is the ops desk's column and must be untouched.
     const { accessToken } = await apiLogin(OWNER);
     const inbox = await fetch(`${API}/me/group-applications?size=50`, { headers: auth(accessToken) })

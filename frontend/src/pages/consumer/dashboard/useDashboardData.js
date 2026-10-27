@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
 import useAsyncList from '../../../hooks/useAsyncList.js';
 import { MAX_PAGE_SIZE } from '../../../services/apiLimits.js';
 import { listPropertiesByIds, searchListings } from '../../../services/propertyService.js';
 import { listVisits, myVisitRequests, rescheduleVisit, updateVisitStatus } from '../../../services/visitService.js';
-import { myContactRequests, respondToContactRequest } from '../../../services/contactService.js';
-import { listDocRequests, respondDocRequest } from '../../../services/documentService.js';
-import { decideGroupApplication, listMyGroupApplications, myRequests, decideRequest } from '../../../services/flatmateService.js';
-import { openFlatmateRequestConversation } from '../../../services/conversationService.js';
-import { myPhotoRequests, decidePhotoRequest } from '../../../services/photoRequestService.js';
+import { myContactRequests } from '../../../services/contactService.js';
+import { listDocRequests } from '../../../services/documentService.js';
+import { listMyGroupApplications, myRequests } from '../../../services/flatmateService.js';
+import { myPhotoRequests } from '../../../services/photoRequestService.js';
 import {
   listMyPropertyReviews, getPropertyReview, markPropertyReviewRead, addPropertyReviewMessage,
 } from '../../../services/propertyReviewService.js';
@@ -59,7 +57,6 @@ async function loadFeed(withRecommended) {
    the mutation handlers. `ownsProperty` is undefined until /me/dashboard answers, null when unknown. */
 
 export function useDashboardData({ user, toast, ownsProperty }) {
-  const navigate = useNavigate();
   const [listings, setListings] = useState([]);
   const [listingsLoaded, setListingsLoaded] = useState(false);
   // Every owner inbox is scoped to the caller's property listings, so a known non-owner skips them and their
@@ -76,7 +73,6 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   const [reviewThread, setReviewThread] = useState(null);
   const [busyIds, setBusyIds] = useState(() => new Set());
   const busyRef = useRef(new Set());
-  const isBusy = useCallback((id) => busyRef.current.has(id), []);
   const setBusy = useCallback((ids, value) => {
     const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
     if (!list.length) return;
@@ -88,19 +84,8 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     busyRef.current = next;
     setBusyIds(next);
   }, []);
-  const runBusy = useCallback(async (ids, fn) => {
-    const list = (Array.isArray(ids) ? ids : [ids]).filter(Boolean);
-    if (list.some((id) => busyRef.current.has(id))) return false;
-    setBusy(list, true);
-    try {
-      const ok = await fn();
-      return ok !== false;
-    } finally {
-      setBusy(list, false);
-    }
-  }, [setBusy]);
 
-  const [flatmateReqs, , setFlatmateReqs, , , refreshFlatmateReqs] = useAsyncList(
+  const [flatmateReqs, , , , , refreshFlatmateReqs] = useAsyncList(
     () => myRequests(),
     [user],
     !!user?.mobile,
@@ -108,7 +93,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
 
   // The document request inbox is a seam read, owner-scoped by the session, so like the contact inbox below it takes
   // its own effect rather than the synchronous localStorage read the panels above use.
-  const [docReqs, , setDocReqs, , , refreshDocReqs] = useAsyncList(
+  const [docReqs, , , , , refreshDocReqs] = useAsyncList(
     () => listDocRequests(user.mobile),
     [user],
     ownerReads,
@@ -116,7 +101,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
 
   // The contact inbox is a network read and is owner-scoped by the session, so unlike the localStorage panels above
   // it takes no mobile argument. Same reasoning as the document inbox.
-  const [contactReqs, , setContactReqs, , , refreshContactReqs] = useAsyncList(
+  const [contactReqs, , , , , refreshContactReqs] = useAsyncList(
     () => myContactRequests().then((res) => res.items.map(toLeadRow)),
     [user],
     ownerReads,
@@ -124,169 +109,17 @@ export function useDashboardData({ user, toast, ownsProperty }) {
 
   // Flatmate group applications on the caller's own listings. Owner-scoped by the session, like the contact inbox,
   // and read through the same seam the ops moderation board uses.
-  const [apps, , setApps, , , refreshApps] = useAsyncList(
+  const [apps, , , , , refreshApps] = useAsyncList(
     () => listMyGroupApplications({ size: MAX_PAGE_SIZE }).then((res) => res.items),
     [user],
     ownerReads,
   );
-  // Accept/decline is irreversible and the server refuses a second answer, so the row is re-read rather than patched
-  // in place.
 
-  const decideApp = async (appId, status) => {
-    return runBusy(`app:${appId}`, async () => {
-      try {
-        const decided = await decideGroupApplication(appId, status);
-        setApps((rows) => rows.map((a) => (a.id === appId ? decided : a)));
-        toast(status === 'accepted'
-          ? 'Group application accepted'
-          : 'Group application declined', status === 'accepted' ? 'success' : 'info');
-      } catch (e) {
-        toast(e?.message || 'That did not go through. Please try again.', 'error');
-        await refreshApps();
-        return false;
-      }
-      return true;
-    });
-  };
-
-  const decideContact = async (reqId, decision) => {
-    return runBusy(`contact:${reqId}`, async () => {
-      const answered = contactReqs.find((r) => r.id === reqId);
-      try {
-        await respondToContactRequest(reqId, decision);
-      } catch (e) {
-        const notLive = e?.code === 'listing_not_live';
-        toast(notLive ? 'Make the listing live to share your number.' : e?.message || 'That did not go through. Please try again.', 'error');
-        await refreshContactReqs();
-        return false;
-      }
-      if (String(answered?.status || '').toLowerCase() === 'pending') {
-        // The My Listings lead chip reads the count off the row, so it moves with the answer.
-        setListings((rows) => rows.map((l) => (!l.flatmate && [l.id, l.uuid].map(String).includes(String(answered.propId))
-          ? { ...l, pendingLeads: Math.max(0, (l.pendingLeads || 0) - 1) } : l)));
-      }
-      toast(decision === 'approved' ? 'Accepted — you can chat now and see their number.' : 'Request declined.', decision === 'approved' ? 'success' : 'info');
-      try {
-        const res = await myContactRequests();
-        setContactReqs(res.items.map(toLeadRow));
-      } catch {
-        await refreshContactReqs();
-      }
-      return true;
-    });
-  };
-
-  const [photoReqs, , setPhotoReqs, , , refreshPhotoReqs] = useAsyncList(
+  const [photoReqs, , , , , refreshPhotoReqs] = useAsyncList(
     () => myPhotoRequests().then((res) => res.items.map(toPhotoRow)),
     [user],
     ownerReads,
   );
-  /* Answer a photo request, either way. */
-  /* The owner's half of the maker-checker pair: the buyer makes the request, the owner marks it satisfied. */
-
-  const decidePhotoReq = async (reqId, decision) => {
-    return runBusy(`photo:${reqId}`, async () => {
-      try {
-        await decidePhotoRequest(reqId, decision);
-      } catch (e) {
-        toast(e?.message || 'That did not go through. Please try again.', 'error');
-        await refreshPhotoReqs();
-        return false;
-      }
-      toast(
-        decision === 'resolved'
-          ? 'Marked done — the buyer has been told your new photos are up.'
-          : "Declined — the buyer has been told there are no more photos coming.",
-        decision === 'resolved' ? 'success' : 'info',
-      );
-      try {
-        const res = await myPhotoRequests();
-        setPhotoReqs(res.items.map(toPhotoRow));
-      } catch {
-        await refreshPhotoReqs();
-      }
-      return true;
-    });
-  };
-  // Buyer document requests are stored one record per document; the Requests panel groups them per buyer, so
-  // Grant/Decline "all" arrives here as a list of ids to resolve together.
-
-  const decideDocReqs = async (reqIds, decision) => {
-    const ids = reqIds || [];
-    // Re-read the inbox through the seam so every surface reflects the server's truth. Shared so the failure path can
-    // refresh too: a partial-loop failure may have already resolved some ids.
-    const busyKeys = ids.map((id) => `doc:${id}`);
-    return runBusy(busyKeys, async () => {
-    const refresh = async () => {
-      try {
-        setDocReqs((await listDocRequests(user.mobile)) || []);
-        // The mutation went through; leave the list as-is if the re-read fails rather than blanking it.
-      } catch {
-      }
-    };
-    let serverSharedCount = 0;
-    try {
-      for (const id of ids) {
-        // eslint-disable-next-line no-await-in-loop -- a few ids per buyer; sequential keeps the store consistent
-        const updated = await respondDocRequest(user.mobile, id, decision);
-        serverSharedCount += updated?.sharedDocumentCount || 0;
-      }
-    } catch {
-      await refresh();
-      toast('Could not update every request. Some may have gone through — please review and retry.', 'error');
-      return false;
-    }
-    await refresh();
-    if (decision !== 'granted') {
-      toast('Request declined — your documents stay private.', 'info');
-      return true;
-    }
-    // The server counts the actual private-vault rows after each grant. A granted category with no
-    // uploaded file is an honest zero, not a successful share.
-    const shared = serverSharedCount;
-    if (shared > 0) {
-      toast(`Access granted — ${shared} document${shared === 1 ? '' : 's'} now visible to this buyer.`, 'success');
-    } else {
-      // Owner approved a category they haven't actually uploaded a file for yet.
-      toast('Access approved, but you haven’t uploaded these documents yet. Upload them in the Document Vault so the buyer can view them.', 'info');
-    }
-    return true;
-    });
-  };
-
-  const decideFlatmateReq = async (reqId, decision) => {
-    const groupJoin = flatmateReqs.find((r) => r.id === reqId)?.kind === 'group';
-    return runBusy(`flatmate:${reqId}`, async () => {
-      try {
-        await decideRequest(reqId, decision);
-      } catch (e) {
-        toast(e?.message || 'That did not go through. Please try again.', 'error');
-        await refreshFlatmateReqs();
-        return false;
-      }
-      if (decision === 'accepted' && !groupJoin) {
-        // Opening the thread puts it in both inboxes; if it fails, Messages still offers Open chat on the request.
-        await openFlatmateRequestConversation(reqId).catch(() => undefined);
-      }
-      const accepted = groupJoin ? 'Accepted — they\'re in your group now.' : 'Request accepted — connect in Messages.';
-      toast(decision === 'accepted' ? accepted : 'Request declined.', decision === 'accepted' ? 'success' : 'info');
-      try {
-        setFlatmateReqs(await myRequests());
-      } catch {
-        await refreshFlatmateReqs();
-      }
-      return true;
-    });
-  };
-
-  const chatFlatmateReq = (reqId) => runBusy(`flatmate:${reqId}`, async () => {
-    try {
-      const conv = await openFlatmateRequestConversation(reqId);
-      navigate(`/messages?c=${encodeURIComponent(conv.id)}`);
-    } catch (e) {
-      toast(e?.message || 'Could not open the chat. Please try again.', 'error');
-    }
-  });
 
   const mutateVisit = (id, patch) => {
     if (busyRef.current.has(`visit:${id}`)) return false;
@@ -439,9 +272,8 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     listings, listingsLoaded, visits, recent, recommended, alertMatches,
     contactReqs, photoReqs, flatmateReqs, docReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
-    apps, decideApp,
-    decideContact, decideDocReqs, decideFlatmateReq, chatFlatmateReq, decidePhotoReq, mutateVisit, openReview, sendReview,
-    busyIds, isBusy, refreshData, refreshRequests, setListings,
+    apps, mutateVisit, openReview, sendReview,
+    busyIds, refreshData, refreshRequests, setListings,
     // Load state, so the page can say "we couldn't load this" instead of rendering a plausible
     // dashboard for a user whose data never arrived.
     dataStatus, dataError, retryData,

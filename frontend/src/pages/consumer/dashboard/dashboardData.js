@@ -1,7 +1,6 @@
 /* Pure derivations for the consumer Dashboard. */
 import { parseWhen } from '../../../lib/visitWhen.js';
 import { getOwnerListingState } from '../../../components/listing/ListingStatusCard.jsx';
-import { shareLabel } from '../requests/requestMeta.js';
 
 const LEAD_KINDS = new Set(['contact', 'photo', 'doc', 'flatmate', 'app']);
 const OWNER_ROLES = new Set(['owner', 'host', 'listing_owner', 'property_owner']);
@@ -109,9 +108,7 @@ export function attentionFromItems(items = []) {
     return acc;
   }, { leads: 0, visits: 0, properties: 0 });
 }
-// The single "what's waiting on ME" triage list. Every row is a real
-// request/task; sorted stale-first so the oldest, most-at-risk items lead.
-
+// The "what's waiting on ME" list behind the Home attention panel; sorted stale-first so the oldest lead each group.
 export function buildActionItems({
   isOwner,
   contactReqs = [],
@@ -123,138 +120,63 @@ export function buildActionItems({
   scheduledVisits = [],
   flatmateReqs = [],
   userId,
-  decideContact,
-  decideApp,
   go,
-  decideDocReqs,
-  decidePhotoReq,
-  decideFlatmateReq,
-  chatFlatmateReq,
-  mutateVisit,
   openReview,
-  isBusy = () => false,
 }) {
   const actionItems = [];
-  const titleOf = (id, fallback) => listingTitleFor(listings, id, fallback);
-  const busy = (key) => !!isBusy?.(key);
 
   if (isOwner) {
     contactReqs.filter((r) => r.status === 'pending').forEach((r) => {
-      const key = `contact:${r.id}`;
-      actionItems.push({
-        id: key, kind: 'contact', tone: 'rose', icon: 'lock-keyhole',
-        title: `${r.buyerName || 'A buyer'} wants to contact you`,
-        sub: titleOf(r.propId, 'Contact request'),
-        at: r.requestedAt || null,
-        busy: busy(key),
-        actions: [
-          { label: 'Accept', icon: 'check', onClick: () => decideContact?.(r.id, 'approved'), disabled: busy(key) },
-          { label: 'Decline', icon: 'x', variant: 'ghost', onClick: () => decideContact?.(r.id, 'declined'), disabled: busy(key) },
-        ],
-      });
+      const who = r.buyerName || 'A buyer';
+      actionItems.push({ id: `contact:${r.id}`, kind: 'contact', who, title: `${who} wants to contact you`, at: r.requestedAt });
     });
     flatmateReqs.filter((r) => r.status === 'pending').forEach((r) => {
-      const key = `flatmate:${r.id}`;
-      const chatFirst = r.kind === 'group' && { label: 'Chat first', icon: 'message-circle', onClick: () => chatFlatmateReq?.(r.id), disabled: busy(key) };
+      const who = r.requesterName || 'A seeker';
       actionItems.push({
-        id: key, kind: 'flatmate', tone: 'teal', icon: r.kind === 'room' ? 'bed-double' : 'users-round',
-        title: `${r.requesterName || 'A seeker'} ${r.kind === 'group' ? 'wants to join your group' : 'is interested'}`,
-        sub: [r.targetTitle || r.locality || 'Flatmate request', shareLabel(r.share)].filter(Boolean).join(' · '),
-        at: r.requestedAt || null,
-        busy: busy(key),
-        actions: [
-          chatFirst,
-          { label: 'Accept', icon: 'check', onClick: () => decideFlatmateReq?.(r.id, 'accepted'), disabled: busy(key) },
-          { label: 'Decline', icon: 'x', variant: 'ghost', onClick: () => decideFlatmateReq?.(r.id, 'declined'), disabled: busy(key) },
-        ].filter(Boolean),
+        id: `flatmate:${r.id}`, kind: 'flatmate', who,
+        title: `${who} ${r.kind === 'group' ? 'wants to join your group' : 'is interested'}`,
+        at: r.requestedAt,
       });
     });
     apps.filter((a) => a.status === 'pending').forEach((a) => {
-      const key = `app:${a.id}`;
       actionItems.push({
-        id: key, kind: 'app', tone: 'teal', icon: 'users-round',
-        title: `Group wants to rent ${a.listingTitle || 'your flat'}`,
-        sub: `${a.groupTitle || 'Flatmate group'} · ${a.members}/${a.seatsTotal} members`,
-        at: a.at || null,
-        busy: busy(key),
-        actions: [
-          { label: 'Accept', icon: 'check', onClick: () => decideApp?.(a.id, 'accepted'), disabled: busy(key) },
-          { label: 'Decline', icon: 'x', variant: 'ghost', onClick: () => decideApp?.(a.id, 'declined'), disabled: busy(key) },
-        ],
+        id: `app:${a.id}`, kind: 'app', who: a.groupTitle || 'A flatmate group',
+        title: `Group wants to rent ${a.listingTitle || 'your flat'}`, at: a.at,
       });
     });
     photoReqs.filter((r) => (r.status || 'pending') === 'pending').forEach((r) => {
-      const key = `photo:${r.id}`;
-      const editId = r.propId || r.propertyId || '';
-      actionItems.push({
-        id: key, kind: 'photo', tone: 'amber', icon: 'image',
-        title: `${r.buyerName || 'A buyer'} asked for more photos`,
-        sub: titleOf(editId, r.propLabel || 'Photo request'),
-        at: r.requestedAt || null,
-        busy: busy(key),
-        actions: [
-          /* Both exits are offered here, not just "Mark done". */
-          { label: 'Add photos', icon: 'image', to: editId ? `/list-property?edit=${editId}&step=photos` : undefined, onClick: editId ? undefined : () => go?.('leads'), disabled: busy(key) },
-          ...(decidePhotoReq ? [{ label: 'Decline', icon: 'x', variant: 'ghost', onClick: () => decidePhotoReq(r.id, 'declined'), disabled: busy(key) }] : []),
-        ],
-      });
+      const who = r.buyerName || 'A buyer';
+      actionItems.push({ id: `photo:${r.id}`, kind: 'photo', who, title: `${who} asked for more photos`, at: r.requestedAt });
     });
     pendingDocGroups.forEach((g) => {
-      const key = `doc:${g.key}`;
       const n = g.pendingDocTypes?.length || g.docTypes?.length || g.pendingIds.length;
       actionItems.push({
-        id: key, kind: 'doc', tone: 'teal', icon: 'folder-check',
+        id: `doc:${g.key}`, kind: 'doc', who: g.buyerName,
         title: `${g.buyerName} wants ${n} document${n === 1 ? '' : 's'}`,
-        sub: g.propLabel || titleOf(g.propId, 'Document request'),
         at: g.requestedAt === Infinity ? null : g.requestedAt,
-        busy: g.pendingIds.some((id) => busy(`doc:${id}`)),
-        actions: [
-          { label: 'Grant all', icon: 'check', onClick: () => decideDocReqs?.(g.pendingIds, 'granted'), disabled: g.pendingIds.some((id) => busy(`doc:${id}`)) },
-          { label: 'Decline', icon: 'x', variant: 'ghost', onClick: () => decideDocReqs?.(g.pendingIds, 'declined'), disabled: g.pendingIds.some((id) => busy(`doc:${id}`)) },
-        ],
       });
     });
     // An unread staff message is only "needs info" while the listing is pending with a needs_info review.
     listings.filter((l) => !l.flatmate && (reviewsByProp?.[l.id]?.unread || reviewsByProp?.get?.(l.id)?.unread || 0) > 0).forEach((l) => {
       const rev = reviewsByProp?.[l.id] || reviewsByProp?.get?.(l.id);
       const open = () => (openReview ? openReview(l.uuid || l.id) : go?.('properties'));
-      if (String(l.status).toLowerCase() === 'pending' && getOwnerListingState(l, rev) === 'needs_info') {
-        actionItems.push({
-          id: `clarify:${l.id}`, kind: 'clarify', tone: 'rose', icon: 'alert-circle',
-          title: `Needs info on "${l.title}"`,
-          sub: 'Draazy verification needs more info',
-          at: rev?.updatedAt || null,
-          actions: [{ label: 'Respond', icon: 'arrow-right', onClick: open }],
-        });
-        return;
-      }
+      const needsInfo = String(l.status).toLowerCase() === 'pending' && getOwnerListingState(l, rev) === 'needs_info';
       actionItems.push({
-        id: `message:${l.id}`, kind: 'message', tone: 'teal', icon: 'message-square',
-        title: `New message on "${l.title}"`,
-        sub: 'From Draazy Support',
-        at: rev?.updatedAt || null,
-        actions: [{ label: 'Read', icon: 'arrow-right', onClick: open }],
+        id: `${needsInfo ? 'clarify' : 'message'}:${l.id}`, kind: needsInfo ? 'clarify' : 'message', who: l.title,
+        title: needsInfo ? `Needs info on "${l.title}"` : `New message on "${l.title}"`,
+        at: rev?.updatedAt, open,
       });
     });
   }
   // Shared: upcoming visits still awaiting confirmation (owner and seeker both act here).
-
   scheduledVisits.filter((v) => v.status === 'scheduled' && isVisitHost(v, userId)).forEach((v) => {
-    const key = `visit:${v.id}`;
+    const who = v.visitorName || v.customer || 'A visitor';
     actionItems.push({
-      id: key, kind: 'visit', tone: 'indigo', icon: 'calendar-check',
-      title: `Visit to confirm${v.listing ? ' — ' + v.listing : ''}`,
-      sub: [v.visitorName || v.customer, v.when].filter(Boolean).join(' · ') || 'Scheduled visit',
-      at: v.at || v.createdAt || null,
-      busy: busy(key),
-      actions: [
-        { label: 'Confirm', icon: 'check', onClick: () => mutateVisit?.(v.id, { status: 'confirmed' }), disabled: busy(key) },
-        { label: 'Review', icon: 'arrow-right', variant: 'ghost', onClick: () => go?.('visits'), disabled: busy(key) },
-      ],
+      id: `visit:${v.id}`, kind: 'visit', who,
+      title: `Visit to confirm${v.listing ? ' ? ' + v.listing : ''}`,
+      at: v.at || v.createdAt,
     });
   });
-  /* No "Rent due soon" item: `rental` comes out of `managedProps`, which is itself what makes `isOwner` true, so
-     `!isOwner && rental` can never fire. */
 
   const STALE_MS = 2 * 86400000;
   for (const item of actionItems) {
