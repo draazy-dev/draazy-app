@@ -78,6 +78,7 @@ const PhotoUploader = ({
     max: ['listProperty.err.photosMax', { count: maxPhotos }],
     failed: ['listProperty.err.photosFailed', {}],
     capped: ['listProperty.err.photosCapped', { count: maxPhotos, skipped: String(error).split(':')[1] }],
+    expired: ['listProperty.err.photosExpired', { count: Number(String(error).split(':')[1]) }],
     categories: ['listProperty.err.photosKeyCats', { count: Math.min(MIN_PUBLISH_KEY_CATEGORIES, KEY_CATS.length), cats: KEY_CATS.join(', ') }],
   };
   const errorCopy = ERROR_COPY[String(error).split(':')[0]] || ['listProperty.photoUploader.errorAddPhoto', {}];

@@ -1,7 +1,7 @@
 import { test, expect } from '../../fixtures/live.js';
 import { trackErrors } from '../../helpers/console.js';
 import { authHeaders, ownerIdOf } from '../../helpers/liveAuth.js';
-import { LIST_PROPERTY_DRAFT_KEY as DRAFT_KEY, pickFloors } from '../../helpers/listingForm.helper.js';
+import { LIST_PROPERTY_DRAFT_KEY as DRAFT_KEY, pickFloors, readListPropertyDraft } from '../../helpers/listingForm.helper.js';
 
 // Seed consent because the bar overlaps the wizard's phone-bottom fields.
 async function withConsent(page) {
@@ -224,7 +224,7 @@ test.describe('Mobile listing wizard', () => {
     await field.fill('1234');
     await page.waitForTimeout(700);
 
-    const saved = await page.evaluate((k) => localStorage.getItem(k), DRAFT_KEY);
+    const saved = await readListPropertyDraft(page);
     expect(saved, 'the wizard autosaved a draft').toBeTruthy();
     expect(saved).toContain('1234');
 

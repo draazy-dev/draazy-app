@@ -1,5 +1,5 @@
 import { test, expect } from '../../../fixtures/live.js';
-import { LIST_PROPERTY_DRAFT_KEY } from '../../../helpers/listingForm.helper.js';
+import { readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
 import { PHOTO_PNG, openPhotoStep as openPhotos, png } from '../../../helpers/listingPhotos.helper.js';
 
 const SMALL_PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4AWJiYGD4D8IgBpBmYAAAAAD//7vS9wEAAAAGSURBVAMAGDACA6ybwrYAAAAASUVORK5CYII=', 'base64');
@@ -71,7 +71,7 @@ test.describe('list property photo UX', () => {
         await page.mouse.up();
         await expect(photos.locator('img').first()).toHaveAttribute('src', /photo-4\.jpg/);
         await expect(photos.locator('img').nth(2)).toHaveAttribute('src', /photo-3\.jpg/);
-        const draft = await page.evaluate((key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY);
+        const draft = await readListPropertyDraft(page);
         expect(draft ?? '').not.toContain('data:');
     });
 

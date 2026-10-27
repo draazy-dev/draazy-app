@@ -1,7 +1,7 @@
 import { test, expect, ACTORS } from '../../../fixtures/live.js';
 import { API, E2E_OTP, authHeaders, ownerIdOf, seedConsent, signIn, storedPhotoUrl, uniqueMobile } from '../../../helpers/liveAuth.js';
 import { rejectListingWithFetch } from '../../../helpers/moderation.js';
-import { LIST_PROPERTY_DRAFT_KEY, pickFloors, pickPossession } from '../../../helpers/listingForm.helper.js';
+import { LIST_PROPERTY_DRAFT_KEY, pickFloors, pickPossession, readListPropertyDraft } from '../../../helpers/listingForm.helper.js';
 import { uploadPublishablePhotos } from '../../../helpers/listingPhotos.helper.js';
 import { fillSociety } from '../../../helpers/places.js';
 import { mintPickableSociety } from '../../../helpers/liveSociety.js';
@@ -110,7 +110,7 @@ test.describe('list property deferred login', () => {
     const society = `Zz Deferred Homes ${uniqueMobile().slice(-6)}`;
     await mintPickableSociety(mobile, society);
     const sheet = await reachDeferredLogin(page, society);
-    await expect.poll(async () => page.evaluate((key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY))
+    await expect.poll(() => readListPropertyDraft(page))
       .toContain('"__owner":""');
 
     await test.step('a guest who dismisses the sheet stays gated and Verify & submit reopens it without posting', async () => {
@@ -130,8 +130,9 @@ test.describe('list property deferred login', () => {
       await verifyInlineOtp(sheet, mobile);
       await expect(page.getByRole('heading', { name: /Photos & description/i })).toBeVisible();
       await page.locator('textarea[data-err="description"]').fill('Draft adoption keeps the guest text after sign-in.');
-      await expect.poll(async () => page.evaluate((key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY))
+      await expect.poll(() => readListPropertyDraft(page))
         .toMatch(/"__owner":"[^"]+"/);
+      expect(await page.evaluate((key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY), 'the signed-out slot is emptied').toBeNull();
       await expect(page.locator('textarea[data-err="description"]')).toHaveValue(/Draft adoption keeps/);
     });
 
@@ -163,18 +164,45 @@ test.describe('list property deferred login', () => {
     await page.getByRole('button', { name: /Next Step/i }).click();
     await fillSociety(page, 'Zz Owner A Private Draft');
 
-    await expect.poll(async () => page.evaluate((key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY))
+    await expect.poll(() => readListPropertyDraft(page))
       .toContain('Zz Owner A Private Draft');
 
     await page.getByRole('button', { name: /Account menu/i }).click();
     await page.getByRole('button', { name: /Log out/i }).click();
     await expect(page.locator('input[data-err="carpetArea"]')).toHaveValue('');
-    await expect.poll(async () => page.evaluate((key) => localStorage.getItem(key), LIST_PROPERTY_DRAFT_KEY))
+    await expect.poll(() => readListPropertyDraft(page))
       .not.toContain('Zz Owner A Private Draft');
 
     await signIn(page, second);
     await page.goto('/list-property');
     await expect(page.locator('input[data-err="carpetArea"]')).toHaveValue('');
     await expect(page.getByText('Zz Owner A Private Draft')).toHaveCount(0);
+  });
+
+  test('without a logout each owner keeps a draft slot of their own: the next account starts blank and the owner gets theirs back', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const first = await namedOwner('Zztest Draft Slot A');
+    const second = await namedOwner('Zztest Draft Slot B');
+    const dropSession = async () => {
+      await page.context().clearCookies();
+      await page.evaluate(() => [localStorage, sessionStorage].forEach((store) => ['draazyTokens', 'draazyUser'].forEach((key) => store.removeItem(key))));
+    };
+    const openWizardAs = async (mobile) => {
+      await signIn(page, mobile);
+      await page.goto('/list-property');
+      await expect(page.getByRole('heading', { name: /List your property/i })).toBeVisible({ timeout: 30000 });
+    };
+
+    await openWizardAs(first);
+    await page.locator('input[data-err="carpetArea"]').fill('1311');
+    await expect.poll(() => readListPropertyDraft(page)).toContain('1311');
+
+    await dropSession();
+    await openWizardAs(second);
+    await expect(page.locator('input[data-err="carpetArea"]')).toHaveValue('');
+
+    await dropSession();
+    await openWizardAs(first);
+    await expect(page.locator('input[data-err="carpetArea"]')).toHaveValue('1311');
   });
 });

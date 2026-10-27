@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { uploadPhoto } from '../../../services/photoService.js';
 import usePhotoLimit from '../../../lib/uploads/usePhotoLimit.js';
 
@@ -18,6 +18,7 @@ export default function useListingMedia({ setErrors }) {
   const [mediaStatus, setMediaStatus] = useState('');
   const operation = useRef(null);
   const uploadSeq = useRef(0);
+  const restoreSeq = useRef(0);
   const previewUrls = useRef(new Set());
   useEffect(() => () => {
     operation.current?.abort();
@@ -123,6 +124,7 @@ export default function useListingMedia({ setErrors }) {
     });
   };
   const resetMedia = () => {
+    restoreSeq.current += 1;
     operation.current?.abort();
     operation.current = null;
     previewUrls.current.forEach((url) => URL.revokeObjectURL(url));
@@ -132,12 +134,36 @@ export default function useListingMedia({ setErrors }) {
     setVideoName('');
     setMediaStatus('');
   };
+  // Swept after a week, a draft can outlive its photos. An <img> probe (CSP keeps the bucket out of connect-src)
+  // can't tell a 404 from a blip, so only what fails twice while online is dropped.
+  const restorePhotos = useCallback((saved) => {
+    const seq = ++restoreSeq.current;
+    setPhotos(saved);
+    const loads = (url) => new Promise((resolve) => {
+      const probe = new Image();
+      probe.onload = () => resolve(true);
+      probe.onerror = () => resolve(false);
+      probe.src = url;
+    });
+    const missing = async (urls) => (await Promise.all(urls.map(loads))).flatMap((ok, i) => (ok ? [] : [urls[i]]));
+    (async () => {
+      let gone = await missing(saved.map(({ url }) => url));
+      if (gone.length) {
+        await new Promise((resolve) => { setTimeout(resolve, 2000); });
+        gone = await missing(gone);
+      }
+      if (!gone.length || !navigator.onLine || seq !== restoreSeq.current) return;
+      const dead = new Set(gone);
+      setPhotos((prev) => prev.filter((photo) => !dead.has(photo.url)));
+      setErrors((prev) => ({ ...prev, photos: `expired:${dead.size}` }));
+    })();
+  }, [setErrors]);
 
   return {
     photos, setPhotos,
     video, setVideo,
     videoName, setVideoName,
     mediaStatus, isMediaBusy: !!mediaStatus, isMediaProcessing: () => !!operation.current, maxPhotos,
-    handlePhotoUpload, removePhoto, setPhotoCategory, retryPhoto, resetMedia,
+    handlePhotoUpload, removePhoto, setPhotoCategory, retryPhoto, resetMedia, restorePhotos,
   };
 }
