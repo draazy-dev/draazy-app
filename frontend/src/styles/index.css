@@ -156,9 +156,28 @@
    floating over the media, so reserving the strip drew a dead band across every reel. */
 .consumer-layout.has-bottom-nav.route-fullbleed { padding-bottom: 0; }
 
-/* Floating "liquid glass" tab bar - an edge-to-edge bar reads as a wall, a detached capsule reads
-   as a control sitting on the page. Material and tint rationale: docs/system/design-system.md - Bottom chrome. */
+/* Floating notched tab bar: the solid bar is drawn by __bg with a notch cut under the active slot and a
+   teal bubble rising through it. Material rationale: docs/system/design-system.md - Bottom chrome. */
+
+/* Registered so the slot index and notch depth interpolate; unregistered custom properties only flip. */
+@property --dz-nav-i {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 2;
+}
+
+@property --dz-notch-y {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: -40px;
+}
+
 .dz-bottom-nav {
+  --dz-bubble: 40px;
+  --dz-lift: 10px;
+  --dz-icon-lift: -9px;
+  /* Slot centre: five equal flex slots inside the 6px side padding. */
+  --dz-slot-x: calc(6px + (100% - 12px) * (var(--dz-nav-i) + 0.5) / 5);
   position: fixed;
   left: calc(env(safe-area-inset-left, 0px) + 12px);
   right: calc(env(safe-area-inset-right, 0px) + 12px);
@@ -168,61 +187,71 @@
   align-items: stretch;
   height: var(--dz-bottom-nav-h);
   padding: 0 6px;
-  border-radius: 999px;
-  /* Tinted with the app's own indigo/teal, not neutral grey, and the alphas are set by the worst
-     case: a gallery or reel can put near-white imagery directly behind the bar. */
-  background: var(--bottom-nav-bg);
-  backdrop-filter: blur(28px) saturate(180%);
-  -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgb(var(--dz-c-white) / calc(0.14 * var(--dz-line-boost)));
-  box-shadow: var(--bottom-nav-shadow), inset 0 1px 0 rgb(var(--dz-c-white) / 0.18);
+  border-radius: 12px;
+  transition:
+    --dz-nav-i 520ms cubic-bezier(0.65, 0, 0.35, 1),
+    --dz-notch-y 300ms cubic-bezier(0.2, 0, 0, 1);
 }
 
-/* Without backdrop-filter a translucent fill is just unreadable text over content, so those
-   browsers get an opaque capsule. Firefox on Android and older WebViews land here. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .dz-bottom-nav { background: var(--bottom-nav-solid); }
-}
+.dz-bottom-nav.has-active { --dz-notch-y: 0px; }
 
-/* Geometry is set inline by BottomNav.jsx from the measured slot; how it looks and moves lives
-   here. Sliding says the five tabs are one control; transform/width keeps it on the compositor. */
-.dz-bottom-nav__indicator {
+/* drop-shadow, not box-shadow, so it follows the notch; on this wrapper because a filter on the masked layer itself
+   runs before the mask and gets cut away. */
+.dz-bottom-nav__bg {
   position: absolute;
-  top: 6px;
-  bottom: 6px;
-  left: 0;
-  border-radius: 999px;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
   pointer-events: none;
-  background: linear-gradient(180deg, rgb(var(--dz-c-teal-400) / 0.24), rgb(var(--dz-c-teal-500) / 0.10));
-  border: 1px solid rgb(var(--dz-c-teal-400) / 0.32);
-  box-shadow: inset 0 1px 0 rgb(var(--dz-c-white) / 0.16);
-  will-change: transform;
+  filter: drop-shadow(0 10px 22px rgb(0 0 0 / 0.45)) drop-shadow(0 0 0.5px rgb(var(--dz-c-pure-white) / 0.35));
 }
 
-/* Added one paint after the first measurement: until then the indicator must be able to jump to
-   its measured slot without animating, or every page load slides it in from the left edge. */
-.dz-bottom-nav__indicator.is-animated { transition:
-    transform 340ms cubic-bezier(0.32, 0.72, 0, 1),
-    width 340ms cubic-bezier(0.32, 0.72, 0, 1),
-    opacity 180ms linear; }
-
-/* The slide is decorative: it only re-states where the user already is. Cutting it is
-   free, so the whole travel goes and only the fade survives. */
-@media (prefers-reduced-motion: reduce) {
-  .dz-bottom-nav__indicator.is-animated { transition: opacity 180ms linear; }
+html.light .dz-bottom-nav__bg {
+  filter: drop-shadow(0 10px 22px rgb(15 23 42 / 0.14)) drop-shadow(0 0 0.5px rgb(15 23 42 / 0.4));
 }
 
-/* The raised centre breaks the capsule's top edge on purpose - that overlap is what makes Post
-   read as the primary act rather than the third of five tabs. */
-.dz-bottom-nav__fab {
-  margin-top: -14px;
-  box-shadow: 0 6px 18px rgb(var(--dz-c-teal-600) / 0.45);
+/* Notch tile (80px, 10px outward fillets) rides the active slot over a bar with a 78px hole, overlapping 1px so no
+   seam shows; it is 120px tall so it still covers the bar while sliding up to close. Position % = (bar - tile). */
+.dz-bottom-nav__bg::before {
+  --dz-notch-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='120'%3E%3Cpath d='M0 0H4A10 10 0 0 1 14 10A26 26 0 0 0 66 10A10 10 0 0 1 76 0H80V120H0Z'/%3E%3C/svg%3E")
+      calc(-34px + (100% + 68px) * (var(--dz-nav-i) + 0.5) / 5) var(--dz-notch-y) / 80px 120px no-repeat,
+    linear-gradient(
+      to right,
+      #000 calc(var(--dz-slot-x) - 39px),
+      transparent calc(var(--dz-slot-x) - 39px) calc(var(--dz-slot-x) + 39px),
+      #000 calc(var(--dz-slot-x) + 39px)
+    );
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--bottom-nav-solid);
+  -webkit-mask: var(--dz-notch-mask);
+  mask: var(--dz-notch-mask);
 }
+
+.dz-bottom-nav__bubble {
+  position: absolute;
+  top: calc(-1 * var(--dz-lift));
+  left: calc(var(--dz-slot-x) - var(--dz-bubble) / 2);
+  width: var(--dz-bubble);
+  height: var(--dz-bubble);
+  border-radius: 50%;
+  pointer-events: none;
+  background: linear-gradient(145deg, rgb(var(--dz-c-teal-500)), rgb(var(--dz-c-teal-600)));
+  box-shadow: 0 3px 6px -2px rgb(var(--dz-c-teal-600) / 0.5);
+  transform: scale(0);
+  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dz-bottom-nav.has-active .dz-bottom-nav__bubble { transform: scale(1); }
 
 /* Height owned by the token: --dz-bottom-nav-h is what --dz-bottom-inset reserves against, so a
    hardcoded height here would desync every bottom-anchored widget the moment the bar resized. */
 .dz-bottom-nav__tab {
   height: var(--dz-bottom-nav-h);
+  color: rgb(var(--dz-c-gray-300));
   /* A floating control that does not move under the finger reads as a picture of a button; the
      dip is the confirmation, and transform costs no layout. */
   transition: transform 140ms cubic-bezier(0.32, 0.72, 0, 1);
@@ -230,10 +259,21 @@
 
 .dz-bottom-nav__tab:active { transform: scale(0.93); }
 
-@media (prefers-reduced-motion: reduce) {
-  .dz-bottom-nav__tab { transition: none; }
+html.light .dz-bottom-nav__tab { color: rgb(var(--dz-c-gray-500)); }
 
-  .dz-bottom-nav__tab:active { transform: none; }
+.dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-300)); }
+
+html.light .dz-bottom-nav__tab.is-active { color: rgb(var(--dz-c-teal-700)); }
+
+.dz-bottom-nav__icon {
+  display: grid;
+  place-items: center;
+  transition: transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1), color 200ms linear;
+}
+
+.dz-bottom-nav__tab.is-active .dz-bottom-nav__icon {
+  transform: translateY(var(--dz-icon-lift));
+  color: rgb(var(--dz-c-pure-white));
 }
 
 /* In rem so the label honours the OS font-size setting - a px label is immune to dynamic type,
@@ -249,6 +289,20 @@
   overflow-x: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  transition: transform 460ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Nudged down so it clears the bottom of the notch. */
+.dz-bottom-nav__tab.is-active .dz-bottom-nav__label { transform: translateY(5px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dz-bottom-nav,
+  .dz-bottom-nav__bubble,
+  .dz-bottom-nav__tab,
+  .dz-bottom-nav__icon,
+  .dz-bottom-nav__label { transition: none; }
+
+  .dz-bottom-nav__tab:active { transform: none; }
 }
 
 /* Landscape phones are a height budget, not a width one; guarded three ways so no desktop or
@@ -259,29 +313,18 @@
     --dz-bottom-nav-h: 44px;
   }
 
+  /* A 44px icon-only bar has no height to spare for a raised bubble, so it sits inside the bar with no notch. */
+  .dz-bottom-nav {
+    --dz-bubble: 36px;
+    --dz-lift: -4px;
+    --dz-icon-lift: 0px;
+  }
+
+  .dz-bottom-nav.has-active { --dz-notch-y: -40px; }
+
   /* Icon-only: the tab keeps its accessible name via aria-label, so hiding the visible text
      costs a screen reader nothing. */
   .dz-bottom-nav__label { display: none; }
-
-  .dz-bottom-nav__tab {
-    justify-content: center;
-    /* Clears the Post tab's baseline-matching bottom padding, which only exists to
-       line its label up with the others — and the labels are gone here. */
-    padding-bottom: 0;
-  }
-
-  /* The raised centre circle overhangs the capsule by 14px; on a 44px bar that overhang
-     would collide with page content, so it drops to the bar's own height and sits flush. */
-  .dz-bottom-nav__fab {
-    height: 40px;
-    width: 40px;
-    margin-top: 0;
-  }
-
-  .dz-bottom-nav__fab svg {
-    height: 22px;
-    width: 22px;
-  }
 }
 
 /* viewport-fit=cover lets full-bleed fixed bars run under a rotated phone's notch, so anything
