@@ -13,6 +13,8 @@ const WAIVED = new Map([
   ['push_subscriptions', 'written by the push opt-in flow; a seeded endpoint would fake browser registration'],
   ['flatmate_owner_notices', 'written when a tenant posts a room; the link token exists only in the WhatsApp message'],
   ['provider_call', 'written by every OTP, email and payment call the specs make'],
+  ['photo_uploads', 'written by every POST /me/photos; a seeded row would point the sweep at a file nobody uploaded'],
+  ['whatsapp_opt_outs', "written only by Meta's signed STOP/START webhook, which the e2e profile leaves unconfigured"],
   ['error_event', 'written by the error appender and POST /api/client-errors; a seeded row would fake a captured failure'],
   ['audit_log', 'written BY the admin actions the ops specs assert on'],
   ['transactions', 'written by the payment flows; a seeded row would fake the thing under test'],

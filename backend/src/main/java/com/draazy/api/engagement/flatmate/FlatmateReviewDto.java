@@ -6,7 +6,8 @@ import java.time.LocalDate;
 import java.util.Map;
 import java.util.UUID;
 
-/** Contract schema {@code FlatmateReview}. Back-office only, so the host's mobile is in full. */
+/** Contract schema {@code FlatmateReview}. Back-office only, so the host's and owner's mobiles are in full. The
+ * consent OTP proves only possession of the number, so the desk also sees whose Draazy account holds it. */
 public record FlatmateReviewDto(
         UUID id,
         String kind,
@@ -19,6 +20,9 @@ public record FlatmateReviewDto(
         String tier,
         boolean flagForReview,
         boolean ownerConsent,
+        String ownerConsentMobile,
+        String ownerConsentAccount,
+        boolean ownerConsentAccountVerified,
         Map<String, Object> agreementDoc,
         String evidenceType,
         LocalDate evidenceIssuedOn,
@@ -30,7 +34,7 @@ public record FlatmateReviewDto(
         Instant createdAt,
         Instant updatedAt) {
 
-    static FlatmateReviewDto of(FlatmateReview review, User host) {
+    static FlatmateReviewDto of(FlatmateReview review, User host, String ownerMobile, User ownerAccount) {
         return new FlatmateReviewDto(
                 review.getId(),
                 review.getKind(),
@@ -43,6 +47,9 @@ public record FlatmateReviewDto(
                 review.getTier(),
                 review.isFlagForReview(),
                 review.isOwnerConsent(),
+                ownerMobile,
+                ownerAccount == null ? null : ownerAccount.getName(),
+                ownerAccount != null && ownerAccount.isVerified(),
                 review.getAgreementDoc(),
                 review.getEvidenceType(),
                 review.getEvidenceIssuedOn(),

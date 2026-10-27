@@ -41,6 +41,7 @@ public class WaitingDigestService {
             select u.id, u.mobile, u.waiting_digest_at as previous, count(*) as waiting
               from waiting w join users u on u.id = w.user_id
              where u.status = 'active' and not u.archived
+               and not exists (select 1 from whatsapp_opt_outs o where o.mobile = u.mobile and o.opted_out)
                and w.created_at > coalesce(u.last_active, '-infinity'::timestamptz)
                and w.created_at > coalesce(u.waiting_digest_at, '-infinity'::timestamptz)
              group by u.id, u.mobile, u.waiting_digest_at

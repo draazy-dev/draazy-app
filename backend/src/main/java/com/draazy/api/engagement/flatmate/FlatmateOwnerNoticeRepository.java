@@ -25,6 +25,8 @@ public interface FlatmateOwnerNoticeRepository extends JpaRepository<FlatmateOwn
 
     long countByOwnerMobileAndCreatedAtAfter(String ownerMobile, Instant since);
 
+    long countByCreatedAtAfter(Instant since);
+
     @Modifying
     @Query("delete from FlatmateOwnerNotice n where n.expiresAt < :now")
     int deleteExpired(@Param("now") Instant now);

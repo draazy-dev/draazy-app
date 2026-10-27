@@ -1283,5 +1283,8 @@ public final class Routes {
 
         /** Public — Cashfree payment result. Signature-verified, deduped on order id, always 200. */
         public static final String CASHFREE_PAYMENT = "/webhooks/cashfree/payment";
+
+        /** Public — Meta WhatsApp: GET is the subscribe handshake, POST is signed STOP/START replies and statuses. */
+        public static final String WHATSAPP = "/webhooks/whatsapp";
     }
 }

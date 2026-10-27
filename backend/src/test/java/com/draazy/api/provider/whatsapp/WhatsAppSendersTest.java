@@ -12,6 +12,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.draazy.api.provider.OtpSender;
 import com.draazy.api.provider.ProviderCalls;
@@ -29,6 +30,7 @@ class WhatsAppSendersTest {
 
     private final WhatsAppClient client = mock(WhatsAppClient.class);
     private final ProviderCalls calls = mock(ProviderCalls.class);
+    private final WhatsAppOptOuts optOuts = mock(WhatsAppOptOuts.class);
 
     @BeforeEach
     void trackRunsTheCall() {
@@ -40,12 +42,17 @@ class WhatsAppSendersTest {
 
     private static WhatsAppProperties props(String otpName, String otpLang, String idName, String idLang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                otpName, otpLang, idName, idLang, null, null, null, null);
+                otpName, otpLang, idName, idLang, null, null, null, null, null);
     }
 
     private static WhatsAppProperties digestProps(String name, String lang) {
         return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
-                "login", "en_US", null, null, name, lang, null, null);
+                "login", "en_US", null, null, name, lang, null, null, null);
+    }
+
+    private static WhatsAppProperties noticeProps(String noticeNumberId) {
+        return new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
+                "login", "en_US", null, null, null, null, "notice", "en", noticeNumberId);
     }
 
     @SuppressWarnings("unchecked")
@@ -102,9 +109,9 @@ class WhatsAppSendersTest {
     @Test
     @DisplayName("a decision notice is skipped and recorded when the identity template is unset")
     void decisionSkippedWithoutTemplate() {
-        new WhatsAppDecisionMessenger(client, props("login", "en_US", "", "en_US"), calls)
+        new WhatsAppDecisionMessenger(client, props("login", "en_US", "", "en_US"), calls, optOuts)
                 .sendIdentityDecision(MOBILE, "Approved");
-        new WhatsAppDecisionMessenger(client, props("login", "en_US", "decision", null), calls)
+        new WhatsAppDecisionMessenger(client, props("login", "en_US", "decision", null), calls, optOuts)
                 .sendIdentityDecision(MOBILE, "Approved");
 
         verify(client, never()).post(anyString(), any());
@@ -115,7 +122,7 @@ class WhatsAppSendersTest {
     @Test
     @DisplayName("a decision notice carries the line as the template's single body parameter")
     void decisionPayload() {
-        new WhatsAppDecisionMessenger(client, props("login", "en_US", "decision", "en"), calls)
+        new WhatsAppDecisionMessenger(client, props("login", "en_US", "decision", "en"), calls, optOuts)
                 .sendIdentityDecision(MOBILE, "Your identity check passed");
 
         Map<String, Object> payload = postedPayload();
@@ -132,7 +139,7 @@ class WhatsAppSendersTest {
     void digestFailureIsReported() {
         doThrow(new WhatsAppClient.WhatsAppException("down", "http 500")).when(client).post(anyString(), any());
 
-        assertThat(new WhatsAppDecisionMessenger(client, digestProps("waiting", "en_US"), calls)
+        assertThat(new WhatsAppDecisionMessenger(client, digestProps("waiting", "en_US"), calls, optOuts)
                 .sendWaitingDigest(MOBILE, "3 requests")).isFalse();
     }
 
@@ -141,16 +148,16 @@ class WhatsAppSendersTest {
     void decisionFailureIsBestEffort() {
         doThrow(new WhatsAppClient.WhatsAppException("down", "network")).when(client).post(anyString(), any());
 
-        assertThatCode(() -> new WhatsAppDecisionMessenger(client, props("login", "en_US", "decision", "en"), calls)
+        assertThatCode(() -> new WhatsAppDecisionMessenger(client, props("login", "en_US", "decision", "en"), calls, optOuts)
                 .sendIdentityDecision(MOBILE, "Approved")).doesNotThrowAnyException();
     }
 
     @Test
     @DisplayName("the waiting digest is skipped and recorded when its template is unset")
     void digestSkippedWithoutTemplate() {
-        assertThat(new WhatsAppDecisionMessenger(client, digestProps("", "en_US"), calls)
+        assertThat(new WhatsAppDecisionMessenger(client, digestProps("", "en_US"), calls, optOuts)
                 .sendWaitingDigest(MOBILE, "2 requests")).isFalse();
-        assertThat(new WhatsAppDecisionMessenger(client, digestProps("waiting", null), calls)
+        assertThat(new WhatsAppDecisionMessenger(client, digestProps("waiting", null), calls, optOuts)
                 .sendWaitingDigest(MOBILE, "2 requests")).isFalse();
 
         verify(client, never()).post(anyString(), any());
@@ -161,12 +168,41 @@ class WhatsAppSendersTest {
     @Test
     @DisplayName("the waiting digest carries the count phrase as the template's single body parameter")
     void digestPayload() {
-        assertThat(new WhatsAppDecisionMessenger(client, digestProps("waiting", "en_US"), calls)
+        assertThat(new WhatsAppDecisionMessenger(client, digestProps("waiting", "en_US"), calls, optOuts)
                 .sendWaitingDigest(MOBILE, "3 requests")).isTrue();
 
         Map<String, Object> template = templateOf(postedPayload());
         assertThat(template).containsEntry("name", "waiting");
         assertThat(template.get("components")).isEqualTo(List.of(Map.of("type", "body",
                 "parameters", List.of(Map.of("type", "text", "text", "3 requests")))));
+    }
+
+    @Test
+    @DisplayName("a number that replied STOP gets no decision, digest or owner notice")
+    void anOptedOutNumberIsSkipped() {
+        when(optOuts.isOptedOut(MOBILE)).thenReturn(true);
+        WhatsAppDecisionMessenger messenger = new WhatsAppDecisionMessenger(client,
+                new WhatsAppProperties(true, "https://graph.example", "v23.0", "PNID", "token",
+                        "login", "en_US", "decision", "en", "waiting", "en_US", "notice", "en", null), calls, optOuts);
+
+        assertThat(messenger.sendWaitingDigest(MOBILE, "3 requests")).isFalse();
+        assertThat(messenger.sendOwnerNotice(MOBILE, "Asha", "Baner", "https://draazy.test/owner-confirm#t")).isFalse();
+        messenger.sendIdentityDecision(MOBILE, "Approved");
+
+        verify(client, never()).post(anyString(), any());
+        verify(calls, times(3)).record(eq(ProviderCalls.WHATSAPP), anyString(),
+                eq(ProviderCalls.Outcome.SKIPPED), eq(MOBILE), any(), eq("opted out"), any());
+    }
+
+    @Test
+    @DisplayName("owner notices go out from their own number when one is set, else from the main one")
+    void ownerNoticeNumber() {
+        new WhatsAppDecisionMessenger(client, noticeProps("NOTICE"), calls, optOuts)
+                .sendOwnerNotice(MOBILE, "Asha", "Baner", "https://draazy.test/owner-confirm#t");
+        verify(client).post(eq("/NOTICE/messages"), any());
+
+        new WhatsAppDecisionMessenger(client, noticeProps(" "), calls, optOuts)
+                .sendOwnerNotice(MOBILE, "Asha", "Baner", "https://draazy.test/owner-confirm#t");
+        verify(client).post(eq("/PNID/messages"), any());
     }
 }

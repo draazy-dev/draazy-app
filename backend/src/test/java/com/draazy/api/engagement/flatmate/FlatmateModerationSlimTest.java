@@ -137,6 +137,26 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("the review names the Draazy account holding the owner's consent number, so a bill can be matched")
+    void reviewNamesTheConsentAccount() throws Exception {
+        User host = user("9813000011", "Consent Host", Roles.Wire.BUYER);
+        User staff = user("9813000012", "Mod", Roles.Wire.ADMIN);
+        String roomId = createTenantRoom(host, "Consent Court");
+
+        mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, roomId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.review.ownerConsentMobile").value("9890000001"))
+                .andExpect(jsonPath("$.review.ownerConsentAccount").doesNotExist())
+                .andExpect(jsonPath("$.review.ownerConsentAccountVerified").value(false));
+
+        user("9890000001", "Sunil Owner", Roles.Wire.OWNER);
+        mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, roomId)
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff)))
+                .andExpect(jsonPath("$.review.ownerConsentAccount").value("Sunil Owner"));
+    }
+
+    @Test
     @DisplayName("a queue card counts photos and shows only the first, its price, and never the author's id")
     void moderationRowCountsPhotos() throws Exception {
         User host = user("9813000003", "Photo Host", Roles.Wire.BUYER);

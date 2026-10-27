@@ -160,7 +160,9 @@ public class FlatmateBadgeReviewService {
     private static final int DOCUMENT_ACCESS_DAYS = 30;
 
     private FlatmateReviewDto reviewDto(FlatmateReview review) {
-        return FlatmateReviewDto.of(review, users.findById(review.getHostId()).orElse(null));
+        String ownerMobile = badges.ownerMobileOf(review);
+        return FlatmateReviewDto.of(review, users.findById(review.getHostId()).orElse(null),
+                ownerMobile, ownerMobile == null ? null : users.findByMobileAndArchivedFalse(ownerMobile).orElse(null));
     }
 
     /** A sub-let without the owner's written consent is a ground for eviction under the Maharashtra

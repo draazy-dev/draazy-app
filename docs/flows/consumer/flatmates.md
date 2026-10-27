@@ -303,7 +303,9 @@ Dashboard -> My Listings ("Let room by room"), and confirmed in `SplitFlatModal`
     `tenant`; declared-without-upload -> tier `identity` (still posts, no host badge, no review).
 - **Owner consent (tenant track):** a tenant enters the flat owner's mobile and confirms via an OTP
   sent to the owner (`OwnerConsentModal` -> `setOwnerConsent`), turning "trust me" into an auditable
-  consent record. `ownerConsent` is only true when `consentVerified`.
+  consent record. `ownerConsent` is only true when `consentVerified`. The OTP proves only that someone
+  holds that number, so the badge desk's review shows the number and the name on any Draazy account
+  registered to it (`ownerConsentMobile`, `ownerConsentAccount`), and a light bill must name that person.
 - **Prefill helpers:** `prefillGroupFromListing` (attach an Ops-verified own listing - fills
   title/locality/rent only, never trust signals; rent is copied only from a **rent** listing, since a
   sale price is not a monthly rent) and `prefillGroupFromTenancy` (a finalised Draazy tenancy seeds
@@ -709,8 +711,10 @@ fragment never reaches a server; `OwnerConfirm.jsx` scrubs it and sends it as `X
 - **Decline** sends the room back to `pending` with `flagForReview` and the reason "Owner said no on WhatsApp".
 - One answer per link: repeating it is 200, changing it is 409. Links last 30 days and die (404) once
   the room's owner number or address changes.
-- Sends are capped at 5 per host and 3 per owner number per 24 h, and skipped silently past the cap
-  or when consent already exists. Until Meta approves the template, leave the property blank: the send
+- Sends are capped at 5 per host and 3 per owner number per 24 h, and at
+  `draazy.flatmates.owner-notices-per-hour` (30) across the platform. Past a cap, when consent already
+  exists, when the owner's account has WhatsApp turned off, or when the number replied STOP to our
+  WhatsApp, the send is skipped silently. Until Meta approves the template, leave the property blank: the send
   is logged as skipped, with the number masked and the link never logged.
 - The host gets an in-app notification either way (`flatmate.ownerNotice.agreed|declined`, linking to the room).
 - The nightly `flatmate-owner-notice-purge` deletes expired notices. Erasing a host deletes their notices and any

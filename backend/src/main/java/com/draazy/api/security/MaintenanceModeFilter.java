@@ -14,21 +14,15 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * Refuses state-changing requests while the {@code maintenanceMode} flag is on — the half that holds
- * against an open tab, a script or curl. Exemptions and why 503: docs/system/cross-cutting.md §8.6.
- */
+/** Refuses writes while {@code maintenanceMode} is on. Exemptions and why 503: docs/system/cross-cutting.md §8.6. */
 public class MaintenanceModeFilter extends OncePerRequestFilter {
 
     /** Shared with {@link WriteRateLimitFilter}: one answer to "can this request change state". */
     private static final Set<String> MUTATING = WriteRateLimitFilter.MUTATING;
 
-    /**
-     * Server-to-server callbacks. Listed by route constant rather than by prefix: a hole in a
-     * maintenance gate should be exactly two paths wide.
-     */
+    // Exact routes rather than a prefix, so the hole in the gate is only as wide as the providers that call us.
     private static final Set<String> PROVIDER_CALLBACKS =
-            Set.of(Routes.Webhooks.CASHFREE_PAYMENT);
+            Set.of(Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP);
 
     /** Credential routes, exempt so the window can be ended by somebody who is not signed in yet. */
     private static final String AUTH_PREFIX = "/auth/";
@@ -52,10 +46,7 @@ public class MaintenanceModeFilter extends OncePerRequestFilter {
                 "The site is down for maintenance. Please try again shortly.");
     }
 
-    /**
-     * Whether this request is outside the gate — checked before the flag is read, so an exempt
-     * caller costs no query at all.
-     */
+    // Checked before the flag is read, so an exempt caller costs no query.
     private static boolean isExempt(HttpServletRequest request) {
         if (!MUTATING.contains(request.getMethod())) {
             return true;

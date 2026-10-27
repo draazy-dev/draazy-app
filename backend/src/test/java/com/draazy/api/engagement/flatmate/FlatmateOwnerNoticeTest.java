@@ -380,6 +380,37 @@ class FlatmateOwnerNoticeTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("once the platform's hourly owner notices are spent, a new tenant room messages nobody")
+    void thePlatformBudgetSkipsSilently() throws Exception {
+        User first = user("9815660018", "Asha Rao");
+        String firstRoom = tenantRoomWithNotice(first, OWNER);
+        for (int i = 0; i < 30; i++) {
+            insertNotice(firstRoom, first.getId(), "98156609" + String.format("%02d", i));
+        }
+
+        User next = user("9815660019", "Ravi Nair");
+        String roomId = idOf(postRoom(next, roomBody(next, "tenant", "9815660990")));
+        commit();
+
+        assertThat(noticeRows(roomId)).isZero();
+        verify(messenger, never()).sendOwnerNotice(eq("9815660990"), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("an owner whose account has WhatsApp turned off is not messaged")
+    void anOwnerWithWhatsAppOffIsLeftAlone() throws Exception {
+        User owner = user("9815660991", "Own Er");
+        jdbc.update("insert into notification_preferences (user_id, whatsapp) values (?, false)", owner.getId());
+        User host = user("9815660020", "Asha Rao");
+
+        String roomId = idOf(postRoom(host, roomBody(host, "tenant", owner.getMobile())));
+        commit();
+
+        assertThat(noticeRows(roomId)).isZero();
+        verify(messenger, never()).sendOwnerNotice(eq(owner.getMobile()), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("a room with the deposit left out is a 422, while 0 is accepted")
     void roomDepositIsRequired() throws Exception {
         User host = user("9815660017", "Own Er");

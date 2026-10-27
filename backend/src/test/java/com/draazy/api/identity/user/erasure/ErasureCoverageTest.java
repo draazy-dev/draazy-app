@@ -295,6 +295,9 @@ class ErasureCoverageTest extends AbstractApiTest {
                 "The flat owner's number on a notice about somebody else's room. FlatmateErasure deletes "
                         + "every notice the subject hosted or was addressed at, so any row left names a "
                         + "third party's owner for a third party's post, not the subject.");
+        map.put("whatsapp_opt_outs.mobile",
+                "A STOP reply sent to our WhatsApp number, keyed by number and linked to no account. "
+                        + "Erasing it would let the next notice or digest message someone who said stop.");
         map.put("flatmate_groups.address_fingerprint",
                 "As flatmate_rooms.address_fingerprint — a duplicate-detection hash of a flat.");
         map.put("flatmate_owner_consents.address_fingerprint",

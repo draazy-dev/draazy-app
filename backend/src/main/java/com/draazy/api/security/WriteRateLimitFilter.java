@@ -34,11 +34,12 @@ public class WriteRateLimitFilter extends OncePerRequestFilter {
             Routes.Documents.SHARED_URL,
             Routes.Societies.RESOLVE,
             Routes.Flatmates.OWNER_NOTICE,
+            Routes.Webhooks.WHATSAPP,
             "/me/data-export");
 
     /** Callbacks get their own budget: they can't share a user bucket and are {@code permitAll}, so not exempt. */
     private static final Set<String> PROVIDER_CALLBACKS =
-            Set.of(Routes.Webhooks.CASHFREE_PAYMENT);
+            Set.of(Routes.Webhooks.CASHFREE_PAYMENT, Routes.Webhooks.WHATSAPP);
 
     /** Extra window for provider callbacks replaying a backlog after an outage from one address. */
     private static final int CALLBACK_BUDGET_MULTIPLIER = 50;
