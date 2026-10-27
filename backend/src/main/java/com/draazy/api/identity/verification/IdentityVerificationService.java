@@ -8,12 +8,10 @@ import com.draazy.api.common.error.PayloadTooLargeException;
 import com.draazy.api.common.error.RateLimitedException;
 import com.draazy.api.common.error.UnsupportedMediaTypeException;
 import com.draazy.api.common.error.ValidationException;
-import com.draazy.api.common.trust.Notifier;
 import com.draazy.api.common.trust.OwnerBadgeSink;
 import com.draazy.api.common.validation.MediaSignatures;
 import com.draazy.api.identity.user.User;
 import com.draazy.api.identity.user.UserRepository;
-import com.draazy.api.provider.DecisionMessenger;
 import com.draazy.api.provider.DocumentScanner;
 import com.draazy.api.provider.FileStorage;
 import com.draazy.api.security.AuthPrincipal;
@@ -56,8 +54,7 @@ public class IdentityVerificationService {
     private final IdentityHasher hasher;
     private final ObjectMapper json;
     private final OwnerBadgeSink ownerBadge;
-    private final Notifier notifier;
-    private final DecisionMessenger decisionMessenger;
+    private final IdentityRejectionNotice rejectionNotice;
     private final AuditService audit;
     private final LivenessCheck livenessCheck;
     private final Clock clock;
@@ -67,7 +64,7 @@ public class IdentityVerificationService {
     public IdentityVerificationService(IdentityVerificationRepository verifications,
             IdentityVerificationFileRepository files, UserRepository users, FileStorage storage,
             List<DocumentScanner> scanners, IdentityHasher hasher, ObjectMapper json,
-            OwnerBadgeSink ownerBadge, Notifier notifier, DecisionMessenger decisionMessenger,
+            OwnerBadgeSink ownerBadge, IdentityRejectionNotice rejectionNotice,
             AuditService audit, IdentityFilePurgeService filePurge, IdentityConflictService conflicts,
             LivenessCheck livenessCheck, Clock clock, IdentityStatusMapper statusMapper,
             ApplicationEventPublisher events) {
@@ -83,8 +80,7 @@ public class IdentityVerificationService {
         this.hasher = hasher;
         this.json = json;
         this.ownerBadge = ownerBadge;
-        this.notifier = notifier;
-        this.decisionMessenger = decisionMessenger;
+        this.rejectionNotice = rejectionNotice;
         this.audit = audit;
         this.livenessCheck = livenessCheck;
         this.clock = clock;
@@ -364,7 +360,7 @@ public class IdentityVerificationService {
             v.setAttemptWindowStart(now);
             filePurge.purgeFiles(v);
             v.setFilesPurgedAt(now);
-            notifyRejected(v.getUserId(), STALE_NOTE);
+            rejectionNotice.send(v.getUserId(), STALE_NOTE);
             audit.record("system", "admin", "identity.verification.expired", "identity_verification",
                     v.getId().toString(), null, "{\"reason\":\"not_reviewed\"}");
         }
@@ -440,11 +436,4 @@ public class IdentityVerificationService {
         ownerBadge.markOwnerUnverified(userId);
     }
 
-    void notifyRejected(UUID userId, String text) {
-        notifier.notify(userId, "identity.rejected", "Verification needs another try",
-                text, "/verify-identity");
-        users.findById(userId).filter(user -> notifier.allowsWhatsapp(userId)).ifPresent(user ->
-                decisionMessenger.sendIdentityDecision(user.getMobile(),
-                        "Your Draazy identity verification could not be completed. Open the app to see the reason and retake your photos."));
-    }
 }

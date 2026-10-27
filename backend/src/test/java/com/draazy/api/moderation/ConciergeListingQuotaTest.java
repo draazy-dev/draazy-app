@@ -101,6 +101,20 @@ class ConciergeListingQuotaTest extends AbstractApiTest {
     }
 
     @Test
+    @DisplayName("the desk cannot create an owner whose name self-service would refuse")
+    void onBehalfRefusesAnInvalidOwnerName() throws Exception {
+        User staff = user("9853900029", "staff");
+
+        mvc.perform(post("/admin/properties")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(staff))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(ON_BEHALF.formatted("9853900030", "Bad name").replace("Phoned In", "Phoned 123")))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("name"));
+        assertThat(users.findByMobile("9853900030")).isEmpty();
+    }
+
+    @Test
     @DisplayName("the desk can record a listing before photos exist")
     void onBehalfCreateWithoutPhotosStillSucceeds() throws Exception {
         User staff = user("9853900031", "staff");

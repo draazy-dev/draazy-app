@@ -843,6 +843,31 @@ class VerificationEndpointsTest extends AbstractApiTest {
     }
 
     @Test
+    void staffCannotSetAProfileNameThatSelfServiceWouldRefuse() throws Exception {
+        User u = user("9830000089");
+        submitPan(u, PAN).andExpect(status().isAccepted());
+
+        kycProfile(admin("9830000088"), u, "{\"name\":\"Asha 123\"}")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("name"));
+        assertThat(jdbc.queryForObject("select name from users where id = ?", String.class, u.getId()))
+                .isNotEqualTo("Asha 123");
+    }
+
+    @Test
+    void approvingWithAnInvalidLegalNameChangesNothing() throws Exception {
+        User u = user("9830000087");
+        submitPan(u, PAN).andExpect(status().isAccepted());
+
+        approveBody(admin("9830000086"), caseOf(u), "{\"number\":\"" + PAN
+                + "\",\"name\":\"Asha 123\",\"dob\":\"1991-04-12\",\"poseConfirmed\":true}")
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.fields[0].field").value("name"));
+        assertThat(jdbc.queryForObject("select verified from users where id = ?", Boolean.class, u.getId()))
+                .isFalse();
+    }
+
+    @Test
     void aVerifiedCaseLocksTheNameEvenWhenTheBadgeWasRevokedByHand() throws Exception {
         User u = user("9830000098");
         User reviewer = admin("9830000099");
