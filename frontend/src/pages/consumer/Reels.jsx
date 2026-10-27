@@ -192,7 +192,7 @@ export default function Reels() {
     if (navigator.share) {
       try { await navigator.share({ title: r.title, text, url }); return; } catch (err) { if (err?.name === 'AbortError') return; }
     }
-    window.open('https://wa.me/?text=' + encodeURIComponent(`${text} — ${url}`), '_blank');
+    window.open('https://wa.me/?text=' + encodeURIComponent(`${text} — ${url}`), '_blank', 'noopener');
   };
   // Media tap: double-tap → like burst, single tap → play/pause.
 

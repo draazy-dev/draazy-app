@@ -128,7 +128,7 @@ const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, on
       : { kind: 'link', href: editHref, icon: 'edit', label: tr(t, statusKey('actions.fixNow'), 'Fix now') };
   }
   if (state === 'live') {
-    if (onShare) return { kind: 'button', onClick: onShare, icon: 'share-2', label: tr(t, statusKey('actions.share'), 'Share listing') };
+    if (onShare) return { kind: 'button', onClick: onShare, icon: 'share-network', label: tr(t, statusKey('actions.share'), 'Share listing') };
     if (!verified && !badgeRequested) return { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') };
     return { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
   }

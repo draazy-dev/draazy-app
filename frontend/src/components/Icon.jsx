@@ -79,7 +79,6 @@ const MAP = {
   save:                  FloppyDisk,
   copy:                  Copy,
   share: Share,
-  'share-2':             Share,
   'share-network':       ShareNetwork,
   download:              Download,
   upload:                Upload,

@@ -125,6 +125,25 @@ test.describe('Admin shell on a field phone', () => {
     await expect(page).toHaveURL(new RegExp(`${href}$`));
   });
 
+  test('the drawer carries the Post on Behalf and View live site actions the phone top bar has no room for', async ({ page, login }) => {
+    await consent(page);
+    await login.asAdmin();
+    const drawer = page.locator('aside');
+    await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+
+    const live = drawer.getByRole('button', { name: 'View live site', exact: true });
+    await expect(live).toBeVisible();
+    expect((await live.boundingBox()).height, 'View live site hit height').toBeGreaterThanOrEqual(44);
+
+    await drawer.getByRole('button', { name: 'Post on Behalf', exact: true }).click();
+    await expect(page).toHaveURL(/\/admin\/post-on-behalf$/);
+    await expect(drawer).toHaveCSS('transform', /matrix\(1, 0, 0, 1, -\d+/);
+
+    await page.getByRole('button', { name: 'Open menu', exact: true }).click();
+    await live.click();
+    await expect(page).toHaveURL(/\/$/);
+  });
+
   test('on desktop the side rail stays put and scrolls on its own', async ({ page, login }) => {
     await page.setViewportSize({ width: 1280, height: 700 });
     await consent(page);

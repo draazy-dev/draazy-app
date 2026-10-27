@@ -308,7 +308,7 @@ for (const d of DESKS) {
     await login.asAdmin();
     const gets = countGets(page);
     await page.goto(d.url);
-    await expect(page.getByText(d.ready).first()).toBeVisible();
+    await expect(page.getByRole('main').getByText(d.ready).first()).toBeVisible();
     await page.waitForTimeout(1000);
 
     for (const path of d.once) expect(gets.timesPath(path), path).toBe(1);

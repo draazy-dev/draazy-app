@@ -1,7 +1,6 @@
 import { Link } from 'react-router';
 import Icon from '../../../components/Icon.jsx';
 import Tip from '../../../components/ui/Tip.jsx';
-import QualityScoreBadge from '../../../components/ui/QualityScoreBadge.jsx';
 import MobileCollapse from '../../../components/ui/MobileCollapse.jsx';
 import { fmtINR, fmtNum, timeAgo } from '../../../lib/format.js';
 import { listingFreshness } from '../../../lib/freshness.js';
@@ -147,12 +146,11 @@ export default function PropertyHeader({ ctx, priceOnHero = false }) {
                 </MobileCollapse>
               ) : null}
 
-              {social.length || Number.isFinite(p.qualityScore) ? (
+              {social.length ? (
                 <div className="dz-stat-social mt-4 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-slate-400">
                   {social.map(([ic, text]) => (
                     <span key={ic} className="inline-flex items-center gap-1.5 tabular-nums"><Icon name={ic} className="w-3.5 h-3.5" /> {text}</span>
                   ))}
-                  <QualityScoreBadge listing={p} variant="inline" />
                 </div>
               ) : null}
             </div>

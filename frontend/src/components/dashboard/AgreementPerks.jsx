@@ -61,7 +61,7 @@ export default function AgreementPerks({ ra, isOwner = false }) {
       {saved > 0 && (
         <div className="flex items-center justify-between gap-2 text-xs">
           <p className="text-emerald-300 min-w-0 truncate">{t('dash.savedLine', { amount: fmtINR(saved) })}</p>
-          <button type="button" onClick={share} className="flex-shrink-0 inline-flex min-h-[44px] items-center gap-1 px-2 text-teal-300 hover:text-teal-200 font-semibold"><Icon name="share-2" className="w-3.5 h-3.5" /> {t('dash.savedShare')}</button>
+          <button type="button" onClick={share} className="flex-shrink-0 inline-flex min-h-[44px] items-center gap-1 px-2 text-teal-300 hover:text-teal-200 font-semibold"><Icon name="share-network" className="w-3.5 h-3.5" /> {t('dash.savedShare')}</button>
         </div>
       )}
     </div>
