@@ -467,12 +467,12 @@ Full model: [`flatmates.md`](./flatmates.md) section 5.
 draft (client-only autosave)  --submitProperty-->  pending  --checker approve-->  approved (live)
                                                     |   \--needs info--> pending[needs_info]
                                                     |          (owner reply/edit -> pending; 14 d silent -> archived)
-                                                    \--reject (final)--> rejected
+                                                    \--reject--> rejected (fixable reason: owner edit -> pending; otherwise final)
 live listing + stays-live edit -> stays approved + re-check queued
 live listing + off-search edit -> pending (checklist unticked)
 approved  --owner pause-->  paused  --owner resume-->  approved (no new moderation decision)
 ```
-- **Terminal-ish:** `approved` (live), `rejected` (final for the owner; staff can reopen it),
+- **Terminal-ish:** `approved` (live), `rejected` (final for the owner unless the reason is fixable: photos_not_real, wrong_details, locality_unclear, document_unreadable, name_mismatch; staff can always reopen it),
   `archived` (soft-delete; restore resets to `pending`, cross-cutting section 4). Rooms follow the same
   `pending -> ...` shape plus a separate Ops share-review for tenant/flagged posts.
 - **Owner-facing labels:** Pending (amber) / Needs info (rose) / Live (teal) + optional
@@ -717,8 +717,10 @@ One set of rules covers create, owner edit and moderator edit (`ListingSanityLim
   409 `duplicate_submission` with `existingId`. It runs under the create lock, before the daily pace check.
 - **Daily pace.** The 429 `Retry-After` (header and `retryAfterSeconds`) is the time until the post that
   frees a slot leaves the 24-hour window.
-- **Closed listings.** Owner `PATCH /me/listings/{id}` on a rejected, sold, rented or archived listing is
-  409 `listing_not_editable`. A flagged listing stays editable and stays `flagged`; an owner edit raises a
+- **Closed listings.** Owner `PATCH /me/listings/{id}` on a sold, rented or archived listing, or on a listing
+  rejected for a final reason (duplicate, broker, rera_*, other), is 409 `listing_not_editable`. A listing
+  rejected for a fixable reason stays editable: the edit moves it back to `pending` (`RejectionAppeal`),
+  reopens its review and stamps `resubmitted_at`. A flagged listing stays editable and stays `flagged`; an owner edit raises a
   re-check for staff and never moves it to `pending`.
 - **Visits and contacts** answer a closed listing alike: 409 `listing_not_live` (`ListingClosed`), 404 when
   the listing is not visible at all. An owner requesting contact on their own listing gets 409

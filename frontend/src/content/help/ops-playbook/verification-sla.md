@@ -60,7 +60,7 @@ The SLA panel is green at 90% or better, amber from 75% to 89%, and rose below 7
 | `pending` | Waiting, in review, or awaiting owner info | Hidden from public search |
 | `approved` | Published | Visible unless archived |
 | `needs_info` review | Staff asked for a correction | Listing stays `pending`; owner sees the reason |
-| `rejected` | Refusal | Hidden; **Reopen for review** returns it to `pending` |
+| `rejected` | Refusal | Hidden; the owner's edit returns a fixable rejection to `pending`, **Reopen for review** returns any rejection |
 | `flagged` | Unsafe or disputed | Hidden until the flag is cleared or archived |
 | `archived` | Soft-deleted | Hidden; restore returns to `pending` |
 
@@ -87,7 +87,7 @@ The hourly sweep sends owner reminders after 3 days and 7 days. If there is no r
 
 ### Reject listing
 
-Use **Reject** for non-fixable or unsafe listings. A reason code is required. A rejected listing does not reopen just because the owner replies; use **Reopen for review** when a rejected case must re-enter review.
+A reason code is required. Five reasons are fixable: photos not real, wrong details, locality unclear, document unreadable and name mismatch. The owner is told to edit the listing and resubmit it, and the edit sends it back to `pending` for a fresh decision. The other reasons (duplicate, broker, RERA, other) are final: the owner cannot edit, and an owner reply does not reopen the listing. Use **Reopen for review** when a finally rejected case must re-enter review.
 
 ### Work re-checks while live
 

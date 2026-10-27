@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import Icon from '../Icon.jsx';
 import ProgressTracker from './ProgressTracker.jsx';
 import { seeksOwnershipBadge } from '../../lib/recheckFields.js';
+import { isResubmittableReason } from '../../pages/admin/properties/reviewReasons.js';
 
 const statusKey = (suffix) => ['owner', 'listingStatus', ...String(suffix).split('.')].join('.');
 
@@ -46,7 +47,10 @@ const REASON_DEFAULTS = {
 const CLOSED_STATUSES = new Set(['paused', 'sold', 'rented', 'archived', 'under_offer', 'private']);
 const REVIEW_ACTION_REASONS = new Set(['document_unreadable', 'name_mismatch']);
 const AWAITING_CONFIRM = new Set(['created', 'link_sent']);
-const TRACKED_STATES = new Set(['pending', 'needs_info', 'confirm', 'flagged']);
+const TRACKED_STATES = new Set(['pending', 'needs_info', 'confirm', 'flagged', 'rejected']);
+
+const reasonCodeOf = (review) => review?.reasonCode || review?.reason || review?.reason_code;
+export const mayResubmit = (state, review) => state === 'rejected' && isResubmittableReason(reasonCodeOf(review));
 
 const normalizedStatus = (status) => STATUS_ALIASES[String(status || '').toLowerCase()] || String(status || '').toLowerCase();
 const tr = (t, key, defaultValue) => (typeof t === 'function' ? t(key, { defaultValue }) : defaultValue);
@@ -79,7 +83,7 @@ const hasBadgeRequest = (listing = {}) => Boolean(listing.ownershipVerified || s
 const badgeHref = (listing = {}) => `/dashboard?tab=documents&prop=${encodeURIComponent(listing.uuid || listing.id || '')}`;
 
 const reasonText = (t, review = {}) => {
-  const code = review?.reasonCode || review?.reason || review?.reason_code;
+  const code = reasonCodeOf(review);
   const fallback = REASON_DEFAULTS[code] || REASON_DEFAULTS.other;
   const reason = code
     ? tr(t, statusKey(`reasons.${code}`), fallback)
@@ -118,7 +122,7 @@ const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, on
       : { kind: 'link', href: badgeHref(listing), icon: 'shield-check', label: tr(t, statusKey('actions.getBadge'), 'Get Verified property badge') };
   }
   if (state === 'needs_info') {
-    const useThread = REVIEW_ACTION_REASONS.has(review?.reasonCode || review?.reason || review?.reason_code) && onOpenReview;
+    const useThread = REVIEW_ACTION_REASONS.has(reasonCodeOf(review)) && onOpenReview;
     return useThread
       ? { kind: 'button', onClick: onOpenReview, icon: 'message-square', label: tr(t, statusKey('actions.fixNow'), 'Fix now') }
       : { kind: 'link', href: editHref, icon: 'edit', label: tr(t, statusKey('actions.fixNow'), 'Fix now') };
@@ -129,7 +133,9 @@ const actionFor = ({ state, listing, review, editHref, viewHref, supportHref, on
     return { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
   }
   if (state === 'rejected') {
-    return { kind: 'link', href: supportHref, icon: 'life-buoy', label: tr(t, statusKey('actions.contactSupport'), 'Contact support') };
+    return mayResubmit(state, review) && editHref
+      ? { kind: 'link', href: editHref, icon: 'edit', label: tr(t, statusKey('actions.editResubmit'), 'Edit & resubmit'), testId: 'edit-resubmit' }
+      : { kind: 'link', href: supportHref, icon: 'life-buoy', label: tr(t, statusKey('actions.contactSupport'), 'Contact support') };
   }
   return { kind: 'link', href: viewHref, icon: 'eye', label: tr(t, statusKey('actions.view'), 'View listing') };
 };
@@ -207,7 +213,10 @@ export default function ListingStatusCard({
             ) : null}
             <p className="text-xs leading-relaxed text-gray-300">{line}</p>
           </div>
-          {TRACKED_STATES.has(meta.state) ? <ProgressTracker progress={listing?.progress} ownerView className="mt-2" /> : null}
+          {TRACKED_STATES.has(meta.state) ? (
+            <ProgressTracker progress={listing?.progress} ownerView className="mt-2"
+              rejectedLabel={mayResubmit(meta.state, review) ? tr(t, statusKey('status.changesNeeded'), 'Changes needed') : meta.label} />
+          ) : null}
           {onOpenReview && review?.lastMessage ? (
             <button type="button" onClick={onOpenReview} data-testid="support-thread-link" className="tap-coarse mt-1 inline-flex min-h-[32px] items-center gap-1 text-xs font-semibold text-brand-teal-3 hover:underline">
               <Icon name="message-square" className="h-3.5 w-3.5" /> {tr(t, statusKey('actions.supportMessages'), 'Messages from Draazy Support')}

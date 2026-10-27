@@ -338,8 +338,7 @@ class VerificationThreadTest extends AbstractApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.messages[0].body").value(
                         "\u26D4 Your property could not be approved.\nReason: Ownership documents could not be verified."
-                                + " The Index II is illegible.\nThis decision is final."
-                                + " The listing cannot be resubmitted."));
+                                + " The Index II is illegible.\nEdit the listing and resubmit it for review."));
     }
 
     @Test

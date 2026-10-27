@@ -8,6 +8,10 @@ public final class ReviewReasonCodes {
             "wrong_details", "locality_unclear", "document_unreadable", "name_mismatch",
             "rera_not_found", "rera_mismatch", "other");
 
+    /** Rejections the owner can fix and resubmit; every other reason is a final verdict. */
+    public static final Set<String> RESUBMITTABLE = Set.of("photos_not_real", "wrong_details",
+            "locality_unclear", "document_unreadable", "name_mismatch");
+
     private ReviewReasonCodes() {
     }
 
@@ -59,7 +63,9 @@ public final class ReviewReasonCodes {
             default -> "The listing does not meet moderation guidelines.";
         };
         String base = note == null || note.isBlank() ? message : message + " " + note.trim();
-        return base + "\nThis decision is final. The listing cannot be resubmitted.";
+        return base + (RESUBMITTABLE.contains(reasonCode)
+                ? "\nEdit the listing and resubmit it for review."
+                : "\nThis decision is final. The listing cannot be resubmitted.");
     }
 
     /** The thread entry for a final rejection, shared by every route that can reject. */
