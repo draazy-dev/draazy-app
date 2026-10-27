@@ -62,6 +62,10 @@
 ## 5. Business rules & logic  *(the meat)*
 
 ### OTP flow
+- **The code goes out on WhatsApp, and so does every later account update.** Non-OTP WhatsApp
+  (`notification_preferences.whatsapp`) is on by default so urgent notices reach people, so each send
+  button carries one line saying so (`auth.whatsappNotice`). Replying STOP opts the number out
+  (`/webhooks/whatsapp`); the Profile toggle turns it off per account.
 - **The server validates the code.** `useOtpFlow.js` owns only the *send* step and the countdown to
   the next resend; the code itself is checked by `POST /auth/login`, which stores it hashed,
   single-use and expiring, and counts attempts (`OtpService`). A wrong code is refused.
@@ -118,7 +122,7 @@
   its oldest row says when a slot reopens.
 - **`noRollbackFor` is load-bearing on every transactional caller of a send.** Because the budget is
   derived from rows, a rollback refunds the attempt: no cooldown, no window slot, no trace. So
-  `RateLimitedException` and `OtpSender.DeliveryFailedException` are named on `OtpService.sendCode`,
+  `RateLimitedException` and `OtpSender.DeliveryFailedException` (a 503 with `Retry-After: 60`) are named on `OtpService.sendCode`,
   `sendLoginCode`, `AuthService.login` and `FlatmateSupplyService.ownerConsent`. `noRollbackFor` is
   per-advice — it only stops *that* advice marking a shared transaction rollback-only, so a
   participating inner advice cannot enforce the rule for its callers. **A new transactional caller that

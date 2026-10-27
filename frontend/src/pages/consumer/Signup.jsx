@@ -261,6 +261,7 @@ export default function Signup() {
               <button type="button" onClick={sendOtp} disabled={otp.sending} className="send-otp-btn w-full h-btn-lg rounded-xl text-teal-400 font-semibold text-sm flex items-center justify-center gap-2">
                 <Send className="w-4 h-4" /> {otp.sending ? t('auth.sending') : t('auth.sendOtp')}
               </button>
+              <p className="text-[11px] text-gray-500 text-center">{t('auth.whatsappNotice')}</p>
             </>
           ) : (
             <>

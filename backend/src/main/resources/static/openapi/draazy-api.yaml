@@ -204,6 +204,21 @@ paths:
                 ipBusy:
                   summary: The caller's IP is over the write limit
                   value: { error: rate_limited, message: Too many requests, status: 429 }
+        '503':
+          description: >
+            Send step only: the WhatsApp provider did not take the code. The send still counts
+            against this mobile's budget; retry after the header says.
+          headers:
+            Retry-After:
+              schema: { type: integer, minimum: 0 }
+              description: Seconds to wait before asking for another code.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example:
+                error: service_unavailable
+                message: We couldn't send your code on WhatsApp. Please try again in a minute.
+                status: 503
   /auth/staff-login:
     post:
       tags: [Identity & Access]

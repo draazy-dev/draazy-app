@@ -1,9 +1,9 @@
 package com.draazy.api.provider;
 
+import com.draazy.api.common.error.ServiceUnavailableException;
 import com.draazy.api.common.trust.MobileMask;
 import com.draazy.api.security.LocalOnly;
 import com.draazy.api.security.LocalProfileGuard;
-import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -19,17 +19,14 @@ public interface OtpSender {
     /** Deliver {@code code} to {@code mobile}. Implementations must not block the request thread long. */
     void send(String mobile, String code);
 
-    default void send(String mobile, String code, Context context) {
-        send(mobile, code);
-    }
+    // Delivery was attempted and did not demonstrably fail before leaving this process. A 503, because a
+    // provider outage is not the caller's fault and retrying after the hint can succeed.
+    class DeliveryFailedException extends ServiceUnavailableException {
+        static final int RETRY_AFTER_SECONDS = 60;
 
-    record Context(String purpose, String text, List<String> templateParameters) {
-    }
-
-    // Delivery was attempted and did not demonstrably fail before leaving this process.
-    class DeliveryFailedException extends RuntimeException {
         public DeliveryFailedException(String message, Throwable cause) {
-            super(message, cause);
+            super(message, RETRY_AFTER_SECONDS);
+            initCause(cause);
         }
     }
 }
@@ -53,13 +50,6 @@ class MockOtpSender implements OtpSender {
     @Override
     public void send(String mobile, String code) {
         log.info("[MOCK OTP] mobile={} code={}", mobile, code);
-        calls.record(ProviderCalls.WHATSAPP, OPERATION, ProviderCalls.Outcome.SKIPPED, mobile, null, "mock", null);
-    }
-
-    @Override
-    public void send(String mobile, String code, Context context) {
-        log.info("[MOCK OTP] mobile={} code={} text={}", mobile, code,
-                context == null ? "" : context.text());
         calls.record(ProviderCalls.WHATSAPP, OPERATION, ProviderCalls.Outcome.SKIPPED, mobile, null, "mock", null);
     }
 }
@@ -86,11 +76,6 @@ class SandboxOtpSender implements OtpSender {
     public void send(String mobile, String code) {
         log.warn("[SANDBOX OTP] mobile={} - not sent; the code is draazy.otp.sandbox-code", MobileMask.mask(mobile));
         calls.record(ProviderCalls.WHATSAPP, OPERATION, ProviderCalls.Outcome.SKIPPED, mobile, null, "sandbox", null);
-    }
-
-    @Override
-    public void send(String mobile, String code, Context context) {
-        send(mobile, code);
     }
 }
 

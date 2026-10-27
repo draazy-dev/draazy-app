@@ -1,6 +1,8 @@
 package com.draazy.api.security;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.draazy.api.common.web.Routes;
 import jakarta.servlet.ServletException;
@@ -8,6 +10,9 @@ import java.io.IOException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -79,12 +84,35 @@ class BotDefenceFilterTest {
         @Test
         @DisplayName("passes a challenged write straight through, with no token at all")
         void passesThrough() throws Exception {
-            run(new NoopBotDefence(), post(Routes.ServiceWaitlist.BASE));
+            run(new NoopBotDefence(new MockEnvironment()), post(Routes.ServiceWaitlist.BASE));
 
             assertThat(reachedApplication())
                     .as("the unconfigured default must never block a request")
                     .isTrue();
             assertThat(response.getStatus()).isEqualTo(200);
+        }
+
+        @ParameterizedTest(name = "the ''{0}'' profile refuses live WhatsApp with no challenge")
+        @ValueSource(strings = {"prod", "sandbox"})
+        void aDeploymentWithLiveWhatsAppMustChallenge(String profile) {
+            MockEnvironment env = new MockEnvironment().withProperty("draazy.providers.whatsapp.enabled", "true");
+            env.setActiveProfiles(profile);
+
+            assertThatThrownBy(() -> new NoopBotDefence(env))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("TURNSTILE_ENABLED=true");
+        }
+
+        @Test
+        @DisplayName("a developer machine may run live WhatsApp with no challenge, and a deployment may run neither")
+        void onlyTheDeploymentAndWhatsAppPairIsRefused() {
+            MockEnvironment local = new MockEnvironment().withProperty("draazy.providers.whatsapp.enabled", "true");
+            local.setActiveProfiles("local");
+            MockEnvironment prodWithoutWhatsApp = new MockEnvironment();
+            prodWithoutWhatsApp.setActiveProfiles("prod");
+
+            assertThatCode(() -> new NoopBotDefence(local)).doesNotThrowAnyException();
+            assertThatCode(() -> new NoopBotDefence(prodWithoutWhatsApp)).doesNotThrowAnyException();
         }
     }
 

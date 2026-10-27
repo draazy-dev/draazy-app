@@ -126,7 +126,7 @@ class RentAgreementMakerCheckerRaceTest extends AbstractCommittedApiTest {
                 reshareMeanwhile(holder, id);
             }
             return inv.callRealMethod();
-        }).when(sender).send(anyString(), anyString(), any());
+        }).when(sender).send(anyString(), anyString());
 
         int otp = send(Routes.ServiceRequests.DRAFT_OTP, owner, "{\"partyKey\":\"" + partyKey + "\"}", id);
 
