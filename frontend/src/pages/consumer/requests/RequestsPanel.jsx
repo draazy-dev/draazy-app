@@ -77,12 +77,12 @@ const asLead = (item) => ({
   requestedAt: Date.parse(item.createdAt) || null,
 });
 
-export default function RequestsPanel({ onChanged }) {
+export default function RequestsPanel({ initialTab, onChanged }) {
   const { toast } = useToast();
   const inbox = useRequestsInbox();
   const actions = useRequestActions({ inbox, toast, onChanged });
   const leadNotes = useLeadNotes(toast);
-  const [tabKey, setTabKey] = useState('all');
+  const [tabKey, setTabKey] = useState(() => (TABS.some((t) => t.key === initialTab) ? initialTab : 'all'));
   const [confirming, setConfirming] = useState(null);
   const [sheet, setSheet] = useState(null);
   const [showPast, setShowPast] = useState(false);

@@ -226,12 +226,11 @@ export default function OverviewPanel({ isOwner, go, recent, recommended = [], s
       : showProfile
         ? <ProfileNudge profile={profile} go={go} />
         : null;
-  const seekerVisitOnly = !isOwner && actionItems.length > 0 && actionItems.every((item) => item.kind === 'visit' || String(item.id || '').startsWith('visit:'));
 
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* Pinned so waiting requests do not go stale in a sub-tab. */}
-      <ActionCenter items={actionItems} limit={3} onSeeAll={isOwner ? () => go('leads') : seekerVisitOnly ? () => go('visits') : undefined} />
+      <ActionCenter items={actionItems} onOpen={go} />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 lg:grid-cols-4" data-testid="dashboard-stats-grid">
         {statTiles.map((stat) => <OverviewMetric key={stat.label} {...stat} />)}

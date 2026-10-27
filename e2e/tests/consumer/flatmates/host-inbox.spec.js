@@ -21,7 +21,7 @@ async function approve(id) {
   expect(res.status, `approve ${id}: ${await res.clone().text()}`).toBeLessThan(300);
 }
 
-test('host sees a seeker\'s room interest in the dashboard, and Accept persists to the server', async ({ page }) => {
+test('host sees a seeker\'s room interest as a top-bar badge, its notification opens the dashboard Requests, and Accept persists to the server', async ({ page }) => {
   const hostMobile = uniqueMobile();
   const { accessToken: hostToken } = await apiLogin(hostMobile);
 
@@ -58,9 +58,12 @@ test('host sees a seeker\'s room interest in the dashboard, and Accept persists 
     body: JSON.stringify({ message: 'I am interested in this room', share: 'bring' }),
   });
   expect(interestRes.status, await interestRes.clone().text()).toBeLessThan(300);
-  // --- Browser: sign the host in and open the Requests panel ---
+  // --- Browser: the top bar flags the pending request, and its notification opens the Requests panel ---
   await signedInAs(page, hostMobile);
-  await page.goto(`${BASE}/dashboard?tab=leads`);
+  await page.goto(`${BASE}/notifications`);
+  await expect(page.getByTestId('messages-request-badge')).toHaveText('1', { timeout: 15_000 });
+  await page.locator('.notif').filter({ hasText: 'is interested in your room' }).first().getByRole('link').click();
+  await expect(page).toHaveURL(/\/dashboard\?tab=leads/);
   // --- Assert the request renders as a flatmate card carrying the room's society name ---
   const card = page.getByTestId('request-card').filter({ hasText: society });
   await expect(card).toBeVisible({ timeout: 15_000 });
@@ -90,6 +93,7 @@ test('host sees a seeker\'s room interest in the dashboard, and Accept persists 
 
   await expect(page).toHaveURL(/\/messages\?c=/, { timeout: 15_000 });
   await expect(page.locator('.pc-input')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('messages-request-badge')).toHaveCount(0);
 });
 
 test('a room request thread, and the chat it opens once accepted, both show the room as a card linking to the room post', async ({ page }) => {
@@ -181,17 +185,19 @@ const roomChat = async (token, roomId) => {
   return (await res.json()).content.find((c) => c.flatmateTargetId === roomId) ?? null;
 };
 
-test('accepting from the dashboard Action Center opens the chat in both inboxes, and the host can message first', async ({ page }) => {
+test('accepting a request reached from the Home attention panel opens the chat in both inboxes, and the host can message first', async ({ page }) => {
   const society = `Center Room ${Date.now().toString(36)}`;
   const { room, hostMobile, hostToken, seekerToken, ask } = await askedRoom(society);
 
   await signedInAs(page, hostMobile);
   await page.goto(`${BASE}/dashboard`);
-  const action = page.getByTestId('action-center').getByTestId('action-item').filter({ hasText: society });
-  await expect(action).toHaveCount(1, { timeout: 15_000 });
+  const action = page.locator('[data-testid="action-item"][data-group="flatmate"]');
+  await expect(action).toContainText('is interested', { timeout: 15_000 });
+  await action.click();
+  await expect(page).toHaveURL(/#leads-flatmate$/);
   const decided = page.waitForResponse((r) => new URL(r.url()).pathname === `/api/me/flatmate-requests/${ask.id}`
     && r.request().method() === 'PATCH' && r.status() === 200);
-  await action.getByRole('button', { name: 'Accept' }).click();
+  await page.getByTestId('request-card').filter({ hasText: society }).getByRole('button', { name: 'Accept & chat' }).click();
   await decided;
 
   await expect.poll(() => roomChat(hostToken, room.id).then((c) => c?.id ?? null), { timeout: 15_000 }).not.toBeNull();

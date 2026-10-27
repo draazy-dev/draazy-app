@@ -65,7 +65,7 @@ test.afterEach(async () => {
   createdListingIds.clear();
 });
 
-test('an owner shares a real contact request from the Action Center and clears the Requests badge', async ({ page }) => {
+test('an owner follows the Action Center into Number requests, shares the contact, and Home clears', async ({ page }) => {
   const owner = await newActor(`Zztest Action Owner ${letterTag()}`);
   const buyer = await newActor(`Zztest Action Buyer ${letterTag()}`);
   const listing = await createApprovedListing(owner);
@@ -93,20 +93,26 @@ test('an owner shares a real contact request from the Action Center and clears t
   await expect(actionCenter).toBeVisible();
   const action = actionCenter.getByTestId('action-item').filter({ hasText: buyer.name });
   await expect(action).toHaveCount(1);
+  await expect(action).toHaveAttribute('data-group', 'numbers');
   await expect(action).toContainText(/wants to contact you/i);
+  await expect(action.getByRole('button')).toHaveCount(0);
   await expect(page.locator('aside button', { hasText: 'Requests' }).first()).toContainText('1');
 
+  await action.click();
+  await expect(page).toHaveURL(/#leads-numbers$/);
+  await expect(page.getByRole('tab', { name: /^Number requests/ })).toHaveAttribute('aria-selected', 'true');
   const approval = page.waitForResponse((response) =>
     new URL(response.url()).pathname === `/api/me/contact-requests/${pending.id}`
     && response.request().method() === 'PATCH'
     && response.status() === 200,
   );
-  await action.getByRole('button', { name: 'Accept' }).click();
+  await page.getByTestId('request-card').filter({ hasText: buyer.name }).getByRole('button', { name: 'Approve & chat' }).click();
   await approval;
-  await expect(action).toHaveCount(0);
 
   const approved = await ownerContactRequest(owner, listing.id, buyer.name);
   expect(approved.status, 'Accept must persist the owner approval on the server').toBe('approved');
+  await page.goto('/dashboard');
+  await expect(page.getByTestId('action-center-clear')).toBeVisible();
 });
 
 test('a fresh seeker has an honest empty Action Center and a Requests group holding Requests and Visits', async ({ page }) => {
