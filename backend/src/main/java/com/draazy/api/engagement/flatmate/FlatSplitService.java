@@ -109,7 +109,8 @@ public class FlatSplitService {
     }
 
     private void promoteIfStanding(UUID propertyId) {
-        if (properties.findById(propertyId).filter(FlatSplitService::standsAsOwnerTier).isEmpty()) {
+        if (propertyId == null
+                || properties.findById(propertyId).filter(FlatSplitService::standsAsOwnerTier).isEmpty()) {
             return;
         }
         rooms.findByPropertyIdAndArchivedFalse(propertyId).stream()

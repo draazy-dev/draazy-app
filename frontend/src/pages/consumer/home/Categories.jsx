@@ -5,7 +5,7 @@ import Icon from '../../../components/Icon.jsx';
 import { CATEGORIES } from '../../../data/homeData.js';
 import { propertyCounts } from '../../../services/propertyService.js';
 import { feed } from '../../../services/flatmateService.js';
-import { TABS as FLATMATE_TABS } from '../flatmates/model.js';
+import { TABS as FLATMATE_TABS } from '../flatmates/tabs.js';
 
 const formatCount = (value) => new Intl.NumberFormat('en-IN').format(value);
 

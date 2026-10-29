@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +54,12 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
     @Override
     protected String mobilePrefix() {
         return "97914277";
+    }
+
+    @BeforeEach
+    void localitiesAreLive() {
+        liveLocality("Stalewrite Baner");
+        liveLocality("Stalewrite Kothrud");
     }
 
     private static String idIn(String json) {
@@ -96,7 +103,7 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
         User owner = user("01", Roles.Wire.OWNER);
         User host = user("02", Roles.Wire.BUYER);
         User staff = user("03", Roles.Wire.ADMIN);
-        Property flat = new Property(owner, "3BHK in Kothrud", "rent", "apartment", 45000L, "Kothrud", "Pune");
+        Property flat = new Property(owner, "3BHK in Kothrud", "rent", "apartment", 45000L, "Stalewrite Kothrud", "Pune");
         flat.setBhk(new BigDecimal("3"));
         flat.setStatus("approved");
         flat.setPriceUnit("per-month");
@@ -104,7 +111,7 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
         properties.saveAndFlush(flat);
         String groupId = created(post(Routes.Flatmates.GROUPS).header(HttpHeaders.AUTHORIZATION, bearer(host))
                 .contentType(MediaType.APPLICATION_JSON).content("""
-                        {"title":"Three of us","locality":"Kothrud","policy":"any","rent":45000,"deposit":10000,
+                        {"title":"Three of us","locality":"Stalewrite Kothrud","policy":"any","rent":45000,"deposit":10000,
                          "seats":3,"seatsOpen":1,"name":"Host"}"""));
         jdbc.update("update flatmate_groups set mod_status = 'approved' where id = ?::uuid", groupId);
         String applicationId = created(post(Routes.Flatmates.GROUP_APPLY.replace("{id}", groupId))
@@ -136,7 +143,7 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
         String roomId = created(post(Routes.Flatmates.ROOMS).header(HttpHeaders.AUTHORIZATION, bearer(host))
                 .contentType(MediaType.APPLICATION_JSON).content("""
                         {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                         "locality":"Baner","society":"Stale Write Heights","rentShare":15000,"deposit":30000,
+                         "locality":"Stalewrite Baner","society":"Stale Write Heights","rentShare":15000,"deposit":30000,
                          "availableFrom":"2026-12-01","lookingFor":"any","foodPref":"any",
                          "agreementDeclared":true,"ownerConsentMobile":"9890000001",%s,"note":"Sunny room.",%s,%s,%s}
                         """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateAgreementFixture.EVIDENCE,
@@ -164,7 +171,7 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
         User seeker = user("06", Roles.Wire.BUYER);
         String postId = created(post(Routes.Flatmates.POSTS).header(HttpHeaders.AUTHORIZATION, bearer(seeker))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Asha\",\"budget\":18000,\"localities\":[\"Baner\"]}"));
+                .content("{\"name\":\"Asha\",\"budget\":18000,\"localities\":[\"Stalewrite Baner\"]}"));
         jdbc.update("update flatmate_seeker_posts set mod_status = 'expired', expired_from = 'approved' "
                 + "where id = ?::uuid", postId);
 
@@ -189,7 +196,7 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
         String roomId = created(post(Routes.Flatmates.ROOMS).header(HttpHeaders.AUTHORIZATION, bearer(host))
                 .contentType(MediaType.APPLICATION_JSON).content("""
                         {"bhk":"2","roomType":"Private room","attachedBath":"attached",
-                         "locality":"Baner","society":"Consent Race Towers","rentShare":15000,"deposit":30000,
+                         "locality":"Stalewrite Baner","society":"Consent Race Towers","rentShare":15000,"deposit":30000,
                          "availableFrom":"2026-12-01","lookingFor":"any","foodPref":"any",
                          "agreementDeclared":true,"ownerConsentMobile":"9890000001",%s,"note":"Sunny room.",%s,%s,%s}
                         """.formatted(FlatmateRoomFixture.photos(host.getId()), FlatmateAgreementFixture.EVIDENCE,
@@ -197,9 +204,9 @@ class FlatmateStaleWriteTest extends AbstractCommittedApiTest {
                         .replace("\"id\":\"agr-doc-1\"", "\"id\":\"" + doc.getId() + "\"")));
         jdbc.update("update flatmate_rooms set mod_status = 'live', owner_consent_mobile = ?, address_fingerprint = ? "
                 + "where id = ?::uuid", ownerMobile, guardrails.fingerprint(
-                        new FlatmateGuardrails.Address(null, "Consent Race Towers", "Baner", null)), roomId);
+                        new FlatmateGuardrails.Address(null, "Consent Race Towers", "Stalewrite Baner", null)), roomId);
         String consent = """
-                {"ownerMobile":"%s","society":"Consent Race Towers","locality":"Baner"%s}""";
+                {"ownerMobile":"%s","society":"Consent Race Towers","locality":"Stalewrite Baner"%s}""";
         mvc.perform(post(Routes.Flatmates.OWNER_CONSENT).header(HttpHeaders.AUTHORIZATION, bearer(host))
                 .contentType(MediaType.APPLICATION_JSON).content(consent.formatted(ownerMobile, "")));
         jdbc.update("update otp_codes set code_hash = ? where id = (select id from otp_codes where mobile = ? "

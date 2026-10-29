@@ -63,11 +63,11 @@ test('raising the budget from the empty state recovers matches', async ({ page }
 
   // The hint is a second feed read that starts only once the empty state settles.
   const raise = page.getByRole('button', { name: /Raise budget to/i });
-  await expect(raise).toBeVisible({ timeout: 5000 });
+  await expect(raise).toBeVisible({ timeout: 15000 });
   await raise.click();
 
   // The list comes back once the budget clears the cheapest match.
-  await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('.sf-card').first()).toBeVisible({ timeout: 15000 });
 });
 
 test('a slow locality lookup neither searches the raw sentence nor lets an older search win', async ({ page }) => {

@@ -5,7 +5,7 @@ import { openFlatmateFilters, openFlatmates } from '../../../helpers/app.js';
 const TABS = ['move-in', 'people', 'teams'];
 const kindOf = (it) => (it.roomType || it.roomKind ? 'room' : (it.members || it.seatsTotal != null) ? 'group' : 'post');
 const lower = (s) => String(s || '').toLowerCase();
-const today = new Date().toISOString().slice(0, 10);
+const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 
 async function feed(tab, params = {}) {
   const qs = new URLSearchParams({ tab, size: '100' });

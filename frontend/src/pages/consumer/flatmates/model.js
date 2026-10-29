@@ -1,25 +1,7 @@
 import { ROOM_SHARE_MAX } from '../../../lib/data/flatSplit.js';
 
-export const TAB_MOVE_IN = 'move-in';
-export const TAB_PEOPLE = 'people';
-export const TAB_TEAMS = 'teams';
-/* Retired board tab (seekers + hunting groups in one list). Saved alerts still carry it, and the
- * server still answers it, so it is only ever read, never offered. */
-export const TAB_TEAM_UP = 'team-up';
-export const TABS = [TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS];
-export const TAB_ICON = { [TAB_MOVE_IN]: 'door-open', [TAB_PEOPLE]: 'user-search', [TAB_TEAMS]: 'users-round' };
-export const KIND_WORD = { [TAB_MOVE_IN]: 'homes', [TAB_PEOPLE]: 'flatmates', [TAB_TEAMS]: 'teams' };
+export { TAB_MOVE_IN, TAB_PEOPLE, TAB_TEAMS, TAB_TEAM_UP, TABS, TAB_ICON, KIND_WORD, normalizeTab } from './tabs.js';
 
-const TAB_ALIAS = {
-  rooms: TAB_MOVE_IN,
-  flatmates: TAB_PEOPLE,
-  [TAB_TEAM_UP]: TAB_PEOPLE,
-  groups: TAB_TEAMS,
-};
-export const normalizeTab = (v) => (TABS.includes(v) ? v : TAB_ALIAS[v] || TAB_MOVE_IN);
-
-/* `attachedBath: true` on master is implied by the kind, so the owner never has to answer the
- * same question twice. */
 export const ROOM_KINDS = {
   master: { key: 'master', label: 'Master bedroom', attachedBath: true, icon: 'bed-double' },
   bedroom: { key: 'bedroom', label: 'Bedroom', attachedBath: false, icon: 'bed-single' },

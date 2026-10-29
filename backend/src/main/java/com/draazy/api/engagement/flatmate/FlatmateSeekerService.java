@@ -339,7 +339,7 @@ public class FlatmateSeekerService {
         return switch (intent) {
             case "bring" -> "Hi! We are two of us looking together — is that alright?";
             case "match" -> "Hi! I'm interested, and happy to share the room with someone.";
-            default -> "Hi! I'm interested in teaming up.";
+            default -> "Hi! I have a room in my flat that could suit you.";
         };
     }
 
@@ -353,11 +353,12 @@ public class FlatmateSeekerService {
     }
 
     private void notify(UUID hostId, FlatmateSeekerPost post, User requester) {
+        String requesterName = FlatmateVocabulary.blankToNull(requester.getName());
 
         notifier.notify(
                 hostId,
                 "flatmate.interest",
-                requester.getName() + " is interested in teaming up",
+                (requesterName == null ? "Someone" : requesterName) + " has a room for you",
                 "Open your request inbox to review their interest.",
                 Notifier.REQUEST_INBOX);
         notifier.notify(

@@ -4,6 +4,6 @@ export const SHARE_OPENER = {
   match: "Hi! I'm interested in this room and I'd like to split it with another flatmate. Is it still available, and are you open to two people sharing it?",
 };
 
-export const SEEKER_OPENER = "Hi! I'm interested in sharing a flat. Let's connect.";
+export const SEEKER_OPENER = "Hi! I have a room in my flat that could suit you. Let's connect.";
 
 export const GROUP_OPENER = "Hi! I'd like to request a spot in your flatmate group — is it still open?";

@@ -300,7 +300,7 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                     host.getId().toString());
             assertThat(notification.get("link")).isEqualTo("/dashboard?tab=leads&box=received");
             assertThat((String) notification.get("title"))
-                    .contains("Jay")
+                    .isEqualTo("Jay has a room for you")
                     .doesNotContainPattern("\\b\\d{10}\\b");
             assertThat((String) notification.get("body"))
                     .contains("request inbox")
@@ -314,6 +314,25 @@ class FlatmateSeekerEndpointsTest extends AbstractApiTest {
                     "select type from notifications where user_id = ?::uuid",
                     String.class, requester.getId().toString()))
                     .containsExactly("flatmate.interest.sent");
+        }
+
+        @Test
+        @DisplayName("says 'Someone' rather than the word null when the room offerer has no name yet")
+        void namelessOffererReadsAsSomeone() throws Exception {
+            User host = user("9812000096", "Nameless Offer Host");
+            User offerer = user("9812000097", null);
+            String id = createPost(host, "Nameless Offer Host", "Baner");
+
+            mvc.perform(post(Routes.Flatmates.POST_INTEREST, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(offerer))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"share\":\"solo\"}"))
+                    .andExpect(status().isCreated());
+
+            assertThat(jdbc.queryForObject(
+                    "select title from notifications where user_id = ?::uuid and type = 'flatmate.interest'",
+                    String.class, host.getId().toString()))
+                    .isEqualTo("Someone has a room for you");
         }
 
         @Test

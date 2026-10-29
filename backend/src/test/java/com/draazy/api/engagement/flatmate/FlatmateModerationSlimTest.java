@@ -115,7 +115,7 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
     }
 
     @Test
-    @DisplayName("a badge-claim card carries no agreement file and no mobile; the popup's detail still does")
+    @DisplayName("a badge-claim card carries no agreement file; the popup's detail still does")
     void reviewRowIsACard() throws Exception {
         User host = user("9813000001", "Slim Host", Roles.Wire.BUYER);
         User staff = user("9813000002", "Mod", Roles.Wire.ADMIN);
@@ -125,8 +125,10 @@ class FlatmateModerationSlimTest extends AbstractApiTest {
         List<Map<String, Object>> rows = JsonPath.read(list, "$.content[?(@.roomId == '" + roomId + "')]");
         assertThat(rows).hasSize(1);
         assertThat(rows.get(0).keySet()).containsExactlyInAnyOrder("id", "kind", "roomId", "groupId", "host",
-                "hostVerified", "evidenceType", "address", "tier", "flagForReview", "ownerConsent", "createdAt");
-        assertThat(rows.get(0)).containsEntry("host", "Slim Host").containsEntry("tier", "tenant");
+                "hostMobile", "hostVerified", "evidenceType", "address", "tier", "flagForReview", "ownerConsent",
+                "createdAt");
+        assertThat(rows.get(0)).containsEntry("host", "Slim Host").containsEntry("hostMobile", "9813000001")
+                .containsEntry("tier", "tenant");
 
         mvc.perform(get(Routes.Moderation.FLATMATE_MODERATION_DETAIL, roomId)
                         .header(HttpHeaders.AUTHORIZATION, bearer(staff)))

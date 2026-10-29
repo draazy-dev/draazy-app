@@ -67,7 +67,7 @@ const Saved = lazyPage(() => import('./pages/consumer/Saved.jsx'), 'compare-save
 const PayRent = lazyPage(() => import('./pages/consumer/PayRentComingSoon.jsx'), 'misc2');
 const ViewDocuments = lazyPage(() => import('./pages/consumer/ViewDocuments.jsx'), 'reels-docs');
 const Messages = lazyPage(() => import('./pages/consumer/Messages.jsx'), 'flatmates', 'misc2');
-const Flatmates = lazyPage(() => import('./pages/consumer/Flatmates.jsx'), 'flatmates', 'owner', 'property', 'verify');
+const Flatmates = lazyPage(() => import('./pages/consumer/Flatmates.jsx'), 'dashboard', 'flatmates', 'list-property', 'owner', 'property', 'verify');
 const FlatmateDetail = lazyPage(() => import('./pages/consumer/FlatmateDetail.jsx'), 'flatmates', 'owner', 'property');
 const OwnerConfirm = lazyPage(() => import('./pages/consumer/OwnerConfirm.jsx'), 'flatmates');
 const Locality = lazyPage(() => import('./pages/consumer/Locality.jsx'), 'listings', 'locality');

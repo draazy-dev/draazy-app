@@ -338,7 +338,10 @@ test.describe('Ops → flatmate desk (live)', () => {
     await dialog.locator('.revoke-review-btn').click();
     await expect(dialog.getByRole('button', { name: 'Confirm revoke' })).toBeDisabled();
     await dialog.getByPlaceholder('Reason for revoking').fill('The owner says the tenancy ended.');
+    const revoked = page.waitForResponse((r) => r.url().endsWith('/revoke') && r.request().method() === 'POST');
     await dialog.getByRole('button', { name: 'Confirm revoke' }).click();
+    expect((await revoked).ok()).toBe(true);
+    await expect(badge.getByText('Rejected because')).toBeVisible();
     await expect(badge).toContainText('tenancy ended');
     const after = await fetch(`${API}/flatmates/rooms/${room.id}`, { headers: auth(accessToken) }).then((r) => r.json());
     expect(after.item.verificationTier, 'a revoked badge leaves the room unbadged').not.toBe('tenant');
