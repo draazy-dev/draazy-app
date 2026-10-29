@@ -252,6 +252,12 @@ public class ServiceRequestsController {
         return identities.forAssignee(principal, id);
     }
 
+    @GetMapping(Routes.ServiceRequests.MASKED_IDENTITIES)
+    public List<MaskedIdentityDto> getMaskedIdentities(@CurrentUser AuthPrincipal principal,
+            @PathVariable String id) {
+        return identities.maskedForParty(principal, id);
+    }
+
     @PostMapping(value = Routes.ServiceRequests.DRAFT,
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize(SERVICES_WRITE)

@@ -5,7 +5,6 @@ import com.draazy.api.common.error.ConflictException;
 import com.draazy.api.common.error.ErrorCodes;
 import com.draazy.api.documents.vault.DocumentRepository;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -89,7 +88,7 @@ class RentAgreementReadiness {
         }
         List<String> missingIdentities = missingIdentities(request);
         if (!missingIdentities.isEmpty()) {
-            throw new ConflictException("Record Aadhaar numbers before checkout: "
+            throw new ConflictException("Record PAN numbers before checkout: "
                     + summarise(missingIdentities) + ".");
         }
         List<String> missingParticulars = missingParticulars(request);
@@ -137,6 +136,10 @@ class RentAgreementReadiness {
             missing.add("Gram panchayat (Yes or No)");
         }
         need(missing, prop.get("area"), "Area");
+        need(missing, prop.get("landmark"), "Landmark");
+        need(missing, prop.get("policeStation"), "Police station");
+        need(missing, prop.get("roadVicinity"), "Road / vicinity");
+        need(missing, prop.get("roadType"), "Road type");
         if (!RESIDENTIAL.contains(String.valueOf(prop.get("propType")))) {
             missing.add("A residential property type");
         }
@@ -144,14 +147,12 @@ class RentAgreementReadiness {
         entity(missing, owner, "Licensor 1");
         need(missing, owner.get("oName"), "Licensor 1 name");
         need(missing, owner.get("oAge"), "Licensor 1 age");
-        need(missing, owner.get("oAddr"), "Licensor 1 address");
         offlinePapers(missing, owner, "Licensor 1");
         List<Map<?, ?>> coOwners = rows(state.get("coOwners"));
         for (int i = 0; i < coOwners.size(); i++) {
             entity(missing, coOwners.get(i), "Licensor " + (i + 2));
             need(missing, coOwners.get(i).get("name"), "Licensor " + (i + 2) + " name");
             need(missing, coOwners.get(i).get("age"), "Licensor " + (i + 2) + " age");
-            need(missing, coOwners.get(i).get("addr"), "Licensor " + (i + 2) + " address");
             offlinePapers(missing, coOwners.get(i), "Licensor " + (i + 2));
         }
         List<Map<?, ?>> tenants = rows(state.get("tenants"));
@@ -160,14 +161,12 @@ class RentAgreementReadiness {
             entity(missing, tenant, "Tenant " + (j + 1));
             need(missing, tenant.get("name"), "Tenant " + (j + 1) + " name");
             need(missing, tenant.get("age"), "Tenant " + (j + 1) + " age");
-            need(missing, tenant.get("addr"), "Tenant " + (j + 1) + " address");
             offlinePapers(missing, tenant, "Tenant " + (j + 1));
         }
         Map<String, Object> wit = ServiceRequestPricing.childObject(state, "wit");
         for (int w = 1; w <= 2; w++) {
             need(missing, wit.get("w" + w + "Name"), "Witness " + w + " name");
             need(missing, wit.get("w" + w + "Age"), "Witness " + w + " age");
-            need(missing, wit.get("w" + w + "Addr"), "Witness " + w + " address");
         }
         return missing;
     }
@@ -213,36 +212,23 @@ class RentAgreementReadiness {
     List<String> missingIdentities(ServiceRequest request) {
         Map<String, Object> state = ServiceRequestPricing.childObject(request.getDetails() == null
                 ? Map.of() : request.getDetails(), "_state");
-        List<Map<?, ?>> licensors = new ArrayList<>();
-        licensors.add(ServiceRequestPricing.childObject(state, "owner"));
-        licensors.addAll(rows(state.get("coOwners")));
+        int licensors = 1 + rows(state.get("coOwners")).size();
         int tenants = Math.max(1, rows(state.get("tenants")).size());
 
-        List<ServiceRequestIdentity> recorded =
-                identities.findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(request.getId());
-        Set<String> identified = recorded.stream().filter(row -> row.getAadhaar() != null).map(row -> row.getPartyRole() + ":" + row.getPartyIndex()).collect(Collectors.toSet());
+        Set<String> identified = identities.findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(request.getId())
+                .stream().filter(row -> row.getPan() != null)
+                .map(row -> row.getPartyRole() + ":" + row.getPartyIndex()).collect(Collectors.toSet());
 
         List<String> missing = new ArrayList<>();
-        for (int i = 0; i < licensors.size(); i++) {
-            if ("resident".equals(residency(licensors.get(i))) && !identified.contains("owner:" + i)) {
+        for (int i = 0; i < licensors; i++) {
+            if (!identified.contains("owner:" + i)) {
                 missing.add("Licensor " + (i + 1));
             }
         }
-        List<Map<?, ?>> tenantRows = rows(state.get("tenants"));
         for (int j = 0; j < tenants; j++) {
-            Map<?, ?> tenant = j < tenantRows.size() ? tenantRows.get(j) : Map.of();
-            if ("resident".equals(residency(tenant)) && !identified.contains("tenant:" + j)) {
+            if (!identified.contains("tenant:" + j)) {
                 missing.add("Tenant " + (j + 1));
             }
-        }
-        for (int w = 0; w < 2; w++) {
-            if (!identified.contains("witness:" + w)) {
-                missing.add("Witness " + (w + 1));
-            }
-        }
-        Set<String> aadhaars = new HashSet<>();
-        if (recorded.stream().map(ServiceRequestIdentity::getAadhaar).filter(Objects::nonNull).anyMatch(aadhaar -> !aadhaars.add(aadhaar))) {
-            missing.add("a distinct Aadhaar number for every party");
         }
         return missing;
     }

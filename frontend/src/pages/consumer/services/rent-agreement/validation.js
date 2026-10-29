@@ -1,7 +1,5 @@
-import { ADDRESS_PROOF_TYPES, AREA_UNITS, DEPOSIT_PAY_FIELDS, DUE_DAY_MAX, FAMILY_MEMBER_TYPES, FAMILY_RELATIONS, MAX_AREA, MAX_FLOOR, MAX_MONTHS, MAX_OCCUPANTS, MAX_POLICE_OCCUPANTS, MH_PINCODE, PARTY_TYPES, PAYMENT_REF, POA_DOC, PROPERTY_ATTRIBUTE_KINDS, PUNE_TALUKAS, RESIDENCIES, RESIDENTIAL_PROPERTY_TYPES, START_DATE_FUTURE_DAYS, START_DATE_PAST_DAYS, TENANT_DOCS_REQUIRED, VISIT_DATE_FUTURE_DAYS } from './constants.js';
-import { digits, isAadhaar, isEmail, isMobile, isPan, num } from './helpers.js';
-/* Every rule here has a twin in the server's `RentAgreementDetailsRules` or checkout gate; the client copy exists so
-   the customer hears about it on the step that owns the field, not as a 422 after payment opens. */
+import { ADDRESS_PROOF_TYPES, AREA_UNITS, DEPOSIT_PAY_FIELDS, FAMILY_MEMBER_TYPES, FAMILY_RELATIONS, MAX_AREA, MAX_FLOOR, MAX_MONTHS, MAX_POLICE_OCCUPANTS, MH_PINCODE, PARTY_TYPES, PAYMENT_REF, POA_DOC, PUNE_TALUKAS, RESIDENCIES, RESIDENTIAL_PROPERTY_TYPES, START_DATE_FUTURE_DAYS, START_DATE_PAST_DAYS, VISIT_DATE_FUTURE_DAYS } from './constants.js';
+import { digits, isMobile, isPan, num } from './helpers.js';
 
 const IST_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
 export const todayIst = (now = new Date()) => IST_DAY.format(now);
@@ -33,29 +31,26 @@ export const docReady = (d) => !!(d?.dataUrl || d?.vaultDocId || d?.filedOn);
 export const residencyOf = (row) => (RESIDENCIES.includes(row?.residency) ? row.residency : 'resident');
 export const isOfflineParty = (row) => ['nri', 'foreign'].includes(residencyOf(row));
 export const isForeignParty = (row) => residencyOf(row) === 'foreign';
-export const partyDocSlugs = (row) => ['pan', isOfflineParty(row) ? 'passport' : 'aadhaar', ...(isForeignParty(row) ? ['visa'] : []), 'photo'];
-const TENANT_DOC_KEYS = { pan: '0', aadhaar: '1', passport: '1', photo: '2', income: '3', visa: '4', addressproof: '5', prevaddressproof: '6' };
+export const partyDocSlugs = (row) => [...(isOfflineParty(row) ? ['passport'] : []), ...(isForeignParty(row) ? ['visa'] : [])];
+export const TENANT_DOC_KEYS = { passport: '1', visa: '4', addressproof: '5', prevaddressproof: '6', workidproof: '7' };
 export const tenantDocKey = (i, slug) => `t${i}-${TENANT_DOC_KEYS[slug]}`;
 export const workProofRequired = (occupation) => !/\b(student|home\s*maker|homemaker|housewife|retired)\b/i.test(String(occupation || ''));
 export const addressProofUploadRequired = (tenant) => (tenant?.police ? tenant.police.addressProofType || '' : 'uid') !== 'uid';
 export const previousAddressProofUploadRequired = (tenant) => tenant?.police?.previousSameAsPermanent === false && (tenant.police.previousAddressProofType || '') !== 'uid';
 export const ownerDocSlots = (owner) => [
-  'o-pan',
-  isOfflineParty(owner) ? 'o-passport' : 'o-aadhaar',
+  ...(isOfflineParty(owner) ? ['o-passport'] : []),
   ...(isForeignParty(owner) ? ['o-visa'] : []),
-  'o-photo',
   'o-own',
   ...(owner?.capacity === 'poa' ? [POA_DOC] : []),
 ];
 export const coOwnerDocSlots = (c, i) => [...partyDocSlugs(c), ...(c?.capacity === 'poa' ? ['poa'] : [])].map((s) => `c${i}-${s}`);
 export const tenantDocSlots = (tenant, i) => {
-  const required = (slug) => TENANT_DOCS_REQUIRED.includes(Number(TENANT_DOC_KEYS[slug]))
-    || slug === 'passport'
+  const required = (slug) => slug === 'passport'
     || slug === 'visa'
-    || (slug === 'income' && workProofRequired(tenant?.occupation))
     || (slug === 'addressproof' && addressProofUploadRequired(tenant))
-    || (slug === 'prevaddressproof' && previousAddressProofUploadRequired(tenant));
-  return [...partyDocSlugs(tenant), 'income', 'addressproof', 'prevaddressproof'].map((slug) => ({ slug, key: tenantDocKey(i, slug), required: required(slug) }));
+    || (slug === 'prevaddressproof' && previousAddressProofUploadRequired(tenant))
+    || (slug === 'workidproof' && workProofRequired(tenant?.occupation));
+  return [...partyDocSlugs(tenant), 'addressproof', 'prevaddressproof', 'workidproof'].map((slug) => ({ slug, key: tenantDocKey(i, slug), required: required(slug) }));
 };
 
 const blank = (v) => !String(v ?? '').trim();
@@ -63,13 +58,13 @@ const wholeIn = (v, lo, hi) => /^\d+$/.test(String(v).trim()) && Number(v) >= lo
 const passportOk = (v) => /^[A-Za-z0-9]{6,20}$/.test(String(v || '').trim());
 
 const licensorIds = ({ owner, coOwners = [], ownerMode, invite }) => (ownerMode === 'invite'
-  ? [{ m: ['invMobile', invite?.invMobile], a: ['invAadhaar', ''], pan: ['invPan', ''] }]
+  ? [{ m: ['invMobile', invite?.invMobile], pan: ['invPan', ''] }]
   : [
-  { m: ['oMobile', owner?.oMobile], a: ['oAadhaar', owner?.oAadhaar], pan: ['oPan', owner?.oPan] },
-  ...coOwners.map((c, i) => ({ m: [`c${i}mobile`, c.mobile], a: [`c${i}aadhaar`, c.aadhaar], pan: [`c${i}pan`, c.pan] })),
+  { m: ['oMobile', owner?.oMobile], pan: ['oPan', owner?.oPan] },
+  ...coOwners.map((c, i) => ({ m: [`c${i}mobile`, c.mobile], pan: [`c${i}pan`, c.pan] })),
 ]);
-const tenantIds = ({ tenants = [] }) => tenants.map((t, i) => ({ m: [`t${i}mobile`, t.mobile], a: [`t${i}aadhaar`, t.aadhaar], pan: [`t${i}pan`, t.pan] }));
-const witnessIds = ({ wit = {} }) => [1, 2].map((n) => ({ m: [`w${n}Mobile`, wit[`w${n}Mobile`]], a: [`w${n}Aadhaar`, wit[`w${n}Aadhaar`]], pan: [`w${n}Pan`, ''] }));
+const tenantIds = ({ tenants = [] }) => tenants.map((t, i) => ({ m: [`t${i}mobile`, t.mobile], pan: [`t${i}pan`, t.pan] }));
+const witnessIds = ({ wit = {} }) => [1, 2].map((n) => ({ m: [`w${n}Mobile`, wit[`w${n}Mobile`]], pan: [`w${n}Pan`, ''] }));
 
 const panKey = (v) => String(v || '').trim().toUpperCase();
 const flagDuplicates = (e, before, mine, pick, norm = digits) => {
@@ -84,10 +79,9 @@ const flagDuplicates = (e, before, mine, pick, norm = digits) => {
 };
 const distinctParties = (e, before, mine) => {
   flagDuplicates(e, before, mine, (p) => p.m);
-  flagDuplicates(e, before, mine, (p) => p.a);
   flagDuplicates(e, before, mine, (p) => p.pan, panKey);
 };
-export const dupMessageKey = (key) => `services.ra.err.${/mobile$/i.test(key) ? 'dupMobile' : /pan$/i.test(key) ? 'dupPan' : 'dupAadhaar'}`;
+export const dupMessageKey = (key) => `services.ra.err.${/mobile$/i.test(key) ? 'dupMobile' : 'dupPan'}`;
 
 const checkPoa = (e, prefix, row, today) => {
   if (row?.capacity !== 'poa') return;
@@ -98,7 +92,6 @@ const checkPoa = (e, prefix, row, today) => {
 
 const checkDocs = (e, docs, slots) => slots.forEach((k) => { if (!docReady(docs?.[k])) e['doc-' + k] = 'required'; });
 
-const checkEmail = (e, key, v) => { if (!blank(v) && !isEmail(v)) e[key] = 'format'; };
 const checkOptionalArea = (e, key, v) => {
   if (blank(v)) return;
   const area = Number(String(v ?? '').trim());
@@ -108,30 +101,25 @@ const checkAge = (e, key, v, required) => {
   if (blank(v)) { if (required) e[key] = 'required'; return; }
   if (!wholeIn(v, 18, 120)) e[key] = 'range';
 };
-const checkIdentity = (e, p, row, keys) => {
-  if (blank(row[keys.mother])) e[p + keys.mother] = 'required';
-  if (!blank(row[keys.mother]) && String(row[keys.mother]).trim().length > 80) e[p + keys.mother] = 'range';
-  if (!blank(row[keys.alias]) && String(row[keys.alias]).trim().length > 80) e[p + keys.alias] = 'range';
-  if (blank(row[keys.dob])) { e[p + keys.dob] = 'required'; return; }
-  const age = ageFromDob(row[keys.dob]);
-  if (!age || !wholeIn(age, 18, 120)) e[p + keys.dob] = 'range';
-  else if (!blank(row[keys.age]) && String(row[keys.age]).trim() !== age) e[p + keys.age] = 'match';
+const checkDob = (e, key, dob) => {
+  if (blank(dob)) { e[key] = 'required'; return; }
+  const age = ageFromDob(dob);
+  if (!age || !wholeIn(age, 18, 120)) e[key] = 'range';
 };
-const checkPerson = (e, p, row) => {
+const onFile = (held, pan) => (blank(pan) && held ? held : {});
+const checkPerson = (e, p, row, held) => {
+  const kept = onFile(held, row.pan);
   if (!PARTY_TYPES.includes(row.type || 'individual')) e[p + 'type'] = 'format';
   if (row.type === 'entity') e[p + 'type'] = 'entity';
   if (!RESIDENCIES.includes(row.residency || 'resident')) e[p + 'residency'] = 'format';
   if (blank(row.name)) e[p + 'name'] = 'required';
-  checkIdentity(e, p, row, { mother: 'mother', dob: 'dob', alias: 'alias', age: 'age' });
-  checkAge(e, p + 'age', row.age, true);
-  if (!isPan(row.pan)) e[p + 'pan'] = 'format';
+  checkDob(e, p + 'dob', row.dob);
+  if (!kept.pan && !isPan(row.pan)) e[p + 'pan'] = 'format';
   if (isOfflineParty(row)) {
     if (!passportOk(row.passport)) e[p + 'passport'] = 'format';
     if (isForeignParty(row) && blank(row.visaOci)) e[p + 'visaOci'] = 'required';
-  } else if (!isAadhaar(row.aadhaar)) e[p + 'aadhaar'] = 'format';
+  }
   if (!isMobile(row.mobile)) e[p + 'mobile'] = 'format';
-  checkEmail(e, p + 'email', row.email);
-  if (blank(row.addr)) e[p + 'addr'] = 'required';
 };
 
 const checkPoliceAddress = (e, p, group, row) => {
@@ -175,24 +163,22 @@ function licensorErrors(e, f, today) {
   if (!PARTY_TYPES.includes(owner.type || 'individual')) e.type = 'format';
   if (owner.type === 'entity') e.type = 'entity';
   if (!RESIDENCIES.includes(owner.residency || 'resident')) e.residency = 'format';
-  checkIdentity(e, '', owner, { mother: 'oMother', dob: 'oDob', alias: 'oAlias', age: 'oAge' });
-  checkAge(e, 'oAge', owner.oAge, true);
-  if (!isPan(owner.oPan)) e.oPan = 'format';
+  checkDob(e, 'oDob', owner.oDob);
+  const kept = onFile(f.held?.['owner-0'], owner.oPan);
+  if (!kept.pan && !isPan(owner.oPan)) e.oPan = 'format';
   if (isOfflineParty(owner)) {
     if (!passportOk(owner.passport)) e.passport = 'format';
     if (isForeignParty(owner) && blank(owner.visaOci)) e.visaOci = 'required';
-  } else if (!isAadhaar(owner.oAadhaar)) e.oAadhaar = 'format';
+  }
   if (!isMobile(owner.oMobile)) e.oMobile = 'format';
   else if (!f.listed && f.selfMobile && ![owner.oMobile, ...coOwners.map((c) => c.mobile)].some((m) => digits(m).slice(-10) === digits(f.selfMobile).slice(-10))) e.oMobile = 'notOwner';
-  checkEmail(e, 'oEmail', owner.oEmail);
-  if (blank(owner.oAddr)) e.oAddr = 'required';
   const cap = owner.capacity || 'owner';
   if ((coOwners.length && cap === 'owner') || (!coOwners.length && cap === 'co-owner')) e.capacity = 'mismatch';
   checkPoa(e, '', owner, today);
   checkDocs(e, ownerDocs, ownerDocSlots(owner));
   coOwners.forEach((c, i) => {
     const p = `c${i}`;
-    checkPerson(e, p, c);
+    checkPerson(e, p, c, f.held?.[`owner-${i + 1}`]);
     checkPoa(e, p, c, today);
     checkDocs(e, ownerDocs, coOwnerDocSlots(c, i));
   });
@@ -209,7 +195,7 @@ function tenantErrors(e, f) {
     return;
   }
   tenants.forEach((t, i) => {
-    checkPerson(e, `t${i}`, t);
+    checkPerson(e, `t${i}`, t, f.held?.[`tenant-${i}`]);
     checkPoliceRecord(e, `t${i}`, t);
     checkDocs(e, tenantDocs, tenantDocSlots(t, i).filter((slot) => slot.required).map((slot) => slot.key));
   });
@@ -231,7 +217,7 @@ function depositPaymentErrors(e, terms, today) {
   if (rows.reduce((sum, r) => sum + num(r.amount), 0) !== deposit) e.depositPayments = 'total';
 }
 
-function termErrors(e, { terms, tenants = [] }, bounds) {
+function termErrors(e, { terms }, bounds) {
   if (!terms.startDate) e.startDate = 'required';
   else if (terms.startDate < bounds.min || terms.startDate > bounds.max) e.startDate = 'range';
   if (!num(terms.rent)) e.rent = 'required';
@@ -240,12 +226,7 @@ function termErrors(e, { terms, tenants = [] }, bounds) {
   if (!wholeIn(terms.months, 1, MAX_MONTHS)) e.months = 'range';
   const cap = Number.isFinite(months) && months >= 1 ? Math.min(months, MAX_MONTHS) : MAX_MONTHS;
   if (!blank(terms.lockin) && !wholeIn(terms.lockin, 0, cap)) e.lockin = 'range';
-  if (!blank(terms.notice) && !wholeIn(terms.notice, 0, cap)) e.notice = 'range';
-  if (!blank(terms.dueDay) && !wholeIn(terms.dueDay, 1, DUE_DAY_MAX)) e.dueDay = 'range';
   if (!blank(terms.increment) && !wholeIn(terms.increment, 0, 100)) e.increment = 'range';
-  if (!blank(terms.occupants) && !wholeIn(terms.occupants, 1, MAX_OCCUPANTS)) e.occupants = 'range';
-  const namedOccupants = tenants.length + tenants.reduce((sum, t) => sum + (Array.isArray(t.police?.occupants) ? t.police.occupants.length : 0), 0);
-  if (!e.occupants && num(terms.occupants) > 0 && namedOccupants > num(terms.occupants)) e.occupants = 'range';
   checkOptionalArea(e, 'parkingArea', terms.parkingArea);
   if (!blank(terms.parkingAreaUnit) && !AREA_UNITS.includes(terms.parkingAreaUnit)) e.parkingArea = 'range';
   const visit = visitDateBounds();
@@ -253,16 +234,12 @@ function termErrors(e, { terms, tenants = [] }, bounds) {
   depositPaymentErrors(e, terms, bounds.today);
 }
 
-function propertyAttributeErrors(e, prop) {
-  const rows = prop.propertyAttributes;
-  if (rows == null) return;
-  if (!Array.isArray(rows)) { e.propertyAttributes = 'format'; return; }
-  rows.forEach((row, i) => {
-    const hasKind = !blank(row?.kind);
-    const hasNumber = !blank(row?.number);
-    if (!hasKind && !hasNumber) return;
-    if (!PROPERTY_ATTRIBUTE_KINDS.includes(row.kind)) e[`pa${i}kind`] = 'format';
-    if (!hasNumber || String(row.number).trim().length > 80) e[`pa${i}number`] = 'required';
+const IGR_TEXT_LIMITS = { landmark: 80, policeStation: 80, roadVicinity: 80, roadType: 80 };
+
+function propertyIgrErrors(e, prop) {
+  Object.entries(IGR_TEXT_LIMITS).forEach(([key, max]) => {
+    if (blank(prop[key])) e[key] = 'required';
+    else if (String(prop[key]).trim().length > max) e[key] = 'range';
   });
 }
 
@@ -273,8 +250,6 @@ function witnessErrors(e, f) {
     if (blank(wit[p + 'Name'])) e[p + 'Name'] = 'required';
     checkAge(e, p + 'Age', wit[p + 'Age'], true);
     if (!isMobile(wit[p + 'Mobile'])) e[p + 'Mobile'] = 'format';
-    if (blank(wit[p + 'Addr'])) e[p + 'Addr'] = 'required';
-    if (!isAadhaar(wit[p + 'Aadhaar'])) e[p + 'Aadhaar'] = 'format';
   });
   const tenantSide = tenantIds(f);
   distinctParties(e, [...licensorIds(f), ...tenantSide], witnessIds(f));
@@ -286,7 +261,7 @@ export function stepErrors(step, form, now = new Date()) {
   const bounds = startDateBounds(now);
   if (step === 0) {
     const { prop } = form;
-    ['flatNo', 'locality', 'taluka', 'villageCity'].forEach((k) => { if (blank(prop[k])) e[k] = 'required'; });
+    ['flatNo', 'locality', 'taluka'].forEach((k) => { if (blank(prop[k])) e[k] = 'required'; });
     if (blank(prop.society)) e.society = 'required';
     if (typeof prop.gramPanchayat !== 'boolean') e.gramPanchayat = 'required';
     if (!blank(prop.taluka) && !PUNE_TALUKAS.includes(prop.taluka)) e.taluka = 'format';
@@ -296,9 +271,7 @@ export function stepErrors(step, form, now = new Date()) {
     const area = Number(String(prop.area ?? '').trim());
     if (!/^\d+(\.\d{1,2})?$/.test(String(prop.area ?? '').trim()) || !(area >= 1 && area <= MAX_AREA)) e.area = 'required';
     if (!blank(prop.floor) && !wholeIn(prop.floor, 0, MAX_FLOOR)) e.floor = 'range';
-    propertyAttributeErrors(e, prop);
-    checkOptionalArea(e, 'galleryArea', prop.galleryArea);
-    if (!blank(prop.galleryAreaUnit) && !AREA_UNITS.includes(prop.galleryAreaUnit)) e.galleryArea = 'range';
+    propertyIgrErrors(e, prop);
   } else if (step === 1) licensorErrors(e, form, bounds.today);
   else if (step === 2) tenantErrors(e, form);
   else if (step === 3) termErrors(e, form, bounds);

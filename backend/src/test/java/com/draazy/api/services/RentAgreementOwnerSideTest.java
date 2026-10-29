@@ -26,7 +26,7 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
     private static final List<String> PAPERS = List.of("pan", "aadhaar", "photo");
     private static final String PROP = "\"prop\":{\"gramPanchayat\":false,\"propType\":\"Flat / Apartment\","
             + "\"flatNo\":\"B-1204\",\"society\":\"Skyline Heights\",\"locality\":\"Baner\",\"pincode\":\"411045\","
-            + "\"area\":\"850\"}";
+            + "\"area\":\"850\"," + IGR_PROP_FIELDS + "}";
     private static final String WITNESSES = "\"wit\":{\"w1Name\":\"Suresh Patil\",\"w1Age\":\"41\","
             + "\"w1Addr\":\"Karve Road, Pune\",\"w2Name\":\"Meera Joshi\",\"w2Age\":\"36\",\"w2Addr\":\"JM Road, Pune\"}";
     private static final String OWNER_ROW = "{\"partyRole\":\"owner\",\"partyIndex\":0,\"partyName\":\"Asha\","
@@ -133,7 +133,7 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
             upload(tenant, id, "tenant-0-" + paper, 201);
         }
         identities(tenant, id, rows(TENANT_ROW, WITNESS_ROWS)).andExpect(status().isNoContent());
-        pending(checkout(tenant, id), "Ownership proof");
+        pending(checkout(tenant, id), "Index II");
 
         for (String paper : PAPERS) {
             upload(owner, id, "licensor-0-" + paper, 201);
@@ -209,7 +209,7 @@ class RentAgreementOwnerSideTest extends ServiceFixtures {
         return mvc.perform(post(Routes.ServiceRequests.CHECKOUT, id)
                 .header(HttpHeaders.AUTHORIZATION, bearer(caller))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"declaration\":\"ra-decl-2026-09\"}"));
+                .content("{\"declaration\":\"ra-decl-2026-10\"}"));
     }
 
     private static String rows(String... rows) {

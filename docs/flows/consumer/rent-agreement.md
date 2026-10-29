@@ -3,7 +3,7 @@
 > The owner-driven (or co-filled) Maharashtra Leave & License agreement wizard: capture property,
 > owner, tenant(s), terms, witnesses; compute statutory + platform cost; submit into the ops
 > workflow; then track drafting, approval, e-registration and download.
-> The identity documents collected here (both parties' PAN/Aadhaar + the registered agreement) are a
+> The identity details collected here (both parties' PAN + the registered agreement; Aadhaar is taken by staff at the doorstep visit) are a
 > **statutory requirement of the instrument**, not a tier of the trust ladder: a registrable rent
 > agreement names and identifies its parties, so the paperwork is the product. This is the one place
 > in the app a document is genuinely required, and it has nothing to do with the Verified badge —
@@ -143,20 +143,20 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
   desk record; the browser does not maintain a ticket mirror.
 - **Owner KYC** - `draazyOwnerKYC:<mobile>` (autofill + persist on submit).
 - **Document vault** - `documentService` over `GET`/`POST /me/documents/personal`: owner
-  PAN/Aadhaar/photo/ownership proof reused across the wizard and dashboard (`OWNER_VAULT_CAT`). A
+  ownership proof reused across the wizard and dashboard (`OWNER_VAULT_CAT`). A
   vault row carries a signed URL, not bytes, so a reused slot is held by `vaultDocId` and filed onto
   the request server-side by `POST /service-requests/{id}/docs/from-vault`.
-- **Draft (`dzDraft:rentAgreement`)** - autosave/restore of the whole wizard *except* PAN and
-  Aadhaar. Those are stripped before the draft is written (the same redaction the co-fill payload
-  uses), and a draft written before that rule is redacted in place the next time the wizard opens.
-  A mid-fill refresh therefore brings back every answer with those two blank, and the restored-draft
-  banner says so. Attached papers are kept as `docRefs` — never bytes: a vault-backed slot comes back
+- **Draft (`dzDraft:rentAgreement`)** - autosave/restore of the whole wizard *except* PAN. It is
+  stripped before the draft is written (the same redaction the co-fill payload uses), and a draft
+  written before that rule is redacted in place the next time the wizard opens. Fields the wizard
+  no longer collects are dropped on restore (`withDefaults` keeps only the factory keys). A mid-fill
+  refresh therefore brings back every answer with the PAN blank, and the restored-draft banner says so. Attached papers are kept as `docRefs` — never bytes: a vault-backed slot comes back
   whole, any other comes back as a "Re-attach <name>" marker that does not count as uploaded.
 - **Identity numbers (D151)** - `PUT /service-requests/{id}/identities`, once, immediately after the
-  live create and before the checkout modal opens. This is the *only* place PAN and Aadhaar leave the
-  tab: not in `details` (plaintext `jsonb`, echoed to every staff read), not in the draft, not in the
+  live create and before the checkout modal opens. This is the *only* place a PAN leaves the
+    tab (the wizard never collects Aadhaar; staff record it at the doorstep via the desk): not in `details` (plaintext `jsonb`, echoed to every staff read), not in the draft, not in the
   co-fill payload, not in `draazyOwnerKYC`. Built by `identityParties(owner, tenants)` from live
-  component state, sent, and not retained; the server answers 204 so there is nothing to echo back.
+  component state (a PAN row per licensor, co-owner and tenant; none for witnesses), sent, and not retained; the server answers 204 so there is nothing to echo back.
   On the desk's side only the operator the request is **assigned to** can read them back — an admin
   is refused until they take the request — every read and every refusal is written to `audit_log`,
   and the numbers are blanked when the request completes or is cancelled. A failure here is
@@ -170,42 +170,46 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
 
 ### 5.1 Wizard shape (6 steps)
 `STEP_LABELS = [Property, Owner, Tenant, Terms, Witnesses, Review]` (`step` 0..5).
-- **Step 0 Property:** propType (`RESIDENTIAL_PROPERTY_TYPES` only), furnish, flat no, society,
-  locality, city (default Pune), taluka and village/city for Pune district, optional road name and
-  police station, pincode; area (required, 1..1,00,000, two decimals) with its basis (`areaBasis`
-  carpet | built-up, default carpet) and unit (`areaUnit` sqft | sqm), floor (optional, 0..200, 0 =
-  ground), repeatable CTS / survey / plot / property attribute rows, and optional gallery/balcony
-  area. The wing rides in the flat number (*B-1204*). Society is the list-property wizard's
+- **Step 0 Property:** propType (`RESIDENTIAL_PROPERTY_TYPES` only), flat no, society,
+  locality, city (default Pune), taluka, gram panchayat yes/no, pincode; area (required,
+  1..1,00,000, two decimals) with unit (`areaUnit` sqft | sqm), floor (optional, 0..200, 0 =
+  ground). The IGR "Tenant Information for Police Records" tab also needs `landmark`,
+  `policeStation` (plain text, no suggestion list), `roadVicinity` and `roadType` (required, free
+  text ≤80 each), rendered by `IgrPropertyFields.jsx`. Everything else the portal asks about the
+  property (village/city, road, CTS / survey numbers, zone, construction type, building age, gallery
+  area) is read by staff from the owner's Index II, which is the one mandatory owner upload
+  (`OWNER_DOCS_REQUIRED = ['o-own']`, labelled "Index II"). Furnishing and area
+  basis are not asked. The wing rides in the flat number (*B-1204*). Society is the list-property wizard's
   `SocietySelect` (curated + MahaRERA catalogue, binding `societyId`) and locality is a
   `LocalitySelect` over `localityNames()` that fills a blank pincode from the chosen locality.
   Choosing one of the owner's own listings reads it with `myListing` (the list row lacks the address
-  parts) and overwrites with its non-empty values; `?listing=`/`?flat=` fills blanks only and leaves a
-  restored furnishing alone (furnish map unfurnished/semi/furnished; rent/deposit from listing).
-  The listing's carpet area wins over its built-up one and sets the basis to match; a listing
-  measured in another unit leaves the area to type, and the basis and unit only move with the area.
+  parts) and overwrites with its non-empty values; `?listing=`/`?flat=` fills blanks only
+  (rent/deposit from listing). The listing's carpet area wins over its built-up one; a listing
+  measured in another unit leaves the area to type, and the unit only moves with the area.
   There is no Residential/Commercial toggle:
   a commercial licence differs on TDS (194-I, not 194-IB) and clause set, so commercial premises
   are sent to `/services/property-legal` instead of being drafted on residential terms.
-- **Step 1 Owner:** the primary licensor — name, mother's name, DOB (which derives age),
-  optional alias, gender, PAN, Aadhaar, mobile, email, address —
+- **Step 1 Owner:** the primary licensor — name, DOB (which derives age), PAN, mobile —
   plus `capacity` (owner / co-owner / POA holder; a POA holder adds principal, POA registration
   no., SRO and date, `PoaFields.jsx`). `coOwners[]` (`CoOwnerBlock.jsx`) adds every other owner on
   title: all of them execute the deed. Autofilled from `draazyOwnerKYC:<mobile>` or the session user.
 - **Step 2 Tenant:** `tenantMode` = `fill` (one or more tenants, `addTenant`/`removeTenant`) or
-  `invite` (send a co-fill link). Tenant fields mirror owner KYC, including mother's name, DOB and
-  alias, then add the IGR police record under `tenant.police`: permanent/previous address toggles
+  `invite` (send a co-fill link). Tenant fields mirror the owner (name, DOB, PAN, mobile) plus
+    occupation, which drives `workProofRequired` for the police record, then add the IGR police record under `tenant.police`: permanent/previous address toggles
   (pincode, village/city, police station, address), address proof type for permanent and for a
-  different previous address, workplace address + work ID proof type, and optional family/co-occupant
+  different previous address, workplace address + work ID proof type, and a **Work ID proof** upload
+  (`workidproof`, doc key `t{i}-7`, checklist category `tenant-{i}-workidproof`) required whenever
+  `workProofRequired` (anyone but a student, homemaker or retired person; dropped when the occupation changes
+  to one of those), and optional family/co-occupant
   rows whose added fields are all mandatory.
 - **Step 3 Terms:** startDate, months (a preset 11/12/22/24/36/60, default 11, or *Other…* for any
   1..60 — a restored non-preset term reopens as *Other…*), rent, deposit, non-refundable deposit,
   increment % (default 5; labelled *Increase on Renewal* for a term of 11 months or less) and, for a
-  longer term, how often it applies (every 11 or 12 months, default 11), lock-in (6), notice (2),
-  due day (5), pay mode; how the refundable deposit was paid (`depositPayments`, see § validation);
-  maintenance payer; the deed's who-pays clauses, pre-answered with the Pune
-  norm — electricity & water (`utilitiesBy`, Tenant), property tax (`taxBy`, Owner), stamp duty &
-  registration (`costBy`, Split | Tenant | Owner); parking (`none` | `two-wheeler` | `car` |
-  `both`) with optional parking area when parking is included; optional occupant count; the registration area, shown read-only because it follows the
+  longer term, how often it applies (every 11 or 12 months, default 11), lock-in (6); how the
+    refundable deposit was paid (`depositPayments`, see § validation); maintenance payer; stamp duty &
+    registration (`costBy`, Split | Tenant | Owner); parking (`none` | `two-wheeler` | `car` |
+    `both`) with optional parking area when parking is included; notice period, rent due day, payment
+    mode, utilities, property tax and occupant count are not asked; the registration area, shown read-only because it follows the
   locality (see § 5.2); deed language (`language`,
   English | Marathi, default English); the biometric-visit preference — where (`visitAt`, property |
   licensor | licensee, default property), an optional preferred date (`visitDate`, tomorrow to 90
@@ -214,16 +218,16 @@ Link to [`../../system/data-model.md`](../../system/data-model.md).
   lapses before the invited side submits never blocks them. The desk sees all of it in
   `DeedParticulars`. Furniture list
   (`useRaFurniture`) + extra clauses.
-- **Step 4 Witnesses:** two attesting witnesses, both required (name, mobile, Aadhaar, address);
-  e-registration identifies each by Aadhaar biometrics.
+- **Step 4 Witnesses:** two attesting witnesses, both required (name, age, mobile); staff verify
+  each by Aadhaar OTP and biometrics at the visit.
 - **Step 5 Review:** a declaration checkbox is required before `generate`. It is the authority to
-  draft and e-register plus consent to the Aadhaar and PAN being used for this deed only (Aadhaar Act
+  draft and e-register plus consent to the PAN (and the Aadhaar taken at the visit) being used for this deed only (Aadhaar Act
   s.8, DPDP Act 2023 s.6), and checkout sends its version (`DECLARATION_VERSION`); see *Payment opens
   only once the agreement is registrable*.
 
 **`LAST_PUBLIC_STEP` (`constants.js`)** is the index of the last step a signed-out visitor may
 reach. Step 0 asks only about the building, so the Estimated Total is visible before any commitment;
-every later step collects PAN, Aadhaar and scans, which must not be taken from a session with no
+every later step collects PAN and papers, which must not be taken from a session with no
 account behind it — no consent record, no audit trail, nobody to attribute the data to (Aadhaar Act
 s.29). It is a named constant rather than a literal because three places must agree: the gate in
 `useRentAgreement.next`, the clamp that restores a signed-out visitor, and the padlocks the progress
@@ -244,9 +248,10 @@ months  = parseInt(terms.months) || 11
 every   = terms.incrementEvery (11 | 12, default 11)
 years   = ceil(months / 12)
 rentForTerm = Σ monthly rent × months it is paid, the rent rising by increment% every `every`
-              months, compounding, each escalated rent rounded half-up to the rupee
+              months, compounding; each escalated rent is rounded to paise, then its paise are dropped
 taxable = rentForTerm + nr + 0.10 * dep * years      // L&L taxable value
-stamp   = max(100, ceil(0.0025 * taxable / 100) * 100) // 0.25%, up to the next ₹100, ₹100 floor
+exact   = 0.0025 * taxable                           // Charges.exactDutyInPaise, shown with paise
+stamp   = max(100, round(exact))                     // nearest rupee, ₹100 floor
 reg     = isGramPanchayat(prop.locality) ? 500 : 1000 // registration fee
 dhc     = 300                                        // document handling charge
 service = feeRow.platformFee                         // getDealFees('rent').platformFee
@@ -261,13 +266,16 @@ total   = stamp + reg + dhc + service
   top-level `regArea`, so a `_state.terms.regArea` cannot pick the cheaper fee. The desk corrects the
   area from the Index II at pickup as a priced-terms amendment (`regArea: urban | rural`); the
   customer accepts it, and pays the ₹500 difference or has it left on record for a refund.
-- The duty is billed as GRAS collects it (D-a): the IGR calculator rounds up to the next ₹100 and
-  never charges less than ₹100, so a ₹917.50 duty bills ₹1,000. The ceiling reads the unrounded duty
-  (₹100.01 bills ₹200); the wizard does it in integer tenths of a rupee so no float lands a whole
-  hundred one step high. The server keeps the formula's own figure as `Charges.exactDuty`.
+- The duty matches the IGR Leave & License calculator
+  (leaveandlicense.igrmaharashtra.gov.in/Fees/calculator_sd), which supersedes D-a's "next ₹100":
+  it rounds to the nearest rupee and never charges less than ₹100, so a ₹917.50 duty bills ₹918.
+  Both sides work in integer tenths of a rupee so no float tips a half the wrong way. The unrounded
+  duty is returned as `charges.exactDutyInPaise` and shown under the stamp line; every charge and
+  the total display with paise (₹918.00) and are whole rupees, so what we collect is exactly what
+  GRAS takes.
 - The FAQ states the same rule in words: stamp duty = 0.25% of (rent for the full period, including
   agreed increases, + non-refundable deposit + 10% of the refundable deposit per year of term);
-  rounded up to the next ₹100, minimum ₹100); registration Rs 1,000 urban / Rs 500 rural; DHC ₹300. `service` is admin-controlled and is the only Draazy
+  rounded to the nearest rupee, minimum ₹100; registration Rs 1,000 urban / Rs 500 rural; DHC ₹300. `service` is admin-controlled and is the only Draazy
   revenue line here; the government levies pass through.
 - The increment and its interval live only in `_state.terms` (`increment`, `incrementEvery`); the
   server refuses an interval other than 11 or 12 and an increment with more than two decimals.
@@ -275,19 +283,19 @@ total   = stamp + reg + dhc + service
 
 ### 5.3 Validation (`validation.js` → `stepErrors`)
 - Step 0: residential propType, flatNo, society, locality and area required (server: area 1..100000,
-  basis, unit and floor 0..200 when stated, and the area is named at checkout); pincode `^\d{6}$` and in
+  unit and floor 0..200 when stated, and the area is named at checkout); pincode `^\d{6}$` and in
   Maharashtra — 40–44, not Goa's 403 (`MH_PINCODE`; the server refuses `_state.prop.pincode`
   outside it with a 422).
 - Step 1: every licensor's name, age 18..120 (a minor's agreement is void; the server refuses a
   stated age under 18 with a 422 and a missing one at checkout), PAN `^[A-Za-z]{5}\d{4}[A-Za-z]$`,
-  Aadhaar (12 digits, not starting 0/1, Verhoeff check digit — `helpers.isAadhaar`), mobile
-  `^[6-9]\d{9}$`, address; owner email format; capacity, and the POA details when capacity is POA;
-  the four owner documents. Gender starts unchosen and stays optional; occupation is optional.
-- Step 2 (fill): each tenant by the same patterns plus their three documents; (invite): valid invite
+  mobile `^[6-9]\d{9}$`; capacity, and the POA details when capacity is POA;
+  the ownership proof (and passport/visa for an NRI or foreigner). There is no Aadhaar, mother's
+  name, alias, gender, email, address or occupation input, and no PAN/Aadhaar/photo upload.
+- Step 2 (fill): each tenant by the same patterns plus tenant occupation; (invite): valid invite
   mobile.
 - Step 3: startDate within today−30..today+180 (IST), months 1..60, rent > 0, deposit stated (0 is
-  a valid deposit), lock-in and notice ≤ months, due day 1..28 (server too), increment 0..100,
-  occupants 1..20 when stated (server too; the server also refuses a payer, cost bearer or parking
+  a valid deposit), lock-in ≤ months, increment 0..100
+  (server: a payer, cost bearer or parking
   value the wizard does not offer). A deposit above ₹0 needs `depositPayments` — one to ten rows,
   each in an IGR portal mode (`upi`: ref/UTR, amount, date; `netbanking`: bank, branch, ref, amount,
   date; `dd`: bank, branch, DD/cheque date and number, amount; `cash`: date, amount), ref 4–30 letters
@@ -296,23 +304,21 @@ total   = stamp + reg + dhc + service
   the section existed still pass; the details guard checks a well-formed `ref` on a UPI / Internet
   Banking / DD row for a PAN only, since a 12-digit UTR can pass the Aadhaar checksum.
   Advisory, never blocking: *Cash* with any sum ≥ ₹2 lakh shows the s.269ST note; rent over
-  ₹50,000/month shows the s.194-IB TDS note. The furniture list is checked against step 1's
-  furnishing: *Unfurnished* with a preset beyond the usual fittings (`FIXTURES` — fans, lights,
-  geyser, modular kitchen…) offers a one-tap *Mark it Semi-Furnished*; *Semi-/Furnished* with an
-  empty list asks for one, since it is what the deposit is settled against.
-- Step 4: both witnesses' name, mobile, Aadhaar, address.
-- Across steps: no two parties share a mobile or an Aadhaar.
+  ₹50,000/month shows the s.194-IB TDS note. The furniture list is free text with no furnishing
+  cross-check, since furnishing is not asked.
+- Step 4: both witnesses' name, age, mobile.
+- Across steps: no two parties share a mobile or a PAN.
 - `generate` re-checks steps 0..4 and the declaration before submitting (jumps to the first bad step).
 - **A refused step shows where:** the first flagged control on the active panel is scrolled into view
   and focused, and from then on that step re-validates as the customer types, so a fixed answer
   clears without pressing Next again.
 - **The server holds the same line** (a client can skip the wizard): the create and the co-fill
   party-details write run `RentAgreementDetailsRules` on `details._state` (422), the identities write
-  checks role, Verhoeff and distinct Aadhaar per body (422), and pricing refuses a term over 60
+  checks role, PAN shape and distinct PAN per body (422), and pricing refuses a term over 60
   months — past five years it is no longer an Art. 36A leave and licence.
 
 ### 5.4 Document reuse & collection
-- **Owner vault reuse:** if PAN/Aadhaar/photo/ownership proof already exist in the owner's personal
+- **Owner vault reuse:** if an ownership proof already exists in the owner's personal
   vault, those slots pre-fill by reference (`vaultDocId`, `fromVault:true`) so the owner never
   re-uploads; at submit such a slot is filed with `POST /service-requests/{id}/docs/from-vault`
   (owner-scoped: the server refuses another account's vault row). Freshly uploaded owner docs are
@@ -322,9 +328,10 @@ total   = stamp + reg + dhc + service
   `docs` so ops review genuine documents, not placeholders. The co-fill hand-off always files the
   owner's papers, even when the identities write fails, and the invited tenant's docs attach when
   they submit their section.
-- Required docs (`documents.js`, validated per step): each licensor `licensor-{i}-pan|aadhaar|photo`
-  (+ `licensor-{i}-poa` for a POA holder), `ownership-proof` once, each tenant
-  `tenant-{j}-pan|aadhaar|photo` (employment proof optional). Those categories are what the
+- Required docs (`documents.js`, validated per step): `ownership-proof` once (+ `licensor-{i}-poa`
+  for a POA holder, passport/visa for an NRI or foreign party), and for each tenant the police
+  address proof (and previous-address proof when the previous address differs). No PAN, Aadhaar,
+  passport-photo or income-proof upload exists. Those categories are what the
   server's checkout gate looks for.
 
 ### 5.5 Submit (`generate`) - two paths
@@ -362,7 +369,7 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
   decides — it 404s for anyone who is not a party, so a stranger gets the neutral "no longer
   available" panel. An accepted invite leaves the pending list, so absence there is not expiry.
 - Invite mode loads the owner's `_state`, seeds the tenant's blanks from the signed-in account, and
-  jumps to step 0. The tenant's PAN/Aadhaar go through `PUT /identities`, which accepts an accepted
+  jumps to step 0. The tenant's PAN goes through `PUT /identities`, which accepts an accepted
   party for their own side.
 - **A declined invite is recoverable.** Declining leaves the party row `declined`, which used to hold
   the unique `(request_id, role)` slot while checkout waited forever on an accepted party. The
@@ -375,7 +382,7 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
   The owner's locked panel shows `ReadyToPayPanel` for any `awaiting_payment` request with no
   `invited` party. Its Pay button stays disabled until the declaration is ticked again — the tenant's
   answers arrived after the owner's review-step tick — then it calls `POST /{id}/checkout` and then the same `payAndConfirm` as the inline
-  submit. A refusal (missing paper, Aadhaar or witness) is shown as the server's 409 message.
+  submit. A refusal (missing paper, PAN or witness) is shown as the server's 409 message.
 - **The tenant cannot re-price.** The amount is fixed from the owner's terms at create, so a
   party-details write that would change the priced terms (rent, deposits, months, increment,
   interval, area) is refused 409; blank keys still keep the owner's values.
@@ -392,11 +399,11 @@ regArea label (overwritten server-side from the locality), and `_state` = the fu
   their own row. An old invite-mode draft's `invite.invMobile` is moved onto `tenants[0]` on restore.
 - **Companies, NRIs and foreigners** (LEG-1/LEG-3). A company or firm party (`type: entity`) is
   routed to the legal-desk quote flow. An NRI or foreign party (`residency`) takes the SRO route:
-  passport instead of Aadhaar, visa/OCI and an optional FRRO number for a foreigner, and staff book
+  passport instead of PAN/Aadhaar-led identity, visa/OCI and an optional FRRO number for a foreigner, and staff book
   the SRO visit. A foreign tenant is reminded that the owner files Form C on indiafrro.gov.in
   within 24 hours.
 - **Identity numbers after a refresh** (UX-7). Autosave keeps only markers; after a reload,
-  `IdentityReminderNote` names the PAN/Aadhaar fields to re-enter.
+  `IdentityReminderNote` names the PAN fields to re-enter.
 - **A closed checkout is resumed.** Closing the Cashfree sheet sends no webhook and leaves
   `paymentRef` set. A later `POST /{id}/checkout` asks the gateway for a fresh session on that same
   order (`PaymentGateway.resumeSession`, Cashfree `GET /pg/orders/{id}`, `ACTIVE` only) rather than
@@ -448,9 +455,8 @@ section 2.
 `captureFormState` is also the co-fill payload: it is posted as `details._state` so an invited
 tenant can open the owner's half-filled form. But `details` is stored as plaintext jsonb and echoed
 verbatim by `ServiceRequestMapper` on **every** read — including the paged ops queue — so sending
-the raw state would hand the owner's PAN and Aadhaar, and every tenant's, to the invited stranger
-and to any staff account that listed the queue. That is a bulk identity-document dump, and Aadhaar
-in particular is not ours to spread (Aadhaar Act s.29).
+the raw state would hand the owner's PAN, and every tenant's, to the invited stranger
+and to any staff account that listed the queue. That is a bulk identity dump.
 
 The `dzDraft:rentAgreement` autosave is the same threat model on a shorter path: `localStorage`,
 same origin, written on every keystroke and never expired. Both callers therefore get
@@ -460,7 +466,7 @@ the browser so the numbers never cross the wire at all — the server-side `deta
 belt to that pair of braces.
 
 Two purges run **on read**, not merely on write, because every owner who used the wizard before the
-numbers were kept out already has a PAN and an Aadhaar sitting in their browser, and nothing else
+numbers were kept out already has a PAN sitting in their browser, and nothing else
 ever revisits those keys:
 
 - The `DRAFT_KEY` purge effect **must stay above the `useFormDraft` call**. Effects fire in the
@@ -470,7 +476,7 @@ ever revisits those keys:
 - The `draazyOwnerKYC:<mobile>` purge rewrites the entry during the owner-KYC autofill — the only
   moment the app is guaranteed to touch that key.
 
-A mid-form refresh therefore brings back every answer except those two, which the owner retypes; the
+A mid-form refresh therefore brings back every answer except the PAN, which the owner retypes; the
 restored-draft banner says so rather than claiming everything came back.
 
 ### 5.10 Submit-time channels: identities, documents, payment confirmation
@@ -486,13 +492,12 @@ the record, and the desk sees it when payment moves it out of `awaiting-payment`
 
 **Identity numbers ride their own narrow channel (D151).** `details` carries none — the wizard
 redacts them and the server refuses them at any nesting depth, because `details` is plaintext
-`jsonb` echoed verbatim to every staff read. But a Leave & License names each party by PAN and
-Aadhaar, so `PUT /service-requests/{id}/identities` exists: it answers 204 (nothing to echo), stores
+`jsonb` echoed verbatim to every staff read. But a Leave & License names each party by PAN, so `PUT /service-requests/{id}/identities` exists: it answers 204 (nothing to echo), stores
 the rows outside `details`, refuses every reader except the operator the request is assigned to (an
 admin included, until they take it), writes an audit row for each read *and* each refusal, and
 blanks the numbers when the request completes or is cancelled. Nothing touches `localStorage` on the
-way. It is separate from and after the create (the id must exist, and a create body carrying an
-Aadhaar would put one on the response the tracker renders and logs), and before the checkout modal
+way. It is separate from and after the create (the id must exist, and a create body carrying a
+PAN would put one on the response the tracker renders and logs), and before the checkout modal
 (which can outlive the page). It is non-fatal: the request exists and is about to be paid for, so
 throwing would tell a charged customer their submission was lost.
 
@@ -507,12 +512,10 @@ listing.
 **Payment opens only once the agreement is registrable.** A priced create commits the request at
 `awaiting-payment` with no gateway order. The wizard then records identities, uploads documents and
 calls `POST /service-requests/{id}/checkout`, which `RentAgreementReadiness` refuses (409, naming
-what is missing) until every licensor and licensee has an Aadhaar-bearing identity row and their
-papers, the tenant police address/work proof uploads required by the IGR portal, the flat has an ownership proof, both witnesses are recorded, and no Aadhaar repeats across
-parties. Last, it refuses a deed missing its own particulars — a monthly rent (without one there is
+what is missing) until every licensor and licensee has a PAN identity row, the flat has an ownership proof, the tenant police address/work proof uploads required by the IGR portal are filed, and no PAN repeats across
+parties. Witnesses carry no identity rows (name, age and mobile only). Last, it refuses a deed missing its own particulars — a monthly rent (without one there is
 no stamp duty to charge), the start date, flat number, society, locality, pincode, a residential
-property type, the area, every licensor's and licensee's name, age and address, and each witness's name, age and
-address — because create
+property type, the area, and every licensor's and licensee's name and age — because create
 takes a partial form so a draft can be filed and priced. Only then is the declaration checked: the
 body must name the current `declaration` version (`RentAgreementDeclaration.VERSION`, matched by
 `DECLARATION_VERSION` in `constants.js` and guarded by `RentAgreementDeclarationTest`), or the call
@@ -526,7 +529,7 @@ co-fill invite whose identities or papers fail is not shared until a retry lands
 each side writes only its own identity rows and files only its own side's papers (a tenant invitee
 the `tenant` rows and `tenant-*` papers, 403 otherwise), so neither half can erase or impersonate
 the other; an invitee's identity rows freeze once checkout opens (409). Once the invitee accepts,
-each side's PAN, Aadhaar and photo scans carry a download link only for that side and ops; the other
+each side's ownership-proof and tenant address-proof scans carry a download link only for that side and ops; the other
 side sees the paper listed as filed with its `url`, `fileName`, `sizeBytes` and `mimeType` null. Ownership proof and a POA stay readable to
 both, since checking them is the tenant's due diligence. Checkout itself runs the
 readiness gate, calls the gateway outside any transaction, then re-checks under the row lock before
@@ -574,8 +577,17 @@ Request (server wire values):
   assigned | in-progress --share draft--> draft-shared
      draft-shared --customer approves--> approved --registered copy uploaded--> completed
      draft-shared --customer rejects--> changes-requested --new draft--> draft-shared (loop)
+  assigned | in-progress | changes-requested --desk sends back--> action-required
+     action-required --owner/tenant marks it done--> in-progress
   any non-terminal --cancel--> cancelled
 ```
+- Corrections: the holder edits any card of the form, list rows included (`PUT …/desk-details`;
+  priced terms stay on amendments), and any party's PAN / Aadhaar (`PUT …/desk-identities`); the
+  customer is notified. Only a fresh paper or an answer goes back (`action-required`, `papers` and/or
+  `reason`) to one side, who sees a **Needs your attention** banner on the tracker and can mark it
+  done only after re-uploading every paper asked for. That side also gets a bell notification and a
+  **Rent agreement** item on the dashboard's attention panel, both opening `/services/rent-agreement`;
+  the other side's tracker pill reads **Waiting on the owner/tenant** instead.
 - Terminal: `completed` (registered, final document downloadable) and `cancelled`. `isActive` is
   neither.
 - The owner's create-wizard is `locked` while an active (`isActive`) rental request exists;

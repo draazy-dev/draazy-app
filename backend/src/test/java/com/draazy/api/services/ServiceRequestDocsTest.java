@@ -56,7 +56,7 @@ class ServiceRequestDocsTest extends ServiceFixtures {
                         .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
                 .andExpect(status().isOk())
 
-                .andExpect(jsonPath("$.documents", hasSize(9)))
+                .andExpect(jsonPath("$.documents", hasSize(3)))
                 .andExpect(jsonPath("$.documents[0].category").value("final-document"))
                 .andExpect(jsonPath("$.documents[1].category").value("draft"))
                 .andExpect(jsonPath("$.documents[0].propertyId").doesNotExist())

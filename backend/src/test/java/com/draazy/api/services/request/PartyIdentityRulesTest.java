@@ -9,7 +9,7 @@ import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("Rent agreement party identity: portal DOB and mother's-name fields")
+@DisplayName("Rent agreement party identity: portal DOB field")
 class PartyIdentityRulesTest {
 
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 4);
@@ -43,13 +43,11 @@ class PartyIdentityRulesTest {
     }
 
     @Test
-    @DisplayName("mother's name and alias stay bounded so details json remains small")
-    void textBounds() {
+    @DisplayName("mother's name and alias are no longer collected, so older values are not checked")
+    void removedTextFieldsAreIgnored() {
         String tooLong = "x".repeat(81);
-        assertThatThrownBy(() -> RentAgreementDetailsRules.check(Map.of("_state", Map.of(
+        assertThatCode(() -> RentAgreementDetailsRules.check(Map.of("_state", Map.of(
                 "owner", Map.of("oMother", tooLong, "oAlias", tooLong))), TODAY))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("_state.owner.oMother must be at most 80 characters")
-                .hasMessageContaining("_state.owner.oAlias must be at most 80 characters");
+                .doesNotThrowAnyException();
     }
 }

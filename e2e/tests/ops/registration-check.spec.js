@@ -265,7 +265,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
           prop: { flatNo: 'B-702', society: 'Kumar Park', locality: 'Kothrud', gramPanchayat: false, city: 'Pune', pincode: '411038' },
           owner: { oName: 'Asha Deshpande', oMobile: ownerMobile, capacity: 'poa', poaPrincipal: 'Vinod Deshpande', poaRegNo: 'HVL3-889-2024', poaSro: 'Haveli 3', poaDate: '2024-03-15' },
           tenants: [{ name: 'Kiran Rao', mobile: '9922054321' }],
-          terms: { rent: '25000', deposit: '100000', months: '11', lockin: '6', notice: '1' },
+          terms: { rent: '25000', deposit: '100000', months: '11', lockin: '6' },
         },
       },
     });
@@ -322,15 +322,13 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     const papers = dialog.getByRole('region', { name: 'Papers', exact: true });
     const panel = dialog.getByRole('tabpanel');
     const tab = (name) => dialog.getByRole('tab', { name: new RegExp(`^${name}`) });
-    await expect(papers).toContainText('7 of 7 received · 0 verified');
-    await tab('Licensee').click();
-    await panel.getByRole('button', { name: 'Verify Tenant 1 — PAN card' }).click();
-    await expect(papers).toContainText('1 verified');
-    await tab('Licensor').click();
-    await panel.getByRole('button', { name: 'Reject Licensor 1 — PAN card' }).click();
-    await panel.getByLabel('Why is Licensor 1 — PAN card rejected?').fill('The PAN number is cut off at the edge');
+    await expect(papers).toContainText('1 of 1 received · 0 verified');
+    const proof = 'Index II';
+    await tab('Property').click();
+    await panel.getByRole('button', { name: `Reject ${proof}` }).click();
+    await panel.getByLabel(`Why is ${proof} rejected?`).fill('The survey number is cut off at the edge');
     await panel.getByRole('button', { name: 'Send back' }).click();
-    await expect(panel).toContainText('Sent back: The PAN number is cut off at the edge');
+    await expect(panel).toContainText('Sent back: The survey number is cut off at the edge');
     await expect(papers).toContainText('The draft and the registered copy wait until every paper is verified.');
 
     const context = await browser.newContext();
@@ -338,20 +336,21 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
     await signIn(tenantPage, mobile);
     await tenantPage.goto('/services/rent-agreement');
     const redo = tenantPage.getByRole('region', { name: 'Documents to re-upload' });
-    await expect(redo).toContainText('Licensor 1 — PAN card');
-    await expect(redo).toContainText('The PAN number is cut off at the edge');
-    await redo.getByLabel('Upload a new copy of Licensor 1 — PAN card').setInputFiles({ name: 'pan.png', mimeType: 'image/png', buffer: PNG });
-    await expect(tenantPage.getByRole('alert').filter({ hasText: 'Licensor 1 — PAN card re-uploaded' })).toBeVisible();
+    await expect(redo).toContainText(proof);
+    await expect(redo).toContainText('The survey number is cut off at the edge');
+    await redo.getByLabel(`Upload a new copy of ${proof}`).setInputFiles({ name: 'index2.png', mimeType: 'image/png', buffer: PNG });
+    await expect(tenantPage.getByRole('alert').filter({ hasText: `${proof} re-uploaded` })).toBeVisible();
     await expect(redo).toHaveCount(0);
     await context.close();
 
     await page.reload();
     await openCase(page, request.id, 'progress');
+    await tab('Property').click();
     await expect(panel).not.toContainText('Sent back:');
-    await panel.getByRole('button', { name: 'Verify Licensor 1 — PAN card' }).click();
-    await expect(papers).toContainText('2 verified');
+    await panel.getByRole('button', { name: `Verify ${proof}` }).click();
+    await expect(papers).toContainText('1 verified');
     const after = await ok('GET', `/service-requests/${request.id}/checklist`, staff);
-    expect(after.items.find((i) => i.id === 'licensor-0-pan')).toMatchObject({ review: 'verified' });
+    expect(after.items.find((i) => i.id === 'ownership-proof')).toMatchObject({ review: 'verified' });
   });
 
   test('an agreement nobody picked up in four hours is overdue on the desk, and taking it restarts the clock', async ({ page }) => {
@@ -399,6 +398,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
 
     await signIn(page, STAFF.rental, { screen: 'staff' });
     const dialog = await openCase(page, request.id, 'progress');
+    await dialog.getByRole('tab', { name: /^Terms/ }).click();
     const terms = dialog.getByRole('region', { name: 'Priced terms' });
     await terms.getByRole('button', { name: 'Revise priced terms' }).click();
     await expect(terms.getByLabel('Monthly rent')).toHaveValue('20000');
@@ -460,6 +460,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
 
     await signIn(page, STAFF.rental, { screen: 'staff' });
     const dialog = await openCase(page, request.id, 'progress');
+    await dialog.getByRole('tab', { name: 'Payment' }).click();
     const refunds = dialog.getByRole('region', { name: 'Refunds' });
     await expect(refunds.getByTestId('refund-figures')).toContainText('can go back');
     await refunds.getByRole('button', { name: 'Ask for a refund' }).click();
@@ -500,6 +501,7 @@ test.describe('Ops → Drafting desk → registration check (live)', () => {
 
     await signIn(page, STAFF.rental, { screen: 'staff' });
     const dialog = await openCase(page, current, 'pickup');
+    await dialog.getByRole('tab', { name: /^Property/ }).click();
     const panel = dialog.getByRole('region', { name: 'Overlap check' });
     await expect(panel).toContainText('Another agreement covers this flat');
     await expect(panel).toContainText(earlier.slice(0, 8));

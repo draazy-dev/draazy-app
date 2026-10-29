@@ -161,13 +161,11 @@
       "detailsTooLong": "This form is {{over}} characters longer than we can save. Please shorten \u201c{{field}}\u201d and try again.",
       "saveError": "We couldn't save your request — your device storage may be full. Remove large uploads and try again.",
       "identityReminder": {
-        "note": "For privacy, saved drafts do not keep PAN or Aadhaar numbers.",
+        "note": "For privacy, saved drafts do not keep PAN numbers.",
         "reEnter": "Re-enter: {{fields}}",
         "licensor": "Licensor {{n}}",
         "tenant": "Tenant {{n}}",
-        "witness": "Witness {{n}}",
-        "pan": "PAN",
-        "aadhaar": "Aadhaar"
+        "pan": "PAN"
       },
       "doneInviteTitle": "Request sent to the tenant!",
       "doneOwnerTitle": "Request submitted!",
@@ -246,7 +244,6 @@
         "pickerQuestion": "Which property is this agreement for?",
         "enterManually": "Or enter details manually below ↓",
         "propertyType": "Property Type",
-        "furnishing": "Furnishing",
         "flatNo": "Flat / House No.",
         "flatNoPlaceholder": "e.g. B-1204",
         "flatNoErr": "Enter the flat / house number.",
@@ -265,24 +262,18 @@
         "taluka": "Taluka",
         "talukaPlaceholder": "Select taluka",
         "talukaErr": "Choose the Pune taluka.",
-        "villageCity": "Village / City",
-        "villageCityPlaceholder": "e.g. Baner, Pune",
-        "villageCityErr": "Enter the city or village from the Index II.",
-        "roadName": "Road name (optional)",
-        "roadNamePlaceholder": "e.g. Baner Road",
-        "policeStation": "Police station (optional)",
-        "policeStationPlaceholder": "e.g. Chaturshringi",
+        "landmark": "Landmark",
+        "landmarkPlaceholder": "e.g. Near D-Mart",
+        "landmarkErr": "Enter a nearby landmark.",
+        "policeStation": "Police station",
+        "policeStationPlaceholder": "Type the police station name",
+        "policeStationErr": "Enter the police station of the area.",
         "pincode": "Pincode",
         "pincodePlaceholder": "411045",
         "pincodeErr": "Enter a valid 6-digit pincode.",
         "pincodeState": "We draft Maharashtra agreements only — enter the flat's Maharashtra pincode (it starts 40 to 44).",
         "area": "Area",
         "areaErr": "Enter the flat's area — it is on your Index II or tax bill.",
-        "areaBasis": "Measured as",
-        "areaBasisOpt": {
-          "carpet": "Carpet",
-          "built-up": "Built-up"
-        },
         "areaUnit": "Unit",
         "areaUnitOpt": {
           "sqft": "sq ft",
@@ -291,22 +282,16 @@
         "floor": "Floor",
         "floorPlaceholder": "0 = ground",
         "floorErr": "Enter a floor from 0 to {{max}}.",
-        "surveyNo": "CTS / Survey No. (optional)",
-        "surveyNoPlaceholder": "From your Index II or property tax bill",
-        "attributes": "Property attributes",
-        "attributesHint": "Add the CTS, survey, plot or property numbers printed on the Index II.",
-        "attributeAdd": "Add attribute",
-        "attributeKind": "Kind",
-        "attributeKindErr": "Choose the attribute type.",
-        "attributeNumber": "Number",
-        "attributeNumberPlaceholder": "e.g. 1234/5",
-        "attributeNumberErr": "Enter the number, up to 80 characters.",
-        "attributesErr": "Check the property attribute rows.",
-        "galleryArea": "Gallery / balcony area (optional)",
-        "galleryAreaUnit": "Gallery area unit",
         "optionalAreaErr": "Enter an area from 1 to 100000, with up to two decimals.",
         "areaPlaceholder": "e.g. 850",
         "smallAreaPlaceholder": "e.g. 40",
+        "roadVicinity": "Road vicinity",
+        "roadVicinityPlaceholder": "e.g. On main road",
+        "roadVicinityErr": "Enter the road vicinity.",
+        "roadType": "Road type",
+        "roadTypePlaceholder": "e.g. Tar road",
+        "roadTypeErr": "Enter the road type.",
+        "indexTwoHint": "Village, CTS / survey number, zone and building details are taken by our team from the Index II the owner uploads.",
         "commercialNote": "This agreement is for homes only. Renting a shop, office or godown carries different tax rules —",
         "commercialCta": "get a commercial agreement from our legal desk",
         "propTypeErr": "Choose a residential property type. Commercial premises need a commercial agreement."
@@ -335,14 +320,8 @@
         "visaOciErr": "Enter visa or OCI details for a foreign national.",
         "frro": "FRRO registration number (optional)",
         "frroPlaceholder": "If already registered",
-        "mother": "Mother's name",
-        "motherPlaceholder": "As per identity proof",
-        "motherErr": "Enter mother's name.",
         "dob": "Date of birth",
-        "dobErr": "Choose a valid date of birth for an adult party.",
-        "alias": "Alias name (optional)",
-        "aliasPlaceholder": "If used in older papers",
-        "aliasErr": "Keep alias within 80 characters."
+        "dobErr": "Choose a valid date of birth for an adult party."
       },
       "owner": {
         "title": "Owner / Licensor Details",
@@ -350,36 +329,22 @@
         "fullName": "Full Name",
         "fullNamePlaceholder": "As per PAN/Aadhaar",
         "fullNameErr": "Enter the owner's full name.",
-        "age": "Age",
         "agePlaceholder": "e.g. 42",
-        "gender": "Gender",
-        "genderPlaceholder": "Select",
-        "occupationPlaceholder": "e.g. Business, Retired",
         "pan": "PAN Number",
         "panErr": "Enter a valid PAN (e.g. ABCDE1234F).",
-        "aadhaar": "Aadhaar Number",
-        "aadhaarPlaceholder": "12-digit Aadhaar",
-        "aadhaarErr": "Enter a valid Aadhaar number — 12 digits, and it must pass the Aadhaar check digit.",
         "mobile": "Mobile",
         "mobilePlaceholder": "10-digit mobile",
         "mobileErr": "Enter a valid 10-digit mobile number.",
         "mobileNotYou": "Only the owner fills this part. Use your own number if you own the flat, or invite the owner.",
-        "email": "Email",
-        "address": "Permanent Address",
-        "addressPlaceholder": "Full permanent address",
-        "addressErr": "Enter the owner's permanent address.",
         "uploadDocs": "Upload Documents",
         "uploadHint": "JPG, PNG or PDF — up to 2MB each.",
         "doc": {
-          "o-pan": "PAN Card",
-          "o-aadhaar": "Aadhaar Card",
           "o-passport": "Passport Scan",
           "o-visa": "Visa / OCI Scan",
-          "o-photo": "Passport Photo",
-          "o-own": "Ownership Proof (Index II / Bill)",
+          "o-own": "Index II",
           "o-poa": "Registered Power of Attorney"
         },
-        "vaultNote": "PAN, Aadhaar & ownership proof are saved to your dashboard Documents — no need to upload them twice.",
+        "vaultNote": "Your Index II is saved to your dashboard Documents — no need to upload it twice.",
         "vaultReused": "From your Documents",
         "vaultSaved": "Saved to your Documents",
         "capacity": "You are signing as",
@@ -402,11 +367,8 @@
           "dateErr": "Enter the POA registration date — it can't be in the future."
         },
         "coDoc": {
-          "pan": "PAN Card",
-          "aadhaar": "Aadhaar Card",
           "passport": "Passport Scan",
           "visa": "Visa / OCI Scan",
-          "photo": "Passport Photo",
           "poa": "Registered Power of Attorney"
         },
         "coOwners": {
@@ -442,39 +404,21 @@
         "fullName": "Full Name",
         "fullNamePlaceholder": "As per PAN/Aadhaar",
         "fullNameErr": "Enter the tenant's full name.",
-        "age": "Age",
-        "agePlaceholder": "e.g. 29",
-        "gender": "Gender",
         "occupation": "Occupation",
         "occupationPlaceholder": "e.g. Software Engineer",
-        "relation": "Relation to Tenant 1",
-        "relationPlaceholder": "Self / Spouse / Co-tenant",
         "pan": "PAN Number",
         "panErr": "Enter a valid PAN (e.g. ABCDE1234F).",
-        "aadhaar": "Aadhaar Number",
-        "aadhaarPlaceholder": "12-digit Aadhaar",
-        "aadhaarErr": "Enter a valid Aadhaar number — 12 digits, and it must pass the Aadhaar check digit.",
         "mobile": "Mobile",
         "mobilePlaceholder": "10-digit mobile",
         "mobileErr": "Enter a valid 10-digit mobile number.",
-        "email": "Email",
         "address": "Permanent Address",
-        "addressPlaceholder": "Full permanent address",
-        "addressErr": "Enter the tenant's permanent address.",
         "documents": "Documents",
         "doc": {
-          "0": "PAN Card",
-          "1": "Aadhaar Card",
-          "2": "Passport Photo",
-          "3": "Employment / Income Proof",
-          "pan": "PAN Card",
-          "aadhaar": "Aadhaar Card",
           "passport": "Passport Scan",
           "visa": "Visa / OCI Scan",
-          "photo": "Passport Photo",
-          "income": "Employment / Income Proof",
           "addressproof": "Address Proof",
-          "prevaddressproof": "Previous Address Proof"
+          "prevaddressproof": "Previous Address Proof",
+          "workidproof": "Work ID proof"
         },
         "police": {
           "title": "Tenant police record",
@@ -491,7 +435,7 @@
           "policeStationPlaceholder": "e.g. Deccan Police Station",
           "addressProofType": "Address proof type",
           "previousAddressProofType": "Previous address proof type",
-          "uidProofHint": "The Aadhaar scan above is used for this proof.",
+          "uidProofHint": "Aadhaar is verified at the doorstep visit, so nothing to upload for this proof.",
           "addressProofOpt": {
             "driving-license": "Driving License",
             "election-card": "Election Card",
@@ -561,9 +505,6 @@
         "increment": "Rent Increase (%)",
         "incrementEvery": "Rent increases every",
         "lockin": "Lock-in Period (months)",
-        "notice": "Notice Period (months)",
-        "dueDay": "Rent Due Day (of month)",
-        "payMode": "Mode of Payment",
         "maintBy": "Maintenance charges paid by",
         "maintOpt": {
           "Tenant": "Tenant",
@@ -586,10 +527,7 @@
         "clausesLong": "{{chars}} characters. There is a limit on how long the whole form can be — keep this concise so your agreement saves.",
         "startDateRange": "Choose a start date between {{min}} and {{max}}.",
         "lockinErr": "Lock-in must be between 0 and {{months}} months.",
-        "noticeErr": "Notice must be between 0 and {{months}} months.",
-        "dueDayErr": "Enter a day between 1 and 28, so it falls in every month.",
         "incrementErr": "Enter an increase between 0 and 100%.",
-        "cashLimit": "Cash of ₹2 lakh or more in one go is barred by s.269ST of the Income-tax Act, and the owner can be fined the same amount. Pay a sum this size by bank transfer, UPI or cheque.",
         "depositPay": {
           "title": "How the deposit was paid",
           "total": "Entered {{paid}} of {{deposit}}",
@@ -619,16 +557,12 @@
             "total": "Payments add up to {{paid}}; they must equal the deposit of {{deposit}}."
           }
         },
+        "cashLimit": "Cash of ₹2 lakh or more in one go is barred by s.269ST of the Income-tax Act, and the owner can be fined the same amount. Pay a sum this size by bank transfer, UPI or cheque.",
         "tdsNote": "Rent above ₹50,000 a month: under s.194-IB an individual tenant deducts 2% TDS and deposits it with Form 26QC against the owner's PAN.",
-        "furnishMismatch": "Step 1 says the flat is Unfurnished, but this list has furniture or appliances in it. The deed should say what is actually handed over.",
-        "furnishMismatchFix": "Mark it Semi-Furnished",
-        "furnishUnlisted": "Step 1 says the flat is {{furnish}}. List what comes with it: this schedule is what the deposit is settled against at move-out.",
         "periodCustom": "Other…",
         "periodCustomMonths": "Months (1 – 60)",
         "monthsErr": "Enter a period of 1 to 60 months.",
         "incrementRenewal": "Increase on Renewal (%)",
-        "utilitiesBy": "Electricity & water bills paid by",
-        "taxBy": "Property tax paid by",
         "costBy": "Stamp duty & registration paid by",
         "payerOpt": {
           "Tenant": "Tenant",
@@ -644,9 +578,6 @@
         },
         "parkingArea": "Parking area (optional)",
         "parkingAreaUnit": "Parking area unit",
-        "occupants": "Number of occupants",
-        "occupantsPlaceholder": "e.g. 3",
-        "occupantsErr": "Enter between 1 and {{max}} occupants.",
         "language": "Agreement language",
         "languageOpt": {
           "English": "English",
@@ -678,13 +609,10 @@
         "subtitle": "Two adult witnesses are required to execute and register the agreement.",
         "witness": "Witness {{n}}",
         "fullName": "Full Name",
-        "address": "Address",
-        "biometricNote": "Both witnesses must be present at the registration visit with their Aadhaar for thumb/biometric and live-photo capture. Their names and addresses go into the registered deed; Aadhaar is used to verify them and appears only masked.",
+        "biometricNote": "Both witnesses must be present at the registration visit with their Aadhaar for thumb/biometric and live-photo capture. Their names go into the registered deed; the portal fetches the rest from Aadhaar.",
         "age": "Age",
         "mobile": "Mobile",
-        "aadhaar": "Aadhaar Number",
-        "nameErr": "Enter the witness's full name as on their Aadhaar.",
-        "addressErr": "Enter the witness's address."
+        "nameErr": "Enter the witness's full name as on their Aadhaar."
       },
       "review": {
         "title": "Review & Generate",
@@ -692,6 +620,7 @@
         "rowAgreement": "Agreement",
         "rowProperty": "Property",
         "rowJurisdiction": "Jurisdiction",
+        "rowPropertyAddress": "Location details",
         "rowOwner": "Owner",
         "rowTenants": "Tenant(s)",
         "rowTenantPolice": "Tenant police record",
@@ -708,7 +637,7 @@
         "rowRegistration": "Registration",
         "sroRoute": "SRO appointment — offline route",
         "offlineNotice": "Because one party is NRI or a foreign national, Aadhaar e-registration is not available. Draazy staff will book a Sub-Registrar Office appointment; the party must attend with passport, or a registered Power of Attorney can sign.",
-        "declaration": "I confirm the above details are correct and authorize Draazy to draft the Leave & License agreement and assist with stamp duty payment & e-registration as per Maharashtra rules. I consent to the Aadhaar and PAN details and documents given here being used only for this agreement and its e-registration with the Department of Registration & Stamps, Maharashtra, and I confirm every person named has agreed to their details being shared for that purpose.",
+        "declaration": "I confirm the above details are correct and authorize Draazy to draft the Leave & License agreement and assist with stamp duty payment & e-registration as per Maharashtra rules. I consent to the PAN details and documents given here, and the Aadhaar verified at the doorstep visit, being used only for this agreement and its e-registration with the Department of Registration & Stamps, Maharashtra, and I confirm every person named has agreed to their details being shared for that purpose.",
         "generate": "Generate Agreement & Proceed",
         "payAndSubmit": "Pay {{amount}} & Submit",
         "payNote": "Your request reaches our team only after payment.",
@@ -738,6 +667,7 @@
         "termMonths_one": "{{count}} month",
         "termMonths_other": "{{count}} months",
         "stampDuty": "Stamp Duty (0.25%)",
+        "exactDuty": "0.25% works out to {{amount}}; IGR rounds it to the nearest rupee.",
         "registrationFee": "Registration Fee",
         "serviceFee": "Draazy Service Fee",
         "referralWaiver": "Free with your referral reward (\u2212{{amount}})",
@@ -749,7 +679,7 @@
         "chargedDiffers": "You'll be charged {{amount}} \u2014 our confirmed price for this agreement.",
         "title": "Cost Estimate",
         "subtitle": "Maharashtra Leave & License (Art. 36A)",
-        "formula": "Stamp duty = 0.25% of (rent for every month of the term, including agreed increases, + non-refundable deposit + 10% of refundable deposit × years), rounded up to the next ₹100 (minimum ₹100). Registration fee ₹1,000 urban / ₹500 rural, plus ₹300 document handling. Final amount confirmed at registration.",
+        "formula": "Stamp duty = 0.25% of (rent for every month of the term, including agreed increases, + non-refundable deposit + 10% of refundable deposit × years), rounded to the nearest rupee as the IGR calculator does (minimum ₹100). Registration fee ₹1,000 urban / ₹500 rural, plus ₹300 document handling. Final amount confirmed at registration.",
         "needHelp": "Need help?",
         "needHelpSub": "Talk to our agreement desk.",
         "handling": "Document Handling (DHC)"
@@ -761,25 +691,20 @@
         "tenantTitle": "Tenant (Licensee)",
         "otherTitle": "Witnesses & Other",
         "docOwner": [
-          "PAN Card",
-          "Aadhaar Card",
-          "Passport-size photograph",
-          "Ownership proof — Index II / Sale Deed",
+          "PAN number",
+          "Index II of the flat (mandatory)",
           "Latest Electricity Bill or Property Tax receipt",
-          "Every co-owner's PAN, Aadhaar and photo — all co-owners sign",
+          "Every co-owner’s PAN number — all co-owners sign",
           "Registered Power of Attorney, if signing for the owner"
         ],
         "docTenant": [
-          "PAN Card",
-          "Aadhaar Card",
-          "Passport-size photograph",
-          "Employment / Income proof (salary slip / appointment letter)",
+          "PAN number",
           "Proof of current address (if outstation)"
         ],
         "docOther": [
-          "Two adult witnesses — name, address and Aadhaar number",
-          "Biometric (thumb) and live photo of all parties and witnesses at e-registration",
-          "Registered mobile numbers (OTP based)"
+          "Two adult witnesses — name, age and mobile number",
+          "Aadhaar and Aadhaar-registered mobile of every party for the OTP at our doorstep visit",
+          "Biometric (thumb) and live photo of all parties and witnesses at e-registration"
         ]
       },
       "assist": {
@@ -818,7 +743,7 @@
           },
           {
             "q": "How is stamp duty calculated?",
-            "a": "For Leave & License (Article 36A), stamp duty is 0.25% of the total of: rent for the full period, including any agreed increases, + any non-refundable deposit + 10% of the refundable deposit for each year of the term. The duty is paid in whole hundreds: it is rounded up to the next ₹100, and is never less than ₹100."
+            "a": "For Leave & License (Article 36A), stamp duty is 0.25% of the total of: rent for the full period, including any agreed increases, + any non-refundable deposit + 10% of the refundable deposit for each year of the term. The duty is rounded to the nearest rupee, exactly as the IGR Leave & License calculator does, and is never less than ₹100."
           },
           {
             "q": "What is the registration fee?",
@@ -834,18 +759,18 @@
           },
           {
             "q": "What documents do I need?",
-            "a": "PAN and Aadhaar of owner and tenant, owner's ownership proof (Index II / electricity bill), passport photos, and two witnesses with ID."
+            "a": "PAN number of owner and tenant, and the owner’s Index II of the flat. Keep your Aadhaar and its registered mobile handy: we collect them at the doorstep visit for the OTP and biometric, and the portal fetches your name and address from Aadhaar. Two witnesses with name, age and mobile."
           }
         ]
       },
       "draft": {
         "restoredTitle": "We saved your progress",
-        "restoredDesc": "Your earlier answers were restored. PAN and Aadhaar are never saved on this device, so please enter those two again.",
+        "restoredDesc": "Your earlier answers were restored. PAN numbers are never saved on this device, so please enter them again.",
         "startFresh": "Start fresh"
       },
       "gate": {
         "title": "Sign in to continue past this step",
-        "desc": "Property details are open to everyone — fill them in to see your estimate. The steps after this ask for PAN, Aadhaar and ID documents, so they need an account. Your answers are saved and waiting when you come back.",
+        "desc": "Property details are open to everyone — fill them in to see your estimate. The steps after this ask for PAN numbers and an ownership proof, so they need an account. Your answers are saved and waiting when you come back.",
         "nextCta": "Sign in to continue",
         "stepLocked": "Locked — sign in to continue"
       },
@@ -883,15 +808,20 @@
         "startNewHint": "For a different property",
         "continue": "Add what's missing to this request",
         "continueHint": "Opens your saved answers. Submitting again completes this request rather than filing a new one.",
-        "topUpHint": "Your answers are shared with your tenant and stay as filed — this adds only your PAN/Aadhaar numbers and any papers still missing.",
+        "topUpHint": "Your answers are shared with your tenant and stay as filed — this adds only your PAN number and any papers still missing.",
         "toppedUp": "Your side of the agreement is complete.",
         "topUpChanged": "Your answers are shared with your tenant and can't be changed here. Undo the change, or cancel this request from your dashboard and file a new one.",
-        "topUpHint_owner": "Your answers are shared with the owner and stay as filed — this adds only your PAN/Aadhaar numbers and any papers still missing.",
-        "topUpChanged_owner": "Your answers are shared with the owner and can't be changed here. Undo the change, or cancel this request from your dashboard and file a new one."
+        "topUpHint_owner": "Your answers are shared with the owner and stay as filed — this adds only your PAN number and any papers still missing.",
+        "topUpChanged_owner": "Your answers are shared with the owner and can't be changed here. Undo the change, or cancel this request from your dashboard and file a new one.",
+        "coFilledTitle": "Filled in by your tenant — view only",
+        "coFilledTitle_owner": "Filled in by the owner — view only",
+        "coFilledDesc": "PAN shows only the last 4 digits, for both of you."
       },
       "checkoutFailed": "We saved your request but couldn't open payment. Please try again.",
-      "identitiesRetry": "We saved your request but couldn't send the PAN and Aadhaar details. Please try again.",
-      "identitiesDuplicate": "A PAN or Aadhaar entered here is already on this agreement for another party. Each person needs their own — please correct it and submit again.",
+      "maskedIdsFailed": "We couldn't load the other party's ID details. Refresh to try again.",
+      "heldId": "{{masked}} on file. Type only to change it",
+      "identitiesRetry": "We saved your request but couldn't send the PAN details. Please try again.",
+      "identitiesDuplicate": "A PAN entered here is already on this agreement for another party. Each person needs their own — please correct it and submit again.",
       "checkoutIncomplete": "We saved your request, but it is not ready for payment yet: {{detail}}",
       "detailsRejected": "We couldn't save the agreement details: {{detail}}",
       "declined": {
@@ -916,6 +846,7 @@
         "coFilledTitle": "Your tenant has filled in their part",
         "desc": "Pay to send this agreement to our drafting team. If anything is still missing, we'll say exactly what.",
         "cta": "Pay {{amount}}",
+        "feeWaived": "Free (referral reward)",
         "paid": "Payment received — our drafting team will start on your agreement.",
         "coFilledTitle_owner": "The owner has filled in their part"
       },
@@ -923,12 +854,9 @@
       "docsReattach": "You changed the agreement, so it has to be filed again — please re-attach the papers marked below.",
       "err": {
         "adult": "Enter an age between 18 and 120.",
-        "ageDob": "Age must match the date of birth.",
         "docRequired": "This document is required for registration.",
-        "dupAadhaar": "This Aadhaar is already entered for another party. Each person needs their own.",
         "dupMobile": "This mobile is already used by another party. Each person needs their own.",
-        "dupPan": "This PAN is already entered for another party. Each person needs their own.",
-        "email": "Enter a valid email address."
+        "dupPan": "This PAN is already entered for another party. Each person needs their own."
       },
       "doneInviteTitle_owner": "Request sent to the owner!",
       "doneInviteDesc_owner": "We've asked the owner to fill in their details & ownership papers. Once they're done, you pay and our team prepares the draft for approval."

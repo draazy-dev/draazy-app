@@ -3,7 +3,7 @@ import Icon from './Icon.jsx';
 import IdInput from './IdInput.jsx';
 import { useToast } from '../context/ToastContext.jsx';
 import { recordServiceRequestIdentities } from '../services/serviceRequestService.js';
-import { digits, isAadhaar, isPan } from '../pages/consumer/services/rent-agreement/helpers.js';
+import { digits, isPan } from '../pages/consumer/services/rent-agreement/helpers.js';
 
 const IDENTITY_EVENTS = new Set(['identities.purged', 'identities.recorded']);
 const slotKey = (slot) => `${slot.role}-${slot.index}`;
@@ -20,18 +20,16 @@ export const refillSlots = (request, viewerMobile) => {
   const state = request.details?._state || {};
   const coFill = new Set((request.parties || []).filter((p) => p.status === 'accepted').map((p) => `${p.role}-${p.partyIndex}`));
   const named = [
-    { role: 'owner', index: 0, name: state.owner?.oName, pan: true },
-    ...(state.coOwners || []).map((c, i) => ({ role: 'owner', index: i + 1, name: c?.name, pan: true })),
-    ...(state.tenants || []).map((t, i) => ({ role: 'tenant', index: i, name: t?.name, pan: true })),
-    { role: 'witness', index: 0, name: state.wit?.w1Name, pan: false },
-    { role: 'witness', index: 1, name: state.wit?.w2Name, pan: false },
+    { role: 'owner', index: 0, name: state.owner?.oName },
+    ...(state.coOwners || []).map((c, i) => ({ role: 'owner', index: i + 1, name: c?.name })),
+    ...(state.tenants || []).map((t, i) => ({ role: 'tenant', index: i, name: t?.name })),
   ].filter((slot) => String(slot.name || '').trim());
   const viewer = digits(viewerMobile);
   if (viewer && named.some((slot) => coFill.has(slotKey(slot)) && digits(slotMobile(state, slot)) === viewer)) return [];
   return named.filter((slot) => !coFill.has(slotKey(slot)));
 };
 
-const ROLE_LABEL = { owner: 'Owner', tenant: 'Tenant', witness: 'Witness' };
+const ROLE_LABEL = { owner: 'Owner', tenant: 'Tenant' };
 
 export default function IdentityRefill({ request, viewerMobile, onSaved }) {
   const { toast } = useToast();
@@ -50,12 +48,11 @@ export default function IdentityRefill({ request, viewerMobile, onSaved }) {
         partyRole: slot.role,
         partyIndex: slot.index,
         partyName: String(slot.name).trim().slice(0, 120),
-        pan: slot.pan ? String(v.pan || '').trim().toUpperCase() : '',
-        aadhaar: digits(v.aadhaar),
+        pan: String(v.pan || '').trim().toUpperCase(),
       };
-    }).filter((p) => p.pan || p.aadhaar);
+    }).filter((p) => p.pan);
     if (!parties.length) { setError('Enter at least one number.'); return; }
-    const bad = parties.find((p) => (p.pan && !isPan(p.pan)) || (p.aadhaar && !isAadhaar(p.aadhaar)));
+    const bad = parties.find((p) => !isPan(p.pan));
     if (bad) { setError(`Check the numbers for ${bad.partyName}.`); return; }
     setError('');
     setBusy(true);
@@ -76,17 +73,14 @@ export default function IdentityRefill({ request, viewerMobile, onSaved }) {
   return (
     <div data-testid="identity-refill" className="mb-3 rounded-xl border border-amber-500/25 bg-amber-500/8 p-3">
       <p className="text-sm font-semibold text-white flex items-center gap-2"><Icon name="shield-alert" className="w-4 h-4 text-amber-300" /> We deleted the identity numbers on this request</p>
-      <p className="mt-1 text-xs leading-relaxed text-gray-300">This request sat idle, so we discarded the PAN and Aadhaar numbers we held. Enter them again so our team can finish the agreement.</p>
+      <p className="mt-1 text-xs leading-relaxed text-gray-300">This request sat idle, so we discarded the PAN numbers we held. Enter them again so our team can finish the agreement.</p>
       <ul className="mt-3 space-y-2">
         {slots.map((slot) => {
           const v = values[slotKey(slot)] || {};
           return (
-            <li key={slotKey(slot)} className="grid gap-2 sm:grid-cols-[1fr_1fr_1fr] sm:items-center">
+            <li key={slotKey(slot)} className="grid gap-2 sm:grid-cols-[1fr_1fr] sm:items-center">
               <span className="text-xs text-gray-200">{slot.name} <span className="text-gray-500">· {ROLE_LABEL[slot.role]}</span></span>
-              {slot.pan ? (
-                <IdInput kind="pan" value={v.pan || ''} onChange={(val) => set(slot, 'pan', val)} aria-label={`PAN of ${slot.name}`} placeholder="PAN" className={input} />
-              ) : <span className="hidden sm:block" />}
-              <IdInput kind="aadhaar" value={v.aadhaar || ''} onChange={(val) => set(slot, 'aadhaar', val)} aria-label={`Aadhaar of ${slot.name}`} placeholder="Aadhaar" className={input} />
+              <IdInput kind="pan" value={v.pan || ''} onChange={(val) => set(slot, 'pan', val)} aria-label={`PAN of ${slot.name}`} placeholder="PAN" className={input} />
             </li>
           );
         })}

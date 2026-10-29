@@ -26,6 +26,7 @@ export const pickDoc = async (file, before, setDocs, key) => {
 };
 
 export const fmt = (n) => '₹' + Math.round(n || 0).toLocaleString('en-IN');
+export const fmtPaise = (n) => '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 export const digits = (s) => String(s || '').replace(/\D/g, '');
 export const num = (s) => parseInt(digits(s), 10) || 0;
 
@@ -45,9 +46,7 @@ export const detailsChars = (details) => {
 
 const FREE_TEXT_FIELDS = [
   { get: (s) => s.clauses, label: 'services.ra.terms.specialClauses', step: 3 },
-  { get: (s) => s.owner?.oAddr, label: 'services.ra.owner.address', step: 1 },
-  { get: (s) => (s.tenants || []).map((t) => [t.addr, t.police?.permanent?.address, t.police?.previous?.address, t.police?.workplaceAddress, ...(t.police?.occupants || []).map((o) => o.fullName)].join('')).join(''), label: 'services.ra.tenant.address', step: 2 },
-  { get: (s) => (s.wit?.w1Addr || '') + (s.wit?.w2Addr || ''), label: 'services.ra.witnesses.address', step: 4 },
+  { get: (s) => (s.tenants || []).map((t) => [t.police?.permanent?.address, t.police?.previous?.address, t.police?.workplaceAddress, ...(t.police?.occupants || []).map((o) => o.fullName)].join('')).join(''), label: 'services.ra.tenant.address', step: 2 },
   { get: (s) => (s.furnItems || []).map((f) => f.name).join(''), label: 'services.ra.terms.furniture', step: 3 },
 ];
 
@@ -61,17 +60,17 @@ export const largestFreeTextField = (state) => {
 };
 
 const POA_BLANK = { poaPrincipal: '', poaRegNo: '', poaDate: '', poaSro: '' };
-const PARTY_BLANK = { type: 'individual', residency: 'resident', mother: '', dob: '', alias: '', passport: '', visaOci: '', frro: '' };
+const PARTY_BLANK = { type: 'individual', residency: 'resident', dob: '', passport: '', visaOci: '', frro: '' };
 export const emptyTenantPolice = () => ({ permanentSameAsCurrent: true, permanent: { address: '', pincode: '', village: '', policeStation: '' }, addressProofType: 'uid', previousSameAsPermanent: true, previous: { address: '', pincode: '', village: '', policeStation: '' }, previousAddressProofType: 'uid', workplaceAddress: '', workIdProofType: '', occupants: [] });
-export const emptyTenant = () => ({ name: '', age: '', gender: '', occupation: '', relation: '', pan: '', aadhaar: '', mobile: '', email: '', addr: '', police: emptyTenantPolice(), ...PARTY_BLANK });
-export const emptyProp = () => ({ propType: 'Flat / Apartment', furnish: 'Unfurnished', flatNo: '', society: '', societyId: '', locality: '', gramPanchayat: null, city: 'Pune', taluka: '', villageCity: '', roadName: '', policeStation: '', pincode: '', area: '', areaBasis: 'carpet', areaUnit: 'sqft', floor: '', surveyNo: '', propertyAttributes: [], galleryArea: '', galleryAreaUnit: 'sqft' });
-export const emptyOwner = (isIn, user) => ({ oName: isIn ? user?.name || '' : '', oMother: '', oDob: '', oAlias: '', oAge: '', oGender: '', oOccupation: '', oPan: '', oAadhaar: '', oMobile: isIn ? user?.mobile || '' : '', oEmail: '', oAddr: '', capacity: 'owner', type: 'individual', residency: 'resident', passport: '', visaOci: '', frro: '', ...POA_BLANK });
-export const emptyCoOwner = () => ({ name: '', age: '', gender: '', occupation: '', pan: '', aadhaar: '', mobile: '', email: '', addr: '', capacity: 'co-owner', ...PARTY_BLANK, ...POA_BLANK });
+export const emptyTenant = () => ({ name: '', age: '', occupation: '', pan: '', mobile: '', police: emptyTenantPolice(), ...PARTY_BLANK });
+export const emptyProp = () => ({ propType: 'Flat / Apartment', flatNo: '', society: '', societyId: '', societyNotOnMaps: false, locality: '', gramPanchayat: null, city: 'Pune', taluka: '', landmark: '', policeStation: '', roadVicinity: '', roadType: '', pincode: '', area: '', areaUnit: 'sqft', floor: '' });
+export const emptyOwner = (isIn, user) => ({ oName: isIn ? user?.name || '' : '', oDob: '', oAge: '', oPan: '', oMobile: isIn ? user?.mobile || '' : '', capacity: 'owner', type: 'individual', residency: 'resident', passport: '', visaOci: '', frro: '', ...POA_BLANK });
+export const emptyCoOwner = () => ({ name: '', age: '', pan: '', mobile: '', capacity: 'co-owner', ...PARTY_BLANK, ...POA_BLANK });
 export const emptyInvite = () => ({ invMobile: '', invName: '', invMessage: '' });
-export const emptyTerms = () => ({ startDate: '', months: '11', rent: '', deposit: '', nrDeposit: '', increment: '5', incrementEvery: '11', lockin: '6', notice: '2', dueDay: '5', payMode: 'Bank Transfer / NEFT', utilitiesBy: 'Tenant', taxBy: 'Owner', costBy: 'Split', parking: 'none', parkingArea: '', parkingAreaUnit: 'sqft', occupants: '', language: 'English', visitAt: 'property', visitDate: '', visitSlot: 'any', depositPayments: [] });
+export const emptyTerms = () => ({ startDate: '', months: '11', rent: '', deposit: '', nrDeposit: '', increment: '5', incrementEvery: '11', lockin: '6', costBy: 'Split', parking: 'none', parkingArea: '', parkingAreaUnit: 'sqft', language: 'English', visitAt: 'property', visitDate: '', visitSlot: 'any', depositPayments: [] });
 
 export { rentForTerm } from '../../../../lib/toolCalc.js';
-export const emptyWit = () => ({ w1Name: '', w1Age: '', w1Mobile: '', w1Addr: '', w1Aadhaar: '', w2Name: '', w2Age: '', w2Mobile: '', w2Addr: '', w2Aadhaar: '' });
+export const emptyWit = () => ({ w1Name: '', w1Age: '', w1Mobile: '', w2Name: '', w2Age: '', w2Mobile: '' });
 
 export const fillBlanks = (cur, add) => ({
   ...cur,
@@ -81,8 +80,6 @@ export const fillBlanks = (cur, add) => ({
 const norm = (v) => String(v ?? '').trim().toLowerCase();
 export const namesOtherFlat = (cur, add) =>
   ['flatNo', 'society'].some((k) => norm(cur?.[k]) && norm(add?.[k]) && norm(cur[k]) !== norm(add[k]));
-
-const FURNISH_LABEL = { unfurnished: 'Unfurnished', semi: 'Semi-Furnished', furnished: 'Furnished' };
 
 export const listingAnswers = (l = {}) => {
   const f = l.form || {};
@@ -96,10 +93,8 @@ export const listingAnswers = (l = {}) => {
       locality: f.locality || l.locality || '',
       pincode: f.pincode || l.pincode || '',
       area,
-      areaBasis: area ? (f.carpetArea ? 'carpet' : 'built-up') : '',
       areaUnit: area ? unit : '',
       floor: f.floor === '' || f.floor == null ? '' : String(f.floor),
-      furnish: FURNISH_LABEL[f.furnishing || l.furnishing] || '',
     },
     terms: { rent: digits(f.monthlyRent || (l.deal === 'rent' ? l.price : '')), deposit: digits(f.deposit || l.deposit) },
   };
@@ -144,24 +139,25 @@ export const isAadhaar = (s) => {
 };
 export const isPan = (s) => /^[A-Za-z]{5}\d{4}[A-Za-z]$/.test(String(s || ''));
 export const isMobile = (s) => /^[6-9]\d{9}$/.test(digits(s));
-export const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(s || '').trim());
-/* PAN and Aadhaar of every licensor, tenant and witness leave this tab exactly once, via `identityParties` → `PUT
-   /service-requests/{id}/identities`, which only the assigned operator can read back. */
 
-const blankIds = (rows) => (Array.isArray(rows) ? rows : []).map((r) => ({ ...r, pan: '', aadhaar: '' }));
+const blankIds = (rows) => (Array.isArray(rows) ? rows : []).map(({ aadhaar: _aadhaar, ...r }) => ({ ...r, pan: '' }));
+const WITNESS_AADHAAR = /^w\d+Aadhaar$/;
 
-export const redactIdentityNumbers = (state) => ({
-  ...state,
-  owner: { ...(state?.owner || {}), oPan: '', oAadhaar: '' },
-  coOwners: blankIds(state?.coOwners),
-  tenants: blankIds(state?.tenants),
-  wit: { ...(state?.wit || {}), w1Aadhaar: '', w2Aadhaar: '' },
-});
+export const redactIdentityNumbers = (state) => {
+  const { oAadhaar: _oAadhaar, ...owner } = state?.owner || {};
+  return {
+    ...state,
+    owner: { ...owner, oPan: '' },
+    coOwners: blankIds(state?.coOwners),
+    tenants: blankIds(state?.tenants),
+    ...(state?.wit ? { wit: Object.fromEntries(Object.entries(state.wit).filter(([k]) => !WITNESS_AADHAAR.test(k))) } : {}),
+  };
+};
 
 export const hasIdentityNumbers = (state) => {
   if (!state || typeof state !== 'object') return false;
   if (state.owner?.oPan || state.owner?.oAadhaar) return true;
-  if (state.wit?.w1Aadhaar || state.wit?.w2Aadhaar) return true;
+  if (Object.entries(state.wit || {}).some(([k, v]) => WITNESS_AADHAAR.test(k) && v)) return true;
   return [...(Array.isArray(state.coOwners) ? state.coOwners : []), ...(Array.isArray(state.tenants) ? state.tenants : [])]
     .some((r) => r?.pan || r?.aadhaar);
 };
@@ -172,50 +168,29 @@ export const identityReminderFields = (state) => {
   if (!state || typeof state !== 'object') return [];
   return [
     marker('licensor', 0, 'pan', 'owner', state.owner?.oPan),
-    marker('licensor', 0, 'aadhaar', 'owner', state.owner?.oAadhaar),
-    ...(Array.isArray(state.coOwners) ? state.coOwners : []).flatMap((c, i) => [
-      marker('licensor', i + 1, 'pan', 'owner', c?.pan),
-      marker('licensor', i + 1, 'aadhaar', 'owner', c?.aadhaar),
-    ]),
-    ...(Array.isArray(state.tenants) ? state.tenants : []).flatMap((t, i) => [
-      marker('tenant', i, 'pan', 'tenant', t?.pan),
-      marker('tenant', i, 'aadhaar', 'tenant', t?.aadhaar),
-    ]),
-    marker('witness', 0, 'aadhaar', 'witness', state.wit?.w1Aadhaar),
-    marker('witness', 1, 'aadhaar', 'witness', state.wit?.w2Aadhaar),
+    ...(Array.isArray(state.coOwners) ? state.coOwners : []).map((c, i) => marker('licensor', i + 1, 'pan', 'owner', c?.pan)),
+    ...(Array.isArray(state.tenants) ? state.tenants : []).map((t, i) => marker('tenant', i, 'pan', 'tenant', t?.pan)),
   ].filter(Boolean);
 };
 
 const identityValue = (state, field) => {
-  if (field.role === 'licensor' && field.index === 0) {
-    return field.field === 'pan' ? state.owner?.oPan : state.owner?.oAadhaar;
-  }
-  if (field.role === 'licensor') {
-    const row = (Array.isArray(state.coOwners) ? state.coOwners : [])[field.index - 1];
-    return field.field === 'pan' ? row?.pan : row?.aadhaar;
-  }
-  if (field.role === 'tenant') {
-    const row = (Array.isArray(state.tenants) ? state.tenants : [])[field.index];
-    return field.field === 'pan' ? row?.pan : row?.aadhaar;
-  }
-  return field.index === 0 ? state.wit?.w1Aadhaar : state.wit?.w2Aadhaar;
+  if (field.role === 'licensor' && field.index === 0) return state.owner?.oPan;
+  if (field.role === 'licensor') return (Array.isArray(state.coOwners) ? state.coOwners : [])[field.index - 1]?.pan;
+  return (Array.isArray(state.tenants) ? state.tenants : [])[field.index]?.pan;
 };
 
 export const missingIdentityReminderFields = (fields, state) => (Array.isArray(fields) ? fields : [])
   .filter((field) => !String(identityValue(state, field) || '').trim());
 
-export const identityParties = ({ owner, coOwners, tenants, wit } = {}) => {
-  const party = (partyRole, partyIndex, name, rawPan, rawAadhaar) => {
+export const identityParties = ({ owner, coOwners, tenants } = {}) => {
+  const party = (partyRole, partyIndex, name, rawPan) => {
     const pan = String(rawPan || '').trim().toUpperCase();
-    const aadhaar = digits(rawAadhaar);
-    if (!pan && !aadhaar) return null;
-    return { partyRole, partyIndex, partyName: String(name || '').trim().slice(0, 120), pan, aadhaar };
+    if (!pan) return null;
+    return { partyRole, partyIndex, partyName: String(name || '').trim().slice(0, 120), pan };
   };
   return [
-    owner && party('owner', 0, owner.oName, owner.oPan, owner.oAadhaar),
-    ...(Array.isArray(coOwners) ? coOwners : []).map((c, i) => party('owner', i + 1, c?.name, c?.pan, c?.aadhaar)),
-    ...(Array.isArray(tenants) ? tenants : []).map((t, i) => party('tenant', i, t?.name, t?.pan, t?.aadhaar)),
-    wit && party('witness', 0, wit.w1Name, '', wit.w1Aadhaar),
-    wit && party('witness', 1, wit.w2Name, '', wit.w2Aadhaar),
+    owner && party('owner', 0, owner.oName, owner.oPan),
+    ...(Array.isArray(coOwners) ? coOwners : []).map((c, i) => party('owner', i + 1, c?.name, c?.pan)),
+    ...(Array.isArray(tenants) ? tenants : []).map((t, i) => party('tenant', i, t?.name, t?.pan)),
   ].filter(Boolean);
 };

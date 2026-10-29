@@ -3,17 +3,19 @@ import { Link } from 'react-router';
 import NativeSelect from '../../../../components/ui/NativeSelect.jsx';
 import Icon from '../../../../components/Icon.jsx';
 import MobileField from '../../../../components/MobileField.jsx';
-import IdInput from '../../../../components/IdInput.jsx';
+import PartyIdInput from './PartyIdInput.jsx';
 import Field from '../../../../components/ui/Field.jsx';
 import { COMMERCIAL_ROUTE, MAX_TENANTS } from './constants.js';
 import { pickDoc } from './helpers.js';
-import { dupMessageKey, tenantDocSlots } from './validation.js';
+import { dupMessageKey, tenantDocKey, tenantDocSlots, workProofRequired } from './validation.js';
 import UploadBox from './UploadBox.jsx';
 import IdentityReminderNote from './IdentityReminderNote.jsx';
 import PartyIdentityFields from './PartyIdentityFields.jsx';
 import TenantPoliceRecord from './TenantPoliceRecord.jsx';
 
-export default function StepTenant({ step, canInvite, tenantMode, setTenantMode, tenants, setTenant, removeTenant, addTenant, errors, clearErr, tenantDocs, setTenantDocs, invite, setInvite, identityReminders }) {
+const offlineDocSlots = (tenant, i) => tenantDocSlots(tenant, i).filter(({ slug }) => slug === 'passport' || slug === 'visa');
+
+export default function StepTenant({ step, canInvite, tenantMode, setTenantMode, tenants, setTenant, removeTenant, addTenant, errors, clearErr, tenantDocs, setTenantDocs, invite, setInvite, identityReminders, masked, held }) {
   const { t: tr } = useTranslation();
   const why = (k, fallback) => tr(errors[k] === 'dup' ? dupMessageKey(k) : fallback);
   return (
@@ -66,32 +68,27 @@ export default function StepTenant({ step, canInvite, tenantMode, setTenantMode,
                   )}
                   {(t.residency === 'nri' || t.residency === 'foreign') && <div className="sm:col-span-2 rounded-xl border border-sky-400/20 bg-sky-500/10 p-3 text-xs text-sky-100 leading-relaxed">{tr('services.ra.party.offlineNote')}</div>}
                   <Field label={tr('services.ra.tenant.fullName')} required error={errors['t' + i + 'name'] && tr('services.ra.tenant.fullNameErr')}><input value={t.name} onChange={(e) => { setTenant(i, 'name', e.target.value); clearErr('t' + i + 'name'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'name'] ? ' err' : '')} placeholder={tr('services.ra.tenant.fullNamePlaceholder')} /></Field>
-                  <PartyIdentityFields mother={t.mother} dob={t.dob} alias={t.alias} age={t.age} setMother={(v) => setTenant(i, 'mother', v)} setDob={(v) => setTenant(i, 'dob', v)} setAlias={(v) => setTenant(i, 'alias', v)} setAge={(v) => setTenant(i, 'age', v)} keys={{ mother: 't' + i + 'mother', dob: 't' + i + 'dob', alias: 't' + i + 'alias', age: 't' + i + 'age' }} errors={errors} clearErr={clearErr} />
-                  <div className="grid grid-cols-2 gap-3">
-                   <Field label={tr('services.ra.tenant.age')} required error={errors['t' + i + 'age'] && (tr(errors['t' + i + 'age'] === 'match' ? 'services.ra.err.ageDob' : 'services.ra.err.adult'))}><input inputMode="numeric" value={t.age} onChange={(e) => { setTenant(i, 'age', e.target.value.replace(/\D/g, '')); clearErr('t' + i + 'age'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'age'] ? ' err' : '')} placeholder={tr('services.ra.tenant.agePlaceholder')} /></Field>
-                    <Field label={tr('services.ra.tenant.gender')}><NativeSelect value={t.gender} onChange={(e) => setTenant(i, 'gender', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm"><option value="">{tr('services.ra.owner.genderPlaceholder')}</option>{['Male', 'Female', 'Other'].map((o) => <option key={o}>{o}</option>)}</NativeSelect></Field>
-                  </div>
-                  <Field label={tr('services.ra.tenant.occupation')}><input value={t.occupation} onChange={(e) => setTenant(i, 'occupation', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={tr('services.ra.tenant.occupationPlaceholder')} /></Field>
-                  <Field label={tr('services.ra.tenant.relation')}><input value={t.relation} onChange={(e) => setTenant(i, 'relation', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={tr('services.ra.tenant.relationPlaceholder')} /></Field>
-                  <Field label={tr('services.ra.tenant.pan')} required error={errors['t' + i + 'pan'] && why('t' + i + 'pan', 'services.ra.tenant.panErr')}><IdInput kind="pan" value={t.pan} onChange={(v) => { setTenant(i, 'pan', v); clearErr('t' + i + 'pan'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'pan'] ? ' err' : '')} placeholder="ABCDE1234F" /></Field>
-                  {t.residency === 'nri' || t.residency === 'foreign' ? (
+                  <PartyIdentityFields dob={t.dob} setDob={(v) => setTenant(i, 'dob', v)} setAge={(v) => setTenant(i, 'age', v)} keys={{ dob: 't' + i + 'dob', age: 't' + i + 'age' }} errors={errors} clearErr={clearErr} />
+                  <Field label={tr('services.ra.tenant.occupation')}><input value={t.occupation} onChange={(e) => { setTenant(i, 'occupation', e.target.value); if (!workProofRequired(e.target.value)) setTenantDocs((d) => { const next = { ...d }; delete next[tenantDocKey(i, 'workidproof')]; return next; }); }} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={tr('services.ra.tenant.occupationPlaceholder')} /></Field>
+                  <Field label={tr('services.ra.tenant.pan')} required error={errors['t' + i + 'pan'] && why('t' + i + 'pan', 'services.ra.tenant.panErr')}><PartyIdInput masked={masked?.[`tenant-${i}`]?.pan} held={held} kind="pan" value={t.pan} onChange={(v) => { setTenant(i, 'pan', v); clearErr('t' + i + 'pan'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'pan'] ? ' err' : '')} placeholder="ABCDE1234F" /></Field>
+                  {(t.residency === 'nri' || t.residency === 'foreign') && (
                     <>
                       <Field label={tr('services.ra.party.passport')} required error={errors['t' + i + 'passport'] && tr('services.ra.party.passportErr')}><input maxLength={20} value={t.passport || ''} onChange={(e) => { setTenant(i, 'passport', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); clearErr('t' + i + 'passport'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'passport'] ? ' err' : '')} placeholder={tr('services.ra.party.passportPlaceholder')} /></Field>
                       {t.residency === 'foreign' && <Field label={tr('services.ra.party.visaOci')} required error={errors['t' + i + 'visaOci'] && tr('services.ra.party.visaOciErr')}><input maxLength={40} value={t.visaOci || ''} onChange={(e) => { setTenant(i, 'visaOci', e.target.value); clearErr('t' + i + 'visaOci'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'visaOci'] ? ' err' : '')} placeholder={tr('services.ra.party.visaOciPlaceholder')} /></Field>}
                       {t.residency === 'foreign' && <Field label={tr('services.ra.party.frro')}><input maxLength={40} value={t.frro || ''} onChange={(e) => setTenant(i, 'frro', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={tr('services.ra.party.frroPlaceholder')} /></Field>}
                     </>
-                  ) : (
-                    <Field label={tr('services.ra.tenant.aadhaar')} required error={errors['t' + i + 'aadhaar'] && why('t' + i + 'aadhaar', 'services.ra.tenant.aadhaarErr')}><IdInput kind="aadhaar" value={t.aadhaar} onChange={(v) => { setTenant(i, 'aadhaar', v); clearErr('t' + i + 'aadhaar'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'aadhaar'] ? ' err' : '')} placeholder={tr('services.ra.tenant.aadhaarPlaceholder')} /></Field>
                   )}
                   <Field label={tr('services.ra.tenant.mobile')} required error={errors['t' + i + 'mobile'] && why('t' + i + 'mobile', 'services.ra.tenant.mobileErr')}><MobileField value={t.mobile} onChange={(v) => { setTenant(i, 'mobile', v); clearErr('t' + i + 'mobile'); }} error={!!errors['t' + i + 'mobile']} placeholder={tr('services.ra.tenant.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
-                  <Field label={tr('services.ra.tenant.email')} error={errors['t' + i + 'email'] && tr('services.ra.err.email')}><input type="email" value={t.email} onChange={(e) => { setTenant(i, 'email', e.target.value); clearErr('t' + i + 'email'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm' + (errors['t' + i + 'email'] ? ' err' : '')} placeholder="you@example.com" /></Field>
-                  <Field className="sm:col-span-2" label={tr('services.ra.tenant.address')} required error={errors['t' + i + 'addr'] && tr('services.ra.tenant.addressErr')}><textarea rows={2} value={t.addr} onChange={(e) => { setTenant(i, 'addr', e.target.value); clearErr('t' + i + 'addr'); }} className={'field w-full px-4 py-3 rounded-xl text-white text-sm resize-none' + (errors['t' + i + 'addr'] ? ' err' : '')} placeholder={tr('services.ra.tenant.addressPlaceholder')} /></Field>
                   <TenantPoliceRecord tenant={t} index={i} setTenant={setTenant} errors={errors} clearErr={clearErr} tenantDocs={tenantDocs} setTenantDocs={setTenantDocs} />
                 </div>
-                <p className="text-xs font-semibold text-gray-300 mt-4 mb-2 flex items-center gap-2"><Icon name="paperclip" className="w-3.5 h-3.5 text-teal-400" /> {tr('services.ra.tenant.documents')}</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {tenantDocSlots(t, i).filter(({ slug }) => slug !== 'addressproof' && slug !== 'prevaddressproof').map(({ key, slug, required }) => <UploadBox key={key} label={tr(`services.ra.tenant.doc.${slug}`)} required={required} error={errors['doc-' + key]} fileName={tenantDocs[key]?.fileName} preview={tenantDocs[key]} onPick={async (f) => { if (await pickDoc(f, tenantDocs[key], setTenantDocs, key)) clearErr('doc-' + key); }} />)}
-                </div>
+                {offlineDocSlots(t, i).length > 0 && (
+                  <>
+                    <p className="text-xs font-semibold text-gray-300 mt-4 mb-2 flex items-center gap-2"><Icon name="paperclip" className="w-3.5 h-3.5 text-teal-400" /> {tr('services.ra.tenant.documents')}</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {offlineDocSlots(t, i).map(({ key, slug, required }) => <UploadBox key={key} label={tr(`services.ra.tenant.doc.${slug}`)} required={required} error={errors['doc-' + key]} fileName={tenantDocs[key]?.fileName} preview={tenantDocs[key]} onPick={async (f) => { if (await pickDoc(f, tenantDocs[key], setTenantDocs, key)) clearErr('doc-' + key); }} />)}
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           </div>

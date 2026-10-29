@@ -679,7 +679,7 @@ class ServiceRequestFlowTest extends ServiceFixtures {
             mvc.perform(post(Routes.ServiceRequests.CHECKOUT, id)
                             .header(HttpHeaders.AUTHORIZATION, bearer(buyer))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"declaration\":\"ra-decl-2026-09\"}"))
+                            .content("{\"declaration\":\"ra-decl-2026-10\"}"))
                     .andExpect(status().isConflict())
                     .andExpect(jsonPath("$.message", containsString("Upload required documents before checkout")));
             mvc.perform(get(Routes.ServiceRequests.BASE)

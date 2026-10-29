@@ -17,8 +17,7 @@ public record ServiceRequestIdentitiesRequest(
 
         @NotEmpty(message = "record at least one party")
         @Size(max = 12, message = "at most 12 parties")
-        List<@Valid Party> parties) {
-
+        List<@NotNull @Valid Party> parties) {
     @AssertTrue(message = "each party role and index may appear only once")
     public boolean isDistinct() {
         if (parties == null) {

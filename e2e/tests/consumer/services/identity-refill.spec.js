@@ -37,7 +37,7 @@ test.describe('Identity numbers after a retention purge (D282)', () => {
       details: { ownerName: OWNER, _state: { owner: { oName: OWNER, oMobile: mobile }, tenants: [{ name: TENANT }] } },
     });
     await ok('PUT', `/service-requests/${request.id}/identities`, customer, {
-      parties: [{ partyRole: 'owner', partyIndex: 0, partyName: OWNER, aadhaar: '211122223335' }],
+      parties: [{ partyRole: 'owner', partyIndex: 0, partyName: OWNER, pan: 'ABCDE1234F' }],
     });
     purge(request.id);
 
@@ -48,7 +48,8 @@ test.describe('Identity numbers after a retention purge (D282)', () => {
     await expect(panel).toContainText(OWNER);
     await expect(panel).toContainText(TENANT);
 
-    await panel.getByLabel(`Aadhaar of ${OWNER}`).fill('2111 2222 3335');
+    await expect(panel.getByLabel(/^Aadhaar of /), 'Aadhaar is collected at the doorstep, not here').toHaveCount(0);
+    await panel.getByLabel(`PAN of ${OWNER}`).fill('pqrsx6789k');
     await panel.getByLabel(`PAN of ${TENANT}`).fill('abcde1234f');
     await panel.getByRole('button', { name: 'Save numbers' }).click();
     await expect(panel).toBeHidden({ timeout: 15000 });

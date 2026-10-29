@@ -13,8 +13,7 @@ final class PropertyIgrRules {
     private static final Set<String> TALUKAS = Set.of("Pune City", "Haveli", "Mulshi", "Maval", "Khed",
             "Shirur", "Daund", "Indapur", "Baramati", "Purandar", "Bhor", "Velhe / Rajgad", "Junnar",
             "Ambegaon", "Pimpri-Chinchwad / Pimpri");
-    private static final Set<String> ATTRIBUTE_KINDS = Set.of("CTS No.", "Survey No.", "Gat No.", "Plot No.",
-            "Khata No.", "Milkat (Property) No.", "Hissa No.");
+
     private static final Pattern NUMBER = Pattern.compile("^[0-9]+(?:\\.[0-9]+)?$");
 
     private PropertyIgrRules() {
@@ -25,15 +24,11 @@ final class PropertyIgrRules {
             required(prop.get("taluka"), "_state.prop.taluka", problems);
             oneOf(prop.get("taluka"), "_state.prop.taluka", TALUKAS, problems);
         }
-        if (prop.containsKey("villageCity")) {
-            required(prop.get("villageCity"), "_state.prop.villageCity", problems);
-            max(prop.get("villageCity"), "_state.prop.villageCity", 80, problems);
-        }
-        max(prop.get("roadName"), "_state.prop.roadName", 120, problems);
-        max(prop.get("policeStation"), "_state.prop.policeStation", 80, problems);
-        attributes(prop.get("propertyAttributes"), problems);
-        optionalArea(prop.get("galleryArea"), "_state.prop.galleryArea", problems);
-        unit(prop.get("galleryAreaUnit"), "_state.prop.galleryAreaUnit", problems);
+        text(prop, "landmark", 80, problems);
+        text(prop, "policeStation", 80, problems);
+        text(prop, "roadVicinity", 80, problems);
+        text(prop, "roadType", 80, problems);
+
         optionalArea(terms.get("parkingArea"), "_state.terms.parkingArea", problems);
         unit(terms.get("parkingAreaUnit"), "_state.terms.parkingAreaUnit", problems);
         if (isStated(terms.get("parkingArea")) && "none".equals(String.valueOf(terms.get("parking")))) {
@@ -41,28 +36,11 @@ final class PropertyIgrRules {
         }
     }
 
-    private static void attributes(Object raw, List<String> problems) {
-        if (raw == null) {
-            return;
-        }
-        if (!(raw instanceof List<?> rows) || !rows.stream().allMatch(Map.class::isInstance)) {
-            problems.add("_state.prop.propertyAttributes must be a list of attributes");
-            return;
-        }
-        if (rows.size() > 8) {
-            problems.add("_state.prop.propertyAttributes must contain at most 8 rows");
-            return;
-        }
-        for (int i = 0; i < rows.size(); i++) {
-            Map<?, ?> row = (Map<?, ?>) rows.get(i);
-            String path = "_state.prop.propertyAttributes[" + i + "]";
-            if (!isStated(row.get("kind")) && !isStated(row.get("number"))) {
-                continue;
-            }
-            required(row.get("kind"), path + ".kind", problems);
-            oneOf(row.get("kind"), path + ".kind", ATTRIBUTE_KINDS, problems);
-            required(row.get("number"), path + ".number", problems);
-            max(row.get("number"), path + ".number", 80, problems);
+
+    private static void text(Map<String, Object> prop, String key, int max, List<String> problems) {
+        if (prop.containsKey(key)) {
+            required(prop.get(key), "_state.prop." + key, problems);
+            max(prop.get(key), "_state.prop." + key, max, problems);
         }
     }
 

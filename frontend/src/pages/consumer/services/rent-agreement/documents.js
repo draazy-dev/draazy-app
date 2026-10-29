@@ -1,5 +1,5 @@
-import { OWNER_DOC_CATEGORY, TENANT_DOC_SLUGS } from './constants.js';
-import { coOwnerDocSlots, docReady, ownerDocSlots, tenantDocSlots } from './validation.js';
+import { OWNER_DOC_CATEGORY } from './constants.js';
+import { coOwnerDocSlots, docReady, ownerDocSlots, TENANT_DOC_KEYS, tenantDocSlots } from './validation.js';
 
 export function collectDocs({ mode, inviteRole, ownerMode, tenantMode, owner, coOwners = [], tenants = [], ownerDocs = {}, tenantDocs = {} }) {
   const out = [];
@@ -27,16 +27,23 @@ export function draftDocRefs(docs) {
 
 const OWNER_SLOT_BY_CATEGORY = Object.fromEntries(Object.entries(OWNER_DOC_CATEGORY).map(([k, c]) => [c, k]));
 
-export function slotForCategory(category) {
+function slotForCategory(category) {
   const c = String(category || '').toLowerCase();
   if (OWNER_SLOT_BY_CATEGORY[c]) return { side: 'owner', key: OWNER_SLOT_BY_CATEGORY[c] };
   const co = c.match(/^licensor-([1-9]\d*)-([a-z]+)$/);
   if (co) return { side: 'owner', key: `c${Number(co[1]) - 1}-${co[2]}` };
   const tenant = c.match(/^tenant-(\d+)-([a-z]+)$/);
-  const tenantSlot = { pan: '0', aadhaar: '1', passport: '1', photo: '2', income: '3', visa: '4', addressproof: '5', prevaddressproof: '6' }[tenant?.[2]];
-  if (tenantSlot) return { side: 'tenant', key: `t${tenant[1]}-${tenantSlot}` };
-  const di = tenant ? TENANT_DOC_SLUGS.indexOf(tenant[2]) : -1;
-  return di >= 0 ? { side: 'tenant', key: `t${tenant[1]}-${di}` } : null;
+  const tenantSlot = TENANT_DOC_KEYS[tenant?.[2]];
+  return tenantSlot ? { side: 'tenant', key: `t${tenant[1]}-${tenantSlot}` } : null;
+}
+
+export function filedDocSlots(request) {
+  const filed = { owner: {}, tenant: {} };
+  for (const doc of request?.docs || []) {
+    const slot = slotForCategory(doc.category);
+    if (slot && !filed[slot.side][slot.key]) filed[slot.side][slot.key] = { fileName: doc.fileName, filedOn: request.id };
+  }
+  return filed;
 }
 
 export function removeIndexedDocs(docs, prefix, index) {

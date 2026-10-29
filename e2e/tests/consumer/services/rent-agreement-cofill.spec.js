@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { API, apiLogin, authHeaders, signedInAs, signedInAsNew, uniqueMobile, shownMobile } from '../../../helpers/liveAuth.js';
-import { AADHAAR, SOCIETY_PLACEHOLDER, active, clickNext, fillOwner, fillProperty, fillTenantPolice, fillTerms, fillWitnesses, inviteOwner, inviteTenant, uploadAll } from '../../../helpers/rentAgreementWizard.js';
+import { SOCIETY_PLACEHOLDER, active, clickNext, fillOwner, fillProperty, fillTenantPolice, fillTerms, fillWitnesses, inviteOwner, inviteTenant, uploadAll } from '../../../helpers/rentAgreementWizard.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { signInSheet, verifyInSheet } from '../../../helpers/signInSheet.js';
 // Co-fill must be live: it spans two accounts and browser contexts.
@@ -191,11 +191,8 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     const t = active(page);
     await expect(t.getByPlaceholder('10-digit mobile').first(), 'the requester is the first tenant').toHaveValue(shownMobile(tenantMobile));
     await t.getByPlaceholder('As per PAN/Aadhaar').first().fill('Rahul Nair');
-    await t.getByPlaceholder('As per identity proof').first().fill('Latha Nair');
     await pickDate(page, '[data-err="t0dob"]', '1995-01-01');
     await t.getByPlaceholder('ABCDE1234F').first().fill('PQRSX6789K');
-    await t.getByPlaceholder('12-digit Aadhaar').first().fill(AADHAAR.tenant);
-    await t.getByPlaceholder('Full permanent address').first().fill('44, FC Road, Pune 411004');
     await fillTenantPolice(page);
     await uploadAll(t, 'tenant-doc');
     await clickNext(page, 3);
@@ -230,14 +227,13 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
       const o = active(ownerPage);
       await expect(o.getByPlaceholder('10-digit mobile').first(), 'the invitee\'s own number is already there').toHaveValue(shownMobile(ownerMobile));
       await o.getByPlaceholder('As per PAN/Aadhaar').first().fill('Rajesh Deshpande');
-      await o.getByPlaceholder('As per identity proof').first().fill('Maya Deshpande');
       await pickDate(ownerPage, '[data-err="oDob"]', '1974-01-01');
       await o.getByPlaceholder('ABCDE1234F').first().fill('ABCDE1234F');
-      await o.getByPlaceholder('12-digit Aadhaar').first().fill(AADHAAR.owner);
-      await o.getByPlaceholder('Full permanent address').first().fill('12, MG Road, Pune 411001');
       await uploadAll(o, 'owner-doc');
       await clickNext(ownerPage, 2);
       await expect(active(ownerPage).getByPlaceholder('As per PAN/Aadhaar').first(), 'the tenant half is read-only').toBeDisabled();
+      await expect(active(ownerPage).getByTestId('ra-masked-pan'), 'the tenant\'s PAN shows only its last four').toHaveValue('XXXXXX789K');
+      await expect(active(ownerPage).getByPlaceholder('12-digit Aadhaar'), 'no Aadhaar is collected or shown').toHaveCount(0);
       await clickNext(ownerPage, 3);
       await clickNext(ownerPage, 4);
       await clickNext(ownerPage, 5);
@@ -260,6 +256,26 @@ test.describe('Rent Agreement co-fill — the invite the server addresses', () =
     await expect(page.getByTestId('ra-pay-panel').getByText('The owner has filled in their part')).toBeVisible();
     const summary = page.getByTestId('ra-pay-summary');
     await expect(summary, 'the pay panel states the deed being paid for').toContainText('Rahul Nair');
+    const breakdown = page.getByTestId('ra-pay-breakdown');
+    for (const line of ['Stamp Duty', 'Registration Fee', 'Document Handling', 'Draazy Service Fee', 'Total Payable']) {
+      await expect(breakdown, `the pay panel itemises ${line}`).toContainText(line);
+    }
+
+    /* "Add what's missing" must show the owner's half as filed, not reopen the invite form. */
+    await page.getByTestId('ra-continue-filed').click();
+    await clickNext(page, 1);
+    await expect(page.getByTestId('ra-cofilled-note')).toContainText('Filled in by the owner');
+    const ownerHalf = active(page);
+    await expect(ownerHalf.getByPlaceholder('As per PAN/Aadhaar').first()).toHaveValue('Rajesh Deshpande');
+    await expect(ownerHalf.getByPlaceholder('As per PAN/Aadhaar').first()).toBeDisabled();
+    await expect(ownerHalf.getByTestId('ra-masked-pan')).toHaveValue('XXXXXX234F');
+    await expect(ownerHalf.getByText('invite the owner'), 'no invite form over a filled half').toHaveCount(0);
+
+    await clickNext(page, 2);
+    const held = active(page).locator('input[data-held="true"]');
+    await expect(held.first(), 'the tenant\'s own numbers stay on file, not retyped').toHaveAttribute('placeholder', /on file/);
+    await expect(held.first()).toHaveValue('');
+    await clickNext(page, 3);
   });
 
   test('an invite addressed to one account is invisible to another, and a signed-out invitee gets the sign-in sheet and the invite resolves after it — the SERVER withholds it, and the mobile never enters the URL', async ({ page, browser }) => {

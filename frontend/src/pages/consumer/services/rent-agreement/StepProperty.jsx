@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import NativeSelect from '../../../../components/ui/NativeSelect.jsx';
 import LocalitySelect from '../../../../components/ui/LocalitySelect.jsx';
@@ -6,20 +7,42 @@ import FieldError from '../../../../components/ui/FieldError.jsx';
 import Field from '../../../../components/ui/Field.jsx';
 import { Link } from 'react-router';
 import SocietySelect from '../../list-property/SocietySelect.jsx';
+import { activeLocality, societyLocalityName } from '../../list-property/useListingLocation.js';
 import { cleanText } from '../../list-property/sanitize.js';
-import { AREA_BASES, AREA_UNITS, COMMERCIAL_ROUTE, MAX_FLOOR, RESIDENTIAL_PROPERTY_TYPES } from './constants.js';
+import { COMMERCIAL_ROUTE, MAX_FLOOR, RESIDENTIAL_PROPERTY_TYPES } from './constants.js';
 import IgrPropertyFields from './IgrPropertyFields.jsx';
+import AreaField from './AreaField.jsx';
 
 export default function StepProperty({ step, prop, setP, setProp, setSelectedPropertyId, pickListing, myProperties = [], errors = {}, fc, clearErr, onLocalityBusy }) {
   const { t } = useTranslation();
   const clearPropertyBinding = () => setSelectedPropertyId(null);
-  const onSociety = (picked) => {
+  const societyPickSeq = useRef(0);
+  const localityPickedAt = useRef(-1);
+  const onSociety = async (picked) => {
     const name = picked?.name || '';
     if (name !== prop.society) clearPropertyBinding();
-    setProp((p) => ({ ...p, society: name, societyId: picked?.id || '', societyNotOnMaps: !!picked?.notOnMaps }));
-    clearErr('society');
+    const pincode = picked?.pincode;
+    setProp((p) => ({ ...p, society: name, societyId: picked?.id || '', societyNotOnMaps: !!picked?.notOnMaps, ...(pincode ? { pincode } : {}) }));
+    ['society', ...(pincode ? ['pincode'] : [])].forEach(clearErr);
+    const seq = ++societyPickSeq.current;
+    if (!picked?.id) {
+      onLocalityBusy?.(false);
+      return;
+    }
+    onLocalityBusy?.(true);
+    try {
+      const { name: localityName, slug } = await societyLocalityName(picked, Number(picked.lat ?? NaN), Number(picked.lng ?? NaN));
+      const hit = await activeLocality(localityName, slug);
+      if (!hit || seq !== societyPickSeq.current || localityPickedAt.current === seq) return;
+      setProp((p) => ({ ...p, locality: hit.name }));
+      clearErr('locality');
+    } catch {
+    } finally {
+      if (seq === societyPickSeq.current) onLocalityBusy?.(false);
+    }
   };
   const onLocality = (name) => {
+    localityPickedAt.current = societyPickSeq.current;
     if (name !== prop.locality) clearPropertyBinding();
     setP('locality', name);
     clearErr('locality');
@@ -60,16 +83,11 @@ export default function StepProperty({ step, prop, setP, setProp, setSelectedPro
           <Link to={COMMERCIAL_ROUTE} className="text-teal-400 font-semibold hover:underline">{t('services.ra.property.commercialCta')}</Link>
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-5">
+      <div className="mb-5">
         <Field label={t('services.ra.property.propertyType')} error={errors.propType && t('services.ra.property.propTypeErr')}>
           <NativeSelect value={prop.propType} onChange={(e) => { setP('propType', e.target.value); clearErr('propType'); }} className={fc('propType')}>
             {errors.propType && <option value={prop.propType} disabled>{prop.propType}</option>}
             {RESIDENTIAL_PROPERTY_TYPES.map((o) => <option key={o}>{o}</option>)}
-          </NativeSelect>
-        </Field>
-        <Field label={t('services.ra.property.furnishing')}>
-          <NativeSelect value={prop.furnish} onChange={(e) => setP('furnish', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm">
-            {['Unfurnished', 'Semi-Furnished', 'Furnished'].map((o) => <option key={o}>{o}</option>)}
           </NativeSelect>
         </Field>
       </div>
@@ -89,21 +107,11 @@ export default function StepProperty({ step, prop, setP, setProp, setSelectedPro
         </div>
         <FieldError id="ra-gram-err" alert={false} show={!!errors.gramPanchayat}>{t('services.ra.property.gramPanchayatErr')}</FieldError>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-5">
-        <Field label={t('services.ra.property.area')} required error={errors.area && t('services.ra.property.areaErr')}><input inputMode="decimal" value={prop.area} onChange={(e) => { setP('area', e.target.value.replace(/[^\d.]/g, '')); clearErr('area'); }} className={fc('area')} placeholder={t('services.ra.property.areaPlaceholder')} /></Field>
-        <Field label={t('services.ra.property.areaBasis')}>
-          <NativeSelect value={prop.areaBasis} title={t('services.ra.property.areaBasis')} onChange={(e) => setP('areaBasis', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm">
-            {AREA_BASES.map((v) => <option key={v} value={v}>{t(`services.ra.property.areaBasisOpt.${v}`)}</option>)}
-          </NativeSelect>
-        </Field>
-        <Field label={t('services.ra.property.areaUnit')}>
-          <NativeSelect value={prop.areaUnit} title={t('services.ra.property.areaUnit')} onChange={(e) => setP('areaUnit', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm">
-            {AREA_UNITS.map((v) => <option key={v} value={v}>{t(`services.ra.property.areaUnitOpt.${v}`)}</option>)}
-          </NativeSelect>
-        </Field>
+      <div className="grid grid-cols-[minmax(0,1fr)_5.5rem] gap-3 sm:gap-4 mb-5">
+        <AreaField t={t} label={t('services.ra.property.area')} required error={errors.area && t('services.ra.property.areaErr')} inputClassName={fc('area')} value={prop.area} onChange={(v) => { setP('area', v); clearErr('area'); }} placeholder={t('services.ra.property.areaPlaceholder')} unit={prop.areaUnit} onUnit={(v) => setP('areaUnit', v)} unitTitle={t('services.ra.property.areaUnit')} />
         <Field label={t('services.ra.property.floor')} error={errors.floor && t('services.ra.property.floorErr', { max: MAX_FLOOR })}><input inputMode="numeric" value={prop.floor} onChange={(e) => { setP('floor', e.target.value.replace(/\D/g, '')); clearErr('floor'); }} className={fc('floor')} placeholder={t('services.ra.property.floorPlaceholder')} /></Field>
       </div>
-      <IgrPropertyFields t={t} prop={prop} setP={setP} setProp={setProp} errors={errors} clearErr={clearErr} clearPropertyBinding={clearPropertyBinding} />
+      <IgrPropertyFields t={t} prop={prop} setP={setP} errors={errors} clearErr={clearErr} clearPropertyBinding={clearPropertyBinding} />
     </div>
   );
 }

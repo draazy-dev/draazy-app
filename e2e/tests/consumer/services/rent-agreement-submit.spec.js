@@ -71,7 +71,7 @@ test.describe('Rent Agreement — the priced desk, live', () => {
 
     const review = active(page);
     await review.getByRole('checkbox').check();
-    await expect(review.getByRole('button', { name: /Pay ₹[\d,]+ & Submit/ })).toBeVisible();
+    await expect(review.getByRole('button', { name: /Pay ₹[\d,]+\.\d{2} & Submit/ })).toBeVisible();
     await expect(review.getByText('Your request reaches our team only after payment.')).toBeVisible();
     const consents = [];
     page.on('request', (r) => { if (/tenant-consents/.test(r.url())) consents.push(r.url()); });
@@ -106,7 +106,7 @@ test.describe('Rent Agreement — the priced desk, live', () => {
     const opened = await checkout;
     expect(opened.status(), 'checkout opened once the request was complete').toBe(200);
     expect(opened.request().postDataJSON(), 'the declaration ticked on review is named, so the server can record it')
-      .toEqual({ declaration: 'ra-decl-2026-09' });
+      .toEqual({ declaration: 'ra-decl-2026-10' });
     expect(String((await opened.json()).paymentSessionId), 'a checkout session was minted').toMatch(/^mock_session_/);
     expect(body.propertyId, 'the wizard bound the request to the listing it was opened from').toBe(propertyId);
 
@@ -129,9 +129,7 @@ test.describe('Rent Agreement — the priced desk, live', () => {
 
     const settled = (await ownRequests(accessToken)).find((r) => r.id === body.id);
     const names = (settled.documents || []).map((d) => d.name || d.fileName || '').join(',');
-    for (const n of ['owner-doc-0', 'owner-doc-3', 'tenant-doc-0', 'tenant-doc-2', 'tenant-doc-3']) {
-      expect(names, `${n} reached the request`).toContain(n);
-    }
+    expect(names, 'the ownership proof reached the request').toContain('owner-doc-0');
 
     const resumed = page.waitForResponse(
       (r) => r.request().method() === 'POST' && /\/service-requests\/[^/]+\/checkout$/.test(new URL(r.url()).pathname),

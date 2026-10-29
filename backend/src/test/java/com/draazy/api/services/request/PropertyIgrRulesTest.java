@@ -22,44 +22,51 @@ class PropertyIgrRulesTest {
     }
 
     @Test
-    @DisplayName("a stated taluka and village must be usable on the IGR portal")
-    void talukaAndVillage() {
-        assertThatCode(() -> state(Map.of("prop", Map.of("taluka", "Haveli", "villageCity", "Baner"))))
+    @DisplayName("a stated taluka must be usable on the IGR portal")
+    void taluka() {
+        assertThatCode(() -> state(Map.of("prop", Map.of("taluka", "Haveli"))))
                 .doesNotThrowAnyException();
-        assertThatThrownBy(() -> state(Map.of("prop", Map.of("taluka", "", "villageCity", ""))))
+        assertThatThrownBy(() -> state(Map.of("prop", Map.of("taluka", ""))))
                 .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("_state.prop.taluka")
-                .hasMessageContaining("_state.prop.villageCity");
-        assertThatThrownBy(() -> state(Map.of("prop", Map.of("taluka", "Mumbai", "villageCity", "Baner"))))
+                .hasMessageContaining("_state.prop.taluka");
+        assertThatThrownBy(() -> state(Map.of("prop", Map.of("taluka", "Mumbai"))))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("_state.prop.taluka");
     }
 
     @Test
-    @DisplayName("property attribute rows carry a known kind and a bounded number")
-    void attributes() {
-        assertThatCode(() -> state(Map.of("prop", Map.of("propertyAttributes",
-                java.util.List.of(Map.of("kind", "CTS No.", "number", "1234/5A"),
-                        Map.of("kind", "Survey No.", "number", "88")))))).doesNotThrowAnyException();
-        assertThatThrownBy(() -> state(Map.of("prop", Map.of("propertyAttributes",
-                java.util.List.of(Map.of("kind", "Mutation No.", "number", "123"))))))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("_state.prop.propertyAttributes[0].kind");
-        assertThatThrownBy(() -> state(Map.of("prop", Map.of("propertyAttributes",
-                java.util.List.of(Map.of("kind", "CTS No."))))))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("_state.prop.propertyAttributes[0].number");
+    @DisplayName("a present-but-blank required text field is refused; an absent key still saves")
+    void blankRequiredTextIsRefused() {
+        for (String key : java.util.List.of("landmark", "policeStation", "roadVicinity", "roadType")) {
+            assertThatThrownBy(() -> state(Map.of("prop", Map.of(key, " "))))
+                    .isInstanceOf(ValidationException.class)
+                    .hasMessageContaining("_state.prop." + key + " is required");
+        }
+        assertThatCode(() -> state(Map.of("prop", Map.of("taluka", "Haveli")))).doesNotThrowAnyException();
     }
 
     @Test
-    @DisplayName("parking and gallery areas are optional but sane when stated")
+    @DisplayName("text fields are length-capped")
+    void textLengths() {
+        for (String key : java.util.List.of("landmark", "policeStation", "roadVicinity", "roadType")) {
+            assertThatThrownBy(() -> state(Map.of("prop", Map.of(key, "x".repeat(81)))))
+                    .hasMessageContaining("_state.prop." + key + " must be at most 80");
+        }
+    }
+
+    @Test
+    @DisplayName("fields staff now read from Index II are no longer validated, so old drafts still save")
+    void retiredFieldsAreTolerated() {
+        assertThatCode(() -> state(Map.of("prop", Map.of("villageCity", "", "roadName", "x".repeat(500),
+                "zone", " ", "constructionType", "mud", "propertyAge", "old", "galleryArea", "0",
+                "galleryAreaUnit", "guntha", "propertyAttributes", "CTS 1")))).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("a parking area is sane when stated")
     void optionalAreas() {
-        assertThatCode(() -> state(Map.of("prop", Map.of("galleryArea", "45.5", "galleryAreaUnit", "sqft"),
-                "terms", Map.of("parking", "car", "parkingArea", "120", "parkingAreaUnit", "sqm"))))
-                .doesNotThrowAnyException();
-        assertThatThrownBy(() -> state(Map.of("prop", Map.of("galleryArea", "0"))))
-                .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("_state.prop.galleryArea");
+        assertThatCode(() -> state(Map.of("terms", Map.of("parking", "car", "parkingArea", "120",
+                "parkingAreaUnit", "sqm")))).doesNotThrowAnyException();
         assertThatThrownBy(() -> state(Map.of("terms", Map.of("parking", "none", "parkingArea", "120"))))
                 .isInstanceOf(ValidationException.class)
                 .hasMessageContaining("_state.terms.parkingArea requires parking");

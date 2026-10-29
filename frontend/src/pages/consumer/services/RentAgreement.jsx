@@ -38,13 +38,17 @@ export default function RentAgreement() {
     declare, setDeclare, generate, submitting, pendingRequestId, paymentPending, paymentConfirming,
     clearErr, fc, cost, locked, gated, startNewAgreement, restored, startFresh, myInvites,
     identityReminders,
-    stalledInvite, recoverInvite, recovering, payable, payFiled, paying, continuable, continueFiled,
+    stalledInvite, recoverInvite, recovering, payable, payFiled, paying, continuable, continueFiled, coFilledRole, maskedIds,
     copyInviteLink, next, prev,
   } = ctx;
   const invitingOwner = mode === 'owner' && ownerMode === 'invite';
   const inviting = invitingOwner || (mode === 'owner' && tenantMode === 'invite');
   const invitedSide = { context: invitingOwner || inviteRole === 'owner' ? 'owner' : undefined };
   const ownStep = inviteRole === 'owner' ? 1 : 2;
+  const shownOwnerMode = coFilledRole === 'owner' ? 'fill' : ownerMode;
+  const shownTenantMode = coFilledRole === 'tenant' ? 'fill' : tenantMode;
+  const ownerReadOnly = (mode === 'invite' && inviteRole !== 'owner') || coFilledRole === 'owner';
+  const tenantReadOnly = (mode === 'invite' && inviteRole === 'owner') || coFilledRole === 'tenant';
 
   return (
     <div ref={rootRef} className="ra-page">
@@ -120,8 +124,8 @@ export default function RentAgreement() {
                         <p className="text-gray-500 text-[11px] mt-2 flex items-start gap-1.5"><Icon name="clock" className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" /> {tr('services.ra.invite.awaitingReply')}</p>
                       )}
                       <div className="flex flex-col sm:flex-row gap-2 mt-3">
-                        <a href={inviteResult.waLink} target="_blank" rel="noopener noreferrer" className="h-btn flex-1 inline-flex items-center justify-center gap-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold"><Icon name="message-circle" className="w-4 h-4" /> {tr('services.ra.invite.sendWhatsapp')}</a>
-                        <button type="button" onClick={copyInviteLink} className="btn-outline inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-gray-200 text-sm font-semibold min-h-[44px]"><Icon name={copied ? 'check' : 'copy'} className="w-4 h-4" /> {copied ? tr('services.ra.invite.copied') : tr('services.ra.invite.copyLink')}</button>
+                        <a href={inviteResult.waLink} target="_blank" rel="noopener noreferrer" className="btn-teal h-btn sm:flex-1 inline-flex items-center justify-center gap-2 px-4 rounded-xl text-white text-sm font-semibold"><Icon name="message-circle" className="w-4 h-4" /> {tr('services.ra.invite.sendWhatsapp')}</a>
+                        <button type="button" onClick={copyInviteLink} className="btn-outline h-btn sm:flex-1 inline-flex items-center justify-center gap-2 px-4 rounded-xl text-gray-200 text-sm font-semibold"><Icon name={copied ? 'check' : 'copy'} className="w-4 h-4" /> {copied ? tr('services.ra.invite.copied') : tr('services.ra.invite.copyLink')}</button>
                       </div>
                       <p className="text-gray-600 text-[11px] mt-2.5 leading-relaxed">{tr('services.ra.invite.sendNote', invitedSide)}</p>
                       {inviteResult.partyId ? (
@@ -227,27 +231,36 @@ export default function RentAgreement() {
                     )
                   )}
 
+                  {coFilledRole && step === (coFilledRole === 'owner' ? 1 : 2) && (
+                    <div className="mb-6 p-3.5 rounded-xl bg-white/5 border border-white/10 flex items-start gap-2.5" data-testid="ra-cofilled-note">
+                      <Icon name="lock" className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-white font-semibold text-xs">{tr('services.ra.locked.coFilledTitle', { context: coFilledRole === 'owner' ? 'owner' : undefined })}</p>
+                        <p className="text-gray-400 text-[11px] mt-0.5">{tr('services.ra.locked.coFilledDesc')}</p>
+                      </div>
+                    </div>
+                  )}
+
                   <fieldset disabled={mode === 'invite'} className="contents">
                     <StepProperty step={step} prop={prop} setP={setP} setProp={setProp} setSelectedPropertyId={setSelectedPropertyId} pickListing={pickListing} myProperties={myProperties} errors={errors} fc={fc} clearErr={clearErr} onLocalityBusy={setLocalityBusy} />
                   </fieldset>
 
-                  <fieldset disabled={mode === 'invite' && inviteRole !== 'owner'} className="contents">
-                    <StepOwner step={step} canInvite={mode === 'owner'} ownerMode={ownerMode} chooseOwnerMode={chooseOwnerMode} invite={invite} setInvite={setInvite} owner={owner} setO={setO} coOwners={coOwners} setCoOwner={setCoOwner} addCoOwner={addCoOwner} removeCoOwner={removeCoOwner} errors={errors} fc={fc} clearErr={clearErr} ownerDocs={ownerDocs} setOwnerDocs={setOwnerDocs} vaultEnabled={vaultEnabled} onDocSaved={saveOwnerDocToVault} identityReminders={identityReminders.owner} />
+                  <fieldset disabled={ownerReadOnly} className="contents">
+                    <StepOwner step={step} canInvite={mode === 'owner' && !coFilledRole} ownerMode={shownOwnerMode} chooseOwnerMode={chooseOwnerMode} invite={invite} setInvite={setInvite} owner={owner} setO={setO} coOwners={coOwners} setCoOwner={setCoOwner} addCoOwner={addCoOwner} removeCoOwner={removeCoOwner} errors={errors} fc={fc} clearErr={clearErr} ownerDocs={ownerDocs} setOwnerDocs={setOwnerDocs} vaultEnabled={vaultEnabled} onDocSaved={saveOwnerDocToVault} identityReminders={identityReminders.owner} masked={maskedIds} held={!ownerReadOnly} />
                   </fieldset>
 
-                  <fieldset disabled={mode === 'invite' && inviteRole === 'owner'} className="contents">
-                  <StepTenant step={step} canInvite={mode === 'owner' && ownerMode !== 'invite'} tenantMode={tenantMode} setTenantMode={setTenantMode} tenants={tenants} setTenant={setTenant} removeTenant={removeTenant} addTenant={addTenant} errors={errors} clearErr={clearErr} tenantDocs={tenantDocs} setTenantDocs={setTenantDocs} invite={invite} setInvite={setInvite} identityReminders={identityReminders.tenant} />
-                  </fieldset>
-
-                  <fieldset disabled={mode === 'invite'} className="contents">
-                    <StepTerms step={step} terms={terms} setT={setT} startBounds={startBounds} errors={errors} fc={fc} clearErr={clearErr} maint={maint} setMaint={setMaint} regArea={regArea} furnish={prop.furnish} setFurnish={(v) => setP('furnish', v)} furnItems={furnItems} toggleFurn={toggleFurn} isChecked={isChecked} bumpQty={bumpQty} removeFurn={removeFurn} custom={custom} setCustom={setCustom} addCustom={addCustom} clauses={clauses} setClauses={setClauses} />
+                  <fieldset disabled={tenantReadOnly} className="contents">
+                  <StepTenant step={step} canInvite={mode === 'owner' && ownerMode !== 'invite' && !coFilledRole} tenantMode={shownTenantMode} setTenantMode={setTenantMode} tenants={tenants} setTenant={setTenant} removeTenant={removeTenant} addTenant={addTenant} errors={errors} clearErr={clearErr} tenantDocs={tenantDocs} setTenantDocs={setTenantDocs} invite={invite} setInvite={setInvite} identityReminders={identityReminders.tenant} masked={maskedIds} held={!tenantReadOnly} />
                   </fieldset>
 
                   <fieldset disabled={mode === 'invite'} className="contents">
-                    <StepWitnesses step={step} wit={wit} setWit={setWit} errors={errors} fc={fc} clearErr={clearErr} identityReminders={identityReminders.witness} />
+                    <StepTerms step={step} terms={terms} setT={setT} startBounds={startBounds} errors={errors} fc={fc} clearErr={clearErr} maint={maint} setMaint={setMaint} regArea={regArea} furnItems={furnItems} toggleFurn={toggleFurn} isChecked={isChecked} bumpQty={bumpQty} removeFurn={removeFurn} custom={custom} setCustom={setCustom} addCustom={addCustom} clauses={clauses} setClauses={setClauses} />
                   </fieldset>
 
-                  <StepReview step={step} prop={prop} owner={owner} coOwners={coOwners} wit={wit} ownerMode={ownerMode} tenantMode={tenantMode} invite={invite} tenants={tenants} terms={terms} cost={cost} maint={maint} furnitureText={furnitureText} regArea={regArea} declare={declare} setDeclare={setDeclare} generate={generate} submitting={submitting} retrying={!!pendingRequestId} paysNow={mode === 'owner' && !inviting} identityReminders={identityReminders.review} />
+                  <fieldset disabled={mode === 'invite'} className="contents">
+                    <StepWitnesses step={step} wit={wit} setWit={setWit} errors={errors} fc={fc}                     clearErr={clearErr} />                  </fieldset>
+
+                  <StepReview step={step} prop={prop} owner={owner} coOwners={coOwners} wit={wit} ownerMode={shownOwnerMode} tenantMode={shownTenantMode} invite={invite} tenants={tenants} terms={terms} cost={cost} maint={maint} furnitureText={furnitureText} regArea={regArea} declare={declare} setDeclare={setDeclare} generate={generate} submitting={submitting} retrying={!!pendingRequestId} paysNow={mode === 'owner' && !inviting} identityReminders={identityReminders.review} />
 
                   <div className="flex justify-between items-center gap-3 mt-8">
                     {step !== 0 ? <button type="button" onClick={prev} className="btn-outline px-6 py-3 rounded-xl text-gray-300 text-sm font-semibold flex items-center gap-2"><Icon name="arrow-left" className="w-4 h-4" /> {tr('services.ra.back')}</button> : <div />}

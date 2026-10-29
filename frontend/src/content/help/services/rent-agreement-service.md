@@ -21,13 +21,13 @@ tags: [rent agreement, e-stamp, service, legal, co-fill]
 - Draft review, amendments and approval before registration
 - Registered copy upload and tracking after the Sub-Registrar step
 
-The Draazy service fee is shown in the cost breakdown before you pay, with Article 36A stamp duty, registration fee, the document handling charge and any other statutory charges itemised separately. We pay the government charges on your behalf, in the parties' names, at exactly what you paid us for them — they are not part of our fee. Stamp duty is rounded up to the next ₹100.
+The Draazy service fee is shown in the cost breakdown before you pay, with Article 36A stamp duty, registration fee, the document handling charge and any other statutory charges itemised separately. We pay the government charges on your behalf, in the parties' names, at exactly what you paid us for them — they are not part of our fee. Stamp duty is rounded to the nearest rupee, exactly as the IGR Leave & License calculator does.
 
 ## The process
 
-1. **Enter details** — Property, Owner, Tenant, Terms, Witnesses and Review are the six form steps. Property is open to everyone; the later steps ask for PAN and Aadhaar, so you need to sign in. The term can be up to 60 months, and the deed is in English or Marathi.
+1. **Enter details** — Property, Owner, Tenant, Terms, Witnesses and Review are the six form steps. Property is open to everyone; the later steps ask for PAN numbers, so you need to sign in. The term can be up to 60 months, and the deed is in English or Marathi.
 2. **Invite the other side** — tenant or owner can co-fill their own details from a secure invite.
-3. **File documents** — PAN, Aadhaar, photos, ownership proof and witness details are checked before checkout.
+3. **File documents** — PAN numbers, the owner's Index II and witness details are checked before checkout. Keep your Aadhaar and its registered mobile handy: our staff collect them at the doorstep visit for the OTP and biometric.
 4. **Pay** — service fee plus government charges, itemised. Your request reaches our team only after payment, and once it is submitted the details are locked — changes go through the tracker.
 5. **Review the draft** — Draazy shares a versioned draft. Every party — owner, tenant and each co-owner — must open it and approve it; any party can ask for changes instead.
 6. **Register** — after approval, the registered copy is uploaded back to the request tracker. If a party is an NRI or foreign national, Aadhaar e-registration is not available: we book a Sub-Registrar Office appointment instead, and that party attends with a passport or signs through a registered Power of Attorney.

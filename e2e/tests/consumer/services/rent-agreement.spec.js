@@ -1,6 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
-import { AADHAAR, MOBILE, active, BUILDING_PLACEHOLDER, SOCIETY_PLACEHOLDER, clickNext, fillBuilding, fillOwner, fillProperty, fillTenant, fillTenantPolice, fillTerms, fillWitnesses, inviteOwner, pickLocality, uploadAll } from '../../../helpers/rentAgreementWizard.js';
+import { MOBILE, active, BUILDING_PLACEHOLDER, SOCIETY_PLACEHOLDER, clickNext, expectNoRemovedPartyInputs, fillBuilding, fillIgrProperty, fillOwner, fillProperty, fillTenant, fillTenantPolice, fillTerms, fillWitnesses, inviteOwner, pickLocality, uploadAll } from '../../../helpers/rentAgreementWizard.js';
 import { pickDate } from '../../../helpers/datePicker.helper.js';
 import { shownMobile } from '../../../helpers/liveAuth.js';
 import { signInSheet } from '../../../helpers/signInSheet.js';
@@ -28,7 +28,7 @@ async function login(page, user) {
 }
 
 test.describe('Rent Agreement — revenue flow', () => {
-  test('a mid-fill refresh restores every answer except PAN and Aadhaar and remembers which papers were attached', async ({ page }) => {
+  test('a mid-fill refresh restores every answer except the PAN and remembers which papers were attached', async ({ page }) => {
     test.slow();
     await login(page, BUYER);
     await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
@@ -39,23 +39,21 @@ test.describe('Rent Agreement — revenue flow', () => {
        still on disk, so the reload would restore correct fields parked on the wrong panel. */
     await expect
       .poll(async () => page.evaluate(() => localStorage.getItem('dzDraft:rentAgreement') || ''))
-      .toContain('owner-doc-3.jpg');
+      .toContain('owner-doc-0.jpg');
     const written = await page.evaluate(() => localStorage.getItem('dzDraft:rentAgreement') || '');
     expect(written).toContain('"step":1');
     expect(written).toContain('Anita Verma');
     expect(written).not.toContain('data:image');
     expect(written).not.toContain('ABCDE1234F');
-    expect(written).not.toContain(AADHAAR.owner);
 
     await page.reload({ waitUntil: 'networkidle' });
     await expect(page.getByText('We saved your progress')).toBeVisible();
     const back = active(page);
     await expect(back.getByPlaceholder('As per PAN/Aadhaar')).toHaveValue('Anita Verma');
     await expect(back.getByPlaceholder('ABCDE1234F')).toHaveValue('');
-    await expect(back.getByPlaceholder('12-digit Aadhaar')).toHaveValue('');
-    await expect(page.getByText(/PAN and Aadhaar are never saved on this device/)).toBeVisible();
+    await expectNoRemovedPartyInputs(back);
+    await expect(page.getByText(/PAN numbers are never saved on this device/)).toBeVisible();
     await expect(back.getByText('Re-attach owner-doc-0.jpg')).toBeVisible();
-    await expect(back.getByText('Re-attach owner-doc-3.jpg')).toBeVisible();
 
     await clickNext(page);
     await expect(page.locator('.step-dot').nth(1), 'a re-attach marker is not a paper').toHaveClass(/\bactive\b/);
@@ -73,7 +71,7 @@ test.describe('Rent Agreement — revenue flow', () => {
       localStorage.setItem('dzDraft:rentAgreement', JSON.stringify({
         step: 1,
         aType: 'Residential',
-        prop: { propType: 'Flat / Apartment', furnish: 'Unfurnished', flatNo: 'B-1204', society: 'Skyline Heights', locality: 'Baner', gramPanchayat: false, city: 'Pune', pincode: '411045', area: '' },
+        prop: { propType: 'Flat / Apartment', flatNo: 'B-1204', society: 'Skyline Heights', locality: 'Baner', gramPanchayat: false, city: 'Pune', pincode: '411045', area: '' },
         owner: { oName: 'Anita Verma', oAge: '34', oGender: 'Male', oPan: 'ABCDE1234F', oAadhaar: '123412341234', oMobile: '9811223344', oEmail: '', oAddr: '12, MG Road, Pune 411001' },
         tenants: [{ name: 'Rahul Nair', age: '29', gender: 'Male', occupation: '', relation: '', pan: 'PQRSX6789K', aadhaar: '999988887777', mobile: '9822334455', email: '', addr: '44, FC Road, Pune 411004' }],
         tenantMode: 'fill',
@@ -88,9 +86,12 @@ test.describe('Rent Agreement — revenue flow', () => {
     expect(stored).not.toContain('PQRSX6789K');
     expect(stored).not.toContain('999988887777');
     expect(stored).toContain('Skyline Heights');
+    // Retired fields go with the restore's first (debounced) autosave, not the synchronous identity purge.
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('dzDraft:rentAgreement') || ''), { message: 'fields the wizard no longer asks for are dropped from an old draft' })
+      .not.toMatch(/MG Road|FC Road/);
 
     await expect(active(page).getByPlaceholder('ABCDE1234F')).toHaveValue('');
-    await expect(active(page).getByPlaceholder('12-digit Aadhaar')).toHaveValue('');
+    await expectNoRemovedPartyInputs(active(page));
   });
 
   test('each step refuses incomplete answers, and the review carries identity, deed language and the biometric visit preference', async ({ page }) => {
@@ -102,18 +103,22 @@ test.describe('Rent Agreement — revenue flow', () => {
     await owner.getByPlaceholder('As per PAN/Aadhaar').first().fill('Anita Verma');
     await clickNext(page);
     await expect(page.locator('.step-dot').nth(1)).toHaveClass(/\bactive\b/);
-    await expect(owner.getByText("Enter mother's name.")).toBeVisible();
     await expect(owner.getByText('Choose a valid date of birth for an adult party.')).toBeVisible();
+    await expectNoRemovedPartyInputs(owner);
+    await expect(owner.getByPlaceholder('e.g. 42'), 'age follows the date of birth, never typed').toHaveCount(0);
 
     await fillOwner(page, { next: false });
-    await expect(owner.getByPlaceholder('e.g. 42').first()).toHaveValue('46');
     await clickNext(page, 2);
     await fillTenant(page, { next: false });
-    await expect(active(page).getByPlaceholder('e.g. 29').first()).toHaveValue('31');
+    await expectNoRemovedPartyInputs(active(page));
+    await expect(active(page).getByPlaceholder('e.g. 29')).toHaveCount(0);
     await clickNext(page, 3);
     await fillTerms(page, { next: false });
 
     const t = active(page);
+    for (const removed of ['Notice period', 'Rent due day', 'Utilities paid by', 'Property tax paid by', 'Number of occupants']) {
+      await expect(t.getByText(removed, { exact: false }), `"${removed}" was removed from the terms step`).toHaveCount(0);
+    }
     await expect(t.getByRole('button', { name: 'English', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await t.getByRole('button', { name: 'Marathi (मराठी)' }).click();
     await t.getByRole('button', { name: 'Where', exact: true }).click();
@@ -128,18 +133,21 @@ test.describe('Rent Agreement — revenue flow', () => {
     await clickNext(page);
     await expect(page.locator('.step-dot').nth(4), 'an empty witnesses step does not reach review').toHaveClass(/\bactive\b/);
     await expect(w.getByText("Enter the witness's full name as on their Aadhaar.").first()).toBeVisible();
+    await expect(w.getByPlaceholder('12-digit Aadhaar'), 'witnesses give name, age and mobile only').toHaveCount(0);
+    await expect(w.getByPlaceholder('Full permanent address')).toHaveCount(0);
     await fillWitnesses(page);
 
     const review = active(page);
-    await expect(review.getByRole('button', { name: /Pay ₹[\d,]+ & Submit/ })).toBeVisible();
+    await expect(review.getByRole('button', { name: /Pay ₹[\d,]+\.\d{2} & Submit/ })).toBeVisible();
     await expect(review.getByText('Suresh Patil, Meera Joshi')).toBeVisible();
     await expect(review.getByText('Marathi (मराठी)')).toBeVisible();
     await expect(review.getByText("At the tenant's address · date to be agreed · Evening (4 – 8 pm)")).toBeVisible();
     await expect(review.getByText('Owner identity')).toBeVisible();
-    await expect(review.getByText(/Mother's name: Shaila Verma/)).toBeVisible();
     await expect(review.getByText(/Date of birth: 1980-01-01/)).toBeVisible();
     await expect(review.getByText('Tenant identity')).toBeVisible();
-    await expect(review.getByText(/Mother's name: Latha Nair/)).toBeVisible();
+    await expect(review.getByText(/Date of birth: 1995-01-01/)).toBeVisible();
+    await expect(review.getByText(/Mother's name/)).toHaveCount(0);
+    await expect(review.getByText(/Aadhaar:/)).toHaveCount(0);
   });
 
   test('a tenant can start the agreement and invite the owner to fill only the owner half', async ({ page }) => {
@@ -160,11 +168,8 @@ test.describe('Rent Agreement — revenue flow', () => {
     await expect(t.getByText('Invite the tenant', { exact: true }), 'one side is invited at a time').toHaveCount(0);
     await expect(t.getByPlaceholder('As per PAN/Aadhaar').first(), 'the first tenant is the signed-in requester').toHaveValue(BUYER.name);
     await expect(t.getByPlaceholder('10-digit mobile').first()).toHaveValue(shownMobile(BUYER.mobile));
-    await t.getByPlaceholder('As per identity proof').first().fill('Latha Nair');
     await pickDate(page, '[data-err="t0dob"]', '1995-01-01');
     await t.getByPlaceholder('ABCDE1234F').first().fill('PQRSX6789K');
-    await t.getByPlaceholder('12-digit Aadhaar').first().fill(AADHAAR.tenant);
-    await t.getByPlaceholder('Full permanent address').first().fill('44, FC Road, Pune 411004');
     await fillTenantPolice(page);
     await uploadAll(t, 'tenant-doc');
     await clickNext(page, 3);
@@ -180,7 +185,7 @@ test.describe('Rent Agreement — revenue flow', () => {
     await page.addInitScript(() => {
       localStorage.setItem('dzDraft:rentAgreement', JSON.stringify({
         step: 3,
-        prop: { propType: 'Flat / Apartment', furnish: 'Unfurnished', flatNo: 'B-1204', society: 'Skyline Heights', locality: 'Baner', gramPanchayat: false, city: 'Pune', pincode: '411045', area: '' },
+        prop: { propType: 'Flat / Apartment', flatNo: 'B-1204', society: 'Skyline Heights', locality: 'Baner', gramPanchayat: false, city: 'Pune', pincode: '411045', area: '' },
       }));
     });
     await page.goto(`${BASE}/services/rent-agreement`, { waitUntil: 'networkidle' });
@@ -206,7 +211,7 @@ test.describe('Rent Agreement — revenue flow', () => {
     await pickLocality(page);
     await p.getByRole('button', { name: 'Taluka', exact: true }).click();
     await page.getByRole('option', { name: 'Haveli', exact: true }).click();
-    await p.getByPlaceholder('e.g. Baner, Pune').fill('Baner');
+    await fillIgrProperty(page);
     await page.clock.pauseAt(new Date('2025-01-01T10:05:00Z'));
     await p.getByPlaceholder('e.g. B-1204').fill('B-1204');
     await fillBuilding(page);
@@ -282,7 +287,9 @@ test.describe('Rent Agreement — what the platform already holds is not asked f
     await expect(p.locator('[data-err="locality"]')).toContainText('Kharadi');
     await expect(p.getByPlaceholder('411045')).toHaveValue('411014');
     await expect(p.getByPlaceholder('e.g. 850')).toHaveValue('950');
-    await expect(p.getByRole('button', { name: 'Measured as', exact: true }), 'the listing only gives a built-up figure, so the deed says so').toContainText('Built-up');
+    for (const removed of ['Measured as', 'Furnishing']) {
+      await expect(p.getByText(removed, { exact: false }), `"${removed}" was removed from the property step`).toHaveCount(0);
+    }
   });
 
   test('a ?listing= link fills only the blanks of a restored draft for the same flat', async ({ page }) => {
@@ -291,8 +298,8 @@ test.describe('Rent Agreement — what the platform already holds is not asked f
     await page.addInitScript(() => {
       localStorage.setItem('dzDraft:rentAgreement', JSON.stringify({
         step: 0,
-        prop: { propType: 'Flat / Apartment', furnish: 'Furnished', flatNo: 'A-702', society: 'Kumar Paradise', societyId: '', locality: '', city: 'Pune', pincode: '', area: '' },
-        terms: { startDate: '', months: '11', rent: '30000', deposit: '', nrDeposit: '', increment: '5', lockin: '6', notice: '2', dueDay: '5', payMode: 'Bank Transfer / NEFT' },
+        prop: { propType: 'Flat / Apartment', flatNo: 'A-702', society: 'Kumar Paradise', societyId: '', locality: '', city: 'Pune', pincode: '', area: '' },
+        terms: { startDate: '', months: '11', rent: '30000', deposit: '', nrDeposit: '', increment: '5', lockin: '6' },
       }));
     });
     await page.goto(`${BASE}/services/rent-agreement?listing=${LISTING.id}`, { waitUntil: 'networkidle' });
@@ -301,7 +308,6 @@ test.describe('Rent Agreement — what the platform already holds is not asked f
     await expect(p.getByPlaceholder('e.g. 850'), 'a blank the listing can answer is filled').toHaveValue('950');
     await expect(p.getByPlaceholder('411045')).toHaveValue('411014');
     await expect(p.getByPlaceholder('e.g. B-1204')).toHaveValue('A-702');
-    await expect(p.locator('.dz-dropdown__trigger').nth(1), 'furnishing is the restored answer, not the listing\'s').toHaveText('Furnished');
     await expect
       .poll(async () => page.evaluate(() => localStorage.getItem('dzDraft:rentAgreement') || ''))
       .toContain('"area":"950"');
@@ -316,8 +322,8 @@ test.describe('Rent Agreement — what the platform already holds is not asked f
     await page.addInitScript(() => {
       localStorage.setItem('dzDraft:rentAgreement', JSON.stringify({
         step: 0,
-        prop: { propType: 'Flat / Apartment', furnish: 'Furnished', flatNo: 'B-1204', society: 'Skyline Heights', societyId: '', locality: 'Baner', gramPanchayat: false, city: 'Pune', pincode: '411045', area: '' },
-        terms: { startDate: '', months: '11', rent: '30000', deposit: '', nrDeposit: '', increment: '5', lockin: '6', notice: '2', dueDay: '5', payMode: 'Bank Transfer / NEFT' },
+        prop: { propType: 'Flat / Apartment', flatNo: 'B-1204', society: 'Skyline Heights', societyId: '', locality: 'Baner', gramPanchayat: false, city: 'Pune', pincode: '411045', area: '' },
+        terms: { startDate: '', months: '11', rent: '30000', deposit: '', nrDeposit: '', increment: '5', lockin: '6' },
       }));
     });
     await page.goto(`${BASE}/services/rent-agreement?listing=${LISTING.id}`, { waitUntil: 'networkidle' });

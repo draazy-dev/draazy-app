@@ -188,7 +188,7 @@ public class ServiceRequestDraftApprovals {
         Map<String, Object> state = ServiceRequestPricing.childObject(
                 request.getDetails() == null ? Map.of() : request.getDetails(), "_state");
         String requesterSide = requesterSide(request, state);
-        List<ServiceRequestParty> acceptedParties = parties.findByRequestId(request.getId()).stream().filter(p -> p.getUserId() != null && CoFillParties.ACCEPTED.equals(p.getStatus())).toList();
+        List<ServiceRequestParty> acceptedParties = CoFillParties.joined(parties.findByRequestId(request.getId())).toList();
         List<RequiredApproval> out = new ArrayList<>();
         if ("tenant".equals(requesterSide)) {
             addInline(out, "owner", 0, "Licensor", ServiceRequestPricing.childObject(state, "owner"),

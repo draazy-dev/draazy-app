@@ -121,6 +121,33 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
             assertThat(queue(desk)).doesNotContain(OWNER_AADHAAR, OWNER_PAN, TENANT_AADHAAR);
             assertThat(detail(buyer, id)).doesNotContain(OWNER_AADHAAR, TENANT_AADHAAR);
         }
+
+        @Test
+        @DisplayName("a party reads them masked to the last four; strangers and the desk get 404")
+        void partiesReadMasked() throws Exception {
+            User buyer = customer("9820000340");
+            User stranger = customer("9820000341");
+            User desk = staff("9820000342", Teams.RENTAL);
+            String id = raise(buyer, "rent-agreement", listing(buyer));
+            record(buyer, id, 204);
+
+            String body = mvc.perform(get(Routes.ServiceRequests.MASKED_IDENTITIES, id)
+                            .header(HttpHeaders.AUTHORIZATION, bearer(buyer)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].partyRole").value("owner"))
+                    .andExpect(jsonPath("$[0].pan").value("XXXXXX234F"))
+                    .andExpect(jsonPath("$[0].aadhaar").value("XXXX XXXX 3335"))
+                    .andExpect(jsonPath("$[1].aadhaar").value("XXXX XXXX 6666"))
+                    .andExpect(jsonPath("$[1].pan").doesNotExist())
+                    .andReturn().getResponse().getContentAsString();
+            assertThat(body).doesNotContain(OWNER_AADHAAR, OWNER_PAN, TENANT_AADHAAR);
+
+            for (User outsider : List.of(stranger, desk)) {
+                mvc.perform(get(Routes.ServiceRequests.MASKED_IDENTITIES, id)
+                                .header(HttpHeaders.AUTHORIZATION, bearer(outsider)))
+                        .andExpect(status().isNotFound());
+            }
+        }
     }
 
     @Nested
@@ -178,6 +205,33 @@ class ServiceRequestIdentityTest extends ServiceFixtures {
                     .singleElement().asString()
                     .doesNotContain("ZZZZZ9999Z", "999988887779")
                     .matches("enc:v1:[a-z0-9-]+:\\S+\\|enc:v1:[a-z0-9-]+:\\S+");
+        }
+
+        @Test
+        @DisplayName("an omitted party keeps its numbers only while the same person holds that slot on the form")
+        void omittedPartyOnTheFormKeepsItsNumbers() throws Exception {
+            User buyer = customer("9820000331");
+            User desk = staff("9820000332", Teams.RENTAL);
+            String id = raise(buyer, "rent-agreement", listing(buyer));
+            tenantOnForm(id, "rahul  joshi");
+            record(buyer, id, 204);
+            String ownerOnly = """
+                    {"parties":[{"partyRole":"owner","partyIndex":0,"partyName":"Asha Patil","pan":"ZZZZZ9999Z"}]}""";
+
+            putIdentities(buyer, id, ownerOnly, 204);
+            setStatus(desk, id, "assigned", 200);
+            assertThat(readIdentities(desk, id, 200)).contains("ZZZZZ9999Z", TENANT_AADHAAR);
+
+            tenantOnForm(id, "Neha Kulkarni");
+            putIdentities(buyer, id, ownerOnly, 204);
+            assertThat(readIdentities(desk, id, 200)).contains("ZZZZZ9999Z").doesNotContain(TENANT_AADHAAR);
+        }
+
+        private void tenantOnForm(String id, String name) {
+            em.flush();
+            jdbc.update("update service_requests set details = jsonb_build_object('_state', jsonb_build_object("
+                    + "'tenants', jsonb_build_array(jsonb_build_object('name', ?::text)))) where id = ?::uuid", name, id);
+            em.clear();
         }
 
         @Test

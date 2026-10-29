@@ -96,7 +96,9 @@ export const addServiceRequestDocFromVault = async (id, { documentId, category }
 export const recordServiceRequestIdentities = async (id, parties) =>
   (await provider()).recordServiceRequestIdentities(id, parties);
 
-/** Post a customer message onto a request's thread. Resolves to the updated request. */
+export const readMaskedServiceRequestIdentities = async (id) =>
+  (await provider()).readMaskedServiceRequestIdentities(id);
+
 export const addServiceRequestMessage = async (id, text) =>
   (await provider()).addServiceRequestMessage(id, text);
 

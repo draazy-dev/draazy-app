@@ -223,6 +223,12 @@ export async function recordServiceRequestIdentities(id, parties) {
   await put(`/service-requests/${encodeURIComponent(id)}/identities`, { parties });
 }
 
+export async function readMaskedServiceRequestIdentities(id) {
+  const rows = await get(`/service-requests/${encodeURIComponent(id)}/identities/masked`);
+  return Object.fromEntries((Array.isArray(rows) ? rows : [])
+    .map((r) => [`${r.partyRole}-${r.partyIndex}`, { pan: r.pan || '', aadhaar: r.aadhaar || '' }]));
+}
+
 export async function addServiceRequestMessage(id, text) {
   const body = String(text || '').trim();
   if (!body) return getServiceRequest(id);

@@ -92,6 +92,7 @@ export default function SocietySelect({
       lat: rec.lat ?? place.lat,
       lng: rec.lng ?? place.lng,
       pincode: place.pincode || '',
+      street: place.street || '',
       localityRaw: place.localityRaw || '',
       source,
     });
@@ -161,6 +162,7 @@ export default function SocietySelect({
         lat: d.lat ?? null,
         lng: d.lng ?? null,
         pincode: d.pincode || '',
+        street: d.street || '',
         localityRaw: d.localityRaw || '',
       };
       res = await resolveSociety(place);

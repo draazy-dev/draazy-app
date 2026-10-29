@@ -2,7 +2,7 @@
    the wizard's "Saved to your Documents" badge only follows the server's answer. */
 import { expect, test } from '../../../fixtures/live.js';
 import { API, authHeaders, signedInAsNew } from '../../../helpers/liveAuth.js';
-import { fillBuilding, pickLocality } from '../../../helpers/rentAgreementWizard.js';
+import { fillBuilding, fillIgrProperty, pickLocality } from '../../../helpers/rentAgreementWizard.js';
 
 const PAGE = '/services/rent-agreement';
 // The browser decodes even under-cap originals before uploading them unchanged.
@@ -30,7 +30,7 @@ async function toOwnerStep(page) {
   await p.getByPlaceholder('e.g. 850').fill('850');
   await p.getByRole('button', { name: 'Taluka', exact: true }).click();
   await page.getByRole('option', { name: 'Haveli', exact: true }).click();
-  await p.getByPlaceholder('e.g. Baner, Pune').fill('Baner');
+  await fillIgrProperty(page);
   await page.getByRole('button', { name: 'Next' }).click();
   /* Every panel shares these placeholders, so a Next that refuses to advance would send the upload
      below into the Property panel and fail far from its cause. */
@@ -53,15 +53,15 @@ test.describe('rent-agreement document vault, live', () => {
 
     await page.goto(PAGE);
     await toOwnerStep(page);
-    await uploadOwnerDoc(page, 0, 'live-pan.png');
+    await uploadOwnerDoc(page, 0, 'live-own.png');
     await expect(page.getByText('Saved to your Documents')).toBeVisible({ timeout: 15000 });
     /* An id-set delta survives a vault that already had rows. `fileName` because this reads the
        wire (`DocumentDto.fileName`); `name` is the client's word for it and would be undefined. */
     await expect(async () => {
       const arrived = (await personalVault(mobile)).filter((d) => !beforeIds.has(d.id));
-      expect(arrived, 'the PAN card reached the server-side vault').toHaveLength(1);
-      expect(arrived[0].category).toBe('PAN Card');
-      expect(arrived[0].fileName).toBe('live-pan.jpg');
+      expect(arrived, 'the ownership proof reached the server-side vault').toHaveLength(1);
+      expect(arrived[0].category).toBe('Ownership Proof');
+      expect(arrived[0].fileName).toBe('live-own.jpg');
     }).toPass({ timeout: 15000 });
     /* The other half of "not this browser": a build that filed to the server *and* kept writing
        `draazyDocs:<mobile>` would pass the assertion above, so the absence is stated separately. */
@@ -71,17 +71,13 @@ test.describe('rent-agreement document vault, live', () => {
 
     /* The dedup compares against the rows the server holds, which is the only version of the check
        that means anything on a second device. */
-    const withPan = idsOf(await personalVault(mobile));
-    await uploadOwnerDoc(page, 1, 'live-aadhaar.png');
-    await expect(async () => {
-      expect(await personalVault(mobile), 'the first Aadhaar pick was filed').toHaveLength(withPan.size + 1);
-    }).toPass({ timeout: 15000 });
+    const filed = idsOf(await personalVault(mobile));
+    await expect(page.locator('.step-panel.active input[type="file"]'), 'ownership proof is the only paper a licensor uploads').toHaveCount(1);
 
-    await uploadOwnerDoc(page, 1, 'live-aadhaar.png');
+    await uploadOwnerDoc(page, 0, 'live-own.png');
     await page.waitForTimeout(2000);
     const after = await personalVault(mobile);
-    expect(after, 'the re-pick did not file a second copy').toHaveLength(withPan.size + 1);
-    expect(after.filter((d) => !withPan.has(d.id)).map((d) => d.category)).toEqual(['Aadhaar Card']);
+    expect(after, 'the re-pick did not file a second copy').toHaveLength(filed.size);
   });
 
   test('a paper the vault refused carries no "Saved to your Documents" badge', async ({ page }) => {
@@ -92,7 +88,7 @@ test.describe('rent-agreement document vault, live', () => {
     await page.goto(PAGE);
     await toOwnerStep(page);
     const refused = page.waitForResponse((res) => res.request().method() === 'POST' && /\/me\/documents\/personal$/.test(res.url()));
-    await uploadOwnerDoc(page, 0, 'refused-pan.png');
+    await uploadOwnerDoc(page, 0, 'refused-own.png');
     await refused;
     await expect(page.getByText('Saved to your Documents')).toHaveCount(0);
   });

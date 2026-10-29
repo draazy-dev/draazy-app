@@ -41,6 +41,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
 abstract class ServiceFixtures extends AbstractApiTest {
+    static final String IGR_PROP_FIELDS = "\"landmark\":\"Near D-Mart\",\"policeStation\":\"Chaturshringi\","
+            + "\"roadVicinity\":\"On main road\",\"roadType\":\"Tar road\"";
 
     @Autowired
     UserRepository users;
@@ -280,5 +282,12 @@ abstract class ServiceFixtures extends AbstractApiTest {
                         .param("category", category)
                         .header(HttpHeaders.AUTHORIZATION, bearer(caller)))
                 .andExpect(status().is(expected));
+    }
+
+    void nriParties(String id) {
+        jdbc.update("update service_requests set details = coalesce(details, '{}'::jsonb) || jsonb_build_object("
+                + "'_state', jsonb_build_object('owner', jsonb_build_object('residency', 'nri'),"
+                + " 'tenants', jsonb_build_array(jsonb_build_object('residency', 'nri')))) where id = ?::uuid", id);
+        em.clear();
     }
 }

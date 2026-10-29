@@ -10,11 +10,14 @@ import com.draazy.api.security.AccountPermissions;
 import com.draazy.api.security.AuthPrincipal;
 import com.draazy.api.security.Roles;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -110,7 +113,20 @@ public class ServiceRequestIdentityService {
         return rows.stream().map(ServiceRequestIdentityDto::of).toList();
     }
 
-    // Blank the numbers held against a request that has finished, and say so on the timeline.
+    @Transactional(readOnly = true)
+    public List<MaskedIdentityDto> maskedForParty(AuthPrincipal caller, String id) {
+        ServiceRequest request = Ids.parseUuid(id).flatMap(requests::findById)
+                .orElseThrow(() -> NotFoundException.of("Service request"));
+        if (!caller.userId().equals(request.getRequesterId())
+                && acceptedRoles(request.getId(), caller.userId()).isEmpty()) {
+            throw NotFoundException.of("Service request");
+        }
+        return identities.findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(request.getId()).stream()
+                .filter(ServiceRequestIdentity::isHeld)
+                .map(MaskedIdentityDto::of)
+                .toList();
+    }
+
     @Transactional
     public int purgeFor(UUID serviceRequestId) {
         List<ServiceRequestIdentity> rows =
@@ -223,7 +239,41 @@ public class ServiceRequestIdentityService {
         if (bodySlots.stream().anyMatch(coFillSlots::contains)) {
             throw new ConflictException("the invited party records their own identity numbers");
         }
-        return identities.findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(request.getId()).stream().map(row -> new Slot(row.getPartyRole(), row.getPartyIndex())).filter(slot -> !coFillSlots.contains(slot) && (ownsOwnerSide || !"owner".equals(slot.role()))).collect(Collectors.toSet());
+        Map<String, String> onForm = ServiceRequestTypes.RENT_AGREEMENT.equals(request.getType()) ? formParties(request) : Map.of();
+        return identities.findByServiceRequestIdOrderByPartyRoleAscPartyIndexAsc(request.getId()).stream()
+                .filter(row -> bodySlots.contains(new Slot(row.getPartyRole(), row.getPartyIndex()))
+                        || !samePerson(onForm.get(row.getPartyRole() + "-" + row.getPartyIndex()), row.getPartyName()))
+                .map(row -> new Slot(row.getPartyRole(), row.getPartyIndex()))
+                .filter(slot -> !coFillSlots.contains(slot) && (ownsOwnerSide || !"owner".equals(slot.role())))
+                .collect(Collectors.toSet());
+    }
+
+    private static boolean samePerson(String onForm, String recorded) {
+        String a = onForm == null ? "" : onForm.trim().replaceAll("\\s+", " ");
+        return !a.isEmpty() && recorded != null && a.equalsIgnoreCase(recorded.trim().replaceAll("\\s+", " "));
+    }
+
+    static Map<String, String> formParties(ServiceRequest request) {
+        Map<String, Object> state = ServiceRequestPricing.childObject(request.getDetails() == null ? Map.of() : request.getDetails(), "_state");
+        Map<String, String> slots = new HashMap<>();
+        slots.put("owner-0", text(ServiceRequestPricing.childObject(state, "owner").get("oName")));
+        Map<String, Object> wit = ServiceRequestPricing.childObject(state, "wit");
+        slots.put("witness-0", text(wit.get("w1Name")));
+        slots.put("witness-1", text(wit.get("w2Name")));
+        slots.put("tenant-0", "");
+        List<?> coOwners = state.get("coOwners") instanceof List<?> rows ? rows : List.of();
+        List<?> tenants = state.get("tenants") instanceof List<?> rows ? rows : List.of();
+        IntStream.range(0, coOwners.size()).forEach(i -> slots.put("owner-" + (i + 1), name(coOwners.get(i))));
+        IntStream.range(0, tenants.size()).forEach(i -> slots.put("tenant-" + i, name(tenants.get(i))));
+        return slots;
+    }
+
+    private static String name(Object row) {
+        return row instanceof Map<?, ?> map ? text(map.get("name")) : "";
+    }
+
+    private static String text(Object value) {
+        return value == null ? "" : value.toString();
     }
 
     private Set<Slot> purgedSlots(UUID requestId) {
@@ -244,7 +294,7 @@ public class ServiceRequestIdentityService {
     private record Slot(String role, int index) {
     }
 
-    private static void validateDistinctNumbers(Collection<?> rows) {
+    static void validateDistinctNumbers(Collection<?> rows) {
         Set<String> aadhaars = new HashSet<>();
         Set<String> pans = new HashSet<>();
         for (Object row : rows) {

@@ -6,10 +6,10 @@ import { MOBILE } from '../../../helpers/rentAgreementWizard.js';
 
 const BASE = process.env.BASE_URL || 'http://localhost:5173';
 const BUYER = { name: 'Anita Verma', mobile: MOBILE.owner, email: '', role: 'buyer', joinedAt: Date.now() };
-const PROP = { propType: 'Flat / Apartment', furnish: 'Unfurnished', flatNo: 'B-1204', society: 'Skyline Heights', locality: 'Baner', gramPanchayat: false, city: 'Pune', taluka: 'Haveli', villageCity: 'Baner', pincode: '411045', area: '' };
-const TERMS = { startDate: '', months: '11', rent: '20000', deposit: '100000', nrDeposit: '', increment: '5', lockin: '6', notice: '2', dueDay: '5', payMode: 'Bank Transfer / NEFT' };
+const PROP = { propType: 'Flat / Apartment', flatNo: 'B-1204', society: 'Skyline Heights', locality: 'Baner', gramPanchayat: false, city: 'Pune', taluka: 'Haveli', pincode: '411045', area: '' };
+const TERMS = { startDate: '', months: '11', rent: '20000', deposit: '100000', nrDeposit: '', increment: '5', lockin: '6' };
 
-const rupees = (text) => Number(String(text).replace(/[^\d]/g, ''));
+const rupees = (text) => Number(String(text).replace(/[^\d.]/g, ''));
 
 test('a free rent agreement from referrals strikes the Draazy fee but keeps government charges', async ({ page }) => {
   let remaining = 0;

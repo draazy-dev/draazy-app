@@ -8,7 +8,6 @@ import java.util.Map;
 
 final class PartyIdentityRules {
 
-    private static final int MAX_TEXT = 80;
     private static final int MIN_AGE = 18;
     private static final int MAX_AGE = 150;
 
@@ -17,20 +16,17 @@ final class PartyIdentityRules {
 
     static void check(Map<String, Object> state, List<Map<?, ?>> coOwners, List<Map<?, ?>> tenants,
             LocalDate today, List<String> problems) {
-        row(ServiceRequestPricing.childObject(state, "owner"), "_state.owner", "oMother", "oDob", "oAlias",
-                "oAge", today, problems);
+        row(ServiceRequestPricing.childObject(state, "owner"), "_state.owner", "oDob", "oAge", today, problems);
         for (int i = 0; i < coOwners.size(); i++) {
-            row(coOwners.get(i), "_state.coOwners[" + i + "]", "mother", "dob", "alias", "age", today, problems);
+            row(coOwners.get(i), "_state.coOwners[" + i + "]", "dob", "age", today, problems);
         }
         for (int i = 0; i < tenants.size(); i++) {
-            row(tenants.get(i), "_state.tenants[" + i + "]", "mother", "dob", "alias", "age", today, problems);
+            row(tenants.get(i), "_state.tenants[" + i + "]", "dob", "age", today, problems);
         }
     }
 
-    private static void row(Map<?, ?> row, String path, String motherKey, String dobKey, String aliasKey,
-            String ageKey, LocalDate today, List<String> problems) {
-        bounded(row.get(motherKey), path + "." + motherKey, problems);
-        bounded(row.get(aliasKey), path + "." + aliasKey, problems);
+    private static void row(Map<?, ?> row, String path, String dobKey, String ageKey, LocalDate today,
+            List<String> problems) {
         if (!stated(row.get(dobKey))) {
             return;
         }
@@ -47,12 +43,6 @@ final class PartyIdentityRules {
             if (statedAge != null && statedAge.intValue() != age) {
                 problems.add(path + "." + ageKey + " must match " + path + "." + dobKey);
             }
-        }
-    }
-
-    private static void bounded(Object raw, String path, List<String> problems) {
-        if (stated(raw) && raw.toString().trim().length() > MAX_TEXT) {
-            problems.add(path + " must be at most " + MAX_TEXT + " characters");
         }
     }
 

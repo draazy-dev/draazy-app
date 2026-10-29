@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +35,10 @@ class CoFillParties {
     static final String DECLINED = "declined";
 
     static final Duration PENDING_INVITE_TTL = Duration.ofDays(90);
+
+    static Stream<ServiceRequestParty> joined(List<ServiceRequestParty> all) {
+        return all.stream().filter(p -> p.getUserId() != null && ACCEPTED.equals(p.getStatus()));
+    }
 
     private final ServiceRequestPartyRepository parties;
     private final ServiceRequestRepository requests;

@@ -113,6 +113,7 @@ export default function TenantPoliceRecord({ tenant, index, setTenant, errors = 
           <Field className="sm:col-span-2" label={t('services.ra.tenant.police.workIdProofType')} required={workRequired} error={errors[`${prefix}WorkIdProofType`] && t('services.ra.tenant.police.required')}>
             <input maxLength={80} value={police.workIdProofType || ''} onChange={(e) => set('workIdProofType', e.target.value)} className={fieldClass(`${prefix}WorkIdProofType`)} placeholder={t('services.ra.tenant.police.workIdPlaceholder')} />
           </Field>
+          {workRequired && <div className="sm:col-span-2">{proofUpload('workidproof')}</div>}
         </div>
         <div>
           <div className="flex items-center justify-between gap-3 mb-2">

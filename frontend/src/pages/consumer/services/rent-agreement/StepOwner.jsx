@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import NativeSelect from '../../../../components/ui/NativeSelect.jsx';
 import Icon from '../../../../components/Icon.jsx';
 import MobileField from '../../../../components/MobileField.jsx';
-import IdInput from '../../../../components/IdInput.jsx';
+import PartyIdInput from './PartyIdInput.jsx';
 import Field from '../../../../components/ui/Field.jsx';
 import { COMMERCIAL_ROUTE, MAX_LICENSORS } from './constants.js';
 import { pickDoc } from './helpers.js';
@@ -14,7 +14,7 @@ import UploadBox from './UploadBox.jsx';
 import IdentityReminderNote from './IdentityReminderNote.jsx';
 import PartyIdentityFields from './PartyIdentityFields.jsx';
 
-export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, addCoOwner, removeCoOwner, errors, fc, clearErr, ownerDocs, setOwnerDocs, vaultEnabled, onDocSaved, canInvite, ownerMode, chooseOwnerMode, invite, setInvite, identityReminders }) {
+export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, addCoOwner, removeCoOwner, errors, fc, clearErr, ownerDocs, setOwnerDocs, vaultEnabled, onDocSaved, canInvite, ownerMode, chooseOwnerMode, invite, setInvite, identityReminders, masked, held }) {
   const { t } = useTranslation();
   const today = todayIst();
   const why = (k, fallback) => t(errors[k] === 'dup' ? dupMessageKey(k) : fallback);
@@ -61,7 +61,7 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
           </NativeSelect>
         </Field>
         <Field label={t('services.ra.party.residency')}>
-          <NativeSelect value={owner.residency || 'resident'} onChange={(e) => { setO('residency', e.target.value); setOwnerDocs((d) => { const next = { ...d }; delete next['o-aadhaar']; delete next['o-passport']; delete next['o-visa']; return next; }); clearErr('residency'); }} className={fc('residency')}>
+          <NativeSelect value={owner.residency || 'resident'} onChange={(e) => { setO('residency', e.target.value); setOwnerDocs((d) => { const next = { ...d }; delete next['o-passport']; delete next['o-visa']; return next; }); clearErr('residency'); }} className={fc('residency')}>
             {['resident', 'nri', 'foreign'].map((r) => <option key={r} value={r}>{t(`services.ra.party.residencyOpt.${r}`)}</option>)}
           </NativeSelect>
         </Field>
@@ -75,25 +75,16 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
           <div className="sm:col-span-2 rounded-xl border border-sky-400/20 bg-sky-500/10 p-3 text-xs text-sky-100 leading-relaxed">{t('services.ra.party.offlineNote')}</div>
         )}
         <Field label={t('services.ra.owner.fullName')} required error={errors.oName && t('services.ra.owner.fullNameErr')}><input value={owner.oName} onChange={(e) => { setO('oName', e.target.value); clearErr('oName'); }} className={fc('oName')} placeholder={t('services.ra.owner.fullNamePlaceholder')} /></Field>
-        <PartyIdentityFields mother={owner.oMother} dob={owner.oDob} alias={owner.oAlias} age={owner.oAge} setMother={(v) => setO('oMother', v)} setDob={(v) => setO('oDob', v)} setAlias={(v) => setO('oAlias', v)} setAge={(v) => setO('oAge', v)} keys={{ mother: 'oMother', dob: 'oDob', alias: 'oAlias', age: 'oAge' }} errors={errors} clearErr={clearErr} />
-        <div className="grid grid-cols-2 gap-3">
-          <Field label={t('services.ra.owner.age')} required error={errors.oAge && (t(errors.oAge === 'match' ? 'services.ra.err.ageDob' : 'services.ra.err.adult'))}><input inputMode="numeric" value={owner.oAge} onChange={(e) => { setO('oAge', e.target.value.replace(/\D/g, '')); clearErr('oAge'); }} className={fc('oAge')} placeholder={t('services.ra.owner.agePlaceholder')} /></Field>
-          <Field label={t('services.ra.owner.gender')}><NativeSelect value={owner.oGender} onChange={(e) => setO('oGender', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm"><option value="">{t('services.ra.owner.genderPlaceholder')}</option>{['Male', 'Female', 'Other'].map((o) => <option key={o}>{o}</option>)}</NativeSelect></Field>
-        </div>
-        <Field label={t('services.ra.owner.pan')} required error={errors.oPan && why('oPan', 'services.ra.owner.panErr')}><IdInput kind="pan" value={owner.oPan} onChange={(v) => { setO('oPan', v); clearErr('oPan'); }} className={fc('oPan')} placeholder="ABCDE1234F" /></Field>
-        {offline ? (
+        <PartyIdentityFields dob={owner.oDob} setDob={(v) => setO('oDob', v)} setAge={(v) => setO('oAge', v)} keys={{ dob: 'oDob', age: 'oAge' }} errors={errors} clearErr={clearErr} />
+        <Field label={t('services.ra.owner.pan')} required error={errors.oPan && why('oPan', 'services.ra.owner.panErr')}><PartyIdInput masked={masked?.['owner-0']?.pan} held={held} kind="pan" value={owner.oPan} onChange={(v) => { setO('oPan', v); clearErr('oPan'); }} className={fc('oPan')} placeholder="ABCDE1234F" /></Field>
+        {offline && (
           <>
             <Field label={t('services.ra.party.passport')} required error={errors.passport && t('services.ra.party.passportErr')}><input maxLength={20} value={owner.passport || ''} onChange={(e) => { setO('passport', e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')); clearErr('passport'); }} className={fc('passport')} placeholder={t('services.ra.party.passportPlaceholder')} /></Field>
             {owner.residency === 'foreign' && <Field label={t('services.ra.party.visaOci')} required error={errors.visaOci && t('services.ra.party.visaOciErr')}><input maxLength={40} value={owner.visaOci || ''} onChange={(e) => { setO('visaOci', e.target.value); clearErr('visaOci'); }} className={fc('visaOci')} placeholder={t('services.ra.party.visaOciPlaceholder')} /></Field>}
             {owner.residency === 'foreign' && <Field label={t('services.ra.party.frro')}><input maxLength={40} value={owner.frro || ''} onChange={(e) => setO('frro', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={t('services.ra.party.frroPlaceholder')} /></Field>}
           </>
-        ) : (
-          <Field label={t('services.ra.owner.aadhaar')} required error={errors.oAadhaar && why('oAadhaar', 'services.ra.owner.aadhaarErr')}><IdInput kind="aadhaar" value={owner.oAadhaar} onChange={(v) => { setO('oAadhaar', v); clearErr('oAadhaar'); }} className={fc('oAadhaar')} placeholder={t('services.ra.owner.aadhaarPlaceholder')} /></Field>
         )}
         <Field label={t('services.ra.owner.mobile')} required error={errors.oMobile && why('oMobile', errors.oMobile === 'notOwner' ? 'services.ra.owner.mobileNotYou' : 'services.ra.owner.mobileErr')}><MobileField value={owner.oMobile} onChange={(v) => { setO('oMobile', v); clearErr('oMobile'); }} error={!!errors.oMobile} placeholder={t('services.ra.owner.mobilePlaceholder')} inputClassName="px-4 py-3" /></Field>
-        <Field label={t('services.ra.owner.email')} error={errors.oEmail && t('services.ra.err.email')}><input type="email" value={owner.oEmail} onChange={(e) => { setO('oEmail', e.target.value); clearErr('oEmail'); }} className={fc('oEmail')} placeholder="you@example.com" /></Field>
-        <Field label={t('services.ra.tenant.occupation')}><input value={owner.oOccupation || ''} onChange={(e) => setO('oOccupation', e.target.value)} className="field w-full px-4 py-3 rounded-xl text-white text-sm" placeholder={t('services.ra.owner.occupationPlaceholder')} /></Field>
-        <Field className="sm:col-span-2" label={t('services.ra.owner.address')} required error={errors.oAddr && t('services.ra.owner.addressErr')}><textarea rows={2} value={owner.oAddr} onChange={(e) => { setO('oAddr', e.target.value); clearErr('oAddr'); }} className={fc('oAddr') + ' resize-none'} placeholder={t('services.ra.owner.addressPlaceholder')} /></Field>
         <Field className="sm:col-span-2" label={t('services.ra.owner.capacity')} error={errors.capacity && t('services.ra.owner.capacityErr')}>
           <NativeSelect value={capacities.includes(owner.capacity) ? owner.capacity : capacities[0]} onChange={(e) => { setO('capacity', e.target.value); clearErr('capacity'); }} className={fc('capacity')}>
             {capacities.map((c) => <option key={c} value={c}>{t(`services.ra.owner.capacityOpt.${c}`)}</option>)}
@@ -132,7 +123,7 @@ export default function StepOwner({ step, owner, setO, coOwners, setCoOwner, add
         <p className="text-gray-500 text-xs mb-3">{t('services.ra.owner.coOwners.hint')}</p>
         <div className="space-y-5">
           {coOwners.map((c, i) => (
-            <CoOwnerBlock key={i} index={i} row={c} set={(k, v) => setCoOwner(i, k, v)} remove={() => removeCoOwner(i)} errors={errors} fc={fc} clearErr={clearErr} ownerDocs={ownerDocs} setOwnerDocs={setOwnerDocs} today={today} />
+            <CoOwnerBlock key={i} index={i} row={c} set={(k, v) => setCoOwner(i, k, v)} remove={() => removeCoOwner(i)} errors={errors} fc={fc} clearErr={clearErr} ownerDocs={ownerDocs} setOwnerDocs={setOwnerDocs} today={today} masked={masked?.[`owner-${i + 1}`]} held={held} />
           ))}
         </div>
         {coOwners.length < MAX_LICENSORS - 1 && (

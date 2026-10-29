@@ -667,6 +667,7 @@ public final class Routes {
         public static final String CHECKLIST_ITEM = CHECKLIST + "/{category}";
 
         public static final String IDENTITIES = BY_ID + "/identities";
+        public static final String MASKED_IDENTITIES = IDENTITIES + "/masked";
 
         public static final String DRAFT = BY_ID + "/draft";
 

@@ -96,7 +96,7 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     await panel.getByRole('button', { name: /^Pay/ }).click();
     const refused = await checkout;
     expect(refused.request().postDataJSON(), 'the accepted declaration travels with the checkout')
-      .toEqual({ declaration: 'ra-decl-2026-09' });
+      .toEqual({ declaration: 'ra-decl-2026-10' });
     expect(refused.status(), 'the click reached the server checkout').toBe(409);
     await expect(page.getByText(/not ready for payment yet/)).toBeVisible();
     await expect(panel.getByRole('button', { name: /^Pay/ })).toBeEnabled();
@@ -122,7 +122,7 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const created = page.waitForResponse((r) => isCreate(r.request()));
     await payAndSubmit(page);
     const requestId = (await (await created).json()).id;
-    await expect(page.getByText(/couldn't send the PAN and Aadhaar details/)).toBeVisible();
+    await expect(page.getByText(/couldn't send the PAN details/)).toBeVisible();
 
     await page.reload({ waitUntil: 'networkidle' });
     await page.getByTestId('ra-continue-filed').click();
@@ -206,7 +206,7 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const created = page.waitForResponse((r) => r.request().method() === 'POST' && /\/service-requests\/co-fill$/.test(new URL(r.url()).pathname));
     await active(page).getByRole('button', { name: /Generate Agreement & Proceed/ }).click();
     const requestId = (await (await created).json()).id;
-    await expect(page.getByText(/couldn't send the PAN and Aadhaar details/)).toBeVisible();
+    await expect(page.getByText(/couldn't send the PAN details/)).toBeVisible();
 
     const other = await (await browser.newContext()).newPage();
     await signedInAs(other, ownerMobile);
@@ -279,25 +279,21 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const savedToVault = page.waitForResponse(
       (r) => r.request().method() === 'POST' && /\/me\/documents\/personal$/.test(new URL(r.url()).pathname),
     );
-    await o.locator('input[type="file"]').nth(0).setInputFiles({ name: 'live-pan.png', mimeType: 'image/png', buffer: PNG });
-    expect((await savedToVault).ok(), 'the first owner paper was saved to the vault').toBe(true);
+    await o.locator('input[type="file"]').nth(0).setInputFiles({ name: 'live-own.png', mimeType: 'image/png', buffer: PNG });
+    expect((await savedToVault).ok(), 'the ownership proof was saved to the vault').toBe(true);
     await expect(o.getByText('Saved to your Documents')).toBeVisible({ timeout: 15000 });
     await expect
       .poll(async () => page.evaluate(() => {
         const draft = JSON.parse(localStorage.getItem('dzDraft:rentAgreement') || '{}');
-        return draft.docRefs?.owner?.['o-pan'] || null;
+        return draft.docRefs?.owner?.['o-own'] || null;
       }), { timeout: 10000 })
-      .toMatchObject({ fileName: 'live-pan.jpg', fromVault: true });
+      .toMatchObject({ fileName: 'live-own.jpg', fromVault: true });
     /* A vault row carries a signed URL, not bytes, so the reload proves the slot is held by id. */
     await page.reload({ waitUntil: 'networkidle' });
-    await expect(o.getByText('live-pan.jpg')).toBeVisible();
+    await expect(o.getByText('live-own.jpg')).toBeVisible();
     await expect(o.getByText('From your Documents')).toBeVisible();
 
-    const inputs = o.locator('input[type="file"]');
-    for (let i = 1; i < 4; i++) {
-      await inputs.nth(i).setInputFiles({ name: `owner-doc-${i}.png`, mimeType: 'image/png', buffer: PNG });
-      await expect(o.getByText(`owner-doc-${i}.jpg`)).toBeVisible();
-    }
+    await expect(o.locator('input[type="file"]'), 'ownership proof is the only paper a licensor uploads').toHaveCount(1);
     await fillOwner(page, { docs: false });
     await inviteTenant(page, uniqueMobile());
     await fillTerms(page);
@@ -317,6 +313,6 @@ test.describe('Rent Agreement — reuse what the platform holds, live', () => {
     const read = await fetch(`${API}/service-requests/${requestId}`, { headers: await authHeaders(ownerMobile) });
     expect(read.status).toBe(200);
     const docs = (await read.json()).documents || [];
-    expect(docs.map((d) => d.category), 'the PAN is on the request under its slot').toContain(category);
+    expect(docs.map((d) => d.category), 'the ownership proof is on the request under its slot').toContain(category);
   });
 });
