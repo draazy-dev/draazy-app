@@ -7,6 +7,7 @@ import { myContactRequests } from '../../../services/contactService.js';
 import { listDocRequests } from '../../../services/documentService.js';
 import { listMyGroupApplications, myRequests } from '../../../services/flatmateService.js';
 import { myPhotoRequests } from '../../../services/photoRequestService.js';
+import { listServiceRequests } from '../../../services/serviceRequestService.js';
 import {
   listMyPropertyReviews, getPropertyReview, markPropertyReviewRead, addPropertyReviewMessage,
 } from '../../../services/propertyReviewService.js';
@@ -83,8 +84,12 @@ export function useDashboardData({ user, toast, ownsProperty }) {
     !!user?.mobile,
   );
 
-  // The document request inbox is a seam read, owner-scoped by the session, so like the contact inbox below it takes
-  // its own effect rather than the synchronous localStorage read the panels above use.
+  const [serviceReqs, , , , , refreshServiceReqs] = useAsyncList(
+    () => listServiceRequests('rental'),
+    [user],
+    !!user?.mobile,
+  );
+
   const [docReqs, , , , , refreshDocReqs] = useAsyncList(
     () => listDocRequests(user.mobile),
     [user],
@@ -201,12 +206,13 @@ export function useDashboardData({ user, toast, ownsProperty }) {
   const refreshRequests = useCallback(() => {
     refreshData();
     refreshFlatmateReqs();
+    refreshServiceReqs();
     if (!ownerReads) return;
     refreshContactReqs();
     refreshPhotoReqs();
     refreshDocReqs();
     refreshApps();
-  }, [ownerReads, refreshApps, refreshContactReqs, refreshData, refreshDocReqs, refreshFlatmateReqs, refreshPhotoReqs]);
+  }, [ownerReads, refreshApps, refreshContactReqs, refreshData, refreshDocReqs, refreshFlatmateReqs, refreshPhotoReqs, refreshServiceReqs]);
 
   const lastVisibleRefresh = useRef(0);
   useEffect(() => {
@@ -247,7 +253,7 @@ export function useDashboardData({ user, toast, ownsProperty }) {
 
   return {
     listings, listingsLoaded, visits, recent, recommended, alertMatches,
-    contactReqs, photoReqs, flatmateReqs, docReqs,
+    contactReqs, photoReqs, flatmateReqs, docReqs, serviceReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
     apps, mutateVisit, openReview, sendReview,
     busyIds, refreshData, refreshRequests, setListings,

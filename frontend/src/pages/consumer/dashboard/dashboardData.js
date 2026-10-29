@@ -116,6 +116,7 @@ export function buildActionItems({
   reviewsByProp,
   scheduledVisits = [],
   flatmateReqs = [],
+  serviceReqs = [],
   userId,
   go,
   openReview,
@@ -171,6 +172,10 @@ export function buildActionItems({
       title: `Visit to confirm${v.listing ? ' ? ' + v.listing : ''}`,
       at: v.at || v.createdAt,
     });
+  });
+  serviceReqs.filter((r) => r.status === 'action_required' && r.attention?.forYou).forEach((r) => {
+    const who = r.details?.property || 'Your rent agreement';
+    actionItems.push({ id: `agreement:${r.id}`, kind: 'agreement', who, title: `Correction needed · ${who}`, at: r.attention.askedAt });
   });
 
   const STALE_MS = 2 * 86400000;

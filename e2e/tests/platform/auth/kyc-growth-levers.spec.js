@@ -4,12 +4,18 @@ import { API, authHeaders, signedInAsNew, grantIdentityBadge, fileIdentityCase }
 // Owns the dashboard badge CTA (ADR-019, badge-not-gate); the profile surface belongs to `verify-funnel.spec.js`.
 const badgeCta = (page) => page.getByTestId('verify-badge-cta');
 
-test('an unverified user sees the opt-in badge CTA on the dashboard', async ({ page }) => {
+test('on a phone the badge CTA is one compact tap row with no "Optional" tag', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await signedInAsNew(page);
   await page.goto('/dashboard');
 
-  await expect(badgeCta(page)).toBeVisible();
-  await expect(badgeCta(page).getByText('Optional', { exact: false })).toBeVisible();
+  const cta = badgeCta(page);
+  await expect(cta).toContainText('Get your KYC badge');
+  await expect(cta).toContainText('Rank higher and get faster replies.');
+  await expect(cta).not.toContainText(/optional/i);
+  const [card, btn, title] = [await cta.boundingBox(), await cta.getByText('Verify', { exact: true }).boundingBox(), await cta.getByText('Get your KYC badge').boundingBox()];
+  expect(btn.y, 'Verify sits beside the title, not on its own line').toBeLessThan(title.y + title.height);
+  expect(card.height, 'the card stays a compact row').toBeLessThan(110);
 });
 
 test('the CTA retires the moment a reviewer confirms', async ({ page }) => {

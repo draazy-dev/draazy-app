@@ -60,7 +60,7 @@ test.afterEach(async ({ request }) => {
   createdListingIds.clear();
 });
 
-test('the overview shows the optional Verified badge nudge before profile completion', async ({ page }) => {
+test('the overview shows the Verified badge nudge before profile completion', async ({ page }) => {
   const seeker = await newActor(`Zztest Dashboard Seeker ${letterTag()}`, {
     email: `dashboard-${Date.now()}@example.test`,
     city: 'Pune',
@@ -71,7 +71,6 @@ test('the overview shows the optional Verified badge nudge before profile comple
 
   await expect(page.getByTestId('action-center-clear')).toBeVisible();
   await expect(page.getByTestId('verify-badge-cta')).toBeVisible();
-  await expect(page.getByTestId('verify-badge-cta')).toContainText(/optional/i);
   await expect(page.getByTestId('profile-meter')).toHaveCount(0);
 });
 

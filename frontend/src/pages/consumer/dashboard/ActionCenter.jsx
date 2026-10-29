@@ -1,6 +1,6 @@
 import Icon from '../../../components/Icon.jsx';
 import { timeAgo } from '../../../lib/format.js';
-import { Card, SectionHead } from './components.jsx';
+import { Card } from './components.jsx';
 
 const STALE_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -15,13 +15,13 @@ function isStale(at) {
   return !!at && Date.now() - at > STALE_MS;
 }
 
-function AgePill({ at }) {
+function Age({ at }) {
   if (!at) return null;
   if (isStale(at)) {
     const days = Math.max(1, Math.round((Date.now() - at) / 86400000));
-    return <span className="dz-tag flex-shrink-0 bg-rose-500/15 font-bold text-rose-300">{days}d waiting</span>;
+    return <span className="whitespace-nowrap text-[11px] font-bold text-rose-300">{days}d waiting</span>;
   }
-  return <span className="flex-shrink-0 whitespace-nowrap text-[11px] text-gray-500">{timeAgo(at)}</span>;
+  return <span className="whitespace-nowrap text-[11px] text-gray-500">{timeAgo(at)}</span>;
 }
 
 const GROUPS = [
@@ -31,6 +31,7 @@ const GROUPS = [
   { key: 'documents', kinds: ['doc'], label: 'Document requests', icon: 'folder-check', tone: 'teal', to: 'leads-documents' },
   { key: 'visits', kinds: ['visit'], label: 'Visits to confirm', icon: 'calendar-check', tone: 'indigo', to: 'visits' },
   { key: 'listings', kinds: ['clarify', 'message'], label: 'Listings need you', icon: 'alert-circle', tone: 'rose', to: 'properties' },
+  { key: 'agreements', kinds: ['agreement'], label: 'Rent agreement', icon: 'file-pen-line', tone: 'amber', to: 'rent-agreement' },
 ];
 
 function groupItems(items) {
@@ -68,22 +69,19 @@ export default function ActionCenter({ items = [], onOpen }) {
   }
 
   return (
-    <Card className="p-5 sm:p-6" data-testid="action-center">
-      <SectionHead
-        icon="bell"
-        iconCls="text-amber-400"
-        title="Needs your attention"
-        sub="Tap to review and respond."
-        action={
-          <span className="dz-tag bg-amber-500/15 font-semibold text-amber-300">
-            {items.length} pending
-          </span>
-        }
-      />
-      <div className="-mx-3 divide-y divide-white/[0.05]">
+    <section data-testid="action-center" aria-labelledby="action-center-title">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 id="action-center-title" className="flex min-w-0 items-center gap-2 text-base font-bold text-white">
+          <Icon name="bell" className="h-5 w-5 flex-shrink-0 text-amber-400" aria-hidden="true" />
+          <span className="truncate">Needs your attention</span>
+        </h2>
+        <span className="dz-tag bg-amber-500/15 font-semibold text-amber-300">{items.length} pending</span>
+      </div>
+      <div className="grid gap-2.5 lg:grid-cols-2">
         {groupItems(items).map((g) => {
           const lead = g.items[0];
           const stale = isStale(lead.at);
+          const tone = TONES[g.tone] || TONES.teal;
           const open = g.items.length === 1 && lead.open ? lead.open : () => onOpen?.(g.to);
           return (
             <button
@@ -92,30 +90,25 @@ export default function ActionCenter({ items = [], onOpen }) {
               data-testid="action-item"
               data-group={g.key}
               onClick={open}
-              className={
-                'relative flex min-h-[56px] w-full items-center gap-3.5 rounded-xl py-3 pl-4 pr-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50 ' +
-                (stale ? 'bg-rose-500/[0.05] hover:bg-rose-500/[0.08]' : 'hover:bg-white/[0.03]')
-              }
+              className="glass-card relative flex min-h-[68px] w-full items-center gap-3 overflow-hidden rounded-2xl p-3.5 text-left transition-colors hover:border-teal-400/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 sm:px-4"
             >
-              {stale ? (
-                <span aria-hidden="true" className="absolute left-0 top-1/2 h-9 w-[3px] -translate-y-1/2 rounded-full bg-rose-400" />
-              ) : null}
-              <span className={'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ' + (TONES[g.tone] || TONES.teal)}>
-                <Icon name={g.icon} className="h-5 w-5" />
+              {stale ? <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-rose-400" /> : null}
+              <span className={'flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ' + tone}>
+                <Icon name={g.icon} className="h-5 w-5" aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="truncate text-sm font-semibold text-white">{g.label}</span>
-                  <span className="dz-tag flex-shrink-0 bg-white/10 font-bold text-white" data-testid="action-count">{g.items.length}</span>
-                </span>
-                <span className="block truncate text-xs text-gray-400">{summary(g.items)}</span>
+                <span className="block truncate text-sm font-semibold text-white">{g.label}</span>
+                <span className="mt-0.5 block truncate text-xs text-gray-400">{summary(g.items)}</span>
               </span>
-              <AgePill at={lead.at} />
+              <span className="flex flex-shrink-0 flex-col items-end gap-1">
+                <span className={'dz-count ' + tone} data-testid="action-count">{g.items.length}</span>
+                <Age at={lead.at} />
+              </span>
               <Icon name="chevron-right" className="h-4 w-4 flex-shrink-0 text-gray-500" aria-hidden="true" />
             </button>
           );
         })}
       </div>
-    </Card>
+    </section>
   );
 }

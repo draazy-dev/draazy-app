@@ -98,6 +98,8 @@ test('Action Center count, Requests rows and nav badge agree for mixed pending l
   for (const group of ['numbers', 'photos', 'documents']) {
     await expect(actionCenter.locator(`[data-group="${group}"] [data-testid="action-count"]`)).toHaveText('1');
   }
+  const tiles = await actionCenter.getByTestId('action-item').evaluateAll((els) => els.map((el) => el.classList.contains('glass-card')));
+  expect(tiles, 'each request type is its own tile').toEqual([true, true, true]);
   await expect(page.locator('aside button', { hasText: 'Requests' }).first()).toContainText('3');
 
   await page.locator('aside button', { hasText: 'Requests' }).first().click();

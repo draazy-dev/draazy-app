@@ -20,6 +20,7 @@ export const TAB_ALIAS = {
   'leads-flatmate': { tab: 'leads', sub: 'flatmate' },
   saved: { link: '/saved' },
   messages: { link: '/messages' },
+  'rent-agreement': { link: '/services/rent-agreement' },
   recent: { tab: 'activity', sub: 'recent' },
   alerts: { tab: 'activity', sub: 'alerts' },
   groups: { tab: 'activity', sub: 'groups' },

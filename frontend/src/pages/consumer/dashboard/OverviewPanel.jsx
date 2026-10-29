@@ -117,25 +117,20 @@ function VerifyPending({ submittedAt, t }) {
 
 function VerifyNudge({ onStart, t }) {
   return (
-    <Card className="relative overflow-hidden p-5 sm:p-6" data-testid="verify-badge-cta">
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-br from-emerald-500/10 via-transparent to-transparent" />
-      <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3.5">
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
-            <Icon name="shield-check" className="h-5 w-5 text-emerald-400" />
-          </div>
-          <div className="min-w-0">
-            <p className="flex flex-wrap items-center gap-2 text-sm font-semibold text-white sm:text-base">
-              {t('verify.overviewTitle')}
-              <span className="dz-tag bg-white/[0.06] font-semibold uppercase tracking-wide text-gray-400">{t('verify.overviewOptional')}</span>
-            </p>
-            <p className="mt-1 text-xs text-gray-400 sm:text-sm">{t('verify.overviewBody')}</p>
-          </div>
-        </div>
-        <button type="button" onClick={onStart} data-testid="verify-badge-btn" className="btn-teal inline-flex min-h-[44px] flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-5 py-2.5 text-sm font-semibold">
-          <Icon name="shield-check" className="h-4 w-4" /> {t('verify.overviewCta')}
-        </button>
-      </div>
+    <Card className="relative overflow-hidden transition-colors hover:border-emerald-400/30" data-testid="verify-badge-cta">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent" />
+      <button type="button" onClick={onStart} data-testid="verify-badge-btn" className="relative flex min-h-[72px] w-full items-center gap-3.5 rounded-2xl p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/60 sm:p-5">
+        <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/15">
+          <Icon name="shield-check" className="h-5 w-5 text-emerald-400" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-white sm:text-base">{t('verify.overviewTitle')}</span>
+          <span className="mt-0.5 block text-xs text-gray-400 sm:text-sm">{t('verify.overviewBody')}</span>
+        </span>
+        <span className="btn-teal inline-flex h-9 flex-shrink-0 items-center gap-1 rounded-xl px-3.5 text-xs font-semibold">
+          {t('verify.overviewCta')} <Icon name="arrow-right" className="h-3.5 w-3.5" aria-hidden="true" />
+        </span>
+      </button>
     </Card>
   );
 }

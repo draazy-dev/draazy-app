@@ -75,7 +75,7 @@ export default function Dashboard() {
 
   const {
     listings, listingsLoaded, visits, recent, recommended, alertMatches,
-    contactReqs, photoReqs, flatmateReqs, docReqs,
+    contactReqs, photoReqs, flatmateReqs, docReqs, serviceReqs,
     reviewProp, setReviewProp, reviewInput, setReviewInput, reviewsByProp, reviewThread,
     apps, mutateVisit, openReview, sendReview,
     dataStatus, dataError, retryData,
@@ -143,7 +143,7 @@ export default function Dashboard() {
   const scheduledVisits = useMemo(() => visits.filter((v) => v.status === 'scheduled'), [visits]);
   const actionItems = buildActionItems({
     isOwner, contactReqs, apps, photoReqs, pendingDocGroups, listings, reviewsByProp,
-    scheduledVisits, flatmateReqs, userId: user?.id, openReview, go,
+    scheduledVisits, flatmateReqs, serviceReqs, userId: user?.id, openReview, go,
   });
   const attentionCounts = attentionFromItems(actionItems);
 
@@ -188,9 +188,6 @@ export default function Dashboard() {
           <h1 className="text-2xl sm:text-3xl font-bold text-white">Hi, {firstName(user)} <span className="inline-block">👋</span></h1>
           <p className="text-gray-400 text-sm mt-1">Here's your Draazy activity.</p>
         </div>
-        {/* Mobile section switcher — one row that opens a full sheet of all sections, so nothing (and no attention
-           badge) is hidden behind a horizontal scroll. */}
-
         <MobileNav
           groups={dashboardGroups}
           activeTab={tab}
