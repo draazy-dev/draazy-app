@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { listSaved, listSavedKeys, saveProperty, unsaveProperty } from '../services/savedService.js';
 import { useAuth } from './AuthContext.jsx';
-import { FLATMATE_SAVES_CHANGED, listFlatmateSaveKeys } from '../services/flatmateService.js';
 
 const SavedContext = createContext(null);
 
@@ -9,10 +8,7 @@ const ITEMS_PAGE_SIZE = 100;
 const FOREGROUND_RELOAD_MS = 30000;
 
 export function SavedProvider({ children }) {
-  const { isIn, user } = useAuth();
-  const [flatmateIds, setFlatmateIds] = useState(() => new Set());
-  const [flatmateStatus, setFlatmateStatus] = useState('loading');
-  // routing token (slug || uuid) -> uuid, because the writes take the uuid
+  const { isIn } = useAuth();
   const [keys, setKeys] = useState(() => new Map());
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(isIn ? 'loading' : 'ready');
@@ -22,44 +18,6 @@ export function SavedProvider({ children }) {
   const busyRef = useRef(new Set());
   const lastForegroundReload = useRef(0);
   const writes = useRef(0);
-
-  useEffect(() => {
-    setFlatmateIds(new Set());
-    setFlatmateStatus(isIn ? 'loading' : 'ready');
-    if (!isIn) return undefined;
-    let alive = true;
-    let request = 0;
-    let lastRefresh = 0;
-    const refresh = async () => {
-      const current = ++request;
-      lastRefresh = Date.now();
-      try {
-        const rows = await listFlatmateSaveKeys();
-        if (!alive || current !== request) return;
-        setFlatmateIds(new Set(rows.map((row) => `${row.kind}:${row.id}`)));
-        setFlatmateStatus('ready');
-      } catch (err) {
-        if (alive && current === request) {
-          setFlatmateStatus('error');
-          console.warn('[saved] flatmate save keys failed', err);
-        }
-      }
-    };
-    const changed = () => { void refresh(); };
-    const foreground = () => {
-      if (document.visibilityState !== 'hidden' && Date.now() - lastRefresh >= FOREGROUND_RELOAD_MS) void refresh();
-    };
-    window.addEventListener(FLATMATE_SAVES_CHANGED, changed);
-    window.addEventListener('focus', foreground);
-    document.addEventListener('visibilitychange', foreground);
-    void refresh();
-    return () => {
-      alive = false;
-      window.removeEventListener(FLATMATE_SAVES_CHANGED, changed);
-      window.removeEventListener('focus', foreground);
-      document.removeEventListener('visibilitychange', foreground);
-    };
-  }, [isIn, user?.id, user?.mobile]);
 
   useEffect(() => { keysRef.current = keys; }, [keys]);
 
@@ -187,8 +145,8 @@ export function SavedProvider({ children }) {
   }, [loadAll]);
 
   const value = useMemo(
-    () => ({ ids, count: ids.size, totalCount: status === 'ready' && flatmateStatus === 'ready' ? ids.size + flatmateIds.size : null, loading, status, error, busyIds, has, save, unsave, toggle, reload, refresh: reload }),
-    [ids, flatmateIds, flatmateStatus, loading, status, error, busyIds, has, save, unsave, toggle, reload],
+    () => ({ ids, count: ids.size, loading, status, error, busyIds, has, save, unsave, toggle, reload, refresh: reload }),
+    [ids, loading, status, error, busyIds, has, save, unsave, toggle, reload],
   );
   return <SavedContext.Provider value={value}>{children}</SavedContext.Provider>;
 }
@@ -248,7 +206,6 @@ export function useSavedItems({ size = ITEMS_PAGE_SIZE } = {}) {
 const EMPTY = {
   ids: new Set(),
   count: 0,
-  totalCount: 0,
   loading: false,
   status: 'ready',
   error: null,

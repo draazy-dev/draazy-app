@@ -8,7 +8,6 @@ import { useCity } from '../../context/CityContext.jsx';
 import { useAppFlags } from '../../context/AppFlagsContext.jsx';
 import { useCompare } from '../../context/CompareContext.jsx';
 import { useConversationUnread } from '../../context/ConversationContext.jsx';
-import { useSaved } from '../../context/SavedContext.jsx';
 import { TOPBAR_SCROLL } from '../../lib/chrome.js';
 import { firstName, initial, roleLabel } from '../../lib/auth.js';
 import { setAppPrefs } from '../../lib/localPrefs.js';
@@ -24,7 +23,6 @@ export default function Navbar() {
   const { city, setCity, openRequest, cities } = useCity();
   const { flagEnabled } = useAppFlags();
   const { count: compareCount } = useCompare();
-  const saved = useSaved();
   const { unread: chatUnread, pendingRequests } = useConversationUnread();
   const light = useIsLightTheme();
   const location = useLocation();
@@ -42,7 +40,6 @@ export default function Navbar() {
   const cityRef = useRef(null);
   const acctRef = useRef(null);
   const acctDrawerRef = useRef(null);
-  const savedCount = isIn ? saved.totalCount : 0;
   const chatBadge = isIn ? chatUnread : 0;
   const requestBadge = isIn ? pendingRequests : 0;
   const messagesLabel = requestBadge > 0 ? `Messages, ${requestBadge} pending ${requestBadge === 1 ? 'request' : 'requests'}` : 'Messages';
@@ -296,7 +293,6 @@ export default function Navbar() {
               <>
                 <Link to="/saved" className="dz-topbar__action tap-target tap-extend relative inline-flex items-center justify-center p-2 rounded-xl hover:bg-white/5 transition-all duration-300 group" title="Saved" aria-label="Saved properties">
                   <Icon name="heart" className="w-5 h-5 text-gray-300 group-hover:text-white transition-colors" />
-                  {savedCount > 0 && <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-gradient-to-br from-orange-500 to-orange-400 rounded-full flex items-center justify-center text-[10px] font-bold text-white shadow-lg shadow-orange-500/30">{savedCount}</span>}
                 </Link>
                 <NotificationBell />
                 {flagEnabled('inAppMessaging') && (

@@ -10,7 +10,7 @@ import PropChip from './PropChip.jsx';
 import { useTargetCard } from './useTargetCard.js';
 
 const draftKey = (userId, threadId) => `dzMsgDraft:${userId || 'anon'}:${threadId}`;
-const finePointer = () => typeof matchMedia === 'function' && matchMedia('(hover: hover) and (pointer: fine)').matches;
+const INPUT_MAX_HEIGHT = 120;
 const hasPrivateContact = (text) =>
   /(^|[^\d])(?:\+?91[\s.-]*|0[\s.-]*)?[6-9](?:[\s.-]*\d){9}(?![\s.-]*\d)/.test(text)
   || /[^\s@]+@[^\s@]+\.[^\s@]+/.test(text);
@@ -85,7 +85,10 @@ export default function Thread({
     const el = inputRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+    el.style.overflowY = 'hidden';
+    const full = el.scrollHeight + el.offsetHeight - el.clientHeight;
+    el.style.height = `${Math.min(full, INPUT_MAX_HEIGHT)}px`;
+    if (full > INPUT_MAX_HEIGHT) el.style.overflowY = 'auto';
   };
   useEffect(resize, [draft]);
 
@@ -220,7 +223,7 @@ export default function Thread({
               {replyTo ? <div className="pc-reply-bar"><span>{replyTo.text}</span><button type="button" onClick={() => setReplyTo(null)} aria-label="Cancel reply"><Icon name="x" className="w-4 h-4" /></button></div> : null}
               <input ref={fileRef} type="file" accept="image/jpeg,image/png" className="sr-only" onChange={pickPhoto} />
               <button type="button" className="pc-icon-btn pc-attach" onClick={() => fileRef.current?.click()} aria-label={t('misc.msgAttachPhoto')}><Icon name="paperclip" className="w-5 h-5" /></button>
-              <textarea ref={inputRef} className="pc-input" value={draft} onChange={(e) => changeDraft(e.target.value)} onInput={resize} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && finePointer()) { e.preventDefault(); send(); } }} rows={1} enterKeyHint="send" placeholder={t('misc.msgTypeMessage')} aria-label={t('misc.msgTypeMessage')} />
+              <textarea ref={inputRef} className="pc-input" value={draft} onChange={(e) => changeDraft(e.target.value)} onInput={resize} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); } }} rows={1} enterKeyHint="send" placeholder={t('misc.msgTypeMessage')} aria-label={t('misc.msgTypeMessage')} />
               <button className="pc-send" disabled={!draft.trim()} onClick={() => send()} aria-label={t('misc.msgSendMessage')}><Icon name="send" className="w-5 h-5" /></button>
             </div>
             {preview ? (

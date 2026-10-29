@@ -621,16 +621,14 @@ export default function PropertyReviewModal({ review, setReview, onRefresh, onEd
                     <textarea
                       value={msg}
                       onChange={(e) => setMsg(e.target.value)}
-                      onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') reviewSend(false); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); reviewSend(false); } }}
                       rows={2}
                       aria-label="Message to the owner"
                       placeholder={'Share a note, or ask for a clarification to hand the listing back for correction\u2026'}
                       className="block w-full resize-none bg-transparent text-sm leading-relaxed text-white outline-none placeholder:text-gray-500"
                     />
                     <div className="mt-2 flex flex-wrap items-center justify-end gap-2">
-                      <span className="mr-auto hidden text-[11px] text-gray-500 sm:inline">Ctrl + Enter to send</span>
-                      {/* The server refuses a hand-back once the listing is published, so the button only shows
-                          while it awaits us. A staff-posted listing is refused too, but not visible here. */}
+                      <span className="mr-auto hidden text-[11px] text-gray-500 sm:inline">Enter to send · Shift + Enter for a new line</span>
                       <button
                         type="button"
                         onClick={() => reviewSend(true)}

@@ -47,6 +47,34 @@ test.describe('Mobile inbox + saved', () => {
     }, { message: 'with the bar gone the composer drops onto the keyboard' }).toBeLessThanOrEqual(1);
   });
 
+  test('Messages composer sends on Enter on touch and shows a scrollbar only once the text outgrows it', async ({ page, login }) => {
+    await seed(page);
+    await login.asBuyer();
+    await page.setViewportSize(MOBILE);
+    await page.goto(`/messages?c=${THREAD}`);
+    const input = page.locator('.pc-input');
+    const overflows = () => input.evaluate((el) => ({
+      clipped: el.scrollHeight > el.clientHeight,
+      overflowY: getComputedStyle(el).overflowY,
+    }));
+
+    await input.fill('hie');
+    expect(await overflows()).toEqual({ clipped: false, overflowY: 'hidden' });
+
+    await input.press('Shift+Enter');
+    await input.pressSequentially('second line');
+    expect(await overflows(), 'two lines grow the box instead of scrolling it').toEqual({ clipped: false, overflowY: 'hidden' });
+
+    await input.fill(Array.from({ length: 12 }, (_, i) => `line ${i}`).join('\n'));
+    await expect.poll(async () => (await overflows()).overflowY).toBe('auto');
+
+    const text = `Enter sends ${Date.now()}`;
+    await input.fill(text);
+    await input.press('Enter');
+    await expect(page.locator('.pc-bubble.me').last()).toContainText(text);
+    await expect(input).toHaveValue('');
+  });
+
   test('Messages is edge-to-edge and Saved tabs fit one row on mobile, with no console errors, while desktop keeps its footer', async ({ page, login }) => {
     test.slow();
     const errors = trackErrors(page);

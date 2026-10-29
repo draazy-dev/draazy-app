@@ -49,21 +49,9 @@ export const flatmatePulse = async () => (await provider()).flatmatePulse();
 
 export const listFlatmateSaves = async (params) => (await provider()).listFlatmateSaves(params);
 export const listFlatmateSaveKeys = async () => (await provider()).listFlatmateSaveKeys();
-/** Idempotent. A second tap on an already-saved post is not an error. */
-export const FLATMATE_SAVES_CHANGED = 'dz:flatmate-saves-changed';
-export const saveFlatmatePost = async (kind, id) => {
-  await (await provider()).saveFlatmatePost(kind, id);
-  window.dispatchEvent(new Event(FLATMATE_SAVES_CHANGED));
-};
-/** Idempotent. Succeeds with or without an existing row. */
-export const unsaveFlatmatePost = async (kind, id) => {
-  await (await provider()).unsaveFlatmatePost(kind, id);
-  window.dispatchEvent(new Event(FLATMATE_SAVES_CHANGED));
-};
+export const saveFlatmatePost = async (kind, id) => (await provider()).saveFlatmatePost(kind, id);
+export const unsaveFlatmatePost = async (kind, id) => (await provider()).unsaveFlatmatePost(kind, id);
 
-/* ─── Ops: verification, moderation, group applications ─────────────────────────────────────── */
-
-/** The host-verification queue. `{ status, flagged, page, size }`, all optional. Paged. */
 export const listFlatmateReviews = async (params) => (await provider()).listFlatmateReviews(params);
 export const decideFlatmateReview = async (id, decision, note, checks) => (await provider()).decideFlatmateReview(id, decision, note, checks);
 export const getFlatmateReviewDocumentUrl = async (id) => (await provider()).getFlatmateReviewDocumentUrl(id);

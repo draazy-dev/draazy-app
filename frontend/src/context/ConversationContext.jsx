@@ -7,9 +7,11 @@ import { CONNECTION_KINDS, isPending } from '../pages/consumer/requests/requestM
 import { useAuth } from './AuthContext.jsx';
 
 const ConversationContext = createContext(null);
+const STAFF_ROLES = new Set(['admin', 'manager', 'staff']);
 
 export function ConversationProvider({ children }) {
-  const { isIn } = useAuth();
+  const { isIn, role } = useAuth();
+  const hasInbox = isIn && !STAFF_ROLES.has(role);
   const [unread, setUnread] = useState(0);
   const [pendingRequests, setPendingRequests] = useState(0);
   const [streamConnected, setStreamConnected] = useState(false);
@@ -32,7 +34,7 @@ export function ConversationProvider({ children }) {
   }, [isIn]);
 
   const refreshRequests = useCallback(async () => {
-    if (!isIn) {
+    if (!hasInbox) {
       setPendingRequests(0);
       return;
     }
@@ -42,7 +44,7 @@ export function ConversationProvider({ children }) {
     } catch {
       setPendingRequests(0);
     }
-  }, [isIn]);
+  }, [hasInbox]);
 
   useEffect(() => {
     refreshRequests();

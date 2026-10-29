@@ -229,42 +229,15 @@ test('saved rooms, groups and flatmate posts open their own detail pages', async
   expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
 });
 
-test('header saved count includes homes and flatmates and tracks confirmed removals', async ({ page, consoleErrors }) => {
+test('header saved heart carries no count badge', async ({ page, consoleErrors }) => {
   const { mobile, headers } = await actor();
   const { buy } = await pickListings();
   await shortlist(headers, buy);
-  const sourceHeaders = await authHeaders(ACTORS.buyer);
-  const response = await api('/me/flatmate-saves/keys', sourceHeaders);
-  expect(response.status).toBe(200);
-  const keys = await response.json();
-  expect(keys.length).toBeGreaterThan(0);
-  for (const { kind, id } of keys) {
-    const saved = await api(`/me/flatmate-saves/${kind}/${id}`, headers, { method: 'PUT' });
-    expect(saved.status).toBe(204);
-  }
-  const total = buy.length + keys.length;
   await openSaved(page, mobile);
-  const cards = page.getByTestId('saved-card');
-  await expect(cards).toHaveCount(total);
-  const badge = page.locator('nav').getByRole('link', { name: 'Saved properties', exact: true }).locator('span');
-  await expect(badge).toHaveText(String(total));
-  await page.getByRole('button', { name: /^Flatmates\b/ }).click();
-  await expect(cards).toHaveCount(keys.length);
-  await cards.first().getByRole('button', { name: 'Remove from saved' }).click();
-  const undo = page.getByRole('button', { name: /Undo removing/ });
-  await expect(undo).toBeVisible();
-  await expect(badge).toHaveText(String(total));
-  await undo.click();
-  await expect(cards).toHaveCount(keys.length);
-  const link = cards.first().locator('.saved-row-link');
-  const detailUrl = await link.getAttribute('href');
-  await cards.first().getByRole('button', { name: 'Remove from saved' }).click();
-  await expect(badge).toHaveText(String(total - 1), { timeout: 15000 });
-  const [, kind, id] = detailUrl.match(/\/flatmates\/(room|post|group)\/([^/?#]+)/);
-  const board = { room: ['rooms', 'r'], post: ['people', 's'], group: ['teams', 'g'] }[kind];
-  await page.goto(`/flatmates?view=${board[0]}`);
-  await page.locator(`[data-sf-id="${board[1]}:${id}"] .save-btn`).click();
-  await expect(badge).toHaveText(String(total));
+  await expect(page.getByTestId('saved-card')).toHaveCount(buy.length);
+  const heart = page.locator('nav').getByRole('link', { name: 'Saved properties', exact: true });
+  await expect(heart).toBeVisible();
+  await expect(heart.locator('span')).toHaveCount(0);
   expect(consoleErrors, consoleErrors.join('\n')).toEqual([]);
 });
 
